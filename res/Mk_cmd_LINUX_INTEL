@@ -1,0 +1,14 @@
+#
+# Pathnames for AOPP Cluster
+# 
+FORTCOMP        = gfortran -O -c
+LINK            = gfortran -O
+LIBLINK         = ar rvu
+INCCDF_PATH     = /usr/include/
+LIBCDF_PATH     = /usr/lib/
+LIBCDF_NAME     = netcdff
+OMPARG          = -fopenmp -fPIC
+
+LIBSUFFIX       = a
+
+.SUFFIXES: $(SUFFIXES) .f90
