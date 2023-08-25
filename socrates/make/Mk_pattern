@@ -1,0 +1,10 @@
+#
+# Pattern Matching Rules
+#
+%.o : %.mod
+
+%.o : %.f
+	$(FORTCOMP) $<
+
+%.o : %.f90
+	$(FORTCOMP) $<

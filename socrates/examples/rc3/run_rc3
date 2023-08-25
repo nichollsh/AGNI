@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# Script to run the test case RC3 at reduced angular resolution
+#
+resrm rc3
+Crun_mono -B rc3 -G 5 0 -e +R +S 1 9 0 3 -S -T -Z 19 -F R
+diff -q rc3_ref.radn rc3.radn || exit 1
+resrm rc3
+echo OK
+exit 0

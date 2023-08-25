@@ -1,3 +1,10 @@
+# Socrates files
+currentlw.*
+currentsw.*
+profile.*
+
+
+# Misc files
 .DS_Store
 *.log
 radiation_code.lock

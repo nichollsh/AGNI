@@ -1,0 +1,268 @@
+#!/bin/bash
+
+# Create ice optical property parametrisations using Pade fits to the
+# equivalent spherical radius. This uses a database provided by Anthony Baran
+# of optical properties against Ice Water Mixing ratio and Number density
+# using 2-moment output from the CASIM microphysics scheme. The optical
+# properties in the database have been calculated using an ensemble model
+# of ice-crystal habits. The optical properties for a given equivalent
+# spherical radius therefore represent the assumed particle shape for that
+# size.
+
+# Initialise error status (to test for output differences)
+ierr=0
+
+# Create a parametrisation based on Anthony Baran's ensemble model
+# calculations for CASIM 2-moment output.
+
+ver="2022"
+database_path="$RAD_DATA/cloud"
+
+# Reduce the original database to a binned version:
+# reduce_casim_ice \
+#   /data/users/frba/CASIM21/ens_tot_sol_ir_62531_casim_${ver}.dat \
+#   scatter_ice_casim_${ver}
+# database_path=.
+
+
+# Parametrise thin averaging as type 12
+# -------------------------------------
+rm -f fit_ice_casim_${ver}_sw_ga9 mon_ice_casim_${ver}_sw_ga9
+Cscatter_average \
+  -s $RAD_DATA/spectra/ga9/sp_sw_ga9 -P 1 -w -S $RAD_DATA/solar/lean_12 \
+  -f 20 fit_ice_casim_${ver}_sw_ga9 mon_ice_casim_${ver}_sw_ga9 917 \
+  ${database_path}/scatter_ice_casim_${ver}
+
+rm -f fit_ice_casim_${ver}_lw_ga9 mon_ice_casim_${ver}_lw_ga9
+Cscatter_average -s $RAD_DATA/spectra/ga9/sp_lw_ga9 -P 1 -w -p 250 \
+  -f 20 fit_ice_casim_${ver}_lw_ga9 mon_ice_casim_${ver}_lw_ga9 917 \
+  ${database_path}/scatter_ice_casim_${ver}
+
+rm -f fit_ice_casim_${ver}_sw_cloud9 mon_ice_casim_${ver}_sw_cloud9
+Cscatter_average \
+  -s $RAD_DATA/spectra/ga7/sp_sw_cloud7 -P 1 -w -S $RAD_DATA/solar/lean_12 \
+  -f 20 fit_ice_casim_${ver}_sw_cloud9 mon_ice_casim_${ver}_sw_cloud9 917 \
+  ${database_path}/scatter_ice_casim_${ver}
+
+rm -f fit_ice_casim_${ver}_lw_cloud9 mon_ice_casim_${ver}_lw_cloud9
+Cscatter_average -s $RAD_DATA/spectra/ga7/sp_lw_cloud7 -P 1 -w -p 250 \
+  -f 20 fit_ice_casim_${ver}_lw_cloud9 mon_ice_casim_${ver}_lw_cloud9 917 \
+  ${database_path}/scatter_ice_casim_${ver}
+
+# Parametrise thick averaging as type 13
+# --------------------------------------
+rm -f fit_thick_ice_casim_${ver}_sw_ga9 mon_thick_ice_casim_${ver}_sw_ga9
+Cscatter_average \
+  -s $RAD_DATA/spectra/ga9/sp_sw_ga9 -P 1 -t -S $RAD_DATA/solar/lean_12 \
+  -f 20 fit_thick_ice_casim_${ver}_sw_ga9 \
+        mon_thick_ice_casim_${ver}_sw_ga9 917 \
+  ${database_path}/scatter_ice_casim_${ver}
+
+rm -f fit_thick_ice_casim_${ver}_lw_ga9 mon_thick_ice_casim_${ver}_lw_ga9
+Cscatter_average -s $RAD_DATA/spectra/ga9/sp_lw_ga9 -P 1 -t -p 250 \
+  -f 20 fit_thick_ice_casim_${ver}_lw_ga9 \
+        mon_thick_ice_casim_${ver}_lw_ga9 917 \
+  ${database_path}/scatter_ice_casim_${ver}
+
+rm -f fit_thick_ice_casim_${ver}_sw_cloud9 mon_thick_ice_casim_${ver}_sw_cloud9
+Cscatter_average \
+  -s $RAD_DATA/spectra/ga7/sp_sw_cloud7 -P 1 -t -S $RAD_DATA/solar/lean_12 \
+  -f 20 fit_thick_ice_casim_${ver}_sw_cloud9 \
+        mon_thick_ice_casim_${ver}_sw_cloud9 917 \
+  ${database_path}/scatter_ice_casim_${ver}
+
+rm -f fit_thick_ice_casim_${ver}_lw_cloud9 mon_thick_ice_casim_${ver}_lw_cloud9
+Cscatter_average -s $RAD_DATA/spectra/ga7/sp_lw_cloud7 -P 1 -t -p 250 \
+  -f 20 fit_thick_ice_casim_${ver}_lw_cloud9 \
+        mon_thick_ice_casim_${ver}_lw_cloud9 917 \
+  ${database_path}/scatter_ice_casim_${ver}
+
+# Plot the fits:
+# python ../../python/cloud_fits.py mon_ice_casim_${ver}_sw_ga9 1026
+# python ../../python/cloud_fits.py mon_ice_casim_${ver}_lw_ga9 1026
+
+# python ../../python/cloud_optics.py fit_ice_casim_${ver}_sw_ga9
+# python ../../python/cloud_optics.py fit_ice_casim_${ver}_lw_ga9
+
+# Add the fits to the ga9 spectral files:
+# ---------------------------------------
+rm -f sp_sw_ga9_casim_${ver}*
+prep_spec <<EOF > prep_spec_sw_ga9_casim_log
+$RAD_DATA/spectra/ga9/sp_sw_ga9
+n
+sp_sw_ga9_casim_${ver}
+12
+12
+fit_ice_casim_${ver}_sw_ga9
+12
+13
+fit_thick_ice_casim_${ver}_sw_ga9
+-1
+EOF
+
+rm -f sp_lw_ga9_casim_${ver}*
+prep_spec <<EOF > prep_spec_lw_ga9_casim_log
+$RAD_DATA/spectra/ga9/sp_lw_ga9
+n
+sp_lw_ga9_casim_${ver}
+12
+12
+fit_ice_casim_${ver}_lw_ga9
+12
+13
+fit_thick_ice_casim_${ver}_lw_ga9
+-1
+EOF
+
+rm -f sp_sw_cloud9_casim_${ver}*
+prep_spec <<EOF > prep_spec_sw_cloud9_casim_log
+$RAD_DATA/spectra/ga7/sp_sw_cloud7
+n
+sp_sw_cloud9_casim_${ver}
+12
+9
+r
+12
+12
+fit_ice_casim_${ver}_sw_cloud9
+12
+13
+fit_thick_ice_casim_${ver}_sw_cloud9
+-1
+EOF
+
+rm -f sp_lw_cloud9_casim_${ver}*
+prep_spec <<EOF > prep_spec_lw_cloud9_casim_log
+$RAD_DATA/spectra/ga7/sp_lw_cloud7
+n
+sp_lw_cloud9_casim_${ver}
+12
+9
+r
+12
+12
+fit_ice_casim_${ver}_lw_cloud9
+12
+13
+fit_thick_ice_casim_${ver}_lw_cloud9
+-1
+EOF
+
+# Add the fits to the ga7 spectral files:
+# ---------------------------------------
+rm -f sp_sw_ga7_casim_${ver}*
+prep_spec <<EOF > prep_spec_sw_ga7_casim_log
+$RAD_DATA/spectra/ga7/sp_sw_ga7
+n
+sp_sw_ga7_casim_${ver}
+12
+9
+r
+12
+10
+r
+12
+12
+fit_ice_casim_${ver}_sw_ga9
+12
+13
+fit_thick_ice_casim_${ver}_sw_ga9
+-1
+EOF
+
+rm -f sp_lw_ga7_casim_${ver}*
+prep_spec <<EOF > prep_spec_lw_ga7_casim_log
+$RAD_DATA/spectra/ga7/sp_lw_ga7
+n
+sp_lw_ga7_casim_${ver}
+12
+9
+r
+12
+10
+r
+12
+12
+fit_ice_casim_${ver}_lw_ga9
+12
+13
+fit_thick_ice_casim_${ver}_lw_ga9
+-1
+EOF
+
+rm -f sp_sw_cloud7_casim_${ver}*
+prep_spec <<EOF > prep_spec_sw_cloud7_casim_log
+$RAD_DATA/spectra/ga7/sp_sw_cloud7
+n
+sp_sw_cloud7_casim_${ver}
+12
+9
+r
+12
+12
+fit_ice_casim_${ver}_sw_cloud9
+12
+13
+fit_thick_ice_casim_${ver}_sw_cloud9
+-1
+EOF
+
+rm -f sp_lw_cloud7_casim_${ver}*
+prep_spec <<EOF > prep_spec_lw_cloud7_casim_log
+$RAD_DATA/spectra/ga7/sp_lw_cloud7
+n
+sp_lw_cloud7_casim_${ver}
+12
+9
+r
+12
+12
+fit_ice_casim_${ver}_lw_cloud9
+12
+13
+fit_thick_ice_casim_${ver}_lw_cloud9
+-1
+EOF
+
+# Test the ouput parametrisations against KGO
+(diff -q ga9_casim_${ver}/sp_sw_ga9_casim_${ver} sp_sw_ga9_casim_${ver} && \
+ diff -q ga9_casim_${ver}/sp_sw_cloud9_casim_${ver} \
+                          sp_sw_cloud9_casim_${ver} && \
+ echo 'Matched ifort SW GA9 output') || \
+(diff -q ga9_casim_${ver}/sp_sw_ga9_gfortran sp_sw_ga9_casim_${ver} && \
+ echo 'Matched gfortran SW GA9 output') || \
+ierr=1
+(diff -q ga9_casim_${ver}/sp_lw_ga9_casim_${ver} sp_lw_ga9_casim_${ver} && \
+ diff -q ga9_casim_${ver}/sp_lw_cloud9_casim_${ver} \
+                          sp_lw_cloud9_casim_${ver} && \
+ echo 'Matched ifort LW GA9 output') || \
+(diff -q ga9_casim_${ver}/sp_lw_ga9_gfortran sp_lw_ga9_casim_${ver} && \
+ echo 'Matched gfortran LW GA9 output') || \
+ierr=1
+
+(diff -q ga7_casim_${ver}/sp_sw_ga7_casim_${ver} sp_sw_ga7_casim_${ver} && \
+ diff -q ga7_casim_${ver}/sp_sw_cloud7_casim_${ver} \
+                          sp_sw_cloud7_casim_${ver} && \
+ echo 'Matched ifort SW GA7 output') || \
+(diff -q ga7_casim_${ver}/sp_sw_ga7_gfortran sp_sw_ga7_casim_${ver} && \
+ echo 'Matched gfortran SW GA7 output') || \
+ierr=1
+(diff -q ga7_casim_${ver}/sp_lw_ga7_casim_${ver} sp_lw_ga7_casim_${ver} && \
+ diff -q ga7_casim_${ver}/sp_lw_cloud7_casim_${ver} \
+                          sp_lw_cloud7_casim_${ver} && \
+ echo 'Matched ifort LW GA7 output') || \
+(diff -q ga7_casim_${ver}/sp_lw_ga7_gfortran sp_lw_ga7_casim_${ver} && \
+ echo 'Matched gfortran LW GA7 output') || \
+ierr=1
+
+if [ $ierr -gt 0 ] ; then
+  exit 1
+else
+  rm -f scatter_ice* fit_* mon_* prep_spec_*
+  rm -f sp_sw_ga9_casim_${ver}* sp_lw_ga9_casim_${ver}*
+  rm -f sp_sw_cloud9_casim_${ver}* sp_lw_cloud9_casim_${ver}*
+  rm -f sp_sw_ga7_casim_${ver}* sp_lw_ga7_casim_${ver}*
+  rm -f sp_sw_cloud7_casim_${ver}* sp_lw_cloud7_casim_${ver}*
+  echo OK
+  exit 0
+fi

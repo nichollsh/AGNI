@@ -1,0 +1,9 @@
+#! /bin/ksh
+#
+#
+#
+
+Cdentomix $RAD_DIR/examples/aer_cmp/laer27.o3 \
+          -q $RAD_DIR/examples/aer_cmp/laer27.q \
+	  -t $RAD_DIR/examples/aer_cmp/laer27.t \
+	  -o $RAD_DIR/examples/workdir/test_dentomix

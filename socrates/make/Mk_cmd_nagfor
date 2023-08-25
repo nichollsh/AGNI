@@ -1,0 +1,14 @@
+#
+# Pathnames for compilers and global options for naming files
+#
+FORTCOMP        = nagfor -mismatch -w -kind=byte -ieee=full -O -c
+LINK            = nagfor -O
+LIBLINK         = ar rvu
+INCCDF_PATH     = /project/odb/installs/netcdf/netcdf-4.1.3-ukmo-v1/nagfor-5.2/include
+LIBCDF_PATH     = /project/odb/installs/netcdf/netcdf-4.1.3-ukmo-v1/nagfor-5.2/lib
+LIBCDF_NAME     = netcdff
+
+LIBSUFFIX       = a
+
+.SUFFIXES: $(SUFFIXES) .f90
+
