@@ -1,44 +1,24 @@
-# 
-# Example from https://code.metoffice.gov.uk/trac/socrates/wiki/SocratesDoc/ClearskyFluxExample
-# (clear sky fluxes, based on examples/netcdf/CIRC_case6)
-# 
-# Currently hardcoded to run clear sky, LW flux, no absorption
-# (ie expect constant flux_up, zero flux_down)
+#!/usr/bin/env -S julia --color=yes --startup-file=no
 
-# Code based on src/aux/l_run_cdf.F90, sbin/Cl_run_cdf
+# -------------
+# THEMIS main file, for standalone execution
+# -------------
 
-# NB: File suffixes for physical quantities etc are defined in
-# src/modules_gen/input_head_pcf.f90
+# Import system libraries (install if required)
+import Pkg
 
-using Plots
-using Pkg
-
-include.(filter(contains(r".jl$"), readdir("src/"; join=true)))
-
-# Edit for path on local computer
-SOCRATES_DIR = "socrates/"
-
-# SOCRATES data and example folders relative to SOCRATES_DIR
-RAD_DATA = joinpath(SOCRATES_DIR, "data")
-
-
-#####################################
-# Activate environment
-#####################################
-
-old_dir = Base.source_dir()
-cd(joinpath(SOCRATES_DIR, "julia")) 
-Pkg.activate(".")              
-Pkg.update()       
-cd(old_dir)
-
-import SOCRATES
+Pkg.add("NCDatasets")
 import NCDatasets
 
-#####################################
-# create Fortran Types 
-#######################################
+# Set paths
+SOCRATES_DIR = "socrates/"
+RAD_DATA = joinpath(SOCRATES_DIR, "data")
 
+# Include local jl files
+include(joinpath(SOCRATES_DIR, "julia/src/SOCRATES.jl"))
+include.(filter(contains(r".jl$"), readdir("src/"; join=true)))
+
+# Create Fortran Types 
 dimen = SOCRATES.StrDim()
 control = SOCRATES.StrCtrl()
 spectrum = SOCRATES.StrSpecData()
@@ -48,40 +28,24 @@ aer = SOCRATES.StrAer()
 bound = SOCRATES.StrBound()
 radout = SOCRATES.StrOut()
 
-#####################################
-# Configure options
-#####################################
-
-# SOCRATES example to use
+# Configuration options
 example_dir = joinpath(SOCRATES_DIR, "examples/netcdf/CIRC_case6")
 base_name = "case6"
+tstar = 279.39 # LW uflux bottom boundary condition [kelvin]
 
-# channel for every band
 all_channels = true
-
-# deallocate arrays (false to allow inspection from REPL)
 do_deallocate = true
-
-spectral_file = "spectra/ga7/sp_lw_ga7"
-
+spectral_file = joinpath(RAD_DATA, "spectra/ga7/sp_lw_ga7")
 lw = true
-
-control.spectral_file = joinpath(RAD_DATA, spectral_file)
-if lw
-    control.isolir = SOCRATES.rad_pcf.ip_infra_red
-else spec_opt == "sp_sw_ga7"
-    control.isolir = SOCRATES.rad_pcf.ip_solar
-end
 
 control.l_rayleigh = false
 control.l_gas = true
+control.l_cloud = false
 control.l_continuum = true
+control.l_aerosol = false
 surface_albedo = 0.0
 
-##########################
 # Initialisation
-#############################
-
 control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
 atm.n_profile = 0
 cld.n_condensed = 0
@@ -89,6 +53,14 @@ cld.n_condensed = 0
 #########################################
 # spectral data
 #########################################
+
+control.spectral_file = spectral_file
+
+if lw
+    control.isolir = SOCRATES.rad_pcf.ip_infra_red
+else
+    control.isolir = SOCRATES.rad_pcf.ip_solar
+end
 
 # SOCRATES.read_spectrum(control.spectral_file, spectrum)
 SOCRATES.set_spectrum(spectrum=spectrum, spectral_file=control.spectral_file, l_all_gasses=true)
@@ -104,11 +76,10 @@ end
 # input files
 #########################################
 
-nc_tstar = NCDatasets.NCDataset(joinpath(example_dir, base_name*".tstar"))
 nc_t = NCDatasets.NCDataset(joinpath(example_dir, base_name*".t"))
 nc_tl = NCDatasets.NCDataset(joinpath(example_dir, base_name*".tl"))
 
-nc_open = [nc_tstar, nc_t, nc_tl]
+nc_open = [nc_t, nc_tl]
 
 
 #########################################
@@ -130,7 +101,7 @@ end
 
 # modules_gen/dimensions_field_cdf_ucf.f90
 npd_direction = 1    # Maximum number of directions for radiances
-npd_layer = nc_t.dim["plev"]
+npd_layer = nc_t.dim["plev"] # Maximum number of layers
 npd_latitude = 1
 npd_longitude = 1
 
@@ -150,7 +121,6 @@ npd_cloud_type             =  4 #   Number of permitted types of clouds.
 npd_overlap_coeff          = 18 #   Number of overlap coefficients for cloud
 npd_source_coeff           =  2 #   Number of coefficients for two-stream sources
 npd_region                 =  3 # Number of regions in a layer
-
 
 dimen.nd_profile                = npd_profile
 dimen.nd_flux_profile           = npd_profile
@@ -195,43 +165,36 @@ atm.n_layer <= dimen.nd_layer ||
 n_latitude = 1
 n_longitude = 1
 atm.n_profile = 1
-atm.lat[1:n_latitude] .= nc_t["lat"][:]
-atm.lon[1:n_longitude] .= nc_t["lon"][:]
+atm.lat[1] = 0.0
+atm.lon[1] = 0.0
 
 ###########################################
 # Spectral region
 ###########################################
 
-
-if control.isolir == SOCRATES.rad_pcf.ip_solar
-    Bool(spectrum.Basic.l_present[2]) ||
-        error("The spectral file contains no solar spectral data.")
-
-    #   Assign the solar zenith angles from the input file.
-    #   They will be converted to trigonometric functions later.
-    NCDatasets.NCDataset(joinpath(example_dir, base_name*".szen")) do nc_szen
-        nc_szen.dim["lat"]*nc_szen.dim["lon"] == 1 ||
-            error("only single column supported")
-        bound.zen_0[1] = nc_szen["szen"][1, 1]
-    end
-
-
-    #   The file of solar irradiances.
-    NCDatasets.NCDataset(joinpath(example_dir, base_name*".stoa")) do nc_stoa
-        nc_stoa.dim["lat"]*nc_stoa.dim["lon"] == 1 ||
-            error("only single column supported")
-        bound.solar_irrad[1] = nc_stoa["stoa"][1, 1]
-    end
-
-elseif control.isolir == SOCRATES.rad_pcf.ip_infra_red
+if lw
     Bool(spectrum.Basic.l_present[6]) ||
         error("The spectral file contains no data for the Planckian function." )
 
     if Bool(spectrum.Basic.l_present[2])
         control.l_solar_tail_flux = true
     end
+
 else
-    error("unknown isolir $(control.isolir)")
+    Bool(spectrum.Basic.l_present[2]) ||
+        error("The spectral file contains no solar spectral data.")
+
+    #   Assign the solar zenith angles from the input file.
+    #   They will be converted to trigonometric functions later.
+    NCDatasets.NCDataset(joinpath(example_dir, base_name*".szen")) do nc_szen
+        bound.zen_0[1] = nc_szen["szen"][1, 1]
+    end
+
+    #   The file of solar irradiances.
+    NCDatasets.NCDataset(joinpath(example_dir, base_name*".stoa")) do nc_stoa
+        bound.solar_irrad[1] = nc_stoa["stoa"][1, 1]
+    end
+    
 end
 
 ###########################################
@@ -239,13 +202,7 @@ end
 ###########################################
 
 control.last_band = spectrum.Basic.n_band
-control.last_band  <= spectrum.Basic.n_band ||
-    error("last_band out of range")
-
 control.first_band = 1
-control.first_band  >=1 ||
-    error("first_band out of range")
-
 n_band_active = control.last_band - control.first_band + 1
 
 # Map spectral bands into output channels
@@ -268,10 +225,6 @@ end
 # Calculate the weighting for the bands.
 control.weight_band .= 1.0
 
-##############################################
-# Scaling of optical depth for direct flux
-#############################################
-
 # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
 # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
 control.i_direct_tau = 1
@@ -285,8 +238,6 @@ if control.l_rayleigh
         error("The spectral file contains no rayleigh scattering data.")
 end
 
-# -a
-control.l_aerosol = false
 if control.l_aerosol
     Bool(spectrum.Basic.l_present[11]) ||
         error("The spectral file contains no aerosol data.")
@@ -374,11 +325,8 @@ control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
 if control.i_angular_integration == SOCRATES.rad_pcf.ip_two_stream
     # see src/aux/angular_control_cdf.f
 
-    if control.isolir == SOCRATES.rad_pcf.ip_infra_red
+    if lw
         control.i_2stream = 12 # -t 12: 
-        # the two-stream approximation to use. 
-        # 12 is the recommended approximation for the LW as used within the Met Office. 
-        # (Practical improved flux method with diffusivity factor = 1.66.)
     else
         control.i_2stream = 16 # Cl_run_cdf 
     end
@@ -403,9 +351,7 @@ if control.i_angular_integration == SOCRATES.rad_pcf.ip_two_stream
     dimen.nd_sph_coeff = 1
 
     #   Convert the zenith angles to secants.
-    if control.isolir == SOCRATES.rad_pcf.ip_solar
-        bound.zen_0[1] = 1.0/cosd(bound.zen_0[1])
-    end
+    bound.zen_0[1] = 1.0/cosd(bound.zen_0[1])
 
     # Reset dimen.nd_max_order to reduce memory requirements
     dimen.nd_max_order = 1
@@ -432,9 +378,8 @@ if control.i_angular_integration == SOCRATES.rad_pcf.ip_two_stream
 #       no separate direct albedo the diffuse value must be copied
 #       into the direct field.
 
-    if control.isolir == SOCRATES.rad_pcf.ip_solar
-        bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_dir, :] .=
-            bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :]
+    if !lw
+        bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_dir, :] .= bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :]
     end
 end
 
@@ -460,19 +405,18 @@ atm.t_level[1, 0:end] .= nc_tl["tl"][1, 1, :]
 
 ####################################################
 # Surface temperatures
-# IP_temperature_ground = 9
-# suffix .tstar
 ####################################################
 
-if control.isolir == SOCRATES.rad_pcf.ip_infra_red
-    bound.t_ground[1] = nc_tstar["tstar"][1, 1, 1]
+if lw
+    bound.t_ground[1] = tstar
+
 end
 
 #####################################################
 # Variation of the temperature within layers
 ####################################################
 
-if control.isolir == SOCRATES.rad_pcf.ip_infra_red
+if lw
     # 'Is the ir-source function to be ' //      &
     # 'taken as linear or quadratic in tau? (l/q)'
     control.l_ir_source_quad = false

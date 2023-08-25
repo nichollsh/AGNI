@@ -22,18 +22,6 @@ Radiative-convective solver written in Julia. Uses SOCRATES for radiative-transf
 17. `$ cd ..`
 18. You should end up in a directory called 'julia'.
 
-
-### Testing the SOCRATES wrapper
-
-Start in the 'julia' folder.
-1. `$ julia`
-2. `julia> ]`
-3. `(@v1.9) pkg> activate .`
-4. Press backspace
-5. `julia> cd("test")`
-6. `julia> include("test_clearsky.jl")`
-The code works if you end up with the Julia REPL containing arrays of fluxes.
-
 ### Running the radiative-convective model
 
 
