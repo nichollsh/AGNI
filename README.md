@@ -5,7 +5,6 @@ Radiative-convective solver written in Julia. Uses SOCRATES for radiative-transf
 ### Install
 
 1. `$ cd socrates`
-2. `$ unzip ../res/socrates_revision*.zip`
 3. `$ cp ../res/Mk_cmd_PLAT ./make/Mk_cmd` where PLAT is your platform
 4. `$ ./build_code`
 5. `$ source set_rad_env`
