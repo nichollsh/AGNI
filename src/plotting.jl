@@ -50,21 +50,21 @@ module plotting
         
         if atmos.is_out_lw
             c = "brown3"
-            plot!(plt, -1.0.*atmos.flux_d_lw, arr_P, label="LW d", lw=w, lc=c, ls=:dot)
-            plot!(plt, atmos.flux_u_lw, arr_P,       label="LW u", lw=w, lc=c, ls=:dash)
-            plot!(plt, atmos.flux_n_lw, arr_P,       label="LW n", lw=w, lc=c, ls=:solid)
+            plot!(plt, -1.0.*atmos.flux_d_lw, arr_P, label="LW ↓", lw=w, lc=c, ls=:dot)
+            plot!(plt, atmos.flux_u_lw, arr_P,       label="LW ↑", lw=w, lc=c, ls=:dash)
+            plot!(plt, atmos.flux_n_lw, arr_P,       label="LW ⇅", lw=w, lc=c, ls=:solid)
         end
 
         if atmos.is_out_sw
             c = "royalblue3"
-            plot!(plt, -1.0.*atmos.flux_d_sw, arr_P, label="SW d", lw=w, lc=c, ls=:dot)
-            plot!(plt, atmos.flux_u_sw, arr_P,       label="SW u", lw=w, lc=c, ls=:dash)
-            plot!(plt, atmos.flux_n_sw, arr_P,       label="SW n", lw=w, lc=c, ls=:solid)
+            plot!(plt, -1.0.*atmos.flux_d_sw, arr_P, label="SW ↓", lw=w, lc=c, ls=:dot)
+            plot!(plt, atmos.flux_u_sw, arr_P,       label="SW ↑", lw=w, lc=c, ls=:dash)
+            plot!(plt, atmos.flux_n_sw, arr_P,       label="SW ⇅", lw=w, lc=c, ls=:solid)
         end 
 
         if atmos.is_out_lw && atmos.is_out_sw
             c = "seagreen"
-            plot!(plt, atmos.flux_n, arr_P, label="NET", lw=w, lc=c, ls=:solid)
+            plot!(plt, atmos.flux_n, arr_P, label="Total", lw=w, lc=c, ls=:solid)
         end 
 
         xlabel!(plt, "Upward directed flux [W m-2]")
@@ -75,7 +75,6 @@ module plotting
         savefig(plt, fname)
 
     end
-    
 
 end
 

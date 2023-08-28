@@ -470,9 +470,9 @@ module atmosphere
     function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool)
 
         if lw
-            println("Atmosphere: Calculating LW fluxes")
+            println("Atmosphere: calculating LW fluxes")
         else
-            println("Atmosphere: Calculating SW fluxes")
+            println("Atmosphere: calculating SW fluxes")
         end
 
         if !atmos.is_alloc
