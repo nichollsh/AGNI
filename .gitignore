@@ -1,8 +1,5 @@
 # Socrates files
-currentlw.*
-currentsw.*
-profile.*
-
+out/*
 
 # Misc files
 .DS_Store

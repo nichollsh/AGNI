@@ -1,4 +1,11 @@
+# Contains the radtrans module, which contains all of the core code 
+# for setting-up and running SOCRATES
+
 # Not for direct execution
+if (abspath(PROGRAM_FILE) == @__FILE__)
+    thisfile = @__FILE__
+    error("The file '$thisfile' is not for direct execution")
+end 
 
 module radtrans
 
@@ -12,19 +19,21 @@ module radtrans
     # Struct for holding data pertaining to the atmosphere
     mutable struct Atmos_t
 
-        # Track state of atmos
-        is_param::Bool
-        is_alloc::Bool
+        # Track state of atmos struct
+        is_param::Bool  # Params have been set
+        is_alloc::Bool  # Arrays have been allocated
+        is_out_lw::Bool # Contains data for LW calculation
+        is_out_sw::Bool # Contains data for SW calculation
 
         # SOCRATES objects
         dimen::SOCRATES.StrDim
-        control 
-        spectrum 
-        atm   
-        cld    
-        aer    
-        bound  
-        radout 
+        control::SOCRATES.StrCtrl
+        spectrum::SOCRATES.StrSpecData
+        atm::SOCRATES.StrAtm
+        cld::SOCRATES.StrCld
+        aer::SOCRATES.StrAer
+        bound::SOCRATES.StrBound
+        radout::SOCRATES.StrOut
 
         # Other parameters
         all_channels::Bool 
@@ -37,7 +46,6 @@ module radtrans
         grav_surf::Float64
 
         flag_rayleigh::Bool 
-        flag_gas::Bool 
         flag_continuum::Bool 
         flag_aerosol::Bool 
         flag_cloud::Bool
@@ -52,7 +60,17 @@ module radtrans
         pl::Array
 
         # Calculated fluxes
-        
+        flux_d_lw::Array  # downward component, lw 
+        flux_u_lw::Array  # upward component, lw
+        flux_n_lw::Array  # net upward, lw
+
+        flux_d_sw::Array
+        flux_u_sw::Array
+        flux_n_sw::Array
+
+        flux_d::Array
+        flux_u::Array
+        flux_n::Array
 
         Atmos_t() = new()
     end
@@ -63,15 +81,11 @@ module radtrans
 
         SOCRATES.deallocate_atm(     atmos.atm)
 
-        if atmos.control.l_cloud 
-            SOCRATES.deallocate_cld(     atmos.cld)
-            SOCRATES.deallocate_cld_prsc(atmos.cld)
-        end
+        SOCRATES.deallocate_cld(     atmos.cld)
+        SOCRATES.deallocate_cld_prsc(atmos.cld)
 
-        if atmos.control.l_aerosol
-            SOCRATES.deallocate_aer(     atmos.aer)
-            SOCRATES.deallocate_aer_prsc(atmos.aer)
-        end
+        SOCRATES.deallocate_aer(     atmos.aer)
+        SOCRATES.deallocate_aer_prsc(atmos.aer)
 
         SOCRATES.deallocate_bound(   atmos.bound)
         SOCRATES.deallocate_out(     atmos.radout)
@@ -80,10 +94,10 @@ module radtrans
     end
 
     # Set parameters of atmosphere
-    function setup_atmos!(atmos, spectral_file, nlev_centre,
+    function setup_atmos!(atmos, spectral_file, all_channels,
                             flag_rayleigh,flag_continuum,flag_aerosol,flag_cloud,
                             zenith_degrees,toa_heating,T_surf,
-                            gravity)
+                            gravity, nlev_centre)
 
         println("Atmosphere: instantiating SOCRATES objects")
         atmos.dimen =       SOCRATES.StrDim()
@@ -99,11 +113,11 @@ module radtrans
 
         # Set parameters
         atmos.spectral_file =   spectral_file
-        atmos.flag_gas =        true
         atmos.flag_rayleigh =   flag_rayleigh
         atmos.flag_continuum =  flag_continuum
         atmos.flag_aerosol =    flag_aerosol
         atmos.flag_cloud =      flag_cloud
+        atmos.all_channels =    all_channels
 
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  nlev_centre + 1
@@ -113,9 +127,10 @@ module radtrans
         atmos.grav_surf =       gravity
 
         # Consequential things
-        atmos.control.l_gas = atmos.flag_gas
+        atmos.control.l_gas = true
         atmos.control.l_rayleigh = atmos.flag_rayleigh
         atmos.control.l_continuum = atmos.flag_continuum
+        atmos.control.l_aerosol = atmos.flag_aerosol
 
         # Record that the parameters are set
         atmos.is_param = true
@@ -129,7 +144,6 @@ module radtrans
         if !atmos.is_param
             error(" atmosphere parameters have not been set")
         end
-
 
         atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
         atmos.cld.n_condensed = 0
@@ -231,9 +245,15 @@ module radtrans
         atmos.atm.lon[1] = 0.0
 
         #########################################
-        # input files
+        # Temperature and pressure grids
         #########################################
 
+        atmos.tmpl = zeros(Float64, atmos.nlev_l)
+        atmos.pl =   zeros(Float64, atmos.nlev_l)
+        atmos.tmp =  zeros(Float64, atmos.nlev_c)
+        atmos.p =    zeros(Float64, atmos.nlev_c)
+
+        # TEMP
         nc_t = NCDatasets.NCDataset(joinpath(example_dir, base_name*".t"))
         nc_tl = NCDatasets.NCDataset(joinpath(example_dir, base_name*".tl"))
 
@@ -245,7 +265,15 @@ module radtrans
         atmos.atm.p_level[1, 0:end] .= nc_tl["plev"][:]
         atmos.atm.t_level[1, 0:end] .= nc_tl["tl"][1, 1, :]
 
+        atmos.p[:]    .= nc_t["plev"][:]
+        atmos.tmp[:]  .= nc_t["t"][1, 1, :]
+
+        atmos.pl[:]   .= nc_tl["plev"][:]
+        atmos.tmpl[:] .= nc_tl["tl"][1, 1, :]
+
         close.(nc_open)  # close netcdf files
+
+        # /TEMP
 
         ###########################################
         # Range of bands
@@ -289,7 +317,6 @@ module radtrans
                 error("The spectral file contains no rayleigh scattering data.")
         end
         
-        atmos.control.l_aerosol = atmos.flag_aerosol
         if atmos.control.l_aerosol
             Bool(atmos.spectrum.Basic.l_present[11]) ||
                 error("The spectral file contains no aerosol data.")
@@ -312,29 +339,27 @@ module radtrans
         # Gaseous absorption
         #################################
 
-        if atmos.control.l_gas
-            atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random # = 2
-            for j in atmos.control.first_band:atmos.control.last_band
-                atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
-            end
+        atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random # = 2
+        for j in atmos.control.first_band:atmos.control.last_band
+            atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
+        end
 
-            mr_gases = Dict()
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb
-                # Read gas mixing ratios
-                ti = atmos.spectrum.Gas.type_absorb[i_gas]
-                sfx = SOCRATES.input_head_pcf.gas_suffix[ti]
-                fn = joinpath(example_dir, base_name*"."*sfx)
-                println("Reading mixing ratio for gas $ti $(SOCRATES.gas_list_pcf.name_absorb[ti])    $fn")
+        mr_gases = Dict()
+        for i_gas in 1:atmos.spectrum.Gas.n_absorb
+            # Read gas mixing ratios
+            ti = atmos.spectrum.Gas.type_absorb[i_gas]
+            sfx = SOCRATES.input_head_pcf.gas_suffix[ti]
+            fn = joinpath(example_dir, base_name*"."*sfx)
+            println("Reading mixing ratio for gas $ti $(SOCRATES.gas_list_pcf.name_absorb[ti])    $fn")
 
-                if isfile(fn)
-                    NCDatasets.NCDataset(fn, "r") do nc
-                        mr_gases[sfx] = nc[sfx][1, 1, :]
-                        atmos.atm.gas_mix_ratio[1, :, i_gas] .= mr_gases[sfx]
-                    end
-                else
-                    println("  no file found - setting mixing ratio to 0.0")
-                    atmos.atm.gas_mix_ratio[:, :, i_gas] .= 0.0
+            if isfile(fn)
+                NCDatasets.NCDataset(fn, "r") do nc
+                    mr_gases[sfx] = nc[sfx][1, 1, :]
+                    atmos.atm.gas_mix_ratio[1, :, i_gas] .= mr_gases[sfx]
                 end
+            else
+                println("  no file found - setting mixing ratio to 0.0")
+                atmos.atm.gas_mix_ratio[:, :, i_gas] .= 0.0
             end
         end
 
@@ -361,26 +386,48 @@ module radtrans
         # Clouds
         # see src/aux/input_cloud_cdf.f
         #######################################
+        
+        atmos.dimen.nd_profile_cloud_prsc   = 1
+        atmos.dimen.nd_opt_level_cloud_prsc = 1
+        atmos.dimen.nd_phf_term_cloud_prsc  = 1
 
-        SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
         if atmos.control.l_cloud
-            atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_homogen # 1 (homogeneous)
-            atmos.dimen.nd_profile_cloud_prsc   = 1
-            atmos.dimen.nd_opt_level_cloud_prsc = 1
-            atmos.dimen.nd_phf_term_cloud_prsc  = 1
+            error("Clouds not implemented")
         else
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
 
-            
+        SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
+
         atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
 
+        #######################################
+        # Output arrays
+        #######################################
+        atmos.flux_d_lw =         zeros(Float64, atmos.nlev_l)
+        atmos.flux_u_lw =         zeros(Float64, atmos.nlev_l)
+        atmos.flux_n_lw =         zeros(Float64, atmos.nlev_l)
 
+        atmos.flux_d_sw =         zeros(Float64, atmos.nlev_l)
+        atmos.flux_u_sw =         zeros(Float64, atmos.nlev_l)
+        atmos.flux_n_sw =         zeros(Float64, atmos.nlev_l)
+
+        atmos.flux_d =            zeros(Float64, atmos.nlev_l)
+        atmos.flux_u =            zeros(Float64, atmos.nlev_l)
+        atmos.flux_n =            zeros(Float64, atmos.nlev_l)
+
+        # Mark as allocated
         atmos.is_alloc = true
     end
 
 
     function calc_fluxes!(atmos, lw::Bool)
+
+        if lw
+            println("Atmosphere: Calculating LW fluxes")
+        else
+            println("Atmosphere: Calculating SW fluxes")
+        end
 
         if !atmos.is_alloc
             error("atmosphere arrays have not been allocated")
@@ -516,15 +563,42 @@ module radtrans
         end
 
         # Calculation of fluxes (result is stored in atmos.radout )
-        println("Atmosphere: calling radiance_calc")
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
                                 atmos.atm, atmos.cld, atmos.aer, 
                                 atmos.bound, atmos.radout)
     
-        # Store fluxes in atmos struct
+        # Store new fluxes in atmos struct
+        if lw 
+            # LW case
+            for lv in 1:atmos.nlev_l                # sum over levels
+                for ch in 1:atmos.dimen.nd_channel  # sum over channels
+                    idx = lv+(ch-1)*atmos.nlev_l
+                    atmos.flux_d_lw[lv] += atmos.radout.flux_down[idx]
+                    atmos.flux_u_lw[lv] += atmos.radout.flux_up[idx]
+                end 
+                atmos.flux_n_lw[lv] = atmos.flux_u_lw[lv] - atmos.flux_d_lw[lv] 
+            end
+            atmos.is_out_lw = true 
+        else
+            # SW case include direct beam
+            for lv in 1:atmos.nlev_l                # sum over levels
+                for ch in 1:atmos.dimen.nd_channel  # sum over channels
+                    idx = lv+(ch-1)*atmos.nlev_l
+                    atmos.flux_d_sw[lv] += atmos.radout.flux_down[idx] + atmos.radout.flux_direct[idx]
+                    atmos.flux_u_sw[lv] += atmos.radout.flux_up[idx]
+                end 
+                atmos.flux_n_sw[lv] = atmos.flux_u_sw[lv] - atmos.flux_d_sw[lv]
+            end
+            atmos.is_out_sw = true
+        end
 
+        # Store net fluxes when we have both SW and LW components
+        if (atmos.is_out_lw && atmos.is_out_sw)
+            atmos.flux_d = atmos.flux_d_lw .+ atmos.flux_d_sw
+            atmos.flux_u = atmos.flux_u_lw .+ atmos.flux_u_sw
+            atmos.flux_n = atmos.flux_n_lw .+ atmos.flux_n_sw
+        end
 
-    end
-
+    end # end of calc_fluxes
 
 end
