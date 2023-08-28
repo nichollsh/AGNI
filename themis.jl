@@ -6,10 +6,9 @@
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
-include("src/radtrans.jl")
-include("src/solver.jl")
+include("src/atmosphere.jl")
+include("src/setup_pt.jl")
 include("src/plotting.jl")
-include("src/fileio.jl")
 
 
 # Configuration options
@@ -18,9 +17,9 @@ zenith_degrees  = 45.53     # Zenith angle [degrees from zenith]
 toa_heating     = 1381.53   # SW dflux top boundary condition [W m-2]
 gravity         = 9.81
 nlev_centre     = 100
-p_surf          = 1e+2
-p_top           = 1e-5 
-mixing_ratios   =  Dict([("H2O", 0.5), ("CO2", 0.5)])
+p_surf          = 1e+2      # bar
+p_top           = 1e-5      # bar 
+mixing_ratios   =  Dict([("H2O", 0.7), ("CO2", 0.3)])
 
 # spectral_file = "socrates/data/spectra/ga7/sp_lw_ga7" 
 spectral_file = "res/runtime_spectral_file_rscat"
@@ -32,23 +31,24 @@ rm(output_dir,force=true,recursive=true)
 mkdir(output_dir)
 
 # Setup atmosphere
-atmos = radtrans.Atmos_t()
-
-radtrans.setup_atmos!(atmos, spectral_file, true,
+atmos = atmosphere.Atmos_t()
+atmosphere.setup_atmos!(atmos, spectral_file, true,
                         false, false, false, false,
                         zenith_degrees, toa_heating, tstar,
                         gravity, nlev_centre, p_surf, p_top,
                         mixing_ratios
                         )
+atmosphere.alloc_atmos!(atmos)
 
-radtrans.alloc_atmos!(atmos)
+# Set to dry adiabat 
+setup_pt.dry_adiabat!(atmos)
 
 # Calculate LW and SW fluxes
-radtrans.calc_fluxes!(atmos, true)
-radtrans.calc_fluxes!(atmos, false)
+atmosphere.calc_fluxes!(atmos, true)
+atmosphere.calc_fluxes!(atmos, false)
 
 # Save result
-fileio.write_pt(atmos, "out/pt.csv")
+atmosphere.write_pt(atmos, "out/pt.csv")
 
 # Plot result
 plotting.plot_pt(atmos, output_dir)

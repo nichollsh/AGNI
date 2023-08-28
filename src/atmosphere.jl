@@ -1,5 +1,5 @@
-# Contains the radtrans module, which contains all of the core code 
-# for setting-up and running SOCRATES
+# Contains the atmosphere module, which contains all of the core code 
+# for setting-up the atmosphere and running SOCRATES
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
@@ -7,10 +7,12 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
-module radtrans
+module atmosphere
 
     # Import libraries
+    using Printf
     include("../socrates/julia/src/SOCRATES.jl")
+    include("phys.jl")
 
     # Struct for holding data pertaining to the atmosphere
     mutable struct Atmos_t
@@ -53,21 +55,26 @@ module radtrans
         p::Array        
         pl::Array      
         
-        # Mixing ratios (atmosphere is assumed to be well-mixed)
+        # Mixing ratios (atmosphere is currently assumed to be well-mixed)
         mr_gases::Dict
 
+        # Layers' average properties
+        layer_density::Array  # density [kg m-3]
+        layer_mmw::Array      # mean molecular weight [kg mol-1]
+        layer_cp::Array       # heat capacity at const-p [J K-1 mol-1]
+
         # Calculated fluxes (W m-2)
-        flux_d_lw::Array  # downward component, lw 
-        flux_u_lw::Array  # upward component, lw
+        flux_d_lw::Array  # down component, lw 
+        flux_u_lw::Array  # up component, lw
         flux_n_lw::Array  # net upward, lw
 
-        flux_d_sw::Array
-        flux_u_sw::Array
-        flux_n_sw::Array
+        flux_d_sw::Array  # down component, sw 
+        flux_u_sw::Array  # up component, sw
+        flux_n_sw::Array  # net upward, sw
 
-        flux_d::Array
-        flux_u::Array
-        flux_n::Array
+        flux_d::Array    # down component, lw+sw 
+        flux_u::Array    # up component, lw+sw 
+        flux_n::Array    # net upward, lw+sw 
 
         Atmos_t() = new()
     end
@@ -91,11 +98,12 @@ module radtrans
     end
 
     # Set parameters of atmosphere
-    function setup_atmos!(atmos, spectral_file, all_channels,
-                            flag_rayleigh,flag_continuum,flag_aerosol,flag_cloud,
-                            zenith_degrees,toa_heating,T_surf,
-                            gravity, nlev_centre, p_surf, p_top,
-                            mixing_ratios)
+    function setup_atmos!(atmos::atmosphere.Atmos_t, 
+                            spectral_file::String, all_channels::Bool,
+                            flag_rayleigh::Bool,flag_continuum::Bool,flag_aerosol::Bool,flag_cloud::Bool,
+                            zenith_degrees::Float64,toa_heating::Float64,T_surf::Float64,
+                            gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
+                            mixing_ratios::Dict)
 
         println("Atmosphere: instantiating SOCRATES objects")
         atmos.dimen =       SOCRATES.StrDim()
@@ -149,11 +157,49 @@ module radtrans
         # Record that the parameters are set
         atmos.is_param = true
     end
+
+    # Calculate layer-average properties (e.g. density)
+    function calc_layer_props!(atmos)
+
+        # Mass
+        for i in 1:atmos.atm.n_layer
+            atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.grav_surf
+        end
+
+        # Mean molecular weight and mass density
+        atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
+        atmos.layer_density = zeros(Float64, atmos.nlev_c)
+        atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
+        for i in 1:atmos.atm.n_layer
+
+            # mmw and heat capacity
+            for i_gas in 1:atmos.spectrum.Gas.n_absorb # for each gas
+                ti = atmos.spectrum.Gas.type_absorb[i_gas]
+                gas = SOCRATES.input_head_pcf.header_gas[ti]
+
+                # set mmw
+                if gas in keys(atmos.mr_gases) 
+                    atmos.layer_mmw[i] += atmos.atm.gas_mix_ratio[1, i, i_gas] * phys.lookup_mmw[gas]
+                end
+
+                # set cp
+                if gas in keys(atmos.mr_gases) 
+                    atmos.layer_cp[i] += atmos.atm.gas_mix_ratio[1, i, i_gas] * phys.lookup_cp[gas] * phys.lookup_mmw[gas]
+                end
+
+            end
+
+            # density
+            atmos.layer_density[i] = ( atmos.p[i] * atmos.layer_mmw[i] )  / (phys.R_gas * atmos.tmp[i]) 
+            atmos.atm.density[1,i] = atmos.layer_density[i]
+        end
+
+    end # End of calc_layer_props
     
-    # Allocate atmosphere arrays
+    # Allocate atmosphere arrays and prepare for RT calculation
     function alloc_atmos!(atmos)
 
-        println("Atmosphere: allocate arrays")
+        println("Atmosphere: allocate memory")
 
         if !atmos.is_param
             error(" atmosphere parameters have not been set")
@@ -357,6 +403,13 @@ module radtrans
         end
 
         ################################
+        # Layer average properties
+        #################################
+
+        calc_layer_props!(atmos)
+        
+
+        ################################
         # Aerosol processes
         #################################
 
@@ -507,7 +560,6 @@ module radtrans
             end
         end
 
-
         ###################################################
         # Treatment of scattering
         ###################################################
@@ -516,8 +568,6 @@ module radtrans
         for i in atmos.control.first_band:atmos.control.last_band
             atmos.control.i_scatter_method_band[i] = atmos.control.i_scatter_method
         end
-
-
 
         ####################################################
         # Surface temperatures
@@ -532,30 +582,20 @@ module radtrans
         ####################################################
 
         if lw
-            # 'Is the ir-source function to be ' //      &
-            # 'taken as linear or quadratic in tau? (l/q)'
             atmos.control.l_ir_source_quad = false
             # control.l_ir_source_quad = true  # Cl_run_cdf -q
         end
 
+        #####################################################
+        # Re-calculate layer properties 
+        ####################################################
+
+        calc_layer_props!(atmos)
 
         ######################################################
         # Run radiative transfer model
         ######################################################
 
-        # Gas constant for dry air (FIX ME)
-        r_gas_dry          = 287.026 # J K-1 kg-1
-        for i in range(atmos.atm.n_layer, 1, step=-1)
-            atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.grav_surf
-        end
-
-        # dry air density (FIX ME)
-        r = r_gas_dry
-        for i in 1:atmos.atm.n_layer
-            atmos.atm.density[1, i] = atmos.atm.p[1, i]/(r*atmos.atm.t[1, i])
-        end
-
-        # Calculation of fluxes (result is stored in atmos.radout )
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
                                 atmos.atm, atmos.cld, atmos.aer, 
                                 atmos.bound, atmos.radout)
@@ -593,5 +633,50 @@ module radtrans
         end
 
     end # end of calc_fluxes
+
+
+    # Get interleaved cell-centre and cell-edge PT grid
+    function get_interleaved_pt(atmos)
+        arr_T = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
+        arr_P = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
+
+        # top
+        arr_T[1] = atmos.tmpl[1]
+        arr_P[1] = atmos.pl[1]
+
+        # middle 
+        for i in 1:atmos.nlev_c
+            idx = (i-1)*2
+            arr_T[idx+1] = atmos.tmpl[i]
+            arr_T[idx+2] = atmos.tmp[i]
+            arr_P[idx+1] = atmos.pl[i]
+            arr_P[idx+2] = atmos.p[i]
+        end 
+
+        # bottom
+        arr_T[end] = atmos.tmpl[end]
+        arr_P[end] = atmos.pl[end]
+        
+        return arr_P, arr_T
+    end 
+
+
+    # Write current interleaved pressure/temperature grid to a file
+    function write_pt(atmos, fname)
+
+        arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
+        arr_P *= 1e-5
+        
+        rm(fname, force=true)
+
+        open(fname, "w") do f
+            write(f, "# pressure  , temperature \n")
+            write(f, "# [bar]     , [K] \n")
+            for i in 1:atmos.nlev_l+atmos.nlev_c
+                @printf(f, "%1.5e , %1.5e \n", arr_P[i], arr_T[i])
+            end
+        end
+
+    end
 
 end
