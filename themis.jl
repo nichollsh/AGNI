@@ -4,6 +4,8 @@
 # THEMIS main file, for standalone execution
 # -------------
 
+println("Begin THEMIS")
+
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
 include("src/atmosphere.jl")
@@ -32,27 +34,29 @@ mkdir(output_dir)
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup_atmos!(atmos, spectral_file, true,
+atmosphere.setup!(atmos, spectral_file, true,
                         false, false, false, false,
                         zenith_degrees, toa_heating, tstar,
                         gravity, nlev_centre, p_surf, p_top,
                         mixing_ratios
                         )
-atmosphere.alloc_atmos!(atmos)
+atmosphere.allocate!(atmos)
 
 # Set to dry adiabat 
 setup_pt.dry_adiabat!(atmos)
 
 # Calculate LW and SW fluxes
-atmosphere.calc_fluxes!(atmos, true)
-atmosphere.calc_fluxes!(atmos, false)
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
 
 # Save result
-atmosphere.write_pt(atmos, "out/pt.csv")
+atmosphere.write_pt(atmos, joinpath(output_dir,"pt.csv"))
 
 # Plot result
 plotting.plot_pt(atmos, output_dir)
 plotting.plot_fluxes(atmos, output_dir)
 
+# Deallocate
+atmosphere.deallocate!(atmos)
 
 println("Done!")

@@ -10,6 +10,10 @@ module solver
 
     include("atmosphere.jl")
 
+    function solve_energy(atmos)
 
+        
+
+    end # end solve_energy
 
 end 

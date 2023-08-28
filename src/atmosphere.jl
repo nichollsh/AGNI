@@ -80,7 +80,7 @@ module atmosphere
     end
 
     # Deallocate atmosphere arrays
-    function dealloc_atmos!(atmos)
+    function deallocate!(atmos::atmosphere.Atmos_t)
         println("Atmosphere: dellocating arrays")
 
         SOCRATES.deallocate_atm(     atmos.atm)
@@ -98,7 +98,7 @@ module atmosphere
     end
 
     # Set parameters of atmosphere
-    function setup_atmos!(atmos::atmosphere.Atmos_t, 
+    function setup!(atmos::atmosphere.Atmos_t, 
                             spectral_file::String, all_channels::Bool,
                             flag_rayleigh::Bool,flag_continuum::Bool,flag_aerosol::Bool,flag_cloud::Bool,
                             zenith_degrees::Float64,toa_heating::Float64,T_surf::Float64,
@@ -138,7 +138,6 @@ module atmosphere
         atmos.control.l_cloud = flag_cloud
 
         # Normalise and store gas mixing ratios in dictionary
-
         if isempty(mixing_ratios)
             error("No mixing ratios provided")
         end
@@ -197,7 +196,7 @@ module atmosphere
     end # End of calc_layer_props
     
     # Allocate atmosphere arrays and prepare for RT calculation
-    function alloc_atmos!(atmos)
+    function allocate!(atmos::atmosphere.Atmos_t)
 
         println("Atmosphere: allocate memory")
 
@@ -467,7 +466,7 @@ module atmosphere
     end
 
 
-    function calc_fluxes!(atmos, lw::Bool)
+    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool)
 
         if lw
             println("Atmosphere: Calculating LW fluxes")
@@ -632,7 +631,9 @@ module atmosphere
             atmos.flux_n = atmos.flux_n_lw .+ atmos.flux_n_sw
         end
 
-    end # end of calc_fluxes
+        # Calculate heating rates
+
+    end # end of radtrans
 
 
     # Get interleaved cell-centre and cell-edge PT grid
