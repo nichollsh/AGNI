@@ -99,6 +99,7 @@ module radtrans
 
         # Set parameters
         atmos.spectral_file =   spectral_file
+        atmos.flag_gas =        true
         atmos.flag_rayleigh =   flag_rayleigh
         atmos.flag_continuum =  flag_continuum
         atmos.flag_aerosol =    flag_aerosol
@@ -111,7 +112,12 @@ module radtrans
         atmos.tstar =           T_surf
         atmos.grav_surf =       gravity
 
-        # Parameters are set
+        # Consequential things
+        atmos.control.l_gas = atmos.flag_gas
+        atmos.control.l_rayleigh = atmos.flag_rayleigh
+        atmos.control.l_continuum = atmos.flag_continuum
+
+        # Record that the parameters are set
         atmos.is_param = true
     end
     
@@ -123,6 +129,34 @@ module radtrans
         if !atmos.is_param
             error(" atmosphere parameters have not been set")
         end
+
+
+        atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
+        atmos.cld.n_condensed = 0
+        atmos.atm.n_profile = 0
+
+        #########################################
+        # spectral data
+        #########################################
+
+        atmos.control.spectral_file = atmos.spectral_file
+        SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
+                              spectral_file=atmos.control.spectral_file, 
+                              l_all_gasses=true)
+
+        gas_index = zeros(Int, SOCRATES.gas_list_pcf.npd_gases) # pointers to gases in spectral file
+        for i in 1:atmos.spectrum.Gas.n_absorb
+            ti = atmos.spectrum.Gas.type_absorb[i]
+            gas_index[ti] = i
+            println("spectrum.Gas $i type_absorb $ti $(SOCRATES.gas_list_pcf.name_absorb[ti])")
+        end
+
+        #########################################
+        # diagnostics
+        #########################################
+        atmos.control.l_actinic_flux = Bool(atmos.spectrum.Basic.l_present[2])
+        atmos.control.l_photolysis_rate = atmos.spectrum.Photol.n_pathway > 0
+        atmos.control.l_flux_div = atmos.spectrum.Photol.n_pathway > 0
 
         #########################################
         # parameters
@@ -186,20 +220,16 @@ module radtrans
         atmos.dimen.nd_aerosol_mode           = 1
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
+        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
+        SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
-        if atmos.flag_cloud
-            SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
-            atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
-            atmos.cld.n_condensed = 0
-        end
+        # atm sizes and coordinates 
+        atmos.atm.n_layer = npd_layer
+        atmos.atm.n_profile = 1
+        atmos.atm.lat[1] = 0.0
+        atmos.atm.lon[1] = 0.0
 
-        if atmos.flag_aerosol
-            SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
-        end
-        
-        atmos.atm.n_profile = 0
-        
         #########################################
         # input files
         #########################################
@@ -216,35 +246,6 @@ module radtrans
         atmos.atm.t_level[1, 0:end] .= nc_tl["tl"][1, 1, :]
 
         close.(nc_open)  # close netcdf files
-
-        #########################################
-        # spectral data
-        #########################################
-
-        atmos.control.spectral_file = atmos.spectral_file
-        SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
-                              spectral_file=atmos.control.spectral_file, 
-                              l_all_gasses=true)
-
-        gas_index = zeros(Int, SOCRATES.gas_list_pcf.npd_gases) # pointers to gases in spectral file
-        for i in 1:atmos.spectrum.Gas.n_absorb
-            ti = atmos.spectrum.Gas.type_absorb[i]
-            gas_index[ti] = i
-            println("spectrum.Gas $i type_absorb $ti $(SOCRATES.gas_list_pcf.name_absorb[ti])")
-        end
-
-        #########################################
-        # diagnostics
-        #########################################
-        atmos.control.l_actinic_flux = Bool(atmos.spectrum.Basic.l_present[2])
-        atmos.control.l_photolysis_rate = atmos.spectrum.Photol.n_pathway > 0
-        atmos.control.l_flux_div = atmos.spectrum.Photol.n_pathway > 0
-
-        # atm sizes and coordinates 
-        atmos.atm.n_layer = npd_layer
-        atmos.atm.n_profile = 1
-        atmos.atm.lat[1] = 0.0
-        atmos.atm.lon[1] = 0.0
 
         ###########################################
         # Range of bands
@@ -283,7 +284,6 @@ module radtrans
         # Check Options
         ############################################
 
-        atmos.control.l_rayleigh = atmos.flag_rayleigh
         if atmos.control.l_rayleigh
             Bool(atmos.spectrum.Basic.l_present[3]) ||
                 error("The spectral file contains no rayleigh scattering data.")
@@ -295,13 +295,11 @@ module radtrans
                 error("The spectral file contains no aerosol data.")
         end
 
-        atmos.control.l_gas = atmos.flag_gas
         if atmos.control.l_gas
             Bool(atmos.spectrum.Basic.l_present[5]) ||
                 error("The spectral file contains no gaseous absorption data.")
         end
 
-        atmos.control.l_continuum = atmos.flag_continuum
         if atmos.control.l_continuum
             Bool(atmos.spectrum.Basic.l_present[9]) ||
                 error("The spectral file contains no continuum absorption data.")
@@ -316,7 +314,7 @@ module radtrans
 
         if atmos.control.l_gas
             atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random # = 2
-            for j in atmos.control.first_band:control.last_band
+            for j in atmos.control.first_band:atmos.control.last_band
                 atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
             end
 
@@ -340,19 +338,19 @@ module radtrans
             end
         end
 
-
-
         ################################
         # Aerosol processes
         #################################
 
-        if atmos.control.l_aerosol 
+        SOCRATES.allocate_aer_prsc(atmos.aer, atmos.dimen, atmos.spectrum)
+        if atmos.control.l_aerosol
+            error("Aerosols not implemented")
+        else
             atmos.dimen.nd_profile_aerosol_prsc   = 1
             atmos.dimen.nd_opt_level_aerosol_prsc = 1
             atmos.dimen.nd_phf_term_aerosol_prsc  = 1
 
             atmos.aer.mr_source .= SOCRATES.rad_pcf.ip_aersrc_classic_roff
-            SOCRATES.allocate_aer_prsc(atmos.aer, atmos.dimen, atmos.spectrum)
 
             for i = 1:atmos.spectrum.Dim.nd_aerosol_species
                 atmos.aer.mr_type_index[i] = i
@@ -364,14 +362,14 @@ module radtrans
         # see src/aux/input_cloud_cdf.f
         #######################################
 
+        SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
         if atmos.control.l_cloud
-            atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
-
+            atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_homogen # 1 (homogeneous)
             atmos.dimen.nd_profile_cloud_prsc   = 1
             atmos.dimen.nd_opt_level_cloud_prsc = 1
             atmos.dimen.nd_phf_term_cloud_prsc  = 1
-
-            SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
+        else
+            atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
 
             
