@@ -10,11 +10,7 @@ end
 module radtrans
 
     # Import libraries
-    import NCDatasets
     include("../socrates/julia/src/SOCRATES.jl")
-
-    example_dir     = "socrates/examples/netcdf/CIRC_case6"
-    base_name = "case6"
 
     # Struct for holding data pertaining to the atmosphere
     mutable struct Atmos_t
@@ -35,7 +31,7 @@ module radtrans
         bound::SOCRATES.StrBound
         radout::SOCRATES.StrOut
 
-        # Other parameters
+        # SOCRATES parameters
         all_channels::Bool 
 
         spectral_file::String 
@@ -45,21 +41,22 @@ module radtrans
         tstar::Float64 
         grav_surf::Float64
 
-        flag_rayleigh::Bool 
-        flag_continuum::Bool 
-        flag_aerosol::Bool 
-        flag_cloud::Bool
+        # Pressure-temperature grid 
+        nlev_c::Int32  # Cell centre (count)
+        nlev_l::Int32  # Cell edge (count)
 
-        nlev_c::Int32  # Cell centre
-        nlev_l::Int32  # Cell edge
+        p_boa::Float64 # bottom 
+        p_toa::Float64 # top 
 
-        # Temperature/pressure profile 
-        tmp::Array
-        tmpl::Array
-        p::Array 
-        pl::Array
+        tmp::Array      
+        tmpl::Array     
+        p::Array        
+        pl::Array      
+        
+        # Mixing ratios (atmosphere is assumed to be well-mixed)
+        mr_gases::Dict
 
-        # Calculated fluxes
+        # Calculated fluxes (W m-2)
         flux_d_lw::Array  # downward component, lw 
         flux_u_lw::Array  # upward component, lw
         flux_n_lw::Array  # net upward, lw
@@ -97,7 +94,8 @@ module radtrans
     function setup_atmos!(atmos, spectral_file, all_channels,
                             flag_rayleigh,flag_continuum,flag_aerosol,flag_cloud,
                             zenith_degrees,toa_heating,T_surf,
-                            gravity, nlev_centre)
+                            gravity, nlev_centre, p_surf, p_top,
+                            mixing_ratios)
 
         println("Atmosphere: instantiating SOCRATES objects")
         atmos.dimen =       SOCRATES.StrDim()
@@ -113,10 +111,6 @@ module radtrans
 
         # Set parameters
         atmos.spectral_file =   spectral_file
-        atmos.flag_rayleigh =   flag_rayleigh
-        atmos.flag_continuum =  flag_continuum
-        atmos.flag_aerosol =    flag_aerosol
-        atmos.flag_cloud =      flag_cloud
         atmos.all_channels =    all_channels
 
         atmos.nlev_c         =  nlev_centre
@@ -126,11 +120,31 @@ module radtrans
         atmos.tstar =           T_surf
         atmos.grav_surf =       gravity
 
-        # Consequential things
+        atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
+        atmos.p_boa =           p_surf * 1.0e+5
+
         atmos.control.l_gas = true
-        atmos.control.l_rayleigh = atmos.flag_rayleigh
-        atmos.control.l_continuum = atmos.flag_continuum
-        atmos.control.l_aerosol = atmos.flag_aerosol
+        atmos.control.l_rayleigh = flag_rayleigh
+        atmos.control.l_continuum = flag_continuum
+        atmos.control.l_aerosol = flag_aerosol
+        atmos.control.l_cloud = flag_cloud
+
+        # Normalise and store gas mixing ratios in dictionary
+
+        if isempty(mixing_ratios)
+            error("No mixing ratios provided")
+        end
+
+        atmos.mr_gases = Dict()
+        norm_factor = sum(values(mixing_ratios))
+        
+        for (key, value) in mixing_ratios
+            if key in SOCRATES.input_head_pcf.header_gas
+                atmos.mr_gases[key] = value / norm_factor
+            else
+                error("Invalid gas '$key'")
+            end
+        end
 
         # Record that the parameters are set
         atmos.is_param = true
@@ -162,7 +176,6 @@ module radtrans
         for i in 1:atmos.spectrum.Gas.n_absorb
             ti = atmos.spectrum.Gas.type_absorb[i]
             gas_index[ti] = i
-            println("spectrum.Gas $i type_absorb $ti $(SOCRATES.gas_list_pcf.name_absorb[ti])")
         end
 
         #########################################
@@ -248,32 +261,22 @@ module radtrans
         # Temperature and pressure grids
         #########################################
 
-        atmos.tmpl = zeros(Float64, atmos.nlev_l)
-        atmos.pl =   zeros(Float64, atmos.nlev_l)
-        atmos.tmp =  zeros(Float64, atmos.nlev_c)
+        # Initialise temperature grid to be isothermal
+        atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tstar
+        atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tstar
+
+        # Set pressure cell-edge array by logspace
+        atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
+
+        # Set pressure cell-centre array by interpolation
         atmos.p =    zeros(Float64, atmos.nlev_c)
+        atmos.p[:] .= 0.5 .* (atmos.pl[2:end] + atmos.pl[1:end-1])
 
-        # TEMP
-        nc_t = NCDatasets.NCDataset(joinpath(example_dir, base_name*".t"))
-        nc_tl = NCDatasets.NCDataset(joinpath(example_dir, base_name*".tl"))
-
-        nc_open = [nc_t, nc_tl]
-
-        atmos.atm.p[1, :] .= nc_t["plev"][:]
-        atmos.atm.t[1, :] .= nc_t["t"][1, 1, :]
-
-        atmos.atm.p_level[1, 0:end] .= nc_tl["plev"][:]
-        atmos.atm.t_level[1, 0:end] .= nc_tl["tl"][1, 1, :]
-
-        atmos.p[:]    .= nc_t["plev"][:]
-        atmos.tmp[:]  .= nc_t["t"][1, 1, :]
-
-        atmos.pl[:]   .= nc_tl["plev"][:]
-        atmos.tmpl[:] .= nc_tl["tl"][1, 1, :]
-
-        close.(nc_open)  # close netcdf files
-
-        # /TEMP
+        # Store pressure/temperature grids in SOCRATES struct
+        atmos.atm.p[1, :] .= atmos.p[:]
+        atmos.atm.t[1, :] .= atmos.tmp[:]
+        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+        atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
         ###########################################
         # Range of bands
@@ -332,8 +335,6 @@ module radtrans
                 error("The spectral file contains no continuum absorption data.")
         end
 
-        atmos.control.l_cloud = atmos.flag_cloud 
-
 
         ################################
         # Gaseous absorption
@@ -344,21 +345,13 @@ module radtrans
             atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
         end
 
-        mr_gases = Dict()
         for i_gas in 1:atmos.spectrum.Gas.n_absorb
-            # Read gas mixing ratios
             ti = atmos.spectrum.Gas.type_absorb[i_gas]
-            sfx = SOCRATES.input_head_pcf.gas_suffix[ti]
-            fn = joinpath(example_dir, base_name*"."*sfx)
-            println("Reading mixing ratio for gas $ti $(SOCRATES.gas_list_pcf.name_absorb[ti])    $fn")
+            gas = SOCRATES.input_head_pcf.header_gas[ti]
 
-            if isfile(fn)
-                NCDatasets.NCDataset(fn, "r") do nc
-                    mr_gases[sfx] = nc[sfx][1, 1, :]
-                    atmos.atm.gas_mix_ratio[1, :, i_gas] .= mr_gases[sfx]
-                end
+            if gas in keys(atmos.mr_gases)
+                atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.mr_gases[gas]
             else
-                println("  no file found - setting mixing ratio to 0.0")
                 atmos.atm.gas_mix_ratio[:, :, i_gas] .= 0.0
             end
         end

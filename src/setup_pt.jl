@@ -8,8 +8,8 @@ end
 
 module setup_pt
 
-    function dry_adiabat!()
-
+    function dry_adiabat!(atmos)
+        
     end
      
 end 
