@@ -1,7 +1,6 @@
 # Themis
 Radiative-convective solver written in Julia. Uses SOCRATES for radiative-transfer.
 
-
 ### Install
 
 1. `$ cd socrates`
@@ -23,5 +22,12 @@ Radiative-convective solver written in Julia. Uses SOCRATES for radiative-transf
 18. You should end up in a directory called 'julia'.
 
 ### Running the radiative-convective model
+
+Simply run `$ julia themis.jl` in the root directory of the repository.
+
+### License
+
+See `LICENSE.txt`.
+
 
 
