@@ -4,17 +4,10 @@
 # THEMIS main file, for standalone execution
 # -------------
 
-# Import system libraries (install if required)
-import Pkg
-using Printf
-
-# Pkg.add("NCDatasets")
-import NCDatasets
-
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
 include("src/radtrans.jl")
-include("src/solve_rce.jl")
+include("src/solver.jl")
 
 # Configuration options
 tstar           = 279.39    # LW uflux bottom boundary condition [kelvin]
@@ -25,8 +18,9 @@ nlev_centre     = 69
 
 all_channels = true
 do_deallocate = true
-spectral_file = "res/runtime_spectral_file_rscat" 
-lw = false
+# spectral_file = "socrates/data/spectra/ga7/sp_lw_ga7" 
+spectral_file = "res/runtime_spectral_file_rscat"
+lw = true
 
 # Allocate atmos object
 atmos = radtrans.Atmos_t()

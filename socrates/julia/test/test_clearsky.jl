@@ -551,6 +551,10 @@ end
 # Calculation of radiances or irradiances.
 ############################################################
 
+display(control)
+display(dimen)
+display(atm)
+
 SOCRATES.radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 
 # display output
