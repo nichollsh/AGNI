@@ -11,6 +11,7 @@ include("socrates/julia/src/SOCRATES.jl")
 include("src/atmosphere.jl")
 include("src/setup_pt.jl")
 include("src/plotting.jl")
+include("src/solver.jl")
 
 
 # Configuration options
@@ -45,18 +46,19 @@ atmosphere.allocate!(atmos)
 # Set to dry adiabat 
 setup_pt.dry_adiabat!(atmos)
 
-# Calculate LW and SW fluxes
+# Calculate LW and SW fluxes (once)
 atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 
+# Call solver 
+# solver.solve_energy!(atmos, false)
+
 # Save result
 atmosphere.write_pt(atmos, joinpath(output_dir,"pt.csv"))
-
-# Plot result
-plotting.plot_pt(atmos, output_dir)
-plotting.plot_fluxes(atmos, output_dir)
+plotting.plot_pt(atmos, joinpath(output_dir,"pt.pdf"))
+plotting.plot_fluxes(atmos, joinpath(output_dir,"fluxes.pdf"))
 
 # Deallocate
 atmosphere.deallocate!(atmos)
 
-println("Done!")
+println("Goodbye")

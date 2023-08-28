@@ -12,7 +12,7 @@ module plotting
     using Plots
     include("atmosphere.jl")
 
-    function plot_pt(atmos, output_dir)
+    function plot_pt(atmos, fname)
         """
         Plot the temperature-pressure profile.
         """
@@ -31,11 +31,11 @@ module plotting
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
                 
-        savefig(plt, joinpath(output_dir,"plot_pt.pdf"))
+        savefig(plt, fname)
 
     end
 
-    function plot_fluxes(atmos, output_dir)
+    function plot_fluxes(atmos, fname)
         """
         Plot the fluxes at each pressure level
         """
@@ -72,7 +72,7 @@ module plotting
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
 
-        savefig(plt, joinpath(output_dir,"plot_fluxes.pdf"))
+        savefig(plt, fname)
 
     end
     

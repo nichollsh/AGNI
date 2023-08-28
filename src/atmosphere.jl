@@ -35,7 +35,6 @@ module atmosphere
 
         # SOCRATES parameters
         all_channels::Bool 
-
         spectral_file::String 
         surface_albedo::Float64 
         zenith_degrees::Float64 
@@ -54,6 +53,8 @@ module atmosphere
         tmpl::Array     
         p::Array        
         pl::Array      
+
+        minT::Float64 # Temperature floor [K]
         
         # Mixing ratios (atmosphere is currently assumed to be well-mixed)
         mr_gases::Dict
@@ -62,6 +63,7 @@ module atmosphere
         layer_density::Array  # density [kg m-3]
         layer_mmw::Array      # mean molecular weight [kg mol-1]
         layer_cp::Array       # heat capacity at const-p [J K-1 mol-1]
+        layer_grav::Array     # gravity [m s-2]
 
         # Calculated fluxes (W m-2)
         flux_d_lw::Array  # down component, lw 
@@ -125,11 +127,13 @@ module atmosphere
         atmos.nlev_l         =  nlev_centre + 1
         atmos.zenith_degrees =  zenith_degrees
         atmos.toa_heating =     toa_heating
-        atmos.tstar =           T_surf
+        atmos.tstar =           max(T_surf, atmos.minT)
         atmos.grav_surf =       gravity
 
         atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
         atmos.p_boa =           p_surf * 1.0e+5
+
+        atmos.minT =            30.0 
 
         atmos.control.l_gas = true
         atmos.control.l_rayleigh = flag_rayleigh
@@ -160,9 +164,12 @@ module atmosphere
     # Calculate layer-average properties (e.g. density)
     function calc_layer_props!(atmos)
 
+        # Gravity (TODO: Make height-dependent)
+        atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
+
         # Mass
         for i in 1:atmos.atm.n_layer
-            atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.grav_surf
+            atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
         end
 
         # Mean molecular weight and mass density
@@ -316,12 +323,6 @@ module atmosphere
         # Set pressure cell-centre array by interpolation
         atmos.p =    zeros(Float64, atmos.nlev_c)
         atmos.p[:] .= 0.5 .* (atmos.pl[2:end] + atmos.pl[1:end-1])
-
-        # Store pressure/temperature grids in SOCRATES struct
-        atmos.atm.p[1, :] .= atmos.p[:]
-        atmos.atm.t[1, :] .= atmos.tmp[:]
-        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-        atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
         ###########################################
         # Range of bands
@@ -595,6 +596,14 @@ module atmosphere
         # Run radiative transfer model
         ######################################################
 
+        clamp!(atmos.tmp, atmos.minT, Inf)
+        clamp!(atmos.tmpl, atmos.minT, Inf)
+
+        atmos.atm.p[1, :] .= atmos.p[:]
+        atmos.atm.t[1, :] .= atmos.tmp[:]
+        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+        atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
+
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
                                 atmos.atm, atmos.cld, atmos.aer, 
                                 atmos.bound, atmos.radout)
@@ -630,8 +639,6 @@ module atmosphere
             atmos.flux_u = atmos.flux_u_lw .+ atmos.flux_u_sw
             atmos.flux_n = atmos.flux_n_lw .+ atmos.flux_n_sw
         end
-
-        # Calculate heating rates
 
     end # end of radtrans
 
