@@ -11,15 +11,16 @@ Radiative-convective solver written in Julia. Uses SOCRATES for radiative-transf
 7. `$ julia`
 8. `julia> ]`
 9. `(@v1.9) pkg> add OffsetArrays`
-10. `(@v1.9) pkg> activate .`
-11. Press backspace
-12. `julia> cd("src")`
-13. `julia> include("generate_wrappers.jl")`
-14. `julia> exit()`
-15. `$ cd lib`
-16. `$ make`
-17. `$ cd ..`
-18. You should end up in a directory called 'julia'.
+10. `(@v1.9) pkg> add Revise`
+11. `(@v1.9) pkg> activate .`
+12. Press backspace
+13. `julia> cd("src")`
+14. `julia> include("generate_wrappers.jl")`
+15. `julia> exit()`
+16. `$ cd lib`
+17. `$ make`
+18. `$ cd ..`
+19. You should end up in a directory called 'julia'.
 
 ### Running the radiative-convective model
 

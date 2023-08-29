@@ -31,13 +31,17 @@ module setup_pt
         for idx in 1:atmos.nlev_c
             atmos.tmp[idx] = atmos.tstar * ( atmos.p[idx] / atmos.pl[end] ) ^ ( phys.R_gas / atmos.layer_cp[idx] )
         end
-
-        # Interpolate to cell-edge values 
-        atmos.tmpl[1]   = atmos.tmp[1]
-        atmos.tmpl[end] = atmos.tmp[end]
+        
+        # Calculate cell-edge values
         for idx in 2:atmos.nlev_l-1
-            atmos.tmpl[idx] = 0.5 * (atmos.tmp[idx-1] + atmos.tmp[idx])
-        end 
+            cp = 0.5 * ( atmos.layer_cp[idx-1] + atmos.layer_cp[idx])
+            atmos.tmpl[idx] = atmos.tstar * ( atmos.pl[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
+        end
+
+        # Calculate top boundary
+        dt = atmos.tmp[1]-atmos.tmpl[2]
+        dp = atmos.p[1]-atmos.pl[2]
+        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
     end 
 
     # Set atmosphere to phase curve of 'con' when it enters condensible region
