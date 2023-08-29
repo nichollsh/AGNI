@@ -10,9 +10,11 @@ end
 module atmosphere
 
     # Import libraries
-    using Printf
     include("../socrates/julia/src/SOCRATES.jl")
-    include("phys.jl")
+
+    using Printf
+    using Revise
+    import phys
 
     # Struct for holding data pertaining to the atmosphere
     mutable struct Atmos_t
@@ -78,6 +80,9 @@ module atmosphere
         flux_u::Array    # up component, lw+sw 
         flux_n::Array    # net upward, lw+sw 
 
+        # Heating rate 
+        heating_rate::Array # radiative heating rate [K/day]
+
         Atmos_t() = new()
     end
 
@@ -138,7 +143,6 @@ module atmosphere
         atmos.control.l_gas = true
         atmos.control.l_rayleigh = flag_rayleigh
         atmos.control.l_continuum = false
-        atmos.control.l_cont_gen = flag_gcontinuum
         atmos.control.l_aerosol = flag_aerosol
         atmos.control.l_cloud = flag_cloud
 
@@ -163,7 +167,7 @@ module atmosphere
     end
 
     # Calculate layer-average properties (e.g. density)
-    function calc_layer_props!(atmos)
+    function calc_layer_props!(atmos::atmosphere.Atmos_t)
         if !atmos.is_param
             error(" atmosphere parameters have not been set")
         end
@@ -206,13 +210,23 @@ module atmosphere
 
     end # End of calc_layer_props
 
-    # Set the pressure grid based on the current P_boa
-    function set_pressure_grid!(atmos)
-        if !atmos.is_param
-            error(" atmosphere parameters have not been set")
+    # Interpolate temperature-grid to cell edges
+    function interpolate_tmpl!(atmos::atmosphere.Atmos_t)
+
+        # Calculate cell-edge values
+        for idx in 2:atmos.nlev_l-1
+            atmos.tmpl[idx] = 0.5 * (atmos.tmpl[idx-1] + atmos.tmpl[idx])
         end
 
-        
+        # Calculate top boundary
+        dt = atmos.tmp[1]-atmos.tmpl[2]
+        dp = atmos.p[1]-atmos.pl[2]
+        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
+
+        # Calculate bottom boundary
+        dt = atmos.tmp[end]-atmos.tmpl[end-1]
+        dp = atmos.p[end]-atmos.pl[end-1]
+        atmos.tmpl[end] = atmos.tmp[end] + dt/dp * (atmos.pl[end] - atmos.p[end])
     end
     
     # Allocate atmosphere arrays and prepare for RT calculation
@@ -368,11 +382,11 @@ module atmosphere
         # Check Options
         ############################################
 
-        println("Blocks present:")
-        for i in 1:20
-            v = atmos.spectrum.Basic.l_present[i]
-            println("Block $i = $v")
-        end
+        # println("Blocks present:")
+        # for i in 1:20
+        #     v = atmos.spectrum.Basic.l_present[i]
+        #     println("Block $i = $v")
+        # end
 
         if atmos.control.l_rayleigh
             Bool(atmos.spectrum.Basic.l_present[3]) ||
@@ -475,18 +489,14 @@ module atmosphere
         atmos.flux_u =            zeros(Float64, atmos.nlev_l)
         atmos.flux_n =            zeros(Float64, atmos.nlev_l)
 
+        atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
+
         # Mark as allocated
         atmos.is_alloc = true
     end
 
 
     function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool)
-
-        if lw
-            println("Atmosphere: calculating LW fluxes")
-        else
-            println("Atmosphere: calculating SW fluxes")
-        end
 
         if !atmos.is_alloc
             error("atmosphere arrays have not been allocated")

@@ -18,8 +18,6 @@ module plotting
         Plot the temperature-pressure profile.
         """
 
-        println("Plotting PT profile")
-
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
         arr_P *= 1e-5
@@ -40,8 +38,6 @@ module plotting
         """
         Plot the fluxes at each pressure level
         """
-
-        println("Plotting fluxes")
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
 

@@ -8,17 +8,22 @@ end
 
 module solver 
 
+    # Include libraries
+    include("../socrates/julia/src/SOCRATES.jl")
+
     using Printf
     using Statistics
-    include("../socrates/julia/src/SOCRATES.jl")
-    include("atmosphere.jl")
-    include("phys.jl")
+    using Revise
+    
+    import atmosphere 
+    import phys
+    import plotting
 
     # Calculate heating rates at cell-centres
-    function calc_heat(atmos, sens::Bool)
+    function calc_heat!(atmos, sens::Bool)
 
-        dF = atmos.flux_n[1:end-1] - atmos.flux_n[2:end]
-        dp = atmos.pl[1:end-1]     - atmos.pl[2:end]
+        dF = atmos.flux_n[1:end-1] .- atmos.flux_n[2:end]
+        dp = atmos.pl[1:end-1]     .- atmos.pl[2:end]
 
         if sens
             C_d = 0.001  # Turbulent exchange coefficient [dimensionless]
@@ -28,37 +33,44 @@ module solver
             dF[end] += sens
         end
 
-        heat = zeros(Float64, atmos.nlev_c)
-        heat += (atmos.layer_grav / atmos.layer_cp * atmos.layer_mmw) * dF/dp # K/s
-        heat *= 86400.0 # K/day
+        atmos.heating_rate[:] .= 0.0
+        for i in 1:atmos.nlev_c
+            atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i] * atmos.layer_mmw[i]) * dF[i]/dp[i] # K/s
+        end
+        atmos.heating_rate *= 86400.0 # K/day
 
-        return heat
     end
 
     # Calculates the time-step at each level for a given accuracy
-    function calc_stepsize(atmos, heat, dt_min, dt_max, dtmp_step_frac)
+    function calc_stepsize(atmos::atmosphere.Atmos_t, 
+                            dt_min::Float64, dt_max::Float64, dtmp_step_frac::Float64)
+        
+        dt = zeros(Float64, length(atmos.heating_rate))
 
-        @. expect_heat = abs(heat)
-        clamp!(expect_heat, 1e-30, Inf) # Prevent division by zero
-        dt = dtmp_step_frac * atmos.tmp / expect_heat
+        for i in 1:atmos.nlev_c
+            expect_heat = max( abs(atmos.heating_rate[i]) , 1e-30 )
+            dt[i] = dtmp_step_frac * atmos.tmp[i] / expect_heat
+        end 
 
         dt[end] *= 0.5
+
+        clamp!(dt, dt_min, dt_max)
 
         return dt
     end
 
     # Iterates the atmosphere at each level
-    function temperature_step!(atmos, 
-                                heat::Array, dt::Array, dtmp_clip::Float64, 
+    function temperature_step!(atmos::atmosphere.Atmos_t, 
+                                dt::Array, dtmp_clip::Float64, 
                                 fixed_bottom::Bool, smooth_width::Int64, 
                                 dryadj_steps::Int64, h2oadj_steps::Int64)
 
         bot_old_e = atmos.tmpl[end]
 
         # Apply radiative heating temperature change
-        dtmp = heat * dt 
+        dtmp = atmos.heating_rate .* dt 
         clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
-        atm.tmp += dtmp
+        atmos.tmp += dtmp
 
         adj_changed = 0
 
@@ -86,16 +98,11 @@ module solver
         clamp!(atmos.tmp, atmos.minT, Inf)
         
         # Interpolate to cell-edge values 
-        atmos.tmpl[1]   = atmos.tmp[1]
-        atmos.tmpl[end] = atmos.tmp[end]
-        for idx in 2:atmos.nlev_l-1
-            atmos.tmpl[idx] = 0.5 * (atmos.tmp[idx-1] + atmos.tmp[idx])
-        end 
+        atmosphere.interpolate_tmpl!(atmos)
 
         # Handle boundaries of temperature grid
-        # atm.tmpl[0]  = atm.tmp[0]
         if fixed_bottom
-            atm.tmpl[end] = bot_old_e
+            atmos.tmpl[end] = bot_old_e
         end
 
         # Temperature floor (edges)
@@ -103,16 +110,15 @@ module solver
             
         # Second interpolation back to cell-centres, to prevent grid impriting
         # at medium/low resolutions
-        atmos.tmp[:] .= 0.5 .* (atmos.tmpl[2:end] + atmos.tmpl[1:end-1])
+        atmos.tmp[:] .= 0.5 .* (atmos.tmpl[2:end] .+ atmos.tmpl[1:end-1])
 
         return adj_changed
     end
 
     # Radiative-convective solver
-    function solve_energy!(atmos,
-                            rscatter::Bool, 
+    function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int64=0, surf_value::Float64=350.0, ini_state::Int64=0, 
-                            gofast::Bool=true, dry_adjust::Bool=true, h2o_adjust::Bool=false, 
+                            dry_adjust::Bool=true, h2o_adjust::Bool=false, 
                             sens_heat::Bool=true,
                             verbose::Bool=true, plot::Bool=false )
 
@@ -120,10 +126,10 @@ module solver
         println("RCSolver: begin")
 
         # Run parameters
-        steps_max    = 140   # Maximum number of steps
-        dtmp_gofast  = 40.0  # Change in temperature below which to stop model acceleration
+        steps_max    = 250   # Maximum number of steps
         wait_adj     = 3     # Wait this many steps before introducing convective adjustment
-        modprint     = 10    # Frequency to print when verbose==False
+        modprint     = 10    # Frequency to print when verbose==false
+        len_hist     = 5     # Number of previous states to store
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
@@ -138,26 +144,37 @@ module solver
             @printf(" \n")
         end
 
+        # Tracking
+        adj_changed = 0
+        F_rchng = Inf
+        F_loss = 1.0e99         # Flux loss (TOA vs BOA)
+        F_TOA_rad = 1.0e99      # Net upward TOA radiative flux
+        F_BOA_rad = 0.0
+        F_OLR_rad = 0.0
+
         # Variables
         success = false         # Convergence criteria met
         step = 1                # Current step number
-        # atm_hist = []           # Store previous atmosphere states
-        F_loss = 1e99           # Flux loss (TOA vs BOA)
-        F_TOA_rad = 1e99        # Net upward TOA radiative flux
+        # atm_hist = Array{atmosphere.Atmos_t}(len_hist)  # Store previous n atmosphere states
         dtmp_comp = Inf         # Temperature change comparison
         drel_dt = Inf           # Rate of relative temperature change
         drel_dt_prev  = Inf     # Previous ^
         flag_prev = false       # Previous iteration is meeting convergence
-        step_frac = 1e-3        # Step size fraction relative to absolute temperature
-        stopfast = false        # Stopping the 'fast' phase?
-        # atm_orig = copy.deepcopy(atm)   # Initial atmosphere for plotting
+        step_frac = 5e-3        # Step size fraction relative to absolute temperature
+        dtmp_clip = 40.0
+        dryadj_steps = 20
+        h2oadj_steps = 20
+        dt_min = 1e-3
+        dt_max = 5.0
+        step_frac_max = 4e-3
+        smooth_window = 0
 
         # Handle surface boundary condition
         if surf_state == 0
             fixed_bottom = false
         elseif surf_state == 1
             fixed_bottom = true
-            atmos.tmpl[end] = atmos.T_surf
+            atmos.tmpl[end] = atmos.tstar
         elseif surf_state == 2
             fixed_bottom = true
             atmos.tmpl[end] = max(surf_value,atmos.minT)
@@ -174,6 +191,10 @@ module solver
         # Main loop
         while (!success) && (step <= steps_max)
 
+            if verbose || ( mod(step,modprint) == 0)
+                @printf("    step %d \n", step)
+            end
+
             # Validate arrays
             if !(all(isfinite, atmos.tmp) && all(isfinite, atmos.tmpl))
                 error("Temperature array contains NaNs")
@@ -186,10 +207,10 @@ module solver
             # Get heating rates and step size
             atmosphere.radtrans!(atmos, true)
             atmosphere.radtrans!(atmos, false)
-            heat = calc_heat(atm, sens_heat && !fixed_bottom)
-            dt = calc_stepsize(atm, heat, dt_min, dt_max, step_frac)
+            calc_heat!(atmos, sens_heat && !fixed_bottom)
+            dt = calc_stepsize(atmos,dt_min, dt_max, step_frac)
             if verbose
-                @printf("    dt_max,med  = %.3f, %.3f days", maximum(dt), median(dt))
+                @printf("    dt_max,med  = %.3f, %.3f days \n", maximum(dt), median(dt))
             end
 
             # Cancel convective adjustment if disabled
@@ -203,26 +224,86 @@ module solver
             # Apply radiative heating rate for full step
             # optionally smooth temperature profile
             # optionally do convective adjustment
-            adj_changed = temperature_step!(atmos, heat, dt, 
+            adj_changed = temperature_step!(atmos, dt, 
                                             dtmp_clip, fixed_bottom,
                                             smooth_window,
                                             dryadj_steps, h2oadj_steps)
 
+            # Calculate relative rate of change in temperature
+            # if step > 1
+            #     drel_dt_prev = drel_dt
+            #     drel_dt = maximum(abs.(  ((atmos.tmp - atm_hist[end].tmp)./atm_hist[end].tmp)./dt  ))
+            # end
+
+            # Calculate average change in temperature (insensitive to oscillations)
+            # if step > 3:
+            #     tmp_comp_1 = np.array([ atm.tmp,          atm_hist[-1].tmp ]).mean(axis=0)
+            #     tmp_comp_2 = np.array([ atm_hist[-2].tmp, atm_hist[-3].tmp ]).mean(axis=0)
+            #     dtmp_comp = np.amax(np.abs(tmp_comp_1 - tmp_comp_2))
+
+            # Calculate (the change in) flux balance
+            F_TOA_rad_prev = F_TOA_rad
+            F_TOA_rad = atmos.flux_n[1]
+            F_rchng   = abs( (F_TOA_rad - F_TOA_rad_prev) / F_TOA_rad_prev * 100.0)
+
+            F_BOA_rad = atmos.flux_n[end]
+            F_OLR_rad = atmos.flux_u_lw[1]
+            F_loss = abs(F_TOA_rad-F_BOA_rad)
+
+            # Print debug info to stdout
+            if verbose
+                @printf("    count_adj   = %d layers   \n", adj_changed)
+                @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
+                @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
+                @printf("    F_rad^OLR   = %.2e W m-2  \n", F_OLR_rad)
+                @printf("    F_rad^TOA   = %.2e W m-2  \n", F_TOA_rad)
+                @printf("    F_rad^BOA   = %.2e W m-2  \n", F_BOA_rad)
+                @printf("    F_rad^loss  = %.2f W m-2  \n", F_loss)
+                @printf("    F_chng^TOA  = %.4f %%     \n", F_rchng)
+            end
+
+            # Plot 
+            if plot 
+                plotting.plot_pt(atmos, @sprintf("out/radeqm_monitor_%04d.png", step))
+            end 
+
+            # Convergence check requires that:
+            # - minimal temperature change for two iters
+            # - minimal rate of temperature change for two iters
+            # - minimal change to net radiative flux at TOA for two iters
+            # - solver is not in 'fast' mode, as it is unphysical
+            flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && (F_rchng < F_rchng_conv)
+            success   = flag_this && flag_prev
+            flag_prev = flag_this
             
+            # Prepare for next iter
+            @printf(" \n")
+            step += 1
 
         end # end main loop
 
         # Print information about the final state
         if !success
-            @printf("WARNING: Stopping atmosphere iterations without success")
-            @printf("    count_adj   = %d layers   ", adj_changed)
-            @printf("    max_change  = %.1f'th lvl ", big_dT_lvl)
-            @printf("    dtmp_comp   = %.3f K      ", dtmp_comp)
-            @printf("    dtmp/tmp/dt = %.3f day-1  ", drel_dt)
-            @printf("    F_chng^TOA  = %.4f %%     ", F_rchng)
+            @printf("WARNING: Stopping atmosphere iterations without success \n")
+            @printf("    count_adj   = %d layers   \n", adj_changed)
+            @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
+            @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
+            @printf("    F_chng^TOA  = %.4f %%     \n", F_rchng)
 
         else
-            @printf("Convergence criteria met (%d iterations)", step)
+            @printf("Convergence criteria met (%d iterations) \n", step)
+        end
+
+        @printf("Final radiative fluxes [W m-2] \n")
+        @printf("    OLR   = %.2e W m-2         \n", F_OLR_rad)
+        @printf("    TOA   = %.2e W m-2         \n", F_TOA_rad)
+        @printf("    BOA   = %.2e W m-2         \n", F_BOA_rad)
+        @printf("    loss  = %.2f W m-2         \n", F_loss)
+    
+        # Warn user if there's a sign difference in TOA vs BOA fluxes
+        # because this shouldn't be the case
+        if F_TOA_rad*F_BOA_rad < 0
+            @printf("WARNING: TOA and BOA radiative fluxes have different signs\n")
         end
 
     end # end solve_energy
