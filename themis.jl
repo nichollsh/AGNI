@@ -20,9 +20,9 @@ import solver
 
 
 # Configuration options
-tstar           = 2000.0    # LW uflux bottom boundary condition [kelvin]
+tstar           = 3000.0    # LW uflux bottom boundary condition [kelvin]
 zenith_degrees  = 45.53     # Zenith angle [degrees from zenith]
-toa_heating     = 4.451e+06 # SW dflux top boundary condition [W m-2]
+toa_heating     = 4.451e+04 # SW dflux top boundary condition [W m-2]
 gravity         = 9.81
 nlev_centre     = 100
 p_surf          = 100.0     # bar
@@ -58,7 +58,7 @@ atmosphere.allocate!(atmos)
 # println("OLR = $(atmos.flux_u_lw[1]) W m-2")
 
 # Call solver 
-solver.solve_energy!(atmos, surf_state=1, plot=true)
+solver.solve_energy!(atmos, surf_state=0, plot=true)
 
 # Save result
 atmosphere.write_pt(atmos, joinpath(output_dir,"pt.csv"))

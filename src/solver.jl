@@ -18,6 +18,53 @@ module solver
     import atmosphere 
     import phys
     import plotting
+    import moving_average
+
+    # Dry convective adjustment (single step)
+    function adjust_dry!(atmos)
+
+        Rcp = 2.0/7.0
+        
+        # Downward pass
+        for i in 1:atmos.nlev_c-1
+            T1 = atmos.tmp[i]
+            p1 = atmos.p[i]
+
+            T2 = atmos.tmp[i+1]
+            p2 = atmos.p[i+1]
+            
+            pfact = (p1/p2)^(phys.R_gas / atmos.layer_cp[i])
+            
+            # If slope is shallower than adiabat (unstable), adjust to adiabat
+            if T1 < T2*pfact
+                Tbar = 0.5 * ( T1 + T2 )
+                T2 = 2.0 * Tbar / (1.0 + pfact)
+                T1 = T2 * pfact
+                atmos.tmp[i]   = T1
+                atmos.tmp[i+1] = T2
+            end
+        end
+
+        # Upward pass
+        for i in atmos.nlev_c-1:2
+
+            T1 = atmos.tmp[i]
+            p1 = atmos.p[i]
+
+            T2 = atmos.tmp[i+1]
+            p2 = atmos.p[i+1]
+            
+            pfact = (p1/p2)^(phys.R_gas / atmos.layer_cp[i])
+
+            if T1 < T2*pfact
+                Tbar = 0.5 * ( T1 + T2 )
+                T2 = 2.0 * Tbar / ( 1.0 + pfact)
+                T1 = T2 * pfact
+                atmos.tmp[i]   = T1
+                atmos.tmp[i+1] = T2 
+            end 
+        end
+    end
 
     # Calculate heating rates at cell-centres
     function calc_heat!(atmos, sens::Bool)
@@ -80,9 +127,9 @@ module solver
 
         # Dry convective adjustment
         if dryadj_steps > 0
-            tmp_before_adj = ones(Float64, atmos.nlev_c) * atmos.tmp
+            tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
             for _ in 1:dryadj_steps
-                DryAdj!(atmos)
+                adjust_dry!(atmos)
             end
             adj_changed += count(x->x>0.0, tmp_before_adj - atmos.tmp) 
         end
@@ -95,8 +142,12 @@ module solver
         #     del tmp_before_adj
 
         # Smooth temperature profile
-        # if smooth_width > 1:
-        #     atm.tmp = savgol_filter(atm.tmp, smooth_width, 1)
+        if smooth_width > 2
+            if mod(smooth_width,2) == 0
+                smooth_width += 1
+            end
+            atmos.tmp = moving_average.hma(atmos.tmp, smooth_width)
+        end 
 
         # Temperature floor (centres)
         clamp!(atmos.tmp, atmos.minT, Inf)
@@ -173,12 +224,12 @@ module solver
         flag_prev = false       # Previous iteration is meeting convergence
         step_frac = 5e-3        # Step size fraction relative to absolute temperature
         dtmp_clip = 40.0
-        dryadj_steps = 20
-        h2oadj_steps = 20
+        dryadj_steps = 0
+        h2oadj_steps = 0
         dt_min = 1e-6
         dt_max = 5.0
         step_frac_max = 1e-3
-        smooth_window = 0
+        smooth_window = 2
 
         # Handle surface boundary condition
         if surf_state == 0
@@ -195,8 +246,8 @@ module solver
 
         # Handle initial state
         if ini_state == 1
-            atm.tmp[:]  = atm.tmpl[-1]
-            atm.tmpl[:] = atm.tmpl[-1]
+            atmos.tmp[:]  = atmos.tmpl[end]
+            atmos.tmpl[:] = atmos.tmpl[end]
         end
 
         # Main loop
@@ -224,12 +275,12 @@ module solver
                 @printf("    dt_max,med  = %.3f, %.3f days \n", maximum(dt), median(dt))
             end
 
-            # Cancel convective adjustment if disabled
-            if ( dry_adjust && (step < wait_adj)) || !dry_adjust 
-                dryadj_steps = 0
+            # Apply convective adjustment if ready
+            if dry_adjust && (step > wait_adj)
+                dryadj_steps = 50
             end
-            if ( h2o_adjust && (step < wait_adj)) || !h2o_adjust
-                h2oadj_steps = 0
+            if h2o_adjust && (step > wait_adj)
+                h2oadj_steps = 50
             end
 
             # Apply radiative heating rate for full step
