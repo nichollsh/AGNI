@@ -20,12 +20,12 @@ import solver
 
 
 # Configuration options
-tstar           = 3009.1    # LW uflux bottom boundary condition [kelvin]
+tstar           = 2000.0    # LW uflux bottom boundary condition [kelvin]
 zenith_degrees  = 45.53     # Zenith angle [degrees from zenith]
-toa_heating     = 4.451e+04 # SW dflux top boundary condition [W m-2]
+toa_heating     = 4.451e+06 # SW dflux top boundary condition [W m-2]
 gravity         = 9.81
 nlev_centre     = 100
-p_surf          = 147.2     # bar
+p_surf          = 100.0     # bar
 p_top           = 1e-7      # bar 
 mixing_ratios   = Dict([("CO", 0.8), ("H2O", 0.1), ("N2", 0.1)])
 
