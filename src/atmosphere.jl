@@ -102,7 +102,7 @@ module atmosphere
     # Set parameters of atmosphere
     function setup!(atmos::atmosphere.Atmos_t, 
                             spectral_file::String, all_channels::Bool,
-                            flag_rayleigh::Bool,flag_continuum::Bool,flag_aerosol::Bool,flag_cloud::Bool,
+                            flag_rayleigh::Bool,flag_gcontinuum::Bool,flag_aerosol::Bool,flag_cloud::Bool,
                             zenith_degrees::Float64,toa_heating::Float64,T_surf::Float64,
                             gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
                             mixing_ratios::Dict)
@@ -123,6 +123,8 @@ module atmosphere
         atmos.spectral_file =   spectral_file
         atmos.all_channels =    all_channels
 
+        atmos.minT =            30.0 
+
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  nlev_centre + 1
         atmos.zenith_degrees =  zenith_degrees
@@ -133,11 +135,10 @@ module atmosphere
         atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
         atmos.p_boa =           p_surf * 1.0e+5
 
-        atmos.minT =            30.0 
-
         atmos.control.l_gas = true
         atmos.control.l_rayleigh = flag_rayleigh
-        atmos.control.l_continuum = flag_continuum
+        atmos.control.l_continuum = false
+        atmos.control.l_cont_gen = flag_gcontinuum
         atmos.control.l_aerosol = flag_aerosol
         atmos.control.l_cloud = flag_cloud
 
@@ -163,6 +164,9 @@ module atmosphere
 
     # Calculate layer-average properties (e.g. density)
     function calc_layer_props!(atmos)
+        if !atmos.is_param
+            error(" atmosphere parameters have not been set")
+        end
 
         # Gravity (TODO: Make height-dependent)
         atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
@@ -201,6 +205,15 @@ module atmosphere
         end
 
     end # End of calc_layer_props
+
+    # Set the pressure grid based on the current P_boa
+    function set_pressure_grid!(atmos)
+        if !atmos.is_param
+            error(" atmosphere parameters have not been set")
+        end
+
+        
+    end
     
     # Allocate atmosphere arrays and prepare for RT calculation
     function allocate!(atmos::atmosphere.Atmos_t)
@@ -223,12 +236,6 @@ module atmosphere
         SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
                               spectral_file=atmos.control.spectral_file, 
                               l_all_gasses=true)
-
-        gas_index = zeros(Int, SOCRATES.gas_list_pcf.npd_gases) # pointers to gases in spectral file
-        for i in 1:atmos.spectrum.Gas.n_absorb
-            ti = atmos.spectrum.Gas.type_absorb[i]
-            gas_index[ti] = i
-        end
 
         #########################################
         # diagnostics
@@ -361,6 +368,12 @@ module atmosphere
         # Check Options
         ############################################
 
+        println("Blocks present:")
+        for i in 1:20
+            v = atmos.spectrum.Basic.l_present[i]
+            println("Block $i = $v")
+        end
+
         if atmos.control.l_rayleigh
             Bool(atmos.spectrum.Basic.l_present[3]) ||
                 error("The spectral file contains no rayleigh scattering data.")
@@ -379,6 +392,11 @@ module atmosphere
         if atmos.control.l_continuum
             Bool(atmos.spectrum.Basic.l_present[9]) ||
                 error("The spectral file contains no continuum absorption data.")
+        end
+
+        if atmos.control.l_cont_gen
+            Bool(atmos.spectrum.Basic.l_present[19]) ||
+                error("The spectral file contains no generalised continuum absorption data.")
         end
 
 
@@ -402,12 +420,7 @@ module atmosphere
             end
         end
 
-        ################################
-        # Layer average properties
-        #################################
-
         calc_layer_props!(atmos)
-        
 
         ################################
         # Aerosol processes
@@ -582,15 +595,8 @@ module atmosphere
         ####################################################
 
         if lw
-            atmos.control.l_ir_source_quad = false
-            # control.l_ir_source_quad = true  # Cl_run_cdf -q
+            atmos.control.l_ir_source_quad = true
         end
-
-        #####################################################
-        # Re-calculate layer properties 
-        ####################################################
-
-        calc_layer_props!(atmos)
 
         ######################################################
         # Run radiative transfer model
@@ -603,6 +609,8 @@ module atmosphere
         atmos.atm.t[1, :] .= atmos.tmp[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
+
+        calc_layer_props!(atmos)
 
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
                                 atmos.atm, atmos.cld, atmos.aer, 
@@ -625,7 +633,7 @@ module atmosphere
             for lv in 1:atmos.nlev_l                # sum over levels
                 for ch in 1:atmos.dimen.nd_channel  # sum over channels
                     idx = lv+(ch-1)*atmos.nlev_l
-                    atmos.flux_d_sw[lv] += atmos.radout.flux_down[idx] + atmos.radout.flux_direct[idx]
+                    atmos.flux_d_sw[lv] += atmos.radout.flux_down[idx]
                     atmos.flux_u_sw[lv] += atmos.radout.flux_up[idx]
                 end 
                 atmos.flux_n_sw[lv] = atmos.flux_u_sw[lv] - atmos.flux_d_sw[lv]

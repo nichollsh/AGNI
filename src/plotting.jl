@@ -12,6 +12,7 @@ module plotting
     using Plots
     include("atmosphere.jl")
 
+
     function plot_pt(atmos, fname)
         """
         Plot the temperature-pressure profile.
@@ -24,7 +25,7 @@ module plotting
         arr_P *= 1e-5
 
         # Plot PT profile
-        plt = plot(legend=false)
+        plt = plot(legend=false, framestyle=:box)
         plot!(plt, arr_T, arr_P, lc="black", lw=2)
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
@@ -44,27 +45,27 @@ module plotting
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
 
-        
         w = 2
-        plt = plot(legend=:top)
+        plt = plot(legend=:topleft, framestyle=:box)
+
+        col_u = "brown3"
+        col_d = "seagreen"
+        col_n = "black"
         
         if atmos.is_out_lw
-            c = "brown3"
-            plot!(plt, -1.0.*atmos.flux_d_lw, arr_P, label="LW ↓", lw=w, lc=c, ls=:dot)
-            plot!(plt, atmos.flux_u_lw, arr_P,       label="LW ↑", lw=w, lc=c, ls=:dash)
-            plot!(plt, atmos.flux_n_lw, arr_P,       label="LW ⇅", lw=w, lc=c, ls=:solid)
+            plot!(plt, -1.0.*atmos.flux_d_lw, arr_P, label="DN LW", lw=w, lc=col_d, ls=:dash)
+            plot!(plt, atmos.flux_u_lw, arr_P,       label="UP LW", lw=w, lc=col_u, ls=:dash)
         end
 
         if atmos.is_out_sw
-            c = "royalblue3"
-            plot!(plt, -1.0.*atmos.flux_d_sw, arr_P, label="SW ↓", lw=w, lc=c, ls=:dot)
-            plot!(plt, atmos.flux_u_sw, arr_P,       label="SW ↑", lw=w, lc=c, ls=:dash)
-            plot!(plt, atmos.flux_n_sw, arr_P,       label="SW ⇅", lw=w, lc=c, ls=:solid)
+            plot!(plt, -1.0.*atmos.flux_d_sw, arr_P, label="DN SW", lw=w, lc=col_d, ls=:dot)
+            plot!(plt, atmos.flux_u_sw, arr_P,       label="UP SW", lw=w, lc=col_u, ls=:dot)
         end 
 
         if atmos.is_out_lw && atmos.is_out_sw
-            c = "seagreen"
-            plot!(plt, atmos.flux_n, arr_P, label="Total", lw=w, lc=c, ls=:solid)
+            plot!(plt, atmos.flux_u, arr_P,         label="UP",  lw=w, lc=col_u, ls=:solid)
+            plot!(plt, -1.0*atmos.flux_d, arr_P,    label="DN",  lw=w, lc=col_d, ls=:solid)
+            plot!(plt, atmos.flux_n, arr_P,         label="NET", lw=w, lc=col_n, ls=:solid)
         end 
 
         xlabel!(plt, "Upward directed flux [W m-2]")
