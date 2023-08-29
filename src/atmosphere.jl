@@ -210,25 +210,6 @@ module atmosphere
 
     end # End of calc_layer_props
 
-    # Interpolate temperature-grid to cell edges
-    function interpolate_tmpl!(atmos::atmosphere.Atmos_t)
-
-        # Calculate cell-edge values
-        for idx in 2:atmos.nlev_l-1
-            atmos.tmpl[idx] = 0.5 * (atmos.tmpl[idx-1] + atmos.tmpl[idx])
-        end
-
-        # Calculate top boundary
-        dt = atmos.tmp[1]-atmos.tmpl[2]
-        dp = atmos.p[1]-atmos.pl[2]
-        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
-
-        # Calculate bottom boundary
-        dt = atmos.tmp[end]-atmos.tmpl[end-1]
-        dp = atmos.p[end]-atmos.pl[end-1]
-        atmos.tmpl[end] = atmos.tmp[end] + dt/dp * (atmos.pl[end] - atmos.p[end])
-    end
-    
     # Allocate atmosphere arrays and prepare for RT calculation
     function allocate!(atmos::atmosphere.Atmos_t)
 
@@ -524,7 +505,6 @@ module atmosphere
         else
             Bool(atmos.spectrum.Basic.l_present[2]) ||
                 error("The spectral file contains no solar spectral data.")
-
              
             atmos.bound.zen_0[1] = atmos.zenith_degrees # Assign the solar zenith angle
             atmos.bound.solar_irrad[1] = atmos.toa_heating   # The file of solar irradiances.

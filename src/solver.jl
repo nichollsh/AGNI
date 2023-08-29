@@ -22,13 +22,17 @@ module solver
     # Calculate heating rates at cell-centres
     function calc_heat!(atmos, sens::Bool)
 
-        dF = atmos.flux_n[1:end-1] .- atmos.flux_n[2:end]
-        dp = atmos.pl[1:end-1]     .- atmos.pl[2:end]
+        dF = zeros(Float64, atmos.nlev_c)
+        dp = zeros(Float64, atmos.nlev_c)
+
+        for i in 1:atmos.nlev_c
+            dF[i] = atmos.flux_n[i+1] - atmos.flux_n[i]
+            dp[i] = atmos.pl[i+1]     - atmos.pl[i]
+        end 
 
         if sens
             C_d = 0.001  # Turbulent exchange coefficient [dimensionless]
             U = 10.0     # Wind speed [m s-1]
-
             sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * C_d * U * (atmos.tstar - atmos.tmpl[end])
             dF[end] += sens
         end
@@ -38,7 +42,7 @@ module solver
             atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i] * atmos.layer_mmw[i]) * dF[i]/dp[i] # K/s
         end
         atmos.heating_rate *= 86400.0 # K/day
-
+    
     end
 
     # Calculates the time-step at each level for a given accuracy
@@ -98,19 +102,26 @@ module solver
         clamp!(atmos.tmp, atmos.minT, Inf)
         
         # Interpolate to cell-edge values 
-        atmosphere.interpolate_tmpl!(atmos)
+        for idx in 2:atmos.nlev_l-1
+            atmos.tmpl[idx] = 0.5 * (atmos.tmp[idx-1] + atmos.tmp[idx])
+        end
 
-        # Handle boundaries of temperature grid
+        # Calculate top boundary
+        dt = atmos.tmp[1]-atmos.tmpl[2]
+        dp = atmos.p[1]-atmos.pl[2]
+        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
+
+        # Calculate bottom boundary
         if fixed_bottom
             atmos.tmpl[end] = bot_old_e
+        else
+            dt = atmos.tmp[end]-atmos.tmpl[end-1]
+            dp = atmos.p[end]-atmos.pl[end-1]
+            atmos.tmpl[end] = atmos.tmp[end] + dt/dp * (atmos.pl[end] - atmos.p[end])
         end
 
         # Temperature floor (edges)
         clamp!(atmos.tmpl, atmos.minT, Inf)
-            
-        # Second interpolation back to cell-centres, to prevent grid impriting
-        # at medium/low resolutions
-        atmos.tmp[:] .= 0.5 .* (atmos.tmpl[2:end] .+ atmos.tmpl[1:end-1])
 
         return adj_changed
     end
@@ -164,9 +175,9 @@ module solver
         dtmp_clip = 40.0
         dryadj_steps = 20
         h2oadj_steps = 20
-        dt_min = 1e-3
+        dt_min = 1e-6
         dt_max = 5.0
-        step_frac_max = 4e-3
+        step_frac_max = 1e-3
         smooth_window = 0
 
         # Handle surface boundary condition
