@@ -12,6 +12,9 @@ module phys
     # Universal gas constant, J K-1 mol-1
     const R_gas = 8.31446261815324 
 
+    # Stefan-boltzmann constant, W m−2 K−4
+    const sigma = 5.670367e-8 
+
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict([
         ("H2O", 1.801530E-02 ), 

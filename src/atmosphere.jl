@@ -180,25 +180,23 @@ module atmosphere
             atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
         end
 
-        # Mean molecular weight and mass density
+        # mmw, cp, rho
         atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
         atmos.layer_density = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         for i in 1:atmos.atm.n_layer
 
-            # mmw and heat capacity
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb # for each gas
-                ti = atmos.spectrum.Gas.type_absorb[i_gas]
-                gas = SOCRATES.input_head_pcf.header_gas[ti]
+            # for each gas
+            for gas in keys(atmos.mr_gases) 
 
                 # set mmw
                 if gas in keys(atmos.mr_gases) 
-                    atmos.layer_mmw[i] += atmos.atm.gas_mix_ratio[1, i, i_gas] * phys.lookup_mmw[gas]
+                    atmos.layer_mmw[i] += atmos.mr_gases[gas] * phys.lookup_mmw[gas]
                 end
 
                 # set cp
                 if gas in keys(atmos.mr_gases) 
-                    atmos.layer_cp[i] += atmos.atm.gas_mix_ratio[1, i, i_gas] * phys.lookup_cp[gas] * phys.lookup_mmw[gas]
+                    atmos.layer_cp[i] += atmos.mr_gases[gas] * phys.lookup_cp[gas] * phys.lookup_mmw[gas]
                 end
 
             end
@@ -404,6 +402,7 @@ module atmosphere
             atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
         end
 
+        # Set mixing ratios
         for i_gas in 1:atmos.spectrum.Gas.n_absorb
             ti = atmos.spectrum.Gas.type_absorb[i_gas]
             gas = SOCRATES.input_head_pcf.header_gas[ti]
@@ -413,6 +412,19 @@ module atmosphere
             else
                 atmos.atm.gas_mix_ratio[:, :, i_gas] .= 0.0
             end
+        end
+
+        # Warn user if we are missing gases 
+        missing_gases = false
+        for i in 1:atmos.nlev_c
+            lvl_tot = 0.0
+            for i_gas in 1:atmos.spectrum.Gas.n_absorb
+                lvl_tot += atmos.atm.gas_mix_ratio[1, i, i_gas]
+            end 
+            missing_gases = missing_gases || (lvl_tot < 1.0)
+        end 
+        if missing_gases
+            println("WARNING: constituent gases are missing from the spectral file")
         end
 
         calc_layer_props!(atmos)
