@@ -7,7 +7,7 @@
 println("Begin THEMIS")
 
 using Revise
-using Plots
+using Printf
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
@@ -17,6 +17,7 @@ import atmosphere
 import setup_pt
 import plotting 
 import solver
+import phys
 
 
 # Configuration options
@@ -52,10 +53,10 @@ atmosphere.allocate!(atmos)
 # setup_pt.condensing!(atmos, "H2O")
 
 # Calculate LW and SW fluxes (once)
-# atmosphere.radtrans!(atmos, true)
-# atmosphere.radtrans!(atmos, false)
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
 
-# println("OLR = $(atmos.flux_u_lw[1]) W m-2")
+println("OLR = $(atmos.flux_u_lw[1]) W m-2")
 
 # Call solver 
 solver.solve_energy!(atmos, surf_state=0, plot=true)
