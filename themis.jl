@@ -8,6 +8,7 @@ println("Begin THEMIS")
 
 using Revise
 using Printf
+using Plots
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
@@ -53,15 +54,28 @@ atmosphere.setup!(atmos, spectral_file,
                          )
 atmosphere.allocate!(atmos)
 
-# Set to dry adiabat 
-setup_pt.dry_adiabat!(atmos)
-setup_pt.condensing!(atmos, "H2O")
+run_len = 50
+tsurf_arr = range(100,stop=2400,length=run_len)
+olr_arr = zeros(Float64, run_len)
+for i in 1:run_len
 
-# Calculate LW and SW fluxes (once)
-atmosphere.radtrans!(atmos, true)
-atmosphere.radtrans!(atmos, false)
+    # Set PT profile 
+    atmos.tstar = tsurf_arr[i]
+    setup_pt.dry_adiabat!(atmos)
+    setup_pt.condensing!(atmos, "H2O")
 
-println("OLR = $(atmos.flux_u_lw[1]) W m-2")
+    # Calculate LW and SW fluxes (once)
+    atmosphere.radtrans!(atmos, true)
+    atmosphere.radtrans!(atmos, false)
+
+    olr = atmos.flux_u_lw[1]
+    @printf("Tsurf = %4.1f K  ,  OLR = %5.1f W m-2 \n",tsurf_arr[i],olr)
+    olr_arr[i] = olr 
+
+end
+
+plt = plot(tsurf_arr,olr_arr)
+savefig(plt, "runaway.pdf")
 
 # Call solver 
 # solver.solve_energy!(atmos, surf_state=0, plot=true)

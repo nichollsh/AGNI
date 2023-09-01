@@ -627,6 +627,9 @@ module atmosphere
         # Store new fluxes in atmos struct
         if lw 
             # LW case
+            atmos.flux_u_lw[:] .= 0.0
+            atmos.flux_d_lw[:] .= 0.0
+            atmos.flux_n_lw[:] .= 0.0
             for lv in 1:atmos.nlev_l                # sum over levels
                 for ch in 1:atmos.dimen.nd_channel  # sum over channels
                     idx = lv+(ch-1)*atmos.nlev_l
@@ -637,7 +640,10 @@ module atmosphere
             end
             atmos.is_out_lw = true 
         else
-            # SW case include direct beam
+            # SW case
+            atmos.flux_u_sw[:] .= 0.0
+            atmos.flux_d_sw[:] .= 0.0
+            atmos.flux_n_sw[:] .= 0.0
             for lv in 1:atmos.nlev_l                # sum over levels
                 for ch in 1:atmos.dimen.nd_channel  # sum over channels
                     idx = lv+(ch-1)*atmos.nlev_l
