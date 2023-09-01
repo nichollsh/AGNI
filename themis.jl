@@ -21,14 +21,14 @@ import phys
 
 
 # Configuration options
-tstar           = 3000.0    # LW uflux bottom boundary condition [kelvin]
+tstar           = 1700.0    # LW uflux bottom boundary condition [kelvin]
 zenith_degrees  = 45.53     # Zenith angle [degrees from zenith]
 toa_heating     = 4.451e+04 # SW dflux top boundary condition [W m-2]
 gravity         = 9.81
 nlev_centre     = 100
-p_surf          = 100.0     # bar
+p_surf          = 300.0     # bar
 p_top           = 1e-7      # bar 
-mixing_ratios   = Dict([("CO", 0.8), ("H2O", 0.1), ("N2", 0.1)])
+mixing_ratios   = Dict([("H2O", 1.0)])
 
 # spectral_file = "socrates/data/spectra/ga7/sp_lw_ga7" 
 spectral_file = "res/runtime_spectral_file_rscat"
@@ -38,19 +38,24 @@ output_dir = "out/"
 rm(output_dir,force=true,recursive=true)
 mkdir(output_dir)
 
+# Read T(p) from CSV 
+# read_atmos = setup_pt.readcsv("res/tptest.csv")
+# p_surf = read_atmos["p_surf"]
+# tstar  = read_atmos["T_surf"]
+
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, spectral_file, true,
-                        false, true, false, false,
-                        zenith_degrees, toa_heating, tstar,
-                        gravity, nlev_centre, p_surf, p_top,
-                        mixing_ratios
-                        )
+atmosphere.setup!(atmos, spectral_file,
+                         zenith_degrees, toa_heating, tstar,
+                         gravity, nlev_centre, p_surf, p_top,
+                         mixing_ratios,
+                         flag_gcontinuum=true
+                         )
 atmosphere.allocate!(atmos)
 
 # Set to dry adiabat 
-# setup_pt.dry_adiabat!(atmos)
-# setup_pt.condensing!(atmos, "H2O")
+setup_pt.dry_adiabat!(atmos)
+setup_pt.condensing!(atmos, "H2O")
 
 # Calculate LW and SW fluxes (once)
 atmosphere.radtrans!(atmos, true)
@@ -59,7 +64,7 @@ atmosphere.radtrans!(atmos, false)
 println("OLR = $(atmos.flux_u_lw[1]) W m-2")
 
 # Call solver 
-solver.solve_energy!(atmos, surf_state=0, plot=true)
+# solver.solve_energy!(atmos, surf_state=0, plot=true)
 
 # Save result
 atmosphere.write_pt(atmos, joinpath(output_dir,"pt.csv"))

@@ -9,7 +9,96 @@ end
 module setup_pt
 
     include("phys.jl")
-    import DifferentialEquations
+
+    # Read atmosphere T(p) from a file (DOES NOT SET ATMOS STRUCT DIRECTLY) 
+    function readcsv(fpath)
+
+        # Check file exists
+        if !isfile(fpath)
+            error("File '$fpath' does not exist")
+        end 
+
+        # Read file 
+        content = readlines(fpath)
+
+        # Parse file once, to get number of level edges 
+        nlev_e = 0  
+        for l in content
+            if isempty(l) || (l[1] == '#') || (l[1] == '\n')
+                continue 
+            end
+            nlev_e += 1
+        end
+
+        # Validate 
+        if nlev_e < 3
+            error("Csv file contains too few levels (contains $nlev_e edge values)")
+        end
+        nlev_c = nlev_e - 1
+
+        # Allocate T and P arrays 
+        tmpl = zeros(Float64,nlev_e)
+        tmp  = zeros(Float64,nlev_c)
+        pl   = zeros(Float64,nlev_e)
+        p    = zeros(Float64,nlev_c)
+
+        # Parse file again, storing data this time
+        idx = 1
+        for l in content
+            # Skip
+            if isempty(l) || (l[1] == '#') || (l[1] == '\n')
+                continue 
+            end
+
+            # Read
+            lsplit = split(strip(l,[' ','#','\t','\n']),',')
+            p_val = parse(Float64,lsplit[1])  # Pressure [Pa]
+            t_val = parse(Float64,lsplit[2])  # Temperature [K]
+
+            # Validate 
+            if p_val <= 0.0
+                error("Negative pressure(s) in csv file")
+            end 
+            if t_val <= 0.0
+                error("Negative temperature(s) in csv file")
+            end 
+
+            # Store
+            pl[idx] = p_val 
+            tmpl[idx] = t_val
+
+            # Iterate 
+            idx += 1
+        end 
+
+        # Check if arrays are flipped 
+        if pl[1] > pl[2]  
+            pl = reverse(pl)
+            tmpl = reverse(tmpl)
+        end 
+
+        # Check that pressure is monotonic
+        for i in 1:nlev_c
+            if pl[i] > pl[i+1]
+                error("Pressure is not monotonic in csv file")
+            end
+        end
+
+        # Interpolate to cell-centres
+        p[:]   .= 0.5 .* (pl[2:end]   + pl[1:end-1]  )
+        tmp[:] .= 0.5 .* (tmpl[2:end] + tmpl[1:end-1])
+
+        # Return dict 
+        output = Dict([
+                        ("p_surf", pl[end]),
+                        ("T_surf", tmpl[end]), 
+                        ("p", p),
+                        ("pl",pl),
+                        ("tmp",tmp),
+                        ("tmpl",tmpl)
+                      ])
+        return output
+    end
 
     # Set atmosphere to be isothermal
     function isothermal!(atmos, set_tmp)
