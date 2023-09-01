@@ -75,7 +75,7 @@ for i in 1:run_len
 end
 
 plt = plot(tsurf_arr,olr_arr)
-savefig(plt, "runaway.pdf")
+savefig(plt, "out/runaway.pdf")
 
 # Call solver 
 # solver.solve_energy!(atmos, surf_state=0, plot=true)
