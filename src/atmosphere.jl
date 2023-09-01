@@ -106,11 +106,16 @@ module atmosphere
 
     # Set parameters of atmosphere
     function setup!(atmos::atmosphere.Atmos_t, 
-                            spectral_file::String, all_channels::Bool,
-                            flag_rayleigh::Bool,flag_gcontinuum::Bool,flag_aerosol::Bool,flag_cloud::Bool,
-                            zenith_degrees::Float64,toa_heating::Float64,T_surf::Float64,
-                            gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
-                            mixing_ratios::Dict)
+                    spectral_file::String, zenith_degrees::Float64, 
+                    toa_heating::Float64,tstar::Float64,
+                    gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
+                    mixing_ratios::Dict;
+                    all_channels::Bool  =   true,
+                    flag_rayleigh::Bool =   false,
+                    flag_gcontinuum::Bool = false,
+                    flag_aerosol::Bool =    false,
+                    flag_cloud::Bool =      false
+                    )
 
         println("Atmosphere: instantiating SOCRATES objects")
         atmos.dimen =       SOCRATES.StrDim()
@@ -134,7 +139,7 @@ module atmosphere
         atmos.nlev_l         =  nlev_centre + 1
         atmos.zenith_degrees =  zenith_degrees
         atmos.toa_heating =     toa_heating
-        atmos.tstar =           max(T_surf, atmos.minT)
+        atmos.tstar =           max(tstar, atmos.minT)
         atmos.grav_surf =       gravity
 
         atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
@@ -143,6 +148,7 @@ module atmosphere
         atmos.control.l_gas = true
         atmos.control.l_rayleigh = flag_rayleigh
         atmos.control.l_continuum = false
+        atmos.control.l_cont_gen = flag_gcontinuum
         atmos.control.l_aerosol = flag_aerosol
         atmos.control.l_cloud = flag_cloud
 
