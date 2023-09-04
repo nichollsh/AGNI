@@ -23,8 +23,6 @@ module solver
     # Dry convective adjustment (single step)
     function adjust_dry!(atmos)
 
-        Rcp = 2.0/7.0
-        
         # Downward pass
         for i in 1:atmos.nlev_c-1
             T1 = atmos.tmp[i]
@@ -189,7 +187,7 @@ module solver
 
         # Run parameters
         steps_max    = 250   # Maximum number of steps
-        wait_adj     = 3     # Wait this many steps before introducing convective adjustment
+        wait_adj     = 999     # Wait this many steps before introducing convective adjustment
         modprint     = 10    # Frequency to print when verbose==false
         len_hist     = 5     # Number of previous states to store
 
@@ -222,14 +220,14 @@ module solver
         drel_dt = Inf           # Rate of relative temperature change
         drel_dt_prev  = Inf     # Previous ^
         flag_prev = false       # Previous iteration is meeting convergence
-        step_frac = 5e-3        # Step size fraction relative to absolute temperature
+        step_frac = 1e-2        # Step size fraction relative to absolute temperature
         dtmp_clip = 40.0
         dryadj_steps = 0
         h2oadj_steps = 0
-        dt_min = 1e-6
-        dt_max = 5.0
+        dt_min = 1e-4
+        dt_max = 1e3
         step_frac_max = 1e-3
-        smooth_window = 2
+        smooth_window = 0
 
         # Handle surface boundary condition
         if surf_state == 0
@@ -324,7 +322,8 @@ module solver
                 @printf("    F_chng^TOA  = %.4f %%     \n", F_rchng)
             end
 
-            # Plot 
+            # Plot current state
+            # Animate frames with `ffmpeg -framerate 5 -i out/radeqm_monitor_%04d.png -y out/anim.mp4`
             if plot 
                 plotting.plot_pt(atmos, @sprintf("out/radeqm_monitor_%04d.png", step))
             end 

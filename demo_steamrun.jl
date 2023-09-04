@@ -12,7 +12,7 @@ include("socrates/julia/src/SOCRATES.jl")
 
 push!(LOAD_PATH, joinpath(pwd(),"src"))
 import atmosphere
-import setup_pt
+import setpt
 import phys
 
 
@@ -26,7 +26,8 @@ p_surf          = 300.0     # bar
 p_top           = 1e-7      # bar 
 mixing_ratios   = Dict([("H2O", 1.0)])
 
-spectral_file = "res/runtime_spectral_file_rscat"
+spectral_file = "res/spectral_files/Oak/Oak"
+star_file     = "res/stellar_spectra/spec_sun.txt"
 output_dir = "out/"
 
 # Create output direct
@@ -37,22 +38,23 @@ mkdir(output_dir)
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, spectral_file,
-                         zenith_degrees, toa_heating, tstar,
+                         star_file, zenith_degrees, 
+                         toa_heating, tstar,
                          gravity, nlev_centre, p_surf, p_top,
                          mixing_ratios,
                          flag_gcontinuum=true
                          )
 atmosphere.allocate!(atmos)
 
-run_len = 20
-tsurf_arr = range(100,stop=2100,length=run_len)
+run_len = 30
+tsurf_arr = range(100,stop=2200,length=run_len)
 olr_arr = zeros(Float64, run_len)
 for i in 1:run_len
 
     # Set PT profile 
     atmos.tstar = tsurf_arr[i]
-    setup_pt.dry_adiabat!(atmos)
-    setup_pt.condensing!(atmos, "H2O")
+    setpt.dry_adiabat!(atmos)
+    setpt.condensing!(atmos, "H2O")
 
     # Calculate LW and SW fluxes (once)
     atmosphere.radtrans!(atmos, true)
