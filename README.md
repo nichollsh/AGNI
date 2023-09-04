@@ -37,15 +37,16 @@ Pronounced: *them-iss*. Named after the goddess of justice and order.
 8. `julia> ]`
 9. `(@v1.9) pkg> add OffsetArrays`
 10. `(@v1.9) pkg> add Revise`
-11. `(@v1.9) pkg> activate .`
-12. Press backspace
-13. `julia> cd("src")`
-14. `julia> include("generate_wrappers.jl")`
-15. `julia> exit()`
-16. `$ cd lib`
-17. `$ make`
-18. `$ cd ..`
-19. You should end up in a directory called 'julia'.
+11. `(@v1.9) pkg> add CSV`
+12. `(@v1.9) pkg> activate .`
+13. Press backspace
+14. `julia> cd("src")`
+15. `julia> include("generate_wrappers.jl")`
+16. `julia> exit()`
+17. `$ cd lib`
+18. `$ make`
+19. `$ cd ..`   
+You should end up in a directory called 'julia'.
 
 ### Run instructions
 Simply run `$ julia themis.jl` in the root directory of the repository.

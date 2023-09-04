@@ -38,6 +38,7 @@ module atmosphere
         # SOCRATES parameters
         all_channels::Bool 
         spectral_file::String 
+        stellar_spectrum::String
         surface_albedo::Float64 
         zenith_degrees::Float64 
         toa_heating::Float64 
@@ -106,7 +107,8 @@ module atmosphere
 
     # Set parameters of atmosphere
     function setup!(atmos::atmosphere.Atmos_t, 
-                    spectral_file::String, zenith_degrees::Float64, 
+                    spectral_file::String, 
+                    stellar_spectrum::String, zenith_degrees::Float64, 
                     toa_heating::Float64,tstar::Float64,
                     gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
                     mixing_ratios::Dict;
@@ -130,7 +132,7 @@ module atmosphere
         println("Atmosphere: setting parameters")
 
         # Set parameters
-        atmos.spectral_file =   spectral_file
+        atmos.spectral_file =   spectral_file  # spectral file (no rscat, no star)
         atmos.all_channels =    all_channels
 
         atmos.minT =            30.0 
@@ -138,6 +140,7 @@ module atmosphere
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  nlev_centre + 1
         atmos.zenith_degrees =  zenith_degrees
+        atmos.stellar_spectrum = stellar_spectrum
         atmos.toa_heating =     toa_heating
         atmos.tstar =           max(tstar, atmos.minT)
         atmos.grav_surf =       gravity
@@ -170,6 +173,20 @@ module atmosphere
 
         # Record that the parameters are set
         atmos.is_param = true
+    end
+
+    # Get mixing ratio of gas in atmosphere struct
+    function get_mr(atmos::atmosphere.Atmos_t, gas::String)
+
+        gas_valid = strip(gas, ' ')
+        gas_valid = uppercase(gas_valid)
+
+        mr = 0.0
+        if gas_valid in keys(atmos.mr_gases)
+            mr = atmos.mr_gases[gas_valid]
+        end 
+
+        return mr
     end
 
     # Calculate layer-average properties (e.g. density)
@@ -231,10 +248,29 @@ module atmosphere
         # spectral data
         #########################################
 
-        atmos.control.spectral_file = atmos.spectral_file
+        run_spectral_file = ".spfile_run"
+
+        # Insert stellar spectrum (always)
+        py_cmd = `python src/insert_stellar.py $(atmos.stellar_spectrum) $(atmos.spectral_file) $(run_spectral_file)`
+        run(py_cmd)
+
+        # Insert rayleigh scattering (optionally)
+        if atmos.control.l_rayleigh
+            co2_mr = get_mr(atmos, "co2")
+            n2_mr  = get_mr(atmos, "n2")
+            h2o_mr = get_mr(atmos, "h2o")
+            py_cmd = `python src/insert_rayleigh.py $run_spectral_file $co2_mr $n2_mr $h2o_mr`
+            run(py_cmd)
+        end
+
+        # Read-in spectral file to be used at runtime
+        atmos.control.spectral_file = run_spectral_file
         SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
                               spectral_file=atmos.control.spectral_file, 
                               l_all_gasses=true)
+
+        rm(run_spectral_file; force=true)
+        rm(run_spectral_file*"_k"; force=true)
 
         #########################################
         # diagnostics
