@@ -6,12 +6,14 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
-module setup_pt
+module setpt
 
     include("phys.jl")
 
-    # Read atmosphere T(p) from a file (DOES NOT SET ATMOS STRUCT DIRECTLY) 
-    function readcsv(fpath)
+    using PCHIPInterpolation
+
+    # Read atmosphere T(p) from a file 
+    function csv!(atmos, fpath)
 
         # Check file exists
         if !isfile(fpath)
@@ -84,20 +86,19 @@ module setup_pt
             end
         end
 
-        # Interpolate to cell-centres
-        p[:]   .= 0.5 .* (pl[2:end]   + pl[1:end-1]  )
-        tmp[:] .= 0.5 .* (tmpl[2:end] + tmpl[1:end-1])
+        # Set pressure grid
+        atmos.p_boa = pl[end]
+        atmos.p_toa = pl[1]
+        atmosphere.generate_pgrid!(atmos)
 
-        # Return dict 
-        output = Dict([
-                        ("p_surf", pl[end]),
-                        ("T_surf", tmpl[end]), 
-                        ("p", p),
-                        ("pl",pl),
-                        ("tmp",tmp),
-                        ("tmpl",tmpl)
-                      ])
-        return output
+        # Set temperatures
+        atmos.tstar = tmpl[end]
+
+        itp = Interpolator(pl, tmpl) # Cell edges 
+        atmos.tmpl[:] .= itp.(atmos.pl)
+
+        itp = Interpolator(p, tmp) # Cell centres 
+        atmos.tmp[:] .= itp.(atmos.p)
     end
 
     # Set atmosphere to be isothermal
@@ -135,8 +136,6 @@ module setup_pt
 
     # Set atmosphere to phase curve of 'con' when it enters condensible region
     function condensing!(atmos, con::String)
-
-        # Validate input
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup")
         end 
@@ -144,10 +143,19 @@ module setup_pt
             error("Invalid condensible $con")
         end 
 
+        # Get properties
         L = phys.lookup_L_vap[con]
         R = phys.R_gas / phys.lookup_mmw[con]
         p0 = phys.lookup_P_trip[con]
         T0 = phys.lookup_T_trip[con]
+
+        # Check surface pressure (should not be supersaturated)
+        tsurf = atmos.tmpl[end]
+        psat = p0 * exp( L/R * (1/T0 - 1/tsurf)   )
+        if atmos.pl[end] > psat 
+            atmos.p_boa = psat 
+            atmosphere.generate_pgrid!(atmos)
+        end
 
         # Check if each level is condensing. If it is, place on phase curve
         for i in 1:atmos.nlev_c

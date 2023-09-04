@@ -13,11 +13,14 @@ Pronounced: *them-iss*. Named after the goddess of justice and order.
 * `res/`            - Resources
 * `src/`            - THEMIS source code
 * `socrates/`       - Directory containing SOCRATES and associated files
-* `themis.jl`       - THEMIS run file
+* `themis.jl`       - Main THEMIS run file
+* `demo_steamrun.jl`- Demo THEMIS run file (steam runaway greenhouse effect)
 
 
 ### Requirements
 * Julia (version 1.9.1 or later)
+* Python (version 3.10 or later)
+* NumPy and SciPy
 * gfortran
 * NetCDF
 * netcdf-fortran
@@ -37,7 +40,7 @@ Pronounced: *them-iss*. Named after the goddess of justice and order.
 8. `julia> ]`
 9. `(@v1.9) pkg> add OffsetArrays`
 10. `(@v1.9) pkg> add Revise`
-11. `(@v1.9) pkg> add CSV`
+11. `(@v1.9) pkg> add PCHIPInterpolation`
 12. `(@v1.9) pkg> activate .`
 13. Press backspace
 14. `julia> cd("src")`

@@ -13,7 +13,7 @@ include("socrates/julia/src/SOCRATES.jl")
 
 push!(LOAD_PATH, joinpath(pwd(),"src"))
 import atmosphere
-import setup_pt
+import setpt
 import plotting 
 import solver
 import phys
@@ -27,10 +27,13 @@ gravity         = 9.81
 nlev_centre     = 100
 p_surf          = 300.0     # bar
 p_top           = 1e-7      # bar 
-mixing_ratios   = Dict([("H2O", 1.0)])
+mixing_ratios   = Dict([
+                        ("CO" , 0.90),
+                        ("CO2", 0.05),
+                        ("N2" , 0.05)
+                        ])
 
-# spectral_file = "res/runtime_spectral_file_rscat"
-spectral_file = "res/spectral_files/Oak/Oak"
+spectral_file = "res/spectral_files/Reach/Reach"
 star_file     = "res/stellar_spectra/spec_sun.txt"
 output_dir = "out/"
 
@@ -51,15 +54,15 @@ atmosphere.setup!(atmos, spectral_file,
 atmosphere.allocate!(atmos)
 
 # Set PT profile 
-setup_pt.dry_adiabat!(atmos)
-setup_pt.condensing!(atmos, "H2O")
+setpt.dry_adiabat!(atmos)
+# setpt.condensing!(atmos, "H2O")
 
 # Calculate LW and SW fluxes (once)
 atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-# solver.solve_energy!(atmos, surf_state=0, plot=true)
+solver.solve_energy!(atmos, surf_state=0, plot=true)
 
 # Save result
 atmosphere.write_pt(atmos, joinpath(output_dir,"pt.csv"))

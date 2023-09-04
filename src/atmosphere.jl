@@ -229,7 +229,17 @@ module atmosphere
             atmos.atm.density[1,i] = atmos.layer_density[i]
         end
 
-    end # End of calc_layer_props
+    end 
+
+    # Generate log-spaced pressure grid
+    function generate_pgrid!(atmos::atmosphere.Atmos_t)
+        # Set pressure cell-edge array by logspace
+        atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
+
+        # Set pressure cell-centre array by interpolation
+        atmos.p =    zeros(Float64, atmos.nlev_c)
+        atmos.p[:] .= 0.5 .* (atmos.pl[2:end] + atmos.pl[1:end-1])
+    end
 
     # Allocate atmosphere arrays and prepare for RT calculation
     function allocate!(atmos::atmosphere.Atmos_t)
@@ -359,12 +369,8 @@ module atmosphere
         atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tstar
         atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tstar
 
-        # Set pressure cell-edge array by logspace
-        atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
-
-        # Set pressure cell-centre array by interpolation
-        atmos.p =    zeros(Float64, atmos.nlev_c)
-        atmos.p[:] .= 0.5 .* (atmos.pl[2:end] + atmos.pl[1:end-1])
+        # Initialise pressure grid with current p_toa and p_boa
+        generate_pgrid!(atmos)
 
         ###########################################
         # Range of bands
@@ -403,12 +409,6 @@ module atmosphere
         # Check Options
         ############################################
 
-        # println("Blocks present:")
-        # for i in 1:20
-        #     v = atmos.spectrum.Basic.l_present[i]
-        #     println("Block $i = $v")
-        # end
-
         if atmos.control.l_rayleigh
             Bool(atmos.spectrum.Basic.l_present[3]) ||
                 error("The spectral file contains no rayleigh scattering data.")
@@ -444,7 +444,7 @@ module atmosphere
             atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
         end
 
-        # Set mixing ratios
+        # Set mixing ratios (assumed to be well-mixed)
         for i_gas in 1:atmos.spectrum.Gas.n_absorb
             ti = atmos.spectrum.Gas.type_absorb[i_gas]
             gas = SOCRATES.input_head_pcf.header_gas[ti]
@@ -466,7 +466,7 @@ module atmosphere
             missing_gases = missing_gases || (lvl_tot < 1.0)
         end 
         if missing_gases
-            println("WARNING: constituent gases are missing from the spectral file")
+            println("WARNING: mixing ratios do not sum to unity (possibly due to missing gases in spectral file)")
         end
 
         calc_layer_props!(atmos)
@@ -528,11 +528,9 @@ module atmosphere
 
         # Mark as allocated
         atmos.is_alloc = true
-    end
-
+    end  
 
     function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool)
-
         if !atmos.is_alloc
             error("atmosphere arrays have not been allocated")
         end
@@ -700,7 +698,6 @@ module atmosphere
 
     end # end of radtrans
 
-
     # Get interleaved cell-centre and cell-edge PT grid
     function get_interleaved_pt(atmos)
         arr_T = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
@@ -725,7 +722,6 @@ module atmosphere
         
         return arr_P, arr_T
     end 
-
 
     # Write current interleaved pressure/temperature grid to a file
     function write_pt(atmos, fname)
