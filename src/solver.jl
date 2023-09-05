@@ -14,14 +14,15 @@ module solver
     using Printf
     using Statistics
     using Revise
+    using PCHIPInterpolation
     
     import atmosphere 
     import phys
     import plotting
     import moving_average
 
-    # Dry convective adjustment (single step)
-    function adjust_dry!(atmos)
+    # Dry convective adjustment, single step
+    function adjust_dry!(atmos::atmosphere.Atmos_t)
 
         # Downward pass
         for i in 1:atmos.nlev_c-1
@@ -62,6 +63,48 @@ module solver
                 atmos.tmp[i+1] = T2 
             end 
         end
+    end
+
+    # Naive steam adjustment, single step (as per AEOLUS)
+    function adjust_steam!(atmos::atmosphere.Atmos_t)
+        
+        # Get mixing ratio of water 
+        gas = "H2O"
+        mr_h2o = atmosphere.get_mr(atmos, gas)
+
+        # Skip if no water present
+        if mr_h2o == 0.0
+            return 
+        end 
+
+        #Downward pass
+        for i in range(1,stop=atmos.nlev_c-1, step=1)
+            pp_h2o = atmos.p[i] * mr_h2o
+            if (pp_h2o < 1e-10)
+                continue
+            end 
+            Tdew = phys.calc_Tdew(gas, pp_h2o)
+            if (atmos.tmp[i] < Tdew)
+                atmos.tmp[i] = Tdew
+            end
+        end
+
+        #Upward pass
+        for i in range(atmos.nlev_c-1,stop=2, step=-1)
+            pp_h2o = atmos.p[i] * mr_h2o
+            if (pp_h2o < 1e-10)
+                continue
+            end 
+            Tdew = phys.calc_Tdew(gas, pp_h2o)
+            if (atmos.tmp[i] < Tdew)
+                atmos.tmp[i] = Tdew
+            end
+        end
+    
+        # Change in temperature is Tmid_cc - Tmid
+        dT_conv[:] = (Tmid_cc[:] - atm.tmp[:])/conv_timescale
+        return dT_conv
+    
     end
 
     # Calculate heating rates at cell-centres
@@ -133,11 +176,13 @@ module solver
         end
 
         # H2O moist convective adjustment
-        # if h2oadj_steps > 0:
-        #     tmp_before_adj = copy.deepcopy(atm.tmp)
-        #     atm.tmp += moist_adj(atm, 1.0, nb_convsteps=h2oadj_steps)
-        #     adj_changed += np.count_nonzero(tmp_before_adj - atm.tmp)
-        #     del tmp_before_adj
+        if h2oadj_steps > 0
+            tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
+            for _ in 1:h2oadj_steps
+                adjust_steam!(atmos)
+            end
+            adj_changed += count(x->x>0.0, tmp_before_adj - atmos.tmp) 
+        end
 
         # Smooth temperature profile
         if smooth_width > 2
@@ -151,9 +196,8 @@ module solver
         clamp!(atmos.tmp, atmos.minT, Inf)
         
         # Interpolate to cell-edge values 
-        for idx in 2:atmos.nlev_l-1
-            atmos.tmpl[idx] = 0.5 * (atmos.tmp[idx-1] + atmos.tmp[idx])
-        end
+        itp = Interpolator(atmos.p, atmos.tmp) # Cell edges 
+        atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
         # Extrapolate top boundary
         dt = atmos.tmp[1]-atmos.tmpl[2]
@@ -185,7 +229,7 @@ module solver
                             surf_state::Int64=0, surf_value::Float64=350.0, ini_state::Int64=0, 
                             dry_adjust::Bool=true, h2o_adjust::Bool=false, 
                             sens_heat::Bool=true,
-                            verbose::Bool=true, plot::Bool=false, gofast::Bool=true )
+                            verbose::Bool=true, modplot::Int=0, gofast::Bool=true )
 
 
         println("RCSolver: begin")
@@ -199,7 +243,7 @@ module solver
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 5.0   # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
+        drel_dt_conv = 2.0   # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
         F_rchng_conv = 0.01   # Maximum relative value of F_loss for convergence [%]
         
         if verbose
@@ -395,7 +439,7 @@ module solver
 
             # Plot current state
             # Animate frames with `ffmpeg -framerate 5 -i out/radeqm_monitor_%04d.png -y out/anim.mp4`
-            if plot 
+            if (modplot > 0) && (mod(step,modplot) == 0)
                 plotting.plot_pt(atmos, @sprintf("out/radeqm_monitor_%04d.png", step))
             end 
 

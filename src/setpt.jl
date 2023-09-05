@@ -134,7 +134,7 @@ module setpt
         atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
     end 
 
-    # Set atmosphere to phase curve of 'con' when it enters condensible region
+    # Set pure 'con' atmosphere to phase curve of 'con' when it enters condensible region
     function condensing!(atmos, con::String)
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup")

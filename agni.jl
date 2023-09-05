@@ -1,16 +1,15 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # -------------
-# THEMIS main file, for standalone execution
+# AGNI main file, for standalone execution
 # -------------
 
-println("Begin THEMIS")
+println("Begin AGNI")
 
 using Revise
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
-
 push!(LOAD_PATH, joinpath(pwd(),"src"))
 import atmosphere
 import setpt
@@ -18,6 +17,8 @@ import plotting
 import solver
 import phys
 
+# Get AGNI root directory
+ROOT_DIR = dirname(abspath(@__FILE__))
 
 # Configuration options
 tstar           = 1700.0    # LW uflux bottom boundary condition [kelvin]
@@ -35,7 +36,7 @@ mixing_ratios   = Dict([
 
 spectral_file = "res/spectral_files/Mallard/Mallard"
 star_file     = "res/stellar_spectra/spec_sun.txt"
-output_dir = "out/"
+output_dir    = "out/"
 
 # Create output direct
 rm(output_dir,force=true,recursive=true)
@@ -51,7 +52,7 @@ atmosphere.setup!(atmos, spectral_file,
                          flag_gcontinuum=true,
                          flag_rayleigh=true
                          )
-atmosphere.allocate!(atmos)
+atmosphere.allocate!(atmos, ROOT_DIR)
 
 # Set PT profile 
 setpt.dry_adiabat!(atmos)
@@ -62,7 +63,7 @@ atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-solver.solve_energy!(atmos, surf_state=0, plot=true)
+solver.solve_energy!(atmos, surf_state=1, modplot=0)
 
 # Save result
 atmosphere.write_pt(atmos, joinpath(output_dir,"pt.csv"))
