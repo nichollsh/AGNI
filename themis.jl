@@ -33,7 +33,7 @@ mixing_ratios   = Dict([
                         ("N2" , 0.05)
                         ])
 
-spectral_file = "res/spectral_files/Reach/Reach"
+spectral_file = "res/spectral_files/Mallard/Mallard"
 star_file     = "res/stellar_spectra/spec_sun.txt"
 output_dir = "out/"
 

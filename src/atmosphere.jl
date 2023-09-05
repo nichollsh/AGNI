@@ -260,18 +260,32 @@ module atmosphere
 
         run_spectral_file = ".spfile_run"
 
+        # Validate files
+        if !isfile(atmos.spectral_file)
+            error("Spectral file '$(atmos.spectral_file)' does not exist")
+        end
+        if !isfile(atmos.stellar_spectrum)
+            error("Stellar spectrum file '$(atmos.stellar_spectrum)' does not exist")
+        end
+
         # Insert stellar spectrum (always)
-        py_cmd = `python src/insert_stellar.py $(atmos.stellar_spectrum) $(atmos.spectral_file) $(run_spectral_file)`
-        run(py_cmd)
+        run(`python src/insert_stellar.py $(atmos.stellar_spectrum) $(atmos.spectral_file) $(run_spectral_file)`)
 
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
             co2_mr = get_mr(atmos, "co2")
             n2_mr  = get_mr(atmos, "n2")
             h2o_mr = get_mr(atmos, "h2o")
-            py_cmd = `python src/insert_rayleigh.py $run_spectral_file $co2_mr $n2_mr $h2o_mr`
-            run(py_cmd)
+            run(`python src/insert_rayleigh.py $run_spectral_file $co2_mr $n2_mr $h2o_mr`)
         end
+
+        # Validate files
+        if occursin("NaN", readchomp(run_spectral_file*"_k"))
+            error("Spectral _k file contains NaN values")
+        end 
+        if occursin("NaN", readchomp(run_spectral_file))
+            error("Spectral file contains NaN values")
+        end 
 
         # Read-in spectral file to be used at runtime
         atmos.control.spectral_file = run_spectral_file
