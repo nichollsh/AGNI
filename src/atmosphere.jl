@@ -14,6 +14,7 @@ module atmosphere
 
     using Printf
     using Revise
+
     import phys
 
     # Struct for holding data pertaining to the atmosphere
@@ -242,7 +243,7 @@ module atmosphere
     end
 
     # Allocate atmosphere arrays and prepare for RT calculation
-    function allocate!(atmos::atmosphere.Atmos_t)
+    function allocate!(atmos::atmosphere.Atmos_t, ROOT_DIR::String)
 
         println("Atmosphere: allocate memory")
 
@@ -269,14 +270,14 @@ module atmosphere
         end
 
         # Insert stellar spectrum (always)
-        run(`python src/insert_stellar.py $(atmos.stellar_spectrum) $(atmos.spectral_file) $(run_spectral_file)`)
+        run(`python $ROOT_DIR/src/insert_stellar.py $(atmos.stellar_spectrum) $(atmos.spectral_file) $(run_spectral_file)`)
 
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
             co2_mr = get_mr(atmos, "co2")
             n2_mr  = get_mr(atmos, "n2")
             h2o_mr = get_mr(atmos, "h2o")
-            run(`python src/insert_rayleigh.py $run_spectral_file $co2_mr $n2_mr $h2o_mr`)
+            run(`python $ROOT_DIR/src/insert_rayleigh.py $run_spectral_file $co2_mr $n2_mr $h2o_mr`)
         end
 
         # Validate files
@@ -542,7 +543,7 @@ module atmosphere
 
         # Mark as allocated
         atmos.is_alloc = true
-    end  
+    end  # end of allocate
 
     function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool)
         if !atmos.is_alloc

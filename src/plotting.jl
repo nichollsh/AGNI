@@ -24,7 +24,10 @@ module plotting
 
         # Plot PT profile
         plt = plot(legend=false, framestyle=:box)
+
+        scatter!(plt, [atmos.tstar], [atmos.pl[end]], color="red")
         plot!(plt, arr_T, arr_P, lc="black", lw=2)
+
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
