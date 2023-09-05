@@ -2,7 +2,7 @@
 #
 #  Initialization script for radiation code
 #
-RAD_DIR=/Users/nichollsh/Projects/THEMIS/socrates
+RAD_DIR=/Users/nichollsh/Projects/AGNI/socrates
 RAD_BIN=${RAD_DIR}/bin
 RAD_DATA=${RAD_DIR}/data
 RAD_SCRIPT=${RAD_DIR}/sbin

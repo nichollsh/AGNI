@@ -1,6 +1,6 @@
-# THEMIS
+# AGNI
 Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer.    
-Pronounced: *them-iss*. Named after the goddess of justice and order.  
+Pronounced: *ag-nee*. Named after the fire deity of Hinduism.    
 
 ### Contributors (abbreviations & email addresses)
 * HN - Harrison Nicholls (harrison.nicholls@physics.ox.ac.uk)  
@@ -11,10 +11,10 @@ Pronounced: *them-iss*. Named after the goddess of justice and order.
 * `doc/`            - Other documentation
 * `out/`            - Output files
 * `res/`            - Resources
-* `src/`            - THEMIS source code
+* `src/`            - AGNI source code
 * `socrates/`       - Directory containing SOCRATES and associated files
-* `themis.jl`       - Main THEMIS run file
-* `demo_steamrun.jl`- Demo THEMIS run file (steam runaway greenhouse effect)
+* `agni.jl`         - Main AGNI run file
+* `demo_steamrun.jl`- Demo AGNI run file (steam runaway greenhouse effect)
 
 
 ### Requirements
@@ -52,9 +52,9 @@ Pronounced: *them-iss*. Named after the goddess of justice and order.
 You should end up in a directory called 'julia'.
 
 ### Run instructions
-Simply run `$ julia themis.jl` in the root directory of the repository.
+Simply run `$ julia agni.jl` in the root directory of the repository.
 
 ### License
-See [LICENSE.txt](LICENSE.txt) for THEMIS.      
+See [LICENSE.txt](LICENSE.txt) for AGNI.      
 See [socrates/COPYRIGHT.txt](socrates/COPYRIGHT.txt) for SOCRATES.   
 

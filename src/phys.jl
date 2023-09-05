@@ -126,4 +126,18 @@ module phys
         ("He", 2.030000E+04)
     ])
 
+    # Get dew point temperature at a given pressure 
+    function calc_Tdew(gas::String, p::Float64)
+
+        # Get properties
+        L = lookup_L_vap[gas]
+        R = R_gas / lookup_mmw[gas]
+        p0 = lookup_P_trip[gas]
+        T0 = lookup_T_trip[gas]
+
+        # Calculate Tsat
+        Tsat = 1.0/(  1/T0 - R/L * log(p/p0)  )
+        return Tsat
+    end 
+
 end 
