@@ -17,7 +17,7 @@ module atmosphere
 
     import phys
 
-    # Struct for holding data pertaining to the atmosphere
+    # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
 
         # Track state of atmos struct
@@ -25,6 +25,10 @@ module atmosphere
         is_alloc::Bool  # Arrays have been allocated
         is_out_lw::Bool # Contains data for LW calculation
         is_out_sw::Bool # Contains data for SW calculation
+
+        # Directories
+        ROOT_DIR::String
+        OUT_DIR::String
 
         # SOCRATES objects
         dimen::SOCRATES.StrDim
@@ -39,7 +43,6 @@ module atmosphere
         # SOCRATES parameters
         all_channels::Bool 
         spectral_file::String 
-        stellar_spectrum::String
         surface_albedo::Float64 
         zenith_degrees::Float64 
         toa_heating::Float64 
@@ -106,16 +109,43 @@ module atmosphere
         atmos.is_alloc = false
     end
 
-    # Set parameters of atmosphere
+    """
+    **Set parameters of the atmosphere.**
+
+    This is used to set up the struct immediately after creation. It must be 
+        done before `allocate!()` is called, and before any RT calculcations
+        are performed.
+
+    Arguments:
+    - `atmos::Atmos_t`              the atmosphere struct instance to be used.
+    - `ROOT_DIR::String`            AGNI root directory 
+    - `OUT_DIR::String`             Output directory
+    - `spfile_name::String`         name of spectral file
+    - `zenith_degrees::Float64`     angle of radiation from the star, relative to the zenith [degrees].
+    - `toa_heating::Float64`        downward shortwave flux at the top of the atmosphere [W m-2].
+    - `tstar::Float64`              effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
+    - `gravity::Float64`            gravitational acceleration at the surface [m s-2].
+    - `nlev_centre::Int64`          number of cells.
+    - `p_surf::Float64`             total surface pressure [bar].
+    - `p_top::Float64`              total top of atmosphere pressure [bar].
+    - `mixing_ratios::Dict`         dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
+    - `all_channels::Bool=true`     use all channels available for RT?
+    - `flag_rayleigh::Bool=false`   include rayleigh scattering?
+    - `flag_gcontinuum::Bool=false` include generalised continuum absorption?
+    - `flag_continuum::Bool=false`  include continuum absorption?
+    - `flag_aerosol::Bool=false`    include aersols?
+    - `flag_cloud::Bool=false`      include clouds?
+    """
     function setup!(atmos::atmosphere.Atmos_t, 
-                    spectral_file::String, 
-                    stellar_spectrum::String, zenith_degrees::Float64, 
-                    toa_heating::Float64,tstar::Float64,
+                    ROOT_DIR::String, OUT_DIR::String, 
+                    spfile_name::String, zenith_degrees::Float64, 
+                    toa_heating::Float64, tstar::Float64,
                     gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
                     mixing_ratios::Dict;
                     all_channels::Bool  =   true,
                     flag_rayleigh::Bool =   false,
                     flag_gcontinuum::Bool = false,
+                    flag_continuum::Bool =  false,
                     flag_aerosol::Bool =    false,
                     flag_cloud::Bool =      false
                     )
@@ -133,7 +163,10 @@ module atmosphere
         println("Atmosphere: setting parameters")
 
         # Set parameters
-        atmos.spectral_file =   spectral_file  # spectral file (no rscat, no star)
+        atmos.ROOT_DIR = abspath(ROOT_DIR)
+        atmos.OUT_DIR = abspath(OUT_DIR)
+
+        atmos.spectral_file =   joinpath([atmos.ROOT_DIR, "res", "spectral_files", spfile_name, spfile_name])
         atmos.all_channels =    all_channels
 
         atmos.minT =            30.0 
@@ -141,7 +174,6 @@ module atmosphere
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  nlev_centre + 1
         atmos.zenith_degrees =  zenith_degrees
-        atmos.stellar_spectrum = stellar_spectrum
         atmos.toa_heating =     toa_heating
         atmos.tstar =           max(tstar, atmos.minT)
         atmos.grav_surf =       gravity
@@ -151,7 +183,7 @@ module atmosphere
 
         atmos.control.l_gas = true
         atmos.control.l_rayleigh = flag_rayleigh
-        atmos.control.l_continuum = false
+        atmos.control.l_continuum = flag_continuum
         atmos.control.l_cont_gen = flag_gcontinuum
         atmos.control.l_aerosol = flag_aerosol
         atmos.control.l_cloud = flag_cloud
@@ -176,8 +208,19 @@ module atmosphere
         atmos.is_param = true
     end
 
-    # Get mixing ratio of gas in atmosphere struct
-    function get_mr(atmos::atmosphere.Atmos_t, gas::String)
+    """
+    **Get the mass mixing ratio of a gas within the atmosphere.**
+
+    The atmosphere is assumed to be well-mixed.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `gas::String`             name of the gas (e.g. "H2O").
+
+    Returns:
+    - `mr::Float64`             mixing ratio of `gas`.
+    """
+    function get_mr(atmos::atmosphere.Atmos_t, gas::String)::Float64
 
         gas_valid = strip(gas, ' ')
         gas_valid = uppercase(gas_valid)
@@ -190,7 +233,12 @@ module atmosphere
         return mr
     end
 
-    # Calculate layer-average properties (e.g. density)
+    """
+    **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    """
     function calc_layer_props!(atmos::atmosphere.Atmos_t)
         if !atmos.is_param
             error(" atmosphere parameters have not been set")
@@ -232,7 +280,14 @@ module atmosphere
 
     end 
 
-    # Generate log-spaced pressure grid
+    """
+    **Generate a log-spaced pressure grid.**
+
+    Uses the values of `atmos.nlev_l`, `atmos.p_toa`, and `atmos.p_boa`.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    """
     function generate_pgrid!(atmos::atmosphere.Atmos_t)
         # Set pressure cell-edge array by logspace
         atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
@@ -242,8 +297,21 @@ module atmosphere
         atmos.p[:] .= 0.5 .* (atmos.pl[2:end] + atmos.pl[1:end-1])
     end
 
-    # Allocate atmosphere arrays and prepare for RT calculation
-    function allocate!(atmos::atmosphere.Atmos_t, ROOT_DIR::String)
+    
+    """
+    **Allocate atmosphere arrays, prepare spectral files, and final steps before RT calculations.**
+
+    Arguments:
+    - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
+    - `spfile_has_star::Bool=false`    does the spectral file already contain the stellar spectrum?
+    - `stellar_spectrum::String=""`    path to stellar spectrum csv file (used when `spfile_has_star==false`)
+    - `spfile_noremove::Bool=false`    should the runtime spectral file not be removed after use?
+    """
+    function allocate!(atmos::atmosphere.Atmos_t;
+                        spfile_has_star::Bool=false,
+                        stellar_spectrum::String="",
+                        spfile_noremove::Bool=false
+                        )
 
         println("Atmosphere: allocate memory")
 
@@ -259,43 +327,59 @@ module atmosphere
         # spectral data
         #########################################
 
-        run_spectral_file = ".spfile_run"
-
         # Validate files
         if !isfile(atmos.spectral_file)
             error("Spectral file '$(atmos.spectral_file)' does not exist")
         end
-        if !isfile(atmos.stellar_spectrum)
-            error("Stellar spectrum file '$(atmos.stellar_spectrum)' does not exist")
+        if !spfile_has_star && (stellar_spectrum == "")
+            error("No stellar spectrum provided")
+        end
+        if spfile_has_star && (stellar_spectrum != "")
+            error("Stellar spectrum provided, but spectral file already contains this block")
+        end 
+        if !isfile(stellar_spectrum) && !spfile_has_star
+            error("Stellar spectrum file '$(stellar_spectrum)' does not exist")
         end
 
-        # Insert stellar spectrum (always)
-        run(`python $ROOT_DIR/src/insert_stellar.py $(atmos.stellar_spectrum) $(atmos.spectral_file) $(run_spectral_file)`)
+        # Spectral file to be loaded
+        spectral_file_run  = joinpath([atmos.OUT_DIR, ".spfile_runtime"])  
+
+        # Insert stellar spectrum 
+        if !spfile_has_star
+            runfile = joinpath([atmos.ROOT_DIR, "src", "insert_stellar.py"])
+            run(`python $runfile $(stellar_spectrum) $(atmos.spectral_file) $(spectral_file_run)`)
+        else 
+            cp(atmos.spectral_file,      spectral_file_run,      force=true)
+            cp(atmos.spectral_file*"_k", spectral_file_run*"_k", force=true)
+        end
 
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
             co2_mr = get_mr(atmos, "co2")
             n2_mr  = get_mr(atmos, "n2")
             h2o_mr = get_mr(atmos, "h2o")
-            run(`python $ROOT_DIR/src/insert_rayleigh.py $run_spectral_file $co2_mr $n2_mr $h2o_mr`)
+            runfile = joinpath([atmos.ROOT_DIR, "src", "insert_rayleigh.py"])
+            run(`python $runfile $spectral_file_run $co2_mr $n2_mr $h2o_mr`)
         end
 
         # Validate files
-        if occursin("NaN", readchomp(run_spectral_file*"_k"))
+        if occursin("NaN", readchomp(spectral_file_run*"_k"))
             error("Spectral _k file contains NaN values")
         end 
-        if occursin("NaN", readchomp(run_spectral_file))
+        if occursin("NaN", readchomp(spectral_file_run))
             error("Spectral file contains NaN values")
         end 
 
         # Read-in spectral file to be used at runtime
-        atmos.control.spectral_file = run_spectral_file
+        atmos.control.spectral_file = spectral_file_run
         SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
                               spectral_file=atmos.control.spectral_file, 
                               l_all_gasses=true)
 
-        rm(run_spectral_file; force=true)
-        rm(run_spectral_file*"_k"; force=true)
+        if !spfile_noremove                              
+            rm(spectral_file_run; force=true)
+            rm(spectral_file_run*"_k"; force=true)
+        end
 
         #########################################
         # diagnostics
