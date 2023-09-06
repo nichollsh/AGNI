@@ -21,6 +21,7 @@ module solver
     import plotting
     import moving_average
 
+
     # Dry convective adjustment, single step
     function adjust_dry!(atmos::atmosphere.Atmos_t)
 
@@ -229,13 +230,13 @@ module solver
                             surf_state::Int64=0, surf_value::Float64=350.0, ini_state::Int64=0, 
                             dry_adjust::Bool=true, h2o_adjust::Bool=false, 
                             sens_heat::Bool=true,
-                            verbose::Bool=true, modplot::Int=0, gofast::Bool=true )
+                            verbose::Bool=true, modplot::Int=0, gofast::Bool=true,
+                            max_steps::Int64=250)
 
 
         println("RCSolver: begin")
 
         # Run parameters
-        steps_max    = 250   # Maximum number of steps
         dtmp_gofast  = 40.0  # Change in temperature below which to stop model acceleration
         wait_adj     = 3   # Wait this many steps before introducing convective adjustment
         modprint     = 10    # Frequency to print when verbose==false
@@ -243,7 +244,7 @@ module solver
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 2.0   # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
+        drel_dt_conv = 1.0   # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
         F_rchng_conv = 0.01   # Maximum relative value of F_loss for convergence [%]
         
         if verbose
@@ -269,10 +270,8 @@ module solver
         drel_dt = Inf           # Rate of relative temperature change
         drel_dt_prev  = Inf     # Previous ^
         flag_prev = false       # Previous iteration is meeting convergence
-        step_frac = 1e-3        # Step size fraction relative to absolute temperature
         stopfast = false
-        dt_min = 1e-4
-        dt_max = 1e3
+        step_frac = 0.05
 
         # Store previous n atmosphere states
         hist_tmp  = zeros(Float64, (len_hist, atmos.nlev_c)) 
@@ -298,7 +297,7 @@ module solver
         end
 
         # Main loop
-        while (!success) && (step <= steps_max)
+        while (!success) && (step <= max_steps)
 
             # Validate arrays
             if !(all(isfinite, atmos.tmp) && all(isfinite, atmos.tmpl))
@@ -309,7 +308,7 @@ module solver
             end
 
             # End of the initial fast period
-            if gofast && ( (dtmp_comp < dtmp_gofast) || ( step/steps_max > 0.4) )
+            if gofast && ( (dtmp_comp < dtmp_gofast) || ( step/max_steps > 0.4) )
                 gofast = false 
                 stopfast = true
             end
@@ -337,8 +336,8 @@ module solver
                 dryadj_steps = 20
                 h2oadj_steps = 20
                 dt_min = 1e-5
-                dt_max = 20.0
-                step_frac_max = 5e-3
+                dt_max = 25.0
+                step_frac_max = 0.01
                 smooth_window = 0
 
                 # End of 'fast' period (take average of last two iters)
@@ -351,7 +350,7 @@ module solver
                 end
 
                 # Solver is struggling
-                if (step > steps_max * 0.8)
+                if (step > max_steps * 0.8)
                     step_frac_max *= 0.7
                     dt_max *= 0.5
                     dtmp_clip *= 0.8
@@ -359,7 +358,9 @@ module solver
 
                 # Adapt the time-stepping accuracy
                 if drel_dt < Inf
-                    step_frac *= min(max( drel_dt_prev/drel_dt , 0.6 ) , 1.2)
+                    max_inc = 1.1 
+                    min_dec = 0.5
+                    step_frac *= min(max( drel_dt_prev/drel_dt , min_dec ) , max_inc)
                 end 
                 step_frac = min(step_frac, step_frac_max)
                 if verbose
@@ -438,9 +439,9 @@ module solver
             hist_tmpl[end,:] .= atmos.tmpl[:]
 
             # Plot current state
-            # Animate frames with `ffmpeg -framerate 5 -i out/radeqm_monitor_%04d.png -y out/anim.mp4`
+            # Animate frames with `ffmpeg -framerate 16 -i out/radeqm_monitor_%04d.png -y out/anim.mp4`
             if (modplot > 0) && (mod(step,modplot) == 0)
-                plotting.plot_pt(atmos, @sprintf("out/radeqm_monitor_%04d.png", step))
+                plotting.plot_solver(atmos, @sprintf("%s/radeqm_monitor_%04d.png", atmos.OUT_DIR, step), hist_tmpl=hist_tmpl)
             end 
 
             # Convergence check requires that:
@@ -466,12 +467,14 @@ module solver
             @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
             @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
             @printf("    F_chng^TOA  = %.4f %%     \n", F_rchng)
+            @printf("\n")
 
         else
             @printf("RCSolver: Convergence criteria met (%d iterations) \n", step)
+            @printf("\n")
         end
 
-        @printf("Final radiative fluxes [W m-2] \n")
+        @printf("RCSolver: Final radiative fluxes [W m-2] \n")
         @printf("    OLR   = %.2e W m-2         \n", F_OLR_rad)
         @printf("    TOA   = %.2e W m-2         \n", F_TOA_rad)
         @printf("    BOA   = %.2e W m-2         \n", F_BOA_rad)

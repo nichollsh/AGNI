@@ -1,6 +1,7 @@
 # AGNI
 Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer.    
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.    
+The main repository for this code is [github.com/nichollsh/AGNI](https://github.com/nichollsh/AGNI).
 
 ### Contributors (abbreviations & email addresses)
 * HN - Harrison Nicholls (harrison.nicholls@physics.ox.ac.uk)  
@@ -31,24 +32,25 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * Ubuntu (x86-64)
 
 ### Installation instructions
-1. `$ cd socrates`
-3. `$ cp ../res/Mk_cmd_PLAT ./make/Mk_cmd` where PLAT is your platform
-4. `$ ./build_code`
-5. `$ source set_rad_env`
-6. `$ cd julia`
-7. `$ julia`
-8. `julia> ]`
-9. `(@v1.9) pkg> add OffsetArrays`
-10. `(@v1.9) pkg> add Revise`
-11. `(@v1.9) pkg> add PCHIPInterpolation`
-12. `(@v1.9) pkg> activate .`
-13. Press backspace
-14. `julia> cd("src")`
-15. `julia> include("generate_wrappers.jl")`
-16. `julia> exit()`
-17. `$ cd lib`
-18. `$ make`
-19. `$ cd ..`   
+- `$ cd socrates`
+- `$ cp ../res/Mk_cmd_PLAT ./make/Mk_cmd` where PLAT is your platform
+- `$ ./build_code`
+- `$ cd julia`
+- `$ julia`
+- `julia> ]`
+- `(@v1.9) pkg> add OffsetArrays`
+-  `(@v1.9) pkg> add Revise`
+-  `(@v1.9) pkg> add PCHIPInterpolation`
+-  `(@v1.9) pkg> add LaTeXStrings`
+-  `(@v1.9) pkg> add Plots`
+-  `(@v1.9) pkg> activate .`
+-  Press backspace
+-  `julia> cd("src")`
+-  `julia> include("generate_wrappers.jl")`
+-  `julia> exit()`
+-  `$ cd lib`
+-  `$ make`
+-  `$ cd ..`   
 You should end up in a directory called 'julia'.
 
 ### Run instructions

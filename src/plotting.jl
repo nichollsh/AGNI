@@ -10,24 +10,27 @@ module plotting
 
     # Import stuff
     using Plots
-    include("atmosphere.jl")
+    using LaTeXStrings
+    import atmosphere
 
-
+    """
+    Plot the temperature-pressure profile.
+    """
     function plot_pt(atmos, fname)
-        """
-        Plot the temperature-pressure profile.
-        """
-
+        
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
         arr_P *= 1e-5
 
-        # Plot PT profile
-        plt = plot(legend=false, framestyle=:box)
+        ylims  = (arr_P[1], arr_P[end])
+        yticks = 10 .^ floor.(range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
-        scatter!(plt, [atmos.tstar], [atmos.pl[end]], color="red")
-        plot!(plt, arr_T, arr_P, lc="black", lw=2)
+        # Create plot
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks)
 
+        # Plot temperature
+        scatter!(plt, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
+        plot!(plt, arr_T, arr_P, lc="black", lw=2, label=L"T(p)")
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
@@ -37,12 +40,81 @@ module plotting
 
     end
 
+    """
+    Plot the current temperature-pressure profile, current heating rates, and
+    optionally the previous states that the atmosphere has taken.
+    """
+    function plot_solver(atmos, fname; hist_tmpl::Array=[])
+
+        dpi=250
+
+        # Interleave cell-centre and cell-edge arrays for current atmosphere
+        arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
+        arr_P *= 1e-5
+
+        ylims  = (arr_P[1], arr_P[end])
+        yticks = 10 .^ floor.(range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
+        # Optionally get past atmosphere
+        plot_hist = !isempty(hist_tmpl)
+        if plot_hist 
+            len_hist = size(hist_tmpl, 1)-1
+        end
+
+        # Create plot 1
+        plt1 = plot(framestyle=:box, legend=:topright, ylims=ylims, yticks=yticks)
+
+        # Plot temperature
+        scatter!(plt1, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
+        plot!(plt1, arr_T, arr_P, lc="black", lw=2, label=L"T_n")
+        if plot_hist 
+            for i in range(len_hist-1,1,step=-1)
+                alpha = Float64(i)/(len_hist)
+                n = len_hist-i
+                plot!(plt1, hist_tmpl[i,1:end], atmos.pl*1e-5, lc="black", linealpha=alpha, lw=2, label=L"T_{n-%$n}")
+            end 
+        end
+        
+
+        xlabel!(plt1, "Temperature [K]")
+        ylabel!(plt1, "Pressure [bar]")
+        yflip!(plt1)
+        yaxis!(plt1, yscale=:log10)
+
+        # Create plot 2
+        plt2 = plot(framestyle=:box, legend=:topleft, ylims=ylims, yticks=yticks)
+
+        # Plot heating rate
+        p =  atmos.p*1e-5
+        abshr = zeros(Float64, atmos.nlev_c)
+        poshr = trues(atmos.nlev_c)
+        for i in 1:atmos.nlev_c
+            abshr[i] = abs(atmos.heating_rate[i])
+            poshr[i] = (atmos.heating_rate[i] >= 0)
+        end 
+        plot!(plt2, abshr, p, lc="brown3", lw=2, label=L"|H_n|")
+        scatter!(plt2, abshr[poshr],    p[poshr],    markershape=:diamond, markeralpha=0.8, label=L"H_n>0")
+        scatter!(plt2, abshr[.!poshr],  p[.!poshr],  markershape=:circle,  markeralpha=0.8, label=L"H_n<0")
+        xlabel!(plt2, "Heating rate [K/day]")
+        yflip!(plt2)
+        yaxis!(plt2, yscale=:log10)
+        xaxis!(plt2, xscale=:log10, xlims=(1e-2, maximum(abshr)))
+        
+        # Combine subplots and save
+        plt = plot(plt1, plt2, layout=(1,2), dpi=dpi)
+        savefig(plt, fname)
+
+    end
+
+    """
+    Plot the fluxes at each pressure level
+    """
     function plot_fluxes(atmos, fname)
-        """
-        Plot the fluxes at each pressure level
-        """
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
+
+        ylims  = (arr_P[1], arr_P[end])
+        yticks = 10 .^ floor.(range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         w = 2
         plt = plot(legend=:topleft, framestyle=:box)

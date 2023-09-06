@@ -6,19 +6,21 @@
 
 println("Begin AGNI")
 
+# Get AGNI root directory
+ROOT_DIR = dirname(abspath(@__FILE__))
+
+# Include libraries
 using Revise
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
-push!(LOAD_PATH, joinpath(pwd(),"src"))
+push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
 import setpt
 import plotting 
 import solver
 import phys
 
-# Get AGNI root directory
-ROOT_DIR = dirname(abspath(@__FILE__))
 
 # Configuration options
 tstar           = 1700.0    # LW uflux bottom boundary condition [kelvin]
@@ -34,7 +36,7 @@ mixing_ratios   = Dict([
                         ("N2" , 0.05)
                         ])
 
-spectral_file = "res/spectral_files/Mallard/Mallard"
+spfile_name   = "Mallard"
 star_file     = "res/stellar_spectra/spec_sun.txt"
 output_dir    = "out/"
 
@@ -44,32 +46,31 @@ mkdir(output_dir)
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, spectral_file,
-                         star_file, zenith_degrees, 
+atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+                         spfile_name, zenith_degrees, 
                          toa_heating, tstar,
                          gravity, nlev_centre, p_surf, p_top,
                          mixing_ratios,
                          flag_gcontinuum=true,
                          flag_rayleigh=true
                          )
-atmosphere.allocate!(atmos, ROOT_DIR)
+atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 setpt.dry_adiabat!(atmos)
-# setpt.condensing!(atmos, "H2O")
 
 # Calculate LW and SW fluxes (once)
 atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-solver.solve_energy!(atmos, surf_state=1, modplot=0)
+solver.solve_energy!(atmos, surf_state=1, modplot=1)
 
 # Save result
-atmosphere.write_pt(atmos, joinpath(output_dir,"pt.csv"))
-plotting.plot_pt(atmos, joinpath(output_dir,"pt.pdf"))
-plotting.plot_fluxes(atmos, joinpath(output_dir,"fluxes.pdf"))
-
+atmosphere.write_pt(atmos,  joinpath(atmos.OUT_DIR,"pt.csv"))
+plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
+plotting.plot_solver(atmos, joinpath(atmos.OUT_DIR,"pt_hr.pdf"))
+plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fluxes.pdf"))
 
 # Deallocate atmosphere
 atmosphere.deallocate!(atmos)
