@@ -1,4 +1,4 @@
-#!/usr/bin/env -S julia --color=yes --startup-file=no
+#!/usr/bin/env -S julia --optimize=3 --color=yes --startup-file=no
 
 println("Begin runaway demo")
 

@@ -44,6 +44,7 @@ The main repository for this code is [github.com/nichollsh/AGNI](https://github.
 -  `(@v1.9) pkg> add LaTeXStrings`
 -  `(@v1.9) pkg> add Plots`
 -  `(@v1.9) pkg> add Glob`
+-  `(@v1.9) pkg> add ArgParse`
 -  `(@v1.9) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`
