@@ -24,7 +24,6 @@ import phys
 
 # Configuration options
 tstar           = 1700.0    # LW uflux bottom boundary condition [kelvin]
-zenith_degrees  = 45.53     # Zenith angle [degrees from zenith]
 toa_heating     = 4.451e+04 # SW dflux top boundary condition [W m-2]
 gravity         = 9.81
 nlev_centre     = 100
@@ -47,7 +46,7 @@ mkdir(output_dir)
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
-                         spfile_name, zenith_degrees, 
+                         spfile_name,
                          toa_heating, tstar,
                          gravity, nlev_centre, p_surf, p_top,
                          mixing_ratios,
@@ -58,6 +57,7 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 setpt.dry_adiabat!(atmos)
+setpt.stratosphere!(atmos, atmos.T_skin)
 
 # Calculate LW and SW fluxes (once)
 atmosphere.radtrans!(atmos, true)
@@ -69,7 +69,7 @@ solver.solve_energy!(atmos, surf_state=1, modplot=1)
 # Save result
 atmosphere.write_pt(atmos,  joinpath(atmos.OUT_DIR,"pt.csv"))
 plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
-plotting.plot_solver(atmos, joinpath(atmos.OUT_DIR,"pt_hr.pdf"))
+plotting.anim_solver(atmos)
 plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fluxes.pdf"))
 
 # Deallocate atmosphere

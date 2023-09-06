@@ -61,8 +61,13 @@ module atmosphere
         p::Array        
         pl::Array      
 
-        minT::Float64 # Temperature floor [K]
-        
+        T_floor::Float64        # Temperature floor [K]
+
+        # Temperature parameters 
+        bond_albedo::Float64    # Bond albedo for the atmosphere
+        T_eqm::Float64          # Radiative equilibrium temperature [K]
+        T_skin::Float64         # Skin temperature [K]
+
         # Mixing ratios (atmosphere is currently assumed to be well-mixed)
         mr_gases::Dict
 
@@ -117,37 +122,40 @@ module atmosphere
         are performed.
 
     Arguments:
-    - `atmos::Atmos_t`              the atmosphere struct instance to be used.
-    - `ROOT_DIR::String`            AGNI root directory 
-    - `OUT_DIR::String`             Output directory
-    - `spfile_name::String`         name of spectral file
-    - `zenith_degrees::Float64`     angle of radiation from the star, relative to the zenith [degrees].
-    - `toa_heating::Float64`        downward shortwave flux at the top of the atmosphere [W m-2].
-    - `tstar::Float64`              effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
-    - `gravity::Float64`            gravitational acceleration at the surface [m s-2].
-    - `nlev_centre::Int64`          number of cells.
-    - `p_surf::Float64`             total surface pressure [bar].
-    - `p_top::Float64`              total top of atmosphere pressure [bar].
-    - `mixing_ratios::Dict`         dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
-    - `all_channels::Bool=true`     use all channels available for RT?
-    - `flag_rayleigh::Bool=false`   include rayleigh scattering?
-    - `flag_gcontinuum::Bool=false` include generalised continuum absorption?
-    - `flag_continuum::Bool=false`  include continuum absorption?
-    - `flag_aerosol::Bool=false`    include aersols?
-    - `flag_cloud::Bool=false`      include clouds?
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `ROOT_DIR::String`                AGNI root directory 
+    - `OUT_DIR::String`                 Output directory
+    - `spfile_name::String`             name of spectral file
+    - `toa_heating::Float64`            downward shortwave flux at the top of the atmosphere [W m-2].
+    - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
+    - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
+    - `nlev_centre::Int64`              number of cells.
+    - `p_surf::Float64`                 total surface pressure [bar].
+    - `p_top::Float64`                  total top of atmosphere pressure [bar].
+    - `mixing_ratios::Dict`             dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
+    - `zenith_degrees::Float64=54.74`   angle of radiation from the star, relative to the zenith [degrees].
+    - `bond_albedo::Float64=0.175`      bond albedo for the planet (scattering).
+    - `all_channels::Bool=true`         use all channels available for RT?
+    - `flag_rayleigh::Bool=false`       include rayleigh scattering?
+    - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
+    - `flag_continuum::Bool=false`      include continuum absorption?
+    - `flag_aerosol::Bool=false`        include aersols?
+    - `flag_cloud::Bool=false`          include clouds?
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
-                    spfile_name::String, zenith_degrees::Float64, 
+                    spfile_name::String, 
                     toa_heating::Float64, tstar::Float64,
                     gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
                     mixing_ratios::Dict;
-                    all_channels::Bool  =   true,
-                    flag_rayleigh::Bool =   false,
-                    flag_gcontinuum::Bool = false,
-                    flag_continuum::Bool =  false,
-                    flag_aerosol::Bool =    false,
-                    flag_cloud::Bool =      false
+                    zenith_degrees::Float64 =   54.74,
+                    bond_albedo::Float64 =      0.175,
+                    all_channels::Bool  =       true,
+                    flag_rayleigh::Bool =       false,
+                    flag_gcontinuum::Bool =     false,
+                    flag_continuum::Bool =      false,
+                    flag_aerosol::Bool =        false,
+                    flag_cloud::Bool =          false
                     )
 
         println("Atmosphere: instantiating SOCRATES objects")
@@ -169,24 +177,32 @@ module atmosphere
         atmos.spectral_file =   joinpath([atmos.ROOT_DIR, "res", "spectral_files", spfile_name, spfile_name])
         atmos.all_channels =    all_channels
 
-        atmos.minT =            30.0 
+        atmos.T_floor =          5.0 
 
-        atmos.nlev_c         =  nlev_centre
+        atmos.nlev_c         =  max(nlev_centre,10)
         atmos.nlev_l         =  nlev_centre + 1
-        atmos.zenith_degrees =  zenith_degrees
-        atmos.toa_heating =     toa_heating
-        atmos.tstar =           max(tstar, atmos.minT)
+        atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.0)
+        atmos.bond_albedo =     max(min(bond_albedo, 1.0 ), 0.0)
+        atmos.toa_heating =     max(toa_heating, 0.0)
+        atmos.tstar =           max(tstar, atmos.T_floor)
         atmos.grav_surf =       gravity
+
+        atmos.T_eqm  = (toa_heating * (1.0 - bond_albedo) / (4.0 * phys.sigma))^(1.0/4.0)
+        atmos.T_skin = atmos.T_eqm * (0.5^0.25) # Assuming a grey stratosphere in radiative eqm (https://doi.org/10.5194/esd-7-697-2016)
+
+        if p_top > p_surf 
+            error("p_top must be less than p_surf")
+        end
 
         atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
         atmos.p_boa =           p_surf * 1.0e+5
 
-        atmos.control.l_gas = true
-        atmos.control.l_rayleigh = flag_rayleigh
+        atmos.control.l_gas =       true
+        atmos.control.l_rayleigh =  flag_rayleigh
         atmos.control.l_continuum = flag_continuum
-        atmos.control.l_cont_gen = flag_gcontinuum
-        atmos.control.l_aerosol = flag_aerosol
-        atmos.control.l_cloud = flag_cloud
+        atmos.control.l_cont_gen =  flag_gcontinuum
+        atmos.control.l_aerosol =   flag_aerosol
+        atmos.control.l_cloud =     flag_cloud
 
         # Normalise and store gas mixing ratios in dictionary
         if isempty(mixing_ratios)
@@ -743,8 +759,8 @@ module atmosphere
         # Run radiative transfer model
         ######################################################
 
-        clamp!(atmos.tmp, atmos.minT, Inf)
-        clamp!(atmos.tmpl, atmos.minT, Inf)
+        clamp!(atmos.tmp, atmos.T_floor, Inf)
+        clamp!(atmos.tmpl, atmos.T_floor, Inf)
 
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.t[1, :] .= atmos.tmp[:]

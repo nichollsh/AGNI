@@ -140,13 +140,15 @@ module solver
         
         dt = zeros(Float64, length(atmos.heating_rate))
 
+        T_c = atmos.tmp[end-8] # Switch to sub-linear timestep scaling above this temperature
+
         for i in 1:atmos.nlev_c
             expect_heat = max( abs(atmos.heating_rate[i]) , 1e-30 )
-            dt[i] = dtmp_step_frac * atmos.tmp[i] / expect_heat
+            tmp = atmos.tmp[i]
+            dt[i] = dtmp_step_frac * tmp / expect_heat * (T_c / tmp)^0.5
         end 
 
         dt[end] *= 0.5
-
         clamp!(dt, dt_min, dt_max)
 
         return dt
@@ -194,7 +196,7 @@ module solver
         end 
 
         # Temperature floor (centres)
-        clamp!(atmos.tmp, atmos.minT, Inf)
+        clamp!(atmos.tmp, atmos.T_floor, Inf)
         
         # Interpolate to cell-edge values 
         itp = Interpolator(atmos.p, atmos.tmp) # Cell edges 
@@ -220,7 +222,7 @@ module solver
         atmos.tmp[:] .= 0.5 .* (atmos.tmpl[2:end] + atmos.tmpl[1:end-1])
 
         # Temperature floor (edges)
-        clamp!(atmos.tmpl, atmos.minT, Inf)
+        clamp!(atmos.tmpl, atmos.T_floor, Inf)
 
         return adj_changed
     end
@@ -238,14 +240,14 @@ module solver
 
         # Run parameters
         dtmp_gofast  = 40.0  # Change in temperature below which to stop model acceleration
-        wait_adj     = 3   # Wait this many steps before introducing convective adjustment
+        wait_adj     = 10    # Wait this many steps before introducing convective adjustment
         modprint     = 10    # Frequency to print when verbose==false
         len_hist     = 5     # Number of previous states to store
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 1.0   # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
-        F_rchng_conv = 0.01   # Maximum relative value of F_loss for convergence [%]
+        drel_dt_conv = 5.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
+        F_rchng_conv = 0.02   # Maximum relative value of F_loss for convergence [%]
         
         if verbose
             @printf("    convergence criteria       \n")
@@ -255,20 +257,27 @@ module solver
             @printf(" \n")
         end
 
+        # Validate inputs
+        wait_adj = max(min(wait_adj, max_steps-2), 1)
+        len_hist = max(min(len_hist, max_steps-1), 4)
+        modprint = max(modprint, 0)
+
         # Tracking
         adj_changed = 0
         F_rchng = Inf
         F_loss = 1.0e99         # Flux loss (TOA vs BOA)
+        F_loss_prev = 1.0e99    # Previous ^
         F_TOA_rad = 1.0e99      # Net upward TOA radiative flux
-        F_BOA_rad = 0.0
-        F_OLR_rad = 0.0
+        F_BOA_rad = 0.0         # Net upward BOA radiative flux
+        F_OLR_rad = 0.0         # Longwave upward TOA radiative flux
+        dtmp_comp = Inf         # Temperature change comparison
+        drel_dt = Inf           # Rate of relative temperature change
+        drel_dt_prev  = Inf     # Previous ^
 
         # Variables
         success = false         # Convergence criteria met
         step = 1                # Current step number
-        dtmp_comp = Inf         # Temperature change comparison
-        drel_dt = Inf           # Rate of relative temperature change
-        drel_dt_prev  = Inf     # Previous ^
+
         flag_prev = false       # Previous iteration is meeting convergence
         stopfast = false
         step_frac = 0.05
@@ -285,7 +294,7 @@ module solver
             atmos.tmpl[end] = atmos.tstar
         elseif surf_state == 2
             fixed_bottom = true
-            atmos.tmpl[end] = max(surf_value,atmos.minT)
+            atmos.tmpl[end] = max(surf_value,atmos.T_floor)
         else
             error("Invalid surface state for radiative-convective solver")
         end
@@ -295,6 +304,11 @@ module solver
             atmos.tmp[:]  = atmos.tmpl[end]
             atmos.tmpl[:] = atmos.tmpl[end]
         end
+
+        # Plot initial state 
+        if modplot > 0 
+            plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_0000.png", atmos.OUT_DIR))
+        end 
 
         # Main loop
         while (!success) && (step <= max_steps)
@@ -336,11 +350,11 @@ module solver
                 dryadj_steps = 20
                 h2oadj_steps = 20
                 dt_min = 1e-5
-                dt_max = 25.0
-                step_frac_max = 0.01
+                dt_max = 10.0
+                step_frac_max = 4e-3
                 smooth_window = 0
 
-                # End of 'fast' period (take average of last two iters)
+                # End of 'fast' period - take average of last two iters
                 if stopfast
                     stopfast = false
                     atmos.tmpl[:] .= 0.5*(hist_tmpl[end,:] .+ hist_tmpl[end-1,:])
@@ -360,7 +374,9 @@ module solver
                 if drel_dt < Inf
                     max_inc = 1.1 
                     min_dec = 0.5
-                    step_frac *= min(max( drel_dt_prev/drel_dt , min_dec ) , max_inc)
+                    # step_frac *= min(max( drel_dt_prev/drel_dt , min_dec ) , max_inc)
+                    step_frac *= min(max( F_loss_prev/F_loss , min_dec ) , max_inc)
+
                 end 
                 step_frac = min(step_frac, step_frac_max)
                 if verbose
@@ -416,6 +432,8 @@ module solver
 
             F_BOA_rad = atmos.flux_n[end]
             F_OLR_rad = atmos.flux_u_lw[1]
+
+            F_loss_prev = F_loss
             F_loss = abs(F_TOA_rad-F_BOA_rad)
 
             # Print debug info to stdout
@@ -439,9 +457,8 @@ module solver
             hist_tmpl[end,:] .= atmos.tmpl[:]
 
             # Plot current state
-            # Animate frames with `ffmpeg -framerate 16 -i out/radeqm_monitor_%04d.png -y out/anim.mp4`
             if (modplot > 0) && (mod(step,modplot) == 0)
-                plotting.plot_solver(atmos, @sprintf("%s/radeqm_monitor_%04d.png", atmos.OUT_DIR, step), hist_tmpl=hist_tmpl)
+                plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_%04d.png", atmos.OUT_DIR, step), hist_tmpl=hist_tmpl)
             end 
 
             # Convergence check requires that:
