@@ -8,7 +8,7 @@ end
 
 module setpt
 
-    include("phys.jl")
+    import phys
 
     using PCHIPInterpolation
 

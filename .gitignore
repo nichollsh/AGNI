@@ -4,7 +4,6 @@ out/*
 # Misc files
 .DS_Store
 *.log
-radiation_code.lock
-
-
+.vscode 
+__pycache__
 
