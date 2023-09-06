@@ -3,9 +3,6 @@ Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer.
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.    
 The main repository for this code is [github.com/nichollsh/AGNI](https://github.com/nichollsh/AGNI).
 
-### Contributors (abbreviations & email addresses)
-* HN - Harrison Nicholls (harrison.nicholls@physics.ox.ac.uk)  
-
 ### Repository structure 
 * `README.md`       - This file
 * `LICENSE.txt`     - License for use and re-use
@@ -14,7 +11,8 @@ The main repository for this code is [github.com/nichollsh/AGNI](https://github.
 * `res/`            - Resources
 * `src/`            - AGNI source code
 * `socrates/`       - Directory containing SOCRATES and associated files
-* `agni.jl`         - Main AGNI run file
+* `agni.jl`         - Main AGNI run file 
+* `agni_cli.jl`     - CLI AGNI run file
 * `demo_steamrun.jl`- Demo AGNI run file (steam runaway greenhouse effect)
 
 
@@ -55,8 +53,10 @@ The main repository for this code is [github.com/nichollsh/AGNI](https://github.
 -  `$ cd ..`   
 You should end up in a directory called 'julia'.
 
-### Run instructions
-Simply run `$ julia agni.jl` in the root directory of the repository.
+### Running the code
+Simply run `$ ./agni.jl` in the root directory of the repository.     
+For the command line interface, instead run `$ ./agni_cli.jl`.    
+To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.   
 
 ### License
 See [LICENSE.txt](LICENSE.txt) for AGNI.      
