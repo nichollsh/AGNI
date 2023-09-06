@@ -74,7 +74,7 @@ end
 control.l_rayleigh = ("rayleigh" in example_opts)
 control.l_gas = ("gas" in example_opts)
 control.l_continuum = ("continuum" in example_opts)
-surface_albedo = 0.0
+albedo_s = 0.0
 
 ##########################
 # Initialisation
@@ -432,7 +432,7 @@ end
 # rho_alb(l, IP_surf_alb_dir, i_band)
 # rho_alb(l, IP_surf_alb_diff, i_band)
 
-bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= surface_albedo
+bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= albedo_s
 
 if control.i_angular_integration == SOCRATES.rad_pcf.ip_two_stream
 

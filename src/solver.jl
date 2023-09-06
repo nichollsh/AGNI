@@ -227,9 +227,26 @@ module solver
         return adj_changed
     end
 
-    # Radiative-convective solver
+    """
+    **Run the radiative-convective solver.**
+
+    Time-steps the temperature profile with the heating rates to obtain global and 
+    local energy balance.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `surf_state::Int64=0`             bottom layer temperature, 0: free | 1: star | 2: surf_value
+    - `surf_value::Float64=350.0`       bottom layer temperature when `surf_state==2`
+    - `dry_adjust::Bool=true`           enable dry convective adjustment
+    - `h2o_adjust::Bool=false`          enable naive steam convective adjustment
+    - `sens_heat::Bool=true`            include sensible heating 
+    - `verbose::Bool=false`             verbose output
+    - `modplot::Int=0`                  plot frequency (0 => no plots)
+    - `gofast::Bool=true`               enable accelerated fast period at the start 
+    - `max_steps::Int64=250`            maximum number of solver steps
+    """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int64=0, surf_value::Float64=350.0, ini_state::Int64=0, 
+                            surf_state::Int64=0, surf_value::Float64=350.0,
                             dry_adjust::Bool=true, h2o_adjust::Bool=false, 
                             sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, gofast::Bool=true,
@@ -297,12 +314,6 @@ module solver
             atmos.tmpl[end] = max(surf_value,atmos.T_floor)
         else
             error("Invalid surface state for radiative-convective solver")
-        end
-
-        # Handle initial state
-        if ini_state == 1
-            atmos.tmp[:]  = atmos.tmpl[end]
-            atmos.tmpl[:] = atmos.tmpl[end]
         end
 
         # Plot initial state 
@@ -446,6 +457,7 @@ module solver
                 @printf("    F_rad^BOA   = %.2e W m-2  \n", F_BOA_rad)
                 @printf("    F_rad^loss  = %.2f W m-2  \n", F_loss)
                 @printf("    F_chng^TOA  = %.4f %%     \n", F_rchng)
+                @printf("\n")
             end
 
             # Update history array
@@ -472,7 +484,7 @@ module solver
             
             # Prepare for next iter
             atexit(exit)
-            @printf(" \n")
+            
             step += 1
 
         end # end main loop

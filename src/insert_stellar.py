@@ -190,8 +190,6 @@ def InsertStellarSpectrum(orig_file:str, star_file:str, outp_file:str):
 # 3. socrates spectral file (output)
 if __name__=='__main__':
 
-    print("Python: inserting stellar spectrum")
-
     args = sys.argv
 
     if len(args) != 4:

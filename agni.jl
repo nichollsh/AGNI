@@ -1,7 +1,7 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # -------------
-# AGNI main file, for standalone execution
+# AGNI main file for standalone execution
 # -------------
 
 println("Begin AGNI")
@@ -44,6 +44,7 @@ rm(output_dir,force=true,recursive=true)
 mkdir(output_dir)
 
 # Setup atmosphere
+println("Atmosphere: setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
@@ -56,15 +57,17 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
+println("Atmosphere: setting initial T(p)")
 setpt.dry_adiabat!(atmos)
-setpt.stratosphere!(atmos, atmos.T_skin)
+setpt.stratosphere!(atmos, 400.0)
 
 # Calculate LW and SW fluxes (once)
+println("RadTrans: calculating fluxes")
 atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-solver.solve_energy!(atmos, surf_state=1, modplot=1)
+solver.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true)
 
 # Save result
 atmosphere.write_pt(atmos,  joinpath(atmos.OUT_DIR,"pt.csv"))
@@ -73,6 +76,7 @@ plotting.anim_solver(atmos)
 plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fluxes.pdf"))
 
 # Deallocate atmosphere
+println("Atmosphere: deallocating arrays")
 atmosphere.deallocate!(atmos)
 
 println("Goodbye")
