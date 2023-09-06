@@ -12,6 +12,7 @@ module plotting
     using Plots
     using LaTeXStrings
     using Glob
+    using Revise
 
     import atmosphere
 

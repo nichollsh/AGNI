@@ -43,7 +43,7 @@ module atmosphere
         # SOCRATES parameters
         all_channels::Bool 
         spectral_file::String 
-        surface_albedo::Float64 
+        albedo_s::Float64 
         zenith_degrees::Float64 
         toa_heating::Float64 
         tstar::Float64 
@@ -62,11 +62,6 @@ module atmosphere
         pl::Array      
 
         T_floor::Float64        # Temperature floor [K]
-
-        # Temperature parameters 
-        bond_albedo::Float64    # Bond albedo for the atmosphere
-        T_eqm::Float64          # Radiative equilibrium temperature [K]
-        T_skin::Float64         # Skin temperature [K]
 
         # Mixing ratios (atmosphere is currently assumed to be well-mixed)
         mr_gases::Dict
@@ -134,7 +129,7 @@ module atmosphere
     - `p_top::Float64`                  total top of atmosphere pressure [bar].
     - `mixing_ratios::Dict`             dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
     - `zenith_degrees::Float64=54.74`   angle of radiation from the star, relative to the zenith [degrees].
-    - `bond_albedo::Float64=0.175`      bond albedo for the planet (scattering).
+    - `albedo_s::Float64=0.0`           surface albedo.
     - `all_channels::Bool=true`         use all channels available for RT?
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
@@ -149,7 +144,7 @@ module atmosphere
                     gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
                     mixing_ratios::Dict;
                     zenith_degrees::Float64 =   54.74,
-                    bond_albedo::Float64 =      0.175,
+                    albedo_s::Float64 =         0.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -158,7 +153,6 @@ module atmosphere
                     flag_cloud::Bool =          false
                     )
 
-        println("Atmosphere: instantiating SOCRATES objects")
         atmos.dimen =       SOCRATES.StrDim()
         atmos.control =     SOCRATES.StrCtrl()
         atmos.spectrum =    SOCRATES.StrSpecData()
@@ -167,8 +161,6 @@ module atmosphere
         atmos.aer =         SOCRATES.StrAer()
         atmos.bound =       SOCRATES.StrBound()
         atmos.radout =      SOCRATES.StrOut()
-        
-        println("Atmosphere: setting parameters")
 
         # Set parameters
         atmos.ROOT_DIR = abspath(ROOT_DIR)
@@ -182,13 +174,10 @@ module atmosphere
         atmos.nlev_c         =  max(nlev_centre,10)
         atmos.nlev_l         =  nlev_centre + 1
         atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.0)
-        atmos.bond_albedo =     max(min(bond_albedo, 1.0 ), 0.0)
+        atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.toa_heating =     max(toa_heating, 0.0)
         atmos.tstar =           max(tstar, atmos.T_floor)
         atmos.grav_surf =       gravity
-
-        atmos.T_eqm  = (toa_heating * (1.0 - bond_albedo) / (4.0 * phys.sigma))^(1.0/4.0)
-        atmos.T_skin = atmos.T_eqm * (0.5^0.25) # Assuming a grey stratosphere in radiative eqm (https://doi.org/10.5194/esd-7-697-2016)
 
         if p_top > p_surf 
             error("p_top must be less than p_surf")
@@ -329,10 +318,8 @@ module atmosphere
                         spfile_noremove::Bool=false
                         )
 
-        println("Atmosphere: allocate memory")
-
         if !atmos.is_param
-            error(" atmosphere parameters have not been set")
+            error("atmosphere parameters have not been set")
         end
 
         atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
@@ -362,6 +349,7 @@ module atmosphere
 
         # Insert stellar spectrum 
         if !spfile_has_star
+            println("Python: inserting stellar spectrum")
             runfile = joinpath([atmos.ROOT_DIR, "src", "insert_stellar.py"])
             run(`python $runfile $(stellar_spectrum) $(atmos.spectral_file) $(spectral_file_run)`)
         else 
@@ -371,6 +359,7 @@ module atmosphere
 
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
+            println("Python: inserting rayleigh scattering")
             co2_mr = get_mr(atmos, "co2")
             n2_mr  = get_mr(atmos, "n2")
             h2o_mr = get_mr(atmos, "h2o")
@@ -722,7 +711,7 @@ module atmosphere
         # IP_surface_char  = 51, file suffix 'surf'
         #####################################
 
-        atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.surface_albedo
+        atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
 
         if atmos.control.i_angular_integration == SOCRATES.rad_pcf.ip_two_stream
             if !lw
