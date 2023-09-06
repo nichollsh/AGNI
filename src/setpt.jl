@@ -9,11 +9,12 @@ end
 module setpt
 
     import phys
+    import atmosphere
 
     using PCHIPInterpolation
 
     # Read atmosphere T(p) from a file 
-    function csv!(atmos, fpath)
+    function csv!(atmos::atmosphere.Atmos_t, fpath::String)
 
         # Check file exists
         if !isfile(fpath)
@@ -102,7 +103,7 @@ module setpt
     end
 
     # Set atmosphere to be isothermal
-    function isothermal!(atmos, set_tmp)
+    function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
         if !atmos.is_param
             error("Atmosphere parameters not set")
         end 
@@ -111,7 +112,7 @@ module setpt
     end 
 
     # Set atmosphere to dry adiabat
-    function dry_adiabat!(atmos)
+    function dry_adiabat!(atmos::atmosphere.Atmos_t)
         # Validate input
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup")
@@ -134,8 +135,34 @@ module setpt
         atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
     end 
 
-    # Set pure 'con' atmosphere to phase curve of 'con' when it enters condensible region
-    function condensing!(atmos, con::String)
+    # Set atmosphere to have an isothermal stratosphere
+    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp::Float64)
+
+        # Keep stratosphere below tstar value
+        strat_tmp = min(strat_tmp, atmos.tstar)
+
+        # Loop upwards from bottom of model
+        strat = false
+        for i in range(atmos.nlev_c,1,step=-1)
+            # Find tropopause 
+            strat = strat || (atmos.tmp[i] < strat_tmp) || (atmos.tmpl[i+1] < strat_tmp) 
+            
+            # Apply stratosphere to this level if required
+            if strat
+                atmos.tmp[i]    = strat_tmp 
+                atmos.tmpl[i+1] = strat_tmp 
+            end
+        end
+
+        # Handle topmost level 
+        if strat
+            atmos.tmpl[1] = strat_tmp 
+        end
+
+    end
+
+    # Set atmosphere to phase curve of 'con' when it enters condensible region
+    function condensing!(atmos::atmosphere.Atmos_t, con::String)
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup")
         end 
@@ -149,25 +176,27 @@ module setpt
         p0 = phys.lookup_P_trip[con]
         T0 = phys.lookup_T_trip[con]
 
+        mr = atmosphere.get_mr(atmos, con)
+
         # Check surface pressure (should not be supersaturated)
         tsurf = atmos.tmpl[end]
         psat = p0 * exp( L/R * (1/T0 - 1/tsurf)   )
-        if atmos.pl[end] > psat 
-            atmos.p_boa = psat 
+        if atmos.pl[end]*mr > psat 
+            atmos.p_boa = atmos.pl[end]*(1.0-mr) + psat 
             atmosphere.generate_pgrid!(atmos)
         end
 
         # Check if each level is condensing. If it is, place on phase curve
         for i in 1:atmos.nlev_c
             # Cell centre
-            p = atmos.p[i]
+            p = atmos.p[i]*mr
             Tsat = 1.0/(  1/T0 - R/L * log(p/p0)  )
             if atmos.tmp[i] < Tsat
                 atmos.tmp[i] = Tsat
             end
                 
             # Cell edge
-            p = atmos.pl[i]
+            p = atmos.pl[i]*mr
             Tsat = 1.0/(  1/T0 - R/L * log(p/p0)  )
             if atmos.tmpl[i] < Tsat
                 atmos.tmpl[i] = Tsat
