@@ -11,6 +11,8 @@ module plotting
     # Import stuff
     using Plots
     using LaTeXStrings
+    using Glob
+
     import atmosphere
 
     """
@@ -47,6 +49,7 @@ module plotting
     function plot_solver(atmos, fname; hist_tmpl::Array=[])
 
         dpi=250
+        lw=1.5
 
         # Interleave cell-centre and cell-edge arrays for current atmosphere
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -65,13 +68,16 @@ module plotting
         plt1 = plot(framestyle=:box, legend=:topright, ylims=ylims, yticks=yticks)
 
         # Plot temperature
-        scatter!(plt1, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
-        plot!(plt1, arr_T, arr_P, lc="black", lw=2, label=L"T_n")
+        scatter!(plt1, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*") 
+        plot!(plt1, arr_T, arr_P, lc="black", lw=lw, label=L"T_n")
         if plot_hist 
             for i in range(len_hist-1,1,step=-1)
-                alpha = Float64(i)/(len_hist)
-                n = len_hist-i
-                plot!(plt1, hist_tmpl[i,1:end], atmos.pl*1e-5, lc="black", linealpha=alpha, lw=2, label=L"T_{n-%$n}")
+                xvals = hist_tmpl[i,1:end]
+                if count(x->x!=0.0, xvals) > 0
+                    alpha = Float64(i)/(len_hist)
+                    n = len_hist-i
+                    plot!(plt1, xvals, atmos.pl*1e-5, lc="black", linealpha=alpha, lw=lw, label=L"T_{n-%$n}")
+                end
             end 
         end
         
@@ -92,7 +98,7 @@ module plotting
             abshr[i] = abs(atmos.heating_rate[i])
             poshr[i] = (atmos.heating_rate[i] >= 0)
         end 
-        plot!(plt2, abshr, p, lc="brown3", lw=2, label=L"|H_n|")
+        plot!(plt2, abshr, p, lc="brown3", lw=lw, label=L"|H_n|")
         scatter!(plt2, abshr[poshr],    p[poshr],    markershape=:diamond, markeralpha=0.8, label=L"H_n>0")
         scatter!(plt2, abshr[.!poshr],  p[.!poshr],  markershape=:circle,  markeralpha=0.8, label=L"H_n<0")
         xlabel!(plt2, "Heating rate [K/day]")
@@ -147,6 +153,30 @@ module plotting
         savefig(plt, fname)
 
     end
+
+    """
+    Animate output frames from solver, using ffmpeg
+    """
+    function anim_solver(atmos)
+
+        # Command line format:
+        # bash> ffmpeg -framerate 16 -i out/solver_monitor_%04d.png -y out/anim.mp4
+
+        # Find output files
+        out = atmos.OUT_DIR
+        frames = glob("solver_monitor_*.png",out)
+        nframes = length(frames)
+        if nframes < 1
+            println("WARNING: Cannot animate solver because no output frames were found")
+        end
+
+        # Create animation
+        runtime = 15.0
+        fps = max(nframes/runtime, 5)
+        run(`ffmpeg -loglevel quiet -framerate $fps -i $out/solver_monitor_%04d.png -y $out/anim.mp4`)
+
+    end
+
 
 end
 
