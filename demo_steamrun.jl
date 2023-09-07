@@ -61,8 +61,10 @@ for i in 1:run_len
     atmosphere.generate_pgrid!(atmos)
     atmos.tstar =       tsurf_arr[i]
     atmos.tmpl[end] =   tsurf_arr[i]
+
+    setpt.prevent_surfsupersat!(atmos)
     setpt.dry_adiabat!(atmos)
-    setpt.saturation!(atmos, "H2O")
+    setpt.condensing!(atmos, "H2O")
 
     # Calculate LW fluxes 
     atmosphere.radtrans!(atmos, true)
