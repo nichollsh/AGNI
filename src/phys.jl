@@ -86,6 +86,19 @@ module phys
         ("He", 5.196000E+03)
     ])
 
+    # Critical point temperature, K
+    const lookup_T_crit = Dict([
+        ("H2O", 6.471000e+02), 
+        ("CO2", 3.042000e+02), 
+        ("CO", 1.134450e+02), 
+        ("CH4", 1.904400e+02), 
+        ("O2", 1.545400e+02), 
+        ("NH3", 4.055000e+02), 
+        ("N2", 1.262000e+02), 
+        ("H2", 3.320000e+01), 
+        ("He", 5.100000e+00)
+    ])
+
     # Triple point temperature, K
     const lookup_T_trip = Dict([
         ("H2O", 2.731500E+02), 

@@ -1,4 +1,9 @@
 # Socrates files
+.spfile_runtime
+.spfile_runtime_k
+.star_file
+
+# Output files 
 out/*
 
 # Misc files
@@ -6,4 +11,5 @@ out/*
 *.log
 .vscode 
 __pycache__
+
 

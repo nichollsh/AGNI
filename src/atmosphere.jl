@@ -166,7 +166,11 @@ module atmosphere
         atmos.ROOT_DIR = abspath(ROOT_DIR)
         atmos.OUT_DIR = abspath(OUT_DIR)
 
-        atmos.spectral_file =   joinpath([atmos.ROOT_DIR, "res", "spectral_files", spfile_name, spfile_name])
+        if spfile_name == "_runtime"
+            atmos.spectral_file =  joinpath([atmos.OUT_DIR, ".spfile_runtime"])
+        else
+            atmos.spectral_file =  joinpath([atmos.ROOT_DIR, "res", "spectral_files", spfile_name, spfile_name])
+        end
         atmos.all_channels =    all_channels
 
         atmos.T_floor =          5.0 
@@ -352,7 +356,7 @@ module atmosphere
             println("Python: inserting stellar spectrum")
             runfile = joinpath([atmos.ROOT_DIR, "src", "insert_stellar.py"])
             run(`python $runfile $(stellar_spectrum) $(atmos.spectral_file) $(spectral_file_run)`)
-        else 
+        elseif atmos.spectral_file != spectral_file_run
             cp(atmos.spectral_file,      spectral_file_run,      force=true)
             cp(atmos.spectral_file*"_k", spectral_file_run*"_k", force=true)
         end

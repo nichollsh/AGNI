@@ -25,8 +25,8 @@ module plotting
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
         arr_P *= 1e-5
 
-        ylims  = (arr_P[1], arr_P[end])
-        yticks = 10 .^ floor.(range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
+        yticks = 10.0 .^ round.(Int64,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks)
@@ -56,8 +56,8 @@ module plotting
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
         arr_P *= 1e-5
 
-        ylims  = (arr_P[1], arr_P[end])
-        yticks = 10 .^ floor.(range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
+        yticks = 10.0 .^ round.(Int64,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Optionally get past atmosphere
         plot_hist = !isempty(hist_tmpl)
@@ -88,10 +88,7 @@ module plotting
         yflip!(plt1)
         yaxis!(plt1, yscale=:log10)
 
-        # Create plot 2
-        plt2 = plot(framestyle=:box, legend=:topleft, ylims=ylims, yticks=yticks)
-
-        # Plot heating rate
+        # Process heating rates 
         p =  atmos.p*1e-5
         abshr = zeros(Float64, atmos.nlev_c)
         poshr = trues(atmos.nlev_c)
@@ -99,13 +96,21 @@ module plotting
             abshr[i] = abs(atmos.heating_rate[i])
             poshr[i] = (atmos.heating_rate[i] >= 0)
         end 
+
+        xlims  = (1e-2, maximum(abshr))
+        xticks = 10.0 .^ round.(Int64,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+
+        # Create plot 2
+        plt2 = plot(framestyle=:box, legend=:topleft, ylims=ylims, yticks=yticks, xlims=xlims, xticks=xticks)
+
+        # Plot heating rate
         plot!(plt2, abshr, p, lc="brown3", lw=lw, label=L"|H_n|")
         scatter!(plt2, abshr[poshr],    p[poshr],    markershape=:diamond, markeralpha=0.8, label=L"H_n>0")
         scatter!(plt2, abshr[.!poshr],  p[.!poshr],  markershape=:circle,  markeralpha=0.8, label=L"H_n<0")
         xlabel!(plt2, "Heating rate [K/day]")
         yflip!(plt2)
         yaxis!(plt2, yscale=:log10)
-        xaxis!(plt2, xscale=:log10, xlims=(1e-2, maximum(abshr)))
+        xaxis!(plt2, xscale=:log10)
         
         # Combine subplots and save
         plt = plot(plt1, plt2, layout=(1,2), dpi=dpi)
@@ -120,36 +125,50 @@ module plotting
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
 
-        ylims  = (arr_P[1], arr_P[end])
-        yticks = 10 .^ floor.(range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
+        yticks = 10.0 .^ round.(Int64,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         w = 2
-        plt = plot(legend=:topleft, framestyle=:box)
+        plt = plot(legend=:topleft, framestyle=:box, ylims=ylims, yticks=yticks)
 
         col_u = "brown3"
         col_d = "seagreen"
         col_n = "black"
+
+        max_fl = 1e2
         
         if atmos.is_out_lw
-            plot!(plt, -1.0.*atmos.flux_d_lw, arr_P, label="DN LW", lw=w, lc=col_d, ls=:dash)
-            plot!(plt, atmos.flux_u_lw, arr_P,       label="UP LW", lw=w, lc=col_u, ls=:dash)
+            plot!(plt, atmos.flux_d_lw, arr_P, label="DN LW", lw=w, lc=col_d, ls=:dash)
+            plot!(plt, atmos.flux_u_lw, arr_P, label="UP LW", lw=w, lc=col_u, ls=:dash)
+            max_fl = max(max_fl, maximum(atmos.flux_d_lw))
+            max_fl = max(max_fl, maximum(atmos.flux_u_lw))
         end
 
         if atmos.is_out_sw
-            plot!(plt, -1.0.*atmos.flux_d_sw, arr_P, label="DN SW", lw=w, lc=col_d, ls=:dot)
-            plot!(plt, atmos.flux_u_sw, arr_P,       label="UP SW", lw=w, lc=col_u, ls=:dot)
+            plot!(plt, atmos.flux_d_sw, arr_P, label="DN SW", lw=w, lc=col_d, ls=:dot)
+            plot!(plt, atmos.flux_u_sw, arr_P, label="UP SW", lw=w, lc=col_u, ls=:dot)
+            max_fl = max(max_fl, maximum(atmos.flux_d_sw))
+            max_fl = max(max_fl, maximum(atmos.flux_u_lw))
         end 
 
         if atmos.is_out_lw && atmos.is_out_sw
-            plot!(plt, atmos.flux_u, arr_P,         label="UP",  lw=w, lc=col_u, ls=:solid)
-            plot!(plt, -1.0*atmos.flux_d, arr_P,    label="DN",  lw=w, lc=col_d, ls=:solid)
-            plot!(plt, atmos.flux_n, arr_P,         label="NET", lw=w, lc=col_n, ls=:solid)
+            plot!(plt, atmos.flux_u, arr_P,    label="UP",  lw=w, lc=col_u, ls=:solid)
+            plot!(plt, atmos.flux_d, arr_P,    label="DN",  lw=w, lc=col_d, ls=:solid)
+            plot!(plt, atmos.flux_n, arr_P,    label="NET", lw=w, lc=col_n, ls=:solid)
+            max_fl = max(max_fl, maximum(atmos.flux_d))
+            max_fl = max(max_fl, maximum(atmos.flux_u))
+            max_fl = max(max_fl, maximum(atmos.flux_n))
         end 
+
+
+        xlims  = (1e-1, max_fl * 1.5)
+        xticks = 10.0 .^ round.(Int64,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         xlabel!(plt, "Upward directed flux [W m-2]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
+        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks)
 
         savefig(plt, fname)
 

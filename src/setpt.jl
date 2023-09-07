@@ -161,25 +161,52 @@ module setpt
 
     end
 
+    # Ensure that the surface isn't supersaturated
+    function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)
+        if !(atmos.is_alloc && atmos.is_param) 
+            error("Atmosphere is not setup")
+        end 
+
+        # For each condensible volatile
+        for con in keys(atmos.mr_gases)
+            # Get mixing ratio
+            mr = atmosphere.get_mr(atmos, con)
+            if mr < 1.0e-10
+                continue 
+            end
+
+            # Check surface pressure (should not be supersaturated)
+            psat = phys.calc_Psat(con, atmos.tmpl[end])
+            Tsat = phys.calc_Tdew(con, atmos.p_boa)
+            if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_T_crit[con])
+                # Reduce amount of volatile until reaches phase curve 
+                atmos.p_boa = atmos.pl[end]*(1.0-mr) + psat
+                atmos.mr_gases[con] = psat / atmos.p_boa  
+
+                # Renormalise mixing ratios
+                norm_factor = sum(values(atmos.mr_gases))
+                for (key, value) in atmos.mr_gases
+                    atmos.mr_gases[key] = value / norm_factor
+                end
+
+                # Generate new pressure grid 
+                atmosphere.generate_pgrid!(atmos)
+
+                # Inform user
+                println("Atmosphere: Supersaturated surface - setting partial pressure to saturation pressure")
+            end
+        end 
+    end
+
+
     # Set atmosphere to phase curve of 'con' when it enters the condensible region
-    function saturation!(atmos::atmosphere.Atmos_t, con::String)
+    function condensing!(atmos::atmosphere.Atmos_t, con::String)
+
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup")
         end 
         if !(con in keys(phys.lookup_L_vap))
             error("Invalid condensible $con")
-        end 
-
-        # Get mixing ratio
-        mr = atmosphere.get_mr(atmos, con)
-
-        # Check surface pressure (should not be supersaturated)
-        psat = phys.calc_Psat(con, atmos.tmpl[end])
-        Tsat = phys.calc_Tdew(con, atmos.p_boa)
-        if atmos.tmpl[end] < Tsat 
-            atmos.p_boa = atmos.pl[end]*(1.0-mr) + psat 
-            atmosphere.generate_pgrid!(atmos)
-            println("Atmosphere: Supersaturated surface - setting partial pressure to saturation pressure")
         end
 
         # Check if each level is condensing. If it is, place on phase curve
@@ -196,6 +223,6 @@ module setpt
                 atmos.tmpl[i] = Tsat
             end
         end
-    end 
+    end
 
 end 

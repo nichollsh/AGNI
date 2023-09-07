@@ -15,6 +15,7 @@ module solver
     using Statistics
     using Revise
     using PCHIPInterpolation
+    using LinearAlgebra
     
     import atmosphere 
     import phys
@@ -131,27 +132,7 @@ module solver
             atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i] * atmos.layer_mmw[i]) * dF[i]/dp[i] # K/s
         end
         atmos.heating_rate *= 86400.0 # K/day
-    
-    end
-
-    # Calculates the time-step at each level for a given accuracy
-    function calc_stepsize(atmos::atmosphere.Atmos_t, 
-                            dt_min::Float64, dt_max::Float64, dtmp_step_frac::Float64)
         
-        dt = zeros(Float64, length(atmos.heating_rate))
-
-        T_c = atmos.tmp[end-8] # Switch to sub-linear timestep scaling above this temperature
-
-        for i in 1:atmos.nlev_c
-            expect_heat = max( abs(atmos.heating_rate[i]) , 1e-30 )
-            tmp = atmos.tmp[i]
-            dt[i] = dtmp_step_frac * tmp / expect_heat * (T_c / tmp)^0.5
-        end 
-
-        dt[end] *= 0.5
-        clamp!(dt, dt_min, dt_max)
-
-        return dt
     end
 
     # Iterates the atmosphere at each level
@@ -198,7 +179,7 @@ module solver
         # Temperature floor (centres)
         clamp!(atmos.tmp, atmos.T_floor, Inf)
         
-        # Interpolate to cell-edge values 
+        # Interpolate to bulk cell-edge values 
         itp = Interpolator(atmos.p, atmos.tmp) # Cell edges 
         atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
@@ -216,6 +197,10 @@ module solver
             dt = atmos.tmp[end]-atmos.tmpl[end-1]
             dp = atmos.p[end]-atmos.pl[end-1]
             atmos.tmpl[end] = atmos.tmp[end] + dt/dp * (atmos.pl[end] - atmos.p[end])
+            
+            # Limit change at bottom edge 
+            dT_surf = max(min(atmos.tmpl[end]-bot_old_e, dtmp_clip * 0.2), dtmp_clip * -0.2)
+            atmos.tmpl[end] = bot_old_e + dT_surf
         end
 
         # Second interpolation back to cell-centres 
@@ -235,7 +220,7 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int64=0`             bottom layer temperature, 0: free | 1: star | 2: surf_value
+    - `surf_state::Int64=0`             bottom layer temperature, 0: free | 1: T_surf | 2: surf_value
     - `surf_value::Float64=350.0`       bottom layer temperature when `surf_state==2`
     - `dry_adjust::Bool=true`           enable dry convective adjustment
     - `h2o_adjust::Bool=false`          enable naive steam convective adjustment
@@ -263,8 +248,8 @@ module solver
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 5.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
-        F_rchng_conv = 0.02   # Maximum relative value of F_loss for convergence [%]
+        drel_dt_conv = 1.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
+        F_rchng_conv = 0.01   # Maximum relative value of F_loss for convergence [%]
         
         if verbose
             @printf("    convergence criteria       \n")
@@ -290,6 +275,8 @@ module solver
         dtmp_comp = Inf         # Temperature change comparison
         drel_dt = Inf           # Rate of relative temperature change
         drel_dt_prev  = Inf     # Previous ^
+        heat_prev = zeros(Float64, atmos.nlev_c) # Previous iteration heating rates
+        dt = ones(Float64,  atmos.nlev_c) # time-step [days]
 
         # Variables
         success = false         # Convergence criteria met
@@ -308,7 +295,6 @@ module solver
             fixed_bottom = false
         elseif surf_state == 1
             fixed_bottom = true
-            atmos.tmpl[end] = atmos.tstar
         elseif surf_state == 2
             fixed_bottom = true
             atmos.tmpl[end] = max(surf_value,atmos.T_floor)
@@ -347,7 +333,7 @@ module solver
                 dtmp_clip = 100.0
                 dryadj_steps = 40
                 h2oadj_steps = 40
-                dt_min = 1e-3
+                dt_min = 1e1
                 dt_max = 1e6
                 step_frac = 0.1
                 smooth_window = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
@@ -360,9 +346,10 @@ module solver
                 dtmp_clip = 10.0
                 dryadj_steps = 20
                 h2oadj_steps = 20
-                dt_min = 1e-5
-                dt_max = 10.0
-                step_frac_max = 4e-3
+                dt_min = 1e-2
+                dt_max = 20.0
+                step_frac_max = 0.1
+                step_frac_min = 1e-9
                 smooth_window = 0
 
                 # End of 'fast' period - take average of last two iters
@@ -384,24 +371,46 @@ module solver
                 # Adapt the time-stepping accuracy
                 if drel_dt < Inf
                     max_inc = 1.1 
-                    min_dec = 0.5
-                    # step_frac *= min(max( drel_dt_prev/drel_dt , min_dec ) , max_inc)
-                    step_frac *= min(max( F_loss_prev/F_loss , min_dec ) , max_inc)
-
+                    min_dec = 0.1
+                    step_frac *= min(max( drel_dt_prev/drel_dt , min_dec ) , max_inc)
                 end 
-                step_frac = min(step_frac, step_frac_max)
+                step_frac = max(min(step_frac, step_frac_max),step_frac_min)
+
                 if verbose
                     @printf("    step_frac   = %.2e \n", step_frac)
                 end
             end
 
-            # Get heating rates and step size
+            # Get fluxes 
             atmosphere.radtrans!(atmos, true)
             atmosphere.radtrans!(atmos, false)
+
+            # Calc heating rates 
+            heat_prev[:] .= atmos.heating_rate[:]
             calc_heat!(atmos, sens_heat && !fixed_bottom)
-            dt = calc_stepsize(atmos,dt_min, dt_max, step_frac)
+
+            # Calc step size
+            for i in 1:atmos.nlev_c
+                expect_heat = max( abs(atmos.heating_rate[i]) , 1e-30 )
+                dt_i = step_frac * atmos.tmp[i] / expect_heat
+                if gofast 
+                    dt[i] = dt_i
+                else 
+                    dt[i] = dot( [dt[i]; dt_i] , [0.4; 0.6] )
+                end
+            end 
+
+            if !gofast 
+                for i in 1:atmos.nlev_c 
+                    if (atmos.heating_rate[i]*heat_prev[i] < 0) # oscillating hr => reduce step size
+                        dt[i] *= 0.1
+                    end 
+                end 
+            end
+            clamp!(dt, dt_min, dt_max)
+            
             if verbose
-                @printf("    dt_max,med  = %.3f, %.3f days \n", maximum(dt), median(dt))
+                @printf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
             end
 
             # Apply convective adjustment if ready
@@ -412,14 +421,14 @@ module solver
                 h2oadj_steps = 0
             end
 
-            # Apply radiative heating rate for full step
+            # Apply temperature change
             # optionally smooth temperature profile
             # optionally do convective adjustment
             adj_changed = temperature_step!(atmos, dt, 
                                             dtmp_clip, fixed_bottom,
                                             smooth_window,
                                             dryadj_steps, h2oadj_steps)
-
+            
             # Calculate relative rate of change in temperature
             if step > 1
                 drel_dt_prev = drel_dt
@@ -483,8 +492,8 @@ module solver
             flag_prev = flag_this
             
             # Prepare for next iter
+            sleep(1e-4)
             atexit(exit)
-            
             step += 1
 
         end # end main loop

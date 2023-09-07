@@ -4,6 +4,9 @@
 # AGNI main file with command line arguments
 # -------------
 
+println("AGNI CLI")
+println(" ")
+
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
 
@@ -44,13 +47,16 @@ s = ArgParseSettings()
         arg_type = Float64
         required = true
     "mr_dict"
-        help = "Mixing ratio of volatiles formatted as a dictionary e.g. {H2O:0.8, H2:0.2}"
+        help = "Mixing ratios of volatiles formatted as a dictionary e.g. \"H2O=0.8,H2=0.2\" "
         arg_type = String 
         required = true
     "--trppt"
         help = "Initialise with an isothermal stratosphere at this temperature."
         arg_type = Float64
-        default = 0.0
+        default = 150.0
+    "--cstsurf"
+        help = "Fix the surface temperature to be constant."
+        action = :store_true
     "--once"
         help = "Just calculate fluxes once - don't iterate."
         action = :store_true
@@ -104,11 +110,12 @@ star_file       = args["stf"]
 rscatter        = args["rscatter"]
 verbose         = args["verbose"]
 animate         = args["animate"]
+fixed_surf      = args["cstsurf"]
 
 if verbose 
-    println("Command line arguments")
+    println("Command line arguments:")
     for (arg,val) in args
-        println("  $arg  =>  $val")
+        println("    '$arg': $val")
     end
     println("")
 end
@@ -119,7 +126,7 @@ spfile_noremove = args["spf_keep"]
 # Parse the provided mr dict 
 mixing_ratios = Dict()
 
-mr_strip = strip(args["mr_dict"], [' ', '{', '}'])
+mr_strip = strip(args["mr_dict"], [' ', '"'])
 mr_split = split(mr_strip, ",")
 
 if length(mr_split) < 1
@@ -127,7 +134,7 @@ if length(mr_split) < 1
 end 
 
 for pair in mr_split # for each gas:val pair 
-    gas_split = split(pair, ":")
+    gas_split = split(pair, "=")
     if length(gas_split) != 2
         error("Cannot parse input mixing ratios. Check the required formatting.")
     end 
@@ -141,10 +148,6 @@ for pair in mr_split # for each gas:val pair
     end 
     mixing_ratios[gas] = val
 end 
-
-# Create output direct
-rm(output_dir,force=true,recursive=true)
-mkdir(output_dir)
 
 # Setup atmosphere
 println("Atmosphere: setting up")
@@ -164,6 +167,7 @@ atmosphere.allocate!(atmos;
                         )
 
 # Set PT profile 
+setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
 setpt.stratosphere!(atmos, trppt)
 
@@ -178,14 +182,19 @@ else
     else
         modplot = 0
     end
-    solver.solve_energy!(atmos, modplot=modplot, verbose=verbose)
+    if fixed_surf
+        surf_state = 1 
+    else 
+        surf_state = 0
+    end
+    solver.solve_energy!(atmos, modplot=modplot, verbose=verbose, surf_state=surf_state)
 end
 
 # Write final PT profile
 atmosphere.write_pt(atmos,  joinpath(atmos.OUT_DIR,"pt.csv"))
 
 # Final plots 
-if animate 
+if animate and !oneshot
     println("Atmosphere: Making animation")
     plotting.anim_solver(atmos)
 end 
@@ -195,9 +204,9 @@ if plot
     plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fluxes.pdf"))
 end 
 
-
 # Deallocate atmosphere
 atmosphere.deallocate!(atmos)
 
 # Done
 println("Goodbye")
+println(" ")
