@@ -161,8 +161,8 @@ module setpt
 
     end
 
-    # Set atmosphere to phase curve of 'con' when it enters condensible region
-    function condensing!(atmos::atmosphere.Atmos_t, con::String)
+    # Set atmosphere to phase curve of 'con' when it enters the condensible region
+    function saturation!(atmos::atmosphere.Atmos_t, con::String)
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup")
         end 
@@ -170,39 +170,32 @@ module setpt
             error("Invalid condensible $con")
         end 
 
-        # Get properties
-        L = phys.lookup_L_vap[con]
-        R = phys.R_gas / phys.lookup_mmw[con]
-        p0 = phys.lookup_P_trip[con]
-        T0 = phys.lookup_T_trip[con]
-
+        # Get mixing ratio
         mr = atmosphere.get_mr(atmos, con)
 
         # Check surface pressure (should not be supersaturated)
-        tsurf = atmos.tmpl[end]
-        psat = p0 * exp( L/R * (1/T0 - 1/tsurf)   )
-        if atmos.pl[end]*mr > psat 
+        psat = phys.calc_Psat(con, atmos.tmpl[end])
+        Tsat = phys.calc_Tdew(con, atmos.p_boa)
+        if atmos.tmpl[end] < Tsat 
             atmos.p_boa = atmos.pl[end]*(1.0-mr) + psat 
             atmosphere.generate_pgrid!(atmos)
+            println("Atmosphere: Supersaturated surface - setting partial pressure to saturation pressure")
         end
 
         # Check if each level is condensing. If it is, place on phase curve
         for i in 1:atmos.nlev_c
             # Cell centre
-            p = atmos.p[i]*mr
-            Tsat = 1.0/(  1/T0 - R/L * log(p/p0)  )
+            Tsat = phys.calc_Tdew(con,atmos.p[i])
             if atmos.tmp[i] < Tsat
                 atmos.tmp[i] = Tsat
             end
                 
             # Cell edge
-            p = atmos.pl[i]*mr
-            Tsat = 1.0/(  1/T0 - R/L * log(p/p0)  )
+            Tsat = phys.calc_Tdew(con,atmos.pl[i])
             if atmos.tmpl[i] < Tsat
                 atmos.tmpl[i] = Tsat
             end
         end
-
     end 
 
 end 

@@ -459,6 +459,9 @@ module atmosphere
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
+        atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s   #   Set surface albedo.
+        atmos.bound.zen_0[1] = 1.0/cosd(atmos.bound.zen_0[1])   #   Convert the zenith angles to secants.
+
         # atm sizes and coordinates 
         atmos.atm.n_layer = npd_layer
         atmos.atm.n_profile = 1
@@ -673,7 +676,6 @@ module atmosphere
             atmos.control.i_2stream = 16 # as per Cl_run_cdf 
         end
 
-
         #####################################
         # Angular integration
         # see src/aux/angular_control_cdf.f
@@ -698,20 +700,14 @@ module atmosphere
         atmos.dimen.nd_viewing_level =      1
         atmos.dimen.nd_sph_coeff =          1
 
-        #   Convert the zenith angles to secants.
-        atmos.bound.zen_0[1] = 1.0/cosd(atmos.bound.zen_0[1])
-
         # Reset dimen.nd_max_order to reduce memory requirements
         atmos.dimen.nd_max_order = 1
-
 
         #####################################
         # surface properties
         # see src/aux/assign_surface_char_cdf.f
         # IP_surface_char  = 51, file suffix 'surf'
         #####################################
-
-        atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
 
         if atmos.control.i_angular_integration == SOCRATES.rad_pcf.ip_two_stream
             if !lw
@@ -755,7 +751,7 @@ module atmosphere
         atmos.atm.t[1, :] .= atmos.tmp[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
-
+        
         calc_layer_props!(atmos)
 
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
