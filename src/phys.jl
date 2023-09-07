@@ -125,8 +125,8 @@ module phys
         ("He", 2.030000E+04)
     ])
 
-    # Get dew point temperature at a given pressure 
-    function calc_Tdew(gas::String, p::Float64)
+    # Get saturation pressure at a given temperature
+    function calc_Psat(gas::String, T_eval::Float64)
 
         # Get properties
         L = lookup_L_vap[gas]
@@ -134,9 +134,63 @@ module phys
         p0 = lookup_P_trip[gas]
         T0 = lookup_T_trip[gas]
 
-        # Calculate Tsat
-        Tsat = 1.0/(  1/T0 - R/L * log(p/p0)  )
-        return Tsat
+        # Calculate Psat
+        return p0*exp(-(L/R)*(1.0/T_eval - 1.0/T0))
+    end
+
+    # Get dew point temperature at a given pressure (derived from AEOLUS)
+    function calc_Tdew(gas::String, p_eval::Float64)
+
+        # Get properties
+        L = lookup_L_vap[gas]
+        R = R_gas / lookup_mmw[gas]
+
+        # Avoid math error for p = 0
+        p = max(p_eval, 1.0e-100)
+
+        if gas == "H2O"
+            Tref = 373.15 # K, boiling point of H2O at 1 atm 
+            pref = 1e5 # esat('H2O',Tref) returns 121806.3 Pa, should return 1e5    
+
+        elseif gas == "CH4"
+            Tref = 148.15 # K, arbitrary point (148.15K,esat(148.15K)=9.66bar) on the L/G coexistence curve of methane 
+            pref = calc_Psat(gas,Tref)
+
+        elseif gas == "CO2"
+            Tref = 253.0 # K, arbitrary point (253K,esat(253K)=20.9bar) on the coexistence curve of CO2 
+            pref = calc_Psat(gas,Tref)
+
+        elseif gas == "CO"
+            Tref = 100. # K, arbitrary point (100K,esat(100K)=4.6bar) on the coexistence curve of CO 
+            pref = calc_Psat(gas,Tref)
+
+        elseif gas == "N2"
+            Tref = 98.15 # K, arbitrary point (98.15K,esat(98.15K)=7.9bar) on the coexistence curve of N2 
+            pref = calc_Psat(gas,Tref)
+
+        elseif gas == "O2"
+            Tref = 123.15 # K, arbitrary point (123.15K,esat(123.15K)=21.9bar) on the coexistence curve of O2 
+            pref = p_sat(gas,Tref)
+
+        elseif gas == "H2"
+            Tref = 23.15 # K, arbitrary point (23.15K,esat(23.15K)=1.7bar) on the coexistence curve of H2 
+            pref = p_sat(gas,Tref)
+
+        elseif gas == "He"
+            Tref = 4.22 # K, boiling point of He at 1 atm 
+            pref = 1e5 # esat('He',Tref) returns 45196 Pa, should return 1e5
+
+        elseif gas == "NH3"
+            Tref = 273.15 # K, arbitrary point (273.15K,esat(273.15K)=8.6bar) on the coexistence curve of NH3 
+            pref = p_sat(gas,Tref)
+        
+        else 
+            return 0.0
+        end
+
+        pref = calc_Psat(gas,Tref)
+        Tsat = Tref/(1.0-(Tref*R/L)*log(p/pref))
+        return Tsat 
     end 
 
 end 

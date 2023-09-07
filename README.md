@@ -11,9 +11,9 @@ The main repository for this code is [github.com/nichollsh/AGNI](https://github.
 * `res/`            - Resources
 * `src/`            - AGNI source code
 * `socrates/`       - Directory containing SOCRATES and associated files
-* `agni.jl`         - Main AGNI run file 
-* `agni_cli.jl`     - CLI AGNI run file
-* `demo_steamrun.jl`- Demo AGNI run file (steam runaway greenhouse effect)
+* `agni.jl`         - Main AGNI executable 
+* `agni_cli.jl`     - CLI AGNI executable
+* `demo_steamrun.jl`- Demo pure-steam runaway greenhouse effect
 
 
 ### Requirements

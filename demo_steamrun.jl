@@ -1,5 +1,8 @@
 #!/usr/bin/env -S julia --optimize=3 --color=yes --startup-file=no
 
+# Get AGNI root directory
+ROOT_DIR = dirname(abspath(@__FILE__))
+
 println("Begin runaway demo")
 
 using Revise
@@ -14,19 +17,18 @@ push!(LOAD_PATH, joinpath(pwd(),"src"))
 import atmosphere
 import setpt
 import phys
+import plotting
 
 
 # Configuration options
-tstar           = 1700.0    # LW uflux bottom boundary condition [kelvin]
-zenith_degrees  = 45.53     # Zenith angle [degrees from zenith]
-toa_heating     = 4.451e+04 # SW dflux top boundary condition [W m-2]
+toa_heating     = 1000.0  # SW dflux top boundary condition [W m-2]
 gravity         = 9.81
 nlev_centre     = 100
 p_surf          = 300.0     # bar
-p_top           = 1e-7      # bar 
+p_top           = 1e-8      # bar 
 mixing_ratios   = Dict([("H2O", 1.0)])
 
-spectral_file = "res/spectral_files/Oak/Oak"
+spectral_file = "Oak"
 star_file     = "res/stellar_spectra/spec_sun.txt"
 output_dir = "out/"
 
@@ -34,59 +36,71 @@ output_dir = "out/"
 rm(output_dir,force=true,recursive=true)
 mkdir(output_dir)
 
-
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, spectral_file,
-                         star_file, zenith_degrees, 
-                         toa_heating, tstar,
-                         gravity, nlev_centre, p_surf, p_top,
-                         mixing_ratios,
-                         flag_gcontinuum=true
-                         )
-atmosphere.allocate!(atmos)
+atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+                        spectral_file,
+                        toa_heating, 1700.0,
+                        gravity, nlev_centre, p_surf, p_top,
+                        mixing_ratios,
+                        flag_gcontinuum=true
+                        )
+atmosphere.allocate!(atmos, stellar_spectrum=star_file)
 
-run_len = 30
-tsurf_arr = range(100,stop=2200,length=run_len)
+p_boa = atmos.p_boa
+
+plot_frames = false
+
+run_len = 55
+tsurf_arr = range(200,stop=2200,length=run_len)
 olr_arr = zeros(Float64, run_len)
 for i in 1:run_len
-
+    
     # Set PT profile 
-    atmos.tstar = tsurf_arr[i]
+    atmos.p_boa = p_boa
+    atmosphere.generate_pgrid!(atmos)
+    atmos.tstar =       tsurf_arr[i]
+    atmos.tmpl[end] =   tsurf_arr[i]
     setpt.dry_adiabat!(atmos)
-    setpt.condensing!(atmos, "H2O")
+    setpt.saturation!(atmos, "H2O")
 
-    # Calculate LW and SW fluxes (once)
+    # Calculate LW fluxes 
     atmosphere.radtrans!(atmos, true)
-    atmosphere.radtrans!(atmos, false)
 
     olr = atmos.flux_u_lw[1]
-    @printf("Tsurf = %4.1f K  ,  OLR = %5.1f W m-2 \n",tsurf_arr[i],olr)
+    @printf("Tsurf = %4.1f K  ,  OLR = %5.1f W m-2 \n",atmos.tmpl[end],olr)
     olr_arr[i] = olr 
+
+    if plot_frames 
+        tsurf = round(Int64,atmos.tmpl[end])
+        plotting.plot_pt(atmos, joinpath(output_dir,"pt_$tsurf.png"))
+        atmosphere.write_pt(atmos, joinpath(output_dir, "pt_$tsurf.csv") )
+    end
 
 end
 
-# Deallocate atmosphere
-atmosphere.deallocate!(atmos)
+# Make plot of OLR vs T_surf
+plt = plot(framestyle=:box)
 
-# Make plot
-plt = plot()
+lw=2.5
 
 litdata = readdlm("res/runaway_litdata/Goldblatt13_data.txt", ',', Float64; header=false, skipstart=2)
-plot!(plt, litdata[:,1] , litdata[:,2], label="Goldblatt+13")
+plot!(plt, litdata[:,1] , litdata[:,2], label="Goldblatt+13", lw=lw)
 
 litdata = readdlm("res/runaway_litdata/Hamano15_data.txt", ',', Float64; header=false, skipstart=2)
-plot!(plt, litdata[:,1] , litdata[:,2], label="Hamano+15")
+plot!(plt, litdata[:,1] , litdata[:,2], label="Hamano+15", lw=lw)
 
 litdata = readdlm("res/runaway_litdata/Kopparapu13_data.txt", ',', Float64; header=false, skipstart=2)
-plot!(plt, litdata[:,1] , litdata[:,2], label="Kopparapu+13")
+plot!(plt, litdata[:,1] , litdata[:,2], label="Kopparapu+13", lw=lw)
 
-plot!(tsurf_arr,olr_arr,label="HERMES")
+plot!(tsurf_arr,olr_arr,label="AGNI", lw=lw)
 
 xlabel!(plt, "Surface temperature [K]")
 ylabel!(plt, "OLR [W m-2]")
-title!(plt, "Steam runaway greenhouse")
 
 savefig(plt, "out/runaway_olr.pdf")
+
+# Deallocate atmosphere
+atmosphere.deallocate!(atmos)
 
 println("Goodbye")
