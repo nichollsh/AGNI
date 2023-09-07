@@ -50,12 +50,12 @@ The main repository for this code is [github.com/nichollsh/AGNI](https://github.
 -  `julia> exit()`
 -  `$ cd lib`
 -  `$ make`
--  `$ cd ..`   
-You should end up in a directory called 'julia'.
+-  `$ cd ../../..`   
+You should end up in the root directory of the repository.    
 
 ### Running the code
 Simply run `$ ./agni.jl` in the root directory of the repository.     
-For the command line interface, instead run `$ ./agni_cli.jl`.    
+For the command line interface, instead run `$ ./agni_cli.jl` (pass `--help` for help).   
 To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.   
 
 ### License

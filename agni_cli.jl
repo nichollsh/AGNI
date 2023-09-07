@@ -1,11 +1,10 @@
-#!/usr/bin/env -S julia --optimize=3 --color=yes --startup-file=no
+#!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # -------------
 # AGNI main file with command line arguments
 # -------------
 
 println("AGNI CLI")
-println(" ")
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
@@ -13,15 +12,6 @@ ROOT_DIR = dirname(abspath(@__FILE__))
 # Include libraries
 using Revise
 using ArgParse
-
-# Include local jl files
-include("socrates/julia/src/SOCRATES.jl")
-push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
-import atmosphere
-import setpt
-import plotting 
-import solver
-import phys
 
 # Command line arguments
 s = ArgParseSettings()
@@ -57,6 +47,9 @@ s = ArgParseSettings()
     "--cstsurf"
         help = "Fix the surface temperature to be constant."
         action = :store_true
+    "--noadjust"
+        help = "Disable convective adjustment."
+        action = :store_true
     "--once"
         help = "Just calculate fluxes once - don't iterate."
         action = :store_true
@@ -65,7 +58,7 @@ s = ArgParseSettings()
         arg_type = String
         default = "out"
     "--spf"
-        help = "Spectral file (name)."
+        help = "Spectral file (name). Default is Mallard."
         arg_type = String
         default = "Mallard"
     "--spf_keep"
@@ -76,7 +69,7 @@ s = ArgParseSettings()
         arg_type = String
         default = ""
     "--nlevels"
-        help = "Number of cell-centre levels."
+        help = "Number of model levels."
         arg_type = Int64
         default = 100
     "--rscatter"
@@ -93,6 +86,13 @@ s = ArgParseSettings()
         action = :store_true
 end
 args = parse_args(s)
+
+# Include local jl files
+include("socrates/julia/src/SOCRATES.jl")
+push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
+import atmosphere
+import setpt
+import plotting 
 
 # Set the configuration options
 tstar           = args["tstar"]
@@ -111,6 +111,7 @@ rscatter        = args["rscatter"]
 verbose         = args["verbose"]
 animate         = args["animate"]
 fixed_surf      = args["cstsurf"]
+no_adjust       = args["noadjust"]
 
 if verbose 
     println("Command line arguments:")
@@ -119,6 +120,13 @@ if verbose
     end
     println("")
 end
+
+# Remove old files 
+if abspath(output_dir) == abspath(ROOT_DIR)
+    error("Output directory cannot be the root directory")
+end
+rm(output_dir,force=true,recursive=true)
+mkdir(output_dir)
 
 spfile_has_star = (star_file == "")
 spfile_noremove = args["spf_keep"]
@@ -187,14 +195,15 @@ else
     else 
         surf_state = 0
     end
-    solver.solve_energy!(atmos, modplot=modplot, verbose=verbose, surf_state=surf_state)
+    import solver
+    solver.solve_energy!(atmos, modplot=modplot, verbose=verbose, surf_state=surf_state, dry_adjust=!no_adjust)
 end
 
 # Write final PT profile
 atmosphere.write_pt(atmos,  joinpath(atmos.OUT_DIR,"pt.csv"))
 
 # Final plots 
-if animate and !oneshot
+if animate && !oneshot
     println("Atmosphere: Making animation")
     plotting.anim_solver(atmos)
 end 
