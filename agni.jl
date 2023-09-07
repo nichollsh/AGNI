@@ -58,8 +58,9 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Atmosphere: setting initial T(p)")
+setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
-setpt.stratosphere!(atmos, 400.0)
+setpt.stratosphere!(atmos, 200.0)
 
 # Calculate LW and SW fluxes (once)
 println("RadTrans: calculating fluxes")
