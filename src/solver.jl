@@ -190,9 +190,7 @@ module solver
         atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
 
         # Limit change at top edge 
-        # dT_top = max(min(atmos.tmpl[1]-top_old_e, dtmp_clip * 0.5), dtmp_clip * -0.5)
-        # atmos.tmpl[1] = top_old_e + dT_top
-
+        atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.6; 0.4] )
 
         # Calculate bottom boundary
         if fixed_bottom
@@ -205,8 +203,7 @@ module solver
             atmos.tmpl[end] = atmos.tmp[end] + dt/dp * (atmos.pl[end] - atmos.p[end])
             
             # Limit change at bottom edge 
-            dT_surf = max(min(atmos.tmpl[end]-bot_old_e, dtmp_clip * 0.5), dtmp_clip * -0.5)
-            atmos.tmpl[end] = bot_old_e + dT_surf
+            atmos.tmpl[1] = dot( [atmos.tmpl[end]; bot_old_e] , [0.6; 0.4] )
         end
 
         # Second interpolation back to cell-centres 

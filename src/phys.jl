@@ -183,11 +183,11 @@ module phys
 
         elseif gas == "O2"
             Tref = 123.15 # K, arbitrary point (123.15K,esat(123.15K)=21.9bar) on the coexistence curve of O2 
-            pref = p_sat(gas,Tref)
+            pref = calc_Psat(gas,Tref)
 
         elseif gas == "H2"
             Tref = 23.15 # K, arbitrary point (23.15K,esat(23.15K)=1.7bar) on the coexistence curve of H2 
-            pref = p_sat(gas,Tref)
+            pref = calc_Psat(gas,Tref)
 
         elseif gas == "He"
             Tref = 4.22 # K, boiling point of He at 1 atm 
@@ -195,13 +195,12 @@ module phys
 
         elseif gas == "NH3"
             Tref = 273.15 # K, arbitrary point (273.15K,esat(273.15K)=8.6bar) on the coexistence curve of NH3 
-            pref = p_sat(gas,Tref)
+            pref = calc_Psat(gas,Tref)
         
         else 
             return 0.0
         end
 
-        pref = calc_Psat(gas,Tref)
         Tsat = Tref/(1.0-(Tref*R/L)*log(p/pref))
         return Tsat 
     end 
