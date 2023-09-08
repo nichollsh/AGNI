@@ -36,7 +36,7 @@ mixing_ratios   = Dict([
                         ])
 
 spfile_name   = "Mallard"
-star_file     = "res/stellar_spectra/spec_sun.txt"
+star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
 # Create output direct

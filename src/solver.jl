@@ -142,6 +142,7 @@ module solver
                                 dryadj_steps::Int64, h2oadj_steps::Int64)
 
         bot_old_e = atmos.tmpl[end]
+        top_old_e = atmos.tmpl[1]
 
         # Apply radiative heating temperature change
         dtmp = atmos.heating_rate .* dt 
@@ -180,15 +181,18 @@ module solver
         clamp!(atmos.tmp, atmos.T_floor, Inf)
         
         # Interpolate to bulk cell-edge values 
-        itp = Interpolator(atmos.p, atmos.tmp) # Cell edges 
+        itp = Interpolator(atmos.p, atmos.tmp)
         atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
         # Extrapolate top boundary
-        # dt = atmos.tmp[1]-atmos.tmpl[2]
-        # dp = atmos.p[1]-atmos.pl[2]
-        # atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
+        dt = atmos.tmp[1]-atmos.tmpl[2]
+        dp = atmos.p[1]-atmos.pl[2]
+        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
 
-        atmos.tmpl[1] = atmos.tmp[1]
+        # Limit change at top edge 
+        # dT_top = max(min(atmos.tmpl[1]-top_old_e, dtmp_clip * 0.5), dtmp_clip * -0.5)
+        # atmos.tmpl[1] = top_old_e + dT_top
+
 
         # Calculate bottom boundary
         if fixed_bottom
@@ -201,12 +205,13 @@ module solver
             atmos.tmpl[end] = atmos.tmp[end] + dt/dp * (atmos.pl[end] - atmos.p[end])
             
             # Limit change at bottom edge 
-            dT_surf = max(min(atmos.tmpl[end]-bot_old_e, dtmp_clip * 0.2), dtmp_clip * -0.2)
+            dT_surf = max(min(atmos.tmpl[end]-bot_old_e, dtmp_clip * 0.5), dtmp_clip * -0.5)
             atmos.tmpl[end] = bot_old_e + dT_surf
         end
 
         # Second interpolation back to cell-centres 
-        atmos.tmp[:] .= 0.5 .* (atmos.tmpl[2:end] + atmos.tmpl[1:end-1])
+        itp = Interpolator(atmos.pl, atmos.tmpl)  
+        atmos.tmp[:] .= itp.(atmos.p[:])
 
         # Temperature floor (edges)
         clamp!(atmos.tmpl, atmos.T_floor, Inf)
@@ -250,14 +255,14 @@ module solver
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 1.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
-        F_rchng_conv = 0.1    # Maximum relative value of F_loss for convergence [%]
+        drel_dt_conv = 0.1    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
+        F_rchng_conv = 0.5   # Maximum relative value of F_loss for convergence [%]
         
         if verbose
             @printf("    convergence criteria       \n")
             @printf("    dtmp_comp   < %.3f K       \n", dtmp_conv)
             @printf("    dtmp/tmp/dt < %.3f K day-1 \n", drel_dt_conv)
-            @printf("    F_chng^TOA  < %.3f %%      \n", F_rchng_conv)
+            @printf("    F_chng^loss < %.3f %%      \n", F_rchng_conv)
             @printf(" \n")
         end
 
@@ -348,7 +353,7 @@ module solver
                 dtmp_clip = 10.0
                 dryadj_steps = 20
                 h2oadj_steps = 20
-                dt_min = 1e-2
+                dt_min = 1e-3
                 dt_max = 10.0
                 smooth_window = 0
 
@@ -440,15 +445,14 @@ module solver
             end 
 
             # Calculate (the change in) flux balance
-            F_TOA_rad_prev = F_TOA_rad
             F_TOA_rad = atmos.flux_n[1]
-            F_rchng   = abs( (F_TOA_rad - F_TOA_rad_prev) / F_TOA_rad_prev * 100.0)
 
             F_BOA_rad = atmos.flux_n[end]
             F_OLR_rad = atmos.flux_u_lw[1]
 
             F_loss_prev = F_loss
             F_loss = abs(F_TOA_rad-F_BOA_rad)
+            F_rchng   = abs( (F_loss - F_loss_prev) / F_loss_prev * 100.0)
 
             # Print debug info to stdout
             if verbose
@@ -459,7 +463,7 @@ module solver
                 @printf("    F_rad^TOA   = %.2e W m-2  \n", F_TOA_rad)
                 @printf("    F_rad^BOA   = %.2e W m-2  \n", F_BOA_rad)
                 @printf("    F_rad^loss  = %.2f W m-2  \n", F_loss)
-                @printf("    F_chng^TOA  = %.4f %%     \n", F_rchng)
+                @printf("    F_chng^loss = %.4f %%     \n", F_rchng)
                 @printf("\n")
             end
 

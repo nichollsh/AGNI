@@ -63,8 +63,9 @@ module atmosphere
 
         T_floor::Float64        # Temperature floor [K]
 
-        # Mixing ratios (atmosphere is currently assumed to be well-mixed)
-        mr_gases::Dict
+        # Mixing ratios 
+        mr_hom::Dict      # Dictonary with scalar quantities (well-mixed)
+        mr_het::Dict      # Dictionary with per-level values (not yet implemented)
 
         # Layers' average properties
         layer_density::Array  # density [kg m-3]
@@ -202,12 +203,12 @@ module atmosphere
             error("No mixing ratios provided")
         end
 
-        atmos.mr_gases = Dict()
+        atmos.mr_hom = Dict()
         norm_factor = sum(values(mixing_ratios))
         
         for (key, value) in mixing_ratios
             if key in SOCRATES.input_head_pcf.header_gas
-                atmos.mr_gases[key] = value / norm_factor
+                atmos.mr_hom[key] = value / norm_factor
             else
                 error("Invalid gas '$key'")
             end
@@ -235,8 +236,8 @@ module atmosphere
         gas_valid = uppercase(gas_valid)
 
         mr = 0.0
-        if gas_valid in keys(atmos.mr_gases)
-            mr = atmos.mr_gases[gas_valid]
+        if gas_valid in keys(atmos.mr_hom)
+            mr = atmos.mr_hom[gas_valid]
         end 
 
         return mr
@@ -268,16 +269,16 @@ module atmosphere
         for i in 1:atmos.atm.n_layer
 
             # for each gas
-            for gas in keys(atmos.mr_gases) 
+            for gas in keys(atmos.mr_hom) 
 
                 # set mmw
-                if gas in keys(atmos.mr_gases) 
-                    atmos.layer_mmw[i] += atmos.mr_gases[gas] * phys.lookup_mmw[gas]
+                if gas in keys(atmos.mr_hom) 
+                    atmos.layer_mmw[i] += atmos.mr_hom[gas] * phys.lookup_mmw[gas]
                 end
 
                 # set cp
-                if gas in keys(atmos.mr_gases) 
-                    atmos.layer_cp[i] += atmos.mr_gases[gas] * phys.lookup_cp[gas] * phys.lookup_mmw[gas]
+                if gas in keys(atmos.mr_hom) 
+                    atmos.layer_cp[i] += atmos.mr_hom[gas] * phys.lookup_cp[gas] * phys.lookup_mmw[gas]
                 end
 
             end
@@ -560,8 +561,8 @@ module atmosphere
             ti = atmos.spectrum.Gas.type_absorb[i_gas]
             gas = SOCRATES.input_head_pcf.header_gas[ti]
 
-            if gas in keys(atmos.mr_gases)
-                atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.mr_gases[gas]
+            if gas in keys(atmos.mr_hom)
+                atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.mr_hom[gas]
             else
                 atmos.atm.gas_mix_ratio[:, :, i_gas] .= 0.0
             end

@@ -168,7 +168,7 @@ module setpt
         end 
 
         # For each condensible volatile
-        for con in keys(atmos.mr_gases)
+        for con in keys(atmos.mr_hom)
             # Get mixing ratio
             mr = atmosphere.get_mr(atmos, con)
             if mr < 1.0e-10
@@ -181,12 +181,12 @@ module setpt
             if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_T_crit[con])
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-mr) + psat
-                atmos.mr_gases[con] = psat / atmos.p_boa  
+                atmos.mr_hom[con] = psat / atmos.p_boa  
 
                 # Renormalise mixing ratios
-                norm_factor = sum(values(atmos.mr_gases))
-                for (key, value) in atmos.mr_gases
-                    atmos.mr_gases[key] = value / norm_factor
+                norm_factor = sum(values(atmos.mr_hom))
+                for (key, value) in atmos.mr_hom
+                    atmos.mr_hom[key] = value / norm_factor
                 end
 
                 # Generate new pressure grid 
