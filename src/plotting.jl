@@ -138,33 +138,51 @@ module plotting
         max_fl = 1e2
         
         if atmos.is_out_lw
-            plot!(plt, atmos.flux_d_lw, arr_P, label="DN LW", lw=w, lc=col_d, ls=:dash)
-            plot!(plt, atmos.flux_u_lw, arr_P, label="UP LW", lw=w, lc=col_u, ls=:dash)
-            max_fl = max(max_fl, maximum(atmos.flux_d_lw))
-            max_fl = max(max_fl, maximum(atmos.flux_u_lw))
+            y = abs.(atmos.flux_d_lw)
+            max_fl = max(max_fl, maximum(y))
+            plot!(plt, y, arr_P, label="DN LW", lw=w, lc=col_d, ls=:dash)
+
+            y = abs.(atmos.flux_u_lw)
+            max_fl = max(max_fl, maximum(y))
+            plot!(plt, y, arr_P, label="UP LW", lw=w, lc=col_u, ls=:dash)
         end
 
         if atmos.is_out_sw
-            plot!(plt, atmos.flux_d_sw, arr_P, label="DN SW", lw=w, lc=col_d, ls=:dot)
-            plot!(plt, atmos.flux_u_sw, arr_P, label="UP SW", lw=w, lc=col_u, ls=:dot)
-            max_fl = max(max_fl, maximum(atmos.flux_d_sw))
-            max_fl = max(max_fl, maximum(atmos.flux_u_lw))
+            y = abs.(atmos.flux_d_sw)
+            max_fl = max(max_fl, maximum(y))
+            plot!(plt, y, arr_P, label="DN SW", lw=w, lc=col_d, ls=:dot)
+
+            y = abs.(atmos.flux_u_sw)
+            max_fl = max(max_fl, maximum(y))
+            plot!(plt, y, arr_P, label="UP SW", lw=w, lc=col_u, ls=:dot)
         end 
 
         if atmos.is_out_lw && atmos.is_out_sw
-            plot!(plt, atmos.flux_u, arr_P,    label="UP",  lw=w, lc=col_u, ls=:solid)
-            plot!(plt, atmos.flux_d, arr_P,    label="DN",  lw=w, lc=col_d, ls=:solid)
-            plot!(plt, atmos.flux_n, arr_P,    label="NET", lw=w, lc=col_n, ls=:solid)
-            max_fl = max(max_fl, maximum(atmos.flux_d))
-            max_fl = max(max_fl, maximum(atmos.flux_u))
-            max_fl = max(max_fl, maximum(atmos.flux_n))
+            y = abs.(atmos.flux_u)
+            max_fl = max(max_fl, maximum(y))
+            plot!(plt, y, arr_P,    label="UP",  lw=w, lc=col_u, ls=:solid)
+
+            y = abs.(atmos.flux_d)
+            max_fl = max(max_fl, maximum(y))
+            plot!(plt, y, arr_P,    label="DN",  lw=w, lc=col_d, ls=:solid)
+
+            absnet = zeros(Float64, atmos.nlev_l)
+            posnet = trues(atmos.nlev_l)
+            for i in 1:atmos.nlev_l
+                absnet[i] = abs(atmos.flux_n[i])
+                posnet[i] = (atmos.flux_n[i] >= 0)
+            end 
+            max_fl = max(max_fl, maximum(absnet))
+            plot!(plt, absnet, arr_P, label="NET", lw=w, lc=col_n, ls=:solid)
+            scatter!(plt, absnet[  posnet], arr_P[  posnet],  markershape=:diamond, markeralpha=0.8, label=L">0")
+            scatter!(plt, absnet[.!posnet], arr_P[.!posnet],  markershape=:circle,  markeralpha=0.8, label=L"<0")
         end 
 
 
         xlims  = (1e-1, max_fl * 1.5)
         xticks = 10.0 .^ round.(Int64,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
-        xlabel!(plt, "Upward directed flux [W m-2]")
+        xlabel!(plt, "Unsigned flux [W m-2]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
