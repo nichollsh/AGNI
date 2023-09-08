@@ -447,7 +447,7 @@ module solver
             # Calculate (the change in) flux balance
             F_TOA_rad = atmos.flux_n[1]
 
-            F_BOA_rad = atmos.flux_n[end]
+            F_BOA_rad = atmos.flux_n[end-1]
             F_OLR_rad = atmos.flux_u_lw[1]
 
             F_loss_prev = F_loss
