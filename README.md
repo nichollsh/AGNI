@@ -1,6 +1,6 @@
 # AGNI
 Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer.    
-Flux boundary conditions are kept constant, with the upward LW flux being set by `tstar` and the downward SW flux being set by `toa_heating`. The model is designed for integration into a coupled atmosphere-interior code, with surface boundary conditions set by an interior model, so it won't work well outside of these regimes (i.e. cool temperatures).    
+Flux boundary conditions are kept constant, with the upward LW flux being set by `tstar` and the downward SW flux being set by `toa_heating`. The model is designed for integration into a coupled atmosphere-interior code, with surface boundary conditions set by an interior model, so it won't work well for cooler planets.    
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
@@ -30,6 +30,11 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 ### Supported platforms
 * MacOS (ARM and x86-64)
 * Ubuntu (x86-64)
+
+### License
+See [LICENSE.txt](LICENSE.txt) for AGNI.      
+See [socrates/COPYRIGHT.txt](socrates/COPYRIGHT.txt) for SOCRATES.   
+
 
 ### Installation instructions
 - `$ cd socrates`
@@ -78,11 +83,4 @@ Solving for RCE with accelerated time-stepping.
   <img src="doc/example_withsolve/anim.gif" width="400"/>
   <img src="doc/example_withsolve/fl.png" width="400 /> 
 </p>
-
-
-
-
-### License
-See [LICENSE.txt](LICENSE.txt) for AGNI.      
-See [socrates/COPYRIGHT.txt](socrates/COPYRIGHT.txt) for SOCRATES.   
 
