@@ -104,9 +104,9 @@ module plotting
         plt2 = plot(framestyle=:box, legend=:topleft, ylims=ylims, yticks=yticks, xlims=xlims, xticks=xticks)
 
         # Plot heating rate
-        plot!(plt2, abshr, p, lc="brown3", lw=lw, label=L"|H_n|")
-        scatter!(plt2, abshr[poshr],    p[poshr],    markershape=:diamond, markeralpha=0.8, label=L"H_n>0")
-        scatter!(plt2, abshr[.!poshr],  p[.!poshr],  markershape=:circle,  markeralpha=0.8, label=L"H_n<0")
+        plot!(plt2, abshr, p, lc="brown3", lw=lw, label=L"|H_{n-1}|")
+        scatter!(plt2, abshr[poshr],    p[poshr],    markershape=:diamond, markeralpha=0.8, label=L">0")
+        scatter!(plt2, abshr[.!poshr],  p[.!poshr],  markershape=:circle,  markeralpha=0.8, label=L"<0")
         xlabel!(plt2, "Heating rate [K/day]")
         yflip!(plt2)
         yaxis!(plt2, yscale=:log10)

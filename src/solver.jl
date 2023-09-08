@@ -184,9 +184,11 @@ module solver
         atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
         # Extrapolate top boundary
-        dt = atmos.tmp[1]-atmos.tmpl[2]
-        dp = atmos.p[1]-atmos.pl[2]
-        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
+        # dt = atmos.tmp[1]-atmos.tmpl[2]
+        # dp = atmos.p[1]-atmos.pl[2]
+        # atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
+
+        atmos.tmpl[1] = atmos.tmp[1]
 
         # Calculate bottom boundary
         if fixed_bottom
@@ -249,7 +251,7 @@ module solver
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
         drel_dt_conv = 1.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
-        F_rchng_conv = 0.01   # Maximum relative value of F_loss for convergence [%]
+        F_rchng_conv = 0.1    # Maximum relative value of F_loss for convergence [%]
         
         if verbose
             @printf("    convergence criteria       \n")
@@ -275,6 +277,8 @@ module solver
         dtmp_comp = Inf         # Temperature change comparison
         drel_dt = Inf           # Rate of relative temperature change
         drel_dt_prev  = Inf     # Previous ^
+        ldrel_dt      = ones(Float64, atmos.nlev_c)
+        ldrel_dt_prev = ones(Float64, atmos.nlev_c)
         heat_prev = zeros(Float64, atmos.nlev_c) # Previous iteration heating rates
         dt = ones(Float64,  atmos.nlev_c) # time-step [days]
 
@@ -284,7 +288,6 @@ module solver
 
         flag_prev = false       # Previous iteration is meeting convergence
         stopfast = false
-        step_frac = 0.05
 
         # Store previous n atmosphere states
         hist_tmp  = zeros(Float64, (len_hist, atmos.nlev_c)) 
@@ -335,7 +338,6 @@ module solver
                 h2oadj_steps = 40
                 dt_min = 1e1
                 dt_max = 1e6
-                step_frac = 0.1
                 smooth_window = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
                 
             else
@@ -347,9 +349,7 @@ module solver
                 dryadj_steps = 20
                 h2oadj_steps = 20
                 dt_min = 1e-2
-                dt_max = 20.0
-                step_frac_max = 0.1
-                step_frac_min = 1e-9
+                dt_max = 10.0
                 smooth_window = 0
 
                 # End of 'fast' period - take average of last two iters
@@ -363,21 +363,8 @@ module solver
 
                 # Solver is struggling
                 if (step > max_steps * 0.8)
-                    step_frac_max *= 0.7
                     dt_max *= 0.5
                     dtmp_clip *= 0.8
-                end
-
-                # Adapt the time-stepping accuracy
-                if drel_dt < Inf
-                    max_inc = 1.1 
-                    min_dec = 0.1
-                    step_frac *= min(max( drel_dt_prev/drel_dt , min_dec ) , max_inc)
-                end 
-                step_frac = max(min(step_frac, step_frac_max),step_frac_min)
-
-                if verbose
-                    @printf("    step_frac   = %.2e \n", step_frac)
                 end
             end
 
@@ -391,24 +378,28 @@ module solver
 
             # Calc step size
             for i in 1:atmos.nlev_c
-                expect_heat = max( abs(atmos.heating_rate[i]) , 1e-30 )
-                dt_i = step_frac * atmos.tmp[i] / expect_heat
+
+                # Increase dt
+                dt_i = dt[i] * 1.05
+
+                # Set new time-step 
                 if gofast 
                     dt[i] = dt_i
                 else 
-                    dt[i] = dot( [dt[i]; dt_i] , [0.4; 0.6] )
+                    # Weight by previous time-step 
+                    dt[i] = dot( [dt[i]; dt_i] , [0.2; 0.8] )
+
+                    # oscillating hr => reduce step size
+                    if (atmos.heating_rate[i]*heat_prev[i] < 0) 
+                        dt[i] *= 0.1
+                    end 
                 end
             end 
 
-            if !gofast 
-                for i in 1:atmos.nlev_c 
-                    if (atmos.heating_rate[i]*heat_prev[i] < 0) # oscillating hr => reduce step size
-                        dt[i] *= 0.1
-                    end 
-                end 
-            end
+            dt[1] = dt_min
+            dt[2] = dt_min
             clamp!(dt, dt_min, dt_max)
-            
+
             if verbose
                 @printf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
             end
@@ -431,8 +422,11 @@ module solver
             
             # Calculate relative rate of change in temperature
             if step > 1
+                ldrel_dt_prev[:] .= ldrel_dt[:]
+                ldrel_dt[:] .= abs.(  ((atmos.tmp[:] .- hist_tmp[end,1:end])./hist_tmp[end,1:end])./dt  )
+
                 drel_dt_prev = drel_dt
-                drel_dt = maximum(abs.(  ((atmos.tmp[:] .- hist_tmp[end,1:end])./hist_tmp[end,1:end])./dt  ))
+                drel_dt = maximum(ldrel_dt)
             end
 
             # Calculate maximum average change in temperature (insensitive to oscillations)
