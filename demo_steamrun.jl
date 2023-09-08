@@ -29,7 +29,7 @@ p_top           = 1e-8      # bar
 mixing_ratios   = Dict([("H2O", 1.0)])
 
 spectral_file = "Oak"
-star_file     = "res/stellar_spectra/spec_sun.txt"
+star_file     = "res/stellar_spectra/sun.txt"
 output_dir = "out/"
 
 # Create output direct
@@ -51,8 +51,8 @@ p_boa = atmos.p_boa
 
 plot_frames = false
 
-run_len = 55
-tsurf_arr = range(200,stop=2200,length=run_len)
+run_len = 60
+tsurf_arr = range(200,stop=2250,length=run_len)
 olr_arr = zeros(Float64, run_len)
 for i in 1:run_len
     

@@ -68,7 +68,7 @@ def PrepareStellarSpectrum(wl, fl, star_file, nbins_max=95000):
     
     # Down-sample spectrum when necessary or requested
     if (len(wl) > socrates_nbins_max):
-        print("Rebinning stellar spectrum")
+        print("Python: Rebinning stellar spectrum")
 
         # Parameters
         max_retry           = 10    # Number of times to down-sample before giving up

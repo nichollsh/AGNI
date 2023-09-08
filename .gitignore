@@ -8,7 +8,6 @@ out/*
 
 # Misc files
 .DS_Store
-*.log
 .vscode 
 __pycache__
 

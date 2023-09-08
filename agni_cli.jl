@@ -45,7 +45,7 @@ s = ArgParseSettings()
     "--trppt"
         help = "Initialise with an isothermal stratosphere at this temperature."
         arg_type = Float64
-        default = 150.0
+        default = 10.0
     "--cstsurf"
         help = "Fix the surface temperature to be constant."
         action = :store_true
