@@ -61,21 +61,6 @@ Simply run `$ ./agni.jl` in the root directory of the repository.
 For the command line interface, instead run `$ ./agni_cli.jl` (pass `--help` for help).   
 To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.   
 
-
-### Example outputs
-Calculating fluxes with SOCRATES, without solving for RCE.
-<p float="left">
-  <img src="doc/example_nosolve/pt.png" width="400" />
-  <img src="doc/example_nosolve/fl.png" width="400" /> 
-</p>
-
-Solving for RCE with accelerated time-stepping.
-<p float="left">
-  <img src="doc/example_withsolve/anim.gif" width="400" />
-  <img src="doc/example_withsolve/fl.png"   width="400 /> 
-</p>
-
-
 ### License
 See [LICENSE.txt](LICENSE.txt) for AGNI.      
 See [socrates/COPYRIGHT.txt](socrates/COPYRIGHT.txt) for SOCRATES.   
