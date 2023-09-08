@@ -1,7 +1,6 @@
 # AGNI
 Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer.    
-Flux boundary conditions are kept constant, with the upward LW flux being set by `tstar` and the downward SW flux being set by `toa_heating`.    
-Designed for integration into a coupled atmosphere-interior code, with surface boundary conditions set by an interior model.   
+Flux boundary conditions are kept constant, with the upward LW flux being set by `tstar` and the downward SW flux being set by `toa_heating`. The model is designed for integration into a coupled atmosphere-interior code, with surface boundary conditions set by an interior model, so it won't work well outside of these regimes (i.e. cool temperatures).    
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
@@ -60,6 +59,28 @@ You should end up in the root directory of the repository.
 Simply run `$ ./agni.jl` in the root directory of the repository.     
 For the command line interface, instead run `$ ./agni_cli.jl` (pass `--help` for help).   
 To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.   
+
+
+### Example outputs
+Pure steam runaway greenhouse
+<p float="left">
+  <img src="doc/example_runaway/curve.png" width="500" />
+</p>
+
+Calculating fluxes with SOCRATES, without solving for RCE.
+<p float="left">
+  <img src="doc/example_nosolve/pt.png" width="400" />
+  <img src="doc/example_nosolve/fl.png" width="400" /> 
+</p>
+
+Solving for RCE with accelerated time-stepping.
+<p float="left">
+  <img src="doc/example_withsolve/anim.gif" width="400"/>
+  <img src="doc/example_withsolve/fl.png" width="400 /> 
+</p>
+
+
+
 
 ### License
 See [LICENSE.txt](LICENSE.txt) for AGNI.      

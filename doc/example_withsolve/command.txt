@@ -1,1 +1,0 @@
-./agni_cli.jl 400 1e4 10.0 400.0 1e-6 "CO=0.9,H2O=0.05,N2=0.05" --stf "res/stellar_spectra/trappist-1.txt" --plot --animate  --verbose --rscatter
