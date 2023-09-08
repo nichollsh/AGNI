@@ -23,20 +23,22 @@ import phys
 
 
 # Configuration options
-tstar           = 1700.0    # LW uflux bottom boundary condition [kelvin]
-toa_heating     = 4.451e+04 # SW dflux top boundary condition [W m-2]
-gravity         = 9.81
+tstar           = 1740.0    # LW uflux bottom boundary condition [kelvin]
+toa_heating     = 4.391e+04 # SW dflux top boundary condition [W m-2]
+gravity         = 10.0
 nlev_centre     = 100
-p_surf          = 300.0     # bar
-p_top           = 1e-7      # bar 
+p_surf          = 280.4     # bar
+p_top           = 1e-6      # bar 
 mixing_ratios   = Dict([
-                        ("CO" , 0.90),
-                        ("CO2", 0.05),
-                        ("N2" , 0.05)
+                        ("H2O" , 10.36251/280.4),
+                        ("CO2" , 94.02385/280.4),
+                        ("H2"  , 0.54123/280.4),
+                        ("CO"  , 172.91992/280.4),
+                        ("N2"  , 2.28491/280.4)
                         ])
 
 spfile_name   = "Mallard"
-star_file     = "res/stellar_spectra/sun.txt"
+star_file     = "res/stellar_spectra/trappist-1.txt"
 output_dir    = "out/"
 
 # Create output direct
@@ -60,7 +62,7 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 println("Atmosphere: setting initial T(p)")
 setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
-setpt.stratosphere!(atmos, 200.0)
+setpt.stratosphere!(atmos, 300.0)
 
 # Calculate LW and SW fluxes (once)
 println("RadTrans: calculating fluxes")
