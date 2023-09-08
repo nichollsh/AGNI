@@ -771,8 +771,8 @@ module atmosphere
             for lv in 1:atmos.nlev_l                # sum over levels
                 for ch in 1:atmos.dimen.nd_channel  # sum over channels
                     idx = lv+(ch-1)*atmos.nlev_l
-                    atmos.flux_d_lw[lv] += atmos.radout.flux_down[idx]
-                    atmos.flux_u_lw[lv] += atmos.radout.flux_up[idx]
+                    atmos.flux_d_lw[lv] += max(0.0, atmos.radout.flux_down[idx])
+                    atmos.flux_u_lw[lv] += max(0.0, atmos.radout.flux_up[idx])
                 end 
                 atmos.flux_n_lw[lv] = atmos.flux_u_lw[lv] - atmos.flux_d_lw[lv] 
             end
@@ -785,8 +785,8 @@ module atmosphere
             for lv in 1:atmos.nlev_l                # sum over levels
                 for ch in 1:atmos.dimen.nd_channel  # sum over channels
                     idx = lv+(ch-1)*atmos.nlev_l
-                    atmos.flux_d_sw[lv] += atmos.radout.flux_down[idx]
-                    atmos.flux_u_sw[lv] += atmos.radout.flux_up[idx]
+                    atmos.flux_d_sw[lv] += max(0.0, atmos.radout.flux_down[idx])
+                    atmos.flux_u_sw[lv] += max(0.0, atmos.radout.flux_up[idx])
                 end 
                 atmos.flux_n_sw[lv] = atmos.flux_u_sw[lv] - atmos.flux_d_sw[lv]
             end
@@ -840,6 +840,28 @@ module atmosphere
             write(f, "# [bar]     , [K] \n")
             for i in 1:atmos.nlev_l+atmos.nlev_c
                 @printf(f, "%1.5e , %1.5e \n", arr_P[i], arr_T[i])
+            end
+        end
+
+    end
+
+    # Write current cell-edge fluxes to a file
+    function write_fluxes(atmos, fname)
+
+        arr_P = atmos.pl * 1e-5
+        
+        rm(fname, force=true)
+
+        open(fname, "w") do f
+            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N       \n")
+            write(f, "# [bar]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2] \n")
+            for i in 1:atmos.nlev_l
+                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
+                          arr_P[i], 
+                          atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
+                          atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
+                          atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
+                          )
             end
         end
 
