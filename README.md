@@ -1,7 +1,9 @@
 # AGNI
 Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer.    
-Pronounced: *ag-nee*. Named after the fire deity of Hinduism.    
-The main repository for this code is [github.com/nichollsh/AGNI](https://github.com/nichollsh/AGNI).
+Flux boundary conditions are kept constant, with the upward LW flux being set by `tstar` and the downward SW flux being set by `toa_heating`.    
+Designed for integration into a coupled atmosphere-interior code, with surface boundary conditions set by an interior model.   
+    
+Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
 ### Repository structure 
 * `README.md`       - This file
@@ -10,6 +12,7 @@ The main repository for this code is [github.com/nichollsh/AGNI](https://github.
 * `out/`            - Output files
 * `res/`            - Resources
 * `src/`            - AGNI source code
+* `socrates/`       - Directory containing SOCRATES and associated files
 * `socrates/`       - Directory containing SOCRATES and associated files
 * `agni.jl`         - Main AGNI executable 
 * `agni_cli.jl`     - CLI AGNI executable
@@ -68,8 +71,8 @@ Calculating fluxes with SOCRATES, without solving for RCE.
 
 Solving for RCE with accelerated time-stepping.
 <p float="left">
-  <img src="https://j.gifs.com/28pzDW.gif" width="400" />
-  <img src="doc/example_withsolve/fl.png"  width="400 /> 
+  <img src="doc/example_withsolve/anim.gif" width="400" />
+  <img src="doc/example_withsolve/fl.png"   width="400 /> 
 </p>
 
 
