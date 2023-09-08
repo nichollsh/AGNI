@@ -92,10 +92,8 @@ module atmosphere
         Atmos_t() = new()
     end
 
-    # Deallocate atmosphere arrays
+    # Deallocate SOCRATES arrays
     function deallocate!(atmos::atmosphere.Atmos_t)
-        println("Atmosphere: dellocating arrays")
-
         SOCRATES.deallocate_atm(     atmos.atm)
 
         SOCRATES.deallocate_cld(     atmos.cld)

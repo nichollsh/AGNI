@@ -13,9 +13,9 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * `src/`            - AGNI source code
 * `socrates/`       - Directory containing SOCRATES and associated files
 * `socrates/`       - Directory containing SOCRATES and associated files
-* `agni.jl`         - Main AGNI executable 
-* `agni_cli.jl`     - CLI AGNI executable
-* `demo_steamrun.jl`- Demo pure-steam runaway greenhouse effect
+* `agni.jl`         - AGNI executable for debugging
+* `agni_cli.jl`     - AGNI executable with CLI
+* `demo_steamrun.jl`- Demonstrate pure-steam runaway greenhouse effect
 
 
 ### Requirements
