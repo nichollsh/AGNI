@@ -68,7 +68,7 @@ Calculating fluxes with SOCRATES, without solving for RCE.
 
 Solving for RCE with accelerated time-stepping.
 <p float="left">
-  <video src='doc/example_withsolve/anim.mp4' width="400" ></video>
+  <video src="doc/example_withsolve/anim.mp4" width="400" ></video>
   <img   src="doc/example_withsolve/fl.png"   width="400 /> 
 </p>
 
