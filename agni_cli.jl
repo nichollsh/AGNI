@@ -6,6 +6,8 @@
 
 println("AGNI CLI")
 
+tbegin = time()
+
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
 
@@ -200,7 +202,10 @@ else
 end
 
 # Write final PT profile
-atmosphere.write_pt(atmos,  joinpath(atmos.OUT_DIR,"pt.csv"))
+atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt.csv"))
+
+# Write final fluxes 
+atmosphere.write_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Final plots 
 if animate && !oneshot
@@ -210,12 +215,14 @@ end
 if plot 
     println("Atmosphere: Making plots")
     plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
-    plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fluxes.pdf"))
+    plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
 end 
 
 # Deallocate atmosphere
 atmosphere.deallocate!(atmos)
 
 # Done
+runtime = time() - tbegin
+println("Runtime: $runtime seconds")
 println("Goodbye")
 println(" ")

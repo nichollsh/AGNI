@@ -6,8 +6,8 @@
 #FORTCOMP        = gfortran -c -fcheck=all,no-recursion -fbacktrace -g
 #LINK            = gfortran -fcheck=all,no-recursion -fbacktrace -g
 
-FORTCOMP        = gfortran -O -c
-LINK            = gfortran -O
+FORTCOMP        = gfortran -Ofast -c
+LINK            = gfortran
 LIBLINK         = ar rvu
 INCCDF_PATH     = /opt/homebrew/Cellar/netcdf-fortran/4.6.1/include
 LIBCDF_PATH     = /opt/homebrew/Cellar/netcdf-fortran/4.6.1/lib

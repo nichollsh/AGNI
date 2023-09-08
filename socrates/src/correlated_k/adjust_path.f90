@@ -70,7 +70,7 @@ SUBROUTINE adjust_path ( &
   REAL  (RealK) :: lse_SI
   REAL  (RealK) :: S_SI
 
-  INTEGER :: i
+  INTEGER :: i 
   INTEGER :: reqd_species
 
 !- End of header

@@ -74,7 +74,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
   TYPE(StrBound),    INTENT(IN)  :: bound
 
 ! Output fields:
-  TYPE(StrOut),      INTENT(OUT) :: radout
+  TYPE(StrOut),      INTENT(OUT) :: radout 
 
 
 ! Local arguments.
