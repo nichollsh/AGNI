@@ -31,10 +31,6 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * MacOS (ARM and x86-64)
 * Ubuntu (x86-64)
 
-### License
-See [LICENSE.txt](LICENSE.txt) for AGNI.      
-See [socrates/COPYRIGHT.txt](socrates/COPYRIGHT.txt) for SOCRATES.   
-
 
 ### Installation instructions
 - `$ cd socrates`
@@ -81,6 +77,6 @@ Calculating fluxes with SOCRATES, without solving for RCE.
 Solving for RCE with accelerated time-stepping.
 <p float="left">
   <img src="doc/example_withsolve/anim.gif" width="400"/>
-  <img src="doc/example_withsolve/fl.png" width="400 /> 
+  <img src="doc/example_withsolve/fl.png" width="400" /> 
 </p>
 
