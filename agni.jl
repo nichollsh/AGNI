@@ -23,7 +23,7 @@ import phys
 
 
 # Configuration options
-tstar           = 2740.0    # LW uflux bottom boundary condition [kelvin]
+tstar           = 1740.0    # LW uflux bottom boundary condition [kelvin]
 toa_heating     = 4.391e+04 # SW dflux top boundary condition [W m-2]
 gravity         = 10.0
 nlev_centre     = 100
@@ -61,8 +61,8 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 # Set PT profile 
 println("Atmosphere: setting initial T(p)")
 setpt.prevent_surfsupersat!(atmos)
-setpt.dry_adiabat!(atmos)
-setpt.stratosphere!(atmos, 300.0)
+# setpt.dry_adiabat!(atmos)
+# setpt.stratosphere!(atmos, 300.0)
 
 # Calculate LW and SW fluxes (once)
 # println("RadTrans: calculating fluxes")
@@ -70,12 +70,12 @@ setpt.stratosphere!(atmos, 300.0)
 # atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-solver.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, dry_adjust=false)
+solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=false, max_steps=500)
 
 # Save result
 plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
-plotting.anim_solver(atmos)
 plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
+plotting.anim_solver(atmos)
 
 # Deallocate atmosphere
 println("Atmosphere: deallocating arrays")

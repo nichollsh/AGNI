@@ -74,7 +74,7 @@ for i in 1:run_len
     olr_arr[i] = olr 
 
     if plot_frames 
-        tsurf = round(Int64,atmos.tmpl[end])
+        tsurf = round(Int,atmos.tmpl[end])
         plotting.plot_pt(atmos, joinpath(output_dir,"pt_$tsurf.png"))
         atmosphere.write_pt(atmos, joinpath(output_dir, "pt_$tsurf.csv") )
     end
