@@ -13,37 +13,35 @@ module setpt
 
     using PCHIPInterpolation
 
-    # Read atmosphere T(p) from a file 
-    function csv!(atmos::atmosphere.Atmos_t, fpath::String)
+    # Read atmosphere T(p) from a CSV file 
+    function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
 
         # Check file exists
         if !isfile(fpath)
-            error("File '$fpath' does not exist")
+            error("The file '$fpath' does not exist")
         end 
 
         # Read file 
         content = readlines(fpath)
 
         # Parse file once, to get number of level edges 
-        nlev_e = 0  
+        nlev_l = 0  
         for l in content
             if isempty(l) || (l[1] == '#') || (l[1] == '\n')
                 continue 
             end
-            nlev_e += 1
+            nlev_l += 1
         end
 
         # Validate 
-        if nlev_e < 3
-            error("Csv file contains too few levels (contains $nlev_e edge values)")
+        if nlev_l < 3
+            error("Csv file contains too few levels (contains $nlev_l edge values)")
         end
-        nlev_c = nlev_e - 1
+        nlev_c = nlev_l - 1
 
-        # Allocate T and P arrays 
-        tmpl = zeros(Float64,nlev_e)
-        tmp  = zeros(Float64,nlev_c)
-        pl   = zeros(Float64,nlev_e)
-        p    = zeros(Float64,nlev_c)
+        # Allocate temporary T and P arrays 
+        tmpl = zeros(Float64,nlev_l)
+        pl   = zeros(Float64,nlev_l)
 
         # Parse file again, storing data this time
         idx = 1
@@ -92,14 +90,12 @@ module setpt
         atmos.p_toa = pl[1]
         atmosphere.generate_pgrid!(atmos)
 
-        # Set temperatures
-        atmos.tstar = tmpl[end]
-
+        # Interpolate from the provided grid to the generated one
         itp = Interpolator(pl, tmpl) # Cell edges 
-        atmos.tmpl[:] .= itp.(atmos.pl)
+        atmos.tmpl[:] .= itp.(atmos.pl[:])
 
-        itp = Interpolator(p, tmp) # Cell centres 
-        atmos.tmp[:] .= itp.(atmos.p)
+        itp = Interpolator(pl, tmpl) # Cell centres 
+        atmos.tmp[:] .= itp.(atmos.p[:])
     end
 
     # Set atmosphere to be isothermal
@@ -120,13 +116,13 @@ module setpt
 
         # Calculate cell-centre values
         for idx in 1:atmos.nlev_c
-            atmos.tmp[idx] = atmos.tstar * ( atmos.p[idx] / atmos.pl[end] ) ^ ( phys.R_gas / atmos.layer_cp[idx] )
+            atmos.tmp[idx] = atmos.tmpl[end] * ( atmos.p[idx] / atmos.pl[end] ) ^ ( phys.R_gas / atmos.layer_cp[idx] )
         end
         
         # Calculate cell-edge values
         for idx in 2:atmos.nlev_l-1
             cp = 0.5 * ( atmos.layer_cp[idx-1] + atmos.layer_cp[idx])
-            atmos.tmpl[idx] = atmos.tstar * ( atmos.pl[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
+            atmos.tmpl[idx] = atmos.tmpl[end] * ( atmos.pl[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
         end
 
         # Calculate top boundary
@@ -168,25 +164,25 @@ module setpt
         end 
 
         # For each condensible volatile
-        for con in keys(atmos.mr_hom)
-            # Get mixing ratio
-            mr = atmosphere.get_mr(atmos, con)
+        for (i_gas, gas) in enumerate(atmos.gases)
+            # Get mixing ratio at surface
+            mr = atmosphere.get_mr(atmos, gas, lvl=atmos.nlev_c)
             if mr < 1.0e-10
                 continue 
             end
 
             # Check surface pressure (should not be supersaturated)
-            psat = phys.calc_Psat(con, atmos.tmpl[end])
-            Tsat = phys.calc_Tdew(con, atmos.p_boa)
-            if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_T_crit[con])
+            psat = phys.calc_Psat(gas, atmos.tmpl[end])
+            Tsat = phys.calc_Tdew(gas, atmos.p_boa)
+            if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_T_crit[gas])
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-mr) + psat
-                atmos.mr_hom[con] = psat / atmos.p_boa  
+                atmos.layer_mr[atmos.nlev_c, i_gas] = psat / atmos.p_boa  
 
                 # Renormalise mixing ratios
-                norm_factor = sum(values(atmos.mr_hom))
-                for (key, value) in atmos.mr_hom
-                    atmos.mr_hom[key] = value / norm_factor
+                norm_factor = sum(atmos.layer_mr[atmos.nlev_c, :])
+                for j_gas in 1:length(atmos.gases)
+                    atmos.layer_mr[atmos.nlev_c, j_gas] /= norm_factor
                 end
 
                 # Generate new pressure grid 
@@ -200,25 +196,25 @@ module setpt
 
 
     # Set atmosphere to phase curve of 'con' when it enters the condensible region
-    function condensing!(atmos::atmosphere.Atmos_t, con::String)
+    function condensing!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup")
         end 
-        if !(con in keys(phys.lookup_L_vap))
-            error("Invalid condensible $con")
+        if !(gas in keys(phys.lookup_L_vap))
+            error("Invalid condensible $gas")
         end
 
         # Check if each level is condensing. If it is, place on phase curve
         for i in 1:atmos.nlev_c
             # Cell centre
-            Tsat = phys.calc_Tdew(con,atmos.p[i])
+            Tsat = phys.calc_Tdew(gas,atmos.p[i])
             if atmos.tmp[i] < Tsat
                 atmos.tmp[i] = Tsat
             end
                 
             # Cell edge
-            Tsat = phys.calc_Tdew(con,atmos.pl[i])
+            Tsat = phys.calc_Tdew(gas,atmos.pl[i])
             if atmos.tmpl[i] < Tsat
                 atmos.tmpl[i] = Tsat
             end

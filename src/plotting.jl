@@ -26,7 +26,7 @@ module plotting
         arr_P *= 1e-5
 
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
-        yticks = 10.0 .^ round.(Int64,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks)
@@ -57,7 +57,7 @@ module plotting
         arr_P *= 1e-5
 
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
-        yticks = 10.0 .^ round.(Int64,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Optionally get past atmosphere
         plot_hist = !isempty(hist_tmpl)
@@ -98,7 +98,7 @@ module plotting
         end 
 
         xlims  = (1e-2, maximum(abshr))
-        xticks = 10.0 .^ round.(Int64,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         # Create plot 2
         plt2 = plot(framestyle=:box, legend=:topleft, ylims=ylims, yticks=yticks, xlims=xlims, xticks=xticks)
@@ -126,7 +126,7 @@ module plotting
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
 
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
-        yticks = 10.0 .^ round.(Int64,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         w = 2
         plt = plot(legend=:topleft, framestyle=:box, ylims=ylims, yticks=yticks)
@@ -180,7 +180,7 @@ module plotting
 
 
         xlims  = (1e-1, max_fl * 1.5)
-        xticks = 10.0 .^ round.(Int64,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         xlabel!(plt, "Unsigned flux [W m-2]")
         ylabel!(plt, "Pressure [bar]")

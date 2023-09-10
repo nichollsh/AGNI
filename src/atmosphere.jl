@@ -50,8 +50,8 @@ module atmosphere
         grav_surf::Float64
 
         # Pressure-temperature grid 
-        nlev_c::Int32  # Cell centre (count)
-        nlev_l::Int32  # Cell edge (count)
+        nlev_c::Int  # Cell centre (count)
+        nlev_l::Int  # Cell edge (count)
 
         p_boa::Float64 # bottom 
         p_toa::Float64 # top 
@@ -64,8 +64,9 @@ module atmosphere
         T_floor::Float64        # Temperature floor [K]
 
         # Mixing ratios 
-        mr_hom::Dict      # Dictonary with scalar quantities (well-mixed)
-        mr_het::Dict      # Dictionary with per-level values (not yet implemented)
+        mr_input::Dict     # Dictonary with scalar quantities (well-mixed)
+        gases::Array       # Component gases
+        layer_mr::Array    # Per-level mixing ratios [lvl, gas_idx] cell centres
 
         # Layers' average properties
         layer_density::Array  # density [kg m-3]
@@ -123,7 +124,7 @@ module atmosphere
     - `toa_heating::Float64`            downward shortwave flux at the top of the atmosphere [W m-2].
     - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
-    - `nlev_centre::Int64`              number of cells.
+    - `nlev_centre::Int`              number of cells.
     - `p_surf::Float64`                 total surface pressure [bar].
     - `p_top::Float64`                  total top of atmosphere pressure [bar].
     - `mixing_ratios::Dict`             dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
@@ -140,7 +141,7 @@ module atmosphere
                     ROOT_DIR::String, OUT_DIR::String, 
                     spfile_name::String, 
                     toa_heating::Float64, tstar::Float64,
-                    gravity::Float64, nlev_centre::Int64, p_surf::Float64, p_top::Float64,
+                    gravity::Float64, nlev_centre::Int, p_surf::Float64, p_top::Float64,
                     mixing_ratios::Dict;
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
@@ -201,12 +202,12 @@ module atmosphere
             error("No mixing ratios provided")
         end
 
-        atmos.mr_hom = Dict()
+        atmos.mr_input = Dict()
         norm_factor = sum(values(mixing_ratios))
         
         for (key, value) in mixing_ratios
             if key in SOCRATES.input_head_pcf.header_gas
-                atmos.mr_hom[key] = value / norm_factor
+                atmos.mr_input[key] = value / norm_factor
             else
                 error("Invalid gas '$key'")
             end
@@ -224,18 +225,24 @@ module atmosphere
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `gas::String`             name of the gas (e.g. "H2O").
+    - `lvl::Int=0`              model level to measure mixing ratio (0 => use well-mixed input value)
 
     Returns:
     - `mr::Float64`             mixing ratio of `gas`.
     """
-    function get_mr(atmos::atmosphere.Atmos_t, gas::String)::Float64
+    function get_mr(atmos::atmosphere.Atmos_t, gas::String; lvl::Int=0)::Float64
 
         gas_valid = strip(gas, ' ')
         gas_valid = uppercase(gas_valid)
 
         mr = 0.0
-        if gas_valid in keys(atmos.mr_hom)
-            mr = atmos.mr_hom[gas_valid]
+        if gas_valid in keys(atmos.mr_input)
+            if lvl == 0 
+                mr = atmos.mr_input[gas_valid]
+            else 
+                i_gas = findfirst(==(gas), atmos.gases)
+                mr = atmos.layer_mr[lvl,i_gas]
+            end
         end 
 
         return mr
@@ -267,18 +274,13 @@ module atmosphere
         for i in 1:atmos.atm.n_layer
 
             # for each gas
-            for gas in keys(atmos.mr_hom) 
+            for (i_gas, gas) in enumerate(atmos.gases)
 
                 # set mmw
-                if gas in keys(atmos.mr_hom) 
-                    atmos.layer_mmw[i] += atmos.mr_hom[gas] * phys.lookup_mmw[gas]
-                end
+                atmos.layer_mmw[i] += atmos.layer_mr[i,i_gas] * phys.lookup_mmw[gas]
 
                 # set cp
-                if gas in keys(atmos.mr_hom) 
-                    atmos.layer_cp[i] += atmos.mr_hom[gas] * phys.lookup_cp[gas] * phys.lookup_mmw[gas]
-                end
-
+                atmos.layer_cp[i] += atmos.layer_mr[i,i_gas] * phys.lookup_cp[gas] * phys.lookup_mmw[gas]
             end
 
             # density
@@ -363,8 +365,8 @@ module atmosphere
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
             println("Python: inserting rayleigh scattering")
-            co2_mr = get_mr(atmos, "co2")
-            n2_mr  = get_mr(atmos, "n2")
+            co2_mr = get_mr(atmos, "co2")  # Just use mixing ratio at BOA
+            n2_mr  = get_mr(atmos, "n2" )
             h2o_mr = get_mr(atmos, "h2o")
             runfile = joinpath([atmos.ROOT_DIR, "src", "insert_rayleigh.py"])
             run(`python $runfile $spectral_file_run $co2_mr $n2_mr $h2o_mr`)
@@ -554,24 +556,32 @@ module atmosphere
             atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
         end
 
-        # Set mixing ratios (assumed to be well-mixed)
+        # Set mixing ratios
+        atmos.gases = Array{String}(undef, atmos.spectrum.Gas.n_absorb)
+        atmos.layer_mr = zeros(Float64, (atmos.nlev_c,length(atmos.gases)))
+
         for i_gas in 1:atmos.spectrum.Gas.n_absorb
             ti = atmos.spectrum.Gas.type_absorb[i_gas]
             gas = SOCRATES.input_head_pcf.header_gas[ti]
 
-            if gas in keys(atmos.mr_hom)
-                atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.mr_hom[gas]
+            atmos.gases[i_gas] = gas
+
+            if gas in keys(atmos.mr_input)
+                atmos.layer_mr[:,i_gas] .= atmos.mr_input[gas]
             else
-                atmos.atm.gas_mix_ratio[:, :, i_gas] .= 0.0
+                atmos.layer_mr[:,i_gas] .= 0.0
             end
+
+            # Initialise as well-mixed
+            atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.layer_mr[:,i_gas]
         end
 
         # Warn user if we are missing gases 
         missing_gases = false
         for i in 1:atmos.nlev_c
             lvl_tot = 0.0
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb
-                lvl_tot += atmos.atm.gas_mix_ratio[1, i, i_gas]
+            for i_gas in 1:length(atmos.gases)
+                lvl_tot += atmos.layer_mr[i,i_gas]
             end 
             missing_gases = missing_gases || (lvl_tot < 1.0)
         end 
@@ -754,7 +764,10 @@ module atmosphere
         atmos.atm.t[1, :] .= atmos.tmp[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
-        
+
+        for i_gas in 1:length(atmos.gases)
+            atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.layer_mr[:,i_gas]
+        end 
         calc_layer_props!(atmos)
 
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
@@ -830,13 +843,12 @@ module atmosphere
     function write_pt(atmos, fname)
 
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
-        arr_P *= 1e-5
-        
+
         rm(fname, force=true)
 
         open(fname, "w") do f
             write(f, "# pressure  , temperature \n")
-            write(f, "# [bar]     , [K] \n")
+            write(f, "# [Pa]      , [K] \n")
             for i in 1:atmos.nlev_l+atmos.nlev_c
                 @printf(f, "%1.5e , %1.5e \n", arr_P[i], arr_T[i])
             end
@@ -847,16 +859,14 @@ module atmosphere
     # Write current cell-edge fluxes to a file
     function write_fluxes(atmos, fname)
 
-        arr_P = atmos.pl * 1e-5
-        
         rm(fname, force=true)
 
         open(fname, "w") do f
             write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N       \n")
-            write(f, "# [bar]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2] \n")
+            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2] \n")
             for i in 1:atmos.nlev_l
                 @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
-                          arr_P[i], 
+                          atmos.pl[i], 
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],

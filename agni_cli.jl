@@ -15,6 +15,8 @@ ROOT_DIR = dirname(abspath(@__FILE__))
 using Revise
 using ArgParse
 
+trppt_default = 0.1
+
 # Command line arguments
 s = ArgParseSettings()
 @add_arg_table s begin
@@ -42,13 +44,18 @@ s = ArgParseSettings()
         help = "Mixing ratios of volatiles formatted as a dictionary e.g. \"H2O=0.8,H2=0.2\" "
         arg_type = String 
         required = true
+    "--load"
+        help = "Path to a CSV file containing a T(p) profile to load. Columns of file should be [Pa, K]"
+        arg_type = String 
+        default = ""
     "--trppt"
         help = "Initialise with an isothermal stratosphere at this temperature."
         arg_type = Float64
-        default = 10.0
-    "--cstsurf"
-        help = "Fix the surface temperature to be constant."
-        action = :store_true
+        default = trppt_default
+    "--surface"
+        help = "Surface state (0: free, 1: fixed at T(p_surf), 2: fixed at T_star)"
+        arg_type = Int
+        default = 0
     "--noadjust"
         help = "Disable convective adjustment."
         action = :store_true
@@ -72,7 +79,7 @@ s = ArgParseSettings()
         default = ""
     "--nlevels"
         help = "Number of model levels."
-        arg_type = Int64
+        arg_type = Int
         default = 100
     "--rscatter"
         help = "Include rayleigh scattering."
@@ -107,12 +114,13 @@ spfile_name     = args["spf"]
 output_dir      = args["output"]
 oneshot         = args["once"]
 plot            = args["plot"]
+csv_path        = args["load"]
 trppt           = args["trppt"]
 star_file       = args["stf"]
 rscatter        = args["rscatter"]
 verbose         = args["verbose"]
 animate         = args["animate"]
-fixed_surf      = args["cstsurf"]
+surf_state      = args["surface"]
 no_adjust       = args["noadjust"]
 
 if verbose 
@@ -122,13 +130,6 @@ if verbose
     end
     println("")
 end
-
-# Remove old files 
-if abspath(output_dir) == abspath(ROOT_DIR)
-    error("Output directory cannot be the root directory")
-end
-rm(output_dir,force=true,recursive=true)
-mkdir(output_dir)
 
 spfile_has_star = (star_file == "")
 spfile_noremove = args["spf_keep"]
@@ -177,9 +178,21 @@ atmosphere.allocate!(atmos;
                         )
 
 # Set PT profile 
+if !(csv_path == "")
+    setpt.fromcsv!(atmos, abspath(csv_path))
+end 
 setpt.prevent_surfsupersat!(atmos)
-setpt.dry_adiabat!(atmos)
-setpt.stratosphere!(atmos, trppt)
+if trppt > trppt_default+1e-9
+    setpt.dry_adiabat!(atmos)
+    setpt.stratosphere!(atmos, trppt)
+end
+
+# Remove old files 
+if abspath(output_dir) == abspath(ROOT_DIR)
+    error("Output directory cannot be the root directory")
+end
+rm(output_dir,force=true,recursive=true)
+mkdir(output_dir)
 
 # Just once or iterate?
 if oneshot
@@ -192,10 +205,8 @@ else
     else
         modplot = 0
     end
-    if fixed_surf
-        surf_state = 1 
-    else 
-        surf_state = 0
+    if (surf_state > 2) || (surf_state < 0)
+        error("Invalid surface state '$surf_state'")
     end
     import solver
     solver.solve_energy!(atmos, modplot=modplot, verbose=verbose, surf_state=surf_state, dry_adjust=!no_adjust)
@@ -222,7 +233,6 @@ end
 atmosphere.deallocate!(atmos)
 
 # Done
-runtime = time() - tbegin
+runtime = round(time() - tbegin, digits=2)
 println("Runtime: $runtime seconds")
 println("Goodbye")
-println(" ")
