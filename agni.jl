@@ -1,7 +1,7 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # -------------
-# AGNI main file for standalone execution
+# AGNI executable file for standalone execution
 # -------------
 
 println("Begin AGNI")
