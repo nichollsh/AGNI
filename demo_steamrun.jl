@@ -1,5 +1,10 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
+# -------------
+# AGNI executable file for demonstrating pure-steam runaway greenhouse effect
+# -------------
+
+
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
 
@@ -18,7 +23,6 @@ import atmosphere
 import setpt
 import phys
 import plotting
-
 
 # Configuration options
 toa_heating     = 1000.0  # SW dflux top boundary condition [W m-2]

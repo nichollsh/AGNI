@@ -1,7 +1,7 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # -------------
-# AGNI main file with command line arguments
+# AGNI executable file with command line arguments
 # -------------
 
 println("AGNI CLI")
@@ -49,7 +49,7 @@ s = ArgParseSettings()
         arg_type = String 
         default = ""
     "--trppt"
-        help = "Initialise with an isothermal stratosphere at this temperature."
+        help = "Initialise on a dry adiabat, with an isothermal stratosphere at this temperature."
         arg_type = Float64
         default = trppt_default
     "--surface"
