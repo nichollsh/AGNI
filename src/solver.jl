@@ -72,15 +72,15 @@ module solver
         
         # Get mixing ratio of water 
         gas = "H2O"
-        mr_h2o = atmosphere.get_mr(atmos, gas)
 
         # Skip if no water present
-        if mr_h2o == 0.0
+        if !(gas in atmos.gases)
             return 
         end 
 
         #Downward pass
         for i in range(1,stop=atmos.nlev_c-1, step=1)
+            mr_h2o = atmosphere.get_mr(atmos, gas, lvl=i)
             pp_h2o = atmos.p[i] * mr_h2o
             if (pp_h2o < 1e-10)
                 continue
@@ -93,6 +93,7 @@ module solver
 
         #Upward pass
         for i in range(atmos.nlev_c-1,stop=2, step=-1)
+            mr_h2o = atmosphere.get_mr(atmos, gas, lvl=i)
             pp_h2o = atmos.p[i] * mr_h2o
             if (pp_h2o < 1e-10)
                 continue
@@ -138,8 +139,8 @@ module solver
     # Iterates the atmosphere at each level
     function temperature_step!(atmos::atmosphere.Atmos_t, 
                                 dt::Array, dtmp_clip::Float64, 
-                                fixed_bottom::Bool, smooth_width::Int64, 
-                                dryadj_steps::Int64, h2oadj_steps::Int64)
+                                fixed_bottom::Bool, smooth_width::Int, 
+                                dryadj_steps::Int, h2oadj_steps::Int)
 
         bot_old_e = atmos.tmpl[end]
         top_old_e = atmos.tmpl[1]
@@ -185,12 +186,12 @@ module solver
         atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
         # Extrapolate top boundary
-        dt = atmos.tmp[1]-atmos.tmpl[2]
-        dp = atmos.p[1]-atmos.pl[2]
+        dt = atmos.tmp[1]-atmos.tmp[2]
+        dp = atmos.p[1]-atmos.p[2]
         atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
 
         # Limit change at top edge 
-        atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.6; 0.4] )
+        atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.7; 0.3] )
 
         # Calculate bottom boundary
         if fixed_bottom
@@ -224,8 +225,7 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int64=0`             bottom layer temperature, 0: free | 1: T_surf | 2: surf_value
-    - `surf_value::Float64=350.0`       bottom layer temperature when `surf_state==2`
+    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: T_surf | 2: tstar
     - `dry_adjust::Bool=true`           enable dry convective adjustment
     - `h2o_adjust::Bool=false`          enable naive steam convective adjustment
     - `sens_heat::Bool=true`            include sensible heating 
@@ -233,15 +233,15 @@ module solver
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `gofast::Bool=true`               enable accelerated fast period at the start 
     - `extrap::Bool=true`               enable extrapolation forward in time 
-    - `max_steps::Int64=250`            maximum number of solver steps
+    - `max_steps::Int=300`              maximum number of solver steps
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int64=0, surf_value::Float64=350.0,
+                            surf_state::Int=0,
                             dry_adjust::Bool=true, h2o_adjust::Bool=false, 
                             sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
                             gofast::Bool=true, extrap::Bool=true,
-                            max_steps::Int64=250)
+                            max_steps::Int=300)
 
 
         println("RCSolver: begin")
@@ -254,14 +254,14 @@ module solver
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 5.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
-        F_rchng_conv = 0.8    # Maximum relative value of F_loss for convergence [%]
+        drel_dt_conv = 3.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
+        H_rchng_conv = 1.0    # Maximum relative change in H_stat for convergence [%]
         
         if verbose
             @printf("    convergence criteria       \n")
             @printf("    dtmp_comp   < %.3f K       \n", dtmp_conv)
             @printf("    dtmp/tmp/dt < %.3f K day-1 \n", drel_dt_conv)
-            @printf("    F_chng^loss < %.3f %%      \n", F_rchng_conv)
+            @printf("    H_rchng     < %.3f %%      \n", H_rchng_conv)
             @printf(" \n")
         end
 
@@ -272,17 +272,18 @@ module solver
 
         # Tracking
         adj_changed = 0
-        F_rchng = Inf
         F_loss = 1.0e99         # Flux loss (TOA vs BOA)
-        F_loss_prev = 1.0e99    # Previous ^
+        H_stat = 1.0e99         # Heating rate statistic
+        H_stat_prev = 1.0e99    # Previous ^
+        H_rchng = Inf
         F_TOA_rad = 1.0e99      # Net upward TOA radiative flux
         F_BOA_rad = 0.0         # Net upward BOA radiative flux
         F_OLR_rad = 0.0         # Longwave upward TOA radiative flux
         dtmp_comp = Inf         # Temperature change comparison
         drel_dt = Inf           # Rate of relative temperature change
         drel_dt_prev  = Inf     # Previous ^
-        ldrel      = ones(Float64, atmos.nlev_c)
-        ldrel_prev = ones(Float64, atmos.nlev_c)
+
+        oscil = falses(atmos.nlev_c)  # layers which are oscillating
         heat_prev = zeros(Float64, atmos.nlev_c) # Previous iteration heating rates
         dt = ones(Float64,  atmos.nlev_c) # time-step [days]
 
@@ -304,7 +305,7 @@ module solver
             fixed_bottom = true
         elseif surf_state == 2
             fixed_bottom = true
-            atmos.tmpl[end] = max(surf_value,atmos.T_floor)
+            atmos.tmpl[end] = atmos.tstar
         else
             error("Invalid surface state for radiative-convective solver")
         end
@@ -341,7 +342,7 @@ module solver
                 dryadj_steps = 40
                 h2oadj_steps = 40
                 dt_min = 1e1
-                dt_max = 1e6
+                dt_max = 1e5
                 smooth_window = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
                 
             else
@@ -349,11 +350,11 @@ module solver
                 if verbose || ( mod(step,modprint) == 0)
                     @printf("    step %d \n", step)
                 end
-                dtmp_clip = 80.0
+                dtmp_clip = 50.0
                 dryadj_steps = 20
                 h2oadj_steps = 20
-                dt_min = 5e-4
-                dt_max = 30
+                dt_min = 1e-4
+                dt_max = 10
                 smooth_window = 0
 
                 # End of 'fast' period - take average of last two iters
@@ -361,6 +362,7 @@ module solver
                     stopfast = false
                     atmos.tmpl[:] .= 0.5*(hist_tmpl[end,:] .+ hist_tmpl[end-1,:])
                     atmos.tmp[:]  .= 0.5*(hist_tmp[end,:]  .+ hist_tmp[end-1,:])
+                    dt[:]   .= 0.5 * (dt_min + dt_max)
                     dryadj_steps = 0
                     h2oadj_steps = 0
                     step_stopfast = step
@@ -382,19 +384,24 @@ module solver
             calc_heat!(atmos, sens_heat && !fixed_bottom)
 
             # Calc step size
+            H_small = 1.0 
+            p_large = 5e5  # = 2 bar 
             for i in 1:atmos.nlev_c
+
+                oscil[i] = false
 
                 # Increment dt
                 if gofast 
                     dt[i] *= 1.3
                 else
-                    # oscillating => reduce step size
-                    if (atmos.heating_rate[i]*heat_prev[i] < 0) 
-                        dt[i] = dt_min
+                    # large oscillations => reduce step size
+                    if (atmos.heating_rate[i]*heat_prev[i] < 0) && (abs(atmos.heating_rate[i]) > H_small)
+                        oscil[i] = true
+                        dt[i] *= 0.1
                     
-                    # low heating rate at high p => increase step size
-                    elseif ( abs(atmos.heating_rate[i]) < 1e-1 ) && (atmos.pl[i] > 1e5)
-                        dt[i] = dt_max
+                    # low heating rate at high pressure => increase step size
+                    elseif ( abs(atmos.heating_rate[i]) < H_small ) && (atmos.pl[i] > p_large) && !stopfast
+                        dt[i] *= 1.5
 
                     else
                         dt[i] *= 1.1
@@ -402,7 +409,7 @@ module solver
                 end
             end 
 
-            dt[1:3] .= dt_min
+            dt[1:2] .= dt_min
             clamp!(dt, dt_min, dt_max)
 
             if verbose
@@ -426,22 +433,20 @@ module solver
                                             dryadj_steps, h2oadj_steps)
 
             # Extrapolate forward in time (at higher pressures, when appropriate) 
-            ex_lookback = 5
-            ex_lookback = max(len_hist-1, ex_lookback)
+            ex_lookback     = 4
+            ex_lookback     = max(len_hist-1, ex_lookback)
+            ex_dtmp_clip    = ex_lookback * dtmp_clip
             if !gofast && extrap && (step_stopfast+ex_lookback+1 < step < 0.95*max_steps) && ( mod(step,ex_lookback+1) == 0)
                 for i in 1:atmos.nlev_c 
-                    if atmos.pl[i] > 1e2  # 1 mbar 
-                        atmos.tmp[i]  += max(-dtmp_clip, min(dtmp_clip, atmos.tmp[i]  - hist_tmp[end-ex_lookback,i]))
-                        atmos.tmpl[i] += max(-dtmp_clip, min(dtmp_clip, atmos.tmpl[i] - hist_tmpl[end-ex_lookback,i]))
+                    if (atmos.pl[i] > p_large) && !oscil[i]
+                        atmos.tmp[i]  += max(-ex_dtmp_clip, min(ex_dtmp_clip, atmos.tmp[i]  - hist_tmp[end-ex_lookback,i]  ))
+                        atmos.tmpl[i] += max(-ex_dtmp_clip, min(ex_dtmp_clip, atmos.tmpl[i] - hist_tmpl[end-ex_lookback,i] ))
                     end 
                 end 
             end 
             
             # Calculate relative rate of change in temperature
             if step > 1
-                ldrel_prev[:] .= ldrel[:]
-                ldrel[:] .= abs.( (atmos.tmp[:] .- hist_tmp[end,1:end])./hist_tmp[end,1:end]  )
-
                 drel_dt_prev = drel_dt
                 drel_dt = maximum(abs.(  ((atmos.tmp[:] .- hist_tmp[end,1:end])./hist_tmp[end,1:end])./dt  ))
             end
@@ -462,9 +467,12 @@ module solver
             
             F_OLR_rad = atmos.flux_u_lw[1]
 
-            F_loss_prev = F_loss
-            F_loss = abs(F_TOA_rad-F_BOA_rad)
-            F_rchng = (F_loss - F_loss_prev) / F_loss_prev * 100.0
+            F_loss      = abs(F_TOA_rad-F_BOA_rad)
+
+            # Calculate the relative change in heating rate
+            H_stat_prev = H_stat
+            H_stat      = quantile(abs.(atmos.heating_rate[:]), 0.6)
+            H_rchng     = (H_stat - H_stat_prev) / H_stat_prev * 100.0
 
             # Print debug info to stdout
             if verbose
@@ -475,7 +483,8 @@ module solver
                 @printf("    F_rad^TOA   = %.2e W m-2  \n", F_TOA_rad)
                 @printf("    F_rad^BOA   = %.2e W m-2  \n", F_BOA_rad)
                 @printf("    F_rad^loss  = %.2f W m-2  \n", F_loss)
-                @printf("    F_chng^loss = %.4f %%     \n", F_rchng)
+                @printf("    H_stat      = %.4f K day-1\n", H_stat)
+                @printf("    H_rchng     = %.4f %%     \n", H_rchng)
                 @printf("\n")
             end
 
@@ -497,7 +506,7 @@ module solver
             # - minimal rate of temperature change for two iters
             # - minimal change to net radiative flux at TOA for two iters
             # - solver is not in 'fast' mode, as it is unphysical
-            flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( -F_rchng_conv < F_rchng < 0)
+            flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( -H_rchng_conv < H_rchng < 0)
             success   = flag_this && flag_prev
             flag_prev = flag_this
             
@@ -510,11 +519,10 @@ module solver
 
         # Print information about the final state
         if !success
-            @printf("RCSolver: Stopping atmosphere iterations without success \n")
-            @printf("    count_adj   = %d layers   \n", adj_changed)
+            @printf("RCSolver: Stopping atmosphere iterations before convergence \n")
             @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
             @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
-            @printf("    F_chng^TOA  = %.4f %%     \n", F_rchng)
+            @printf("    H_rchng     = %.4f %%     \n", H_rchng)
             @printf("\n")
 
         else
