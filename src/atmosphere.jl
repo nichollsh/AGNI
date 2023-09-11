@@ -12,8 +12,10 @@ module atmosphere
     # Import libraries
     include("../socrates/julia/src/SOCRATES.jl")
 
-    using Printf
     using Revise
+    using Printf
+    using NCDatasets
+    using DataStructures
 
     import phys
 
@@ -73,6 +75,7 @@ module atmosphere
         layer_mmw::Array      # mean molecular weight [kg mol-1]
         layer_cp::Array       # heat capacity at const-p [J K-1 mol-1]
         layer_grav::Array     # gravity [m s-2]
+        layer_z::Array        # height [m]
 
         # Calculated fluxes (W m-2)
         flux_d_lw::Array  # down component, lw 
@@ -287,6 +290,9 @@ module atmosphere
             atmos.layer_density[i] = ( atmos.p[i] * atmos.layer_mmw[i] )  / (phys.R_gas * atmos.tmp[i]) 
             atmos.atm.density[1,i] = atmos.layer_density[i]
         end
+
+        # height 
+        atmos.layer_z = zeros(Float64, atmos.nlev_c)
 
     end 
 
@@ -815,7 +821,7 @@ module atmosphere
     end # end of radtrans
 
     # Get interleaved cell-centre and cell-edge PT grid
-    function get_interleaved_pt(atmos)
+    function get_interleaved_pt(atmos::atmosphere.Atmos_t)
         arr_T = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         arr_P = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
 
@@ -839,8 +845,8 @@ module atmosphere
         return arr_P, arr_T
     end 
 
-    # Write current interleaved pressure/temperature grid to a file
-    function write_pt(atmos, fname)
+    # Write current interleaved pressure/temperature grid to a CSV file
+    function write_pt(atmos::atmosphere.Atmos_t, fname::String)
 
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
 
@@ -856,8 +862,8 @@ module atmosphere
 
     end
 
-    # Write current cell-edge fluxes to a file
-    function write_fluxes(atmos, fname)
+    # Write current cell-edge fluxes to a CSV file
+    function write_fluxes(atmos::atmosphere.Atmos_t, fname::String)
 
         rm(fname, force=true)
 
@@ -873,7 +879,107 @@ module atmosphere
                           )
             end
         end
-
     end
+
+    # Write atmosphere data to a NetCDF file
+    function write_ncdf!(atmos::atmosphere.Atmos_t, fname::String)
+
+        # Create dataset handle
+        fname = abspath(fname)
+        rm(fname, force=true)
+        ds = Dataset(fname,"c")
+
+        # Prepare
+        ds.attrib["description"] = "AGNI atmosphere data"
+
+        nlev_c = Int(atmos.nlev_c)
+        nlev_l = nlev_c + 1
+
+        ngases = length(atmos.gases)
+        nchars = 16
+
+        # ----------------------
+        # Create dimensions
+        defDim(ds, "nlev_c", nlev_c)    # Cell centres
+        defDim(ds, "nlev_l", nlev_l)    # Cell edges
+        defDim(ds, "ngases", ngases)    # Gases
+        defDim(ds, "nchars", nchars)    # Length of string containing gas names
+
+        # ----------------------
+        # Scalar quantities  
+        #    Create variables
+        var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # BOA LW BC
+        var_toah =      defVar(ds, "toa_heating",   Float64, (), attrib = OrderedDict("units" => "W m-2"))  # TOA SW BC
+
+        #     Store data
+        var_tstar[1] =  atmos.tstar 
+        var_toah[1] =   atmos.toa_heating
+
+        # ----------------------
+        # Layer quantities  
+        #    Create variables
+        var_p =         defVar(ds, "p",      Float64, ("nlev_c",), attrib = OrderedDict("units" => "Pa"))
+        var_pl =        defVar(ds, "pl",     Float64, ("nlev_l",), attrib = OrderedDict("units" => "Pa"))
+        var_tmp =       defVar(ds, "tmp",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "K"))
+        var_tmpl =      defVar(ds, "tmpl",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "K"))
+        var_z =         defVar(ds, "z",      Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
+        var_grav =      defVar(ds, "gravity",Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
+        var_mmw =       defVar(ds, "mmw",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
+        var_gases =     defVar(ds, "gases",  Char,    ("nchars", "ngases")) # Transposed cf AEOLUS because of how Julia stores arrays
+        var_mr =        defVar(ds, "x_gas",  Float64, ("ngases", "nlev_c")) # ^^
+        var_fdl =       defVar(ds, "fl_D_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_ful =       defVar(ds, "fl_U_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fnl =       defVar(ds, "fl_N_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fds =       defVar(ds, "fl_D_SW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fus =       defVar(ds, "fl_U_SW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fns =       defVar(ds, "fl_N_SW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fd =        defVar(ds, "fl_D",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fu =        defVar(ds, "fl_U",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_hr =        defVar(ds, "rad_hr", Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
+
+        #     Store data
+        var_p[:] =      atmos.p
+        var_pl[:] =     atmos.pl
+        var_tmp[:] =    atmos.tmp
+        var_tmpl[:] =   atmos.tmpl
+        var_z[:]    =   atmos.layer_z
+        var_mmw[:]  =   atmos.layer_mmw
+        var_grav[:]  =  atmos.layer_grav
+
+        for i_gas in 1:ngases 
+            for i_char in 1:nchars 
+                var_gases[i_char, i_gas] = ' '
+            end 
+            for i_char in 1:length(atmos.gases[i_gas])
+                var_gases[i_char,i_gas] = atmos.gases[i_gas][i_char]
+            end 
+        end 
+        
+        for i_gas in 1:ngases 
+            for i_lvl in 1:nlev_c
+                var_mr[i_gas, i_lvl] = atmos.layer_mr[i_lvl, i_gas]
+            end 
+        end 
+
+        var_fdl[:] =    atmos.flux_d_lw
+        var_ful[:] =    atmos.flux_u_lw
+        var_fnl[:] =    atmos.flux_n_lw
+
+        var_fds[:] =    atmos.flux_d_sw
+        var_fus[:] =    atmos.flux_u_sw
+        var_fns[:] =    atmos.flux_n_sw
+        
+        var_fd[:] =     atmos.flux_d
+        var_fu[:] =     atmos.flux_u
+        var_fn[:] =     atmos.flux_n
+
+        var_hr[:] =     atmos.heating_rate
+
+        # ----------------------
+        # Close
+        close(ds)
+
+    end 
 
 end
