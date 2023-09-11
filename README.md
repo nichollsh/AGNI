@@ -23,8 +23,8 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * Python (version 3.10 or later)
 * NumPy and SciPy
 * gfortran
-* NetCDF
 * netcdf-fortran
+* make
 * OpenMP
 
 ### Supported platforms
@@ -44,6 +44,8 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 -  `(@v1.9) pkg> add PCHIPInterpolation`
 -  `(@v1.9) pkg> add LaTeXStrings`
 -  `(@v1.9) pkg> add Plots`
+-  `(@v1.9) pkg> add NCDatasets`
+-  `(@v1.9) pkg> add DataStructures`
 -  `(@v1.9) pkg> add Glob`
 -  `(@v1.9) pkg> add ArgParse`
 -  `(@v1.9) pkg> activate .`

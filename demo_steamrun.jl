@@ -4,7 +4,6 @@
 # AGNI executable file for demonstrating pure-steam runaway greenhouse effect
 # -------------
 
-
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
 
