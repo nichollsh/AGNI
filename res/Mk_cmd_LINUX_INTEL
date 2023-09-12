@@ -1,13 +1,15 @@
 #
-# Pathnames for AOPP Cluster
+# Pathnames for Linux on an Intel x86_64 platform. 
+# Tested with Ubuntu.
 # 
-FORTCOMP        = gfortran -O3 -c
-LINK            = gfortran -O3 
+
+FORTCOMP        = gfortran -O3 -fPIC -c
+LINK            = gfortran -O3 -fPIC
 LIBLINK         = ar rvu
 INCCDF_PATH     = /usr/include/
 LIBCDF_PATH     = /usr/lib/
 LIBCDF_NAME     = netcdff
-OMPARG          = -fopenmp -fPIC
+OMPARG          = -fopenmp 
 
 LIBSUFFIX       = a
 
