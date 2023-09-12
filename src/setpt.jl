@@ -13,7 +13,7 @@ module setpt
 
     using PCHIPInterpolation
 
-    # Read atmosphere T(p) from a CSV file 
+    # Read atmosphere T(p) from a CSV file (overwites existing P_boa and P_toa values).
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
 
         # Check file exists

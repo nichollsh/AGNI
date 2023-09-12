@@ -48,7 +48,7 @@ s = ArgParseSettings()
         help = "Mixing ratios of volatiles formatted as a dictionary e.g. \"H2O=0.8,H2=0.2\" "
         arg_type = String 
         required = true
-    "--load"
+    "--loadcsv"
         help = "Path to a CSV file containing a T(p) profile to load. Columns of file should be [Pa, K]"
         arg_type = String 
         default = ""
@@ -60,6 +60,14 @@ s = ArgParseSettings()
         help = "Surface state (0: free, 1: fixed at T(p_surf), 2: fixed at T_star)"
         arg_type = Int
         default = 0
+    "--albedo_s"
+        help = "Grey surface albedo."
+        arg_type = Float64
+        default = 0.0
+    "--zenith_degrees"
+        help = "Direction of solar radiation beam measured from zenith [deg]."
+        arg_type = Float64
+        default = 54.74
     "--noadjust"
         help = "Disable convective adjustment."
         action = :store_true
@@ -71,9 +79,9 @@ s = ArgParseSettings()
         arg_type = String
         default = "out"
     "--spf"
-        help = "Spectral file (name). Default is Mallard."
+        help = "Spectral file path. Default is Mallard."
         arg_type = String
-        default = "Mallard"
+        default = "res/spectral_files/Mallard/Mallard"
     "--spf_keep"
         help = "Keep runtime spectral file."
         action = :store_true
@@ -119,7 +127,9 @@ spfile_name     = args["spf"]
 output_dir      = args["output"]
 oneshot         = args["once"]
 plot            = args["plot"]
-csv_path        = args["load"]
+csv_path        = args["loadcsv"]
+albedo_s        = args["albedo_s"]
+zenith_degrees  = args["zenith_degrees"]
 trppt           = args["trppt"]
 star_file       = args["stf"]
 rscatter        = args["rscatter"]
@@ -174,6 +184,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mixing_ratios,
+                         zenith_degrees=zenith_degrees,
+                         albedo_s=albedo_s,
                          flag_gcontinuum=true,
                          flag_rayleigh=rscatter
                          )
@@ -222,10 +234,8 @@ end
 atmosphere.write_ncdf!(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
 
 # Write final PT profile and final fluxes 
-if verbose 
-    atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt.csv"))
-    atmosphere.write_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.csv"))
-end
+atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt.csv"))
+atmosphere.write_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Final plots 
 if animate && !oneshot
