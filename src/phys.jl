@@ -8,6 +8,11 @@ end
 
 module phys 
 
+    # Sources:
+    # - Python files that accompany Ray's book (=> phys.py)
+    # - SOCRATES source code
+    # - NIST
+
     # Universal gas constant, J K-1 mol-1
     const R_gas = 8.31446261815324 
 
@@ -53,7 +58,6 @@ module phys
         ("HCN", 2.702530E-02 ), 
         ("H2S", 3.408100E-02 ), 
         ("Ar", 3.994800E-02 ), 
-        ("AIR", 2.896600E-02 ), 
         ("O", 1.599940E-02 ), 
         ("N", 1.400674E-02 ), 
         ("NO3", 6.301280E-02 ), 
@@ -67,10 +71,7 @@ module phys
         ("HO2", 3.300670E-02 ), 
         ("HDO", 1.902140E-02 ), 
         ("HCl", 3.646100E-02 ), 
-        ("HF", 2.000689E-02 ), 
-        ("cOSSO", 9.612900E-02 ), 
-        ("tOSSO", 9.612900E-02 ), 
-        ("yOSOS", 9.612900E-02 )
+        ("HF", 2.000689E-02 )
     ])
 
     # Molecule heat capacity at constant pressure, J K-1 kg-1
@@ -138,14 +139,49 @@ module phys
         ("He", 2.030000E+04)
     ])
 
+    # Get values from thermodynamic property lookup tables 
+    function lookup_safe(prop::String,gas::String)
+
+        prop = lowercase(prop)
+
+        # Find table 
+        if prop == "l_vap"
+            table = lookup_L_vap
+        elseif prop == "p_trip"
+            table = lookup_P_trip
+        elseif prop == "t_trip"
+            table = lookup_T_trip
+        elseif prop == "t_crit"
+            table = lookup_T_crit
+        elseif prop == "mmw"
+            table = lookup_mmw
+        elseif prop == "cp"
+            table = lookup_cp
+        else 
+            error("Invalid thermodynamic property '$thermo'")
+        end 
+
+        # Find value 
+        if gas in keys(table)
+            return table[gas]
+        end 
+
+        # Default case
+        return 0.0
+    end
+
     # Get saturation pressure at a given temperature
     function calc_Psat(gas::String, T_eval::Float64)
 
         # Get properties
-        L = lookup_L_vap[gas]
-        R = R_gas / lookup_mmw[gas]
-        p0 = lookup_P_trip[gas]
-        T0 = lookup_T_trip[gas]
+        L = phys.lookup_safe("L_vap",gas)
+        if L < 1e-20
+            return 0.0
+        end 
+
+        R = R_gas /  phys.lookup_safe("mmw",gas)
+        p0 =  phys.lookup_safe("P_trip",gas)
+        T0 =  phys.lookup_safe("T_trip",gas)
 
         # Calculate Psat
         return p0*exp(-(L/R)*(1.0/T_eval - 1.0/T0))
@@ -155,8 +191,12 @@ module phys
     function calc_Tdew(gas::String, p_eval::Float64)
 
         # Get properties
-        L = lookup_L_vap[gas]
-        R = R_gas / lookup_mmw[gas]
+        L = phys.lookup_safe("L_vap",gas)
+        if L < 1e-20
+            return 0.0
+        end 
+
+        R = R_gas /  phys.lookup_safe("mmw",gas)
 
         # Avoid math error for p = 0
         p = max(p_eval, 1.0e-100)
