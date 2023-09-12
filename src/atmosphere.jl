@@ -273,10 +273,10 @@ module atmosphere
             for (i_gas, gas) in enumerate(atmos.gases)
 
                 # set mmw
-                atmos.layer_mmw[i] += atmos.layer_mr[i,i_gas] * phys.lookup_mmw[gas]
+                atmos.layer_mmw[i] += atmos.layer_mr[i,i_gas] * phys.lookup_safe("mmw",gas)
 
                 # set cp
-                atmos.layer_cp[i] += atmos.layer_mr[i,i_gas] * phys.lookup_cp[gas] * phys.lookup_mmw[gas]
+                atmos.layer_cp[i] += atmos.layer_mr[i,i_gas] * phys.lookup_safe("mmw",gas) * phys.lookup_safe("cp",gas)
             end
 
             # density
@@ -694,16 +694,18 @@ module atmosphere
 
         # Check files are acceptable and set instellation if doing SW flux
         if lw
-            Bool(atmos.spectrum.Basic.l_present[6]) ||
-                error("The spectral file contains no data for the Planckian function." )
+            if !Bool(atmos.spectrum.Basic.l_present[6])
+                error("The spectral file contains no data for the Planckian function.\nCheck that the file contains a stellar spectrum.")
+            end
 
             if Bool(atmos.spectrum.Basic.l_present[2])
                 atmos.control.l_solar_tail_flux = true
             end
 
         else
-            Bool(atmos.spectrum.Basic.l_present[2]) ||
+            if !Bool(atmos.spectrum.Basic.l_present[2])
                 error("The spectral file contains no solar spectral data.")
+            end
              
             atmos.bound.zen_0[1] = atmos.zenith_degrees # Assign the solar zenith angle
             atmos.bound.solar_irrad[1] = atmos.toa_heating   # The file of solar irradiances.
@@ -903,7 +905,7 @@ module atmosphere
     end
 
     # Write atmosphere data to a NetCDF file
-    function write_ncdf!(atmos::atmosphere.Atmos_t, fname::String)
+    function write_ncdf(atmos::atmosphere.Atmos_t, fname::String)
 
         # See the tutorial at:
         # https://github.com/Alexander-Barth/NCDatasets.jl#create-a-netcdf-file

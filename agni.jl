@@ -23,7 +23,7 @@ import phys
 
 
 # Configuration options
-tstar           = 1740.0    # LW uflux bottom boundary condition [kelvin]
+tstar           = 2740.0    # LW uflux bottom boundary condition [kelvin]
 toa_heating     = 4.391e+04 # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
@@ -43,8 +43,8 @@ star_file     = "res/stellar_spectra/trappist-1.txt"
 output_dir    = "out/"
 
 # Create output direct
-rm(output_dir,force=true,recursive=true)
-mkdir(output_dir)
+# rm(output_dir,force=true,recursive=true)
+# mkdir(output_dir)
 
 # Setup atmosphere
 println("Atmosphere: setting up")
@@ -62,6 +62,7 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Atmosphere: setting initial T(p)")
+# setpt.fromcsv!(atmos,"out/pt.csv")
 setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
 setpt.stratosphere!(atmos, 300.0)
@@ -75,7 +76,7 @@ atmosphere.radtrans!(atmos, false)
 # solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=false, max_steps=500)
 
 # Write arrays
-atmosphere.write_ncdf!(atmos,   joinpath(atmos.OUT_DIR,"atm.nc"))
+atmosphere.write_ncdf(atmos,   joinpath(atmos.OUT_DIR,"atm.nc"))
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
 atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 

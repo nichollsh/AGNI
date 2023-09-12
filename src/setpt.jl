@@ -13,7 +13,7 @@ module setpt
 
     using PCHIPInterpolation
 
-    # Read atmosphere T(p) from a CSV file (overwites existing P_boa and P_toa values).
+    # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
 
         # Check file exists
@@ -85,12 +85,15 @@ module setpt
             end
         end
 
-        # Set pressure grid
-        atmos.p_boa = pl[end]
-        atmos.p_toa = pl[1]
-        atmosphere.generate_pgrid!(atmos)
+        # Extend loaded grid isothermally to lower pressures (prevent domain error)
+        pushfirst!(pl,   atmos.pl[1]/1.1)
+        pushfirst!(tmpl, tmpl[1]  )
 
-        # Interpolate from the provided grid to the generated one
+        # Extend loaded grid isothermally to higher pressures 
+        push!(pl,   atmos.pl[end]*1.1)
+        push!(tmpl, tmpl[end])
+
+        # Interpolate from the loaded grid to existing one
         itp = Interpolator(pl, tmpl) # Cell edges 
         atmos.tmpl[:] .= itp.(atmos.pl[:])
 
@@ -174,7 +177,7 @@ module setpt
             # Check surface pressure (should not be supersaturated)
             psat = phys.calc_Psat(gas, atmos.tmpl[end])
             Tsat = phys.calc_Tdew(gas, atmos.p_boa)
-            if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_T_crit[gas])
+            if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_safe("T_crit",gas))
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-mr) + psat
                 atmos.layer_mr[atmos.nlev_c, i_gas] = psat / atmos.p_boa  
@@ -201,8 +204,9 @@ module setpt
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup")
         end 
-        if !(gas in keys(phys.lookup_L_vap))
-            error("Invalid condensible $gas")
+
+        if phys.lookup_safe("L_vap",gas) < 1e-20
+            return
         end
 
         # Check if each level is condensing. If it is, place on phase curve
