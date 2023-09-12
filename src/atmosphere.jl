@@ -295,15 +295,18 @@ module atmosphere
         atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
         for i in range(atmos.nlev_c, 1, step=-1)
 
-            g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
-            atmos.layer_grav[i] = g
+            # Technically, g and z should be integrated as coupled equations,
+            # but here they are not. This is somewhat reasonable for high mmw 
+            # atmospheres, but will break-down at large scale heights.
 
-            mu_g = atmos.layer_mmw[i] * g  # technically, g and z should be integrated as coupled equations
-
-            dzc = phys.R_gas * atmos.tmp[i] * log(atmos.pl[i+1]/atmos.p[i]) / mu_g
+            g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.zl[i+1])^2.0)
+            dzc = phys.R_gas * atmos.tmp[i] * log(atmos.pl[i+1]/atmos.p[i]) / (atmos.layer_mmw[i] * g)
             atmos.z[i] = atmos.zl[i+1] + dzc
 
-            dzl = phys.R_gas * atmos.tmp[i] * log(atmos.p[i]/atmos.pl[i]) / mu_g
+            atmos.layer_grav[i] = g
+
+            g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
+            dzl = phys.R_gas * atmos.tmp[i] * log(atmos.p[i]/atmos.pl[i]) / (atmos.layer_mmw[i] * g)
             atmos.zl[i] = atmos.z[i] + dzl
 
             if (dzl < 1e-20) || (dzc < 1e-20)
@@ -977,6 +980,8 @@ module atmosphere
         var_zl[:]   =   atmos.zl
         var_mmw[:]  =   atmos.layer_mmw
         var_grav[:]  =  atmos.layer_grav
+
+        display(atmos.layer_grav)
 
         for i_gas in 1:ngases 
             for i_char in 1:nchars 
