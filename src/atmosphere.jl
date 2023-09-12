@@ -125,7 +125,7 @@ module atmosphere
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `ROOT_DIR::String`                AGNI root directory 
     - `OUT_DIR::String`                 Output directory
-    - `spfile_name::String`             name of spectral file
+    - `spfile::String`                  path to spectral file
     - `toa_heating::Float64`            downward shortwave flux at the top of the atmosphere [W m-2].
     - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
@@ -145,7 +145,7 @@ module atmosphere
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
-                    spfile_name::String, 
+                    spfile::String, 
                     toa_heating::Float64, tstar::Float64,
                     gravity::Float64, radius::Float64,
                     nlev_centre::Int, p_surf::Float64, p_top::Float64,
@@ -173,12 +173,8 @@ module atmosphere
         atmos.ROOT_DIR = abspath(ROOT_DIR)
         atmos.OUT_DIR = abspath(OUT_DIR)
 
-        if spfile_name == "_runtime"
-            atmos.spectral_file =  joinpath([atmos.OUT_DIR, ".spfile_runtime"])
-        else
-            atmos.spectral_file =  joinpath([atmos.ROOT_DIR, "res", "spectral_files", spfile_name, spfile_name])
-        end
-        atmos.all_channels =    all_channels
+        atmos.spectral_file =  abspath(spfile)
+        atmos.all_channels =   all_channels
 
         atmos.T_floor =          5.0 
 
@@ -980,8 +976,6 @@ module atmosphere
         var_zl[:]   =   atmos.zl
         var_mmw[:]  =   atmos.layer_mmw
         var_grav[:]  =  atmos.layer_grav
-
-        display(atmos.layer_grav)
 
         for i_gas in 1:ngases 
             for i_char in 1:nchars 

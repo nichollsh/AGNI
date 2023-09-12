@@ -38,7 +38,7 @@ mixing_ratios   = Dict([
                         ("N2"  , 2.28491/280.4)
                         ])
 
-spfile_name   = "Mallard"
+spfile_name   = "res/spectral_files/Mallard/Mallard"
 star_file     = "res/stellar_spectra/trappist-1.txt"
 output_dir    = "out/"
 
