@@ -32,6 +32,10 @@ s = ArgParseSettings()
         help = "Surface gravitational acceleration [m s-2]."
         arg_type = Float64
         required = true
+    "radius"
+        help = "Planet radius at the surface [m]."
+        arg_type = Float64 
+        required = true
     "psurf"
         help = "Total surface pressure [bar]."
         arg_type = Float64
@@ -107,6 +111,7 @@ import plotting
 tstar           = args["tstar"]
 toa_heating     = args["toa_heating"]
 gravity         = args["gravity"]
+radius          = args["radius"]
 p_surf          = args["psurf"]
 p_top           = args["ptop"]
 nlev_centre     = args["nlevels"]
@@ -166,7 +171,8 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, tstar,
-                         gravity, nlev_centre, p_surf, p_top,
+                         gravity, radius,
+                         nlev_centre, p_surf, p_top,
                          mixing_ratios,
                          flag_gcontinuum=true,
                          flag_rayleigh=rscatter
@@ -212,11 +218,14 @@ else
     solver.solve_energy!(atmos, modplot=modplot, verbose=verbose, surf_state=surf_state, dry_adjust=!no_adjust)
 end
 
-# Write final PT profile
-atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt.csv"))
+# Write NetCDF file 
+atmosphere.write_ncdf!(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
 
-# Write final fluxes 
-atmosphere.write_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.csv"))
+# Write final PT profile and final fluxes 
+if verbose 
+    atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt.csv"))
+    atmosphere.write_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.csv"))
+end
 
 # Final plots 
 if animate && !oneshot

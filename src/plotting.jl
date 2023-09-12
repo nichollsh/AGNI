@@ -200,18 +200,20 @@ module plotting
         # Command line format:
         # bash> ffmpeg -framerate 16 -i out/solver_monitor_%04d.png -y out/anim.mp4
 
+        runtime = 15.0 # seconds
+
         # Find output files
         out = atmos.OUT_DIR
         frames = glob("solver_monitor_*.png",out)
         nframes = length(frames)
-        if nframes < 1
-            println("WARNING: Cannot animate solver because no output frames were found")
-        end
 
         # Create animation
-        runtime = 15.0
-        fps = max(nframes/runtime, 5)
-        run(`ffmpeg -loglevel quiet -framerate $fps -i $out/solver_monitor_%04d.png -y $out/anim.mp4`)
+        if nframes < 1
+            println("WARNING: Cannot animate solver because no output frames were found")
+        else 
+            fps = max(nframes/runtime, 5)
+            run(`ffmpeg -loglevel quiet -framerate $fps -i $out/solver_monitor_%04d.png -y $out/anim.mp4`)
+        end
 
     end
 

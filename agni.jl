@@ -25,8 +25,9 @@ import phys
 # Configuration options
 tstar           = 1740.0    # LW uflux bottom boundary condition [kelvin]
 toa_heating     = 4.391e+04 # SW dflux top boundary condition [W m-2]
-gravity         = 10.0
-nlev_centre     = 100
+radius          = 7.1e6     # metres
+gravity         = 10.0      # m s-2
+nlev_centre     = 100  
 p_surf          = 280.4     # bar
 p_top           = 1e-6      # bar 
 mixing_ratios   = Dict([
@@ -51,7 +52,8 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, tstar,
-                         gravity, nlev_centre, p_surf, p_top,
+                         gravity, radius,
+                         nlev_centre, p_surf, p_top,
                          mixing_ratios,
                          flag_gcontinuum=true,
                          flag_rayleigh=false
@@ -69,12 +71,16 @@ println("RadTrans: calculating fluxes")
 atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 
-atmosphere.write_ncdf!(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
-
 # Call solver 
 # solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=false, max_steps=500)
 
-# Save result
+# Write arrays
+atmosphere.write_ncdf!(atmos,   joinpath(atmos.OUT_DIR,"atm.nc"))
+atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
+atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
+
+
+# Save plots
 plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
 plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
 plotting.anim_solver(atmos)
