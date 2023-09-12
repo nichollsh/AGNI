@@ -59,9 +59,9 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 You should end up in the root directory of the repository.    
 
 ### Running the code
-Simply run `$ ./agni.jl` in the root directory of the repository.     
-For the command line interface, instead run `$ ./agni_cli.jl` (pass `--help` for help).   
-To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.   
+For the command line interface, run `$ ./agni_cli.jl` (pass `--help` for help).     
+To debug the program, run `$ ./agni.jl` in the root directory of the repository.       
+To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.     
 
 
 ### Example outputs

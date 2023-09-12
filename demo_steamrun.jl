@@ -56,7 +56,7 @@ p_boa = atmos.p_boa
 
 plot_frames = false
 
-run_len = 60
+run_len = 100
 tsurf_arr = range(200,stop=2250,length=run_len)
 olr_arr = zeros(Float64, run_len)
 for i in 1:run_len
