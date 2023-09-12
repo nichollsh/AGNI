@@ -57,11 +57,14 @@ module atmosphere
 
         p_boa::Float64 # bottom 
         p_toa::Float64 # top 
+        rp::Float64 # planet radius [m]
 
         tmp::Array      
         tmpl::Array     
         p::Array        
         pl::Array      
+        z::Array 
+        zl::Array 
 
         T_floor::Float64        # Temperature floor [K]
 
@@ -75,7 +78,6 @@ module atmosphere
         layer_mmw::Array      # mean molecular weight [kg mol-1]
         layer_cp::Array       # heat capacity at const-p [J K-1 mol-1]
         layer_grav::Array     # gravity [m s-2]
-        layer_z::Array        # height [m]
 
         # Calculated fluxes (W m-2)
         flux_d_lw::Array  # down component, lw 
@@ -127,7 +129,8 @@ module atmosphere
     - `toa_heating::Float64`            downward shortwave flux at the top of the atmosphere [W m-2].
     - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
-    - `nlev_centre::Int`              number of cells.
+    - `radius::Float64`                 planet radius at the surface [m]
+    - `nlev_centre::Int`                number of cells.
     - `p_surf::Float64`                 total surface pressure [bar].
     - `p_top::Float64`                  total top of atmosphere pressure [bar].
     - `mixing_ratios::Dict`             dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
@@ -144,7 +147,8 @@ module atmosphere
                     ROOT_DIR::String, OUT_DIR::String, 
                     spfile_name::String, 
                     toa_heating::Float64, tstar::Float64,
-                    gravity::Float64, nlev_centre::Int, p_surf::Float64, p_top::Float64,
+                    gravity::Float64, radius::Float64,
+                    nlev_centre::Int, p_surf::Float64, p_top::Float64,
                     mixing_ratios::Dict;
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
@@ -192,6 +196,7 @@ module atmosphere
 
         atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
         atmos.p_boa =           p_surf * 1.0e+5
+        atmos.rp =              max(1.0, radius)
 
         atmos.control.l_gas =       true
         atmos.control.l_rayleigh =  flag_rayleigh
@@ -262,14 +267,6 @@ module atmosphere
             error(" atmosphere parameters have not been set")
         end
 
-        # Gravity (TODO: Make height-dependent)
-        atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
-
-        # Mass
-        for i in 1:atmos.atm.n_layer
-            atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
-        end
-
         # mmw, cp, rho
         atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
         atmos.layer_density = zeros(Float64, atmos.nlev_c)
@@ -291,8 +288,33 @@ module atmosphere
             atmos.atm.density[1,i] = atmos.layer_density[i]
         end
 
-        # height 
-        atmos.layer_z = zeros(Float64, atmos.nlev_c)
+        # geometrical height and gravity
+        # dz = -dp / (rho * g)
+        atmos.z          = zeros(Float64, atmos.nlev_c)
+        atmos.zl         = zeros(Float64, atmos.nlev_l)
+        atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
+        for i in range(atmos.nlev_c, 1, step=-1)
+
+            g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
+            atmos.layer_grav[i] = g
+
+            mu_g = atmos.layer_mmw[i] * g  # technically, g and z should be integrated as coupled equations
+
+            dzc = phys.R_gas * atmos.tmp[i] * log(atmos.pl[i+1]/atmos.p[i]) / mu_g
+            atmos.z[i] = atmos.zl[i+1] + dzc
+
+            dzl = phys.R_gas * atmos.tmp[i] * log(atmos.p[i]/atmos.pl[i]) / mu_g
+            atmos.zl[i] = atmos.z[i] + dzl
+
+            if (dzl < 1e-20) || (dzc < 1e-20)
+                error("Height integration resulted in dz <= 0")
+            end
+        end 
+
+        # Mass
+        for i in 1:atmos.atm.n_layer
+            atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
+        end
 
     end 
 
@@ -884,6 +906,13 @@ module atmosphere
     # Write atmosphere data to a NetCDF file
     function write_ncdf!(atmos::atmosphere.Atmos_t, fname::String)
 
+        # See the tutorial at:
+        # https://github.com/Alexander-Barth/NCDatasets.jl#create-a-netcdf-file
+
+        # Note that the content of the NetCDF file is designed to be compatible
+        # with what AEOLUS writes. As a result, they can both be integrated 
+        # into PROTEUS without compatibility issues.
+
         # Create dataset handle
         fname = abspath(fname)
         rm(fname, force=true)
@@ -923,6 +952,7 @@ module atmosphere
         var_tmp =       defVar(ds, "tmp",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "K"))
         var_tmpl =      defVar(ds, "tmpl",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "K"))
         var_z =         defVar(ds, "z",      Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
+        var_zl =        defVar(ds, "zl",     Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
         var_grav =      defVar(ds, "gravity",Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
         var_mmw =       defVar(ds, "mmw",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
         var_gases =     defVar(ds, "gases",  Char,    ("nchars", "ngases")) # Transposed cf AEOLUS because of how Julia stores arrays
@@ -943,7 +973,8 @@ module atmosphere
         var_pl[:] =     atmos.pl
         var_tmp[:] =    atmos.tmp
         var_tmpl[:] =   atmos.tmpl
-        var_z[:]    =   atmos.layer_z
+        var_z[:]    =   atmos.z
+        var_zl[:]   =   atmos.zl
         var_mmw[:]  =   atmos.layer_mmw
         var_grav[:]  =  atmos.layer_grav
 
