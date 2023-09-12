@@ -4,10 +4,6 @@
 # AGNI executable file with command line arguments
 # -------------
 
-println("AGNI CLI")
-
-tbegin = time()
-
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
 
@@ -48,12 +44,18 @@ s = ArgParseSettings()
         help = "Mixing ratios of volatiles formatted as a dictionary e.g. \"H2O=0.8,H2=0.2\" "
         arg_type = String 
         required = true
-    "--loadcsv"
+    "--load_csv"
         help = "Path to a CSV file containing a T(p) profile to load. Columns of file should be [Pa, K]"
         arg_type = String 
         default = ""
-    "--trppt"
+    "--ini_dry"
         help = "Initialise on a dry adiabat, with an isothermal stratosphere at this temperature."
+        action = :store_true
+    "--ini_sat"
+        help = "Check each level for saturation and set to the saturation coexistance curve when T < T_dew."
+        action = :store_true
+    "--trppt"
+        help = "Apply an isothermal stratosphere at this temperature."
         arg_type = Float64
         default = trppt_default
     "--surface"
@@ -82,9 +84,6 @@ s = ArgParseSettings()
         help = "Spectral file path. Default is Mallard."
         arg_type = String
         default = "res/spectral_files/Mallard/Mallard"
-    "--spf_keep"
-        help = "Keep runtime spectral file."
-        action = :store_true
     "--stf"
         help = "Path to stellar spectrum txt file. If not provided, spectral file is assumed to already include it."
         arg_type = String
@@ -127,9 +126,11 @@ spfile_name     = args["spf"]
 output_dir      = args["output"]
 oneshot         = args["once"]
 plot            = args["plot"]
-csv_path        = args["loadcsv"]
+csv_path        = args["load_csv"]
 albedo_s        = args["albedo_s"]
 zenith_degrees  = args["zenith_degrees"]
+ini_dry         = args["ini_dry"]
+ini_sat         = args["ini_sat"]
 trppt           = args["trppt"]
 star_file       = args["stf"]
 rscatter        = args["rscatter"]
@@ -147,7 +148,6 @@ if verbose
 end
 
 spfile_has_star = (star_file == "")
-spfile_noremove = args["spf_keep"]
 
 # Parse the provided mr dict 
 mixing_ratios = Dict()
@@ -191,26 +191,30 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          )
 atmosphere.allocate!(atmos; 
                         spfile_has_star=spfile_has_star, 
-                        stellar_spectrum=star_file, 
-                        spfile_noremove=spfile_noremove
+                        stellar_spectrum=star_file
                         )
 
 # Set PT profile 
+#    Load CSV if required
 if !(csv_path == "")
     setpt.fromcsv!(atmos, abspath(csv_path))
 end 
+#    Prevent surface supersaturation
 setpt.prevent_surfsupersat!(atmos)
-if trppt > trppt_default+1e-9
+#    Apply dry adiabat if required
+if ini_dry
     setpt.dry_adiabat!(atmos)
+end 
+#    Apply stratosphere if required
+if trppt > trppt_default+1e-9
     setpt.stratosphere!(atmos, trppt)
 end
-
-# Remove old files 
-if abspath(output_dir) == abspath(ROOT_DIR)
-    error("Output directory cannot be the root directory")
-end
-rm(output_dir,force=true,recursive=true)
-mkdir(output_dir)
+#    Apply saturation curves if required 
+if ini_sat
+    for gas in atmos.gases 
+        setpt.condensing!(atmos, gas)
+    end 
+end 
 
 # Just once or iterate?
 if oneshot
@@ -231,11 +235,11 @@ else
 end
 
 # Write NetCDF file 
-atmosphere.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
+atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 
 # Write final PT profile and final fluxes 
-atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt.csv"))
-atmosphere.write_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.csv"))
+atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
+atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Final plots 
 if animate && !oneshot
@@ -250,8 +254,3 @@ end
 
 # Deallocate atmosphere
 atmosphere.deallocate!(atmos)
-
-# Done
-runtime = round(time() - tbegin, digits=2)
-println("Runtime: $runtime seconds")
-println("Goodbye")

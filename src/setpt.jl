@@ -101,7 +101,7 @@ module setpt
         atmos.tmp[:] .= itp.(atmos.p[:])
     end
 
-    # Set atmosphere to be isothermal
+    # Set atmosphere to be isothermal at the given temperature
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
         if !atmos.is_param
             error("Atmosphere parameters not set")
@@ -114,7 +114,7 @@ module setpt
     function dry_adiabat!(atmos::atmosphere.Atmos_t)
         # Validate input
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup")
+            error("Atmosphere is not setup or allocated")
         end 
 
         # Calculate cell-centre values
@@ -163,7 +163,7 @@ module setpt
     # Ensure that the surface isn't supersaturated
     function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup")
+            error("Atmosphere is not setup or allocated")
         end 
 
         # For each condensible volatile
@@ -176,11 +176,16 @@ module setpt
 
             # Check surface pressure (should not be supersaturated)
             psat = phys.calc_Psat(gas, atmos.tmpl[end])
-            Tsat = phys.calc_Tdew(gas, atmos.p_boa)
+            Tsat = phys.calc_Tdew(gas, atmos.p_boa*mr)
             if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_safe("T_crit",gas))
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-mr) + psat
                 atmos.layer_mr[atmos.nlev_c, i_gas] = psat / atmos.p_boa  
+
+                # Check that p_boa is still reasonable 
+                if atmos.p_boa <= 10.0 * atmos.p_toa 
+                    error("Supersaturation check ($gas) resulted in an unreasonably small surface pressure")
+                end 
 
                 # Renormalise mixing ratios
                 norm_factor = sum(atmos.layer_mr[atmos.nlev_c, :])
@@ -190,35 +195,40 @@ module setpt
 
                 # Generate new pressure grid 
                 atmosphere.generate_pgrid!(atmos)
-
-                # Inform user
-                println("Atmosphere: Supersaturated surface - setting partial pressure to saturation pressure")
             end
         end 
     end
 
 
-    # Set atmosphere to phase curve of 'con' when it enters the condensible region
+    # Set atmosphere to phase curve of 'con' when it enters the condensible region (does not modify T_surf)
     function condensing!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup")
+            error("Atmosphere is not setup or allocated")
         end 
 
         if phys.lookup_safe("L_vap",gas) < 1e-20
             return
         end
+        
+        i_gas = findfirst(==(gas), atmos.gases)
 
         # Check if each level is condensing. If it is, place on phase curve
         for i in 1:atmos.nlev_c
+
+            mr = atmos.layer_mr[i,i_gas]
+            if mr < 1.0e-10 
+                continue
+            end
+
             # Cell centre
-            Tsat = phys.calc_Tdew(gas,atmos.p[i])
+            Tsat = phys.calc_Tdew(gas,atmos.p[i] * mr )
             if atmos.tmp[i] < Tsat
                 atmos.tmp[i] = Tsat
             end
                 
             # Cell edge
-            Tsat = phys.calc_Tdew(gas,atmos.pl[i])
+            Tsat = phys.calc_Tdew(gas,atmos.pl[i] * mr )
             if atmos.tmpl[i] < Tsat
                 atmos.tmpl[i] = Tsat
             end
