@@ -152,6 +152,7 @@ module atmosphere
                     mixing_ratios::Dict;
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
+                    T_floor::Float64 =          10.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -170,13 +171,13 @@ module atmosphere
         atmos.radout =      SOCRATES.StrOut()
 
         # Set parameters
-        atmos.ROOT_DIR = abspath(ROOT_DIR)
-        atmos.OUT_DIR = abspath(OUT_DIR)
+        atmos.ROOT_DIR =        abspath(ROOT_DIR)
+        atmos.OUT_DIR =         abspath(OUT_DIR)
 
-        atmos.spectral_file =  abspath(spfile)
-        atmos.all_channels =   all_channels
+        atmos.spectral_file =   abspath(spfile)
+        atmos.all_channels =    all_channels
 
-        atmos.T_floor =          5.0 
+        atmos.T_floor =         T_floor
 
         atmos.nlev_c         =  max(nlev_centre,10)
         atmos.nlev_l         =  nlev_centre + 1
