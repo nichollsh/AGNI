@@ -4,6 +4,7 @@
 # AGNI executable file for standalone execution
 # -------------
 
+tbegin = time()
 println("Begin AGNI")
 
 # Get AGNI root directory
@@ -42,9 +43,10 @@ spfile_name   = "res/spectral_files/Mallard/Mallard"
 star_file     = "res/stellar_spectra/trappist-1.txt"
 output_dir    = "out/"
 
-# Create output direct
-# rm(output_dir,force=true,recursive=true)
-# mkdir(output_dir)
+# Create output directory
+if !isdir(output_dir) && !isfile(output_dir)
+    mkdir(output_dir)
+end
 
 # Setup atmosphere
 println("Atmosphere: setting up")
@@ -90,4 +92,6 @@ plotting.anim_solver(atmos)
 println("Atmosphere: deallocating arrays")
 atmosphere.deallocate!(atmos)
 
+runtime = round(time() - tbegin, digits=2)
+println("Runtime: $runtime seconds")
 println("Goodbye")
