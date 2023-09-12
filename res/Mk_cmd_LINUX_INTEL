@@ -1,8 +1,8 @@
 #
 # Pathnames for AOPP Cluster
 # 
-FORTCOMP        = gfortran -Ofast -c
-LINK            = gfortran -Ofast
+FORTCOMP        = gfortran -O3 -c
+LINK            = gfortran -O3 
 LIBLINK         = ar rvu
 INCCDF_PATH     = /usr/include/
 LIBCDF_PATH     = /usr/lib/

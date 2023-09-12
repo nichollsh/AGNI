@@ -36,6 +36,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 - `$ cd socrates`
 - `$ cp ../res/Mk_cmd_PLAT ./make/Mk_cmd` where PLAT is your platform
 - `$ ./build_code`
+- `$ source set_rad_env`
 - `$ cd julia`
 - `$ julia`
 - `julia> ]`
