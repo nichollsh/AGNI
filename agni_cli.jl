@@ -231,7 +231,7 @@ else
 end
 
 # Write NetCDF file 
-atmosphere.write_ncdf!(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
+atmosphere.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
 
 # Write final PT profile and final fluxes 
 atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt.csv"))
