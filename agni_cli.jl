@@ -156,6 +156,11 @@ if verbose
     println("")
 end
 
+# Create output directory
+if !isdir(output_dir) && !isfile(output_dir)
+    mkdir(output_dir)
+end
+
 spfile_has_star = (star_file == "")
 
 # Parse the provided mr dict 
