@@ -24,7 +24,7 @@ import phys
 
 
 # Configuration options
-tstar           = 2740.0    # LW uflux bottom boundary condition [kelvin]
+tstar           = 1740.0    # LW uflux bottom boundary condition [kelvin]
 toa_heating     = 4.391e+04 # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
@@ -70,18 +70,18 @@ setpt.dry_adiabat!(atmos)
 setpt.stratosphere!(atmos, 300.0)
 
 # Calculate LW and SW fluxes (once)
-println("RadTrans: calculating fluxes")
-atmosphere.radtrans!(atmos, true)
-atmosphere.radtrans!(atmos, false)
+# println("RadTrans: calculating fluxes")
+# atmosphere.radtrans!(atmos, true)
+# atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-# solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=false, max_steps=500)
+println("RadTrans: starting solver")
+solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=500)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,   joinpath(atmos.OUT_DIR,"atm.nc"))
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
 atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
-
 
 # Save plots
 plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
