@@ -92,6 +92,13 @@ s = ArgParseSettings()
         help = "Number of model levels."
         arg_type = Int
         default = 100
+    "--nsteps"
+        help = "Number of solver steps (max)."
+        arg_type = Int
+        default = 250
+    "--noaccel"
+        help = "Disable model acceleration."
+        action = :store_true
     "--rscatter"
         help = "Include rayleigh scattering."
         action = :store_true
@@ -137,7 +144,9 @@ rscatter        = args["rscatter"]
 verbose         = args["verbose"]
 animate         = args["animate"]
 surf_state      = args["surface"]
+max_steps       = args["nsteps"]
 no_adjust       = args["noadjust"]
+no_accel        = args["noaccel"]
 
 if verbose 
     println("Command line arguments:")
@@ -231,7 +240,11 @@ else
         error("Invalid surface state '$surf_state'")
     end
     import solver
-    solver.solve_energy!(atmos, modplot=modplot, verbose=verbose, surf_state=surf_state, dry_adjust=!no_adjust)
+    solver.solve_energy!(atmos, 
+                         modplot=modplot, verbose=verbose, 
+                         surf_state=surf_state, dry_adjust=!no_adjust, 
+                         max_steps=max_steps, gofast=!no_accel, extrap=!no_accel
+                         )
 end
 
 # Write NetCDF file 
