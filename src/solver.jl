@@ -28,10 +28,11 @@ module solver
 
         # Downward pass
         for i in 1:atmos.nlev_c-1
-            T1 = atmos.tmp[i]
+
+            T1 = atmos.tmp[i]    # upper layer
             p1 = atmos.p[i]
 
-            T2 = atmos.tmp[i+1]
+            T2 = atmos.tmp[i+1]  # lower layer
             p2 = atmos.p[i+1]
             
             pfact = (p1/p2)^(phys.R_gas / atmos.layer_cp[i])
@@ -254,29 +255,30 @@ module solver
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 3.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
-        H_rchng_conv = 1.0    # Maximum relative change in H_stat for convergence [%]
+        drel_dt_conv = 2.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
+        drel_F_conv  = 1.0    # Maximum relative change in F_TOA_rad for convergence [%]
         
         if verbose
             @printf("    convergence criteria       \n")
             @printf("    dtmp_comp   < %.3f K       \n", dtmp_conv)
             @printf("    dtmp/tmp/dt < %.3f K day-1 \n", drel_dt_conv)
-            @printf("    H_rchng     < %.3f %%      \n", H_rchng_conv)
+            @printf("    drel_F_conv < %.3f %%      \n", drel_F_conv)
             @printf(" \n")
         end
 
         # Validate inputs
-        wait_adj = max(min(wait_adj, max_steps-2), 1)
-        len_hist = max(min(len_hist, max_steps-1), 5)
-        modprint = max(modprint, 0)
-
+        max_steps = max(10,max_steps)
+        wait_adj  = max(min(wait_adj, max_steps-2), 1)
+        len_hist  = max(min(len_hist, max_steps-1), 5)
+        modprint  = max(modprint, 0)
+        
         # Tracking
         adj_changed = 0
         F_loss = 1.0e99         # Flux loss (TOA vs BOA)
         H_stat = 1.0e99         # Heating rate statistic
-        H_stat_prev = 1.0e99    # Previous ^
-        H_rchng = Inf
         F_TOA_rad = 1.0e99      # Net upward TOA radiative flux
+        F_TOA_pre = 1.0e99      # Previous ^
+        F_TOA_rel = 1.0e99      # Relative change in ^
         F_BOA_rad = 0.0         # Net upward BOA radiative flux
         F_OLR_rad = 0.0         # Longwave upward TOA radiative flux
         dtmp_comp = Inf         # Temperature change comparison
@@ -291,6 +293,7 @@ module solver
         success = false         # Convergence criteria met
         step = 1                # Current step number
         flag_prev = false       # Previous iteration is meeting convergence
+        flag_this = false       # Current iteration is meeting convergence
         stopfast = false        # stop fast period this iter
         step_stopfast = 1       # step at which fast period was steopped
 
@@ -339,8 +342,8 @@ module solver
                     @printf("    step %d (fast) \n", step)
                 end
                 dtmp_clip = 100.0
-                dryadj_steps = 40
-                h2oadj_steps = 40
+                dryadj_steps = 20
+                h2oadj_steps = 20
                 dt_min = 1e1
                 dt_max = 1e5
                 smooth_window = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
@@ -351,8 +354,8 @@ module solver
                     @printf("    step %d \n", step)
                 end
                 dtmp_clip = 50.0
-                dryadj_steps = 20
-                h2oadj_steps = 20
+                dryadj_steps = 40
+                h2oadj_steps = 40
                 dt_min = 1e-4
                 dt_max = 10
                 smooth_window = 0
@@ -433,7 +436,7 @@ module solver
                                             dryadj_steps, h2oadj_steps)
 
             # Extrapolate forward in time (at higher pressures, when appropriate) 
-            ex_lookback     = 4
+            ex_lookback     = 3
             ex_lookback     = max(len_hist-1, ex_lookback)
             ex_dtmp_clip    = ex_lookback * dtmp_clip
             if !gofast && extrap && (step_stopfast+ex_lookback+1 < step < 0.95*max_steps) && ( mod(step,ex_lookback+1) == 0)
@@ -462,29 +465,29 @@ module solver
             end 
 
             # Calculate the (change in) flux balance
-            F_TOA_rad = atmos.flux_n[1]
-            F_BOA_rad = atmos.flux_n[end-1]
-            
-            F_OLR_rad = atmos.flux_u_lw[1]
 
+            F_TOA_pre = F_TOA_rad 
+            F_TOA_rad = atmos.flux_n[1]
+            F_TOA_rel = abs((F_TOA_rad-F_TOA_pre)/F_TOA_pre)*100.0
+
+            F_BOA_rad = atmos.flux_n[end-1]
+            F_OLR_rad = atmos.flux_u_lw[1]
             F_loss      = abs(F_TOA_rad-F_BOA_rad)
 
             # Calculate the relative change in heating rate
-            H_stat_prev = H_stat
             H_stat      = quantile(abs.(atmos.heating_rate[:]), 0.6)
-            H_rchng     = (H_stat - H_stat_prev) / H_stat_prev * 100.0
 
             # Print debug info to stdout
             if verbose
                 @printf("    count_adj   = %d layers   \n", adj_changed)
                 @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
                 @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
-                @printf("    F_rad^OLR   = %.2e W m-2  \n", F_OLR_rad)
+                @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
                 @printf("    F_rad^TOA   = %.2e W m-2  \n", F_TOA_rad)
                 @printf("    F_rad^BOA   = %.2e W m-2  \n", F_BOA_rad)
+                @printf("    F_rad^OLR   = %.2e W m-2  \n", F_OLR_rad)
                 @printf("    F_rad^loss  = %.2f W m-2  \n", F_loss)
-                @printf("    H_stat      = %.4f K day-1\n", H_stat)
-                @printf("    H_rchng     = %.4f %%     \n", H_rchng)
+                @printf("    HR_typical  = %.4f K day-1\n", H_stat)
                 @printf("\n")
             end
 
@@ -506,12 +509,12 @@ module solver
             # - minimal rate of temperature change for two iters
             # - minimal change to net radiative flux at TOA for two iters
             # - solver is not in 'fast' mode, as it is unphysical
-            flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( -H_rchng_conv < H_rchng < 0)
-            success   = flag_this && flag_prev
             flag_prev = flag_this
+            flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv)
+            success   = flag_this && flag_prev && !gofast && !stopfast
             
             # Prepare for next iter
-            sleep(1e-4)
+            sleep(1e-6)
             atexit(exit)
             step += 1
 
@@ -522,7 +525,7 @@ module solver
             @printf("RCSolver: Stopping atmosphere iterations before convergence \n")
             @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
             @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
-            @printf("    H_rchng     = %.4f %%     \n", H_rchng)
+            @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
             @printf("\n")
 
         else
