@@ -71,12 +71,12 @@ setpt.stratosphere!(atmos, 300.0)
 
 # Calculate LW and SW fluxes (once)
 # println("RadTrans: calculating fluxes")
-# atmosphere.radtrans!(atmos, true)
-# atmosphere.radtrans!(atmos, false)
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
 
 # Call solver 
 println("RadTrans: starting solver")
-solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=500)
+# solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=500)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,   joinpath(atmos.OUT_DIR,"atm.nc"))
