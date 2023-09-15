@@ -255,7 +255,7 @@ module solver
 
         # Convergence criteria
         dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 2.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
+        drel_dt_conv = 1.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
         drel_F_conv  = 0.5    # Maximum relative change in F_TOA_rad for convergence [%]
         
         if verbose
