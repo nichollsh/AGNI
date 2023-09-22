@@ -104,11 +104,6 @@ module solver
                 atmos.tmp[i] = Tdew
             end
         end
-    
-        # Change in temperature is Tmid_cc - Tmid
-        dT_conv[:] = (Tmid_cc[:] - atm.tmp[:])/conv_timescale
-        return dT_conv
-    
     end
 
     # Calculate heating rates at cell-centres
@@ -235,6 +230,7 @@ module solver
     - `gofast::Bool=true`               enable accelerated fast period at the start 
     - `extrap::Bool=true`               enable extrapolation forward in time 
     - `max_steps::Int=300`              maximum number of solver steps
+    - `min_steps::Int=20`              minimum number of solver steps
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=0,
@@ -242,7 +238,7 @@ module solver
                             sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
                             gofast::Bool=true, extrap::Bool=true,
-                            max_steps::Int=300)
+                            max_steps::Int=300, min_steps::Int=20)
 
 
         println("RCSolver: begin")
@@ -268,6 +264,7 @@ module solver
 
         # Validate inputs
         max_steps = max(10,max_steps)
+        min_steps = min(max(min_steps,wait_adj), max_steps-1)
         wait_adj  = max(min(wait_adj, max_steps-2), 1)
         len_hist  = max(min(len_hist, max_steps-1), 5)
         modprint  = max(modprint, 0)
@@ -291,7 +288,7 @@ module solver
 
         # Variables
         success = false         # Convergence criteria met
-        step = 1                # Current step number
+        step = 0                # Current step number
         flag_prev = false       # Previous iteration is meeting convergence
         flag_this = false       # Current iteration is meeting convergence
         stopfast = false        # stop fast period this iter
@@ -320,6 +317,7 @@ module solver
 
         # Main loop
         while (!success) && (step <= max_steps)
+            step += 1
 
             # Validate arrays
             if !(all(isfinite, atmos.tmp) && all(isfinite, atmos.tmpl))
@@ -511,12 +509,11 @@ module solver
             # - solver is not in 'fast' mode, as it is unphysical
             flag_prev = flag_this
             flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv)
-            success   = flag_this && flag_prev && !gofast && !stopfast
+            success   = flag_this && flag_prev && !gofast && !stopfast && (step > min_steps)
             
             # Prepare for next iter
-            sleep(1e-6)
+            sleep(1e-5)
             atexit(exit)
-            step += 1
 
         end # end main loop
 
