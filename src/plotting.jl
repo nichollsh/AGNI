@@ -183,9 +183,9 @@ module plotting
 
         # Sensible heat
         if atmos.flux_sens > 0
-            scatter!(plt, [atmos.flux_sens], [arr_P[end]], markershape=:utriangle, markercolor=col_u, label="SENS")
+            scatter!(plt, [atmos.flux_sens],      [arr_P[end]], markershape=:utriangle, markercolor=col_u, label="SENS")
         else
-            scatter!(plt, [abs(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_d, label="SENS")
+            scatter!(plt, [abs(atmos.flux_sens)], [arr_P[end]], markershape=:dtriangle, markercolor=col_d, label="SENS")
         end 
 
         xlims  = (1e-1, max_fl * 1.5)

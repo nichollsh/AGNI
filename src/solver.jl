@@ -118,10 +118,10 @@ module solver
         end 
 
         if sens
-            C_d = 0.001  # Turbulent exchange coefficient [dimensionless]
-            U = 10.0     # Wind speed [m s-1]
-            sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * C_d * U * (atmos.tstar - atmos.tmpl[end])
-            dF[end] += sens
+            # sensible heat flux 
+            # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
+            atmos.flux_sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
+            dF[end]   += atmos.flux_sens
         end
 
         atmos.heating_rate[:] .= 0.0
@@ -221,7 +221,9 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: T_surf
     - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: T_surf | 2: tstar
+    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: T_surf
     - `dry_adjust::Bool=true`           enable dry convective adjustment
     - `h2o_adjust::Bool=false`          enable naive steam convective adjustment
     - `sens_heat::Bool=true`            include sensible heating 
@@ -382,7 +384,9 @@ module solver
 
             # Calc heating rates 
             heat_prev[:] .= atmos.heating_rate[:]
+            calc_heat!(atmos, sens_heat)
             calc_heat!(atmos, sens_heat && !fixed_bottom)
+            calc_heat!(atmos, sens_heat)
 
             # Calc step size
             H_small = 1.0 
