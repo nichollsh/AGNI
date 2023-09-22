@@ -2,6 +2,8 @@
 .spfile_runtime
 .spfile_runtime_k
 .star_file
+*.mod
+*.o
 
 # Output files 
 out/*

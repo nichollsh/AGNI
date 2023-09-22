@@ -79,7 +79,7 @@ module atmosphere
         layer_cp::Array       # heat capacity at const-p [J K-1 mol-1]
         layer_grav::Array     # gravity [m s-2]
 
-        # Calculated fluxes (W m-2)
+        # Calculated radiative fluxes (W m-2)
         flux_d_lw::Array  # down component, lw 
         flux_u_lw::Array  # up component, lw
         flux_n_lw::Array  # net upward, lw
@@ -91,6 +91,11 @@ module atmosphere
         flux_d::Array    # down component, lw+sw 
         flux_u::Array    # up component, lw+sw 
         flux_n::Array    # net upward, lw+sw 
+        
+        # Sensible heating
+        C_d::Float64        # Turbulent exchange coefficient [dimensionless]
+        U::Float64          # Wind speed [m s-1]
+        flux_sens::Float64  # Turbulent flux
 
         # Heating rate 
         heating_rate::Array # radiative heating rate [K/day]
@@ -136,6 +141,8 @@ module atmosphere
     - `mixing_ratios::Dict`             dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
     - `zenith_degrees::Float64=54.74`   angle of radiation from the star, relative to the zenith [degrees].
     - `albedo_s::Float64=0.0`           surface albedo.
+    - `C_d::Float64=0.001`              turbulent heat exchange coefficient [dimensionless].
+    - `U::Float64=10.0`                 surface wind speed [m s-1].
     - `all_channels::Bool=true`         use all channels available for RT?
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
@@ -153,6 +160,8 @@ module atmosphere
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
                     T_floor::Float64 =          10.0,
+                    C_d::Float64 =              0.001,
+                    U::Float64 =                10.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -186,6 +195,9 @@ module atmosphere
         atmos.toa_heating =     max(toa_heating, 0.0)
         atmos.tstar =           max(tstar, atmos.T_floor)
         atmos.grav_surf =       gravity
+
+        atmos.C_d =             max(0,C_d)
+        atmos.U =               max(0,U)
 
         if p_top > p_surf 
             error("p_top must be less than p_surf")
@@ -611,7 +623,7 @@ module atmosphere
             for i_gas in 1:length(atmos.gases)
                 lvl_tot += atmos.layer_mr[i,i_gas]
             end 
-            missing_gases = missing_gases || (lvl_tot < 1.0)
+            missing_gases = missing_gases || (lvl_tot < 1.0-1.0e-50)
         end 
         if missing_gases
             println("WARNING: mixing ratios do not sum to unity (possibly due to missing gases in spectral file)")
@@ -671,6 +683,8 @@ module atmosphere
         atmos.flux_d =            zeros(Float64, atmos.nlev_l)
         atmos.flux_u =            zeros(Float64, atmos.nlev_l)
         atmos.flux_n =            zeros(Float64, atmos.nlev_l)
+
+        atmos.flux_sens =         0.0
 
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
@@ -768,24 +782,8 @@ module atmosphere
         end
 
         ####################################################
-        # Surface temperatures
+        # Temperature
         ####################################################
-
-        if lw
-            atmos.bound.t_ground[1] = atmos.tstar
-        end
-
-        #####################################################
-        # Variation of the temperature within layers
-        ####################################################
-
-        if lw
-            atmos.control.l_ir_source_quad = true
-        end
-
-        ######################################################
-        # Run radiative transfer model
-        ######################################################
 
         clamp!(atmos.tmp, atmos.T_floor, Inf)
         clamp!(atmos.tmpl, atmos.T_floor, Inf)
@@ -794,6 +792,20 @@ module atmosphere
         atmos.atm.t[1, :] .= atmos.tmp[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
+
+        atmos.tstar = atmos.tmpl[end]
+
+        if lw
+            atmos.bound.t_ground[1] = atmos.tstar
+        end
+
+        if lw
+            atmos.control.l_ir_source_quad = true
+        end
+
+        ######################################################
+        # Run radiative transfer model
+        ######################################################        
 
         for i_gas in 1:length(atmos.gases)
             atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.layer_mr[:,i_gas]
