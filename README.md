@@ -1,5 +1,6 @@
 # AGNI
-Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer.    
+Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface).
+    
 Flux boundary conditions are kept constant, with the upward LW flux being set by `tstar` and the downward SW flux being set by `toa_heating`. The model is designed for integration into a coupled atmosphere-interior code, with surface boundary conditions set by an interior model, so it won't work well for cooler planets.    
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
@@ -11,11 +12,10 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * `out/`            - Output files
 * `res/`            - Resources
 * `src/`            - AGNI source code
-* `socrates/`       - Directory containing SOCRATES and associated files
-* `socrates/`       - Directory containing SOCRATES and associated files
+* `socrates/`       - Directory containing SOCRATES and associated files (subject to the license therein)
 * `agni.jl`         - AGNI executable for debugging
-* `agni_cli.jl`     - AGNI executable with CLI
-* `demo_steamrun.jl`- Demonstrate pure-steam runaway greenhouse effect
+* `agni_cli.jl`     - AGNI executable with command-line interface
+* `demo_steamrun.jl`- Script to demonstrate the pure-steam runaway greenhouse effect
 
 
 ### Requirements
