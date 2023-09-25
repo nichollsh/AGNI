@@ -68,9 +68,11 @@ module plotting
         # Create plot 1
         plt1 = plot(framestyle=:box, legend=:topright, ylims=ylims, yticks=yticks)
 
-        # Plot temperature
+        # Plot surface temperature(s)
         scatter!(plt1, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
         scatter!(plt1, [atmos.tstar],     [atmos.pl[end]*1e-5], color="brown3",         label=L"T_*") 
+        
+        # Plot temperature profiles 
         plot!(plt1, arr_T, arr_P, lc="black", lw=lw, label=L"T_n")
         if plot_hist 
             for i in range(len_hist-1,1,step=-1)
@@ -83,6 +85,26 @@ module plotting
             end 
         end
         
+        # Highlight recently adjusted regions 
+        region_new = true
+        for i in 1:atmos.nlev_c
+            if atmos.conv_idx[i] <= atmos.conv_thresh
+                if region_new
+                    region_new = false
+                    if length(region_T) > 0
+                        plot!(plt1, region_T, region_p*1e-5, color="orchid2", linealpha=0.4, lw=4*lw, label="")
+                    end
+                    region_p = []
+                    region_T = []
+                end 
+                push!(region_p, atmos.p[i])
+                push!(region_p, atmos.pl[i])
+                push!(region_T, atmos.tmp[i])
+                push!(region_T, atmos.tmpl[i])
+            else 
+                region_new = true
+            end
+        end 
 
         xlabel!(plt1, "Temperature [K]")
         ylabel!(plt1, "Pressure [bar]")
