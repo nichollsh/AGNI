@@ -24,8 +24,8 @@ import phys
 
 
 # Configuration options
-tstar           = 1740.0    # LW uflux bottom boundary condition [kelvin]
-toa_heating     = 4.391e+04 # SW dflux top boundary condition [W m-2]
+tstar           = 2000.0    # LW uflux bottom boundary condition [kelvin]
+toa_heating     = 4.0e+04   # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
 nlev_centre     = 100  
@@ -60,7 +60,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mixing_ratios,
                          flag_gcontinuum=true,
                          flag_rayleigh=false
-                         )
+                 )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
@@ -77,7 +77,7 @@ println("Atmosphere: setting initial T(p)")
 
 # Call solver 
 println("RadTrans: starting solver")
-solver.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, dry_adjust=true, h2o_adjust=false, max_steps=500, min_steps=20)
+solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=500, min_steps=20)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,   joinpath(atmos.OUT_DIR,"atm.nc"))

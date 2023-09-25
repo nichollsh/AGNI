@@ -1,5 +1,6 @@
 # Contains the atmosphere module, which contains all of the core code 
-# for setting-up the atmosphere and running SOCRATES
+# for setting-up the atmosphere and running SOCRATES. A lot of this code was 
+# adapted from the SOCRATES-Julia examples.
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
@@ -51,22 +52,27 @@ module atmosphere
         tstar::Float64 
         grav_surf::Float64
 
-        # Pressure-temperature grid 
-        nlev_c::Int  # Cell centre (count)
-        nlev_l::Int  # Cell edge (count)
+        # Pressure-temperature grid (with i=1 at the top of the model)
+        nlev_c::Int         # Cell centre (count)
+        nlev_l::Int         # Cell edge (count)
 
-        p_boa::Float64 # bottom 
-        p_toa::Float64 # top 
-        rp::Float64 # planet radius [m]
+        p_boa::Float64      # Pressure at bottom [Pa]
+        p_toa::Float64      # Pressure at top [Pa]
+        rp::Float64         # planet radius [m]
 
-        tmp::Array      
-        tmpl::Array     
-        p::Array        
-        pl::Array      
-        z::Array 
-        zl::Array 
+        tmp::Array          # cc temperature [K]
+        tmpl::Array         # ce temperature
+        p::Array            # cc pressure 
+        pl::Array           # ce pressure
+        z::Array            # cc height 
+        zl::Array           # ce height 
 
-        T_floor::Float64        # Temperature floor [K]
+        tmp_floor::Float64  # Temperature floor to prevent numerics [K]
+
+        # Conductive boundary layer 
+        lid_d::Float64      # Lid thickness [m]
+        lid_k::Float64      # Lid thermal conductivity [W m-1 K-1]
+        tmp_magma::Float64  # Mantle temperature [K]
 
         # Mixing ratios 
         mr_input::Dict     # Dictonary with scalar quantities (well-mixed)
@@ -141,8 +147,12 @@ module atmosphere
     - `mixing_ratios::Dict`             dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
     - `zenith_degrees::Float64=54.74`   angle of radiation from the star, relative to the zenith [degrees].
     - `albedo_s::Float64=0.0`           surface albedo.
+    - `tmp_floor::Float64=10.0`         temperature floor [K].
     - `C_d::Float64=0.001`              turbulent heat exchange coefficient [dimensionless].
     - `U::Float64=10.0`                 surface wind speed [m s-1].
+    - `tmp_magma::Float64=3000.0`       mantle temperature [K].
+    - `lid_d::Float64=0.5`              lid thickness [m].
+    - `lid_k::Float64=2.0`              lid thermal conductivity [W m-1 K-1].
     - `all_channels::Bool=true`         use all channels available for RT?
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
@@ -159,9 +169,12 @@ module atmosphere
                     mixing_ratios::Dict;
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
-                    T_floor::Float64 =          10.0,
+                    tmp_floor::Float64 =        10.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                10.0,
+                    tmp_magma::Float64 =        3000.0,
+                    lid_d::Float64 =            0.5,
+                    lid_k::Float64 =            2.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -179,25 +192,29 @@ module atmosphere
         atmos.bound =       SOCRATES.StrBound()
         atmos.radout =      SOCRATES.StrOut()
 
-        # Set parameters
+        # Set the parameters (and make sure that they're reasonable)
         atmos.ROOT_DIR =        abspath(ROOT_DIR)
         atmos.OUT_DIR =         abspath(OUT_DIR)
 
         atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
 
-        atmos.T_floor =         T_floor
+        atmos.tmp_floor =       max(0.1,tmp_floor)
 
         atmos.nlev_c         =  max(nlev_centre,10)
-        atmos.nlev_l         =  nlev_centre + 1
+        atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.0)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.toa_heating =     max(toa_heating, 0.0)
-        atmos.tstar =           max(tstar, atmos.T_floor)
-        atmos.grav_surf =       gravity
+        atmos.tstar =           max(tstar, atmos.tmp_floor)
+        atmos.grav_surf =       max(1.0e-3, gravity)
 
         atmos.C_d =             max(0,C_d)
         atmos.U =               max(0,U)
+
+        atmos.tmp_magma =       max(atmos.tmp_floor, tmp_magma)
+        atmos.lid_d =           max(1.0e-6,lid_d)
+        atmos.lid_k =           max(1.0e-6,lid_k)
 
         if p_top > p_surf 
             error("p_top must be less than p_surf")
@@ -785,8 +802,8 @@ module atmosphere
         # Temperature
         ####################################################
 
-        clamp!(atmos.tmp, atmos.T_floor, Inf)
-        clamp!(atmos.tmpl, atmos.T_floor, Inf)
+        clamp!(atmos.tmp, atmos.tmp_floor, Inf)
+        clamp!(atmos.tmpl, atmos.tmp_floor, Inf)
 
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.t[1, :] .= atmos.tmp[:]

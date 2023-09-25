@@ -69,7 +69,8 @@ module plotting
         plt1 = plot(framestyle=:box, legend=:topright, ylims=ylims, yticks=yticks)
 
         # Plot temperature
-        scatter!(plt1, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*") 
+        scatter!(plt1, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
+        scatter!(plt1, [atmos.tstar],     [atmos.pl[end]*1e-5], color="brown3",         label=L"T_*") 
         plot!(plt1, arr_T, arr_P, lc="black", lw=lw, label=L"T_n")
         if plot_hist 
             for i in range(len_hist-1,1,step=-1)
