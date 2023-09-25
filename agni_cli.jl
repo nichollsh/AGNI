@@ -59,7 +59,7 @@ s = ArgParseSettings()
         arg_type = Float64
         default = trppt_default
     "--surface"
-        help = "Surface state (0: free, 1: fixed at T(p_surf), 2: fixed at T_star)"
+        help = "Surface state (0: free, 1: fixed at T(p_surf), 2: conductive lid)"
         arg_type = Int
         default = 0
     "--albedo_s"

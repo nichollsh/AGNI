@@ -221,9 +221,7 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: T_surf
-    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: T_surf | 2: tstar
-    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: T_surf
+    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: fixed | 2: lid
     - `dry_adjust::Bool=true`           enable dry convective adjustment
     - `h2o_adjust::Bool=false`          enable naive steam convective adjustment
     - `sens_heat::Bool=true`            include sensible heating 
@@ -302,12 +300,14 @@ module solver
 
         # Handle surface boundary condition
         if surf_state == 0
-            fixed_bottom = false
+            fixed_bottom =  false
+            solve_lid =     false
         elseif surf_state == 1
-            fixed_bottom = true
+            fixed_bottom =  true
+            solve_lid =     false 
         elseif surf_state == 2
-            fixed_bottom = true
-            atmos.tmpl[end] = atmos.tstar
+            fixed_bottom =  true
+            solve_lid =     true 
         else
             error("Invalid surface state for radiative-convective solver")
         end
