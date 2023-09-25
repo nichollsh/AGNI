@@ -69,7 +69,7 @@ module atmosphere
 
         tmp_floor::Float64  # Temperature floor to prevent numerics [K]
 
-        # Conductive boundary layer 
+        # Conductive lid
         lid_d::Float64      # Lid thickness [m]
         lid_k::Float64      # Lid thermal conductivity [W m-1 K-1]
         tmp_magma::Float64  # Mantle temperature [K]
@@ -102,6 +102,10 @@ module atmosphere
         C_d::Float64        # Turbulent exchange coefficient [dimensionless]
         U::Float64          # Wind speed [m s-1]
         flux_sens::Float64  # Turbulent flux
+
+        # Convection flag tracker
+        conv_thresh::Int    # Threshold for what counts as recently adjusted
+        conv_idx::Array     # Number of steps previous that adjustment was performed 
 
         # Heating rate 
         heating_rate::Array # radiative heating rate [K/day]
@@ -169,7 +173,7 @@ module atmosphere
                     mixing_ratios::Dict;
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
-                    tmp_floor::Float64 =        10.0,
+                    tmp_floor::Float64 =        50.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                10.0,
                     tmp_magma::Float64 =        3000.0,
@@ -702,6 +706,9 @@ module atmosphere
         atmos.flux_n =            zeros(Float64, atmos.nlev_l)
 
         atmos.flux_sens =         0.0
+
+        atmos.conv_thresh =       2
+        atmos.conv_idx =          ones(Int,  atmos.nlev_c) * 1e9  # set to large value
 
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 

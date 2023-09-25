@@ -290,6 +290,8 @@ module solver
                     dtmp_clip *= 0.8
                 end
             end
+
+            adj_changed = 0
             
             # ----------------------------------------------------------
             # Get radiative fluxes (LW and SW)
@@ -354,15 +356,25 @@ module solver
             clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
             atmos.tmp += dtmp
 
-            adj_changed = 0
-
+            
             # Dry convective adjustment
             if dryadj_steps > 0 && dry_adjust && (step >= wait_adj)
                 tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
+
+                # do adjustment steps
                 for _ in 1:dryadj_steps
                     adjust_dry!(atmos)
                 end
-                adj_changed += count(x->x>0.0, tmp_before_adj - atmos.tmp) 
+                
+                # check which levels were changed
+                for i in 1:atmos.nlev_c
+                    if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
+                        atmos.conv_idx[i] = 0
+                        adj_changed += 1
+                    else 
+                        atmos.conv_idx[i] += 1
+                    end
+                end 
             end
 
             # H2O moist convective adjustment
@@ -371,10 +383,17 @@ module solver
                 for _ in 1:h2oadj_steps
                     adjust_steam!(atmos)
                 end
-                adj_changed += count(x->x>0.0, tmp_before_adj - atmos.tmp) 
+                for i in 1:atmos.nlev_c
+                    if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
+                        atmos.conv_idx[i] = 0
+                        adj_changed += 1
+                    else 
+                        atmos.conv_idx[i] += 1
+                    end
+                end
             end
 
-            # Smooth temperature profile
+            # Smooth temperature profile (if required)
             if smooth_width > 2
                 if mod(smooth_width,2) == 0
                     smooth_width += 1
@@ -402,15 +421,18 @@ module solver
                 grad_dp = atmos.p[end]-atmos.pl[end-1]
                 atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
                 weights = [0.7; 0.3]
-            elseif surf_state == 1 || gofast
+
+            elseif surf_state == 1 || gofast || step < 3
                 # Fixed
                 weights = [0.0; 1.0]
+
             elseif surf_state == 2
                 # Conductive lid 
                 # Set tmpl[end] such that the lid carries the required flux
                 atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_n[1] * atmos.lid_d / atmos.lid_k
                 atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
                 weights = [0.2; 0.8]
+
             else 
                 error("Invalid surface state $(surf_state)")
             end 
@@ -541,6 +563,7 @@ module solver
         @printf("    TOA   = %.2e W m-2         \n", F_TOA_rad)
         @printf("    BOA   = %.2e W m-2         \n", F_BOA_rad)
         @printf("    loss  = %.2f W m-2         \n", F_loss)
+        @printf("    loss  = %.2f %%            \n", F_loss/F_BOA_rad*100.0)
     
         # Warn user if there's a sign difference in TOA vs BOA fluxes
         # because this shouldn't be the case
