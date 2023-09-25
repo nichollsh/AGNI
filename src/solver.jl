@@ -118,7 +118,7 @@ module solver
         end 
 
         if sens
-            # sensible heat flux 
+            # sensible heat flux (TKE scheme for this 1D case)
             # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
             atmos.flux_sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
             dF[end]   += atmos.flux_sens
@@ -130,87 +130,6 @@ module solver
         end
         atmos.heating_rate *= 86400.0 # K/day
         
-    end
-
-    # Iterates the atmosphere at each level
-    function temperature_step!(atmos::atmosphere.Atmos_t, 
-                                dt::Array, dtmp_clip::Float64, 
-                                fixed_bottom::Bool, smooth_width::Int, 
-                                dryadj_steps::Int, h2oadj_steps::Int)
-
-        bot_old_e = atmos.tmpl[end]
-        top_old_e = atmos.tmpl[1]
-
-        # Apply radiative heating temperature change
-        dtmp = atmos.heating_rate .* dt 
-        clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
-        atmos.tmp += dtmp
-
-        adj_changed = 0
-
-        # Dry convective adjustment
-        if dryadj_steps > 0
-            tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
-            for _ in 1:dryadj_steps
-                adjust_dry!(atmos)
-            end
-            adj_changed += count(x->x>0.0, tmp_before_adj - atmos.tmp) 
-        end
-
-        # H2O moist convective adjustment
-        if h2oadj_steps > 0
-            tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
-            for _ in 1:h2oadj_steps
-                adjust_steam!(atmos)
-            end
-            adj_changed += count(x->x>0.0, tmp_before_adj - atmos.tmp) 
-        end
-
-        # Smooth temperature profile
-        if smooth_width > 2
-            if mod(smooth_width,2) == 0
-                smooth_width += 1
-            end
-            atmos.tmp = moving_average.hma(atmos.tmp, smooth_width)
-        end 
-
-        # Temperature floor (centres)
-        clamp!(atmos.tmp, atmos.T_floor, Inf)
-
-        # Interpolate to bulk cell-edge values 
-        itp = Interpolator(atmos.p, atmos.tmp)
-        atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
-
-        # Extrapolate top boundary
-        dt = atmos.tmp[1]-atmos.tmp[2]
-        dp = atmos.p[1]-atmos.p[2]
-        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
-
-        # Limit change at top edge 
-        atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.7; 0.3] )
-
-        # Calculate bottom boundary
-        if fixed_bottom
-            # Fixed
-            atmos.tmpl[end] = bot_old_e
-        else
-            # Extrapolate
-            dt = atmos.tmp[end]-atmos.tmpl[end-1]
-            dp = atmos.p[end]-atmos.pl[end-1]
-            atmos.tmpl[end] = atmos.tmp[end] + dt/dp * (atmos.pl[end] - atmos.p[end])
-            
-            # Limit change at bottom edge 
-            atmos.tmpl[end] = dot( [atmos.tmpl[end]; bot_old_e] , [0.6; 0.4] )
-        end
-
-        # Second interpolation back to cell-centres 
-        itp = Interpolator(atmos.pl, atmos.tmpl)  
-        atmos.tmp[:] .= itp.(atmos.p[:])
-
-        # Temperature floor (edges)
-        clamp!(atmos.tmpl, atmos.T_floor, Inf)
-
-        return adj_changed
     end
 
     """
@@ -271,7 +190,7 @@ module solver
         
         # Tracking
         adj_changed = 0
-        F_loss = 1.0e99         # Flux loss (TOA vs BOA)
+        F_loss = 1.0e99         # Radiative flux loss (TOA vs BOA)
         H_stat = 1.0e99         # Heating rate statistic
         F_TOA_rad = 1.0e99      # Net upward TOA radiative flux
         F_TOA_pre = 1.0e99      # Previous ^
@@ -285,6 +204,7 @@ module solver
         oscil = falses(atmos.nlev_c)  # layers which are oscillating
         heat_prev = zeros(Float64, atmos.nlev_c) # Previous iteration heating rates
         dt = ones(Float64,  atmos.nlev_c) # time-step [days]
+        dtmp = zeros(Float64, atmos.nlev_c) # temperature step [K]
 
         # Variables
         success = false         # Convergence criteria met
@@ -298,20 +218,6 @@ module solver
         hist_tmp  = zeros(Float64, (len_hist, atmos.nlev_c)) 
         hist_tmpl = zeros(Float64, (len_hist, atmos.nlev_l)) 
 
-        # Handle surface boundary condition
-        if surf_state == 0
-            fixed_bottom =  false
-            solve_lid =     false
-        elseif surf_state == 1
-            fixed_bottom =  true
-            solve_lid =     false 
-        elseif surf_state == 2
-            fixed_bottom =  true
-            solve_lid =     true 
-        else
-            error("Invalid surface state for radiative-convective solver")
-        end
-
         # Plot initial state 
         if modplot > 0 
             plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_0000.png", atmos.OUT_DIR))
@@ -321,7 +227,9 @@ module solver
         while (!success) && (step <= max_steps)
             step += 1
 
-            # Validate arrays
+            # ----------------------------------------------------------
+            # Check that solver is happy 
+            # ----------------------------------------------------------
             if !(all(isfinite, atmos.tmp) && all(isfinite, atmos.tmpl))
                 error("Temperature array contains NaNs")
             end 
@@ -329,13 +237,18 @@ module solver
                 error("Temperature array contains negative values")
             end
 
+
+            # ----------------------------------------------------------
+            # Prepare for new iteration
+            # ----------------------------------------------------------
+
             # End of the initial fast period
             if gofast && ( (dtmp_comp < dtmp_gofast) || ( step/max_steps > 0.3) ) && (step > 2)
                 gofast = false 
                 stopfast = true
             end
-
-             # Set parameters for step size calculation
+            
+            # Handle phases
             if gofast
                 # Fast phase
                 if verbose || ( mod(step,modprint) == 0)
@@ -346,7 +259,7 @@ module solver
                 h2oadj_steps = 20
                 dt_min = 1e1
                 dt_max = 1e5
-                smooth_window = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
+                smooth_width = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
                 
             else
                 # Slow phase
@@ -358,7 +271,7 @@ module solver
                 h2oadj_steps = 40
                 dt_min = 1e-4
                 dt_max = 10
-                smooth_window = 0
+                smooth_width = 0
 
                 # End of 'fast' period - take average of last two iters
                 if stopfast
@@ -377,18 +290,24 @@ module solver
                     dtmp_clip *= 0.8
                 end
             end
-
-            # Get fluxes 
+            
+            # ----------------------------------------------------------
+            # Get radiative fluxes (LW and SW)
+            # ---------------------------------------------------------- 
             atmosphere.radtrans!(atmos, true)
             atmosphere.radtrans!(atmos, false)
 
-            # Calc heating rates 
+
+            # ----------------------------------------------------------
+            # Calculate heating rates
+            # ---------------------------------------------------------- 
             heat_prev[:] .= atmos.heating_rate[:]
             calc_heat!(atmos, sens_heat)
-            calc_heat!(atmos, sens_heat && !fixed_bottom)
-            calc_heat!(atmos, sens_heat)
 
-            # Calc step size
+
+            # ----------------------------------------------------------
+            # Calculate step size for this step
+            # ---------------------------------------------------------- 
             H_small = 1.0 
             p_large = 5e5  # = 2 bar 
             for i in 1:atmos.nlev_c
@@ -421,26 +340,96 @@ module solver
                 @printf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
             end
 
-            # Apply convective adjustment if ready
-            if ( dry_adjust && (step < wait_adj)) || !dry_adjust
-                dryadj_steps = 0
-            end 
-            if ( h2o_adjust && (step < wait_adj)) || !h2o_adjust
-                h2oadj_steps = 0
-            end
-
-            # Apply temperature change
+            # ----------------------------------------------------------
+            # Apply temperature step
+            # ---------------------------------------------------------- 
             # optionally smooth temperature profile
             # optionally do convective adjustment
-            adj_changed = temperature_step!(atmos, dt, 
-                                            dtmp_clip, fixed_bottom,
-                                            smooth_window,
-                                            dryadj_steps, h2oadj_steps)
 
-            # Extrapolate forward in time (at higher pressures, when appropriate) 
-            ex_lookback     = 3
+            bot_old_e = atmos.tmpl[end]
+            top_old_e = atmos.tmpl[1]
+
+            # Apply radiative heating temperature change
+            dtmp .= atmos.heating_rate .* dt 
+            clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
+            atmos.tmp += dtmp
+
+            adj_changed = 0
+
+            # Dry convective adjustment
+            if dryadj_steps > 0 && dry_adjust && (step >= wait_adj)
+                tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
+                for _ in 1:dryadj_steps
+                    adjust_dry!(atmos)
+                end
+                adj_changed += count(x->x>0.0, tmp_before_adj - atmos.tmp) 
+            end
+
+            # H2O moist convective adjustment
+            if h2oadj_steps > 0 && h2o_adjust && (step >= wait_adj)
+                tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
+                for _ in 1:h2oadj_steps
+                    adjust_steam!(atmos)
+                end
+                adj_changed += count(x->x>0.0, tmp_before_adj - atmos.tmp) 
+            end
+
+            # Smooth temperature profile
+            if smooth_width > 2
+                if mod(smooth_width,2) == 0
+                    smooth_width += 1
+                end
+                atmos.tmp = moving_average.hma(atmos.tmp, smooth_width)
+            end 
+
+            # Temperature floor (centres)
+            clamp!(atmos.tmp, atmos.tmp_floor, Inf)
+
+            # Interpolate temperature to bulk cell-edge values 
+            itp = Interpolator(atmos.p, atmos.tmp)
+            atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
+
+            # Extrapolate top boundary temperature
+            grad_dt = atmos.tmp[1]-atmos.tmp[2]
+            grad_dp = atmos.p[1]-atmos.p[2]
+            atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
+            atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.7; 0.3] )  # limit change
+
+            # Calculate bottom boundary temperature
+            if surf_state == 0
+                # Extrapolate
+                grad_dt = atmos.tmp[end]-atmos.tmpl[end-1]
+                grad_dp = atmos.p[end]-atmos.pl[end-1]
+                atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
+                weights = [0.7; 0.3]
+            elseif surf_state == 1 || gofast
+                # Fixed
+                weights = [0.0; 1.0]
+            elseif surf_state == 2
+                # Conductive lid 
+                # Set tmpl[end] such that the lid carries the required flux
+                atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_n[1] * atmos.lid_d / atmos.lid_k
+                atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
+                weights = [0.2; 0.8]
+            else 
+                error("Invalid surface state $(surf_state)")
+            end 
+            atmos.tmpl[end] = dot( [atmos.tmpl[end]; bot_old_e] , normalize(weights) )  # limit change
+
+            # Temperature floor (edges)
+            clamp!(atmos.tmpl, atmos.tmp_floor, Inf)
+
+            # Second interpolation back to cell-centres 
+            itp = Interpolator(atmos.pl, atmos.tmpl)  
+            atmos.tmp[:] .= itp.(atmos.p[:])
+
+            # ----------------------------------------------------------
+            # Accelerate solver with time-extrapolation
+            # ---------------------------------------------------------- 
+            # (at higher pressures, when appropriate) 
+            ex_lookback     = 4
             ex_lookback     = max(len_hist-1, ex_lookback)
-            ex_dtmp_clip    = ex_lookback * dtmp_clip
+            ex_dtmp_clip    = dtmp_clip
             if !gofast && extrap && (step_stopfast+ex_lookback+1 < step < 0.95*max_steps) && ( mod(step,ex_lookback+1) == 0)
                 for i in 1:atmos.nlev_c 
                     if (atmos.pl[i] > p_large) && !oscil[i]
@@ -450,6 +439,9 @@ module solver
                 end 
             end 
             
+            # ----------------------------------------------------------
+            # Calculate solver statistics
+            # ---------------------------------------------------------- 
             # Calculate relative rate of change in temperature
             if step > 1
                 drel_dt_prev = drel_dt
@@ -467,7 +459,6 @@ module solver
             end 
 
             # Calculate the (change in) flux balance
-
             F_TOA_pre = F_TOA_rad 
             F_TOA_rad = atmos.flux_n[1]
             F_TOA_rel = abs((F_TOA_rad-F_TOA_pre)/F_TOA_pre)*100.0
@@ -479,7 +470,9 @@ module solver
             # Calculate the relative change in heating rate
             H_stat      = quantile(abs.(atmos.heating_rate[:]), 0.6)
 
-            # Print debug info to stdout
+            # --------------------------------------
+            # Print debug info
+            # -------------------------------------- 
             if verbose
                 @printf("    count_adj   = %d layers   \n", adj_changed)
                 @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
@@ -493,7 +486,9 @@ module solver
                 @printf("\n")
             end
 
-            # Update history array
+            # --------------------------------------
+            # Store current state for plotting, etc.
+            # -------------------------------------- 
             for i in 1:len_hist-1
                 hist_tmp[i,:]  .= hist_tmp[i+1,:]
                 hist_tmpl[i,:] .= hist_tmpl[i+1,:]
@@ -501,12 +496,17 @@ module solver
             hist_tmp[end,:]  .= atmos.tmp[:]
             hist_tmpl[end,:] .= atmos.tmpl[:]
 
-            # Plot current state
+            # --------------------------------------
+            # Make plots 
+            # -------------------------------------- 
             if (modplot > 0) && (mod(step,modplot) == 0)
                 plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_%04d.png", atmos.OUT_DIR, step), hist_tmpl=hist_tmpl)
             end 
 
-            # Convergence check requires that:
+            # --------------------------------------
+            # Convergence check
+            # -------------------------------------- 
+            # Requires that:
             # - minimal temperature change for two iters
             # - minimal rate of temperature change for two iters
             # - minimal change to net radiative flux at TOA for two iters
@@ -515,7 +515,9 @@ module solver
             flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv)
             success   = flag_this && flag_prev && !gofast && !stopfast && (step > min_steps)
             
-            # Prepare for next iter
+            # --------------------------------------
+            # Sleep in order to capture keyboard interrupt
+            # -------------------------------------- 
             sleep(1e-5)
             atexit(exit)
 
