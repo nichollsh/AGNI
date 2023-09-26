@@ -27,34 +27,34 @@ module solver
     function adjust_dry!(atmos::atmosphere.Atmos_t)
 
         # Downward pass
-        for i in 1:atmos.nlev_c-1
+        for i in 2:atmos.nlev_c
 
-            T1 = atmos.tmp[i]    # upper layer
-            p1 = atmos.p[i]
+            T1 = atmos.tmp[i-1]    # upper layer
+            p1 = atmos.p[i-1]
 
-            T2 = atmos.tmp[i+1]  # lower layer
-            p2 = atmos.p[i+1]
+            T2 = atmos.tmp[i]  # lower layer
+            p2 = atmos.p[i]
             
             pfact = (p1/p2)^(phys.R_gas / atmos.layer_cp[i])
             
-            # If slope is shallower than adiabat (unstable), adjust to adiabat
+            # If slope dT/dp is stepper than adiabat (unstable), adjust to adiabat
             if T1 < T2*pfact
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / (1.0 + pfact)
                 T1 = T2 * pfact
-                atmos.tmp[i]   = T1
-                atmos.tmp[i+1] = T2
+                atmos.tmp[i-1]   = T1
+                atmos.tmp[i] = T2
             end
         end
 
         # Upward pass
-        for i in atmos.nlev_c-1:2
+        for i in atmos.nlev_c:2
 
-            T1 = atmos.tmp[i]
-            p1 = atmos.p[i]
+            T1 = atmos.tmp[i-1]
+            p1 = atmos.p[i-1]
 
-            T2 = atmos.tmp[i+1]
-            p2 = atmos.p[i+1]
+            T2 = atmos.tmp[i]
+            p2 = atmos.p[i]
             
             pfact = (p1/p2)^(phys.R_gas / atmos.layer_cp[i])
 
@@ -62,8 +62,8 @@ module solver
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / ( 1.0 + pfact)
                 T1 = T2 * pfact
-                atmos.tmp[i]   = T1
-                atmos.tmp[i+1] = T2 
+                atmos.tmp[i-1]   = T1
+                atmos.tmp[i] = T2 
             end 
         end
     end
@@ -140,39 +140,41 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: fixed | 2: lid
+    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: fixed | 2: skin
     - `dry_adjust::Bool=true`           enable dry convective adjustment
     - `h2o_adjust::Bool=false`          enable naive steam convective adjustment
     - `sens_heat::Bool=true`            include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
-    - `gofast::Bool=true`               enable accelerated fast period at the start 
+    - `accel::Bool=true`                enable accelerated fast period at the start 
     - `extrap::Bool=true`               enable extrapolation forward in time 
     - `max_steps::Int=300`              maximum number of solver steps
-    - `min_steps::Int=20`              minimum number of solver steps
+    - `min_steps::Int=20`               minimum number of solver steps
+    - `dtmp_conv::Float64=5.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
+    - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
+    - `drel_F_conv::Float64=0.5`        convergence: maximum relative change in F_TOA_rad for convergence [%]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=0,
                             dry_adjust::Bool=true, h2o_adjust::Bool=false, 
                             sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
-                            gofast::Bool=true, extrap::Bool=true,
-                            max_steps::Int=300, min_steps::Int=20)
+                            accel::Bool=true, extrap::Bool=true,
+                            max_steps::Int=300, min_steps::Int=20,
+                            dtmp_conv::Float64=10.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.4
+                            )
 
 
         println("RCSolver: begin")
 
         # Run parameters
-        dtmp_gofast  = 40.0  # Change in temperature below which to stop model acceleration
+        dtmp_accel   = 60.0  # Change in temperature below which to stop model acceleration
         wait_adj     = 10    # Wait this many steps before introducing convective adjustment
         modprint     = 10    # Frequency to print when verbose==false
-        len_hist     = 6     # Number of previous states to store
+        len_hist     = 10    # Number of previous states to store
+        H_small      = 1.0   # A small heating rate [K/day]
+        p_large      = 5e5   # A large pressure [Pa] 
 
-        # Convergence criteria
-        dtmp_conv    = 5.0    # Maximum rolling change in temperature for convergence (dtmp) [K]
-        drel_dt_conv = 1.0    # Maximum rate of relative change in temperature for convergence (dtmp/tmp/dt) [day-1]
-        drel_F_conv  = 0.5    # Maximum relative change in F_TOA_rad for convergence [%]
-        
         if verbose
             @printf("    convergence criteria       \n")
             @printf("    dtmp_comp   < %.3f K       \n", dtmp_conv)
@@ -211,8 +213,12 @@ module solver
         step = 0                # Current step number
         flag_prev = false       # Previous iteration is meeting convergence
         flag_this = false       # Current iteration is meeting convergence
-        stopfast = false        # stop fast period this iter
-        step_stopfast = 1       # step at which fast period was steopped
+        stopaccel = false       # stop accelerated period this iter
+        step_stopaccel = 99999  # step at which accelerated period was stopped
+
+        if !accel 
+            step_stopaccel = 1
+        end
 
         # Store previous n atmosphere states
         hist_tmp  = zeros(Float64, (len_hist, atmos.nlev_c)) 
@@ -226,6 +232,7 @@ module solver
         # Main loop
         while (!success) && (step <= max_steps)
             step += 1
+            
 
             # ----------------------------------------------------------
             # Check that solver is happy 
@@ -242,17 +249,26 @@ module solver
             # Prepare for new iteration
             # ----------------------------------------------------------
 
-            # End of the initial fast period
-            if gofast && ( (dtmp_comp < dtmp_gofast) || ( step/max_steps > 0.3) ) && (step > 2)
-                gofast = false 
-                stopfast = true
+            if verbose || ( mod(step,modprint) == 0)
+                @printf("    step %d ", step)
             end
-            
+
+            # End of the initial fast period
+            if accel && ( (dtmp_comp < dtmp_accel) || ( step/max_steps > 0.3) ) && (step > 2)
+                accel = false 
+                stopaccel = true
+            end
+
+            # Stop extrapolation towards end
+            if ((step/max_steps > 0.7) && (step > 2)) || (F_TOA_rel < drel_F_conv * 10.0)
+                extrap = false
+            end 
+
             # Handle phases
-            if gofast
+            if accel
                 # Fast phase
                 if verbose || ( mod(step,modprint) == 0)
-                    @printf("    step %d (fast) \n", step)
+                    @printf("(accel) ")
                 end
                 dtmp_clip = 100.0
                 dryadj_steps = 20
@@ -263,9 +279,6 @@ module solver
                 
             else
                 # Slow phase
-                if verbose || ( mod(step,modprint) == 0)
-                    @printf("    step %d \n", step)
-                end
                 dtmp_clip = 50.0
                 dryadj_steps = 40
                 h2oadj_steps = 40
@@ -274,14 +287,14 @@ module solver
                 smooth_width = 0
 
                 # End of 'fast' period - take average of last two iters
-                if stopfast
-                    stopfast = false
+                if stopaccel
+                    stopaccel = false
                     atmos.tmpl[:] .= 0.5*(hist_tmpl[end,:] .+ hist_tmpl[end-1,:])
                     atmos.tmp[:]  .= 0.5*(hist_tmp[end,:]  .+ hist_tmp[end-1,:])
                     dt[:]   .= 0.5 * (dt_min + dt_max)
                     dryadj_steps = 0
                     h2oadj_steps = 0
-                    step_stopfast = step
+                    step_stopaccel = step
                 end
 
                 # Solver is struggling
@@ -290,6 +303,14 @@ module solver
                     dtmp_clip *= 0.8
                 end
             end
+
+            if verbose || ( mod(step,modprint) == 0)
+                if extrap
+                    @printf("(extrap)")
+                end 
+                @printf("\n")
+            end
+
 
             adj_changed = 0
             
@@ -310,14 +331,11 @@ module solver
             # ----------------------------------------------------------
             # Calculate step size for this step
             # ---------------------------------------------------------- 
-            H_small = 1.0 
-            p_large = 5e5  # = 2 bar 
             for i in 1:atmos.nlev_c
-
                 oscil[i] = false
 
                 # Increment dt
-                if gofast 
+                if accel 
                     dt[i] *= 1.3
                 else
                     # large oscillations => reduce step size
@@ -326,7 +344,7 @@ module solver
                         dt[i] *= 0.1
                     
                     # low heating rate at high pressure => increase step size
-                    elseif ( abs(atmos.heating_rate[i]) < H_small ) && (atmos.pl[i] > p_large) && !stopfast
+                    elseif ( abs(atmos.heating_rate[i]) < H_small ) && (atmos.pl[i] > p_large) && !stopaccel
                         dt[i] *= 1.5
 
                     else
@@ -403,8 +421,8 @@ module solver
             atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
             # Extrapolate top boundary temperature
-            grad_dt = atmos.tmp[1]-atmos.tmp[2]
-            grad_dp = atmos.p[1]-atmos.p[2]
+            grad_dt = atmos.tmp[1]-atmos.tmp[3]
+            grad_dp = atmos.p[1]-atmos.p[3]
             atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
             atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.7; 0.3] )  # limit change
 
@@ -416,24 +434,27 @@ module solver
                 atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
                 weights = [0.7; 0.3]
 
-            elseif surf_state == 1 || gofast || step < 3
+            elseif surf_state == 1 || step <= step_stopaccel
                 # Fixed
                 weights = [0.0; 1.0]
 
             elseif surf_state == 2
-                # Conductive lid 
-                # Set tmpl[end] such that the lid carries the required flux
-                atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_n[1] * atmos.lid_d / atmos.lid_k
+                # Conductive skin
+                # Set tmpl[end] such that the skin carries the required flux
+                atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_n[1] * atmos.skin_d / atmos.skin_k
                 atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
-                weights = [0.2; 0.8]
 
+                # don't update T_star if the change is small (prevents oscillations)
+                if abs(atmos.tmpl[end]-bot_old_e) < 5.0
+                    weights = [0.0; 1.0]  
+                else 
+                    weights = [0.15; 0.85]  
+                end
             else 
                 error("Invalid surface state $(surf_state)")
             end 
-            atmos.tmpl[end] = dot( [atmos.tmpl[end]; bot_old_e] , normalize(weights) )  # limit change
 
-            # Temperature floor (edges)
-            clamp!(atmos.tmpl, atmos.tmp_floor, Inf)
+            atmos.tmpl[end] = dot( [atmos.tmpl[end]; bot_old_e] , weights )  # limit change at surface
 
             # Second interpolation back to cell-centres 
             itp = Interpolator(atmos.pl, atmos.tmpl)  
@@ -443,10 +464,16 @@ module solver
             # Accelerate solver with time-extrapolation
             # ---------------------------------------------------------- 
             # (at higher pressures, when appropriate) 
-            ex_lookback     = 4
-            ex_lookback     = max(len_hist-1, ex_lookback)
-            ex_dtmp_clip    = dtmp_clip
-            if !gofast && extrap && (step_stopfast+ex_lookback+1 < step < 0.95*max_steps) && ( mod(step,ex_lookback+1) == 0)
+            ex_lookback     = 9
+            ex_lookback     = min(len_hist-1, ex_lookback)
+            ex_dtmp_clip    = dtmp_clip * 2.0
+            if !accel && extrap && (step_stopaccel+ex_lookback+1 < step < 0.95*max_steps) && ( mod(step,ex_lookback+1) == 0)
+                # don't extrapolate surface when handling skin
+                ex_endlvl = atmos.nlev_c
+                if surf_state == 2
+                    ex_endlvl -= 1
+                end
+                # extrapolate each level
                 for i in 1:atmos.nlev_c 
                     if (atmos.pl[i] > p_large) && !oscil[i]
                         atmos.tmp[i]  += max(-ex_dtmp_clip, min(ex_dtmp_clip, atmos.tmp[i]  - hist_tmp[end-ex_lookback,i]  ))
@@ -454,6 +481,13 @@ module solver
                     end 
                 end 
             end 
+
+            # Temperature floor
+            clamp!(atmos.tmp,  atmos.tmp_floor, Inf)
+            clamp!(atmos.tmpl, atmos.tmp_floor, Inf)
+
+            # Set tstar 
+            atmos.tstar = atmos.tmpl[end]
             
             # ----------------------------------------------------------
             # Calculate solver statistics
@@ -529,7 +563,7 @@ module solver
             # - solver is not in 'fast' mode, as it is unphysical
             flag_prev = flag_this
             flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv)
-            success   = flag_this && flag_prev && !gofast && !stopfast && (step > min_steps)
+            success   = flag_this && flag_prev && !accel && !stopaccel && (step > min_steps)
             
             # --------------------------------------
             # Sleep in order to capture keyboard interrupt

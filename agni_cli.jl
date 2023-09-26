@@ -59,7 +59,7 @@ s = ArgParseSettings()
         arg_type = Float64
         default = trppt_default
     "--surface"
-        help = "Surface state (0: free, 1: fixed at T(p_surf), 2: conductive lid)"
+        help = "Surface state (0: free, 1: fixed at T(p_surf), 2: conductive skin)"
         arg_type = Int
         default = 0
     "--albedo_s"
@@ -70,12 +70,6 @@ s = ArgParseSettings()
         help = "Direction of solar radiation beam measured from zenith [deg]."
         arg_type = Float64
         default = 54.74
-    "--noadjust"
-        help = "Disable convective adjustment."
-        action = :store_true
-    "--once"
-        help = "Just calculate fluxes once - don't iterate."
-        action = :store_true
     "--output"
         help = "Output directory relative to AGNI directory. This directory will be emptied before being used."
         arg_type = String
@@ -92,16 +86,34 @@ s = ArgParseSettings()
         help = "Number of model levels."
         arg_type = Int
         default = 100
+    "--once"
+        help = "Just calculate fluxes once - don't iterate."
+        action = :store_true
     "--nsteps"
         help = "Number of solver steps (max)."
         arg_type = Int
         default = 250
+    "--noadjust"
+        help = "Disable convective adjustment."
+        action = :store_true
     "--noaccel"
         help = "Disable model acceleration."
         action = :store_true
     "--rscatter"
         help = "Include rayleigh scattering."
         action = :store_true
+    "--convcrit_tmpabs"
+        help = "Convergence criterion on dtmp [K]."
+        arg_type = Float64
+        default = 5.0
+    "--convcrit_tmprel"
+        help = "Convergence criterion on dtmp/tmp/dt [day-1]."
+        arg_type = Float64
+        default = 5.0
+    "--convcrit_fradrel"
+        help = "Convergence criterion on dfrad/frad [%]."
+        arg_type = Float64
+        default = 0.8
     "--plot"
         help = "Make plots."
         action = :store_true
@@ -147,6 +159,9 @@ surf_state      = args["surface"]
 max_steps       = args["nsteps"]
 no_adjust       = args["noadjust"]
 no_accel        = args["noaccel"]
+cc_tmpabs       = args["convcrit_tmpabs"]
+cc_tmprel       = args["convcrit_tmprel"]
+cc_fradrel      = args["convcrit_fradrel"]
 
 if verbose 
     println("Command line arguments:")
@@ -248,7 +263,8 @@ else
     solver.solve_energy!(atmos, 
                          modplot=modplot, verbose=verbose, 
                          surf_state=surf_state, dry_adjust=!no_adjust, 
-                         max_steps=max_steps, gofast=!no_accel, extrap=!no_accel
+                         max_steps=max_steps, accel=!no_accel, extrap=!no_accel,
+                         dtmp_conv=cc_tmpabs,drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel
                          )
 end
 
