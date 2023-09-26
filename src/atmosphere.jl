@@ -52,6 +52,10 @@ module atmosphere
         tstar::Float64 
         grav_surf::Float64
 
+        # Band edge wavelengths [m]
+        bands_min::Array
+        bands_max::Array
+
         # Pressure-temperature grid (with i=1 at the top of the model)
         nlev_c::Int         # Cell centre (count)
         nlev_l::Int         # Cell edge (count)
@@ -468,6 +472,14 @@ module atmosphere
         else
             n_channel = 1
         end
+
+        atmos.bands_max = zeros(Float64, atmos.spectrum.Basic.n_band)
+        atmos.bands_min = zeros(Float64, atmos.spectrum.Basic.n_band)
+
+        for i in 1:atmos.spectrum.Basic.n_band
+            atmos.bands_min[i] = atmos.spectrum.Basic.wavelength_short[i]
+            atmos.bands_max[i] = atmos.spectrum.Basic.wavelength_long[i]
+        end 
 
         # modules_gen/dimensions_field_cdf_ucf.f90
         npd_direction = 1           # Maximum number of directions for radiances
@@ -1020,6 +1032,7 @@ module atmosphere
 
         ngases = length(atmos.gases)
         nchars = 16
+        nbands = length(atmos.bands_min)
 
         # ----------------------
         # Create dimensions
@@ -1027,19 +1040,37 @@ module atmosphere
         defDim(ds, "nlev_l", nlev_l)    # Cell edges
         defDim(ds, "ngases", ngases)    # Gases
         defDim(ds, "nchars", nchars)    # Length of string containing gas names
+        defDim(ds, "nbands", nbands)    # Number of spectral channels
 
         # ----------------------
         # Scalar quantities  
         #    Create variables
         var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # BOA LW BC
         var_toah =      defVar(ds, "toa_heating",   Float64, (), attrib = OrderedDict("units" => "W m-2"))  # TOA SW BC
+        var_tmagma =    defVar(ds, "tmagma",        Float64, (), attrib = OrderedDict("units" => "K"))      # Magma temperature
+        var_fray =      defVar(ds, "flag_rayleigh", Char, ())  # Includes rayleigh scattering?
+        var_fcon =      defVar(ds, "flag_continuum",Char, ())  # Includes continuum absorption?
 
         #     Store data
         var_tstar[1] =  atmos.tstar 
         var_toah[1] =   atmos.toa_heating
+        var_tmagma[1] = atmos.tmp_magma
+
+        if atmos.control.l_rayleigh
+            var_fray[1] = 'y'
+        else
+            var_fray[1] = 'n'
+        end 
+
+        if atmos.control.l_cont_gen
+            var_fcon[1] = 'y'
+        else
+            var_fcon[1] = 'n'
+        end 
+        
 
         # ----------------------
-        # Layer quantities  
+        # Vector quantities
         #    Create variables
         var_p =         defVar(ds, "p",      Float64, ("nlev_c",), attrib = OrderedDict("units" => "Pa"))
         var_pl =        defVar(ds, "pl",     Float64, ("nlev_l",), attrib = OrderedDict("units" => "Pa"))
@@ -1061,6 +1092,8 @@ module atmosphere
         var_fu =        defVar(ds, "fl_U",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "rad_hr", Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
+        var_bs =        defVar(ds, "bandmin",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
+        var_bl =        defVar(ds, "bandmax",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
 
         #     Store data
         var_p[:] =      atmos.p
@@ -1100,6 +1133,9 @@ module atmosphere
         var_fn[:] =     atmos.flux_n
 
         var_hr[:] =     atmos.heating_rate
+
+        var_bs[:] =     atmos.bands_min
+        var_bl[:] =     atmos.bands_max
 
         # ----------------------
         # Close
