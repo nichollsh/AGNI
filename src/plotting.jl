@@ -63,6 +63,7 @@ module plotting
         plot_hist = !isempty(hist_tmpl)
         if plot_hist 
             len_hist = size(hist_tmpl, 1)-1
+            len_hist = min(len_hist, 4)  # don't plot more than 4 previous iterations
         end
 
         # Create plot 1
@@ -86,7 +87,7 @@ module plotting
         end
         
         # Highlight convective regions 
-        atmosphere.dryconvection_check!(atmos, tmp_eps=10.0)
+        atmosphere.dryconvection_check!(atmos, tmp_eps=5.0)
         region_p = []
         region_T = []
         region_new = true
