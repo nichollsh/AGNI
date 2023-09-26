@@ -369,10 +369,7 @@ module solver
                 # check which levels were changed
                 for i in 1:atmos.nlev_c
                     if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
-                        atmos.conv_idx[i] = 0
                         adj_changed += 1
-                    else 
-                        atmos.conv_idx[i] += 1
                     end
                 end 
             end
@@ -385,10 +382,7 @@ module solver
                 end
                 for i in 1:atmos.nlev_c
                     if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
-                        atmos.conv_idx[i] = 0
                         adj_changed += 1
-                    else 
-                        atmos.conv_idx[i] += 1
                     end
                 end
             end

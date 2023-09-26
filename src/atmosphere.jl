@@ -103,9 +103,9 @@ module atmosphere
         U::Float64          # Wind speed [m s-1]
         flux_sens::Float64  # Turbulent flux
 
-        # Convection flag tracker
-        conv_thresh::Int    # Threshold for what counts as recently adjusted
-        conv_idx::Array     # Number of steps previous that adjustment was performed 
+        # Convection 
+        nptmp::Array        # Potential temperature of cell relative to neighbour layer above [K]
+        conv_inst::Array    # Flag for dry convective instability [true/false]
 
         # Heating rate 
         heating_rate::Array # radiative heating rate [K/day]
@@ -707,13 +707,14 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
-        atmos.conv_thresh =       2
-        atmos.conv_idx =          ones(Int,  atmos.nlev_c) * 1e9  # set to large value
+        atmos.nptmp =             zeros(Float64, atmos.nlev_c)
+        atmos.conv_inst =         falses(atmos.nlev_c)
 
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
         # Mark as allocated
         atmos.is_alloc = true
+
     end  # end of allocate
 
     function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool)
@@ -879,6 +880,61 @@ module atmosphere
         end
 
     end # end of radtrans
+
+    # Calculate potential temperature and check convective instability
+    function dryconvection_check!(atmos; tmp_eps::Float64=0.1)
+
+        # Only applies to cell-centre temperatures.
+        # Set tmp_eps to relax the check by that amount [K].
+        
+        # Calculate potential temperatures 
+        # theta[i] = tmp[i] * ( p[i-1] / p[i]] )^( R/cp[i] )
+        atmos.nptmp[1] = 0.0
+        for i in 2:atmos.nlev_c 
+            atmos.nptmp[i] = atmos.tmp[i] * (atmos.p[i-1]/atmos.p[i])^(phys.R_gas/atmos.layer_cp[i])
+        end 
+
+        # Set convective instability flag
+        atmos.conv_inst[1] = false
+        for i in 2:atmos.nlev_c 
+            atmos.conv_inst[i] = (atmos.tmp[i-1] < atmos.nptmp[i] + tmp_eps )
+        end 
+        
+        
+    end 
+
+    # Calculate dry convective fluxes using mixing length theory
+    function dryconvection_mlt!(atmos)
+
+        error("MLT not yet implemented")
+
+        # Follows the method of Drummond+16, which derives from
+        #   Henyey+1965
+        #   Gustafsson+2008
+
+        # F_conv = 0.5  ρ  Cp T v_conv (l/Hp) δΔ 
+        # when ∇T > ∇ad, otherwise F_conv = zero.
+        # ∇T = ∂log(T)/∂log(P) and ∇ad is the adiabatic lapse rate.
+
+        # δΔ = Γ/(1+Γ) * (∇T − ∇ad )
+        # Γ = v_conv ρ Cp (1 + y(ρχ)^2)/(8 σ T^3 ρ χ l)
+        # where χ is the Rosseland mean opacity, σ is the SB constant, y=0.076, and l is the mixing length
+
+        # l = α H
+        # H = P/(gρ) is the pressure scale height
+        # α is the mixing length parameter (=1.5)
+
+        # v_conv = H sqrt{ GM/(r^2) H Q δΔ/ν }
+        # Q = − T ρ (∂ρ/∂T) at constant pressure 
+        # ν is the viscosity (=8.0)
+
+        # τ = int_0^inf χ ρ dz 
+        # so we can use τ from SOCRATES to calculate χ assuming hydrostatic equilibrium
+        # χ = g dτ/dp at a level with pressure p and optical depth τ
+        # dimensionally this works out.
+
+        
+    end
 
     # Get interleaved cell-centre and cell-edge PT grid
     function get_interleaved_pt(atmos::atmosphere.Atmos_t)
