@@ -85,13 +85,16 @@ module plotting
             end 
         end
         
-        # Highlight recently adjusted regions 
+        # Highlight convective regions 
+        atmosphere.dryconvection_check!(atmos, tmp_eps=10.0)
+        region_p = []
+        region_T = []
         region_new = true
         for i in 1:atmos.nlev_c
-            if atmos.conv_idx[i] <= atmos.conv_thresh
+            if atmos.conv_inst[i]
                 if region_new
                     region_new = false
-                    if length(region_T) > 0
+                    if length(region_p) > 0
                         plot!(plt1, region_T, region_p*1e-5, color="orchid2", linealpha=0.4, lw=4*lw, label="")
                     end
                     region_p = []
