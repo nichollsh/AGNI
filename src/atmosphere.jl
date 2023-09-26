@@ -73,9 +73,9 @@ module atmosphere
 
         tmp_floor::Float64  # Temperature floor to prevent numerics [K]
 
-        # Conductive lid
-        lid_d::Float64      # Lid thickness [m]
-        lid_k::Float64      # Lid thermal conductivity [W m-1 K-1]
+        # Conductive skin
+        skin_d::Float64      # skin thickness [m]
+        skin_k::Float64      # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
         tmp_magma::Float64  # Mantle temperature [K]
 
         # Mixing ratios 
@@ -155,12 +155,12 @@ module atmosphere
     - `mixing_ratios::Dict`             dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
     - `zenith_degrees::Float64=54.74`   angle of radiation from the star, relative to the zenith [degrees].
     - `albedo_s::Float64=0.0`           surface albedo.
-    - `tmp_floor::Float64=10.0`         temperature floor [K].
+    - `tmp_floor::Float64=50.0`         temperature floor [K].
     - `C_d::Float64=0.001`              turbulent heat exchange coefficient [dimensionless].
     - `U::Float64=10.0`                 surface wind speed [m s-1].
     - `tmp_magma::Float64=3000.0`       mantle temperature [K].
-    - `lid_d::Float64=0.5`              lid thickness [m].
-    - `lid_k::Float64=2.0`              lid thermal conductivity [W m-1 K-1].
+    - `skin_d::Float64=0.5`             skin thickness [m].
+    - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
     - `all_channels::Bool=true`         use all channels available for RT?
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
@@ -181,8 +181,8 @@ module atmosphere
                     C_d::Float64 =              0.001,
                     U::Float64 =                10.0,
                     tmp_magma::Float64 =        3000.0,
-                    lid_d::Float64 =            0.5,
-                    lid_k::Float64 =            2.0,
+                    skin_d::Float64 =           0.5,
+                    skin_k::Float64 =           2.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -221,8 +221,8 @@ module atmosphere
         atmos.U =               max(0,U)
 
         atmos.tmp_magma =       max(atmos.tmp_floor, tmp_magma)
-        atmos.lid_d =           max(1.0e-6,lid_d)
-        atmos.lid_k =           max(1.0e-6,lid_k)
+        atmos.skin_d =          max(1.0e-6,skin_d)
+        atmos.skin_k =          max(1.0e-6,skin_k)
 
         if p_top > p_surf 
             error("p_top must be less than p_surf")
