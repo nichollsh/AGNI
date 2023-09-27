@@ -29,7 +29,7 @@ toa_heating     = 4.0e+04   # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
 nlev_centre     = 100  
-p_surf          = 300.0     # bar
+p_surf          = 50.0     # bar
 p_top           = 1e-6      # bar 
 mixing_ratios   = Dict([
                         ("H2O" , 0.040),
@@ -59,9 +59,10 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mixing_ratios,
                          flag_gcontinuum=true,
-                         flag_rayleigh=false,
+                         flag_rayleigh=true,
+                         overlap_method=4,
                          skin_d=0.1,
-                         tmp_magma=1800.0
+                         tmp_magma=2000.0
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
