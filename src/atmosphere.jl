@@ -51,6 +51,7 @@ module atmosphere
         toa_heating::Float64 
         tstar::Float64 
         grav_surf::Float64
+        overlap_method::Int
 
         # Band edge wavelengths [m]
         bands_min::Array
@@ -162,6 +163,7 @@ module atmosphere
     - `skin_d::Float64=0.5`             skin thickness [m].
     - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
     - `all_channels::Bool=true`         use all channels available for RT?
+    - `overlap_method::Int=2`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv ext, 8: ro+r&r)
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
     - `flag_continuum::Bool=false`      include continuum absorption?
@@ -183,6 +185,7 @@ module atmosphere
                     tmp_magma::Float64 =        3000.0,
                     skin_d::Float64 =           0.5,
                     skin_k::Float64 =           2.0,
+                    overlap_method::Int =       2,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -206,6 +209,7 @@ module atmosphere
 
         atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
+        atmos.overlap_method =  Int(overlap_method)
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
 
@@ -624,7 +628,22 @@ module atmosphere
         # Gaseous absorption
         #################################
 
-        atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random # = 2
+        if atmos.overlap_method == 2
+            # random overlap 
+            atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random
+
+        elseif atmos.overlap_method == 4
+            # equivalent extinction with correct scaling
+            atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_k_eqv_scl
+        
+        elseif atmos.overlap_method == 8
+            # random overlap with resorting and rebinning
+            atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random_resort_rebin
+
+        else 
+            error("Invalid overlap method")
+        end
+
         for j in atmos.control.first_band:atmos.control.last_band
             atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
         end
