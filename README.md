@@ -1,7 +1,9 @@
 # AGNI
-Radiative-convective solver which uses SOCRATES (2306) for radiative-transfer. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface).
-    
-Flux boundary conditions are kept constant, with the upward LW flux being set by `tstar` and the downward SW flux being set by `toa_heating`. The model is designed for integration into a coupled atmosphere-interior code, with surface boundary conditions set by an interior model, so it won't work well for cooler planets.    
+Time-stepped radiative-convective solver designed for integration into a coupled atmosphere-interior code.   
+
+AGNI relies on SOCRATES (2306) for calculating the radiative-transfer. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). SOCRATES is setup here to include shortwave irradiation from the star, Rayleigh scattering, and continuum absorption / CIA.        
+
+Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files.
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
@@ -66,7 +68,7 @@ To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.
 
 
 ### Example outputs
-Pure steam runaway greenhouse
+Pure steam runaway greenhouse.
 <p float="left">
   <img src="doc/example_runaway/curve.png" width="500" />
 </p>
@@ -77,7 +79,7 @@ Calculating fluxes with SOCRATES, without solving for RCE.
   <img src="doc/example_nosolve/fl.png" width="400" /> 
 </p>
 
-Solving for RCE with accelerated time-stepping.
+Solving for RCE with accelerated time-stepping (this GIF is somewhat outdated now).
 <p float="left">
   <img src="doc/example_withsolve/anim.gif" width="400"/>
   <img src="doc/example_withsolve/fl.png" width="400" /> 
