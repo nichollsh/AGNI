@@ -37,7 +37,7 @@ module solver
             
             pfact = (p1/p2)^(phys.R_gas / atmos.layer_cp[i])
             
-            # If slope dT/dp is stepper than adiabat (unstable), adjust to adiabat
+            # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
             if T1 < T2*pfact
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / (1.0 + pfact)
@@ -149,10 +149,10 @@ module solver
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `extrap::Bool=true`               enable extrapolation forward in time 
     - `max_steps::Int=300`              maximum number of solver steps
-    - `min_steps::Int=20`               minimum number of solver steps
+    - `min_steps::Int=15`               minimum number of solver steps
     - `dtmp_conv::Float64=5.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
     - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
-    - `drel_F_conv::Float64=0.5`        convergence: maximum relative change in F_TOA_rad for convergence [%]
+    - `drel_F_conv::Float64=0.2`        convergence: maximum relative change in F_TOA_rad for convergence [%]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=0,
@@ -160,15 +160,16 @@ module solver
                             sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
                             accel::Bool=true, extrap::Bool=true,
-                            max_steps::Int=300, min_steps::Int=20,
-                            dtmp_conv::Float64=10.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.4
+                            max_steps::Int=300, min_steps::Int=15,
+                            dtmp_conv::Float64=5.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.2
                             )
 
 
         println("RCSolver: begin")
 
         # Run parameters
-        dtmp_accel   = 60.0  # Change in temperature below which to stop model acceleration
+        dtmp_accel   = 40.0  # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
+        dtmp_extrap  = 20.0  # Change in temperature above which to use model extrapolation (not worth it at small dtmp)
         wait_adj     = 10    # Wait this many steps before introducing convective adjustment
         modprint     = 10    # Frequency to print when verbose==false
         len_hist     = 10    # Number of previous states to store
@@ -184,8 +185,8 @@ module solver
         end
 
         # Validate inputs
-        max_steps = max(10,max_steps)
-        min_steps = min(max(min_steps,wait_adj), max_steps-1)
+        min_steps = max(min_steps,wait_adj+1)
+        max_steps = max(min_steps+10,max_steps)
         wait_adj  = max(min(wait_adj, max_steps-2), 1)
         len_hist  = max(min(len_hist, max_steps-1), 5)
         modprint  = max(modprint, 0)
@@ -254,13 +255,13 @@ module solver
             end
 
             # End of the initial fast period
-            if accel && ( (dtmp_comp < dtmp_accel) || ( step/max_steps > 0.3) ) && (step > 2)
+            if accel && (step > 2) && ( (dtmp_comp < dtmp_accel) || ( step/max_steps > 0.3)  || flag_prev ) 
                 accel = false 
                 stopaccel = true
             end
 
             # Stop extrapolation towards end
-            if ((step/max_steps > 0.7) && (step > 2)) || (F_TOA_rel < drel_F_conv * 10.0)
+            if ((step/max_steps > 0.7) && (step > 2)) || flag_prev
                 extrap = false
             end 
 
@@ -270,11 +271,11 @@ module solver
                 if verbose || ( mod(step,modprint) == 0)
                     @printf("(accel) ")
                 end
-                dtmp_clip = 100.0
+                dtmp_clip = 80.0
                 dryadj_steps = 20
                 h2oadj_steps = 20
                 dt_min = 1e1
-                dt_max = 1e5
+                dt_max = 1e4
                 smooth_width = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
                 
             else
@@ -282,7 +283,7 @@ module solver
                 dtmp_clip = 50.0
                 dryadj_steps = 40
                 h2oadj_steps = 40
-                dt_min = 1e-4
+                dt_min = 1e-6
                 dt_max = 10
                 smooth_width = 0
 
@@ -336,7 +337,7 @@ module solver
 
                 # Increment dt
                 if accel 
-                    dt[i] *= 1.3
+                    dt[i] *= 1.2
                 else
                     # large oscillations => reduce step size
                     if (atmos.heating_rate[i]*heat_prev[i] < 0) && (abs(atmos.heating_rate[i]) > H_small)
@@ -345,7 +346,7 @@ module solver
                     
                     # low heating rate at high pressure => increase step size
                     elseif ( abs(atmos.heating_rate[i]) < H_small ) && (atmos.pl[i] > p_large) && !stopaccel
-                        dt[i] *= 1.5
+                        dt[i] *= 1.2
 
                     else
                         dt[i] *= 1.1
@@ -467,7 +468,7 @@ module solver
             ex_lookback     = 9
             ex_lookback     = min(len_hist-1, ex_lookback)
             ex_dtmp_clip    = dtmp_clip * 2.0
-            if !accel && extrap && (step_stopaccel+ex_lookback+1 < step < 0.95*max_steps) && ( mod(step,ex_lookback+1) == 0)
+            if !accel && extrap && (step_stopaccel+ex_lookback+1 < step < 0.95*max_steps) && ( mod(step,ex_lookback+1) == 0) && (dtmp_comp > dtmp_extrap)
                 # don't extrapolate surface when handling skin
                 ex_endlvl = atmos.nlev_c
                 if surf_state == 2
