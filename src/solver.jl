@@ -66,6 +66,7 @@ module solver
                 atmos.tmp[i] = T2 
             end 
         end
+        return nothing
     end
 
     # Naive steam adjustment, single step (as per AEOLUS)
@@ -149,7 +150,8 @@ module solver
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `extrap::Bool=true`               enable extrapolation forward in time 
-    - `max_steps::Int=300`              maximum number of solver steps
+    - `dt_max::Float64=10.0`            maximum time-step outside of the accelerated phase
+    - `max_steps::Int=200`              maximum number of solver steps
     - `min_steps::Int=15`               minimum number of solver steps
     - `dtmp_conv::Float64=5.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
     - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
@@ -161,7 +163,7 @@ module solver
                             sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
                             accel::Bool=true, extrap::Bool=true,
-                            max_steps::Int=300, min_steps::Int=15,
+                            dt_max::Float64=10.0, max_steps::Int=200, min_steps::Int=15,
                             dtmp_conv::Float64=5.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.2
                             )
 
@@ -187,7 +189,7 @@ module solver
 
         # Validate inputs
         min_steps = max(min_steps,wait_adj+1)
-        max_steps = max(min_steps+10,max_steps)
+        max_steps = max(min_steps+10, max_steps)
         wait_adj  = max(min(wait_adj, max_steps-2), 1)
         len_hist  = max(min(len_hist, max_steps-1), 5)
         modprint  = max(modprint, 0)
@@ -215,6 +217,7 @@ module solver
         step = 0                # Current step number
         flag_prev = false       # Previous iteration is meeting convergence
         flag_this = false       # Current iteration is meeting convergence
+        plt_magma = false       # Include tmp_magma in plots
         stopaccel = false       # stop accelerated period this iter
         step_stopaccel = 99999  # step at which accelerated period was stopped
 
@@ -222,19 +225,20 @@ module solver
             step_stopaccel = 1
         end
 
+        plt_magma = (surf_state == 2)
+
         # Store previous n atmosphere states
         hist_tmp  = zeros(Float64, (len_hist, atmos.nlev_c)) 
         hist_tmpl = zeros(Float64, (len_hist, atmos.nlev_l)) 
 
         # Plot initial state 
         if modplot > 0 
-            plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_0000.png", atmos.OUT_DIR))
+            plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_0000.png", atmos.OUT_DIR), incl_magma=plt_magma)
         end 
 
         # Main loop
         while (!success) && (step <= max_steps)
             step += 1
-            
 
             # ----------------------------------------------------------
             # Check that solver is happy 
@@ -275,17 +279,17 @@ module solver
                 dtmp_clip = 80.0
                 dryadj_steps = 20
                 h2oadj_steps = 20
-                dt_min = 1e1
-                dt_max = 1e4
+                dt_min_step = 1.0e1
+                dt_max_step = 1.0e4
                 smooth_width = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
                 
             else
                 # Slow phase
                 dtmp_clip = 50.0
-                dryadj_steps = 40
-                h2oadj_steps = 40
-                dt_min = 1e-6
-                dt_max = 10
+                dryadj_steps = 30
+                h2oadj_steps = 30
+                dt_min_step = 1.0e-6
+                dt_max_step = max(dt_max, 1.0e-3)
                 smooth_width = 0
 
                 # End of 'fast' period - take average of last two iters
@@ -293,7 +297,7 @@ module solver
                     stopaccel = false
                     atmos.tmpl[:] .= 0.5*(hist_tmpl[end,:] .+ hist_tmpl[end-1,:])
                     atmos.tmp[:]  .= 0.5*(hist_tmp[end,:]  .+ hist_tmp[end-1,:])
-                    dt[:]   .= 0.5 * (dt_min + dt_max)
+                    dt[:]   .= 0.5 * (dt_min_step + dt_max_step)
                     dryadj_steps = 0
                     h2oadj_steps = 0
                     step_stopaccel = step
@@ -301,7 +305,7 @@ module solver
 
                 # Solver is struggling
                 if (step > max_steps * 0.9)
-                    dt_max *= 0.5
+                    dt_max_step *= 0.5
                     dtmp_clip *= 0.8
                 end
             end
@@ -355,8 +359,8 @@ module solver
                 end
             end 
 
-            dt[1:2] .= dt_min
-            clamp!(dt, dt_min, dt_max)
+            dt[1:2] .= dt_min_step
+            clamp!(dt, dt_min_step, dt_max_step)
 
             if verbose
                 @printf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
@@ -423,10 +427,10 @@ module solver
             atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
             # Extrapolate top boundary temperature
-            grad_dt = atmos.tmp[1]-atmos.tmp[3]
-            grad_dp = atmos.p[1]-atmos.p[3]
+            grad_dt = atmos.tmp[1]-atmos.tmp[2]
+            grad_dp = atmos.p[1]-atmos.p[2]
             atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
-            atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.7; 0.3] )  # limit change
+            atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.9; 0.1] )  # limit change
 
             # Calculate bottom boundary temperature
             if surf_state == 0
@@ -552,7 +556,7 @@ module solver
             # Make plots 
             # -------------------------------------- 
             if (modplot > 0) && (mod(step,modplot) == 0)
-                plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_%04d.png", atmos.OUT_DIR, step), hist_tmpl=hist_tmpl)
+                plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_%04d.png", atmos.OUT_DIR, step), hist_tmpl=hist_tmpl, incl_magma=plt_magma)
             end 
 
             # --------------------------------------

@@ -83,8 +83,8 @@ module atmosphere
 
         # Mole fractions (= VMR)
         gases::Array        # List of gas names 
-        input_x::Dict       # Dict of layer mole fractions (key,value) = (gas_name,array)
-        layer_x::Array      # Per-level mole fractions [lvl, gas_idx] cell centres
+        input_x::Dict       # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
+        layer_x::Array      # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
 
         # Layers' average properties
         layer_density::Array  # density [kg m-3]
@@ -220,7 +220,7 @@ module atmosphere
 
         atmos.nlev_c         =  max(nlev_centre,10)
         atmos.nlev_l         =  atmos.nlev_c + 1
-        atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.0)
+        atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.1)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.toa_heating =     max(toa_heating, 0.0)
         atmos.tstar =           max(tstar, atmos.tmp_floor)
@@ -277,18 +277,12 @@ module atmosphere
         
         # Dict input case
         if mf_source == 0
-            norm_factor = sum(values(mf_dict))
-            for (key, value) in mf_dict  # normalise mfs
-                if key in SOCRATES.input_head_pcf.header_gas
-                    mf_dict[key] = value / norm_factor
-                else
-                    error("Invalid gas '$key'")
-                end
-            end
             for (key, value) in mf_dict  # store as arrays
                 gas_valid = strip(key, ' ')
                 gas_valid = uppercase(gas_valid)
-                atmos.input_x[gas_valid] = ones(Float64, atmos.nlev_c) * value
+                if key in SOCRATES.input_head_pcf.header_gas
+                    atmos.input_x[gas_valid] = ones(Float64, atmos.nlev_c) * value
+                end
             end
         end
 
@@ -349,8 +343,8 @@ module atmosphere
                 for i in 1:atmos.nlev_c
                     atmos.input_x[gas][i] = itp(atmos.p[i])
                 end 
-                
             end 
+
         end
 
         # Check that we actually stored some values
@@ -418,7 +412,7 @@ module atmosphere
                 atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas) * phys.lookup_safe("cp",gas)
             end
 
-            # density
+            # density (assumes ideal gas)
             atmos.layer_density[i] = ( atmos.p[i] * atmos.layer_mmw[i] )  / (phys.R_gas * atmos.tmp[i]) 
             atmos.atm.density[1,i] = atmos.layer_density[i]
         end
@@ -756,17 +750,28 @@ module atmosphere
             # Values are provided to SOCRATES when radtrans is called
         end
 
-        # Warn user if we are missing gases 
-        missing_gases = false
+        # Renormalise mole fractions
         for i in 1:atmos.nlev_c
-            lvl_tot = 0.0
-            for i_gas in 1:length(atmos.gases)
-                lvl_tot += atmos.layer_x[i,i_gas]
+            tot = 0.0
+            for i_gas in 1:atmos.spectrum.Gas.n_absorb 
+                tot += atmos.layer_x[i,i_gas]
             end 
-            missing_gases = missing_gases || (lvl_tot < 1.0-1.0e-50)
-        end 
-        if missing_gases
-            println("WARNING: mole fractions do not sum to unity (possibly due to missing gases in spectral file)")
+
+            if tot == 0
+                error("Layer $d has all-zero mole fractions")
+            end
+
+            for i_gas in 1:atmos.spectrum.Gas.n_absorb
+                ti = atmos.spectrum.Gas.type_absorb[i_gas]
+                gas = SOCRATES.input_head_pcf.header_gas[ti]
+
+                atmos.layer_x[i,i_gas] /= tot
+                
+                if gas in keys(atmos.input_x)
+                    atmos.input_x[gas][i] = atmos.layer_x[i,i_gas]
+                end
+
+            end 
         end
 
         calc_layer_props!(atmos)
