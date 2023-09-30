@@ -40,11 +40,15 @@ s = ArgParseSettings()
         help = "Total top of atmosphere pressure [bar]."
         arg_type = Float64
         required = true
-    "x_dict"
+    "--x_dict"
         help = "Mole fractions of volatiles formatted as a dictionary e.g. \"H2O=0.8,H2=0.2\" "
         arg_type = String 
-        required = true
-    "--load_csv"
+        default = ""
+    "--x_path"
+        help = "Mole fractions of volatiles formatted as a CSV file (path to file)"
+        arg_type = String 
+        default = ""
+    "--pt_path"
         help = "Path to a CSV file containing a T(p) profile to load. Columns of file should be [Pa, K]"
         arg_type = String 
         default = ""
@@ -74,11 +78,11 @@ s = ArgParseSettings()
         help = "Output directory relative to AGNI directory. This directory will be emptied before being used."
         arg_type = String
         default = "out"
-    "--spf"
+    "--sp_file"
         help = "Spectral file path. Default is Mallard."
         arg_type = String
         default = "res/spectral_files/Mallard/Mallard"
-    "--stf"
+    "--star"
         help = "Path to stellar spectrum txt file. If not provided, spectral file is assumed to already include it."
         arg_type = String
         default = ""
@@ -141,17 +145,19 @@ radius          = args["radius"]
 p_surf          = args["psurf"]
 p_top           = args["ptop"]
 nlev_centre     = args["nlevels"]
-spfile_name     = args["spf"]
+spfile_name     = args["sp_file"]
 output_dir      = args["output"]
+x_dict          = args["x_dict"]
+x_path          = args["x_path"]
 oneshot         = args["once"]
 plot            = args["plot"]
-csv_path        = args["load_csv"]
+pt_path         = args["pt_path"]
 albedo_s        = args["albedo_s"]
 zenith_degrees  = args["zenith_degrees"]
 ini_dry         = args["ini_dry"]
 ini_sat         = args["ini_sat"]
 trppt           = args["trppt"]
-star_file       = args["stf"]
+star_file       = args["star"]
 rscatter        = args["rscatter"]
 verbose         = args["verbose"]
 animate         = args["animate"]
@@ -178,31 +184,41 @@ end
 
 spfile_has_star = (star_file == "")
 
-# Parse the provided x dict (assumes that the atmosphere is well-mixed)
-mole_fractions = Dict()
+# Handle the provided mole fraction input 
+#    Default case
+mf_dict = nothing
+mf_path = nothing
+#    Dictionary case
+if x_dict != ""
+    mf_dict = Dict()
 
-x_strip = strip(args["x_dict"], [' ', '"'])
-x_split = split(x_strip, ",")
+    x_strip = strip(args["x_dict"], [' ', '"'])
+    x_split = split(x_strip, ",")
 
-if length(x_split) < 1
-    error("No input mole fractions provided. Check the required formatting.")
+    if length(x_split) < 1
+        error("No input mole fractions provided. Check the required dictionary formatting.")
+    end 
+
+    for pair in x_split # for each gas:val pair 
+        gas_split = split(pair, "=")
+        if length(gas_split) != 2
+            error("Cannot parse input mole fractions. Check the required formatting.")
+        end 
+        gas = String(gas_split[1])
+        val = parse(Float64,gas_split[2])
+        if (val > 1.0) || (val < 0.0)
+            error("Mole fractions must be between 0 and 1")
+        end 
+        if gas in keys(mole_fractions)
+            error("Mole fraction for '$gas' has been provided twice")
+        end 
+        mole_fractions[gas] = val
+    end 
 end 
-
-for pair in x_split # for each gas:val pair 
-    gas_split = split(pair, "=")
-    if length(gas_split) != 2
-        error("Cannot parse input mole fractions. Check the required formatting.")
-    end 
-    gas = String(gas_split[1])
-    val = parse(Float64,gas_split[2])
-    if (val > 1.0) || (val < 0.0)
-        error("Mole fractions must be between 0 and 1")
-    end 
-    if gas in keys(mole_fractions)
-        error("Mole fractions for '$gas' has been provided twice")
-    end 
-    mole_fractions[gas] = val
-end 
+#    File path case
+if x_path != ""
+    mf_path = x_path
+end
 
 # Setup atmosphere
 println("Atmosphere: setting up")
@@ -212,7 +228,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          toa_heating, tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
-                         mf_dict=mole_fractions,
+                         mf_dict=mf_dict,
+                         mf_path=mf_path,
                          zenith_degrees=zenith_degrees,
                          albedo_s=albedo_s,
                          flag_gcontinuum=true,
@@ -225,8 +242,8 @@ atmosphere.allocate!(atmos;
 
 # Set PT profile 
 #    Load CSV if required
-if !(csv_path == "")
-    setpt.fromcsv!(atmos, abspath(csv_path))
+if !(pt_path == "")
+    setpt.fromcsv!(atmos, abspath(pt_path))
 end 
 #    Prevent surface supersaturation
 setpt.prevent_surfsupersat!(atmos)
