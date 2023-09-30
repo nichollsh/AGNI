@@ -766,7 +766,7 @@ module atmosphere
                 gas = SOCRATES.input_head_pcf.header_gas[ti]
 
                 atmos.layer_x[i,i_gas] /= tot
-                
+
                 if gas in keys(atmos.input_x)
                     atmos.input_x[gas][i] = atmos.layer_x[i,i_gas]
                 end
@@ -860,7 +860,7 @@ module atmosphere
         # Check files are acceptable and set instellation if doing SW flux
         if lw
             if !Bool(atmos.spectrum.Basic.l_present[6])
-                error("The spectral file contains no data for the Planckian function.\nCheck that the file contains a stellar spectrum.")
+                error("The spectral file contains no data for the Planckian function.\nCheck that the file contains a stellar spectrum or run AGNI with the `stf` argument.")
             end
 
             if Bool(atmos.spectrum.Basic.l_present[2])
