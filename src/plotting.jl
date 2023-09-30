@@ -82,7 +82,7 @@ module plotting
     Plot the current temperature-pressure profile, current heating rates, and
     optionally the previous states that the atmosphere has taken.
     """
-    function plot_solver(atmos, fname; hist_tmpl::Array=[])
+    function plot_solver(atmos, fname; hist_tmpl::Array=[], incl_magma::Bool=false)
 
         dpi=250
         lw=1.5
@@ -105,7 +105,9 @@ module plotting
         plt1 = plot(framestyle=:box, legend=:topright, ylims=ylims, yticks=yticks)
 
         # Plot surface temperature(s)
-        scatter!(plt1, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
+        if incl_magma
+            scatter!(plt1, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
+        end
         scatter!(plt1, [atmos.tstar],     [atmos.pl[end]*1e-5], color="brown3",         label=L"T_*") 
         
         # Plot temperature profiles 
