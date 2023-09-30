@@ -38,9 +38,10 @@ mf_dict         = Dict([
                         ("CO"  , 0.600),
                         ("N2"  , 0.008)
                         ])
+mf_path  = "res/equ.csv"
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
-star_file     = "res/stellar_spectra/trappist-1.txt"
+star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
 # Create output directory
@@ -57,9 +58,9 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          toa_heating, tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
-                         mf_dict=mf_dict,
+                         mf_path=mf_path,
                          flag_gcontinuum=true,
-                         flag_rayleigh=true,
+                         flag_rayleigh=false,
                          overlap_method=4,
                          skin_d=0.1,
                          tmp_magma=2000.0

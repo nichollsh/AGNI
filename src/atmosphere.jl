@@ -17,6 +17,8 @@ module atmosphere
     using Printf
     using NCDatasets
     using DataStructures
+    using DelimitedFiles
+    using PCHIPInterpolation
 
     import phys
 
@@ -246,6 +248,13 @@ module atmosphere
         atmos.control.l_aerosol =   flag_aerosol
         atmos.control.l_cloud =     flag_cloud
 
+        # Initialise temperature grid to be isothermal
+        atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tstar
+        atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tstar
+
+        # Initialise pressure grid with current p_toa and p_boa
+        generate_pgrid!(atmos)
+
         
         # Read mole fractions
         if isnothing(mf_dict) && isnothing(mf_path)
@@ -285,11 +294,66 @@ module atmosphere
 
         # File input case 
         if mf_source == 1
-            # Read header first
-            
+            # check file 
+            if !isfile(mf_path)
+                error("Could not read file '$mf_path'")
+            end
+
+            # get header
+            mf_head = readlines(abspath(mf_path))[1]
+            mf_head = mf_head[2:end]  # remove comment symbol at start
+            mf_head = replace(mf_head, " " => "")  # remove whitespace
+            heads = split(mf_head, ",") # split by columm
+
+            # create arrays 
+            for h in heads
+                gas_valid = strip(h, ' ')
+                gas_valid = uppercase(h)
+                if gas_valid in SOCRATES.input_head_pcf.header_gas
+                    atmos.input_x[gas_valid] = zeros(Float64, atmos.nlev_c)
+                end 
+            end 
+
+            # get body
+            mf_body = readdlm(abspath(mf_path), ',', Float64; header=false, skipstart=2)
+            mf_body = transpose(mf_body)
+
+            # set composition by interpolating with pressure array 
+            for li in 4:lastindex(heads)
+
+                gas = heads[li]
+
+                if !(gas in keys(atmos.input_x)) # skip tem, pre, hgt
+                    continue
+                end
+
+                arr_p = mf_body[1,:]
+                arr_x = mf_body[li,:]
+
+                # Extend loaded profile to lower pressures (prevent domain error)
+                if arr_p[1] > atmos.p_toa
+                    pushfirst!(arr_p,   atmos.p_toa/1.1)
+                    pushfirst!(arr_x,   arr_x[1] )
+                end
+
+                # Extend loaded profile to higher pressures 
+                if arr_p[end] < atmos.p_boa
+                    push!(arr_p,   atmos.p_boa*1.1)
+                    push!(arr_x,   arr_x[end])
+                end
+                
+                # Set up interpolator
+                itp = Interpolator(arr_p, arr_x)
+                
+                # Set values 
+                for i in 1:atmos.nlev_c
+                    atmos.input_x[gas][i] = itp(atmos.p[i])
+                end 
+                
+            end 
         end
 
-        # Check that we actually stored some values for mf 
+        # Check that we actually stored some values
         if length(keys(atmos.input_x)) == 0
             error("No mole fractions were stored")
         end
@@ -585,17 +649,6 @@ module atmosphere
         atmos.atm.n_profile = 1
         atmos.atm.lat[1] = 0.0
         atmos.atm.lon[1] = 0.0
-
-        #########################################
-        # Temperature and pressure grids
-        #########################################
-
-        # Initialise temperature grid to be isothermal
-        atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tstar
-        atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tstar
-
-        # Initialise pressure grid with current p_toa and p_boa
-        generate_pgrid!(atmos)
 
         ###########################################
         # Range of bands
