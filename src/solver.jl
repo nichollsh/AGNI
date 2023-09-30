@@ -71,7 +71,7 @@ module solver
     # Naive steam adjustment, single step (as per AEOLUS)
     function adjust_steam!(atmos::atmosphere.Atmos_t)
         
-        # Get mixing ratio of water 
+        # Get mole fraction of water 
         gas = "H2O"
 
         # Skip if no water present
@@ -81,12 +81,12 @@ module solver
 
         #Downward pass
         for i in range(1,stop=atmos.nlev_c-1, step=1)
-            mr_h2o = atmosphere.get_mr(atmos, gas, lvl=i)
-            pp_h2o = atmos.p[i] * mr_h2o
-            if (pp_h2o < 1e-10)
+            x = atmosphere.get_x(atmos, gas, i)
+            pp = atmos.p[i] * x
+            if (pp < 1e-10)
                 continue
             end 
-            Tdew = phys.calc_Tdew(gas, pp_h2o)
+            Tdew = phys.calc_Tdew(gas, pp)
             if (atmos.tmp[i] < Tdew)
                 atmos.tmp[i] = Tdew
             end
@@ -94,16 +94,17 @@ module solver
 
         #Upward pass
         for i in range(atmos.nlev_c-1,stop=2, step=-1)
-            mr_h2o = atmosphere.get_mr(atmos, gas, lvl=i)
-            pp_h2o = atmos.p[i] * mr_h2o
-            if (pp_h2o < 1e-10)
+            x = atmosphere.get_x(atmos, gas, i)
+            pp = atmos.p[i] * x
+            if (pp < 1e-10)
                 continue
             end 
-            Tdew = phys.calc_Tdew(gas, pp_h2o)
+            Tdew = phys.calc_Tdew(gas, pp)
             if (atmos.tmp[i] < Tdew)
                 atmos.tmp[i] = Tdew
             end
         end
+        return nothing
     end
 
     # Calculate heating rates at cell-centres
@@ -129,7 +130,7 @@ module solver
             atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i] * atmos.layer_mmw[i]) * dF[i]/dp[i] # K/s
         end
         atmos.heating_rate *= 86400.0 # K/day
-        
+        return nothing
     end
 
     """
@@ -599,7 +600,7 @@ module solver
         if F_TOA_rad*F_BOA_rad < 0
             @printf("WARNING: TOA and BOA radiative fluxes have different signs\n")
         end
-
+        return nothing
     end # end solve_energy
 
 end 
