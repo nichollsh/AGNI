@@ -79,10 +79,10 @@ module atmosphere
         skin_k::Float64      # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
         tmp_magma::Float64  # Mantle temperature [K]
 
-        # Mixing ratios 
-        mr_input::Dict     # Dictonary with scalar quantities (well-mixed)
-        gases::Array       # Component gases
-        layer_mr::Array    # Per-level mixing ratios [lvl, gas_idx] cell centres
+        # Mole fractions (= VMR)
+        gases::Array        # List of gas names 
+        input_x::Dict       # Dict of layer mole fractions (key,value) = (gas_name,array)
+        layer_x::Array      # Per-level mole fractions [lvl, gas_idx] cell centres
 
         # Layers' average properties
         layer_density::Array  # density [kg m-3]
@@ -132,6 +132,7 @@ module atmosphere
         SOCRATES.deallocate_out(     atmos.radout)
 
         atmos.is_alloc = false
+        return nothing
     end
 
     """
@@ -143,17 +144,18 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `ROOT_DIR::String`                AGNI root directory 
-    - `OUT_DIR::String`                 Output directory
-    - `spfile::String`                  path to spectral file
+    - `ROOT_DIR::String`                AGNI root directory. 
+    - `OUT_DIR::String`                 Output directory.
+    - `spfile::String`                  path to spectral file.
     - `toa_heating::Float64`            downward shortwave flux at the top of the atmosphere [W m-2].
     - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
-    - `radius::Float64`                 planet radius at the surface [m]
-    - `nlev_centre::Int`                number of cells.
+    - `radius::Float64`                 planet radius at the surface [m].
+    - `nlev_centre::Int`                number of model levels.
     - `p_surf::Float64`                 total surface pressure [bar].
     - `p_top::Float64`                  total top of atmosphere pressure [bar].
-    - `mixing_ratios::Dict`             dictionary of mixing ratios in the format (key,value)=(gas,mixing_ratio).
+    - `mf_dict=nothing`                 dictionary of mole fractions in the format (key,value)=(gas,mf).
+    - `mf_path=nothing`                 path to file containing mole fractions at each level.
     - `zenith_degrees::Float64=54.74`   angle of radiation from the star, relative to the zenith [degrees].
     - `albedo_s::Float64=0.0`           surface albedo.
     - `tmp_floor::Float64=50.0`         temperature floor [K].
@@ -163,7 +165,7 @@ module atmosphere
     - `skin_d::Float64=0.5`             skin thickness [m].
     - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
     - `all_channels::Bool=true`         use all channels available for RT?
-    - `overlap_method::Int=2`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv ext, 8: ro+r&r)
+    - `overlap_method::Int=2`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
     - `flag_continuum::Bool=false`      include continuum absorption?
@@ -175,8 +177,9 @@ module atmosphere
                     spfile::String, 
                     toa_heating::Float64, tstar::Float64,
                     gravity::Float64, radius::Float64,
-                    nlev_centre::Int, p_surf::Float64, p_top::Float64,
-                    mixing_ratios::Dict;
+                    nlev_centre::Int, p_surf::Float64, p_top::Float64;
+                    mf_dict=                    nothing,
+                    mf_path =                   nothing,
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        50.0,
@@ -243,59 +246,89 @@ module atmosphere
         atmos.control.l_aerosol =   flag_aerosol
         atmos.control.l_cloud =     flag_cloud
 
-        # Normalise and store gas mixing ratios in dictionary
-        if isempty(mixing_ratios)
-            error("No mixing ratios provided")
+        
+        # Read mole fractions
+        if isnothing(mf_dict) && isnothing(mf_path)
+            error("No mole fractions provided")
         end
 
-        atmos.mr_input = Dict()
-        norm_factor = sum(values(mixing_ratios))
+        if !isnothing(mf_dict) && !isnothing(mf_path)
+            error("Mole fractions provided twice")
+        end
+
+        mf_source::Int = 0  # source for mf (0: dict, 1: file)
+        if isnothing(mf_dict) && !isnothing(mf_path)
+            mf_source = 1
+        end
         
-        for (key, value) in mixing_ratios
-            if key in SOCRATES.input_head_pcf.header_gas
-                atmos.mr_input[key] = value / norm_factor
-            else
-                error("Invalid gas '$key'")
+        # The values will be stored in a dict of arrays regardless, because 
+        # we do not yet know which order the gases should be indexed in.
+
+        atmos.input_x = Dict()  # dict of arrays 
+        
+        # Dict input case
+        if mf_source == 0
+            norm_factor = sum(values(mf_dict))
+            for (key, value) in mf_dict  # normalise mfs
+                if key in SOCRATES.input_head_pcf.header_gas
+                    mf_dict[key] = value / norm_factor
+                else
+                    error("Invalid gas '$key'")
+                end
             end
+            for (key, value) in mf_dict  # store as arrays
+                gas_valid = strip(key, ' ')
+                gas_valid = uppercase(gas_valid)
+                atmos.input_x[gas_valid] = ones(Float64, atmos.nlev_c) * value
+            end
+        end
+
+        # File input case 
+        if mf_source == 1
+            # Read header first
+            
+        end
+
+        # Check that we actually stored some values for mf 
+        if length(keys(atmos.input_x)) == 0
+            error("No mole fractions were stored")
         end
 
         # Record that the parameters are set
         atmos.is_param = true
+        return nothing
     end
 
     """
-    **Get the mass mixing ratio of a gas within the atmosphere.**
-
-    The atmosphere is assumed to be well-mixed.
+    **Get the mole fraction of a gas within the atmosphere.**
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `gas::String`             name of the gas (e.g. "H2O").
-    - `lvl::Int=0`              model level to measure mixing ratio (0 => use well-mixed input value)
+    - `lvl::Int`                model level to measure mole fraction
 
     Returns:
-    - `mr::Float64`             mixing ratio of `gas`.
+    - `x::Float64`              mole fraction of `gas`.
     """
-    function get_mr(atmos::atmosphere.Atmos_t, gas::String; lvl::Int=0)::Float64
+    function get_x(atmos::atmosphere.Atmos_t, gas::String, lvl::Int)::Float64
 
         gas_valid = strip(gas, ' ')
         gas_valid = uppercase(gas_valid)
 
-        mr = 0.0
-        if gas_valid in keys(atmos.mr_input)
-            if lvl == 0 
-                mr = atmos.mr_input[gas_valid]
-            else 
-                i_gas = findfirst(==(gas), atmos.gases)
-                mr = atmos.layer_mr[lvl,i_gas]
-            end
+        x = 0.0
+        if gas_valid in keys(atmos.input_x)
+            # i_gas = findfirst(==(gas), atmos.gases)
+            # x = atmos.layer_x[lvl,i_gas]
+            x = atmos.input_x[gas_valid][lvl]
         end 
 
-        return mr
+        return x
     end
 
     """
     **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
+
+    Assumes that the atmosphere may be treated as an ideal gas.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -315,10 +348,10 @@ module atmosphere
             for (i_gas, gas) in enumerate(atmos.gases)
 
                 # set mmw
-                atmos.layer_mmw[i] += atmos.layer_mr[i,i_gas] * phys.lookup_safe("mmw",gas)
+                atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
 
                 # set cp
-                atmos.layer_cp[i] += atmos.layer_mr[i,i_gas] * phys.lookup_safe("mmw",gas) * phys.lookup_safe("cp",gas)
+                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas) * phys.lookup_safe("cp",gas)
             end
 
             # density
@@ -357,6 +390,7 @@ module atmosphere
             atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
         end
 
+        return nothing
     end 
 
     """
@@ -374,6 +408,8 @@ module atmosphere
         # Set pressure cell-centre array by interpolation
         atmos.p =    zeros(Float64, atmos.nlev_c)
         atmos.p[:] .= 0.5 .* (atmos.pl[2:end] + atmos.pl[1:end-1])
+
+        return nothing
     end
 
     
@@ -434,11 +470,11 @@ module atmosphere
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
             println("Python: inserting rayleigh scattering")
-            co2_mr = get_mr(atmos, "co2")  # Just use mixing ratio at BOA
-            n2_mr  = get_mr(atmos, "n2" )
-            h2o_mr = get_mr(atmos, "h2o")
+            co2_x = get_x(atmos, "co2", atmos.nlev_c) 
+            n2_x  = get_x(atmos, "n2" , atmos.nlev_c)
+            h2o_x = get_x(atmos, "h2o", atmos.nlev_c)
             runfile = joinpath([atmos.ROOT_DIR, "src", "insert_rayleigh.py"])
-            run(`python $runfile $spectral_file_run $co2_mr $n2_mr $h2o_mr`)
+            run(`python $runfile $spectral_file_run $co2_x $n2_x $h2o_x`)
         end
 
         # Validate files
@@ -648,9 +684,9 @@ module atmosphere
             atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
         end
 
-        # Set mixing ratios
+        # Set composition
         atmos.gases = Array{String}(undef, atmos.spectrum.Gas.n_absorb)
-        atmos.layer_mr = zeros(Float64, (atmos.nlev_c,length(atmos.gases)))
+        atmos.layer_x = zeros(Float64, (atmos.nlev_c,length(atmos.gases)))
 
         for i_gas in 1:atmos.spectrum.Gas.n_absorb
             ti = atmos.spectrum.Gas.type_absorb[i_gas]
@@ -658,14 +694,13 @@ module atmosphere
 
             atmos.gases[i_gas] = gas
 
-            if gas in keys(atmos.mr_input)
-                atmos.layer_mr[:,i_gas] .= atmos.mr_input[gas]
+            if gas in keys(atmos.input_x)
+                atmos.layer_x[:,i_gas] .= atmos.input_x[gas]
             else
-                atmos.layer_mr[:,i_gas] .= 0.0
+                atmos.layer_x[:,i_gas] .= 0.0
             end
 
-            # Initialise as well-mixed
-            atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.layer_mr[:,i_gas]
+            # Values are provided to SOCRATES when radtrans is called
         end
 
         # Warn user if we are missing gases 
@@ -673,12 +708,12 @@ module atmosphere
         for i in 1:atmos.nlev_c
             lvl_tot = 0.0
             for i_gas in 1:length(atmos.gases)
-                lvl_tot += atmos.layer_mr[i,i_gas]
+                lvl_tot += atmos.layer_x[i,i_gas]
             end 
             missing_gases = missing_gases || (lvl_tot < 1.0-1.0e-50)
         end 
         if missing_gases
-            println("WARNING: mixing ratios do not sum to unity (possibly due to missing gases in spectral file)")
+            println("WARNING: mole fractions do not sum to unity (possibly due to missing gases in spectral file)")
         end
 
         calc_layer_props!(atmos)
@@ -746,6 +781,7 @@ module atmosphere
         # Mark as allocated
         atmos.is_alloc = true
 
+        return nothing
     end  # end of allocate
 
     function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool)
@@ -864,7 +900,10 @@ module atmosphere
         ######################################################        
 
         for i_gas in 1:length(atmos.gases)
-            atmos.atm.gas_mix_ratio[1, :, i_gas] .= atmos.layer_mr[:,i_gas]
+            for i in 1:atmos.nlev_c 
+                # convert mole fraction to mass mixing ratio
+                atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw", atmos.gases[i_gas]) / atmos.layer_mmw[i]
+            end
         end 
         calc_layer_props!(atmos)
 
@@ -910,6 +949,7 @@ module atmosphere
             atmos.flux_n = atmos.flux_n_lw .+ atmos.flux_n_sw
         end
 
+        return nothing
     end # end of radtrans
 
     # Calculate potential temperature and check convective instability
@@ -931,7 +971,7 @@ module atmosphere
             atmos.conv_inst[i] = (atmos.tmp[i-1] < atmos.nptmp[i] + tmp_eps )
         end 
         
-        
+        return nothing
     end 
 
     # Calculate dry convective fluxes using mixing length theory
@@ -1006,7 +1046,7 @@ module atmosphere
                 @printf(f, "%1.5e , %1.5e \n", arr_P[i], arr_T[i])
             end
         end
-
+        return nothing
     end
 
     # Write current cell-edge fluxes to a CSV file
@@ -1026,6 +1066,7 @@ module atmosphere
                           )
             end
         end
+        return nothing
     end
 
     # Write atmosphere data to a NetCDF file
@@ -1100,7 +1141,7 @@ module atmosphere
         var_grav =      defVar(ds, "gravity",Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
         var_mmw =       defVar(ds, "mmw",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
         var_gases =     defVar(ds, "gases",  Char,    ("nchars", "ngases")) # Transposed cf AEOLUS because of how Julia stores arrays
-        var_mr =        defVar(ds, "x_gas",  Float64, ("ngases", "nlev_c")) # ^^
+        var_x =         defVar(ds, "x_gas",  Float64, ("ngases", "nlev_c")) # ^^
         var_fdl =       defVar(ds, "fl_D_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ful =       defVar(ds, "fl_U_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fnl =       defVar(ds, "fl_N_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
@@ -1135,7 +1176,7 @@ module atmosphere
         
         for i_gas in 1:ngases 
             for i_lvl in 1:nlev_c
-                var_mr[i_gas, i_lvl] = atmos.layer_mr[i_lvl, i_gas]
+                var_x[i_gas, i_lvl] = atmos.layer_x[i_lvl, i_gas]
             end 
         end 
 
@@ -1159,7 +1200,7 @@ module atmosphere
         # ----------------------
         # Close
         close(ds)
-
+        return nothing
     end 
 
 end

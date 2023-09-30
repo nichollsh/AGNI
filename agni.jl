@@ -31,7 +31,7 @@ gravity         = 10.0      # m s-2
 nlev_centre     = 100  
 p_surf          = 50.0     # bar
 p_top           = 1e-6      # bar 
-mixing_ratios   = Dict([
+mf_dict         = Dict([
                         ("H2O" , 0.040),
                         ("CO2" , 0.350),
                         ("H2"  , 0.002),
@@ -57,7 +57,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          toa_heating, tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
-                         mixing_ratios,
+                         mf_dict=mf_dict,
                          flag_gcontinuum=true,
                          flag_rayleigh=true,
                          overlap_method=4,
@@ -69,18 +69,18 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"out/pt.csv")
-#setpt.prevent_surfsupersat!(atmos)
-#setpt.dry_adiabat!(atmos)
-#setpt.stratosphere!(atmos, 300.0)
+setpt.prevent_surfsupersat!(atmos)
+setpt.dry_adiabat!(atmos)
+setpt.stratosphere!(atmos, 300.0)
 
 # Calculate LW and SW fluxes (once)
-# println("RadTrans: calculating fluxes")
-# atmosphere.radtrans!(atmos, true)
-# atmosphere.radtrans!(atmos, false)
+println("RadTrans: calculating fluxes")
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-println("Starting solver")
-solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=500, min_steps=20)
+# println("Starting solver")
+# solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=50, min_steps=20)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
@@ -88,6 +88,7 @@ atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
 atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Save plots
+plotting.plot_x(atmos,      joinpath(atmos.OUT_DIR,"mf.pdf"))
 plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
 plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
 plotting.anim_solver(atmos)

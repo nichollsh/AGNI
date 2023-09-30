@@ -40,8 +40,8 @@ s = ArgParseSettings()
         help = "Total top of atmosphere pressure [bar]."
         arg_type = Float64
         required = true
-    "mr_dict"
-        help = "Mixing ratios of volatiles formatted as a dictionary e.g. \"H2O=0.8,H2=0.2\" "
+    "x_dict"
+        help = "Mole fractions of volatiles formatted as a dictionary e.g. \"H2O=0.8,H2=0.2\" "
         arg_type = String 
         required = true
     "--load_csv"
@@ -178,30 +178,30 @@ end
 
 spfile_has_star = (star_file == "")
 
-# Parse the provided mr dict 
-mixing_ratios = Dict()
+# Parse the provided x dict (assumes that the atmosphere is well-mixed)
+mole_fractions = Dict()
 
-mr_strip = strip(args["mr_dict"], [' ', '"'])
-mr_split = split(mr_strip, ",")
+x_strip = strip(args["x_dict"], [' ', '"'])
+x_split = split(x_strip, ",")
 
-if length(mr_split) < 1
-    error("No input mixing ratios provided. Check the required formatting.")
+if length(x_split) < 1
+    error("No input mole fractions provided. Check the required formatting.")
 end 
 
-for pair in mr_split # for each gas:val pair 
+for pair in x_split # for each gas:val pair 
     gas_split = split(pair, "=")
     if length(gas_split) != 2
-        error("Cannot parse input mixing ratios. Check the required formatting.")
+        error("Cannot parse input mole fractions. Check the required formatting.")
     end 
     gas = String(gas_split[1])
     val = parse(Float64,gas_split[2])
     if (val > 1.0) || (val < 0.0)
-        error("Mixing ratios must be between 0 and 1")
+        error("Mole fractions must be between 0 and 1")
     end 
-    if gas in keys(mixing_ratios)
-        error("Mixing ratio for '$gas' has been provided twice")
+    if gas in keys(mole_fractions)
+        error("Mole fractions for '$gas' has been provided twice")
     end 
-    mixing_ratios[gas] = val
+    mole_fractions[gas] = val
 end 
 
 # Setup atmosphere
@@ -212,7 +212,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          toa_heating, tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
-                         mixing_ratios,
+                         mf_dict=mole_fractions,
                          zenith_degrees=zenith_degrees,
                          albedo_s=albedo_s,
                          flag_gcontinuum=true,
