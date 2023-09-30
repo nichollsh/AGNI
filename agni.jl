@@ -38,7 +38,6 @@ mf_dict         = Dict([
                         ("CO"  , 0.600),
                         ("N2"  , 0.008)
                         ])
-mf_path  = "res/equ.csv"
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
 star_file     = "res/stellar_spectra/sun.txt"
@@ -58,7 +57,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          toa_heating, tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
-                         mf_path=mf_path,
+                         mf_dict=mf_dict,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
                          overlap_method=4,

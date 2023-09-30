@@ -18,6 +18,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * `agni.jl`         - AGNI executable for debugging
 * `agni_cli.jl`     - AGNI executable with command-line interface
 * `demo_steamrun.jl`- Script to demonstrate the pure-steam runaway greenhouse effect
+* `demo_earth.jl`   - Script to demonstrate solving for Earth's temperature structure
 
 
 ### Requirements
@@ -75,13 +76,18 @@ Pure steam runaway greenhouse.
 
 Calculating fluxes with SOCRATES, without solving for RCE.
 <p float="left">
-  <img src="doc/example_nosolve/pt.png" width="400" />
-  <img src="doc/example_nosolve/fl.png" width="400" /> 
+  <img src="doc/example_nosolve/pt.png" width="350" />
+  <img src="doc/example_nosolve/fl.png" width="350" /> 
 </p>
 
-Solving for RCE with accelerated time-stepping (this GIF is somewhat outdated now).
+Solving for RCE with accelerated time-stepping.
 <p float="left">
-  <img src="doc/example_withsolve/anim.gif" width="400"/>
-  <img src="doc/example_withsolve/fl.png" width="400" /> 
+  <img src="doc/example_withsolve/pt.png" width="350"/>
+  <img src="doc/example_withsolve/fl.png" width="350" /> 
+</p>
+
+An attempt at solving for Earth's temperature profile. The ~100 K accuracy here wouldn't be good enough for Earth system modelling, but it's probably good enough for magma ocean modelling.
+<p float="left">
+  <img src="doc/example_earth/comparison.png" width="500"/>
 </p>
 
