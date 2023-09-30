@@ -29,7 +29,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks)
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright)
 
         # Plot temperature
         scatter!(plt, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
@@ -40,7 +40,42 @@ module plotting
         yaxis!(plt, yscale=:log10)
                 
         savefig(plt, fname)
+        return nothing
+    end
 
+    """
+    Plot the composition of the atmosphere at each cell-centre location.
+    """
+    function plot_x(atmos, fname)
+        
+        arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
+        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
+        
+        # Create plot
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright)
+
+        # Plot mole fractions for each gas
+        min_x = 1.0e-3
+        for gas in keys(atmos.input_x)  
+            arr_x = atmos.input_x[gas]
+            min_x = min(min_x, minimum(arr_x))
+            plot!(arr_x, arr_P, label=gas, lw=2)
+        end
+
+        xlims  = (max(min_x, 1.0e-20)*0.5, 1.2)
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=0, step=1))
+
+        # Set figure properties
+        xlabel!(plt, "Mole fraction")
+        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks)
+
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10)
+                
+        savefig(plt, fname)
     end
 
     """
@@ -143,6 +178,7 @@ module plotting
         plt = plot(plt1, plt2, layout=(1,2), dpi=dpi)
         savefig(plt, fname)
 
+        return nothing
     end
 
     """
@@ -156,7 +192,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         w = 2
-        plt = plot(legend=:topleft, framestyle=:box, ylims=ylims, yticks=yticks)
+        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks)
 
         col_u = "brown3"
         col_d = "seagreen"
@@ -226,6 +262,7 @@ module plotting
 
         savefig(plt, fname)
 
+        return nothing
     end
 
     """
@@ -251,6 +288,7 @@ module plotting
             run(`ffmpeg -loglevel quiet -framerate $fps -i $out/solver_monitor_%04d.png -y $out/anim.mp4`)
         end
 
+        return nothing
     end
 
 

@@ -30,7 +30,7 @@ radius          = 6.0e6
 nlev_centre     = 100
 p_surf          = 300.0     # bar
 p_top           = 1e-8      # bar 
-mixing_ratios   = Dict([("H2O", 1.0)])
+mole_fractions  = Dict([("H2O", 1.0)])
 
 spectral_file = "res/spectral_files/Oak/Oak"
 star_file     = "res/stellar_spectra/sun.txt"
@@ -47,7 +47,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                         toa_heating, 1700.0,
                         gravity, radius,
                         nlev_centre, p_surf, p_top,
-                        mixing_ratios,
+                        mf_dict=mole_fractions,
                         flag_gcontinuum=true
                         )
 atmosphere.allocate!(atmos, stellar_spectrum=star_file)
