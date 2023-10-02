@@ -266,7 +266,7 @@ module solver
             end
 
             # Stop extrapolation towards end
-            if ((step/max_steps > 0.7) && (step > 2)) || flag_prev
+            if ((step/max_steps > 0.9) && (step > 2)) || flag_prev
                 extrap = false
             end 
 
