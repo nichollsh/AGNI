@@ -4,6 +4,7 @@
 .star_file
 *.mod
 *.o
+radiation_code.lock
 
 # Output files 
 out/*
