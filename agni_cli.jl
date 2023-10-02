@@ -76,7 +76,7 @@ s = ArgParseSettings()
     "--skin_d"
         help = "Conductive skin thickness [m]."
         arg_type = Float64
-        default = 0.1
+        default = 0.05
     "--skin_k"
         help = "Conductive skin thermal conductivity [W m-1 K-1]."
         arg_type = Float64
@@ -121,6 +121,9 @@ s = ArgParseSettings()
         action = :store_true
     "--noaccel"
         help = "Disable model acceleration."
+        action = :store_true
+    "--equivext"
+        help = "Use equivalent extinction for computing line overlap. Otherwise, will use random overlap method."
         action = :store_true
     "--rscatter"
         help = "Include rayleigh scattering."
@@ -189,6 +192,7 @@ tmp_magma       = args["tmp_magma"]
 max_steps       = args["nsteps"]
 no_adjust       = args["noadjust"]
 no_accel        = args["noaccel"]
+equivext        = args["equivext"]
 cc_tmpabs       = args["convcrit_tmpabs"]
 cc_tmprel       = args["convcrit_tmprel"]
 cc_fradrel      = args["convcrit_fradrel"]
@@ -233,15 +237,22 @@ if x_dict != ""
         if (val > 1.0) || (val < 0.0)
             error("Mole fractions must be between 0 and 1")
         end 
-        if gas in keys(mole_fractions)
+        if gas in keys(mf_dict)
             error("Mole fraction for '$gas' has been provided twice")
         end 
-        mole_fractions[gas] = val
+        mf_dict[gas] = val
     end 
 end 
 #    File path case
 if x_path != ""
     mf_path = x_path
+end
+
+# Overlap method
+if equivext
+    overlap = 4
+else 
+    overlap = 2
 end
 
 # Setup atmosphere
@@ -258,6 +269,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          albedo_s=albedo_s,
                          skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                          tmp_floor=tmp_floor,
+                         overlap_method=overlap,
                          flag_gcontinuum=true,
                          flag_rayleigh=rscatter
                          )
@@ -272,9 +284,10 @@ if !(pt_path == "")
     setpt.fromcsv!(atmos, abspath(pt_path))
 end 
 #    Do not allow overwriting of tstar
-if tstar_enforce:
+if tstar_enforce
     atmos.tstar = tstar 
     atmos.tmpl[end] = star
+end
 #    Prevent surface supersaturation
 setpt.prevent_surfsupersat!(atmos)
 #    Apply dry adiabat if required
