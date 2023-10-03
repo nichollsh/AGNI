@@ -286,7 +286,7 @@ end
 #    Do not allow overwriting of tstar
 if tstar_enforce
     atmos.tstar = tstar 
-    atmos.tmpl[end] = star
+    atmos.tmpl[end] = tstar
 end
 #    Prevent surface supersaturation
 setpt.prevent_surfsupersat!(atmos)
