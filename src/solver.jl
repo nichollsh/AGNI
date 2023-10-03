@@ -498,10 +498,12 @@ module solver
             # ----------------------------------------------------------
             # Calculate solver statistics
             # ---------------------------------------------------------- 
-            # Calculate relative rate of change in temperature
+            # Calculate a measure of the relative rate of change in temperature
+            # Measured only at cell-centres because they are not set by interpolation
+            # 90th percentile is used to exclude outliers
             if step > 1
                 drel_dt_prev = drel_dt
-                drel_dt = maximum(abs.(  ((atmos.tmp[:] .- hist_tmp[end,1:end])./hist_tmp[end,1:end])./dt  ))
+                drel_dt = quantile(abs.(  ((atmos.tmp[2:end] .- hist_tmp[end,2:end])./hist_tmp[end,2:end])./dt[2:end]  ), 0.9)
             end
 
             # Calculate maximum average change in temperature (insensitive to oscillations)
@@ -521,10 +523,10 @@ module solver
 
             F_BOA_rad = atmos.flux_n[end-1]
             F_OLR_rad = atmos.flux_u_lw[1]
-            F_loss      = abs(F_TOA_rad-F_BOA_rad)
+            F_loss    = abs(F_TOA_rad-F_BOA_rad)
 
-            # Calculate the relative change in heating rate
-            H_stat      = quantile(abs.(atmos.heating_rate[:]), 0.6)
+            # Calculate the 'typical' heating rate magnitude
+            H_stat    = quantile(abs.(atmos.heating_rate[:]), 0.6)
 
             # --------------------------------------
             # Print debug info

@@ -4,7 +4,7 @@
 # Derived from work by Harrison Nicholls on AEOLUS
 
 import numpy as np
-import shutil, os, sys, subprocess
+import shutil, os, sys, subprocess, time
 from scipy.stats import binned_statistic
 
 def LoadStellarSpectrum(spectrum):
@@ -206,6 +206,8 @@ if __name__=='__main__':
 
     # Write data in SOCRATES format
     PrepareStellarSpectrum(wl, fl, temp)
+
+    time.sleep(0.1)  # allow filesystem to catch up
 
     # Insert data into spectral file
     InsertStellarSpectrum(socr, temp, outp)

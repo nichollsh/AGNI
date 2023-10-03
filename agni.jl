@@ -24,30 +24,24 @@ import phys
 
 
 # Configuration options
-tstar           = 1700.0    # LW uflux bottom boundary condition [kelvin]
-toa_heating     = 4.0e+04   # SW dflux top boundary condition [W m-2]
+tstar           = 2769.2    # LW uflux bottom boundary condition [kelvin]
+toa_heating     = 1.232e+05   # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
 nlev_centre     = 100  
-p_surf          = 50.0     # bar
+p_surf          = 88.5     # bar
 p_top           = 1e-6      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 0.040),
-                        ("CO2" , 0.350),
-                        ("H2"  , 0.002),
-                        ("CO"  , 0.600),
-                        ("N2"  , 0.008)
+                        ("H2O" , 0.91806/88.5),
+                        ("CO2" , 4.12401/88.5),
+                        ("H2"  , 2.38348/88.5),
+                        ("CO"  , 79.8336/88.5),
+                        ("N2"  , 1.23623/88.5)
                         ])
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
-star_file     = "res/stellar_spectra/sun.txt"
+star_file     = "res/stellar_spectra/trappist-1.txt"
 output_dir    = "out/"
-
-# Create output directory
-rm(output_dir,force=true,recursive=true)
-if !isdir(output_dir) && !isfile(output_dir)
-    mkdir(output_dir)
-end
 
 # Setup atmosphere
 println("Setting up")
@@ -59,28 +53,35 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
-                         flag_rayleigh=false,
+                         flag_rayleigh=true,
                          overlap_method=4,
-                         skin_d=0.1,
-                         tmp_magma=2000.0
+                         zenith_degrees=54.4,
+                         skin_d=0.05,
+                         tmp_magma=2769.2
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"out/pt.csv")
-setpt.prevent_surfsupersat!(atmos)
-setpt.dry_adiabat!(atmos)
-setpt.stratosphere!(atmos, 300.0)
+# setpt.prevent_surfsupersat!(atmos)
+# setpt.dry_adiabat!(atmos)
+# setpt.stratosphere!(atmos, 300.0)
+
+# Create output directory
+rm(output_dir,force=true,recursive=true)
+if !isdir(output_dir) && !isfile(output_dir)
+    mkdir(output_dir)
+end
 
 # Calculate LW and SW fluxes (once)
 println("RadTrans: calculating fluxes")
-atmosphere.radtrans!(atmos, true)
-atmosphere.radtrans!(atmos, false)
+# atmosphere.radtrans!(atmos, true)
+# atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-# println("Starting solver")
-# solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=50, min_steps=20)
+println("Starting solver")
+solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=300, min_steps=20, extrap=false)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))

@@ -5,7 +5,7 @@
 
 import numpy as np
 import scipy.integrate as spint
-import os, sys
+import os, sys, time
 
 # Function with necessary information for each species to calculate Rayleigh scattering
 def species_info(species):
@@ -67,7 +67,9 @@ def rayleigh_coeff_adder(species_list = ['co2'], mixing_ratio_list = [1.], spect
     spectral_file = open(spectral_file_path,'r')
     
     #Load a dummy file that will hold the wavelength bands
-    
+    if os.path.exists(wavelength_dummy_file_path):
+        os.remove(wavelength_dummy_file_path)
+
     wavelength_band_file = open(wavelength_dummy_file_path,'wt')
     
     #Make a loop that runs through the lines in the spectral file until it finds BLOCK 1,
@@ -99,9 +101,18 @@ def rayleigh_coeff_adder(species_list = ['co2'], mixing_ratio_list = [1.], spect
     
     spectral_file.close()
     wavelength_band_file.close()
+
+    i = 0
+    while (not os.path.exists(wavelength_dummy_file_path)) and (i < 50):
+        time.sleep(0.05)
+        i += 1
+        
+    if (i == 50):
+        raise Exception("Failed to insert rayleigh scattering into spectral file")
     
     #Now we generate an array from the wavelength band file
     wavelength_bands = np.genfromtxt(wavelength_dummy_file_path,usecols=np.arange(0,3))
+
     #Delete the temporary wavelength band file
     os.remove(wavelength_dummy_file_path)
     
