@@ -25,7 +25,7 @@ import phys
 
 # Configuration options
 tstar           = 2769.2    # LW uflux bottom boundary condition [kelvin]
-toa_heating     = 1.232e+05   # SW dflux top boundary condition [W m-2]
+toa_heating     = 1.232e+06   # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
 nlev_centre     = 100  
@@ -81,7 +81,7 @@ println("RadTrans: calculating fluxes")
 
 # Call solver 
 println("Starting solver")
-solver.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_adjust=true, max_steps=300, min_steps=20, extrap=false)
+solver.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, dry_adjust=true, max_steps=300, min_steps=20, extrap=false)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
