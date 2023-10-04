@@ -135,7 +135,7 @@ s = ArgParseSettings()
     "--convcrit_tmprel"
         help = "Convergence criterion on dtmp/tmp/dt [day-1]."
         arg_type = Float64
-        default = 5.0
+        default = 4.0
     "--convcrit_fradrel"
         help = "Convergence criterion on dfrad/frad [%]."
         arg_type = Float64

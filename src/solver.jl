@@ -498,9 +498,10 @@ module solver
             # ----------------------------------------------------------
             # Calculate solver statistics
             # ---------------------------------------------------------- 
-            # Calculate a measure of the relative rate of change in temperature
-            # Measured only at cell-centres because they are not set by interpolation
-            # 90th percentile is used to exclude outliers
+            # Calculate a measure of the relative rate of change in temperature.
+            # Measured only at cell-centres because they are not set by interpolation.
+            # 90th percentile is used to exclude 'difficult' layers, which can 
+            # can be reasonably neglected if the rest of the column is fine.
             if step > 1
                 drel_dt_prev = drel_dt
                 drel_dt = quantile(abs.(  ((atmos.tmp[2:end] .- hist_tmp[end,2:end])./hist_tmp[end,2:end])./dt[2:end]  ), 0.9)
@@ -584,15 +585,13 @@ module solver
         # Print information about the final state
         if !success
             @printf("RCSolver: Stopping atmosphere iterations before convergence \n")
-            @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
-            @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
-            @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
-            @printf("\n")
-
         else
             @printf("RCSolver: Convergence criteria met (%d iterations) \n", step)
-            @printf("\n")
         end
+        @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
+        @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
+        @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
+        @printf("\n")
 
         @printf("RCSolver: Final radiative fluxes [W m-2] \n")
         @printf("    OLR   = %.2e W m-2         \n", F_OLR_rad)
@@ -600,6 +599,7 @@ module solver
         @printf("    BOA   = %.2e W m-2         \n", F_BOA_rad)
         @printf("    loss  = %.2f W m-2         \n", F_loss)
         @printf("    loss  = %.2f %%            \n", F_loss/F_BOA_rad*100.0)
+        @printf("\n")
     
         # Warn user if there's a sign difference in TOA vs BOA fluxes
         # because this shouldn't be the case
