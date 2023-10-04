@@ -6,6 +6,7 @@
 import numpy as np
 import scipy.integrate as spint
 import os, sys, time
+from io import StringIO
 
 # Function with necessary information for each species to calculate Rayleigh scattering
 def species_info(species):
@@ -63,14 +64,10 @@ def band_integrator(species_list, molar_mixing_ratio_list, wavelength1_list, wav
     return total_coefficient
 
 # This is the function that adds  Rayleigh coefficients to spectral files
-def rayleigh_coeff_adder(species_list = ['co2'], mixing_ratio_list = [1.], spectral_file_path= './spectral_files/sp_b318_HITRAN_a16_RS/sp_b318_HITRAN_a16',wavelength_dummy_file_path='./spectral_files/sp_b318_HITRAN_a16_RS/wavelength_band_file.txt'):
+def rayleigh_coeff_adder(species_list = ['co2'], mixing_ratio_list = [1.], spectral_file_path= './spectral_files/sp_b318_HITRAN_a16_RS/sp_b318_HITRAN_a16'):
     spectral_file = open(spectral_file_path,'r')
     
-    #Load a dummy file that will hold the wavelength bands
-    if os.path.exists(wavelength_dummy_file_path):
-        os.remove(wavelength_dummy_file_path)
-
-    wavelength_band_file = open(wavelength_dummy_file_path,'wt')
+    wavelength_band_string = ""
     
     #Make a loop that runs through the lines in the spectral file until it finds BLOCK 1,
     #at which point it begins to "pay attention" and read the relevant lines w/ the wavelength data in that file
@@ -92,7 +89,9 @@ def rayleigh_coeff_adder(species_list = ['co2'], mixing_ratio_list = [1.], spect
             # that starts with a space, which makes the loop ignore the unnecessary
             # bits and only grab the wavelength bands
             if line[0]==' ':
-                wavelength_band_file.write(line)
+                wavelength_band_string += line
+                if line[-1] != "\n":
+                    wavelength_band_string += "\n"
             else:
                 beginning_block_text_list.append(line)
         if '*BLOCK: TYPE =    1' in line:
@@ -100,22 +99,10 @@ def rayleigh_coeff_adder(species_list = ['co2'], mixing_ratio_list = [1.], spect
             pay_attention = True
     
     spectral_file.close()
-    wavelength_band_file.close()
 
-    i = 0
-    while (not os.path.exists(wavelength_dummy_file_path)) and (i < 50):
-        time.sleep(0.05)
-        i += 1
-        
-    if (i == 50):
-        raise Exception("Failed to insert rayleigh scattering into spectral file")
-    
     #Now we generate an array from the wavelength band file
-    wavelength_bands = np.genfromtxt(wavelength_dummy_file_path,usecols=np.arange(0,3))
+    wavelength_bands = np.genfromtxt(StringIO(wavelength_band_string),usecols=np.arange(0,3))
 
-    #Delete the temporary wavelength band file
-    os.remove(wavelength_dummy_file_path)
-    
     # This function calculates the rayleigh scattering cross section for a species at a given wavelength
     
     #calculate the change in wavelength over each band
@@ -201,6 +188,7 @@ def rayleigh_coeff_adder(species_list = ['co2'], mixing_ratio_list = [1.], spect
         temp_spectral_file.write(last_blocks_list[n])
         
     temp_spectral_file.close()
+    time.sleep(20/1000.0) # for filesystem to catch up, wait 20 ms
     
     # The last step is to delete the original spectral file and replace it with the new one
     os.remove(spectral_file_path)
@@ -244,6 +232,5 @@ if __name__ == "__main__":
 
     rayleigh_coeff_adder(species_list=species_list, 
                          mixing_ratio_list=mixing_ratio_list, 
-                         spectral_file_path=spectral_file_path,
-                         wavelength_dummy_file_path='.rayleigh_tmp'
+                         spectral_file_path=spectral_file_path
                          )
