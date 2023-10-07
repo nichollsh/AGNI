@@ -157,7 +157,7 @@ include("socrates/julia/src/SOCRATES.jl")
 push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
 import setpt
-import plotting 
+
 
 # Set the configuration options
 tstar           = args["tstar"]
@@ -334,6 +334,11 @@ atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 # Write final PT profile and final fluxes 
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
 atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
+
+# Plotting?
+if plot || (animate && !oneshot) 
+    import plotting 
+end
 
 # Final plots 
 if animate && !oneshot
