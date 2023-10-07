@@ -1,5 +1,5 @@
 # Contains the atmosphere module, which contains all of the core code 
-# for setting-up the atmosphere and running SOCRATES. A lot of this code was 
+# for setting-up the atmosphere and running SOCRATES. Some of this code was 
 # adapted from the SOCRATES-Julia examples.
 
 # Not for direct execution
@@ -19,6 +19,7 @@ module atmosphere
     using DataStructures
     using DelimitedFiles
     using PCHIPInterpolation
+    using OrdinaryDiffEq
 
     import phys
 
@@ -52,7 +53,6 @@ module atmosphere
         zenith_degrees::Float64 
         toa_heating::Float64 
         tstar::Float64 
-        grav_surf::Float64
         overlap_method::Int
 
         # Band edge wavelengths [m]
@@ -65,7 +65,6 @@ module atmosphere
 
         p_boa::Float64      # Pressure at bottom [Pa]
         p_toa::Float64      # Pressure at top [Pa]
-        rp::Float64         # planet radius [m]
 
         tmp::Array          # cc temperature [K]
         tmpl::Array         # ce temperature
@@ -75,6 +74,11 @@ module atmosphere
         zl::Array           # ce height 
 
         tmp_floor::Float64  # Temperature floor to prevent numerics [K]
+
+        # Planet properties 
+        rp::Float64         # planet radius [m]
+        mp::Float64         # planet mass [kg]
+        grav_surf::Float64  # surface gravity [m s-2]
 
         # Conductive skin
         skin_d::Float64      # skin thickness [m]
@@ -224,7 +228,6 @@ module atmosphere
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.toa_heating =     max(toa_heating, 0.0)
         atmos.tstar =           max(tstar, atmos.tmp_floor)
-        atmos.grav_surf =       max(1.0e-3, gravity)
 
         atmos.C_d =             max(0,C_d)
         atmos.U =               max(0,U)
@@ -239,7 +242,14 @@ module atmosphere
 
         atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
         atmos.p_boa =           p_surf * 1.0e+5
+
+        atmos.grav_surf =       max(1.0e-3, gravity)
         atmos.rp =              max(1.0, radius)
+        atmos.mp =              atmos.grav_surf * atmos.rp * atmos.rp / phys.G
+
+        # g = Gm / r2
+        # g r2 = Gm
+        # m = g r2 / G
 
         atmos.control.l_gas =       true
         atmos.control.l_rayleigh =  flag_rayleigh
@@ -384,23 +394,25 @@ module atmosphere
     end
 
     """
-    **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
+    **Calculate properties within each layer of the atmosphere (e.g. mmw, height).**
 
-    Assumes that the atmosphere may be treated as an ideal gas.
+    Assumes that the atmosphere may be treated as an ideal gas. Solves the
+    hydrostatic equation, ideal gas equation, and gravity equation.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `approx::Bool=false`      use an approximate solution.
     """
-    function calc_layer_props!(atmos::atmosphere.Atmos_t)
+    function solve_hydro!(atmos::atmosphere.Atmos_t; approx::Bool=false)
         if !atmos.is_param
             error(" atmosphere parameters have not been set")
         end
 
         # mmw, cp, rho
-        atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
-        atmos.layer_density = zeros(Float64, atmos.nlev_c)
-        atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         for i in 1:atmos.atm.n_layer
+
+            atmos.layer_mmw[i] = 0.0
+            atmos.layer_cp[i]  = 0.0
 
             # for each gas
             for (i_gas, gas) in enumerate(atmos.gases)
@@ -418,30 +430,84 @@ module atmosphere
         end
 
         # geometrical height and gravity
-        # dz = -dp / (rho * g)
-        atmos.z          = zeros(Float64, atmos.nlev_c)
-        atmos.zl         = zeros(Float64, atmos.nlev_l)
-        atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
-        for i in range(atmos.nlev_c, 1, step=-1)
+        atmos.zl[end] = 0.0
+        atmos.layer_grav[end] = atmos.grav_surf
+        if approx
+
+            # approximate solution...
 
             # Technically, g and z should be integrated as coupled equations,
             # but here they are not. This is somewhat reasonable for high mmw 
             # atmospheres, but will break-down at large scale heights.
 
-            g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.zl[i+1])^2.0)
-            dzc = phys.R_gas * atmos.tmp[i] * log(atmos.pl[i+1]/atmos.p[i]) / (atmos.layer_mmw[i] * g)
-            atmos.z[i] = atmos.zl[i+1] + dzc
+            for i in range(atmos.nlev_c, 1, step=-1)
 
-            atmos.layer_grav[i] = g
+                g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.zl[i+1])^2.0)
+                dzc = phys.R_gas * atmos.tmp[i] * log(atmos.pl[i+1]/atmos.p[i]) / (atmos.layer_mmw[i] * g)
+                atmos.z[i] = atmos.zl[i+1] + dzc
 
-            g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
-            dzl = phys.R_gas * atmos.tmp[i] * log(atmos.p[i]/atmos.pl[i]) / (atmos.layer_mmw[i] * g)
-            atmos.zl[i] = atmos.z[i] + dzl
+                atmos.layer_grav[i] = g
 
-            if (dzl < 1e-20) || (dzc < 1e-20)
-                error("Height integration resulted in dz <= 0")
+                g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
+                dzl = phys.R_gas * atmos.tmp[i] * log(atmos.p[i]/atmos.pl[i]) / (atmos.layer_mmw[i] * g)
+                atmos.zl[i] = atmos.z[i] + dzl
+
+                if (dzl < 1e-20) || (dzc < 1e-20)
+                    error("Height integration resulted in dz <= 0")
+                end
+            end 
+
+        else 
+
+            # integrate coupled equations to provide an accurate solution
+            
+            # dudp = [dz/dp, dg/dp]
+            # u    = [z,g]
+            # p    = params (not used here)
+            # t    = integration variable (pressure)
+            function rhs!(dudp, u, p, t)
+
+                # Get closest layer at which we have mu and tmp values
+                min_eps::Float64 = 9.0e99
+                min_p::Float64 = atmos.pl[end]
+                min_i::Int = 0
+                for i in 1:atmos.nlev_c
+                    if abs(atmos.p[i] - t) < min_eps
+                        min_i = i
+                    else 
+                        break
+                    end
+                end
+                
+                # dz/dp = -R*T/(p * mu * g)
+                dudp[1] = -1.0 * phys.R_gas * atmos.tmp[min_i] / (t * atmos.layer_mmw[min_i] * u[2])
+
+                # dg/dz = -2.0 * G * Mp / (z + Rp)^3
+                # dg/dp = dg/dz * dz/dp
+                dudp[2] = -2.0 * phys.G * atmos.mp / (u[1] + atmos.rp)^3.0 * dudp[1]
             end
-        end 
+
+            u0 = [0.0;atmos.grav_surf]
+            tspan = (atmos.pl[end],atmos.pl[1])  # integrate from surface upwards
+
+            prob = ODEProblem(rhs!,u0,tspan) 
+            sol = solve(prob,Tsit5(); saveat=atmos.pl)  # do integration
+
+            # save values from bottom
+            for i in 1:atmos.nlev_c  
+
+                atmos.zl[i] = sol[1,i]
+
+                atmos.z[i]          = 0.5 * ( sol[1,i] + sol[1,i+1] )  # arithmetic mean is only approximately true
+                atmos.layer_grav[i] = 0.5 * ( sol[2,i] + sol[2,i+1] )  # ^
+            end
+            atmos.zl[end] = sol[1,atmos.nlev_l]
+
+            reverse!(atmos.zl)
+            reverse!(atmos.z)
+            reverse!(atmos.layer_grav)
+
+        end
 
         # Mass
         for i in 1:atmos.atm.n_layer
@@ -464,7 +530,7 @@ module atmosphere
         atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
 
         # Set pressure cell-centre array by interpolation
-        atmos.p =    zeros(Float64, atmos.nlev_c)
+        atmos.p = zeros(Float64, atmos.nlev_c)
         atmos.p[:] .= 0.5 .* (atmos.pl[2:end] + atmos.pl[1:end-1])
 
         return nothing
@@ -774,11 +840,26 @@ module atmosphere
             end 
         end
 
-        calc_layer_props!(atmos)
+        ################################
+        # Layer properties (e.g. mass, gravity, height, density)
+        ################################
+
+        atmos.z          = zeros(Float64, atmos.nlev_c)
+        atmos.zl         = zeros(Float64, atmos.nlev_l)
+        atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
+
+        atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
+        atmos.layer_density = zeros(Float64, atmos.nlev_c)
+        atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
+
+        atmos.atm.p[1, :] .= atmos.p[:]
+        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+
+        solve_hydro!(atmos)
 
         ################################
         # Aerosol processes
-        #################################
+        ################################
 
         SOCRATES.allocate_aer_prsc(atmos.aer, atmos.dimen, atmos.spectrum)
         if atmos.control.l_aerosol
@@ -938,9 +1019,7 @@ module atmosphere
         clamp!(atmos.tmp, atmos.tmp_floor, Inf)
         clamp!(atmos.tmpl, atmos.tmp_floor, Inf)
 
-        atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.t[1, :] .= atmos.tmp[:]
-        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
         atmos.tstar = atmos.tmpl[end]
@@ -963,7 +1042,6 @@ module atmosphere
                 atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw", atmos.gases[i_gas]) / atmos.layer_mmw[i]
             end
         end 
-        calc_layer_props!(atmos)
 
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
                                 atmos.atm, atmos.cld, atmos.aer, 

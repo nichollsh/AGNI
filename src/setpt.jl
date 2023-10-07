@@ -199,6 +199,9 @@ module setpt
 
                 # Generate new pressure grid 
                 atmosphere.generate_pgrid!(atmos)
+                atmos.atm.p[1, :] .= atmos.p[:]
+                atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+                atmosphere.solve_hydro!(atmos)
             end
         end 
         return nothing

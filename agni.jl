@@ -40,7 +40,7 @@ mf_dict         = Dict([
                         ])
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
-star_file     = "res/stellar_spectra/trappist-1.txt"
+star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
 # Setup atmosphere
@@ -53,7 +53,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
-                         flag_rayleigh=true,
+                         flag_rayleigh=false,
                          overlap_method=4,
                          zenith_degrees=54.4,
                          skin_d=0.05,
@@ -75,7 +75,7 @@ if !isdir(output_dir) && !isfile(output_dir)
 end
 
 # Calculate LW and SW fluxes (once)
-println("RadTrans: calculating fluxes")
+# println("RadTrans: calculating fluxes")
 # atmosphere.radtrans!(atmos, true)
 # atmosphere.radtrans!(atmos, false)
 
