@@ -19,7 +19,7 @@ module atmosphere
     using DataStructures
     using DelimitedFiles
     using PCHIPInterpolation
-    using OrdinaryDiffEq
+    using ODEInterfaceDiffEq
 
     import phys
 
@@ -430,7 +430,9 @@ module atmosphere
         end
 
         # geometrical height and gravity
-        atmos.zl[end] = 0.0
+        atmos.zl[:] .= 0.0
+        atmos.z[:] .= 0.0
+        atmos.layer_grav[:] .= 0.0
         atmos.layer_grav[end] = atmos.grav_surf
         if approx
 
@@ -468,15 +470,22 @@ module atmosphere
             function rhs!(dudp, u, p, t)
 
                 # Get closest layer at which we have mu and tmp values
-                min_eps::Float64 = 9.0e99
+                min_eps::Float64 = 9.0e98
+                this_eps::Float64 = 9.0e99 
                 min_p::Float64 = atmos.pl[end]
                 min_i::Int = 0
-                for i in 1:atmos.nlev_c
-                    if abs(atmos.p[i] - t) < min_eps
+                for i in range(atmos.nlev_c, 1, step=-1)
+                    this_eps = abs(atmos.p[i] - t)
+                    if this_eps < min_eps
                         min_i = i
+                        min_eps = this_eps
                     else 
                         break
                     end
+                end
+
+                if min_i == 0
+                    error("Could not find best level for solve_hydro step")
                 end
                 
                 # dz/dp = -R*T/(p * mu * g)
@@ -491,7 +500,7 @@ module atmosphere
             tspan = (atmos.pl[end],atmos.pl[1])  # integrate from surface upwards
 
             prob = ODEProblem(rhs!,u0,tspan) 
-            sol = solve(prob,Tsit5(); saveat=atmos.pl)  # do integration
+            sol = solve(prob,radau(); saveat=atmos.pl)  # do integration
 
             # save values from bottom
             for i in 1:atmos.nlev_c  

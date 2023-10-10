@@ -53,7 +53,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 -  `(@v1.9) pkg> add Glob`
 -  `(@v1.9) pkg> add ArgParse`
 -  `(@v1.9) pkg> add DifferentialEquations`
--  `(@v1.9) pkg> add OrdinaryDiffEq`
+-  `(@v1.9) pkg> add ODEInterfaceDiffEq`
 -  `(@v1.9) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`

@@ -147,7 +147,7 @@ module solver
     - `sens_heat::Bool=true`            include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
-    - `modhydro::Int=1`                 solve hydrostatic equation frequency (0 => never)
+    - `modhydro::Int=5`                 solve hydrostatic equation frequency (0 => never)
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `extrap::Bool=true`               enable extrapolation forward in time 
     - `dt_max::Float64=10.0`            maximum time-step outside of the accelerated phase
@@ -161,7 +161,7 @@ module solver
                             surf_state::Int=0,
                             dry_adjust::Bool=true, h2o_adjust::Bool=false, 
                             sens_heat::Bool=true,
-                            verbose::Bool=true, modplot::Int=0, modhydro::Int=1,
+                            verbose::Bool=true, modplot::Int=0, modhydro::Int=5,
                             accel::Bool=true, extrap::Bool=true,
                             dt_max::Float64=10.0, max_steps::Int=200, min_steps::Int=15,
                             dtmp_conv::Float64=5.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.2
@@ -320,7 +320,7 @@ module solver
             # ----------------------------------------------------------
             # Solve hydrostatic equation + get layer properties
             # ---------------------------------------------------------- 
-            if (modhydro > 0) && (mod(step,modhydro) == 0)
+            if (modhydro > 0) && ( (mod(step,modhydro) == 0) || accel)
                 atmosphere.solve_hydro!(atmos)
             end
             
