@@ -29,14 +29,14 @@ toa_heating     = 1.232e+06   # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
 nlev_centre     = 100  
-p_surf          = 88.5     # bar
+p_surf          = 188.5     # bar
 p_top           = 1e-6      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 0.91806/88.5),
-                        ("CO2" , 4.12401/88.5),
-                        ("H2"  , 2.38348/88.5),
-                        ("CO"  , 79.8336/88.5),
-                        ("N2"  , 1.23623/88.5)
+                        ("H2O" , 0.91806),
+                        ("CO2" , 4.12401),
+                        ("H2"  , 102.38348),
+                        ("CO"  , 79.8336),
+                        ("N2"  , 1.23623)
                         ])
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
