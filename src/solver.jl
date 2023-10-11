@@ -153,8 +153,8 @@ module solver
     - `dt_max::Float64=10.0`            maximum time-step outside of the accelerated phase
     - `max_steps::Int=200`              maximum number of solver steps
     - `min_steps::Int=15`               minimum number of solver steps
-    - `dtmp_conv::Float64=5.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
-    - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
+    - `dtmp_conv::Float64=3.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
+    - `drel_dt_conv::Float64=0.5`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
     - `drel_F_conv::Float64=0.2`        convergence: maximum relative change in F_TOA_rad for convergence [%]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
@@ -164,7 +164,7 @@ module solver
                             verbose::Bool=true, modplot::Int=0, modhydro::Int=5,
                             accel::Bool=true, extrap::Bool=true,
                             dt_max::Float64=10.0, max_steps::Int=200, min_steps::Int=15,
-                            dtmp_conv::Float64=5.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.2
+                            dtmp_conv::Float64=3.0, drel_dt_conv::Float64=0.5, drel_F_conv::Float64=0.2
                             )
 
 
