@@ -20,7 +20,7 @@ module atmosphere
     using DelimitedFiles
     using PCHIPInterpolation
     using OrdinaryDiffEq
-    using Plots
+    # using Plots
 
     import phys
 
@@ -543,7 +543,7 @@ module atmosphere
 
         end
 
-        # Mass
+        # Mass per unit area
         for i in 1:atmos.atm.n_layer
             atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
         end
