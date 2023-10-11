@@ -19,7 +19,8 @@ module atmosphere
     using DataStructures
     using DelimitedFiles
     using PCHIPInterpolation
-    using ODEInterfaceDiffEq
+    using OrdinaryDiffEq
+    using Plots
 
     import phys
 
@@ -247,10 +248,6 @@ module atmosphere
         atmos.rp =              max(1.0, radius)
         atmos.mp =              atmos.grav_surf * atmos.rp * atmos.rp / phys.G
 
-        # g = Gm / r2
-        # g r2 = Gm
-        # m = g r2 / G
-
         atmos.control.l_gas =       true
         atmos.control.l_rayleigh =  flag_rayleigh
         atmos.control.l_continuum = flag_continuum
@@ -463,17 +460,26 @@ module atmosphere
 
             # integrate coupled equations to provide an accurate solution
             
+            sol_p = ones(Float64, atmos.nlev_l)
+            sol_z = ones(Float64, atmos.nlev_l)
+            sol_g = ones(Float64, atmos.nlev_l)
+
+            for i in 1:atmos.nlev_l
+                sol_p[i] = atmos.pl[atmos.nlev_l-i+1]
+            end
+            
             # dudp = [dz/dp, dg/dp]
             # u    = [z,g]
             # p    = params (not used here)
             # t    = integration variable (pressure)
+            dzdp::Float64 = 0.0
+            dgdp::Float64 = 0.0
             function rhs!(dudp, u, p, t)
 
                 # Get closest layer at which we have mu and tmp values
                 min_eps::Float64 = 9.0e98
                 this_eps::Float64 = 9.0e99 
-                min_p::Float64 = atmos.pl[end]
-                min_i::Int = 0
+                min_i::Int = 1
                 for i in range(atmos.nlev_c, 1, step=-1)
                     this_eps = abs(atmos.p[i] - t)
                     if this_eps < min_eps
@@ -484,37 +490,56 @@ module atmosphere
                     end
                 end
 
-                if min_i == 0
-                    error("Could not find best level for solve_hydro step")
-                end
-                
                 # dz/dp = -R*T/(p * mu * g)
-                dudp[1] = -1.0 * phys.R_gas * atmos.tmp[min_i] / (t * atmos.layer_mmw[min_i] * u[2])
+                dzdp = -1.0 * phys.R_gas * atmos.tmp[min_i] / (t * atmos.layer_mmw[min_i] * u[2])
 
                 # dg/dz = -2.0 * G * Mp / (z + Rp)^3
                 # dg/dp = dg/dz * dz/dp
-                dudp[2] = -2.0 * phys.G * atmos.mp / (u[1] + atmos.rp)^3.0 * dudp[1]
+                dgdp = -2.0 * phys.G * atmos.mp / (u[1] + atmos.rp)^3.0 * dzdp
+
+                if (u[1] > 1e15)
+                    error("Invalid height - integration has probably failed")
+                end
+                # if (u[2] < 1e-9)
+                #     error("Invalid gravity - integration has probably failed")
+                # end
+
+                dudp[1] = dzdp
+                dudp[2] = dgdp
+                return nothing
             end
 
             u0 = [0.0;atmos.grav_surf]
-            tspan = (atmos.pl[end],atmos.pl[1])  # integrate from surface upwards
+            tspan = (sol_p[1], sol_p[end])  # integrate from surface upwards
 
             prob = ODEProblem(rhs!,u0,tspan) 
-            sol = solve(prob,radau(); saveat=atmos.pl)  # do integration
+            sol = solve(prob,RK4(),saveat=sol_p)  # do integration
 
-            # save values from bottom
-            for i in 1:atmos.nlev_c  
-
-                atmos.zl[i] = sol[1,i]
-
-                atmos.z[i]          = 0.5 * ( sol[1,i] + sol[1,i+1] )  # arithmetic mean is only approximately true
-                atmos.layer_grav[i] = 0.5 * ( sol[2,i] + sol[2,i+1] )  # ^
+            for i in 1:atmos.nlev_l  # get results
+                sol_z[i] = max(0.0,sol[1,i])
+                sol_g[i] = min(atmos.grav_surf,sol[2,i])
             end
-            atmos.zl[end] = sol[1,atmos.nlev_l]
 
-            reverse!(atmos.zl)
-            reverse!(atmos.z)
-            reverse!(atmos.layer_grav)
+            # save values to arrays
+            atmos.zl[end] = sol_z[1]
+            for i in 1:atmos.nlev_c # i is measured from TOA
+                atmos.zl[i] = sol_z[atmos.nlev_l-i+1]
+                
+                atmos.z[i]          = 0.5 * ( sol_z[atmos.nlev_l-i+1] + sol_z[atmos.nlev_l-i] )  # arithmetic mean is only approximately true
+                atmos.layer_grav[i] = 0.5 * ( sol_g[atmos.nlev_l-i+1] + sol_g[atmos.nlev_l-i] )  # ^
+            end
+
+            # debug plot (requires importing Plots)
+            # plt1 = plot(atmos.z, atmos.p) 
+            # xaxis!(plt1, xlabel="Height [m]", xscale=:log10)
+            # yaxis!(plt1, ylabel="Pressure [Pa]")
+            # plt2 = plot(atmos.layer_grav,atmos.p)
+            # scatter!(plt2, [atmos.grav_surf], [atmos.pl[end]])
+            # xaxis!(plt2, xlabel="Gravity [m s-2]")
+            # plt = plot(plt1, plt2)
+            # yflip!(plt)
+            # yaxis!(plt, yscale=:log10)
+            # savefig(plt,"hydro.png")
 
         end
 
