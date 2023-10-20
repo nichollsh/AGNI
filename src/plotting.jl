@@ -58,9 +58,11 @@ module plotting
 
         # Plot mole fractions for each gas
         min_x = 1.0e-3
-        for gas in keys(atmos.input_x)  
-            arr_x = atmos.input_x[gas]
-            min_x = min(min_x, minimum(arr_x))
+        for (i_gas,gas) in enumerate(atmos.gases)  
+            arr_x = atmos.layer_x[1:end,i_gas]
+            if minimum(arr_x) > 0.0
+                min_x = min(min_x, minimum(arr_x))
+            end
             plot!(arr_x, arr_P, label=gas, lw=2)
         end
 
