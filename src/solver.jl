@@ -22,6 +22,7 @@ module solver
     import plotting
     import moving_average
 
+
     # Dry convective adjustment, single step
     function adjust_dry!(atmos::atmosphere.Atmos_t)
 
@@ -147,24 +148,23 @@ module solver
     - `sens_heat::Bool=true`            include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
-    - `modhydro::Int=5`                 solve hydrostatic equation frequency (0 => never)
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `extrap::Bool=true`               enable extrapolation forward in time 
     - `dt_max::Float64=10.0`            maximum time-step outside of the accelerated phase
     - `max_steps::Int=200`              maximum number of solver steps
     - `min_steps::Int=15`               minimum number of solver steps
-    - `dtmp_conv::Float64=3.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
-    - `drel_dt_conv::Float64=0.5`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
+    - `dtmp_conv::Float64=5.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
+    - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
     - `drel_F_conv::Float64=0.2`        convergence: maximum relative change in F_TOA_rad for convergence [%]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=0,
                             dry_adjust::Bool=true, h2o_adjust::Bool=false, 
                             sens_heat::Bool=true,
-                            verbose::Bool=true, modplot::Int=0, modhydro::Int=5,
+                            verbose::Bool=true, modplot::Int=0, 
                             accel::Bool=true, extrap::Bool=true,
                             dt_max::Float64=10.0, max_steps::Int=200, min_steps::Int=15,
-                            dtmp_conv::Float64=3.0, drel_dt_conv::Float64=0.5, drel_F_conv::Float64=0.2
+                            dtmp_conv::Float64=5.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.2
                             )
 
 
@@ -317,12 +317,8 @@ module solver
                 @printf("\n")
             end
 
-            # ----------------------------------------------------------
-            # Solve hydrostatic equation + get layer properties
-            # ---------------------------------------------------------- 
-            if (modhydro > 0) && ( (mod(step,modhydro) == 0) || accel)
-                atmosphere.solve_hydro!(atmos)
-            end
+
+            adj_changed = 0
             
             # ----------------------------------------------------------
             # Get radiative fluxes (LW and SW)
@@ -384,7 +380,6 @@ module solver
             clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
             atmos.tmp += dtmp
 
-            adj_changed = 0
             
             # Dry convective adjustment
             if dryadj_steps > 0 && dry_adjust && (step >= wait_adj)
