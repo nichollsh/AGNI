@@ -24,19 +24,20 @@ import phys
 
 
 # Configuration options
-tstar           = 2769.2    # LW uflux bottom boundary condition [kelvin]
-toa_heating     = 1.232e+06   # SW dflux top boundary condition [W m-2]
+tstar           = 2009.0    # LW uflux bottom boundary condition [kelvin]
+toa_heating     = 8.0e+04   # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
 nlev_centre     = 100  
-p_surf          = 188.5     # bar
+p_surf          = 66.47     # bar
 p_top           = 1e-6      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 0.91806),
-                        ("CO2" , 4.12401),
-                        ("H2"  , 102.38348),
-                        ("CO"  , 79.8336),
-                        ("N2"  , 1.23623)
+                        ("H2O" , 0.073366),
+                        ("CO2" , 0.000475),
+                        ("H2"  , 60.232909),
+                        ("CO"  , 2.908212),
+                        ("N2"  , 0.238768),
+                        ("CH4" , 0.007032)
                         ])
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
@@ -75,13 +76,13 @@ if !isdir(output_dir) && !isfile(output_dir)
 end
 
 # Calculate LW and SW fluxes (once)
-# println("RadTrans: calculating fluxes")
-# atmosphere.radtrans!(atmos, true)
-# atmosphere.radtrans!(atmos, false)
+println("RadTrans: calculating fluxes")
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
 
 # Call solver 
-println("Starting solver")
-solver.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, dry_adjust=true, max_steps=300, min_steps=20, extrap=false)
+# println("Starting solver")
+# solver.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, dry_adjust=true, max_steps=300, min_steps=20, extrap=false)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))

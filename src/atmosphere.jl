@@ -381,11 +381,10 @@ module atmosphere
         gas_valid = uppercase(gas_valid)
 
         x = 0.0
-        if gas_valid in keys(atmos.input_x)
-            # i_gas = findfirst(==(gas), atmos.gases)
-            # x = atmos.layer_x[lvl,i_gas]
-            x = atmos.input_x[gas_valid][lvl]
-        end 
+        if gas_valid in atmos.gases
+            i_gas = findfirst(==(gas_valid), atmos.gases)
+            x = atmos.layer_x[lvl,i_gas]
+        end
 
         return x
     end
@@ -394,13 +393,15 @@ module atmosphere
     **Calculate properties within each layer of the atmosphere (e.g. mmw, height).**
 
     Assumes that the atmosphere may be treated as an ideal gas. Solves the
-    hydrostatic equation, ideal gas equation, and gravity equation.
+    hydrostatic equation, ideal gas equation, and gravity equation. The exact
+    solution doesn't work well at high temperatures (EOS issue). Can instead 
+    calculate an approximate solution loosely analogous to the Euler method.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    - `approx::Bool=false`      use an approximate solution.
+    - `approx::Bool=true`      use an approximate solution.
     """
-    function solve_hydro!(atmos::atmosphere.Atmos_t; approx::Bool=false)
+    function solve_hydro!(atmos::atmosphere.Atmos_t; approx::Bool=true)
         if !atmos.is_param
             error(" atmosphere parameters have not been set")
         end
@@ -491,6 +492,7 @@ module atmosphere
                 end
 
                 # dz/dp = -R*T/(p * mu * g)
+                # println("$(atmos.layer_mmw[min_i])")
                 dzdp = -1.0 * phys.R_gas * atmos.tmp[min_i] / (t * atmos.layer_mmw[min_i] * u[2])
 
                 # dg/dz = -2.0 * G * Mp / (z + Rp)^3
@@ -500,9 +502,6 @@ module atmosphere
                 if (u[1] > 1e15)
                     error("Invalid height - integration has probably failed")
                 end
-                # if (u[2] < 1e-9)
-                #     error("Invalid gravity - integration has probably failed")
-                # end
 
                 dudp[1] = dzdp
                 dudp[2] = dgdp
@@ -510,7 +509,7 @@ module atmosphere
             end
 
             u0 = [0.0;atmos.grav_surf]
-            tspan = (sol_p[1], sol_p[end])  # integrate from surface upwards
+            tspan = (sol_p[1], sol_p[end]*0.99)  # integrate from surface upwards
 
             prob = ODEProblem(rhs!,u0,tspan) 
             sol = solve(prob,RK4(),saveat=sol_p)  # do integration
@@ -861,17 +860,15 @@ module atmosphere
                 error("Layer $d has all-zero mole fractions")
             end
 
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb
-                ti = atmos.spectrum.Gas.type_absorb[i_gas]
-                gas = SOCRATES.input_head_pcf.header_gas[ti]
+            for (i_gas,gas) in enumerate(atmos.gases)
 
                 atmos.layer_x[i,i_gas] /= tot
 
                 if gas in keys(atmos.input_x)
                     atmos.input_x[gas][i] = atmos.layer_x[i,i_gas]
                 end
-
             end 
+
         end
 
         ################################
@@ -1095,6 +1092,10 @@ module atmosphere
                 end 
                 atmos.flux_n_lw[lv] = atmos.flux_u_lw[lv] - atmos.flux_d_lw[lv] 
             end
+            if !all(isfinite, atmos.flux_n_lw)
+                println("$(atmos.flux_n_lw)")
+                error("NaN or Inf values in flux array (LW)")
+            end
             atmos.is_out_lw = true 
         else
             # SW case
@@ -1108,6 +1109,10 @@ module atmosphere
                     atmos.flux_u_sw[lv] += max(0.0, atmos.radout.flux_up[idx])
                 end 
                 atmos.flux_n_sw[lv] = atmos.flux_u_sw[lv] - atmos.flux_d_sw[lv]
+            end
+            if !all(isfinite, atmos.flux_n_sw)
+                println("$(atmos.flux_n_sw)")
+                error("NaN or Inf values in flux array (SW)")
             end
             atmos.is_out_sw = true
         end
