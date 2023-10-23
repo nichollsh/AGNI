@@ -164,7 +164,7 @@ module atmosphere
     - `C_d::Float64=0.001`              turbulent heat exchange coefficient [dimensionless].
     - `U::Float64=10.0`                 surface wind speed [m s-1].
     - `tmp_magma::Float64=3000.0`       mantle temperature [K].
-    - `skin_d::Float64=0.5`             skin thickness [m].
+    - `skin_d::Float64=0.05`            skin thickness [m].
     - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
     - `all_channels::Bool=true`         use all channels available for RT?
     - `overlap_method::Int=2`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
@@ -188,7 +188,7 @@ module atmosphere
                     C_d::Float64 =              0.001,
                     U::Float64 =                10.0,
                     tmp_magma::Float64 =        3000.0,
-                    skin_d::Float64 =           0.5,
+                    skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
                     overlap_method::Int =       2,
                     all_channels::Bool  =       true,
