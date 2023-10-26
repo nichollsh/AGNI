@@ -84,9 +84,8 @@ module plotting
     Plot the current temperature-pressure profile, current heating rates, and
     optionally the previous states that the atmosphere has taken.
     """
-    function plot_solver(atmos, fname; hist_tmpl::Array=[], incl_magma::Bool=false)
+    function plot_solver(atmos, fname; hist_tmpl::Array=[], incl_magma::Bool=false, dpi::Int=250)
 
-        dpi=250
         lw=1.5
 
         # Interleave cell-centre and cell-edge arrays for current atmosphere
@@ -164,7 +163,7 @@ module plotting
     """
     Plot the fluxes at each pressure level
     """
-    function plot_fluxes(atmos, fname)
+    function plot_fluxes(atmos, fname, dpi::Int=250)
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
 
@@ -172,7 +171,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         w = 2.4
-        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks)
+        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi)
 
         col_u = "brown3"
         col_d = "seagreen"

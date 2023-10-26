@@ -137,10 +137,10 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: fixed | 2: skin
+    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
     - `dry_convect::Bool=true`          enable dry convection
     - `h2o_convect::Bool=false`         enable naive steam convection (not supported by MLT scheme)
-    - `use_mlt::Bool=false`             using mixing length theory to represent convection, instead of adjustment
+    - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=true`            include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
@@ -154,9 +154,9 @@ module solver
     - `drel_F_conv::Float64=0.2`        convergence: maximum relative change in F_TOA_rad for convergence [%]
     """
     function solve_time!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int=0,
-                            dry_convect::Bool=true, h2o_convect::Bool=false, 
-                            use_mlt::Bool=false, sens_heat::Bool=true,
+                            surf_state::Int=1,
+                            dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=true, 
+                            sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
                             accel::Bool=true, extrap::Bool=true,
                             dt_max::Float64=10.0, max_steps::Int=200, min_steps::Int=15,
@@ -189,28 +189,34 @@ module solver
         wait_adj  = max(min(wait_adj, max_steps-2), 1)
         len_hist  = max(min(len_hist, max_steps-1), 5)
         modprint  = max(modprint, 0)
+
+        if use_mlt && h2o_convect 
+            error("MLT convection scheme is not compatible with moist convection")
+        end
         
         # Tracking
-        adj_changed = 0
-        F_loss = 1.0e99         # Radiative flux loss (TOA vs BOA)
-        H_stat = 1.0e99         # Heating rate statistic
-        F_TOA_rad = 1.0e99      # Net upward TOA radiative flux
-        F_TOA_pre = 1.0e99      # Previous ^
-        F_TOA_rel = 1.0e99      # Relative change in ^
-        F_BOA_rad = 0.0         # Net upward BOA radiative flux
-        F_OLR_rad = 0.0         # Longwave upward TOA radiative flux
-        dtmp_comp = Inf         # Temperature change comparison
-        drel_dt = Inf           # Rate of relative temperature change
-        drel_dt_prev  = Inf     # Previous ^
+        adj_changed::Int   = 0           # Number of convectively adjusted levels
+        F_loss::Float64    = 1.0e99      # Total flux loss (TOA vs BOA-1)
+        H_stat::Float64    = 1.0e99      # Heating rate statistic
+        F_TOA_rad::Float64 = 1.0e99      # Net upward TOA radiative flux
+        F_TOA_pre::Float64 = 1.0e99      # Previous ^
+        F_TOA_rel::Float64 = 1.0e99      # Relative change in ^
+        F_BOA_rad::Float64 = 0.0         # Net upward BOA radiative flux
+        F_OLR_rad::Float64 = 0.0         # Longwave upward TOA radiative flux
+        F_TOA_tot::Float64 = 0.0         # Total TOA flux
+        F_BOA_tot::Float64 = 0.0         # Total BOA flux
+        dtmp_comp::Float64 = Inf         # Temperature change comparison
+        drel_dt::Float64   = Inf         # Rate of relative temperature change
+        drel_dt_prev::Float64 = Inf      # Previous ^
 
-        oscil = falses(atmos.nlev_c)  # layers which are oscillating
-        heat_prev = zeros(Float64, atmos.nlev_c) # Previous iteration heating rates
-        dt = ones(Float64,  atmos.nlev_c) # time-step [days]
-        dtmp = zeros(Float64, atmos.nlev_c) # temperature step [K]
+        oscil       = falses(atmos.nlev_c)          # layers which are oscillating
+        heat_prev   = zeros(Float64, atmos.nlev_c)  # Previous iteration heating rates
+        dt          = ones(Float64,  atmos.nlev_c)  # time-step [days]
+        dtmp        = zeros(Float64, atmos.nlev_c)  # temperature step [K]
 
         # Variables
-        success = false         # Convergence criteria met
         step = 0                # Current step number
+        success = false         # Convergence criteria met
         flag_prev = false       # Previous iteration is meeting convergence
         flag_this = false       # Current iteration is meeting convergence
         plt_magma = false       # Include tmp_magma in plots
@@ -335,6 +341,7 @@ module solver
 
             # Turbulence
             if sens_heat
+                # (doesn't have its own function)
                 # sensible heat flux (TKE scheme for this 1D case)
                 # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
                 atmos.flux_sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
@@ -400,8 +407,6 @@ module solver
             if !use_mlt && dryadj_steps > 0 && dry_convect && (step >= wait_adj) 
                 tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
 
-                println("dry adjust")
-
                 # do adjustment steps
                 for _ in 1:dryadj_steps
                     adjust_dry!(atmos)
@@ -464,15 +469,17 @@ module solver
             elseif surf_state == 2
                 # Conductive skin
                 # Set tmpl[end] such that the skin carries the required flux
-                atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_n[1] * atmos.skin_d / atmos.skin_k
+                atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
                 atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
 
                 # don't update T_star if the change is small (prevents oscillations)
-                if abs(atmos.tmpl[end]-bot_old_e) < 5.0
-                    weights = [0.0; 1.0]  
-                else 
-                    weights = [0.15; 0.85]  
-                end
+                # if abs(atmos.tmpl[end]-bot_old_e) < 5.0
+                #     weights = [0.0; 1.0]  
+                # else 
+                #     weights = [0.15; 0.85]  
+                # end
+
+                weights = [1.0; 0.0]  
             else 
                 error("Invalid surface state $(surf_state)")
             end 
@@ -538,27 +545,32 @@ module solver
             F_TOA_pre = F_TOA_rad 
             F_TOA_rad = atmos.flux_n[1]
             F_TOA_rel = abs((F_TOA_rad-F_TOA_pre)/F_TOA_pre)*100.0
-
             F_BOA_rad = atmos.flux_n[end-1]
             F_OLR_rad = atmos.flux_u_lw[1]
-            F_loss    = abs(F_TOA_rad-F_BOA_rad)
+
+            F_TOA_tot = atmos.flux_tot[1]
+            F_BOA_tot = atmos.flux_tot[end-1]
+
+            F_loss    = F_TOA_tot-F_BOA_tot
 
             # Calculate the 'typical' heating rate magnitude
-            H_stat    = quantile(abs.(atmos.heating_rate[:]), 0.6)
+            H_stat    = quantile(abs.(atmos.heating_rate[:]), 0.7)
 
             # --------------------------------------
             # Print debug info
             # -------------------------------------- 
             if verbose
-                @printf("    count_adj   = %d layers   \n", adj_changed)
-                @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
-                @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
-                @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
-                @printf("    F_rad^TOA   = %.2e W m-2  \n", F_TOA_rad)
-                @printf("    F_rad^BOA   = %.2e W m-2  \n", F_BOA_rad)
-                @printf("    F_rad^OLR   = %.2e W m-2  \n", F_OLR_rad)
-                @printf("    F_rad^loss  = %.2f W m-2  \n", F_loss)
-                @printf("    HR_typical  = %.4f K day-1\n", H_stat)
+                @printf("    dtmp_comp   = %+.3f K      \n", dtmp_comp)
+                @printf("    dtmp/tmp/dt = %+.3f day-1  \n", drel_dt)
+                @printf("    drel_F_TOA  = %+.4f %%     \n", F_TOA_rel)
+                @printf("    F_rad^TOA   = %+.2e W m-2  \n", F_TOA_rad)
+                @printf("    F_rad^BOA   = %+.2e W m-2  \n", F_BOA_rad)
+                @printf("    F_rad^OLR   = %+.2e W m-2  \n", F_OLR_rad)
+                @printf("    F_tot^loss  = %+.2f W m-2  \n", F_loss)
+                @printf("    HR_typical  = %+.4f K day-1\n", H_stat)
+                if !use_mlt
+                    @printf("    count_adj   = %d layers   \n", adj_changed)
+                end
                 @printf("\n")
             end
 
@@ -611,20 +623,21 @@ module solver
         @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
         @printf("\n")
 
-        @printf("RCSolver: Final radiative fluxes [W m-2] \n")
-        @printf("    OLR   = %.2e W m-2         \n", F_OLR_rad)
-        @printf("    TOA   = %.2e W m-2         \n", F_TOA_rad)
-        @printf("    BOA   = %.2e W m-2         \n", F_BOA_rad)
-        @printf("    loss  = %.2f W m-2         \n", F_loss)
-        @printf("    loss  = %.2f %%            \n", F_loss/F_BOA_rad*100.0)
+        @printf("RCSolver: Final fluxes [W m-2] \n")
+        @printf("    rad_OLR   = %.2e W m-2         \n", F_OLR_rad)
+        @printf("    rad_TOA   = %.2e W m-2         \n", F_TOA_rad)
+        @printf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
+        @printf("    loss      = %.2f W m-2         \n", F_loss)
+        @printf("    loss      = %.2f %%            \n", F_loss/F_TOA_tot*100.0)
         @printf("\n")
     
         # Warn user if there's a sign difference in TOA vs BOA fluxes
         # because this shouldn't be the case
-        if F_TOA_rad*F_BOA_rad < 0
-            @printf("WARNING: TOA and BOA radiative fluxes have different signs\n")
+        if F_TOA_tot*F_BOA_tot < 0
+            @printf("WARNING: TOA and BOA total fluxes have different signs\n")
         end
         return nothing
+
     end # end solve_time
 
 end 
