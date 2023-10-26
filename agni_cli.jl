@@ -260,6 +260,7 @@ else
 end
 
 # Convection scheme
+dry_convect = false
 if convect_adj || convect_mlt
     dry_convect = true 
 
