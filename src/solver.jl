@@ -471,14 +471,6 @@ module solver
                 # Set tmpl[end] such that the skin carries the required flux
                 atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
                 atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
-
-                # don't update T_star if the change is small (prevents oscillations)
-                # if abs(atmos.tmpl[end]-bot_old_e) < 5.0
-                #     weights = [0.0; 1.0]  
-                # else 
-                #     weights = [0.15; 0.85]  
-                # end
-
                 weights = [1.0; 0.0]  
             else 
                 error("Invalid surface state $(surf_state)")
