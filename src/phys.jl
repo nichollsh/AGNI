@@ -12,12 +12,16 @@ module phys
     # - Python files that accompany Ray's book (=> phys.py)
     # - SOCRATES source code
     # - NIST
+    # - Wikipedia
 
     # Universal gas constant, J K-1 mol-1
     const R_gas = 8.31446261815324 
 
     # Stefan-boltzmann constant, W m−2 K−4
     const sigma = 5.670367e-8 
+
+    # Von Karman constant
+    const k_vk = 0.40
 
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict([
