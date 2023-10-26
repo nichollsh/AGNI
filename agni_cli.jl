@@ -82,7 +82,7 @@ s = ArgParseSettings()
         arg_type = Float64
         default = 2.0
     "--tmp_magma"
-        help = "Magma temperature just below the surface [K]."
+        help = "Magma temperature just below the surface skin [K]."
         arg_type = Float64
         default = 2000.0
     "--albedo_s"
@@ -113,17 +113,20 @@ s = ArgParseSettings()
         help = "Just calculate fluxes once - don't iterate."
         action = :store_true
     "--nsteps"
-        help = "Number of solver steps (max)."
+        help = "Maximum number of solver steps."
         arg_type = Int
         default = 250
-    "--noadjust"
-        help = "Disable convective adjustment."
+    "--convect_adj"
+        help = "Enable convection via dry adjustment."
+        action = :store_true
+    "--convect_mlt"
+        help = "Enable convection via mixing length theory."
         action = :store_true
     "--noaccel"
         help = "Disable model acceleration."
         action = :store_true
     "--equivext"
-        help = "Use equivalent extinction for computing line overlap. Otherwise, will use random overlap method."
+        help = "Use equivalent extinction for computing overlapping absorption. Otherwise, random overlap will be used."
         action = :store_true
     "--rscatter"
         help = "Include rayleigh scattering."
@@ -190,7 +193,8 @@ skin_d          = args["skin_d"]
 skin_k          = args["skin_k"]
 tmp_magma       = args["tmp_magma"]
 max_steps       = args["nsteps"]
-no_adjust       = args["noadjust"]
+convect_adj     = args["convect_adj"]
+convect_mlt     = args["convect_mlt"]
 no_accel        = args["noaccel"]
 equivext        = args["equivext"]
 cc_tmpabs       = args["convcrit_tmpabs"]
@@ -253,6 +257,16 @@ if equivext
     overlap = 4
 else 
     overlap = 2
+end
+
+# Convection scheme
+if convect_adj || convect_mlt
+    dry_convect = true 
+
+    if convect_adj && convect_mlt
+        error("Both convection schemes are enabled! Pick only one at a time")
+    end 
+
 end
 
 # Setup atmosphere
@@ -320,9 +334,9 @@ else
         error("Invalid surface state '$surf_state'")
     end
     import solver
-    solver.solve_energy!(atmos, 
+    solver.solve_time!(atmos, 
                          modplot=modplot, verbose=verbose, 
-                         surf_state=surf_state, dry_adjust=!no_adjust, 
+                         surf_state=surf_state, dry_convect=dry_convect, use_mlt=convect_mlt,
                          max_steps=max_steps, accel=!no_accel, extrap=!no_accel,
                          dtmp_conv=cc_tmpabs,drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel
                          )

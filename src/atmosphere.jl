@@ -104,7 +104,7 @@ module atmosphere
         flux_d::Array    # down component, lw+sw 
         flux_u::Array    # up component, lw+sw 
         flux_n::Array    # net upward, lw+sw 
-        
+
         # Sensible heating
         C_d::Float64        # Turbulent exchange coefficient [dimensionless]
         U::Float64          # Wind speed [m s-1]
@@ -113,6 +113,11 @@ module atmosphere
         # Convection 
         nptmp::Array        # Potential temperature of cell relative to neighbour layer above [K]
         conv_inst::Array    # Flag for dry convective instability [true/false]
+        flux_c::Array     # Dry convective fluxes from MLT
+        K_h::Array          # Eddy diffusion coefficient for heat
+
+        # Total energy flux
+        flux_tot::Array     # Total upward-directed flux at cell edges
 
         # Heating rate 
         heating_rate::Array # radiative heating rate [K/day]
@@ -198,6 +203,10 @@ module atmosphere
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false
                     )
+
+        if !isdir(OUT_DIR) && !isfile(OUT_DIR)
+            mkdir(OUT_DIR)
+        end
 
         atmos.dimen =       SOCRATES.StrDim()
         atmos.control =     SOCRATES.StrCtrl()
@@ -838,6 +847,10 @@ module atmosphere
 
         atmos.nptmp =             zeros(Float64, atmos.nlev_c)
         atmos.conv_inst =         falses(atmos.nlev_c)
+        atmos.flux_c =            zeros(Float64, atmos.nlev_l)
+        atmos.K_h =               zeros(Float64, atmos.nlev_l)
+
+        atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
 
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
@@ -1038,35 +1051,69 @@ module atmosphere
     end 
 
     # Calculate dry convective fluxes using mixing length theory
-    function dryconvection_mlt!(atmos)
+    function mlt!(atmos::atmosphere.Atmos_t)
 
-        error("MLT not yet implemented")
+        # Follows a method similar to that of the VPL climate model.
+        # - Lincowski et al., 2018
+        # - Meadows et al., 2023
+        # - Blackadar, 1962
+        # - Robinson & Crisp, 2018
 
-        # Follows the method of Drummond+16, which derives from
-        #   Henyey+1965
-        #   Gustafsson+2008
+        # F_c   = -rho c_p K_h ( dT/dz + gamma )    , convective flux
+        # gamma = g/c_p                             , dry lapse rate
+        # K_h   = l^2 sqrt[-g/T ( dT/dz + gamma )]  , eddy diffusion for heat
+        # l     = kz / (1 + kz/l0)                  , mixing length
+        # l0    = f_z * H                           , mixing length in a free atmosphere
+        # H     = RT / (mu g)                       , pressure scale height
 
-        # F_conv = 0.5  ρ  Cp T v_conv (l/Hp) δΔ 
-        # when ∇T > ∇ad, otherwise F_conv = zero.
-        # ∇T = ∂log(T)/∂log(P) and ∇ad is the adiabatic lapse rate.
+        # K_h is set to zero under stable conditions
+        # f_z is set to unity (c.f. SPIDER, ATMO)
+        # c_p has units of J k-1 kg-1
+        # mu has units of kg mol-1
+        # k is von karman's constant 
+        
+        # F_c is calculated at every level EDGE (not level centre)
 
-        # δΔ = Γ/(1+Γ) * (∇T − ∇ad )
-        # Γ = v_conv ρ Cp (1 + y(ρχ)^2)/(8 σ T^3 ρ χ l)
-        # where χ is the Rosseland mean opacity, σ is the SB constant, y=0.076, and l is the mixing length
+        # Variables
+        Γ_ad::Float64 = 0.0     # Adiabatic lapse rate
+        dTdz::Float64 = 0.0     # Profile dTdz
+        grav::Float64 = 0.0     # Average gravity at level edge
+        c_p::Float64  = 0.0     # Average c_p at level edge
+        rho::Float64  = 0.0     # Average rho at level edge
+        mu::Float64   = 0.0     # Average mu at level edge
+        l::Float64    = 0.0     # Mixing length
+        H::Float64    = 0.0     # Scale height   
+        f_z::Float64  = 1.0     # Mixing length scale parameter     
 
-        # l = α H
-        # H = P/(gρ) is the pressure scale height
-        # α is the mixing length parameter (=1.5)
+        # Reset convection
+        atmos.flux_c[:] .= 0.0
+        atmos.K_h[:]    .= 0.0
+        
+        # Loop from top downwards
+        for i in 2:atmos.nlev_l-1
 
-        # v_conv = H sqrt{ GM/(r^2) H Q δΔ/ν }
-        # Q = − T ρ (∂ρ/∂T) at constant pressure 
-        # ν is the viscosity (=8.0)
+            grav = 0.5 * (atmos.layer_grav[i] + atmos.layer_grav[i-1])
+            mu = 0.5 * (atmos.layer_mmw[i] + atmos.layer_mmw[i-1])
+            c_p  = 0.5 * (atmos.layer_cp[i]   + atmos.layer_cp[i-1]  ) / mu  # Convert to J K-1 kg-1
 
-        # τ = int_0^inf χ ρ dz 
-        # so we can use τ from SOCRATES to calculate χ assuming hydrostatic equilibrium
-        # χ = g dτ/dp at a level with pressure p and optical depth τ
-        # dimensionally this works out.
+            Γ_ad = grav/c_p
+            dTdz = (atmos.tmp[i] - atmos.tmp[i-1]) / (atmos.z[i] - atmos.z[i-1])
 
+            # Check instability
+            if (dTdz < -1.0 * Γ_ad)
+            
+                rho = 0.5 * (atmos.layer_density[i] + atmos.layer_density[i-1])
+                H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
+
+                l = phys.k_vk * atmos.zl[i] / ( 1.0 + phys.k_vk * atmos.zl[i] / (f_z * H) )
+
+                atmos.K_h[i] = l * l * sqrt( -grav/atmos.tmpl[i] * (dTdz + Γ_ad) )
+
+                atmos.flux_c[i] = -1.0 * rho * c_p * atmos.K_h[i] * (dTdz + Γ_ad)
+            
+            end
+
+        end
         
     end
 
@@ -1118,14 +1165,15 @@ module atmosphere
         rm(fname, force=true)
 
         open(fname, "w") do f
-            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N       \n")
-            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2] \n")
+            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C       \n")
+            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2] \n")
             for i in 1:atmos.nlev_l
-                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
+                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
                           atmos.pl[i], 
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
+                          atmos.flux_c[i]
                           )
             end
         end

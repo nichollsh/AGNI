@@ -125,30 +125,6 @@ module plotting
             end 
         end
         
-        # Highlight convective regions 
-        atmosphere.dryconvection_check!(atmos, tmp_eps=5.0)
-        region_p = []
-        region_T = []
-        region_new = true
-        for i in 1:atmos.nlev_c
-            if atmos.conv_inst[i]
-                if region_new
-                    region_new = false
-                    if length(region_p) > 0
-                        plot!(plt1, region_T, region_p*1e-5, color="orchid2", linealpha=0.4, lw=4*lw, label="")
-                    end
-                    region_p = []
-                    region_T = []
-                end 
-                push!(region_p, atmos.p[i])
-                push!(region_p, atmos.pl[i])
-                push!(region_T, atmos.tmp[i])
-                push!(region_T, atmos.tmpl[i])
-            else 
-                region_new = true
-            end
-        end 
-
         xlabel!(plt1, "Temperature [K]")
         ylabel!(plt1, "Pressure [bar]")
         yflip!(plt1)
@@ -195,12 +171,14 @@ module plotting
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
-        w = 2
+        w = 2.4
         plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks)
 
         col_u = "brown3"
         col_d = "seagreen"
-        col_n = "black"
+        col_n = "deepskyblue2"
+        col_c = "goldenrod2"
+        col_t = "black"
 
         max_fl = 1e2
         
@@ -226,7 +204,7 @@ module plotting
             plot!(plt, y, arr_P, label="RAD UP SW", lw=w, lc=col_u, ls=:dot)
         end 
 
-        # Net fluxes
+        # Net radiative fluxes
         if atmos.is_out_lw && atmos.is_out_sw
             y = abs.(atmos.flux_u)
             max_fl = max(max_fl, maximum(y))
@@ -243,17 +221,29 @@ module plotting
                 posnet[i] = (atmos.flux_n[i] >= 0)
             end 
             max_fl = max(max_fl, maximum(absnet))
-            plot!(plt, absnet, arr_P, label="RAD NET", lw=w, lc=col_n, ls=:solid)
-            scatter!(plt, absnet[  posnet], arr_P[  posnet],  markershape=:diamond, markeralpha=0.8, label=L">0")
-            scatter!(plt, absnet[.!posnet], arr_P[.!posnet],  markershape=:circle,  markeralpha=0.8, label=L"<0")
+
+            plot!(plt, absnet[  posnet], arr_P[  posnet], label="RAD NET"*L">0", lw=w*2.0, lc=col_n, ls=:solid)
+            plot!(plt, absnet[.!posnet], arr_P[.!posnet], label="RAD NET"*L"<0", lw=w    , lc=col_n, ls=:solid)
+        end 
+
+        # Convective flux (MLT)
+        if any(x->x!=0.0, atmos.flux_c)
+            plot!(plt, atmos.flux_c, arr_P, label="CONVECTION", lw=w, lc=col_c, ls=:solid)
+            max_fl = max(max_fl, maximum(atmos.flux_c))
         end 
 
         # Sensible heat
-        if atmos.flux_sens > 0
-            scatter!(plt, [atmos.flux_sens],      [arr_P[end]], markershape=:utriangle, markercolor=col_u, label="SENS")
-        else
-            scatter!(plt, [abs(atmos.flux_sens)], [arr_P[end]], markershape=:dtriangle, markercolor=col_d, label="SENS")
-        end 
+        if atmos.flux_sens != 0.0
+            if atmos.flux_sens > 0.0
+                scatter!(plt, [atmos.flux_sens],      [arr_P[end]], markershape=:utriangle, markercolor=col_u, label="SENSIBLE")
+            else
+                scatter!(plt, [abs(atmos.flux_sens)], [arr_P[end]], markershape=:dtriangle, markercolor=col_d, label="SENSIBLE")
+            end
+        end
+
+        # Total flux
+        plot!(plt, atmos.flux_tot, arr_P, label="TOTAL", lw=w*0.8, lc=col_t, ls=:solid)
+        max_fl = max(max_fl, maximum(abs.(atmos.flux_tot)))
 
         xlims  = (1e-1, max_fl * 1.5)
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
