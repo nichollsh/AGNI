@@ -24,7 +24,7 @@ import phys
 
 
 # Configuration options
-tstar           = 3000.0    # LW uflux bottom boundary condition [kelvin]
+tstar           = 2000.0    # LW uflux bottom boundary condition [kelvin]
 toa_heating     = 1.232e+04   # SW dflux top boundary condition [W m-2]
 radius          = 7.1e6     # metres
 gravity         = 10.0      # m s-2
@@ -56,7 +56,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=false,
                          overlap_method=4,
                          zenith_degrees=54.4,
-                         skin_d=0.05,
+                         skin_d=0.02,
                          tmp_magma=2769.2
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
@@ -64,9 +64,9 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"out/pt.csv")
-# setpt.prevent_surfsupersat!(atmos)
-# setpt.dry_adiabat!(atmos)
-# setpt.stratosphere!(atmos, 300.0)
+# # setpt.prevent_surfsupersat!(atmos)
+# # setpt.dry_adiabat!(atmos)
+# # setpt.stratosphere!(atmos, 300.0)
 
 # Create output directory
 rm(output_dir,force=true,recursive=true)
@@ -75,13 +75,17 @@ if !isdir(output_dir) && !isfile(output_dir)
 end
 
 # Calculate LW and SW fluxes (once)
-println("RadTrans: calculating fluxes")
-atmosphere.radtrans!(atmos, true)
-atmosphere.radtrans!(atmos, false)
+# println("RadTrans: calculating fluxes")
+# atmosphere.radtrans!(atmos, true)
+# atmosphere.radtrans!(atmos, false)
+
+# Calculate convective fluxes (once)
+# println("MLT: calculating fluxes")
+# atmosphere.mlt!(atmos)
 
 # Call solver 
-# println("Starting solver")
-# solver.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, dry_adjust=true, max_steps=300, min_steps=20, extrap=false)
+println("Starting solver")
+solver.solve_time!(atmos, surf_state=1, modplot=1, verbose=true, dry_convect=true, max_steps=300, min_steps=20, extrap=false, use_mlt=true)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))

@@ -61,8 +61,8 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file)
 
 # Call solver 
 println("Starting solver")
-solver.solve_energy!(atmos, surf_state=1, modplot=2, verbose=true, extrap=false,
-                        dry_adjust=true, h2o_adjust=true, sens_heat=true, 
+solver.solve_time!(atmos, surf_state=1, modplot=2, verbose=true, extrap=false,
+                        dry_convect=true, h2o_convect=true, sens_heat=true, 
                         dt_max=4.0, max_steps=300)
 
 # Write arrays

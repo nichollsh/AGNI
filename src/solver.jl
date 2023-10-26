@@ -16,7 +16,7 @@ module solver
     using Revise
     using PCHIPInterpolation
     using LinearAlgebra
-    
+
     import atmosphere 
     import phys
     import plotting
@@ -109,22 +109,15 @@ module solver
     end
 
     # Calculate heating rates at cell-centres
-    function calc_heat!(atmos, sens::Bool)
+    function calc_heat!(atmos)
 
         dF = zeros(Float64, atmos.nlev_c)
         dp = zeros(Float64, atmos.nlev_c)
 
         for i in 1:atmos.nlev_c
-            dF[i] = atmos.flux_n[i+1] - atmos.flux_n[i]
+            dF[i] = atmos.flux_tot[i+1] - atmos.flux_tot[i]
             dp[i] = atmos.pl[i+1]     - atmos.pl[i]
         end 
-
-        if sens
-            # sensible heat flux (TKE scheme for this 1D case)
-            # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
-            atmos.flux_sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
-            dF[end]   += atmos.flux_sens
-        end
 
         atmos.heating_rate[:] .= 0.0
         for i in 1:atmos.nlev_c
@@ -135,16 +128,19 @@ module solver
     end
 
     """
-    **Run the radiative-convective solver.**
+    **Solve for radiative-convective equilibrium using time-stepping.**
 
     Time-steps the temperature profile with the heating rates to obtain global and 
-    local energy balance.
+    local energy balance. Convective adjustment is applied to represent convective
+    energy transport in unstable layers, or alternative MLT is used to calculate the
+    convective fluxes.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `surf_state::Int=0`               bottom layer temperature, 0: free | 1: fixed | 2: skin
-    - `dry_adjust::Bool=true`           enable dry convective adjustment
-    - `h2o_adjust::Bool=false`          enable naive steam convective adjustment
+    - `dry_convect::Bool=true`          enable dry convection
+    - `h2o_convect::Bool=false`         enable naive steam convection (not supported by MLT scheme)
+    - `use_mlt::Bool=false`             using mixing length theory to represent convection, instead of adjustment
     - `sens_heat::Bool=true`            include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
@@ -157,14 +153,14 @@ module solver
     - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
     - `drel_F_conv::Float64=0.2`        convergence: maximum relative change in F_TOA_rad for convergence [%]
     """
-    function solve_energy!(atmos::atmosphere.Atmos_t;
+    function solve_time!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=0,
-                            dry_adjust::Bool=true, h2o_adjust::Bool=false, 
-                            sens_heat::Bool=true,
+                            dry_convect::Bool=true, h2o_convect::Bool=false, 
+                            use_mlt::Bool=false, sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
                             accel::Bool=true, extrap::Bool=true,
                             dt_max::Float64=10.0, max_steps::Int=200, min_steps::Int=15,
-                            dtmp_conv::Float64=5.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.2
+                            dtmp_conv::Float64=5.0, drel_dt_conv::Float64=0.5, drel_F_conv::Float64=0.2
                             )
 
 
@@ -320,18 +316,37 @@ module solver
 
             adj_changed = 0
             
+            
             # ----------------------------------------------------------
-            # Get radiative fluxes (LW and SW)
+            # Get fluxes 
             # ---------------------------------------------------------- 
+            atmos.flux_tot[:] .= 0.0
+
+            # Radiation
             atmosphere.radtrans!(atmos, true)
             atmosphere.radtrans!(atmos, false)
+            atmos.flux_tot += atmos.flux_n
 
+            # Convection
+            if use_mlt
+                atmosphere.mlt!(atmos)
+                atmos.flux_tot += atmos.flux_c
+            end
+
+            # Turbulence
+            if sens_heat
+                # sensible heat flux (TKE scheme for this 1D case)
+                # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
+                atmos.flux_sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
+                atmos.flux_tot[end] += atmos.flux_sens
+            end
+    
 
             # ----------------------------------------------------------
             # Calculate heating rates
             # ---------------------------------------------------------- 
             heat_prev[:] .= atmos.heating_rate[:]
-            calc_heat!(atmos, sens_heat)
+            calc_heat!(atmos)
 
 
             # ----------------------------------------------------------
@@ -349,12 +364,12 @@ module solver
                         oscil[i] = true
                         dt[i] *= 0.1
                     
-                    # low heating rate at high pressure => increase step size
-                    elseif ( abs(atmos.heating_rate[i]) < H_small ) && (atmos.pl[i] > p_large) && !stopaccel
-                        dt[i] *= 1.2
+                    # # low heating rate at high pressure => increase step size
+                    # elseif ( abs(atmos.heating_rate[i]) < H_small ) && (atmos.pl[i] > p_large) && !stopaccel
+                    #     dt[i] *= 1.2
 
                     else
-                        dt[i] *= 1.1
+                        dt[i] *= 1.05
                     end
                 end
             end 
@@ -375,15 +390,17 @@ module solver
             bot_old_e = atmos.tmpl[end]
             top_old_e = atmos.tmpl[1]
 
-            # Apply radiative heating temperature change
+            # Apply heating rate temperature change
             dtmp .= atmos.heating_rate .* dt 
             clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
             atmos.tmp += dtmp
 
             
             # Dry convective adjustment
-            if dryadj_steps > 0 && dry_adjust && (step >= wait_adj)
+            if !use_mlt && dryadj_steps > 0 && dry_convect && (step >= wait_adj) 
                 tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
+
+                println("dry adjust")
 
                 # do adjustment steps
                 for _ in 1:dryadj_steps
@@ -399,7 +416,7 @@ module solver
             end
 
             # H2O moist convective adjustment
-            if h2oadj_steps > 0 && h2o_adjust && (step >= wait_adj)
+            if !use_mlt && h2oadj_steps > 0 && h2o_convect && (step >= wait_adj)
                 tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
                 for _ in 1:h2oadj_steps
                     adjust_steam!(atmos)
@@ -560,6 +577,7 @@ module solver
             # -------------------------------------- 
             if (modplot > 0) && (mod(step,modplot) == 0)
                 plotting.plot_solver(atmos, @sprintf("%s/solver_monitor_%04d.png", atmos.OUT_DIR, step), hist_tmpl=hist_tmpl, incl_magma=plt_magma)
+                plotting.plot_fluxes(atmos, @sprintf("%s/fluxes.png", atmos.OUT_DIR))
             end 
 
             # --------------------------------------
@@ -607,6 +625,6 @@ module solver
             @printf("WARNING: TOA and BOA radiative fluxes have different signs\n")
         end
         return nothing
-    end # end solve_energy
+    end # end solve_time
 
 end 
