@@ -3,7 +3,7 @@ Time-stepped radiative-convective solver designed for integration into a coupled
 
 AGNI relies on SOCRATES (2306) for calculating the radiative-transfer. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). SOCRATES is setup here to include shortwave irradiation from the star, Rayleigh scattering, and continuum absorption / CIA.        
 
-Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files.
+Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Two convection parameterisations are included: convective adjustment (directly manipulating the temperature arrays), and mixing length theory (calculating convective energy fluxes). Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files.
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
@@ -80,7 +80,7 @@ Calculating fluxes with SOCRATES, without solving for RCE.
   <img src="doc/example_nosolve/fl.png" width="350" /> 
 </p>
 
-Solving for RCE with accelerated time-stepping.
+Solving for RCE with accelerated time-stepping. (Outdated plot).
 <p float="left">
   <img src="doc/example_withsolve/pt.png" width="350"/>
   <img src="doc/example_withsolve/fl.png" width="350" /> 
