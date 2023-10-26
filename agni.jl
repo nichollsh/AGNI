@@ -24,23 +24,23 @@ import phys
 
 
 # Configuration options
-tstar           = 2000.0    # LW uflux bottom boundary condition [kelvin]
-toa_heating     = 1.232e+04   # SW dflux top boundary condition [W m-2]
-radius          = 7.1e6     # metres
-gravity         = 10.0      # m s-2
+tstar           = 2235.0    # Surface temperature [kelvin]
+toa_heating     = 3.772e+04 # Instellation flux [W m-2]
+radius          = 7.12e6    # metres
+gravity         = 10.8      # m s-2
 nlev_centre     = 100  
-p_surf          = 88.5     # bar
+p_surf          = 127.0     # bar
 p_top           = 1e-6      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 0.91806),
-                        ("CO2" , 4.12401),
-                        ("H2"  , 2.38348),
-                        ("CO"  , 79.8336),
-                        ("N2"  , 1.23623)
+                        ("H2O" , 0.91805),
+                        ("CO2" , 5.98710),
+                        ("H2"  , 2.37994),
+                        ("CO"  , 115.89786),
+                        ("N2"  , 1.77739)
                         ])
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
-star_file     = "res/stellar_spectra/sun.txt"
+star_file     = "res/stellar_spectra/trappist-1.txt"
 output_dir    = "out/"
 
 # Setup atmosphere
@@ -53,11 +53,12 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
-                         flag_rayleigh=false,
+                         flag_rayleigh=true,
                          overlap_method=4,
                          zenith_degrees=54.4,
                          skin_d=0.02,
-                         tmp_magma=2769.2
+                         skin_k=2.0,
+                         tmp_magma=2674.0
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
@@ -85,7 +86,7 @@ end
 
 # Call solver 
 println("Starting solver")
-solver.solve_time!(atmos, surf_state=1, modplot=1, verbose=true, dry_convect=true, max_steps=300, min_steps=20, extrap=false, use_mlt=true)
+solver.solve_time!(atmos, surf_state=2, modplot=1, verbose=true, dry_convect=true, max_steps=300, min_steps=20, extrap=false, use_mlt=true)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
