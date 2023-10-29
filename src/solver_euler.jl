@@ -1,4 +1,4 @@
-# Contains code for iteratively solving for energy balance
+# Contains code for obtaining energy balance (simplistic euler method)
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
@@ -6,7 +6,7 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
-module solver 
+module solver_euler
 
     # Include libraries
     include("../socrates/julia/src/SOCRATES.jl")
@@ -14,14 +14,13 @@ module solver
     using Printf
     using Statistics
     using Revise
-    using PCHIPInterpolation
-    using LinearAlgebra
+    # using PCHIPInterpolation
+    # using LinearAlgebra
 
     import atmosphere 
     import phys
     import plotting
     import moving_average
-
 
     # Dry convective adjustment, single step
     function adjust_dry!(atmos::atmosphere.Atmos_t)
@@ -108,63 +107,47 @@ module solver
         return nothing
     end
 
-    # Calculate heating rates at cell-centres
-    function calc_heat!(atmos)
-
-        dF = zeros(Float64, atmos.nlev_c)
-        dp = zeros(Float64, atmos.nlev_c)
-
-        for i in 1:atmos.nlev_c
-            dF[i] = atmos.flux_tot[i+1] - atmos.flux_tot[i]
-            dp[i] = atmos.pl[i+1]     - atmos.pl[i]
-        end 
-
-        atmos.heating_rate[:] .= 0.0
-        for i in 1:atmos.nlev_c
-            atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i] * atmos.layer_mmw[i]) * dF[i]/dp[i] # K/s
-        end
-        atmos.heating_rate *= 86400.0 # K/day
-        return nothing
-    end
 
     """
-    **Solve for radiative-convective equilibrium using time-stepping.**
+    **Solve for radiative-convective equilibrium using Euler time-stepping.**
 
     Time-steps the temperature profile with the heating rates to obtain global and 
     local energy balance. Convective adjustment is applied to represent convective
     energy transport in unstable layers, or alternative MLT is used to calculate the
-    convective fluxes.
+    convective fluxes. Uses a first-order Euler method which works well to initialise
+    the integration but may not strictly conserve energy.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
     - `dry_convect::Bool=true`          enable dry convection
     - `h2o_convect::Bool=false`         enable naive steam convection (not supported by MLT scheme)
-    - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
+    - `use_mlt::Bool=fale`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=true`            include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `accel::Bool=true`                enable accelerated fast period at the start 
-    - `extrap::Bool=true`               enable extrapolation forward in time 
-    - `dt_max::Float64=10.0`            maximum time-step outside of the accelerated phase
+    - `extrap::Bool=false`              enable extrapolation forward in time 
+    - `dt_max::Float64=6.0`             maximum time-step outside of the accelerated phase
     - `max_steps::Int=200`              maximum number of solver steps
-    - `min_steps::Int=15`               minimum number of solver steps
+    - `min_steps::Int=10`               minimum number of solver steps
     - `dtmp_conv::Float64=5.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
-    - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
+    - `drel_dt_conv::Float64=0.5`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
     - `drel_F_conv::Float64=0.2`        convergence: maximum relative change in F_TOA_rad for convergence [%]
+    - `F_losspct_conv::Float64=1.0`     convergence: maximum flux loss throughout column [%]
     """
-    function solve_time!(atmos::atmosphere.Atmos_t;
+    function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1,
                             dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=true, 
                             sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
-                            accel::Bool=true, extrap::Bool=true,
-                            dt_max::Float64=10.0, max_steps::Int=200, min_steps::Int=15,
-                            dtmp_conv::Float64=5.0, drel_dt_conv::Float64=0.5, drel_F_conv::Float64=0.2
+                            accel::Bool=true, extrap::Bool=false,
+                            dt_max::Float64=6.0, max_steps::Int=200, min_steps::Int=15,
+                            dtmp_conv::Float64=3.0, drel_dt_conv::Float64=0.5, drel_F_conv::Float64=0.2, F_losspct_conv::Float64=2.0
                             )
 
 
-        println("RCSolver: begin")
+        println("RCSolver: Begin Euler timestepping")
 
         # Run parameters
         dtmp_accel   = 40.0  # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
@@ -197,6 +180,7 @@ module solver
         # Tracking
         adj_changed::Int   = 0           # Number of convectively adjusted levels
         F_loss::Float64    = 1.0e99      # Total flux loss (TOA vs BOA-1)
+        F_losspct::Float64 = 1.0e99      # Total flux loss, relative (TOA vs BOA-1)
         H_stat::Float64    = 1.0e99      # Heating rate statistic
         F_TOA_rad::Float64 = 1.0e99      # Net upward TOA radiative flux
         F_TOA_pre::Float64 = 1.0e99      # Previous ^
@@ -283,7 +267,7 @@ module solver
                 h2oadj_steps = 20
                 dt_min_step = 1.0e1
                 dt_max_step = 1.0e4
-                smooth_width = Int( max(0.1*atmos.nlev_c,2 )) # 10% of levels
+                smooth_width = floor(Int, max(0.1*atmos.nlev_c,2 )) # 10% of levels
                 
             else
                 # Slow phase
@@ -341,10 +325,7 @@ module solver
 
             # Turbulence
             if sens_heat
-                # (doesn't have its own function)
-                # sensible heat flux (TKE scheme for this 1D case)
-                # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
-                atmos.flux_sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
+                atmosphere.sensible!(atmos)
                 atmos.flux_tot[end] += atmos.flux_sens
             end
     
@@ -353,7 +334,7 @@ module solver
             # Calculate heating rates
             # ---------------------------------------------------------- 
             heat_prev[:] .= atmos.heating_rate[:]
-            calc_heat!(atmos)
+            atmosphere.calc_hrates!(atmos)
 
 
             # ----------------------------------------------------------
@@ -394,14 +375,11 @@ module solver
             # optionally smooth temperature profile
             # optionally do convective adjustment
 
-            bot_old_e = atmos.tmpl[end]
-            top_old_e = atmos.tmpl[1]
-
+            
             # Apply heating rate temperature change
             dtmp .= atmos.heating_rate .* dt 
             clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
             atmos.tmp += dtmp
-
             
             # Dry convective adjustment
             if !use_mlt && dryadj_steps > 0 && dry_convect && (step >= wait_adj) 
@@ -444,43 +422,13 @@ module solver
             # Temperature floor (centres)
             clamp!(atmos.tmp, atmos.tmp_floor, Inf)
 
-            # Interpolate temperature to bulk cell-edge values 
-            itp = Interpolator(atmos.p, atmos.tmp)
-            atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
-
-            # Extrapolate top boundary temperature
-            grad_dt = atmos.tmp[1]-atmos.tmp[2]
-            grad_dp = atmos.p[1]-atmos.p[2]
-            atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
-            atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.9; 0.1] )  # limit change
-
-            # Calculate bottom boundary temperature
-            if surf_state == 0
-                # Extrapolate
-                grad_dt = atmos.tmp[end]-atmos.tmpl[end-1]
-                grad_dp = atmos.p[end]-atmos.pl[end-1]
-                atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
-                weights = [0.7; 0.3]
-
-            elseif surf_state == 1 || step <= step_stopaccel
-                # Fixed
-                weights = [0.0; 1.0]
-
-            elseif surf_state == 2
-                # Conductive skin
-                # Set tmpl[end] such that the skin carries the required flux
-                atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
-                atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
-                weights = [1.0; 0.0]  
+            # Set cell-edge values
+            if accel && (step <= step_stopaccel)
+                atmosphere.set_tmpl_from_tmp!(atmos, 1, limit_change=true)  # don't allow tmpl to drift during accelerated phase
             else 
-                error("Invalid surface state $(surf_state)")
-            end 
-
-            atmos.tmpl[end] = dot( [atmos.tmpl[end]; bot_old_e] , weights )  # limit change at surface
-
-            # Second interpolation back to cell-centres 
-            itp = Interpolator(atmos.pl, atmos.tmpl)  
-            atmos.tmp[:] .= itp.(atmos.p[:])
+                atmosphere.set_tmpl_from_tmp!(atmos, surf_state, limit_change=true)
+            end
+            
 
             # ----------------------------------------------------------
             # Accelerate solver with time-extrapolation
@@ -544,9 +492,10 @@ module solver
             F_BOA_tot = atmos.flux_tot[end-1]
 
             F_loss    = F_TOA_tot-F_BOA_tot
-
+            F_losspct = abs(F_loss/F_TOA_tot*100.0)
+            
             # Calculate the 'typical' heating rate magnitude
-            H_stat    = quantile(abs.(atmos.heating_rate[:]), 0.7)
+            H_stat    = quantile(abs.(atmos.heating_rate[:]), 0.8)
 
             # --------------------------------------
             # Print debug info
@@ -555,6 +504,7 @@ module solver
                 @printf("    dtmp_comp   = %+.3f K      \n", dtmp_comp)
                 @printf("    dtmp/tmp/dt = %+.3f day-1  \n", drel_dt)
                 @printf("    drel_F_TOA  = %+.4f %%     \n", F_TOA_rel)
+                @printf("    F_pctloss   = %+.4f %%     \n", F_losspct)
                 @printf("    F_rad^TOA   = %+.2e W m-2  \n", F_TOA_rad)
                 @printf("    F_rad^BOA   = %+.2e W m-2  \n", F_BOA_rad)
                 @printf("    F_rad^OLR   = %+.2e W m-2  \n", F_OLR_rad)
@@ -591,10 +541,11 @@ module solver
             # - minimal temperature change for two iters
             # - minimal rate of temperature change for two iters
             # - minimal change to net radiative flux at TOA for two iters
+            # - minimal flux loss
             # - solver is not in 'fast' mode, as it is unphysical
             flag_prev = flag_this
             flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv)
-            success   = flag_this && flag_prev && !accel && !stopaccel && (step > min_steps)
+            success   = flag_this && flag_prev && !accel && !stopaccel && (step > min_steps) && (F_losspct < F_losspct_conv)
             
             # --------------------------------------
             # Sleep in order to capture keyboard interrupt
@@ -615,12 +566,12 @@ module solver
         @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
         @printf("\n")
 
-        @printf("RCSolver: Final fluxes [W m-2] \n")
+        @printf("RCSolver: Final radiative fluxes [W m-2] \n")
         @printf("    rad_OLR   = %.2e W m-2         \n", F_OLR_rad)
         @printf("    rad_TOA   = %.2e W m-2         \n", F_TOA_rad)
         @printf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
         @printf("    loss      = %.2f W m-2         \n", F_loss)
-        @printf("    loss      = %.2f %%            \n", F_loss/F_TOA_tot*100.0)
+        @printf("    loss      = %.2f %%            \n", F_losspct)
         @printf("\n")
     
         # Warn user if there's a sign difference in TOA vs BOA fluxes
@@ -631,5 +582,6 @@ module solver
         return nothing
 
     end # end solve_time
+
 
 end 
