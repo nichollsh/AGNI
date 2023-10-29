@@ -19,7 +19,7 @@ module plotting
     """
     Plot the temperature-pressure profile.
     """
-    function plot_pt(atmos, fname)
+    function plot_pt(atmos, fname; dpi::Int=250)
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -29,7 +29,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright)
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi)
 
         # Plot temperature
         scatter!(plt, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
@@ -163,7 +163,7 @@ module plotting
     """
     Plot the fluxes at each pressure level
     """
-    function plot_fluxes(atmos, fname, dpi::Int=250)
+    function plot_fluxes(atmos, fname; dpi::Int=250)
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
 
@@ -227,7 +227,7 @@ module plotting
 
         # Convective flux (MLT)
         if any(x->x!=0.0, atmos.flux_c)
-            plot!(plt, atmos.flux_c, arr_P, label="CONVECTION", lw=w, lc=col_c, ls=:solid)
+            plot!(plt, atmos.flux_c, arr_P, label="CONVECT", lw=w, lc=col_c, ls=:solid)
             max_fl = max(max_fl, maximum(atmos.flux_c))
         end 
 

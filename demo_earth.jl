@@ -19,7 +19,7 @@ push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
 import setpt
 import plotting 
-import solver
+import solver_euler
 import phys
 
 
@@ -61,9 +61,9 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file)
 
 # Call solver 
 println("Starting solver")
-solver.solve_time!(atmos, surf_state=1, modplot=2, verbose=true, extrap=false,
+solver_euler.solve_energy!(atmos, surf_state=1, modplot=2, verbose=true, extrap=false,
                         dry_convect=true, h2o_convect=true, sens_heat=true, 
-                        dt_max=4.0, max_steps=300)
+                        dt_max=2.0, max_steps=300)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
