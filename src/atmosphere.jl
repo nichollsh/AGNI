@@ -19,6 +19,7 @@ module atmosphere
     using DataStructures
     using DelimitedFiles
     using PCHIPInterpolation
+    using LinearAlgebra
 
     import phys
 
@@ -111,8 +112,6 @@ module atmosphere
         flux_sens::Float64  # Turbulent flux
 
         # Convection 
-        nptmp::Array        # Potential temperature of cell relative to neighbour layer above [K]
-        conv_inst::Array    # Flag for dry convective instability [true/false]
         flux_c::Array     # Dry convective fluxes from MLT
         K_h::Array          # Eddy diffusion coefficient for heat
 
@@ -845,8 +844,6 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
-        atmos.nptmp =             zeros(Float64, atmos.nlev_c)
-        atmos.conv_inst =         falses(atmos.nlev_c)
         atmos.flux_c =            zeros(Float64, atmos.nlev_l)
         atmos.K_h =               zeros(Float64, atmos.nlev_l)
 
@@ -1028,27 +1025,13 @@ module atmosphere
         return nothing
     end # end of radtrans
 
-    # Calculate potential temperature and check convective instability
-    function dryconvection_check!(atmos; tmp_eps::Float64=0.1)
-
-        # Only applies to cell-centre temperatures.
-        # Set tmp_eps to relax the check by that amount [K].
-        
-        # Calculate potential temperatures 
-        # theta[i] = tmp[i] * ( p[i-1] / p[i]] )^( R/cp[i] )
-        atmos.nptmp[1] = 0.0
-        for i in 2:atmos.nlev_c 
-            atmos.nptmp[i] = atmos.tmp[i] * (atmos.p[i-1]/atmos.p[i])^(phys.R_gas/atmos.layer_cp[i])
-        end 
-
-        # Set convective instability flag
-        atmos.conv_inst[1] = false
-        for i in 2:atmos.nlev_c 
-            atmos.conv_inst[i] = (atmos.tmp[i-1] < atmos.nptmp[i] + tmp_eps )
-        end 
-        
+    # Calculate sensible heat flux (turbulence at surface boundary)
+    function sensible!(atmos::atmosphere.Atmos_t)
+        # sensible heat flux (TKE scheme for this 1D case)
+        # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
         return nothing
-    end 
+    end
 
     # Calculate dry convective fluxes using mixing length theory
     function mlt!(atmos::atmosphere.Atmos_t)
@@ -1112,10 +1095,81 @@ module atmosphere
                 atmos.flux_c[i] = -1.0 * rho * c_p * atmos.K_h[i] * (dTdz + Γ_ad)
             
             end
-
         end
-        
+        return nothing
+    end # end of mlt
+
+    # Calculate heating rates at cell-centres
+    function calc_hrates!(atmos::atmosphere.Atmos_t)
+
+        dF::Float64 = 0.0
+        dp::Float64 = 0.0
+
+        atmos.heating_rate[:] .= 0.0
+
+        for i in 1:atmos.nlev_c
+            dF = atmos.flux_tot[i+1] - atmos.flux_tot[i]
+            dp = atmos.pl[i+1] - atmos.pl[i]
+            atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i] * atmos.layer_mmw[i]) * dF/dp # K/s
+        end
+
+        atmos.heating_rate *= 86400.0 # K/day
+
+        return nothing
     end
+
+    # Set cell edge temperatures from cell centres
+    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false)
+
+        bot_old_e = atmos.tmpl[end]
+        top_old_e = atmos.tmpl[1]
+
+        # Interpolate temperature to bulk cell-edge values 
+        itp = Interpolator(atmos.p, atmos.tmp)
+        atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
+
+        # Extrapolate top boundary temperature
+        grad_dt = atmos.tmp[1]-atmos.tmp[2]
+        grad_dp = atmos.p[1]-atmos.p[2]
+        atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
+
+        if limit_change
+            atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.9; 0.1] )  # limit change
+        end
+
+        # Calculate bottom boundary temperature
+        if surf_state == 0
+            # Extrapolate
+            grad_dt = atmos.tmp[end]-atmos.tmpl[end-1]
+            grad_dp = atmos.p[end]-atmos.pl[end-1]
+            atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
+            weights = [0.7; 0.3]
+
+        elseif surf_state == 1 
+            # Fixed
+            weights = [0.0; 1.0]
+
+        elseif surf_state == 2
+            # Conductive skin
+            # Set tmpl[end] such that the skin carries the required flux
+            atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
+            atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
+            weights = [1.0; 0.0]  
+        else 
+            error("Invalid surface state $(surf_state)")
+        end 
+        
+        # limit change at surface
+        if limit_change
+            atmos.tmpl[end] = dot( [atmos.tmpl[end]; bot_old_e] , weights ) 
+        end 
+
+        # Second interpolation back to cell-centres 
+        itp = Interpolator(atmos.pl, atmos.tmpl)  
+        atmos.tmp[:] .= itp.(atmos.p[:])
+
+        return nothing
+    end 
 
     # Get interleaved cell-centre and cell-edge PT grid
     function get_interleaved_pt(atmos::atmosphere.Atmos_t)

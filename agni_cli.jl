@@ -98,7 +98,7 @@ s = ArgParseSettings()
         arg_type = String
         default = "out"
     "--sp_file"
-        help = "Spectral file path. Default is Mallard."
+        help = "Spectral file path. Default is to Mallard."
         arg_type = String
         default = "res/spectral_files/Mallard/Mallard"
     "--star"
@@ -111,6 +111,9 @@ s = ArgParseSettings()
         default = 100
     "--once"
         help = "Just calculate fluxes once - don't iterate."
+        action = :store_true
+    "--cvode"
+        help = "Run CVODE integration after Euler integration has completed."
         action = :store_true
     "--nsteps"
         help = "Maximum number of solver steps."
@@ -197,6 +200,7 @@ convect_adj     = args["convect_adj"]
 convect_mlt     = args["convect_mlt"]
 no_accel        = args["noaccel"]
 equivext        = args["equivext"]
+cvode           = args["cvode"]
 cc_tmpabs       = args["convcrit_tmpabs"]
 cc_tmprel       = args["convcrit_tmprel"]
 cc_fradrel      = args["convcrit_fradrel"]
@@ -268,6 +272,9 @@ if convect_adj || convect_mlt
         error("Both convection schemes are enabled! Pick only one at a time")
     end 
 
+    if convect_adj && cvode 
+        error("CVODE integration isn't compatible with convective adjustment")
+    end
 end
 
 # Setup atmosphere
@@ -326,6 +333,7 @@ if oneshot
     atmosphere.radtrans!(atmos, true)
     atmosphere.radtrans!(atmos, false)
 else
+
     if animate 
         modplot = 1 
     else
@@ -334,13 +342,21 @@ else
     if (surf_state > 2) || (surf_state < 0)
         error("Invalid surface state '$surf_state'")
     end
-    import solver
-    solver.solve_time!(atmos, 
+
+    # Do Euler integration
+    import solver_euler
+    solver_euler.solve_energy!(atmos, 
                          modplot=modplot, verbose=verbose, 
                          surf_state=surf_state, dry_convect=dry_convect, use_mlt=convect_mlt,
                          max_steps=max_steps, accel=!no_accel, extrap=!no_accel,
                          dtmp_conv=cc_tmpabs,drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel
                          )
+    
+    # Do CVODE integration
+    if cvode
+        import solver_cvode 
+        solver_cvode.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, max_steps=100, verbose=verbose)
+    end
 end
 
 # Write NetCDF file 
