@@ -6,6 +6,7 @@
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
+ENV["GKSwstype"] = "100"
 
 println("Begin complex runaway demo")
 
@@ -73,7 +74,7 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 p_boa = atmos.p_boa
 
 plot_frames = true
-run_len = 10
+run_len = 20
 tsurf_arr = range(500,stop=3000,length=run_len)
 
 toa_arr = zeros(Float64, run_len)
@@ -81,17 +82,19 @@ boa_arr = zeros(Float64, run_len)
 skn_arr = zeros(Float64, run_len)
 
 for i in 1:run_len
-    
+
     # Set PT profile 
     atmos.p_boa = p_boa
     atmosphere.generate_pgrid!(atmos)
     atmos.tstar   =     tsurf_arr[i]
 
-    atmos.tmpl[:] =     atmos.tstar # make isothermal
-    atmos.tmp[:]  =     atmos.tstar
+    atmos.tmpl[:] .=     atmos.tstar # make isothermal
+    atmos.tmp[:]  .=     atmos.tstar
+
+    @printf("Running Tsurf = %3.1f K \n",atmos.tmpl[end])
 
     # Calculate temperature profile
-    solver_euler.solve_energy!(atmos, surf_state=1, modplot=0, verbose=false, dry_convect=true, max_steps=300, extrap=false, min_steps=20, use_mlt=true)
+    solver_euler.solve_energy!(atmos, surf_state=1, modplot=0, verbose=false, dry_convect=true, max_steps=400, min_steps=20, use_mlt=true)
 
     F_toa = atmos.flux_tot[1]
     F_boa = atmos.flux_tot[end]
@@ -101,13 +104,12 @@ for i in 1:run_len
     boa_arr[i] = F_boa 
     skn_arr[i] = F_skn 
 
-    @printf("Tsurf = %3.1f K  ,  F_TOA = %.4e W m-2 ,  F_SKN = %.4e W m-2\n",atmos.tmpl[end],F_toa,F_skn)
-
+    @printf("Completed Tsurf = %3.1f K  ,  F_TOA = %.4e W m-2 ,  F_SKN = %.4e W m-2\n",atmos.tmpl[end],F_toa,F_skn)
 
     if plot_frames 
         tsurf = round(Int,atmos.tmpl[end])
-        plotting.plot_pt(atmos,     joinpath(output_dir,"pt_$tsurf.png"), dpi=220)
-        plotting.plot_fluxes(atmos, joinpath(output_dir,"fl_$tsurf.png"), dpi=220)
+        plotting.plot_pt(atmos,     joinpath(output_dir, "pt_$tsurf.png"), dpi=220)
+        plotting.plot_fluxes(atmos, joinpath(output_dir, "fl_$tsurf.png"), dpi=220)
         atmosphere.write_pt(atmos,  joinpath(output_dir, "pt_$tsurf.csv"))
     end
 

@@ -75,23 +75,24 @@ module atmosphere
         z::Array            # cc height 
         zl::Array           # ce height 
 
-        tmp_floor::Float64  # Temperature floor to prevent numerics [K]
+        tmp_floor::Float64      # Temperature floor to prevent numerics [K]
+        tmp_ceiling::Float64    # Temperature ceiling to prevent numerics [K]
 
         # Conductive skin
-        skin_d::Float64      # skin thickness [m]
-        skin_k::Float64      # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
-        tmp_magma::Float64  # Mantle temperature [K]
+        skin_d::Float64         # skin thickness [m]
+        skin_k::Float64         # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
+        tmp_magma::Float64      # Mantle temperature [K]
 
         # Mole fractions (= VMR)
-        gases::Array        # List of gas names 
-        input_x::Dict       # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
-        layer_x::Array      # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
+        gases::Array            # List of gas names 
+        input_x::Dict           # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
+        layer_x::Array          # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
 
         # Layers' average properties
-        layer_density::Array  # density [kg m-3]
-        layer_mmw::Array      # mean molecular weight [kg mol-1]
-        layer_cp::Array       # heat capacity at const-p [J K-1 mol-1]
-        layer_grav::Array     # gravity [m s-2]
+        layer_density::Array    # density [kg m-3]
+        layer_mmw::Array        # mean molecular weight [kg mol-1]
+        layer_cp::Array         # heat capacity at const-p [J K-1 mol-1]
+        layer_grav::Array       # gravity [m s-2]
 
         # Calculated radiative fluxes (W m-2)
         flux_d_lw::Array  # down component, lw 
@@ -225,6 +226,7 @@ module atmosphere
         atmos.overlap_method =  Int(overlap_method)
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
+        atmos.tmp_ceiling =     6000.0
 
         atmos.nlev_c         =  max(nlev_centre,10)
         atmos.nlev_l         =  atmos.nlev_c + 1
@@ -950,8 +952,8 @@ module atmosphere
         # Temperature
         ####################################################
 
-        clamp!(atmos.tmp, atmos.tmp_floor, Inf)
-        clamp!(atmos.tmpl, atmos.tmp_floor, Inf)
+        clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
+        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
 
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.t[1, :] .= atmos.tmp[:]
@@ -1120,6 +1122,8 @@ module atmosphere
 
     # Set cell edge temperatures from cell centres
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false)
+
+        clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
         bot_old_e = atmos.tmpl[end]
         top_old_e = atmos.tmpl[1]

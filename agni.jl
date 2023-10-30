@@ -9,6 +9,7 @@ println("Begin AGNI")
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
+ENV["GKSwstype"] = "100"
 
 # Include libraries
 using Revise
@@ -25,7 +26,7 @@ import phys
 
 
 # Configuration options
-tstar           = 2100.0    # Surface temperature [kelvin]
+tstar           = 2300.0    # Surface temperature [kelvin]
 toa_heating     = 3.772e+04 # Instellation flux [W m-2]
 radius          = 7.12e6    # metres
 gravity         = 10.8      # m s-2
@@ -59,7 +60,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          zenith_degrees=54.4,
                          skin_d=0.02,
                          skin_k=2.0,
-                         tmp_magma=2654.0
+                         tmp_magma=2654.0,
+                         tmp_floor=2.0
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
@@ -87,8 +89,8 @@ end
 
 # Call solver 
 println("Starting solver")
-solver_euler.solve_energy!(atmos, surf_state=2, modplot=2, verbose=true, dry_convect=true, max_steps=300, min_steps=20, use_mlt=true)
-solver_cvode.solve_energy!(atmos, surf_state=2,            verbose=true, dry_convect=true, max_steps=300)
+solver_euler.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_convect=true, max_steps=400, min_steps=20, use_mlt=true, extrap=true)
+solver_cvode.solve_energy!(atmos, surf_state=2,            verbose=true, dry_convect=true, max_steps=100)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
@@ -96,10 +98,10 @@ atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
 atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Save plots
+plotting.anim_solver(atmos)
 plotting.plot_x(atmos,      joinpath(atmos.OUT_DIR,"mf.pdf"))
 plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
 plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
-plotting.anim_solver(atmos)
 
 # Deallocate atmosphere
 println("Deallocating arrays")

@@ -9,6 +9,7 @@ println("Begin Earth demo")
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
+ENV["GKSwstype"] = "100"
 
 # Include libraries
 using Revise

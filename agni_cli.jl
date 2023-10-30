@@ -6,6 +6,7 @@
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
+ENV["GKSwstype"] = "100"
 
 # Include libraries
 using Revise
@@ -146,6 +147,10 @@ s = ArgParseSettings()
         help = "Convergence criterion on dfrad/frad [%]."
         arg_type = Float64
         default = 0.8
+    "--convcrit_flosspct"
+        help = "Convergence criterion on global flux loss [%]."
+        arg_type = Float64
+        default = 2.0
     "--plot"
         help = "Make plots."
         action = :store_true
@@ -204,6 +209,7 @@ cvode           = args["cvode"]
 cc_tmpabs       = args["convcrit_tmpabs"]
 cc_tmprel       = args["convcrit_tmprel"]
 cc_fradrel      = args["convcrit_fradrel"]
+cc_floss        = args["convcrit_flosspct"]
 
 if verbose 
     println("Command line arguments:")
@@ -349,7 +355,7 @@ else
                          modplot=modplot, verbose=verbose, 
                          surf_state=surf_state, dry_convect=dry_convect, use_mlt=convect_mlt,
                          max_steps=max_steps, accel=!no_accel, extrap=!no_accel,
-                         dtmp_conv=cc_tmpabs,drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel
+                         dtmp_conv=cc_tmpabs,drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel, F_losspct_conv=cc_floss
                          )
     
     # Do CVODE integration

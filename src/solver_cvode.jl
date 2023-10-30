@@ -17,7 +17,7 @@ module solver_cvode
     using PCHIPInterpolation
     using LinearAlgebra
 
-    using DifferentialEquations
+    using SciMLBase
     using SteadyStateDiffEq
     using Sundials
 
@@ -128,24 +128,26 @@ module solver_cvode
         p = 2.0
 
         prob_ss = SteadyStateProblem(objective, u0, p)
-        sol = solve(prob_ss, DynamicSS(CVODE_Adams()), dt=1.0e-2,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
+        sol = solve(prob_ss, DynamicSS(CVODE_Adams()), dt=1.0e-3,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
 
-        println("RCSolver: Iterations completed")
+        if sol.retcode == :Success
+            println("RCSolver: Iterations completed (converged)")
+        elseif sol.retcode == :MaxIters
+            println("RCSolver: Iterations completed (maximum iterations)")
+        else 
+            println("RCSolver: Iterations completed (failure)")
+        end
 
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
         atmos.tmp[:] .= sol.u[:]
-        clamp!(atmos.tmp, atmos.tmp_floor, Inf)
-
-        atmosphere.set_tmpl_from_tmp!(atmos, surf_state, limit_change=false) 
-
         objective(zeros(Float64, atmos.nlev_c), atmos.tmp, p, 1.0e20)
 
         # ----------------------------------------------------------
         # Print info
         # ---------------------------------------------------------- 
-        loss = atmos.flux_tot[1] - atmos.flux_tot[end-1]
+        loss = atmos.flux_tot[1] - atmos.flux_tot[end]
         loss_pct = loss/atmos.flux_tot[1]*100.0
         @printf("RCSolver: Final total fluxes [W m-2] \n")
         @printf("    rad_OLR   = %.2e W m-2         \n", atmos.flux_u_lw[1])
