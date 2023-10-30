@@ -122,19 +122,19 @@ module solver_euler
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
     - `dry_convect::Bool=true`          enable dry convection
     - `h2o_convect::Bool=false`         enable naive steam convection (not supported by MLT scheme)
-    - `use_mlt::Bool=fale`              using mixing length theory to represent convection (otherwise use adjustment)
+    - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=true`            include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `extrap::Bool=false`              enable extrapolation forward in time 
-    - `dt_max::Float64=6.0`             maximum time-step outside of the accelerated phase
+    - `dt_max::Float64=8.0`             maximum time-step outside of the accelerated phase
     - `max_steps::Int=200`              maximum number of solver steps
-    - `min_steps::Int=10`               minimum number of solver steps
+    - `min_steps::Int=15`               minimum number of solver steps
     - `dtmp_conv::Float64=5.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
     - `drel_dt_conv::Float64=0.5`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
     - `drel_F_conv::Float64=0.2`        convergence: maximum relative change in F_TOA_rad for convergence [%]
-    - `F_losspct_conv::Float64=1.0`     convergence: maximum flux loss throughout column [%]
+    - `F_losspct_conv::Float64=2.0`     convergence: maximum flux loss throughout column [%]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1,
@@ -142,7 +142,7 @@ module solver_euler
                             sens_heat::Bool=true,
                             verbose::Bool=true, modplot::Int=0, 
                             accel::Bool=true, extrap::Bool=false,
-                            dt_max::Float64=6.0, max_steps::Int=200, min_steps::Int=15,
+                            dt_max::Float64=8.0, max_steps::Int=250, min_steps::Int=15,
                             dtmp_conv::Float64=3.0, drel_dt_conv::Float64=0.5, drel_F_conv::Float64=0.2, F_losspct_conv::Float64=2.0
                             )
 
@@ -420,7 +420,7 @@ module solver_euler
             end 
 
             # Temperature floor (centres)
-            clamp!(atmos.tmp, atmos.tmp_floor, Inf)
+            clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Set cell-edge values
             if accel && (step <= step_stopaccel)
@@ -453,8 +453,8 @@ module solver_euler
             end 
 
             # Temperature floor
-            clamp!(atmos.tmp,  atmos.tmp_floor, Inf)
-            clamp!(atmos.tmpl, atmos.tmp_floor, Inf)
+            clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
+            clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Set tstar 
             atmos.tstar = atmos.tmpl[end]
@@ -468,7 +468,7 @@ module solver_euler
             # can be reasonably neglected if the rest of the column is fine.
             if step > 1
                 drel_dt_prev = drel_dt
-                drel_dt = quantile(abs.(  ((atmos.tmp[2:end] .- hist_tmp[end,2:end])./hist_tmp[end,2:end])./dt[2:end]  ), 0.9)
+                drel_dt = quantile(abs.(  ((atmos.tmp[2:end] .- hist_tmp[end,2:end])./hist_tmp[end,2:end])./dt[2:end]  ), 0.95)
             end
 
             # Calculate maximum average change in temperature (insensitive to oscillations)
@@ -485,17 +485,17 @@ module solver_euler
             F_TOA_pre = F_TOA_rad 
             F_TOA_rad = atmos.flux_n[1]
             F_TOA_rel = abs((F_TOA_rad-F_TOA_pre)/F_TOA_pre)*100.0
-            F_BOA_rad = atmos.flux_n[end-1]
+            F_BOA_rad = atmos.flux_n[end]
             F_OLR_rad = atmos.flux_u_lw[1]
 
             F_TOA_tot = atmos.flux_tot[1]
-            F_BOA_tot = atmos.flux_tot[end-1]
+            F_BOA_tot = atmos.flux_tot[end]
 
             F_loss    = F_TOA_tot-F_BOA_tot
             F_losspct = abs(F_loss/F_TOA_tot*100.0)
             
             # Calculate the 'typical' heating rate magnitude
-            H_stat    = quantile(abs.(atmos.heating_rate[:]), 0.8)
+            H_stat    = quantile(abs.(atmos.heating_rate[:]), 0.95)
 
             # --------------------------------------
             # Print debug info
@@ -564,14 +564,15 @@ module solver_euler
         @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
         @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
         @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
+        @printf("    loss      = %.2f W m-2         \n", F_loss)
+        @printf("    loss      = %.2f %%            \n", F_losspct)
         @printf("\n")
 
-        @printf("RCSolver: Final radiative fluxes [W m-2] \n")
+        @printf("RCSolver: Final fluxes [W m-2] \n")
         @printf("    rad_OLR   = %.2e W m-2         \n", F_OLR_rad)
         @printf("    rad_TOA   = %.2e W m-2         \n", F_TOA_rad)
         @printf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
-        @printf("    loss      = %.2f W m-2         \n", F_loss)
-        @printf("    loss      = %.2f %%            \n", F_losspct)
+        @printf("    tot_BOA   = %.2e W m-2         \n", F_BOA_tot)
         @printf("\n")
     
         # Warn user if there's a sign difference in TOA vs BOA fluxes
