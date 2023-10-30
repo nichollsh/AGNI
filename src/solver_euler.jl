@@ -153,7 +153,7 @@ module solver_euler
         dtmp_accel   = 40.0  # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
         dtmp_extrap  = 20.0  # Change in temperature above which to use model extrapolation (not worth it at small dtmp)
         wait_adj     = 10    # Wait this many steps before introducing convective adjustment
-        modprint     = 10    # Frequency to print when verbose==false
+        modprint     = 25    # Frequency to print when verbose==false
         len_hist     = 10    # Number of previous states to store
         H_small      = 1.0   # A small heating rate [K/day]
         p_large      = 5e5   # A large pressure [Pa] 
@@ -564,8 +564,8 @@ module solver_euler
         @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
         @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
         @printf("    drel_F_TOA  = %.4f %%     \n", F_TOA_rel)
-        @printf("    loss      = %.2f W m-2         \n", F_loss)
-        @printf("    loss      = %.2f %%            \n", F_losspct)
+        @printf("    loss      = %.2f W m-2    \n", F_loss)
+        @printf("    loss      = %.2f %%       \n", F_losspct)
         @printf("\n")
 
         @printf("RCSolver: Final fluxes [W m-2] \n")

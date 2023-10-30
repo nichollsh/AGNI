@@ -64,7 +64,7 @@ module solver_cvode
 
             call += 1
             if verbose || ( mod(call,modprint) == 0)
-                println("    Call $call")
+                println("    call $call")
             end
             
 
@@ -107,7 +107,7 @@ module solver_cvode
                 du[i] = atmos.heating_rate[i]
             end
             
-            if verbose || ( mod(call,modprint) == 0)
+            if verbose 
                 println("    Max hr = $(maximum(abs.(du)))")
                 println("    Avg hr = $(mean(abs.(du)))")
                 println(" ")
@@ -132,10 +132,8 @@ module solver_cvode
 
         if sol.retcode == :Success
             println("RCSolver: Iterations completed (converged)")
-        elseif sol.retcode == :MaxIters
-            println("RCSolver: Iterations completed (maximum iterations)")
-        else 
-            println("RCSolver: Iterations completed (failure)")
+        else
+            println("RCSolver: Iterations completed (maximum iterations or failure)")
         end
 
         # ----------------------------------------------------------
