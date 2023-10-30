@@ -3,7 +3,7 @@ Time-stepped radiative-convective solver designed for integration into a coupled
 
 AGNI relies on SOCRATES (2306) for calculating the radiative-transfer. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). SOCRATES is setup here to include shortwave irradiation from the star, Rayleigh scattering, and continuum absorption / CIA.        
 
-Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Two convection parameterisations are included: convective adjustment (directly manipulating the temperature arrays), and mixing length theory (calculating convective energy fluxes). Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files.
+Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Two convection parameterisations are included: convective adjustment (directly manipulating the temperature arrays), and mixing length theory (calculating convective energy fluxes). Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files. Integration is primarily via a first-order Euler method with various acceleration options, however it is also possible to activate a high-order stiff integrator with automatic switching (Sundials CVODE Adams-Moulton).
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
@@ -52,6 +52,9 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 -  `(@v1.9) pkg> add DataStructures`
 -  `(@v1.9) pkg> add Glob`
 -  `(@v1.9) pkg> add ArgParse`
+-  `(@v1.9) pkg> add DifferentialEquations`
+-  `(@v1.9) pkg> add SteadyStateDiffEq`
+-  `(@v1.9) pkg> add Sundials`
 -  `(@v1.9) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`
