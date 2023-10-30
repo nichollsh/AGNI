@@ -170,14 +170,16 @@ module plotting
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
-        w = 2.4
+        w = 2.8
         plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi)
 
         col_u = "brown3"
         col_d = "seagreen"
-        col_n = "deepskyblue2"
+        col_np = "deepskyblue2"
+        col_nn = "lightslateblue"
         col_c = "goldenrod2"
-        col_t = "black"
+        col_tp = "black"
+        col_tn = "grey18"
 
         max_fl = 1e2
         
@@ -221,8 +223,8 @@ module plotting
             end 
             max_fl = max(max_fl, maximum(absnet))
 
-            plot!(plt, absnet[  posnet], arr_P[  posnet], label="RAD NET"*L">0", lw=w*2.0, lc=col_n, ls=:solid)
-            plot!(plt, absnet[.!posnet], arr_P[.!posnet], label="RAD NET"*L"<0", lw=w    , lc=col_n, ls=:solid)
+            plot!(plt, absnet[  posnet], arr_P[  posnet], label="RAD NET"*L">0", lw=w*2.0, lc=col_np, ls=:solid)
+            plot!(plt, absnet[.!posnet], arr_P[.!posnet], label="RAD NET"*L"<0", lw=w    , lc=col_nn, ls=:solid)
         end 
 
         # Convective flux (MLT)
@@ -241,8 +243,15 @@ module plotting
         end
 
         # Total flux
-        plot!(plt, atmos.flux_tot, arr_P, label="TOTAL", lw=w*0.8, lc=col_t, ls=:solid)
-        max_fl = max(max_fl, maximum(abs.(atmos.flux_tot)))
+        abstot = zeros(Float64, atmos.nlev_l)
+        postot = trues(atmos.nlev_l)
+        for i in 1:atmos.nlev_l
+            abstot[i] = abs(atmos.flux_tot[i])
+            postot[i] = (atmos.flux_tot[i] >= 0)
+        end 
+        max_fl = max(max_fl, maximum(abstot))
+        plot!(plt, abstot[  postot], arr_P[  postot], label="TOTAL"*L">0", lw=w*0.8, lc=col_tp, ls=:solid)
+        plot!(plt, abstot[.!postot], arr_P[.!postot], label="TOTAL"*L"<0", lw=w*0.5, lc=col_tn, ls=:solid)
 
         xlims  = (1e-1, max_fl * 1.5)
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
