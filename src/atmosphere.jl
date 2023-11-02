@@ -172,7 +172,7 @@ module atmosphere
     - `skin_d::Float64=0.05`            skin thickness [m].
     - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
     - `all_channels::Bool=true`         use all channels available for RT?
-    - `overlap_method::Int=2`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
+    - `overlap_method::Int=4`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
     - `flag_continuum::Bool=false`      include continuum absorption?
@@ -191,11 +191,11 @@ module atmosphere
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        50.0,
                     C_d::Float64 =              0.001,
-                    U::Float64 =                10.0,
+                    U::Float64 =                2.0,
                     tmp_magma::Float64 =        3000.0,
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
-                    overlap_method::Int =       2,
+                    overlap_method::Int =       4,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -467,16 +467,37 @@ module atmosphere
     end 
 
     """
-    **Generate a log-spaced pressure grid.**
+    **Generate a pressure grid.**
 
-    Uses the values of `atmos.nlev_l`, `atmos.p_toa`, and `atmos.p_boa`.
+    Log-spaced in pressure. If P_surf is larger than switch_p, level resolution
+    is set by proprtioning the atmosphere into a lower and upper part, with switch_n
+    levels in the upper part and the remainder levels in the lower part.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `switch_p::Float64`       switch pressure [Pa].
+    - `switch_n::Float64`       switch level count.
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t)
-        # Set pressure cell-edge array by logspace
-        atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; switch_p::Float64=1.0e20, switch_n::Int=60)
+
+        # Set pressure cell-edge array
+        if atmos.p_boa <= switch_p
+            # Logspace only
+            atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
+        else 
+            # Check switch_n 
+            if (switch_n < 20) || (atmos.nlev_l - switch_n < 20)
+                error("More levels required, or switch_n is too large or too small")
+            end
+
+            # Upper and lower parts
+            switch_p *= 0.95  # shift level upwards somewhat
+            pl_up = 10 .^ range( log10(atmos.p_toa), stop=log10(switch_p),    length=switch_n+1)
+            pl_lo = 10 .^ range( log10(switch_p),    stop=log10(atmos.p_boa), length=atmos.nlev_l-switch_n)
+
+            # Set levels
+            atmos.pl = vcat(pl_up[1:end-1], pl_lo[1:end])
+        end
 
         # Set pressure cell-centre array by interpolation
         atmos.p =    zeros(Float64, atmos.nlev_c)
@@ -1085,7 +1106,7 @@ module atmosphere
             dTdz = (atmos.tmp[i] - atmos.tmp[i-1]) / (atmos.z[i] - atmos.z[i-1])
 
             # Check instability
-            if (dTdz < -1.0 * Γ_ad)
+            if (dTdz < 0.0) && ( abs(dTdz) > abs(Γ_ad))
             
                 rho = 0.5 * (atmos.layer_density[i] + atmos.layer_density[i-1])
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
@@ -1120,6 +1141,92 @@ module atmosphere
         return nothing
     end
 
+     # Dry convective adjustment, single step
+     function adjust_dry!(atmos::atmosphere.Atmos_t)
+
+        # Downward pass
+        for i in 2:atmos.nlev_c
+
+            T1 = atmos.tmp[i-1]    # upper layer
+            p1 = atmos.p[i-1]
+
+            T2 = atmos.tmp[i]  # lower layer
+            p2 = atmos.p[i]
+            
+            cp = 0.5 * ( atmos.layer_cp[i-1] +  atmos.layer_cp[i])
+            pfact = (p1/p2)^(phys.R_gas / cp)
+            
+            # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
+            if T1 < T2*pfact
+                Tbar = 0.5 * ( T1 + T2 )
+                T2 = 2.0 * Tbar / (1.0 + pfact)
+                T1 = T2 * pfact
+                atmos.tmp[i-1] = T1
+                atmos.tmp[i]   = T2
+            end
+        end
+
+        # Upward pass
+        for i in atmos.nlev_c:2
+
+            T1 = atmos.tmp[i-1]
+            p1 = atmos.p[i-1]
+
+            T2 = atmos.tmp[i]
+            p2 = atmos.p[i]
+            
+            cp = 0.5 * ( atmos.layer_cp[i-1] + atmos.layer_cp[i])
+            pfact = (p1/p2)^(phys.R_gas / cp)
+
+            if T1 < T2*pfact
+                Tbar = 0.5 * ( T1 + T2 )
+                T2 = 2.0 * Tbar / ( 1.0 + pfact)
+                T1 = T2 * pfact
+                atmos.tmp[i-1] = T1
+                atmos.tmp[i]   = T2 
+            end 
+        end
+        return nothing
+    end
+
+    # Naive steam adjustment, single step (as per AEOLUS)
+    function adjust_steam!(atmos::atmosphere.Atmos_t,  gas::String = "H2O")
+        
+        # Skip if no water present
+        if !(gas in atmos.gases)
+            return 
+        end 
+
+        #Downward pass
+        for i in range(1,stop=atmos.nlev_c-1, step=1)
+            x = atmosphere.get_x(atmos, gas, i)
+            pp = atmos.p[i] * x
+            if (pp < 1e-10)
+                continue
+            end 
+            Tdew = phys.calc_Tdew(gas, pp)
+            if (atmos.tmp[i] < Tdew)
+                atmos.tmp[i] = Tdew
+            end
+        end
+
+        #Upward pass
+        for i in range(atmos.nlev_c-1,stop=2, step=-1)
+            x = atmosphere.get_x(atmos, gas, i)
+            pp = atmos.p[i] * x
+            if (pp < 1e-10)
+                continue
+            end 
+            Tdew = phys.calc_Tdew(gas, pp)
+            if (atmos.tmp[i] < Tdew)
+                atmos.tmp[i] = Tdew
+            end
+        end
+        return nothing
+    end
+
+
+
     # Set cell edge temperatures from cell centres
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false)
 
@@ -1133,8 +1240,8 @@ module atmosphere
         atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
         # Extrapolate top boundary temperature
-        grad_dt = atmos.tmp[1]-atmos.tmp[2]
-        grad_dp = atmos.p[1]-atmos.p[2]
+        grad_dt = atmos.tmp[1] - atmos.tmp[3]
+        grad_dp = atmos.p[1]   - atmos.p[3]
         atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
 
         if limit_change
@@ -1169,6 +1276,7 @@ module atmosphere
         end 
 
         # Second interpolation back to cell-centres 
+        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
         itp = Interpolator(atmos.pl, atmos.tmpl)  
         atmos.tmp[:] .= itp.(atmos.p[:])
 
