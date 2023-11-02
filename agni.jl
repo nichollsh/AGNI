@@ -26,19 +26,19 @@ import phys
 
 
 # Configuration options
-tstar           = 2300.0    # Surface temperature [kelvin]
-toa_heating     = 3.772e+04 # Instellation flux [W m-2]
+tstar           = 2000.0    # Surface temperature [kelvin]
+toa_heating     = 3.745e+04 # Instellation flux [W m-2]
 radius          = 7.12e6    # metres
 gravity         = 10.8      # m s-2
-nlev_centre     = 128  
-p_surf          = 127.0     # bar
+nlev_centre     = 100  
+p_surf          = 120.8     # bar
 p_top           = 1e-6      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 0.91805),
-                        ("CO2" , 5.98710),
-                        ("H2"  , 2.37994),
-                        ("CO"  , 115.89786),
-                        ("N2"  , 1.77739)
+                        ("H2O" , 145.64182),
+                        ("CO2" , 4.72241),
+                        ("H2" , 7.53004),
+                        ("CO" , 90.58514),
+                        ("N2" , 1.41003)
                         ])
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
@@ -55,28 +55,30 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
-                         flag_rayleigh=false,
+                         flag_rayleigh=true,
                          overlap_method=4,
                          zenith_degrees=54.4,
                          skin_d=0.02,
                          skin_k=2.0,
-                         tmp_magma=2654.0,
+                         tmp_magma=2700.0,
                          tmp_floor=2.0
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-# setpt.fromcsv!(atmos,"out/pt.csv")
+# setpt.fromcsv!(atmos,"out/pt_load.csv")
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
 # setpt.stratosphere!(atmos, 300.0)
 
 # Create output directory
-rm(output_dir,force=true,recursive=true)
+# rm(output_dir,force=true,recursive=true)
 if !isdir(output_dir) && !isfile(output_dir)
     mkdir(output_dir)
 end
+
+atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
 # Calculate LW and SW fluxes (once)
 # println("RadTrans: calculating fluxes")
@@ -89,8 +91,10 @@ end
 
 # Call solver 
 println("Starting solver")
-solver_euler.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, dry_convect=true, max_steps=400, min_steps=20, use_mlt=true, extrap=true)
-solver_cvode.solve_energy!(atmos, surf_state=2,            verbose=true, dry_convect=true, max_steps=100)
+solver_euler.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, 
+                            dry_convect=true, use_mlt=false,
+                            max_steps=1000, accel=true, extrap=false, rtol=1.0e-4, atol=1.0e-2)
+# solver_cvode.solve_energy!(atmos, surf_state=2,            verbose=true, dry_convect=true,  max_steps=500)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))

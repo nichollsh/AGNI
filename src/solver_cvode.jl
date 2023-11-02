@@ -20,6 +20,7 @@ module solver_cvode
     using SciMLBase
     using SteadyStateDiffEq
     using Sundials
+    # using NonlinearSolve
 
     import atmosphere 
     import phys
@@ -28,26 +29,25 @@ module solver_cvode
     **Obtain radiative-convective equilibrium using a CVODE solver.**
 
     Time-steps the temperature profile with the heating rates to obtain global and 
-    local energy balance. MLT is used to calculate the convective fluxes. Uses a 
-    high-order adaptive stiff ODE integration (CVode Adams-Moulton) to obtain an
-    accurate solution. 
+    local energy balance. Uses a high-order adaptive stiff ODE integrator from the
+    Sundials library (CVode Adams-Moulton) to obtain an accurate solution. 
     
     This is very expensive, so it's best to get close to the solution by using
     the functions in solver_euler.jl, and then using this one afterwards.
 
-    Not compatible with convective adjustment schemes.
+    Not compatible with convective adjustment; MLT must be used.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
     - `verbose::Bool=false`             verbose output?
     - `dry_convect::Bool=true`          enable dry convection
-    - `sens_heat::Bool=true`            include sensible heating 
+    - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=50`               maximum number of solver steps
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, verbose::Bool=false,
-                            dry_convect::Bool=true, sens_heat::Bool=true,
+                            dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=200
                             )
 
@@ -56,6 +56,9 @@ module solver_cvode
         call::Int = 0
         modprint::Int=25
 
+        if verbose 
+            modprint = 2
+        end
         if max_steps < modprint
             modprint = 2
         end
@@ -63,7 +66,7 @@ module solver_cvode
         function objective(du, u, p, t)
 
             call += 1
-            if verbose || ( mod(call,modprint) == 0)
+            if mod(call,modprint) == 0 
                 println("    call $call")
             end
             
@@ -90,8 +93,10 @@ module solver_cvode
             atmos.flux_tot += atmos.flux_n
 
             # Convection
-            atmosphere.mlt!(atmos)
-            atmos.flux_tot += atmos.flux_c
+            if dry_convect
+                atmosphere.mlt!(atmos)
+                atmos.flux_tot += atmos.flux_c
+            end
 
             # Turbulence
             if sens_heat
@@ -107,7 +112,7 @@ module solver_cvode
                 du[i] = atmos.heating_rate[i]
             end
             
-            if verbose 
+            if mod(call,modprint) == 0 
                 println("    Max hr = $(maximum(abs.(du)))")
                 println("    Avg hr = $(mean(abs.(du)))")
                 println(" ")
@@ -128,7 +133,10 @@ module solver_cvode
         p = 2.0
 
         prob_ss = SteadyStateProblem(objective, u0, p)
-        sol = solve(prob_ss, DynamicSS(CVODE_Adams()), dt=1.0e-3,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
+        sol = solve(prob_ss, DynamicSS(CVODE_BDF()), dt=1.0e-3,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
+
+        # prob_nl = NonlinearProblem(objective, u0, p)
+        # sol = solve(prob_nl, LevenbergMarquardt(autodiff=false), dt=200.0, abstol=1e-1, reltol=1e-2, maxiters=max_steps)
 
         if sol.retcode == :Success
             println("RCSolver: Iterations completed (converged)")
@@ -140,7 +148,7 @@ module solver_cvode
         # Extract solution
         # ---------------------------------------------------------- 
         atmos.tmp[:] .= sol.u[:]
-        objective(zeros(Float64, atmos.nlev_c), atmos.tmp, p, 1.0e20)
+        objective(zeros(Float64, atmos.nlev_c), atmos.tmp, p, 2.0e20)
 
         # ----------------------------------------------------------
         # Print info
