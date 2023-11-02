@@ -229,7 +229,7 @@ module plotting
 
         # Convective flux (MLT)
         if any(x->x!=0.0, atmos.flux_c)
-            plot!(plt, atmos.flux_c, arr_P, label="CONVECT", lw=w, lc=col_c, ls=:solid)
+            plot!(plt, atmos.flux_c, arr_P, label="CONVECT", lw=w*1.2, lc=col_c, ls=:solid)
             max_fl = max(max_fl, maximum(atmos.flux_c))
         end 
 
@@ -250,8 +250,8 @@ module plotting
             postot[i] = (atmos.flux_tot[i] >= 0)
         end 
         max_fl = max(max_fl, maximum(abstot))
-        plot!(plt, abstot[  postot], arr_P[  postot], label="TOTAL"*L">0", lw=w*0.8, lc=col_tp, ls=:solid)
-        plot!(plt, abstot[.!postot], arr_P[.!postot], label="TOTAL"*L"<0", lw=w*0.5, lc=col_tn, ls=:solid)
+        plot!(plt, abstot[  postot], arr_P[  postot], label="TOTAL"*L">0", lw=w*0.7, lc=col_tp, ls=:solid)
+        plot!(plt, abstot[.!postot], arr_P[.!postot], label="TOTAL"*L"<0", lw=w*0.4, lc=col_tn, ls=:solid)
 
         xlims  = (1e-1, max_fl * 1.5)
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))

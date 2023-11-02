@@ -22,7 +22,7 @@ s = ArgParseSettings()
         arg_type = Float64
         required = true
     "toa_heating"
-        help = "SW dflux top boundary condition [W m-2]."
+        help = "Shortwave downward flux top boundary condition [W m-2]."
         arg_type = Float64
         required = true
     "gravity"
@@ -34,11 +34,11 @@ s = ArgParseSettings()
         arg_type = Float64 
         required = true
     "psurf"
-        help = "Total surface pressure [bar]."
+        help = "Total pressure at the surface [bar]."
         arg_type = Float64
         required = true
     "ptop"
-        help = "Total top of atmosphere pressure [bar]."
+        help = "Total pressure at top of atmosphere  [bar]."
         arg_type = Float64
         required = true
     "--x_dict"
@@ -54,7 +54,7 @@ s = ArgParseSettings()
         arg_type = String 
         default = ""
     "--tstar_enforce"
-        help = "Do not allow the PT profile provided by `pt_path`` to overwrite the value of `t_star`"
+        help = "Do not allow the PT profile provided by `pt_path`` to overwrite the value of `tstar`"
         action = :store_true
     "--tmp_floor"
         help = "Minimum temperature allowed in the model - prevents numerical issues [K]."
