@@ -349,9 +349,9 @@ else
         error("Invalid surface state '$surf_state'")
     end
 
-    # Do Euler integration
-    import solver_euler
-    solver_euler.solve_energy!(atmos, 
+    # Do accelerated integration
+    import solver_accel
+    solver_accel.solve_energy!(atmos, 
                          modplot=modplot, verbose=verbose, 
                          surf_state=surf_state, dry_convect=dry_convect, use_mlt=convect_mlt,
                          max_steps=max_steps, accel=!no_accel, extrap=!no_accel,
