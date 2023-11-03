@@ -6,7 +6,7 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
-module solver_euler
+module solver_accel
 
     # Include libraries
     include("../socrates/julia/src/SOCRATES.jl")
@@ -24,30 +24,34 @@ module solver_euler
 
    
     """
-    **Solve for radiative-convective equilibrium using Euler time-stepping.**
+    **Solve for radiative-convective equilibrium using accelerated time-stepping.**
 
-    Time-steps the temperature profile with the heating rates to obtain global and 
-    local energy balance. Convective adjustment is applied to represent convective
-    energy transport in unstable layers, or alternatively MLT is used to calculate the
-    convective fluxes. Uses a first-order Euler method which works well to initialise
-    the integration but may not strictly conserve energy.
+    Time-steps the temperature profile with the heating rates to obtain global 
+    and local energy balance. Uses a first-order Euler method which works well 
+    to initialise the integration but may lead to instabilities. Also implments 
+    a two-step Adams-Bashforth integrator.
+
+    Convective adjustment is applied to represent convective energy transport in 
+    unstable layers, or alternatively MLT is used to calculate the convective 
+    fluxes. Adjustment isn't compatible with the Adams-Bashforth integrator.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
     - `dry_convect::Bool=true`          enable dry convection
     - `h2o_convect::Bool=false`         enable naive steam convection (not supported by MLT scheme)
-    - `use_mlt::Bool=false`             using mixing length theory to represent convection (otherwise use adjustment)
+    - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=false`           include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `extrap::Bool=false`              enable extrapolation forward in time 
-    - `dt_max::Float64=10.0             maximum time-step outside of the accelerated phase
+    - `adams::Bool=true`                use Adams-Bashforth integrator (not supported by adjustment scheme)
+    - `rtol::Bool=7.0e-2`               relative tolerence
+    - `atol::Bool=1.0e-1`               absolute tolerence
+    - `dt_max::Float64=40.0             maximum time-step outside of the accelerated phase
     - `max_steps::Int=300`              maximum number of solver steps
     - `min_steps::Int=15`               minimum number of solver steps
-    - `rtol::Float64=1.0e-2`            relative tolerence on timestep
-    - `atol::Float64=1.0e1`             absolute tolerence on timestep
     - `dtmp_conv::Float64=5.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
     - `drel_dt_conv::Float64=0.5`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
     - `drel_F_conv::Float64=0.1`        convergence: maximum relative change in F_TOA_rad for convergence [%]
@@ -55,21 +59,21 @@ module solver_euler
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1,
-                            dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=false, 
+                            dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=true, 
                             sens_heat::Bool=false,
                             verbose::Bool=true, modplot::Int=0, 
-                            accel::Bool=true, extrap::Bool=false,
-                            dt_max::Float64=10.0, max_steps::Int=300, min_steps::Int=15,
-                            rtol::Float64=1.0e-2, atol::Float64=1.0e1,
+                            accel::Bool=true, extrap::Bool=false, adams::Bool=true,
+                            dt_max::Float64=40.0, max_steps::Int=300, min_steps::Int=15,
+                            rtol::Float64=7.0e-2, atol::Float64=1.0e-1,
                             dtmp_conv::Float64=3.0, drel_dt_conv::Float64=0.5, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=2.0
                             )
 
-        println("RCSolver: Begin Euler timestepping")
+        println("RCSolver: Begin accelerated timestepping")
 
         # Run parameters
-        dtmp_accel   = 70.0  # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
+        dtmp_accel   = 15.0  # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
         dtmp_extrap  = 2.0   # Change in temperature above which to use model extrapolation (not worth it at small dtmp)
-        wait_adj     = 10     # Wait this many steps before introducing convection
+        wait_adj     = 10    # Wait this many steps before introducing convection
         modprint     = 25    # Frequency to print when verbose==false
         len_hist     = 12    # Number of previous states to store
         H_small      = 1.0e-1  # A characteristic heating rate [K/day]
@@ -85,6 +89,14 @@ module solver_euler
 
         if use_mlt && h2o_convect 
             error("MLT convection scheme is not compatible with moist convection")
+        end
+
+        if !use_mlt && adams
+            error("Convective adjustment is not compatible with Adams-Bashforth integration")
+        end
+
+        if (len_hist < 4) && adams
+            error("The value of len_hist is too small ($len_hist < 4)")
         end
 
         if !use_mlt 
@@ -119,7 +131,6 @@ module solver_euler
         drel_dt_prev::Float64 = Inf      # Previous ^
 
         oscil       = falses(atmos.nlev_c)          # layers which are oscillating
-        heat_prev   = zeros(Float64, atmos.nlev_c)  # Previous iteration heating rates
         dt          = ones(Float64,  atmos.nlev_c)  # time-step [days]
         dtmp        = zeros(Float64, atmos.nlev_c)  # temperature step [K]
 
@@ -139,8 +150,9 @@ module solver_euler
         plt_magma = (surf_state == 2)
 
         # Store previous n atmosphere states
-        hist_tmp  = zeros(Float64, (len_hist, atmos.nlev_c)) 
-        hist_tmpl = zeros(Float64, (len_hist, atmos.nlev_l)) 
+        hist_tmp  = zeros(Float64, (len_hist, atmos.nlev_c))   # temperature (cc)
+        hist_tmpl = zeros(Float64, (len_hist, atmos.nlev_l))   # temperature (ce)
+        hist_hr   = zeros(Float64, (len_hist, atmos.nlev_c))   # heating rates (cc)
 
         # Plot initial state 
         if modplot > 0 
@@ -187,11 +199,11 @@ module solver_euler
                 if verbose || ( mod(step,modprint) == 0)
                     @printf("(accel) ")
                 end
-                dtmp_clip = 80.0
+                dtmp_clip = 70.0
                 dryadj_steps = 20
                 h2oadj_steps = 20
                 dt_min_step = 1.0e-1
-                dt_max_step = 200.0
+                dt_max_step = 180.0
                 smooth_width = floor(Int, max(0.1*atmos.nlev_c,2 )) # 10% of levels
 
             else
@@ -253,12 +265,35 @@ module solver_euler
             # ----------------------------------------------------------
             # Calculate heating rates
             # ---------------------------------------------------------- 
-            heat_prev[:] .= atmos.heating_rate[:]
             atmosphere.calc_hrates!(atmos)
 
             # ----------------------------------------------------------
             # Calculate step size for this step
             # ---------------------------------------------------------- 
+            for i in 1:atmos.nlev_c
+                oscil[i] = false
+
+                # Increment dt
+                if accel 
+                    dt[i] *= 1.2
+
+                else
+                    # temperature oscillations  => reduce step size
+                    if (atmos.heating_rate[i]*hist_hr[end,i] < 0) || (abs(atmos.heating_rate[i]) > H_large) 
+                        oscil[i] = true
+                        dt[i] *= 0.02
+                    else
+                        # Set timestep using tolerences (if not oscillating)
+                        if (abs(atmos.tmp[i] - hist_tmp[end,i]) < rtol*abs(hist_tmp[end,i]) + atol) && (abs(atmos.heating_rate[i]) < H_large)
+                            dt[i] *= 1.05
+                        else
+                            dt[i] *= 0.8
+                        end
+                    end
+                end
+
+            end 
+
             # for i in 1:atmos.nlev_c
             #     oscil[i] = false
 
@@ -266,49 +301,22 @@ module solver_euler
             #     if accel 
             #         dt[i] *= 1.2
             #     else
-            #         # large oscillations \  
-            #         #     OR              } => reduce step size
-            #         # large heating rate /
-            #         if (atmos.heating_rate[i]*heat_prev[i] < 0) #&& (abs(atmos.heating_rate[i]) > H_small) 
+            #         # large oscillations => reduce step size
+            #         if (atmos.heating_rate[i]*hist_hr[end,i] < 0)
             #             oscil[i] = true
-            #             dt[i] *= 0.02
-            #         end
-
-            #         # Set timestep using tolerences
-            #         if (abs(atmos.tmp[i] - hist_tmp[end,i]) < rtol*abs(hist_tmp[end,i]) + atol) && (abs(atmos.heating_rate[i]) < H_large)
+            #             dt[i] *= 0.1
+            #         elseif (abs(atmos.heating_rate[i]) < H_small)
             #             dt[i] *= 1.05
-            #         elseif !oscil[i] 
-            #             dt[i] *= 0.5
             #         end
-
             #     end
-
             # end 
-
-            for i in 1:atmos.nlev_c
-                oscil[i] = false
-
-                # Increment dt
-                if accel 
-                    dt[i] *= 1.2
-                else
-                    # large oscillations => reduce step size
-                    if (atmos.heating_rate[i]*heat_prev[i] < 0) && (abs(atmos.heating_rate[i]) > H_small)
-                        oscil[i] = true
-                        dt[i] *= 0.1
-                    
-                    # # low heating rate at high pressure => increase step size
-                    # elseif ( abs(atmos.heating_rate[i]) < H_small ) && (atmos.pl[i] > p_large) && !stopaccel
-                    #     dt[i] *= 1.2
-
-                    else
-                        dt[i] *= 1.05
-                    end
-                end
-            end 
 
             dt[1:2] .= dt_min_step
             clamp!(dt, dt_min_step, dt_max_step)
+
+            if verbose
+                @printf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
+            end
 
             # ----------------------------------------------------------
             # Apply temperature step
@@ -316,8 +324,20 @@ module solver_euler
             # optionally smooth temperature profile
             # optionally do convective adjustment
             
-            # Apply heating rate temperature change
-            dtmp .= atmos.heating_rate .* dt 
+            dtmp[:] .= 0.0
+
+            # Use Adams-Moulton two-step scheme
+            if adams && (step > 3)
+                # https://john-s-butler-dit.github.io/NumericalAnalysisBook/Chapter%2004%20-%20Multistep%20Methods/401_Adams%20Bashforth%20Example.html
+                for i in 1:atmos.nlev_c 
+                    dtmp[i] = 3.0 * atmos.heating_rate[i] - hist_hr[end,i]
+                    dtmp[i] *= dt[i] / 2.0
+                end 
+
+            # Use Euler one-step scheme
+            else 
+                dtmp .= atmos.heating_rate .* dt 
+            end 
             clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
             atmos.tmp += dtmp
 
@@ -362,7 +382,7 @@ module solver_euler
             clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Set cell-edge values (particularly important for handling conductive skin)
-            if accel && (step <= step_stopaccel)
+            if (surf_state == 2) && (step <= 10)
                 atmosphere.set_tmpl_from_tmp!(atmos, 1, limit_change=true)  # don't allow tmpl to drift during accelerated phase
             else 
                 atmosphere.set_tmpl_from_tmp!(atmos, surf_state, limit_change=true)
@@ -375,14 +395,13 @@ module solver_euler
             # (at higher pressures, when appropriate) 
             ex_lookback     = 20
             ex_lookback     = min(len_hist-1, ex_lookback)
-            ex_dtmp_clip    = dtmp_clip * ex_lookback
+            ex_dtmp_clip    = dtmp_clip * 2.0
             if !accel && extrap && ( mod(step,ex_lookback+1) == 0) && (dtmp_comp > dtmp_extrap)
                 # don't extrapolate surface when handling skin
                 ex_endlvl = atmos.nlev_c
                 if surf_state == 2
                     ex_endlvl -= 1
                 end
-                println("extrap")
                 # extrapolate each level
                 for i in 1:atmos.nlev_c 
                     if (atmos.pl[i] > p_large) && !oscil[i]
@@ -395,7 +414,7 @@ module solver_euler
             # Temperature floor
             clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
             clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
-``
+
             # Set tstar 
             if surf_state != 1
                 atmos.tstar = atmos.tmpl[end]
@@ -469,9 +488,11 @@ module solver_euler
             for i in 1:len_hist-1
                 hist_tmp[i,:]  .= hist_tmp[i+1,:]
                 hist_tmpl[i,:] .= hist_tmpl[i+1,:]
+                hist_hr[i,:]   .= hist_hr[i+1,:]
             end
             hist_tmp[end,:]  .= atmos.tmp[:]
             hist_tmpl[end,:] .= atmos.tmpl[:]
+            hist_hr[end,:]   .= atmos.heating_rate[:]
 
             # --------------------------------------
             # Make plots 

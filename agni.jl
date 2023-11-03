@@ -20,18 +20,18 @@ push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
 import setpt
 import plotting 
-import solver_euler
+import solver_accel
 import solver_cvode
 import phys
 
 
 # Configuration options
-tstar           = 2000.0    # Surface temperature [kelvin]
+tstar           = 1700.0    # Surface temperature [kelvin]
 toa_heating     = 3.745e+04 # Instellation flux [W m-2]
 radius          = 7.12e6    # metres
 gravity         = 10.8      # m s-2
 nlev_centre     = 100  
-p_surf          = 120.8     # bar
+p_surf          = 220.8     # bar
 p_top           = 1e-6      # bar 
 mf_dict         = Dict([
                         ("H2O" , 145.64182),
@@ -60,7 +60,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          zenith_degrees=54.4,
                          skin_d=0.02,
                          skin_k=2.0,
-                         tmp_magma=2700.0,
+                         tmp_magma=1710.0,
                          tmp_floor=2.0
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
@@ -91,9 +91,9 @@ atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
 # Call solver 
 println("Starting solver")
-solver_euler.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, 
-                            dry_convect=true, use_mlt=false,
-                            max_steps=1000, accel=true, extrap=false, rtol=1.0e-4, atol=1.0e-2)
+solver_accel.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, 
+                            dry_convect=true, use_mlt=true, adams=true,
+                            max_steps=1000, accel=true, extrap=false)
 # solver_cvode.solve_energy!(atmos, surf_state=2,            verbose=true, dry_convect=true,  max_steps=500)
 
 # Write arrays
