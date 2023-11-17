@@ -29,7 +29,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi)
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400))
 
         # Plot temperature
         scatter!(plt, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
@@ -54,7 +54,7 @@ module plotting
 
         
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright)
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, size=(500,400))
 
         # Plot mole fractions for each gas
         min_x = 1.0e-3
@@ -138,7 +138,7 @@ module plotting
             poshr[i] = (atmos.heating_rate[i] >= 0)
         end 
 
-        xlims  = (1e-2, maximum(abshr))
+        xlims  = (1e-3, maximum(abshr))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         # Create plot 2
@@ -273,13 +273,13 @@ module plotting
     function anim_solver(atmos)
 
         # Command line format:
-        # bash> ffmpeg -framerate 16 -i out/solver_monitor_%04d.png -y out/anim.mp4
+        # bash> ffmpeg -framerate 16 -i out/zzframe_%04d.png -y out/anim.mp4
 
         runtime = 15.0 # seconds
 
         # Find output files
         out = atmos.OUT_DIR
-        frames = glob("solver_monitor_*.png",out)
+        frames = glob("zzframe_*.png",out)
         nframes = length(frames)
 
         # Create animation
@@ -287,7 +287,7 @@ module plotting
             println("WARNING: Cannot animate solver because no output frames were found")
         else 
             fps = max(nframes/runtime, 5)
-            run(`ffmpeg -loglevel quiet -framerate $fps -i $out/solver_monitor_%04d.png -y $out/anim.mp4`)
+            run(`ffmpeg -loglevel quiet -framerate $fps -i $out/zzframe_%04d.png -y $out/anim.mp4`)
         end
 
         return nothing

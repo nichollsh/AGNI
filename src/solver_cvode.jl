@@ -20,7 +20,6 @@ module solver_cvode
     using SciMLBase
     using SteadyStateDiffEq
     using Sundials
-    # using NonlinearSolve
 
     import atmosphere 
     import phys

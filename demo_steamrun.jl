@@ -15,6 +15,7 @@ using Printf
 using Plots
 using DelimitedFiles
 
+
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
 
@@ -88,7 +89,7 @@ for i in 1:run_len
 end
 
 # Make plot of OLR vs T_surf
-plt = plot(framestyle=:box)
+plt = plot(framestyle=:box, size=(500,400))
 
 lw=2.5
 
