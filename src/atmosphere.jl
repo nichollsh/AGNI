@@ -478,7 +478,7 @@ module atmosphere
     - `switch_p::Float64`       switch pressure [Pa].
     - `switch_n::Float64`       switch level count.
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t; switch_p::Float64=1.0e20, switch_n::Int=60)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; switch_p::Float64=1.0e99, switch_n::Int=40)
 
         # Set pressure cell-edge array
         if atmos.p_boa <= switch_p

@@ -52,7 +52,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 -  `(@v1.9) pkg> add DataStructures`
 -  `(@v1.9) pkg> add Glob`
 -  `(@v1.9) pkg> add ArgParse`
--  `(@v1.9) pkg> add DifferentialEquations`
+-  `(@v1.9) pkg> add SciMLBase`
 -  `(@v1.9) pkg> add SteadyStateDiffEq`
 -  `(@v1.9) pkg> add Sundials`
 -  `(@v1.9) pkg> activate .`

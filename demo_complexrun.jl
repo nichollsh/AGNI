@@ -116,7 +116,7 @@ for i in 1:run_len
 end
 
 # Make plot of Fluxes vs T_surf
-plt = plot(framestyle=:box)
+plt = plot(framestyle=:box, size=(500,400))
 
 lw=2.5
 
@@ -125,7 +125,7 @@ plot!(tsurf_arr,boa_arr,label="BOA",  lw=lw)
 plot!(tsurf_arr,skn_arr,label="Skin", lw=lw)
 
 xlabel!(plt, "Surface temperature [K]")
-ylabel!(plt, "Flux [W m-2]")
+ylabel!(plt, "Net flux [W m-2]")
 
 savefig(plt, "out/runaway_complex.pdf")
 
