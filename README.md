@@ -19,6 +19,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * `agni_cli.jl`     - AGNI executable with command-line interface
 * `demo_steamrun.jl`- Script to demonstrate the pure-steam runaway greenhouse effect
 * `demo_earth.jl`   - Script to demonstrate solving for Earth's temperature structure
+* `demo_tests.jl`   - Script containing quick tests for verifying that the basics of the model are functioning
 
 
 ### Requirements
