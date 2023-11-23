@@ -675,7 +675,6 @@ module atmosphere
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
         atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s   #   Set surface albedo.
-        atmos.bound.zen_0[1] = 1.0/cosd(atmos.bound.zen_0[1])   #   Convert the zenith angles to secants.
 
         # atm sizes and coordinates 
         atmos.atm.n_layer = npd_layer
@@ -914,9 +913,11 @@ module atmosphere
                 error("The spectral file contains no solar spectral data.")
             end
              
-            atmos.bound.zen_0[1] = atmos.zenith_degrees # Assign the solar zenith angle
+            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)   #   Convert the zenith angles to secants.
             atmos.bound.solar_irrad[1] = atmos.toa_heating   # The file of solar irradiances.
         end
+
+        atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
 
         # Set the two-stream approximation to be used
         if lw
