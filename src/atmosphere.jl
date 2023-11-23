@@ -294,7 +294,6 @@ module atmosphere
         if mf_source == 0
             for (key, value) in mf_dict  # store as arrays
                 gas_valid = strip(key, ' ')
-                gas_valid = uppercase(gas_valid)
                 if key in SOCRATES.input_head_pcf.header_gas
                     atmos.input_x[gas_valid] = ones(Float64, atmos.nlev_c) * value
                 end
@@ -317,7 +316,6 @@ module atmosphere
             # create arrays 
             for h in heads
                 gas_valid = strip(h, ' ')
-                gas_valid = uppercase(h)
                 if gas_valid in SOCRATES.input_head_pcf.header_gas
                     atmos.input_x[gas_valid] = zeros(Float64, atmos.nlev_c)
                 end 
@@ -378,7 +376,7 @@ module atmosphere
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `gas::String`             name of the gas (e.g. "H2O").
-    - `lvl::Int`                model level to measure mole fraction
+    - `lvl::Int`                model level to measure mole fraction (-1 => use input_x value)
 
     Returns:
     - `x::Float64`              mole fraction of `gas`.
@@ -386,13 +384,15 @@ module atmosphere
     function get_x(atmos::atmosphere.Atmos_t, gas::String, lvl::Int)::Float64
 
         gas_valid = strip(gas, ' ')
-        gas_valid = uppercase(gas_valid)
 
         x = 0.0
         if gas_valid in keys(atmos.input_x)
-            # i_gas = findfirst(==(gas), atmos.gases)
-            # x = atmos.layer_x[lvl,i_gas]
-            x = atmos.input_x[gas_valid][lvl]
+            if lvl > 0
+                i_gas = findfirst(==(gas), atmos.gases)
+                x = atmos.layer_x[lvl,i_gas]
+            else 
+                x = atmos.input_x[gas_valid][1]
+            end
         end 
 
         return x
@@ -567,9 +567,9 @@ module atmosphere
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
             println("Python: inserting rayleigh scattering")
-            co2_x = get_x(atmos, "co2", atmos.nlev_c) 
-            n2_x  = get_x(atmos, "n2" , atmos.nlev_c)
-            h2o_x = get_x(atmos, "h2o", atmos.nlev_c)
+            co2_x = get_x(atmos, "CO2", -1) 
+            n2_x  = get_x(atmos, "N2" , -1)
+            h2o_x = get_x(atmos, "H2O", -1)
             runfile = joinpath([atmos.ROOT_DIR, "src", "insert_rayleigh.py"])
             run(`python $runfile $spectral_file_run $co2_x $n2_x $h2o_x`)
         end
