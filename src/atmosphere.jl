@@ -113,7 +113,9 @@ module atmosphere
         flux_sens::Float64  # Turbulent flux
 
         # Convection 
-        flux_c::Array     # Dry convective fluxes from MLT
+        mask_c::Array       # Layers which are (recently) convective (value is >0)
+        mask_c_decay::Int   # How long is 'recent' in terms of convection?
+        flux_c::Array       # Dry convective fluxes from MLT
         K_h::Array          # Eddy diffusion coefficient for heat
 
         # Total energy flux
@@ -235,7 +237,8 @@ module atmosphere
         atmos.toa_heating =     max(toa_heating, 0.0)
         atmos.tstar =           max(tstar, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-3, gravity)
-
+        
+        atmos.mask_c_decay =    15
         atmos.C_d =             max(0,C_d)
         atmos.U =               max(0,U)
 
@@ -867,6 +870,7 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
+        atmos.mask_c =            zeros(Float64, atmos.nlev_c)
         atmos.flux_c =            zeros(Float64, atmos.nlev_l)
         atmos.K_h =               zeros(Float64, atmos.nlev_l)
 
@@ -1006,7 +1010,7 @@ module atmosphere
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
                                 atmos.atm, atmos.cld, atmos.aer, 
                                 atmos.bound, atmos.radout)
-    
+
         # Store new fluxes in atmos struct
         if lw 
             # LW case
@@ -1107,6 +1111,9 @@ module atmosphere
 
             # Check instability
             if (dTdz < 0.0) && ( abs(dTdz) > abs(Γ_ad))
+
+                atmos.mask_c[i]   = atmos.mask_c_decay
+                atmos.mask_c[i-1] = atmos.mask_c_decay
             
                 rho = 0.5 * (atmos.layer_density[i] + atmos.layer_density[i-1])
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
@@ -1158,6 +1165,8 @@ module atmosphere
             
             # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
             if T1 < T2*pfact
+                atmos.mask_c[i]   = atmos.mask_c_decay
+                atmos.mask_c[i-1] = atmos.mask_c_decay
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / (1.0 + pfact)
                 T1 = T2 * pfact
@@ -1179,6 +1188,9 @@ module atmosphere
             pfact = (p1/p2)^(phys.R_gas / cp)
 
             if T1 < T2*pfact
+                atmos.mask_c[i]   = atmos.mask_c_decay
+                atmos.mask_c[i-1] = atmos.mask_c_decay
+
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / ( 1.0 + pfact)
                 T1 = T2 * pfact
@@ -1206,6 +1218,7 @@ module atmosphere
             end 
             Tdew = phys.calc_Tdew(gas, pp)
             if (atmos.tmp[i] < Tdew)
+                atmos.mask_c[i] = atmos.mask_c_decay
                 atmos.tmp[i] = Tdew
             end
         end
@@ -1219,6 +1232,7 @@ module atmosphere
             end 
             Tdew = phys.calc_Tdew(gas, pp)
             if (atmos.tmp[i] < Tdew)
+                atmos.mask_c[i] = atmos.mask_c_decay
                 atmos.tmp[i] = Tdew
             end
         end
@@ -1428,7 +1442,8 @@ module atmosphere
         var_fd =        defVar(ds, "fl_D",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fu =        defVar(ds, "fl_U",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_hr =        defVar(ds, "rad_hr", Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
+        var_fc =        defVar(ds, "fl_C",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_hr =        defVar(ds, "hrate",  Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_bs =        defVar(ds, "bandmin",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
         var_bl =        defVar(ds, "bandmax",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
 
@@ -1468,6 +1483,8 @@ module atmosphere
         var_fd[:] =     atmos.flux_d
         var_fu[:] =     atmos.flux_u
         var_fn[:] =     atmos.flux_n
+
+        var_fc[:] =     atmos.flux_c
 
         var_hr[:] =     atmos.heating_rate
 

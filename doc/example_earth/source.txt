@@ -5,4 +5,4 @@ The data were generated using the Reference Forward Model (Dudhia+2017).
 Specifically, from the equ_200km.atm file on this website: 
     http://eodg.atm.ox.ac.uk/RFM/atm/
 
-They were converted to the propriate format for AGNI using a Python script.
+They were converted to the appropriate format for AGNI using a Python script.
