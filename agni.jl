@@ -21,18 +21,18 @@ import atmosphere
 import setpt
 import plotting 
 import solver_accel
-import solver_cvode
+# import solver_cvode
 import phys
 
 
 # Configuration options
-tstar           = 2999.0    # Surface temperature [kelvin]
-toa_heating     = 778.5     # Instellation flux [W m-2]
-radius          = 7.12e6    # metres
-gravity         = 10.8      # m s-2
+tstar           = 3000.0    # Surface temperature [kelvin]
+toa_heating     = 430.25     # Instellation flux [W m-2]
+radius          = 1.75e7    # metres
+gravity         = 10.63      # m s-2
 nlev_centre     = 100  
-p_surf          = 100.0    # bar
-p_top           = 1e-5      # bar 
+p_surf          = 50.0    # bar
+p_top           = 1e-6      # bar 
 mf_dict         = Dict([
                         ("H2O" , 0.9),
                         ("CO2" , 0.1),
@@ -42,7 +42,7 @@ mf_dict         = Dict([
                         ])
 
 spfile_name   = "res/spectral_files/Mallard/Mallard"
-star_file     = "res/stellar_spectra/trappist-1.txt"
+star_file     = "res/stellar_spectra/gj1214.txt"
 output_dir    = "out/"
 
 # Setup atmosphere
@@ -55,22 +55,24 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
-                         flag_rayleigh=true,
-                         overlap_method=4,
+                         flag_rayleigh=false,
+                         overlap_method=2,
                          zenith_degrees=54.4,
                          skin_d=0.01,
                          skin_k=2.0,
-                         tmp_magma=3000.0,
+                         tmp_magma=2500.0,
                          tmp_floor=2.0
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-# setpt.fromcsv!(atmos,"out/pt_load.csv")
+setpt.isothermal!(atmos, 1300.0)
+# setpt.fromcsv!(atmos,"out/pt_ini.csv")
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
-# setpt.stratosphere!(atmos, 2000.0)
+# setpt.condensing!(atmos, "H2O")
+# setpt.stratosphere!(atmos, 500.0)
 
 # Create output directory
 rm(output_dir,force=true,recursive=true)
@@ -83,17 +85,19 @@ atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 println("Running model...")
 
 # Calculate LW and SW fluxes (once)
-# atmosphere.radtrans!(atmos, true)
-# atmosphere.radtrans!(atmos, false)
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
 
 # Calculate convective fluxes (once)
 # println("MLT: calculating fluxes")
 # atmosphere.mlt!(atmos)
 
 # Call solver 
-solver_accel.solve_energy!(atmos, surf_state=2, modplot=1, verbose=true, 
-                            dry_convect=true, accel=true, use_mlt=true,
-                            max_steps=1500)
+# solver_accel.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, 
+#                             dry_convect=false, accel=true, extrap=false,
+#                             max_steps=2000, min_steps=500, use_mlt=false,
+#                             dt_max=200.0, F_losspct_conv=5.0)
+
 # solver_cvode.solve_energy!(atmos, surf_state=2,            verbose=true, dry_convect=true,  max_steps=500)
 
 # Write arrays
