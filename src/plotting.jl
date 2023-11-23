@@ -110,7 +110,7 @@ module plotting
             scatter!(plt1, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
         end
         scatter!(plt1, [atmos.tstar],     [atmos.pl[end]*1e-5], color="brown3",         label=L"T_*") 
-        
+
         # Plot temperature profiles 
         plot!(plt1, arr_T, arr_P, lc="black", lw=lw, label=L"T_n")
         if plot_hist 
@@ -123,6 +123,19 @@ module plotting
                 end
             end 
         end
+
+        # Plot convection mask 
+        convective_p = []
+        convective_t = []
+        for i in 1:atmos.nlev_c
+            if atmos.mask_c[i] > 0
+                append!(convective_p, atmos.p[i]*1e-5)
+                append!(convective_t, atmos.tmp[i])
+            end 
+        end
+        if length(convective_p) > 0
+            scatter!(plt1, convective_t, convective_p, color="goldenrod2", label="Conv.", markersize=2, markeralpha=0.8) 
+        end 
         
         xlabel!(plt1, "Temperature [K]")
         ylabel!(plt1, "Pressure [bar]")
@@ -253,8 +266,16 @@ module plotting
         plot!(plt, abstot[  postot], arr_P[  postot], label="TOTAL"*L">0", lw=w*0.7, lc=col_tp, ls=:solid)
         plot!(plt, abstot[.!postot], arr_P[.!postot], label="TOTAL"*L"<0", lw=w*0.4, lc=col_tn, ls=:solid)
 
+        # Set limits
         xlims  = (1e-1, max_fl * 1.5)
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+
+        # Overplot convection mask
+        for i in 1:atmos.nlev_c
+            if atmos.mask_c[i] > 0
+                plot!(plt, [xlims[1],xlims[2]], [atmos.p[i]/1.0e5, atmos.p[i]/1e5], opacity=0.2, linewidth=3.5, color="goldenrod2", label="")
+            end 
+        end
 
         xlabel!(plt, "Unsigned flux [W m-2]")
         ylabel!(plt, "Pressure [bar]")
@@ -273,7 +294,7 @@ module plotting
     function anim_solver(atmos)
 
         # Command line format:
-        # bash> ffmpeg -framerate 16 -i out/zzframe_%04d.png -y out/anim.mp4
+        # bash> ffmpeg -framerate 16 -i out/zzframe_%04d.png -pix_fmt yuv420p -y out/anim.mp4
 
         runtime = 15.0 # seconds
 
@@ -287,7 +308,7 @@ module plotting
             println("WARNING: Cannot animate solver because no output frames were found")
         else 
             fps = max(nframes/runtime, 5)
-            run(`ffmpeg -loglevel quiet -framerate $fps -i $out/zzframe_%04d.png -y $out/anim.mp4`)
+            run(`ffmpeg -loglevel quiet -framerate $fps -i $out/zzframe_%04d.png -pix_fmt yuv420p -y $out/anim.mp4`)
         end
 
         return nothing

@@ -2,6 +2,7 @@
 .spfile_runtime
 .spfile_runtime_k
 .star_file
+.star_temp
 *.mod
 *.o
 radiation_code.lock

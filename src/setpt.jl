@@ -107,7 +107,7 @@ module setpt
         if !atmos.is_param
             error("Atmosphere parameters not set")
         end 
-        atmos.tmpl[:] .= set_tmp 
+        atmos.tmpl[1:end-1] .= set_tmp 
         atmos.tmp[:] .= set_tmp
         return nothing
     end 
