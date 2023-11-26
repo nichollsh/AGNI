@@ -308,7 +308,7 @@ module plotting
             println("WARNING: Cannot animate solver because no output frames were found")
         else 
             fps = max(nframes/runtime, 5)
-            run(`ffmpeg -loglevel quiet -framerate $fps -i $out/zzframe_%04d.png -pix_fmt yuv420p -y $out/anim.mp4`)
+            run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/zzframe_*.png" -pix_fmt yuv420p -y $out/anim.mp4`)
         end
 
         return nothing

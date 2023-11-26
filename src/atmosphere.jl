@@ -67,6 +67,7 @@ module atmosphere
         p_boa::Float64      # Pressure at bottom [Pa]
         p_toa::Float64      # Pressure at top [Pa]
         rp::Float64         # planet radius [m]
+        res_switching::Bool # resolution switching at high pressures
 
         tmp::Array          # cc temperature [K]
         tmpl::Array         # ce temperature
@@ -180,6 +181,7 @@ module atmosphere
     - `flag_continuum::Bool=false`      include continuum absorption?
     - `flag_aerosol::Bool=false`        include aersols?
     - `flag_cloud::Bool=false`          include clouds?
+    - `res_switching::Bool=false`       use resolution switching at high pressures?
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
@@ -203,7 +205,8 @@ module atmosphere
                     flag_gcontinuum::Bool =     false,
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
-                    flag_cloud::Bool =          false
+                    flag_cloud::Bool =          false,
+                    res_switching::Bool =       false
                     )
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -226,6 +229,11 @@ module atmosphere
         atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
         atmos.overlap_method =  Int(overlap_method)
+       
+        if res_switching && (p_surf < 5.0)
+            println("WARNING: Resolution switching is enabled, but surface pressure is quite low")
+        end 
+        atmos.res_switching = res_switching
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     6000.0
@@ -238,7 +246,7 @@ module atmosphere
         atmos.tstar =           max(tstar, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-3, gravity)
         
-        atmos.mask_c_decay =    15
+        atmos.mask_c_decay =    15   
         atmos.C_d =             max(0,C_d)
         atmos.U =               max(0,U)
 
@@ -266,7 +274,7 @@ module atmosphere
         atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tstar
 
         # Initialise pressure grid with current p_toa and p_boa
-        generate_pgrid!(atmos)
+        generate_pgrid!(atmos, switch=atmos.res_switching)
         atmos.z          = zeros(Float64, atmos.nlev_c)
         atmos.zl         = zeros(Float64, atmos.nlev_l)
         atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
@@ -434,27 +442,26 @@ module atmosphere
 
         # geometrical height and gravity
         # dz = -dp / (rho * g)
-        # atmos.z          = zeros(Float64, atmos.nlev_c)
-        # atmos.zl         = zeros(Float64, atmos.nlev_l)
-        # atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
         atmos.z[:] .= 0.0
         atmos.zl[:] .= 0.0
         atmos.layer_grav[:] .= 0.0
         for i in range(atmos.nlev_c, 1, step=-1)
 
             # Technically, g and z should be integrated as coupled equations,
-            # but here they are not. This is somewhat reasonable for high mmw 
-            # atmospheres, but will break-down at large scale heights.
+            # but here they are not. This loose integration has been found to 
+            # be reasonable in all of my tests.
 
-            g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.zl[i+1])^2.0)
-            dzc = phys.R_gas * atmos.tmp[i] * log(atmos.pl[i+1]/atmos.p[i]) / (atmos.layer_mmw[i] * g)
+            # Integrate from lower edge to centre
+            g1 = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.zl[i+1])^2.0)
+            dzc = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g1 * 0.5 * (atmos.pl[i+1] + atmos.p[i])) * (atmos.pl[i+1] - atmos.p[i]) 
             atmos.z[i] = atmos.zl[i+1] + dzc
 
-            atmos.layer_grav[i] = g
-
-            g = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
-            dzl = phys.R_gas * atmos.tmp[i] * log(atmos.p[i]/atmos.pl[i]) / (atmos.layer_mmw[i] * g)
+            # Integrate from centre to upper edge
+            g2 = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
+            dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * 0.5 * (atmos.p[i] + atmos.pl[i] )) * (atmos.p[i]- atmos.pl[i]) 
             atmos.zl[i] = atmos.z[i] + dzl
+
+            atmos.layer_grav[i] = 0.5 * (g1 + g2)
 
             if (dzl < 1e-20) || (dzc < 1e-20)
                 error("Height integration resulted in dz <= 0")
@@ -470,41 +477,53 @@ module atmosphere
     end 
 
     """
-    **Generate a pressure grid.**
+    **Generate pressure grid.**
 
-    Log-spaced in pressure. If P_surf is larger than switch_p, level resolution
-    is set by proprtioning the atmosphere into a lower and upper part, with switch_n
-    levels in the upper part and the remainder levels in the lower part.
+    Equally log-spaced between p_boa and p_boa in the nominal configuration.
+    
+    If switching is enabled, the grid resolution will change at 10% of the 
+    surface pressure, with at least switch_f percent of the levels being placed 
+    at pressures greater than this value with linear spacing.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    - `switch_p::Float64`       switch pressure [Pa].
-    - `switch_n::Float64`       switch level count.
+    - `switch::Float64`         switch resolution at 0.1*p_surf level
+    - `switch_f::Int`           lower region level proportion minimum [%].
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t; switch_p::Float64=1.0e99, switch_n::Int=40)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; switch::Bool=false, switch_f::Int=45)
 
-        # Set pressure cell-edge array
-        if atmos.p_boa <= switch_p
-            # Logspace only
-            atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
-        else 
-            # Check switch_n 
-            if (switch_n < 20) || (atmos.nlev_l - switch_n < 20)
-                error("More levels required, or switch_n is too large or too small")
+        # Try canonical distribution
+        atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
+
+        # Check if resolution switch is required
+        if switch 
+
+            # Upper and lower part counts
+            switch_p  = 0.1 * atmos.p_boa
+            switch_lo = ceil(Int, float(switch_f) / 100 * atmos.nlev_l)
+            switch_up = atmos.nlev_l - switch_lo
+
+            # Check requirement
+            count_lo = 0
+            for i in 1:atmos.nlev_l 
+                if atmos.pl[i] > switch_p 
+                    count_lo += 1
+                end
             end
 
             # Upper and lower parts
-            switch_p *= 0.95  # shift level upwards somewhat
-            pl_up = 10 .^ range( log10(atmos.p_toa), stop=log10(switch_p),    length=switch_n+1)
-            pl_lo = 10 .^ range( log10(switch_p),    stop=log10(atmos.p_boa), length=atmos.nlev_l-switch_n)
-
-            # Set levels
-            atmos.pl = vcat(pl_up[1:end-1], pl_lo[1:end])
+            if count_lo < switch_lo 
+                pl_up = 10 .^ range( log10(atmos.p_toa), stop=log10(switch_p),    length=switch_up + 1)
+                pl_lo = range(switch_p, atmos.p_boa, switch_lo)
+                atmos.pl = vcat(pl_up[1:end-1], pl_lo[1:end])
+            end
         end
 
-        # Set pressure cell-centre array by interpolation
+        # Set pressure cell-centre array using geometric mean
         atmos.p =    zeros(Float64, atmos.nlev_c)
-        atmos.p[:] .= 0.5 .* (atmos.pl[2:end] + atmos.pl[1:end-1])
+        for i in 1:atmos.nlev_c
+            atmos.p[i] = sqrt(atmos.pl[i]*atmos.pl[i+1])
+        end
 
         return nothing
     end

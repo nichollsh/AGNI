@@ -29,7 +29,7 @@ tstar           = 300.0     # LW uflux bottom boundary condition [kelvin]
 toa_heating     = 1367.0    # Daytime instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
-nlev_centre     = 150  
+nlev_centre     = 100  
 p_surf          = 1.0       # bar
 p_top           = 1e-7      # bar 
 mf_path         = "doc/example_earth/equ.csv"
@@ -55,14 +55,14 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_path=mf_path,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,  # the RFM profile does not include scattering
-                         zenith_degrees=30.0,
+                         zenith_degrees=20.0,
                          overlap_method=4
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file)
 
 # Call solver 
 println("Starting solver")
-solver_euler.solve_accel!(atmos, surf_state=1, modplot=2, verbose=true, extrap=false,
+solver_accel.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, extrap=false,
                         dry_convect=true, h2o_convect=true, sens_heat=true, 
                         dt_max=2.0, max_steps=300)
 
