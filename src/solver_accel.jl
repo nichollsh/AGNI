@@ -64,8 +64,8 @@ module solver_accel
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, extrap::Bool=false, adams::Bool=true,
                             dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=300,
-                            rtol::Float64=7.0e-6, atol::Float64=1.0e-2,
-                            dtmp_conv::Float64=3.0, drel_dt_conv::Float64=3.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=5.0
+                            rtol::Float64=4.0e-6, atol::Float64=1.0e-2,
+                            dtmp_conv::Float64=3.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=1.0
                             )
 
         println("RCSolver: Begin accelerated timestepping")
@@ -73,13 +73,18 @@ module solver_accel
         # Run parameters
         dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
         dtmp_extrap  = 2.0    # Change in temperature above which to use model extrapolation (not worth it at small dtmp)
-        smooth_stp   = 450    # Number of steps for which to apply smoothing
-        wait_con     = 150    # Wait this many steps before introducing convection
+        smooth_stp   = 500    # Number of steps for which to apply smoothing
+        smooth       = true   # Currently smoothing?
+        clamping     = false  # Require convective regions to be 'frozen' in time
+
+        wait_con     = 500    # Wait this many steps before introducing convection
+        crit_con     = 5.0    # Introduce convection when F_losspct < crit_con * F_losspct_conv
+
         modprint     = 25     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
         H_large      = 1.0e5  # A characteristic large heating rate [K/day]
         p_large      = 1e6    # A characteristic large pressure [Pa] 
-        smooth       = true   # Currently smoothing?
+
 
         if verbose
             modprint=2
@@ -126,6 +131,7 @@ module solver_accel
         dtmp_comp::Float64 = Inf         # Temperature change comparison
         drel_dt::Float64   = Inf         # Rate of relative temperature change
         drel_dt_prev::Float64 = Inf      # Previous ^
+        start_con          = false       # Convection has been started at any point
 
         oscil       = falses(atmos.nlev_c)          # layers which are oscillating
         dt          = ones(Float64,  atmos.nlev_c)  # time-step [days]
@@ -200,8 +206,8 @@ module solver_accel
                     @printf("(accel) ")
                 end
                 dtmp_clip    = 65.0
-                dryadj_steps = 10
-                h2oadj_steps = 10
+                dryadj_steps = 4
+                h2oadj_steps = 4
                 dt_min_step  = 1.0e-1
                 dt_max_step  = 120.0
                 rtol_step    = rtol
@@ -211,8 +217,8 @@ module solver_accel
             else
                 # Slow phase
                 dtmp_clip    = 30.0
-                dryadj_steps = 50
-                h2oadj_steps = 50
+                dryadj_steps = 16
+                h2oadj_steps = 16
                 dt_min_step  = 1.0e-5
                 dt_max_step  = max(dt_max, 1.0e-3)
                 rtol_step    = rtol
@@ -241,18 +247,17 @@ module solver_accel
                 else
                     if smooth
                         smooth_width = floor(Int, max(0.10*atmos.nlev_c,2 )) # 10% of levels
-                        dt_max_step *= 5.0
-                        rtol_step *= 10.0
+                        dt_max_step *= 10.0
+                        rtol_step *= 12.0
                     else 
                         smooth_width = 0
                     end
                 end
             end
 
-            # Adjustment not ready or it's too late
-            if (step < wait_con) || (flag_prev && use_mlt)
-                dryadj_steps = 0
-                h2oadj_steps = 0
+            # Has convection occurred?
+            if (step >= wait_con) && (F_losspct < crit_con * F_losspct_conv)
+                start_con = true 
             end
 
             if mod(step,modprint) == 0
@@ -275,8 +280,8 @@ module solver_accel
             atmosphere.radtrans!(atmos, false)
             atmos.flux_tot += atmos.flux_n
 
-            # Convection
-            if use_mlt && (step >= wait_con) && dry_convect
+            # Dry convection (MLT)
+            if use_mlt && dry_convect && start_con
                 atmosphere.mlt!(atmos)
                 atmos.flux_tot += atmos.flux_c
             end
@@ -306,7 +311,7 @@ module solver_accel
                     # temperature oscillations  => reduce step size
                     if (atmos.heating_rate[i]*hist_hr[end,i] < 0) || (abs(atmos.heating_rate[i]) > H_large) 
                         oscil[i] = true
-                        dt[i] *= 0.1
+                        dt[i] *= 0.2
                     else
                         # Set timestep using tolerences (if not oscillating)
                         if (abs(atmos.tmp[i] - hist_tmp[end,i]) < (rtol_step*abs(hist_tmp[end,i]) + atol) ) 
@@ -327,9 +332,10 @@ module solver_accel
             end 
 
             dt[1:2] .= dt_min_step
+            dt[end] = min(dt[end], dt_max_step*0.9)
             clamp!(dt, dt_min_step, dt_max_step)
 
-            # display(dt[1:2:end])
+            # display(dt)
 
             if verbose && (mod(step,modprint) == 0)
                 @printf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
@@ -357,13 +363,14 @@ module solver_accel
                 dtmp .= atmos.heating_rate .* dt 
             end 
             clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
+            dtmp[atmos.clamped] .= 0.0
             atmos.tmp += dtmp
 
             # display(dtmp)
 
             # Dry convective adjustment
             adj_changed = 0
-            if dryadj_steps > 0 && dry_convect && !use_mlt
+            if dryadj_steps > 0 && dry_convect && !use_mlt && start_con
                 tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
 
                 # do adjustment steps
@@ -375,12 +382,18 @@ module solver_accel
                 for i in 1:atmos.nlev_c
                     if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
                         adj_changed += 1
+                        if clamping
+                            atmos.clamped[i] = true
+                            atmos.mask_c[i] += 99999
+                        else 
+                            atmos.mask_c[i]  = atmos.mask_c_decay
+                        end
                     end
                 end 
             end
 
             # H2O moist convective adjustment
-            if h2oadj_steps > 0 && h2o_convect && !use_mlt
+            if h2oadj_steps > 0 && h2o_convect && !use_mlt && start_con
                 tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
                 for _ in 1:h2oadj_steps
                     atmosphere.adjust_steam!(atmos)
@@ -388,6 +401,7 @@ module solver_accel
                 for i in 1:atmos.nlev_c
                     if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
                         adj_changed += 1
+                        atmos.mask_c[i]  = atmos.mask_c_decay
                     end
                 end
             end
@@ -474,17 +488,17 @@ module solver_accel
             F_loss    = abs( F_TOA_tot-F_BOA_tot )
 
             F_losspct = 0.0
-            for i in 6:atmos.nlev_c-3
+            for i in 1:atmos.nlev_c
                 # skip convective layers if adjustment is being used
                 skipcheck = false
                 if !use_mlt
-                    for j in -3:4
-                        if j+i <= atmos.nlev_c
-                            skipcheck = skipcheck || (atmos.mask_c[i+j] > 0) 
+                    for j in -3:3  # neighbours
+                        if (j+i <= atmos.nlev_c) && (j+i >= 1)  # don't go out of range
+                            skipcheck = skipcheck || (atmos.mask_c[i+j] > 0) || (atmos.clamped[i+j] > 0) 
                         end
                     end
                 end
-                # if this layer (and its neighbours) are not convective, check flux loss
+                # if this layer (and its neighbours) are valid for this criterion, check flux loss
                 if !skipcheck
                     F_losspct = max(F_losspct, abs( (atmos.flux_n[i]-atmos.flux_n[i+1])/atmos.flux_n[i]))
                 end 
@@ -531,11 +545,11 @@ module solver_accel
             # Make plots 
             # -------------------------------------- 
             if (modplot > 0) && (mod(step,modplot) == 0)
-                plotting.plot_solver(atmos, @sprintf("%s/solver.png", atmos.OUT_DIR), hist_tmpl=hist_tmpl, incl_magma=plt_magma)
+                plotting.plot_solver(atmos, @sprintf("%s/solver.png", atmos.OUT_DIR), hist_tmpl=hist_tmpl, incl_magma=plt_magma, step=step)
                 cp(@sprintf("%s/solver.png", atmos.OUT_DIR), @sprintf("%s/zzframe_%04d.png", atmos.OUT_DIR, step))
 
                 plotting.plot_fluxes(atmos, @sprintf("%s/fluxes.png", atmos.OUT_DIR))
-                # cp(@sprintf("%s/fluxes.png", atmos.OUT_DIR), @sprintf("%s/zyframe_%04d.png", atmos.OUT_DIR, step))
+                cp(@sprintf("%s/fluxes.png", atmos.OUT_DIR), @sprintf("%s/zyframe_%04d.png", atmos.OUT_DIR, step))
             end 
 
             # --------------------------------------
@@ -545,11 +559,11 @@ module solver_accel
             # - minimal temperature change for two iters
             # - minimal rate of temperature change for two iters
             # - minimal change to net radiative flux at TOA for two iters
-            # - minimal flux loss (if MLT is being used for convection)
-            # - solver is not in 'fast' mode, as it is unphysical
+            # - minimal flux loss in radiative regions
+            # - solver is not being accelerated, as it is unphysical
             flag_prev = flag_this
             flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv) && (F_losspct < F_losspct_conv) 
-            success   = flag_this && flag_prev && !accel && !stopaccel && (step > min_steps) && !smooth
+            success   = flag_this && flag_prev && !smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!dry_conv && !h2o_conv))
             
             # --------------------------------------
             # Sleep in order to capture keyboard interrupt
