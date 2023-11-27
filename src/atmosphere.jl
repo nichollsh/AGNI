@@ -125,6 +125,9 @@ module atmosphere
         # Heating rate 
         heating_rate::Array # radiative heating rate [K/day]
 
+        # Clamped layers (temperature fixed in time)
+        clamped::Array
+
         Atmos_t() = new()
     end
 
@@ -483,14 +486,15 @@ module atmosphere
     
     If switching is enabled, the grid resolution will change at 10% of the 
     surface pressure, with at least switch_f percent of the levels being placed 
-    at pressures greater than this value with linear spacing.
+    at pressures greater than this value. This enhances the resolution near the 
+    surface, which may help with model stability.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `switch::Float64`         switch resolution at 0.1*p_surf level
     - `switch_f::Int`           lower region level proportion minimum [%].
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t; switch::Bool=false, switch_f::Int=45)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; switch::Bool=false, switch_f::Int=25)
 
         # Try canonical distribution
         atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
@@ -499,7 +503,7 @@ module atmosphere
         if switch 
 
             # Upper and lower part counts
-            switch_p  = 0.1 * atmos.p_boa
+            switch_p  = 0.10 * atmos.p_boa
             switch_lo = ceil(Int, float(switch_f) / 100 * atmos.nlev_l)
             switch_up = atmos.nlev_l - switch_lo
 
@@ -514,10 +518,14 @@ module atmosphere
             # Upper and lower parts
             if count_lo < switch_lo 
                 pl_up = 10 .^ range( log10(atmos.p_toa), stop=log10(switch_p),    length=switch_up + 1)
-                pl_lo = range(switch_p, atmos.p_boa, switch_lo)
+                pl_lo = 10 .^ range( log10(switch_p),    stop=log10(atmos.p_boa), length=switch_lo)
+                pl_lo[1] = sqrt(pl_up[end-1]*pl_lo[2])
                 atmos.pl = vcat(pl_up[1:end-1], pl_lo[1:end])
             end
         end
+    
+        # Set bottom layer to be very small
+        atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.999)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p =    zeros(Float64, atmos.nlev_c)
@@ -896,6 +904,8 @@ module atmosphere
 
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
+        atmos.clamped =           falses(atmos.nlev_c)
+
         # Mark as allocated
         atmos.is_alloc = true
 
@@ -1262,7 +1272,7 @@ module atmosphere
 
 
     # Set cell edge temperatures from cell centres
-    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false)
+    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false, back_interp::Bool=false)
 
         clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
@@ -1274,8 +1284,8 @@ module atmosphere
         atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
 
         # Extrapolate top boundary temperature
-        grad_dt = atmos.tmp[1] - atmos.tmp[3]
-        grad_dp = atmos.p[1]   - atmos.p[3]
+        grad_dt = atmos.tmp[1] - atmos.tmp[2]
+        grad_dp = atmos.p[1]   - atmos.p[2]
         atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
 
         if limit_change
@@ -1309,10 +1319,15 @@ module atmosphere
             atmos.tmpl[end] = dot( [atmos.tmpl[end]; bot_old_e] , weights ) 
         end 
 
-        # Second interpolation back to cell-centres 
-        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
-        itp = Interpolator(atmos.pl, atmos.tmpl)  
-        atmos.tmp[:] .= itp.(atmos.p[:])
+        # Second interpolation back to cell-centres.
+        # This can help prevent grid-imprinting issues, but in some cases it can 
+        # lead to unphysical behaviour, because it gives the interpolator too 
+        # much control over the temperature profile at small scales.
+        if back_interp
+            clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
+            itp = Interpolator(atmos.pl, atmos.tmpl)  
+            atmos.tmp[:] .= itp.(atmos.p[:])
+        end
 
         return nothing
     end 
