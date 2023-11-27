@@ -84,9 +84,15 @@ module plotting
     Plot the current temperature-pressure profile, current heating rates, and
     optionally the previous states that the atmosphere has taken.
     """
-    function plot_solver(atmos, fname; hist_tmpl::Array=[], incl_magma::Bool=false, dpi::Int=250)
+    function plot_solver(atmos, fname; hist_tmpl::Array=[], incl_magma::Bool=false, dpi::Int=250, step::Int=-1)
 
         lw=1.5
+        
+        # Header info
+        title = ""
+        if step > 0
+            title = "Step $step"
+        end
 
         # Interleave cell-centre and cell-edge arrays for current atmosphere
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -103,7 +109,7 @@ module plotting
         end
 
         # Create plot 1
-        plt1 = plot(framestyle=:box, legend=:topright, ylims=ylims, yticks=yticks)
+        plt1 = plot(framestyle=:box, legend=:topright, ylims=ylims, yticks=yticks, title=title, titlefontsize=9)
 
         # Plot surface temperature(s)
         if incl_magma
@@ -303,12 +309,19 @@ module plotting
         frames = glob("zzframe_*.png",out)
         nframes = length(frames)
 
+        # Animating fluxes?
+        frames2 = glob("zyframe_*.png",out)
+        fluxes = length(frames2) > 0
+
         # Create animation
         if nframes < 1
             println("WARNING: Cannot animate solver because no output frames were found")
         else 
             fps = max(nframes/runtime, 5)
-            run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/zzframe_*.png" -pix_fmt yuv420p -y $out/anim.mp4`)
+            run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/zzframe_*.png" -pix_fmt yuv420p -y $out/anim_tmp.mp4`)
+            if fluxes
+                run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/zyframe_*.png" -pix_fmt yuv420p -y $out/anim_flx.mp4`)
+            end
         end
 
         return nothing
