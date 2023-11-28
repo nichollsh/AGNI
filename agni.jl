@@ -94,7 +94,7 @@ println("Running model...")
 # atmosphere.mlt!(atmos)
 
 # Call solver 
-solver_accel.solve_energy!(atmos, surf_state=0, modplot=10, verbose=true, 
+solver_accel.solve_energy!(atmos, surf_state=2, modplot=10, verbose=true, 
                             dry_convect=false, accel=true, extrap=false,
                             max_steps=3000, min_steps=50, use_mlt=true,
                             dt_max=200.0, F_losspct_conv=0.1)

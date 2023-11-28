@@ -416,7 +416,7 @@ module solver_accel
             clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Set cell-edge values (particularly important for handling conductive skin)
-            if (surf_state == 2) && (step <= 10)
+            if (surf_state == 2) && (step <= 20)
                 atmosphere.set_tmpl_from_tmp!(atmos, 1, limit_change=true)  # don't allow tmpl to drift during accelerated phase
             else 
                 atmosphere.set_tmpl_from_tmp!(atmos, surf_state, limit_change=true)
@@ -479,11 +479,11 @@ module solver_accel
             F_TOA_pre = F_TOA_rad 
             F_TOA_rad = atmos.flux_n[1]
             F_TOA_rel = abs((F_TOA_rad-F_TOA_pre)/F_TOA_pre)*100.0
-            F_BOA_rad = atmos.flux_n[end]
+            F_BOA_rad = atmos.flux_n[end-1]
             F_OLR_rad = atmos.flux_u_lw[1]
 
             F_TOA_tot = atmos.flux_tot[1]
-            F_BOA_tot = atmos.flux_tot[end]
+            F_BOA_tot = atmos.flux_tot[end-1]
             F_loss    = abs( F_TOA_tot-F_BOA_tot )
 
             F_losspct = 0.0
