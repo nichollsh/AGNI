@@ -90,6 +90,7 @@ module atmosphere
         layer_x::Array          # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
 
         # Layers' average properties
+        thermo_funct::Bool      # use temperature-dependent evaluation
         layer_density::Array    # density [kg m-3]
         layer_mmw::Array        # mean molecular weight [kg mol-1]
         layer_cp::Array         # heat capacity at const-p [J K-1 kg-1]
@@ -186,6 +187,7 @@ module atmosphere
     - `flag_aerosol::Bool=false`        include aersols?
     - `flag_cloud::Bool=false`          include clouds?
     - `res_switching::Bool=false`       use resolution switching at high pressures?
+    - `thermo_functions::Bool=true`     use temperature-dependent thermodynamic properties
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
@@ -210,7 +212,8 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
-                    res_switching::Bool =       false
+                    res_switching::Bool =       false,
+                    thermo_functions::Bool =    true
                     )
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -238,6 +241,7 @@ module atmosphere
             println("WARNING: Resolution switching is enabled, but surface pressure is quite low")
         end 
         atmos.res_switching = res_switching
+        atmos.thermo_funct  = thermo_functions
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     6000.0
@@ -250,7 +254,7 @@ module atmosphere
         atmos.tstar =           max(tstar, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-3, gravity)
         
-        atmos.mask_c_decay =    15   
+        atmos.mask_c_decay =    15 
         atmos.C_d =             max(0,C_d)
         atmos.U =               max(0,U)
 
@@ -437,7 +441,11 @@ module atmosphere
                 atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
 
                 # set cp
-                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
+                t = -1.0
+                if atmos.thermo_funct 
+                    t = atmos.tmp[i]
+                end
+                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=t)
             end
 
             # density (assumes ideal gas)
@@ -1133,9 +1141,9 @@ module atmosphere
         # Loop from top downwards
         for i in 2:atmos.nlev_l-1
 
-            grav = 0.5 * (atmos.layer_grav[i] + atmos.layer_grav[i-1])
-            mu = 0.5 * (atmos.layer_mmw[i] + atmos.layer_mmw[i-1])
-            c_p  = 0.5 * (atmos.layer_cp[i]   + atmos.layer_cp[i-1]  )
+            grav = sqrt(atmos.layer_grav[i] * atmos.layer_grav[i-1])
+            mu   = sqrt(atmos.layer_mmw[i]  * atmos.layer_mmw[i-1] )
+            c_p  = sqrt(atmos.layer_cp[i]   * atmos.layer_cp[i-1]  )
 
             Γ_ad = grav/c_p
             dTdz = (atmos.tmp[i] - atmos.tmp[i-1]) / (atmos.z[i] - atmos.z[i-1])
@@ -1146,7 +1154,7 @@ module atmosphere
                 atmos.mask_c[i]   = atmos.mask_c_decay
                 atmos.mask_c[i-1] = atmos.mask_c_decay
             
-                rho = 0.5 * (atmos.layer_density[i] + atmos.layer_density[i-1])
+                rho = sqrt(atmos.layer_density[i] * atmos.layer_density[i-1])
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
 
                 l = phys.k_vk * atmos.zl[i] / ( 1.0 + phys.k_vk * atmos.zl[i] / (f_z * H) )
@@ -1191,13 +1199,11 @@ module atmosphere
             T2 = atmos.tmp[i]  # lower layer
             p2 = atmos.p[i]
             
-            cp = 0.5 * ( atmos.layer_cp[i-1] +  atmos.layer_cp[i])
+            cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +  atmos.layer_cp[i] * atmos.layer_mmw[i])
             pfact = (p1/p2)^(phys.R_gas / cp)
             
             # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
             if T1 < T2*pfact
-                atmos.mask_c[i]   = atmos.mask_c_decay
-                atmos.mask_c[i-1] = atmos.mask_c_decay
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / (1.0 + pfact)
                 T1 = T2 * pfact
@@ -1219,53 +1225,12 @@ module atmosphere
             pfact = (p1/p2)^(phys.R_gas / cp)
 
             if T1 < T2*pfact
-                atmos.mask_c[i]   = atmos.mask_c_decay
-                atmos.mask_c[i-1] = atmos.mask_c_decay
-
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / ( 1.0 + pfact)
                 T1 = T2 * pfact
                 atmos.tmp[i-1] = T1
                 atmos.tmp[i]   = T2 
             end 
-        end
-        return nothing
-    end
-
-    # Naive steam adjustment, single step (as per AEOLUS)
-    function adjust_steam!(atmos::atmosphere.Atmos_t,  gas::String = "H2O")
-        
-        # Skip if no water present
-        if !(gas in atmos.gases)
-            return 
-        end 
-
-        #Downward pass
-        for i in range(1,stop=atmos.nlev_c-1, step=1)
-            x = atmosphere.get_x(atmos, gas, i)
-            pp = atmos.p[i] * x
-            if (pp < 1e-10)
-                continue
-            end 
-            Tdew = phys.calc_Tdew(gas, pp)
-            if (atmos.tmp[i] < Tdew)
-                atmos.mask_c[i] = atmos.mask_c_decay
-                atmos.tmp[i] = Tdew
-            end
-        end
-
-        #Upward pass
-        for i in range(atmos.nlev_c-1,stop=2, step=-1)
-            x = atmosphere.get_x(atmos, gas, i)
-            pp = atmos.p[i] * x
-            if (pp < 1e-10)
-                continue
-            end 
-            Tdew = phys.calc_Tdew(gas, pp)
-            if (atmos.tmp[i] < Tdew)
-                atmos.mask_c[i] = atmos.mask_c_decay
-                atmos.tmp[i] = Tdew
-            end
         end
         return nothing
     end
