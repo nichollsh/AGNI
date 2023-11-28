@@ -37,7 +37,8 @@ module solver_accel
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
+    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
+    - `update_tstar::Bool=false`        update tstar BC to be equal to tmpl[end]
     - `dry_convect::Bool=true`          enable dry convection
     - `h2o_convect::Bool=false`         enable naive steam convection (not supported by MLT scheme)
     - `use_mlt::Bool=false`             using mixing length theory to represent convection (otherwise use adjustment)
@@ -53,18 +54,18 @@ module solver_accel
     - `max_steps::Int=1000`             maximum number of solver steps
     - `min_steps::Int=300`              minimum number of solver steps
     - `dtmp_conv::Float64=3.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
-    - `drel_dt_conv::Float64=3.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
+    - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
     - `drel_F_conv::Float64=0.1`        convergence: maximum relative change in F_TOA_rad for convergence [%]
-    - `F_losspct_conv::Float64=5.0`     convergence: maximum relative local radiative flux loss [%]
+    - `F_losspct_conv::Float64=1.0`     convergence: maximum relative local radiative flux loss [%]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int=1,
+                            surf_state::Int=1, update_tstar::Bool=false,
                             dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=false,
                             sens_heat::Bool=false,
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, extrap::Bool=false, adams::Bool=true,
                             dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=300,
-                            rtol::Float64=4.0e-6, atol::Float64=1.0e-2,
+                            rtol::Float64=4.0e-5, atol::Float64=1.0e-2,
                             dtmp_conv::Float64=3.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=1.0
                             )
 
@@ -73,21 +74,20 @@ module solver_accel
         # Run parameters
         dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
         dtmp_extrap  = 2.0    # Change in temperature above which to use model extrapolation (not worth it at small dtmp)
-        smooth_stp   = 500    # Number of steps for which to apply smoothing
+        smooth_stp   = 400    # Number of steps for which to apply smoothing
         smooth       = true   # Currently smoothing?
         clamping     = false  # Require convective regions to be 'frozen' in time
 
-        wait_con     = 500    # Wait this many steps before introducing convection
-        crit_con     = 5.0    # Introduce convection when F_losspct < crit_con * F_losspct_conv
+        crit_con     = 10.0   # Introduce convection when F_losspct < crit_con * F_losspct_conv
+        wait_con     = 350    # Introduce convection after this many steps, if ^^ is not already true
 
         modprint     = 25     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
         H_large      = 1.0e5  # A characteristic large heating rate [K/day]
         p_large      = 1e6    # A characteristic large pressure [Pa] 
 
-
         if verbose
-            modprint=2
+            modprint=5
         end
 
         # Validate inputs
@@ -256,7 +256,7 @@ module solver_accel
             end
 
             # Has convection occurred?
-            if (step >= wait_con) && (F_losspct < crit_con * F_losspct_conv)
+            if (step >= wait_con) || (F_losspct < crit_con * F_losspct_conv)
                 start_con = true 
             end
 
@@ -421,7 +421,11 @@ module solver_accel
             else 
                 atmosphere.set_tmpl_from_tmp!(atmos, surf_state, limit_change=true)
             end
-            
+
+            # Update tstar
+            if update_tstar 
+                atmos.tstar = tmpl[end]
+            end
 
             # ----------------------------------------------------------
             # Accelerate solver with time-extrapolation
@@ -448,11 +452,6 @@ module solver_accel
             # Temperature floor
             clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
             clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
-
-            # Set tstar 
-            if surf_state != 1
-                atmos.tstar = atmos.tmpl[end]
-            end
             
             # ----------------------------------------------------------
             # Calculate solver statistics
@@ -523,7 +522,7 @@ module solver_accel
                 @printf("    F_tot^loss  = %+.2f W m-2  \n", F_loss)
                 @printf("    HR_typical  = %+.4f K day-1\n", H_stat)
 
-                if (dryadj_steps > 0) || (h2oadj_steps > 0)
+                if ((dryadj_steps > 0) || (h2oadj_steps > 0)) && !use_mlt
                     @printf("    count_adj   = %d layers   \n", adj_changed)
                 end
                 @printf("\n")

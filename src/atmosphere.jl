@@ -92,8 +92,9 @@ module atmosphere
         # Layers' average properties
         layer_density::Array    # density [kg m-3]
         layer_mmw::Array        # mean molecular weight [kg mol-1]
-        layer_cp::Array         # heat capacity at const-p [J K-1 mol-1]
+        layer_cp::Array         # heat capacity at const-p [J K-1 kg-1]
         layer_grav::Array       # gravity [m s-2]
+        layer_mass::Array       # mass per unit area [kg m-2]
 
         # Calculated radiative fluxes (W m-2)
         flux_d_lw::Array  # down component, lw 
@@ -426,6 +427,7 @@ module atmosphere
         atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
         atmos.layer_density = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
+        atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
         for i in 1:atmos.atm.n_layer
 
             # for each gas
@@ -435,7 +437,7 @@ module atmosphere
                 atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
 
                 # set cp
-                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas) * phys.lookup_safe("cp",gas)
+                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
             end
 
             # density (assumes ideal gas)
@@ -473,7 +475,8 @@ module atmosphere
 
         # Mass
         for i in 1:atmos.atm.n_layer
-            atmos.atm.mass[1, i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
+            atmos.layer_mass[i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
+            atmos.atm.mass[1, i] = atmos.layer_mass[i]
         end
 
         return nothing
@@ -823,7 +826,7 @@ module atmosphere
             end 
 
             if tot == 0
-                error("Layer $d has all-zero mole fractions")
+                error("Layer $i has all-zero mole fractions - check your spectral file")
             end
 
             for i_gas in 1:atmos.spectrum.Gas.n_absorb
@@ -1015,8 +1018,6 @@ module atmosphere
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
-        atmos.tstar = atmos.tmpl[end]
-
         if lw
             atmos.bound.t_ground[1] = atmos.tstar
         end
@@ -1086,14 +1087,14 @@ module atmosphere
     function sensible!(atmos::atmosphere.Atmos_t)
         # sensible heat flux (TKE scheme for this 1D case)
         # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
         return nothing
     end
 
     # Calculate dry convective fluxes using mixing length theory
     function mlt!(atmos::atmosphere.Atmos_t)
 
-        # Follows a method similar to that of the VPL climate model.
+        # Follows a method similar to that of the VPL climate model (atmos).
         # - Lincowski et al., 2018
         # - Meadows et al., 2023
         # - Blackadar, 1962
@@ -1134,7 +1135,7 @@ module atmosphere
 
             grav = 0.5 * (atmos.layer_grav[i] + atmos.layer_grav[i-1])
             mu = 0.5 * (atmos.layer_mmw[i] + atmos.layer_mmw[i-1])
-            c_p  = 0.5 * (atmos.layer_cp[i]   + atmos.layer_cp[i-1]  ) / mu  # Convert to J K-1 kg-1
+            c_p  = 0.5 * (atmos.layer_cp[i]   + atmos.layer_cp[i-1]  )
 
             Γ_ad = grav/c_p
             dTdz = (atmos.tmp[i] - atmos.tmp[i-1]) / (atmos.z[i] - atmos.z[i-1])
@@ -1170,7 +1171,7 @@ module atmosphere
         for i in 1:atmos.nlev_c
             dF = atmos.flux_tot[i+1] - atmos.flux_tot[i]
             dp = atmos.pl[i+1] - atmos.pl[i]
-            atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i] * atmos.layer_mmw[i]) * dF/dp # K/s
+            atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i]) * dF/dp # K/s
         end
 
         atmos.heating_rate *= 86400.0 # K/day
@@ -1214,7 +1215,7 @@ module atmosphere
             T2 = atmos.tmp[i]
             p2 = atmos.p[i]
             
-            cp = 0.5 * ( atmos.layer_cp[i-1] + atmos.layer_cp[i])
+            cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + atmos.layer_cp[i] * atmos.layer_mmw[i])
             pfact = (p1/p2)^(phys.R_gas / cp)
 
             if T1 < T2*pfact

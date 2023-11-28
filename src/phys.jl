@@ -12,7 +12,6 @@ module phys
     # - Python files that accompany Ray's book (=> phys.py)
     # - SOCRATES source code
     # - NIST
-    # - Wikipedia
 
     # Universal gas constant, J K-1 mol-1
     const R_gas = 8.31446261815324 
@@ -82,13 +81,14 @@ module phys
     const lookup_cp = Dict([
         ("H2O", 1.847000E+03), 
         ("CO2", 8.200000E+02), 
-        ("CO", 1.040000E+03), 
+        ("CO",  1.040000E+03), 
         ("CH4", 2.195000E+03), 
-        ("O2", 9.160000E+02), 
+        ("O2",  9.160000E+02), 
         ("NH3", 2.060000E+03), 
-        ("N2", 1.037000E+03), 
-        ("H2", 1.423000E+04), 
-        ("He", 5.196000E+03)
+        ("N2",  1.037000E+03), 
+        ("H2",  1.423000E+04), 
+        ("He",  5.196000E+03),
+        ("O3",  819.37)
     ])
 
     # Critical point temperature, K
@@ -101,7 +101,8 @@ module phys
         ("NH3", 4.055000e+02), 
         ("N2", 1.262000e+02), 
         ("H2", 3.320000e+01), 
-        ("He", 5.100000e+00)
+        ("He", 5.100000e+00),
+        ("O3", 261.15)
     ])
 
     # Triple point temperature, K
@@ -114,7 +115,9 @@ module phys
         ("NH3", 1.954000E+02), 
         ("N2", 6.314000E+01), 
         ("H2", 1.395000E+01), 
-        ("He", 2.170000E+00)
+        ("He", 2.170000E+00),
+        ("O3", 80.0),
+
     ])
 
     # Triple point pressure, Pa
@@ -127,7 +130,8 @@ module phys
         ("NH3", 6.100000E+03),
         ("N2", 1.253000E+04),
         ("H2", 7.200000E+03),
-        ("He", 5.070000E+03)
+        ("He", 5.070000E+03),
+        ("O3", 7.346E-1)
     ])
 
     # Latent heat of vapourisation, J kg-1
@@ -140,13 +144,222 @@ module phys
         ("NH3", 1.658000E+06), 
         ("N2", 2.180000E+05), 
         ("H2", 4.540000E+05), 
-        ("He", 2.030000E+04)
+        ("He", 2.030000E+04),
+        ("O3", 2.8849E+5)
     ])
 
+    # Shomate formulation for heat capacity, J K-1 kg-1
+    function shomate_cp(gas::String, tmp::Float64)
+        out = 0.0
+
+        # Get molar mass for this molecule 
+        mmw = 0.0
+        if gas in keys(lookup_mmw)
+            mmw = lookup_mmw[gas]  # kg mol-1
+        else 
+            return 0.0
+        end 
+
+        # Coefficient base values 
+        cA = 0.0
+        cB = 0.0
+        cC = 0.0
+        cD = 0.0
+        cE = 0.0
+
+        # Set coefficients
+        if gas == "H2O"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 500.0, 6000.0)
+            if tmp < 1700.0 
+                cA = 30.09200	
+                cB = 6.832514	
+                cC = 6.793435	
+                cD = -2.534480
+                cE = 0.082139	
+            else 
+                cA = 41.96426
+                cB = 8.622053
+                cC = -1.499780
+                cD = 0.098119
+                cE = -11.15764
+            end 
+        elseif gas == "CO2"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 298.0, 6000.0)
+            if tmp < 1200.0 
+                cA = 24.99735	
+                cB = 55.18696	
+                cC = -33.69137
+                cD = 7.948387	
+                cE = -0.136638
+            else 
+                cA = 58.16639
+                cB = 2.720074
+                cC = -0.492289
+                cD = 0.038844
+                cE = -6.447293
+            end 
+        elseif gas == "CO"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 298.0, 6000.0)
+            if tmp < 1300.0 
+                cA = 25.56759	
+                cB = 6.096130	
+                cC = 4.054656	
+                cD = -2.671301
+                cE = 0.131021	
+            else 
+                cA = 35.15070
+                cB = 1.300095
+                cC = -0.205921
+                cD = 0.013550
+                cE = -3.282780
+            end 
+        elseif gas == "CH4"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 298.0, 6000.0)
+            if tmp < 1300.0 
+                cA = -0.703029
+                cB = 108.4773
+                cC = -42.52157	
+                cD = 5.862788
+                cE = 0.678565	
+            else 
+                cA = 85.81217
+                cB = 11.26467
+                cC = -2.114146
+                cD = 0.138190
+                cE = -26.42221
+            end 
+        elseif gas == "O2"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 100.0, 6000.0)
+            if tmp < 700.0 
+                cA = 31.32234	
+                cB = -20.23531
+                cC = 57.86644	
+                cD = -36.50624
+                cE = -0.007374
+            elseif tmp < 2000.0
+                cA = 30.03235	
+                cB = 8.772972	
+                cC = -3.988133
+                cD = 0.788313	
+                cE = -0.741599
+            else 
+                cA = 20.91111
+                cB = 10.72071
+                cC = -2.020498
+                cD = 0.146449
+                cE = 9.245722
+            end 
+        elseif gas == "NH3"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 298.0, 6000.0)
+            if tmp < 1400.0 
+                cA = 19.99563	
+                cB = 49.77119	
+                cC = -15.37599
+                cD = 1.921168	
+                cE = 0.189174	
+            else 
+                cA = 52.02427
+                cB = 18.48801
+                cC = -3.765128
+                cD = 0.248541
+                cE = -12.45799
+            end 
+        elseif gas == "N2"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 100.0, 6000.0)
+            if tmp < 500.0 
+                cA = 28.98641	
+                cB = 1.853978	
+                cC = -9.647459
+                cD = 16.63537	
+                cE = 0.000117	
+            elseif tmp < 2000.0
+                cA = 19.50583	
+                cB = 19.88705	
+                cC = -8.598535
+                cD = 1.369784	
+                cE = 0.527601	
+            else 
+                cA = 35.51872
+                cB = 1.128728
+                cC = -0.196103
+                cD = 0.014662
+                cE = -4.553760
+            end
+        elseif gas == "H2"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 298.0, 6000.0)
+            if tmp < 1000.0 
+                cA = 33.066178	
+                cB = -11.363417
+                cC = 11.432816	
+                cD = -2.772874	
+                cE = -0.158558	
+            elseif tmp < 2500.0
+                cA = 18.563083
+                cB = 12.257357
+                cC = -2.859786
+                cD = 0.268238	
+                cE = 1.977990	
+            else 
+                cA = 43.413560
+                cB = -4.293079
+                cC = 1.272428
+                cD = -0.096876
+                cE = -20.533862
+            end
+        elseif gas == "He"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 298.0, 6000.0)
+            cA = 20.78603
+            cB = 4.850638e-10
+            cC = -1.582916e-10
+            cD = 1.525102e-11
+            cE = 3.196347e-11
+        elseif gas == "O3"
+            # NIST Tables | Chase, 1998
+            tmp = clamp(tmp, 298.0, 6000.0)
+            if tmp < 1200.0 
+                cA = 21.66157	
+                cB = 79.86001	
+                cC = -66.02603
+                cD = 19.58363	
+                cE = -0.079251
+            else
+                cA = 57.81409
+                cB = 0.730941
+                cC = -0.039253
+                cD = 0.002610
+                cE = -3.560367
+            end
+        else 
+            return 0.0
+        end 
+
+        # Evalulate heat capacity 
+        t1 = tmp/1000.0
+        t2 = t1*t1
+        out = cA + cB*t1 + cC*t2 + cD*t2*t1 + cE/t2
+
+        # Convert units to J K-1 kg-1
+        out /= mmw
+
+        return out 
+    end 
+
     # Get values from thermodynamic property lookup tables 
-    function lookup_safe(prop::String,gas::String)
+    function lookup_safe(prop::String,gas::String;tmp::Float64=-1.0)
 
         prop = lowercase(prop)
+
+        table = nothing
+        funct = nothing
 
         # Find table 
         if prop == "l_vap"
@@ -161,15 +374,22 @@ module phys
             table = lookup_mmw
         elseif prop == "cp"
             table = lookup_cp
+            funct = shomate_cp
         else 
-            error("Invalid thermodynamic property '$thermo'")
+            error("Invalid thermodynamic property '$prop'")
         end 
 
-        # Find value 
-        if gas in keys(table)
-            return table[gas]
-        end 
+        # Try temperature-dependent cases 
+        if !isnothing(funct) && (tmp > 0.1)
+            return funct(gas,tmp)
 
+        # Otherwise, try lookup tables
+        else
+            if gas in keys(table)
+                return table[gas]
+            end
+        end 
+         
         # Default case
         return 0.0
     end
