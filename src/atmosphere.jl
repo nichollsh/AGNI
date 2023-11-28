@@ -1135,7 +1135,7 @@ module atmosphere
 
             grav = 0.5 * (atmos.layer_grav[i] + atmos.layer_grav[i-1])
             mu = 0.5 * (atmos.layer_mmw[i] + atmos.layer_mmw[i-1])
-            c_p  = 0.5 * (atmos.layer_cp[i]   + atmos.layer_cp[i-1]  )
+            c_p  = 0.5 * (atmos.layer_cp[i]  + atmos.layer_cp[i-1]  )
 
             Γ_ad = grav/c_p
             dTdz = (atmos.tmp[i] - atmos.tmp[i-1]) / (atmos.z[i] - atmos.z[i-1])
@@ -1191,13 +1191,11 @@ module atmosphere
             T2 = atmos.tmp[i]  # lower layer
             p2 = atmos.p[i]
             
-            cp = 0.5 * ( atmos.layer_cp[i-1] +  atmos.layer_cp[i])
+            cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +  atmos.layer_cp[i] * atmos.layer_mmw[i])
             pfact = (p1/p2)^(phys.R_gas / cp)
             
             # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
             if T1 < T2*pfact
-                atmos.mask_c[i]   = atmos.mask_c_decay
-                atmos.mask_c[i-1] = atmos.mask_c_decay
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / (1.0 + pfact)
                 T1 = T2 * pfact
@@ -1219,53 +1217,12 @@ module atmosphere
             pfact = (p1/p2)^(phys.R_gas / cp)
 
             if T1 < T2*pfact
-                atmos.mask_c[i]   = atmos.mask_c_decay
-                atmos.mask_c[i-1] = atmos.mask_c_decay
-
                 Tbar = 0.5 * ( T1 + T2 )
                 T2 = 2.0 * Tbar / ( 1.0 + pfact)
                 T1 = T2 * pfact
                 atmos.tmp[i-1] = T1
                 atmos.tmp[i]   = T2 
             end 
-        end
-        return nothing
-    end
-
-    # Naive steam adjustment, single step (as per AEOLUS)
-    function adjust_steam!(atmos::atmosphere.Atmos_t,  gas::String = "H2O")
-        
-        # Skip if no water present
-        if !(gas in atmos.gases)
-            return 
-        end 
-
-        #Downward pass
-        for i in range(1,stop=atmos.nlev_c-1, step=1)
-            x = atmosphere.get_x(atmos, gas, i)
-            pp = atmos.p[i] * x
-            if (pp < 1e-10)
-                continue
-            end 
-            Tdew = phys.calc_Tdew(gas, pp)
-            if (atmos.tmp[i] < Tdew)
-                atmos.mask_c[i] = atmos.mask_c_decay
-                atmos.tmp[i] = Tdew
-            end
-        end
-
-        #Upward pass
-        for i in range(atmos.nlev_c-1,stop=2, step=-1)
-            x = atmosphere.get_x(atmos, gas, i)
-            pp = atmos.p[i] * x
-            if (pp < 1e-10)
-                continue
-            end 
-            Tdew = phys.calc_Tdew(gas, pp)
-            if (atmos.tmp[i] < Tdew)
-                atmos.mask_c[i] = atmos.mask_c_decay
-                atmos.tmp[i] = Tdew
-            end
         end
         return nothing
     end

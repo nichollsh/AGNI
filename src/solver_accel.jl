@@ -19,6 +19,7 @@ module solver_accel
 
     import atmosphere 
     import phys
+    import setpt
     import plotting
     import moving_average
 
@@ -392,12 +393,10 @@ module solver_accel
                 end 
             end
 
-            # H2O moist convective adjustment
-            if h2oadj_steps > 0 && h2o_convect && !use_mlt && start_con
+            # H2O moist convection
+            if h2oadj_steps > 0 && h2o_convect && start_con
                 tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
-                for _ in 1:h2oadj_steps
-                    atmosphere.adjust_steam!(atmos)
-                end
+                setpt.condensing!(atmos, "H2O")
                 for i in 1:atmos.nlev_c
                     if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
                         adj_changed += 1

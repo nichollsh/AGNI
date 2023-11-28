@@ -121,12 +121,13 @@ module setpt
 
         # Calculate cell-centre values
         for idx in 1:atmos.nlev_c
-            atmos.tmp[idx] = atmos.tmpl[end] * ( atmos.p[idx] / atmos.pl[end] ) ^ ( phys.R_gas / atmos.layer_cp[idx] )
+            cp = atmos.layer_cp[idx] * atmos.layer_mmw[idx]
+            atmos.tmp[idx] = atmos.tmpl[end] * ( atmos.p[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
         end
         
         # Calculate cell-edge values
         for idx in 2:atmos.nlev_l-1
-            cp = 0.5 * ( atmos.layer_cp[idx-1] + atmos.layer_cp[idx])
+            cp = 0.5 * ( atmos.layer_cp[idx-1] * atmos.layer_mmw[idx-1] + atmos.layer_cp[idx] * atmos.layer_mmw[idx])
             atmos.tmpl[idx] = atmos.tmpl[end] * ( atmos.pl[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
         end
 
@@ -205,7 +206,7 @@ module setpt
     end
 
 
-    # Set atmosphere to phase curve of 'con' when it enters the condensible region (does not modify T_surf)
+    # Set atmosphere to phase curve of gas when it enters the condensible region (does not modify tstar)
     function condensing!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
