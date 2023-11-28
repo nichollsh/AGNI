@@ -274,9 +274,8 @@ atmosphere.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 atmosphere.calc_hrates!(atmos)
 
-val_e = [30.0, 80.0]  # tests have found ~56 K/day for this setup
-display(atmos.heating_rate)
-val_o = atmos.heating_rate[atmos.nlev_c-1]
+val_e = [20.0, 30.0]  # tests have found ~24 K/day for this setup
+val_o = atmos.heating_rate[atmos.nlev_c-2]
 println("Expected range = $(val_e) K/day")
 println("Modelled value = $(val_o) K/day")
 if ( val_o > val_e[1]) && (val_o < val_e[2]) 
