@@ -250,7 +250,7 @@ module atmosphere
         atmos.tstar =           max(tstar, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-3, gravity)
         
-        atmos.mask_c_decay =    15   
+        atmos.mask_c_decay =    15 
         atmos.C_d =             max(0,C_d)
         atmos.U =               max(0,U)
 
@@ -437,7 +437,7 @@ module atmosphere
                 atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
 
                 # set cp
-                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
+                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas)
             end
 
             # density (assumes ideal gas)

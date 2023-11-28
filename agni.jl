@@ -30,7 +30,7 @@ tstar           = 1960.0    # Surface temperature [kelvin]
 toa_heating     = 510.0     # Instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
-nlev_centre     = 50  
+nlev_centre     = 60  
 p_surf          = 270.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
@@ -68,10 +68,10 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-# setpt.isothermal!(atmos, 1300.0)
+setpt.isothermal!(atmos, 1300.0)
 # setpt.fromcsv!(atmos,"pt.csv")
 # setpt.prevent_surfsupersat!(atmos)
-setpt.dry_adiabat!(atmos)
+# setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
 # setpt.stratosphere!(atmos, 500.0)
 
@@ -96,7 +96,7 @@ println("Running model...")
 # Call solver 
 solver_accel.solve_energy!(atmos, surf_state=0, modplot=10, verbose=true, 
                             dry_convect=true, accel=true, extrap=false,
-                            max_steps=3000, min_steps=50, use_mlt=false,
+                            max_steps=3000, min_steps=50, use_mlt=true,
                             dt_max=200.0, F_losspct_conv=0.1)
 
 # solver_cvode.solve_energy!(atmos, surf_state=2, verbose=true, dry_convect=true,  max_steps=500)
