@@ -90,6 +90,7 @@ module atmosphere
         layer_x::Array          # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
 
         # Layers' average properties
+        thermo_funct::Bool      # use temperature-dependent evaluation
         layer_density::Array    # density [kg m-3]
         layer_mmw::Array        # mean molecular weight [kg mol-1]
         layer_cp::Array         # heat capacity at const-p [J K-1 kg-1]
@@ -186,6 +187,7 @@ module atmosphere
     - `flag_aerosol::Bool=false`        include aersols?
     - `flag_cloud::Bool=false`          include clouds?
     - `res_switching::Bool=false`       use resolution switching at high pressures?
+    - `thermo_functions::Bool=true`     use temperature-dependent thermodynamic properties
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
@@ -210,7 +212,8 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
-                    res_switching::Bool =       false
+                    res_switching::Bool =       false,
+                    thermo_functions::Bool =    true
                     )
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -238,6 +241,7 @@ module atmosphere
             println("WARNING: Resolution switching is enabled, but surface pressure is quite low")
         end 
         atmos.res_switching = res_switching
+        atmos.thermo_funct  = thermo_functions
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     6000.0
@@ -437,7 +441,11 @@ module atmosphere
                 atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
 
                 # set cp
-                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas)
+                t = -1.0
+                if atmos.thermo_funct 
+                    t = atmos.tmp[i]
+                end
+                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=t)
             end
 
             # density (assumes ideal gas)
@@ -1133,9 +1141,9 @@ module atmosphere
         # Loop from top downwards
         for i in 2:atmos.nlev_l-1
 
-            grav = 0.5 * (atmos.layer_grav[i] + atmos.layer_grav[i-1])
-            mu = 0.5 * (atmos.layer_mmw[i] + atmos.layer_mmw[i-1])
-            c_p  = 0.5 * (atmos.layer_cp[i]  + atmos.layer_cp[i-1]  )
+            grav = sqrt(atmos.layer_grav[i] * atmos.layer_grav[i-1])
+            mu   = sqrt(atmos.layer_mmw[i]  * atmos.layer_mmw[i-1] )
+            c_p  = sqrt(atmos.layer_cp[i]   * atmos.layer_cp[i-1]  )
 
             Γ_ad = grav/c_p
             dTdz = (atmos.tmp[i] - atmos.tmp[i-1]) / (atmos.z[i] - atmos.z[i-1])
@@ -1146,7 +1154,7 @@ module atmosphere
                 atmos.mask_c[i]   = atmos.mask_c_decay
                 atmos.mask_c[i-1] = atmos.mask_c_decay
             
-                rho = 0.5 * (atmos.layer_density[i] + atmos.layer_density[i-1])
+                rho = sqrt(atmos.layer_density[i] * atmos.layer_density[i-1])
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
 
                 l = phys.k_vk * atmos.zl[i] / ( 1.0 + phys.k_vk * atmos.zl[i] / (f_z * H) )
