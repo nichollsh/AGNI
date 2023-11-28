@@ -1270,8 +1270,6 @@ module atmosphere
         return nothing
     end
 
-
-
     # Set cell edge temperatures from cell centres
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false, back_interp::Bool=false)
 
@@ -1279,6 +1277,7 @@ module atmosphere
 
         bot_old_e = atmos.tmpl[end]
         top_old_e = atmos.tmpl[1]
+        tstar_old = atmos.tstar
 
         # Interpolate temperature to bulk cell-edge values 
         itp = Interpolator(atmos.p, atmos.tmp)
@@ -1290,35 +1289,35 @@ module atmosphere
         atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
 
         if limit_change
-            atmos.tmpl[1] = dot( [atmos.tmpl[1]; top_old_e] , [0.9; 0.1] )  # limit change
+            atmos.tmpl[1] = 0.9 * atmos.tmpl[1] + 0.1 * top_old_e
         end
 
         # Calculate bottom boundary temperature
-        if surf_state == 0
-            # Extrapolate
+        if (surf_state == 0) || (surf_state == 2)
+            # Extrapolate tmpl[end]
             grad_dt = atmos.tmp[end]-atmos.tmpl[end-1]
             grad_dp = atmos.p[end]-atmos.pl[end-1]
             atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
-            weights = [0.7; 0.3]
 
-        elseif surf_state == 1 
-            # Fixed
-            weights = [0.0; 1.0]
-
-        elseif surf_state == 2
             # Conductive skin
-            # Set tmpl[end] such that the skin carries the required flux
-            atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
-            atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
-            weights = [1.0; 0.0]  
+            if surf_state == 2
+                # Set tstar such that the skin carries the required flux
+                atmos.tstar = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
+                atmos.tstar = max(atmos.tmp_floor, atmos.tstar)
+            end
+
+            if limit_change
+                atmos.tmpl[end] = 0.7 * atmos.tmpl[end] + 0.3 * bot_old_e
+                atmos.tstar     = 0.7 * atmos.tstar     + 0.3 * tstar_old
+            end 
+
+        elseif (surf_state == 1)
+            # Fixed => do nothing
+            atmos.tmpl[end] = bot_old_e
         else 
             error("Invalid surface state $(surf_state)")
         end 
         
-        # limit change at surface
-        if limit_change
-            atmos.tmpl[end] = dot( [atmos.tmpl[end]; bot_old_e] , weights ) 
-        end 
 
         # Second interpolation back to cell-centres.
         # This can help prevent grid-imprinting issues, but in some cases it can 
