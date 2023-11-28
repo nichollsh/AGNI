@@ -68,10 +68,10 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-setpt.isothermal!(atmos, 1300.0)
+# setpt.isothermal!(atmos, 1300.0)
 # setpt.fromcsv!(atmos,"pt.csv")
 # setpt.prevent_surfsupersat!(atmos)
-# setpt.dry_adiabat!(atmos)
+setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
 # setpt.stratosphere!(atmos, 500.0)
 
@@ -94,9 +94,9 @@ println("Running model...")
 # atmosphere.mlt!(atmos)
 
 # Call solver 
-solver_accel.solve_energy!(atmos, surf_state=2, modplot=10, verbose=true, 
-                            dry_convect=false, accel=true, extrap=false,
-                            max_steps=3000, min_steps=50, use_mlt=true,
+solver_accel.solve_energy!(atmos, surf_state=0, modplot=10, verbose=true, 
+                            dry_convect=true, accel=true, extrap=false,
+                            max_steps=3000, min_steps=50, use_mlt=false,
                             dt_max=200.0, F_losspct_conv=0.1)
 
 # solver_cvode.solve_energy!(atmos, surf_state=2, verbose=true, dry_convect=true,  max_steps=500)
