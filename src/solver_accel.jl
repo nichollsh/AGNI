@@ -19,6 +19,7 @@ module solver_accel
 
     import atmosphere 
     import phys
+    import setpt
     import plotting
     import moving_average
 
@@ -41,7 +42,7 @@ module solver_accel
     - `update_tstar::Bool=false`        update tstar BC to be equal to tmpl[end]
     - `dry_convect::Bool=true`          enable dry convection
     - `h2o_convect::Bool=false`         enable naive steam convection (not supported by MLT scheme)
-    - `use_mlt::Bool=false`             using mixing length theory to represent convection (otherwise use adjustment)
+    - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=false`           include sensible heating 
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
@@ -60,7 +61,7 @@ module solver_accel
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, update_tstar::Bool=false,
-                            dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=false,
+                            dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=true,
                             sens_heat::Bool=false,
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, extrap::Bool=false, adams::Bool=true,
@@ -79,7 +80,7 @@ module solver_accel
         clamping     = false  # Require convective regions to be 'frozen' in time
 
         crit_con     = 10.0   # Introduce convection when F_losspct < crit_con * F_losspct_conv
-        wait_con     = 350    # Introduce convection after this many steps, if ^^ is not already true
+        wait_con     = 300    # Introduce convection after this many steps, if ^^ is not already true
 
         modprint     = 25     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
@@ -392,12 +393,10 @@ module solver_accel
                 end 
             end
 
-            # H2O moist convective adjustment
-            if h2oadj_steps > 0 && h2o_convect && !use_mlt && start_con
+            # H2O moist convection
+            if h2oadj_steps > 0 && h2o_convect && start_con
                 tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
-                for _ in 1:h2oadj_steps
-                    atmosphere.adjust_steam!(atmos)
-                end
+                setpt.condensing!(atmos, "H2O")
                 for i in 1:atmos.nlev_c
                     if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
                         adj_changed += 1
