@@ -41,7 +41,7 @@ mf_dict         = Dict([
                         # ("N2" , 1.41003)
                         ])
 
-spfile_name   = "res/spectral_files/Reach/Reach"
+spfile_name   = "res/spectral_files/Reach_cloud/Reach"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
@@ -56,7 +56,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
-                         flag_cloud=false,
+                         flag_cloud=true,
                          overlap_method=4,
                          zenith_degrees=48.19,
                          skin_d=0.01,

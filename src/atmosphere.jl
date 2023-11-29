@@ -579,7 +579,7 @@ module atmosphere
             error("atmosphere parameters have not been set")
         end
 
-        atmos.cld.n_condensed = 0
+        
         atmos.atm.n_profile = 0
 
         #########################################
@@ -892,6 +892,7 @@ module atmosphere
         atmos.dimen.nd_phf_term_cloud_prsc  = 1
 
         if atmos.control.l_cloud
+            atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
             atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_type_homogen # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen ; Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
             atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand           # Maximum/random overlap in a mixed column (-C 2)
             atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous        # Homogeneous cloud
@@ -900,12 +901,13 @@ module atmosphere
             atmos.control.i_st_ice    = 11                                     # Water Ice type 11 (-i 11)
             atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11 
 
-            
+            atmos.cld.n_condensed       = 1
             atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
             atmos.cld.n_cloud_type      = 1
             atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
         else
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
+            atmos.cld.n_condensed = 0
         end
 
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
