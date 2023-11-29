@@ -264,7 +264,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          zenith_degrees=theta,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
-                         overlap_method=2
+                         overlap_method=2,
+                         thermo_functions=false
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file, spfile_noremove=true)
 setpt.isothermal!(atmos, 300.0)
@@ -273,8 +274,7 @@ atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 atmosphere.calc_hrates!(atmos)
-
-val_e = [20.0, 30.0]  # tests have found ~24 K/day for this setup
+val_e = [20.0, 30.0]  # tests have found ~26 K/day for this setup
 val_o = atmos.heating_rate[atmos.nlev_c-2]
 println("Expected range = $(val_e) K/day")
 println("Modelled value = $(val_o) K/day")

@@ -50,7 +50,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                         gravity, radius,
                         nlev_centre, p_surf, p_top,
                         mf_dict=mole_fractions,
-                        flag_gcontinuum=true
+                        flag_gcontinuum=true,
+                        thermo_functions=false
                         )
 atmosphere.allocate!(atmos, stellar_spectrum=star_file)
 

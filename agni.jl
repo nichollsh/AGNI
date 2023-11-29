@@ -26,7 +26,7 @@ import phys
 
 
 # Configuration options
-tstar           = 1960.0    # Surface temperature [kelvin]
+tstar           = 2000.0    # Surface temperature [kelvin]
 toa_heating     = 510.0     # Instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
@@ -62,18 +62,22 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          skin_k=2.0,
                          tmp_magma=2500.0,
                          tmp_floor=2.0,
-                         res_switching=false
+                         res_switching=false,
+                         thermo_functions=true
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-setpt.isothermal!(atmos, 1300.0)
+# setpt.isothermal!(atmos, 1300.0)
 # setpt.fromcsv!(atmos,"pt.csv")
-# setpt.prevent_surfsupersat!(atmos)
-# setpt.dry_adiabat!(atmos)
-# setpt.condensing!(atmos, "H2O")
+setpt.prevent_surfsupersat!(atmos)
+setpt.dry_adiabat!(atmos)
+setpt.condensing!(atmos, "H2O")
+atmosphere.calc_layer_props!(atmos)
 # setpt.stratosphere!(atmos, 500.0)
+
+display(atmos.layer_cp.*(18.0/1000.0))
 
 # Create output directory
 rm(output_dir,force=true,recursive=true)
@@ -86,18 +90,18 @@ atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 println("Running model...")
 
 # Calculate LW and SW fluxes (once)
-# atmosphere.radtrans!(atmos, true)
-# atmosphere.radtrans!(atmos, false)
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
 
 # Calculate convective fluxes (once)
 # println("MLT: calculating fluxes")
 # atmosphere.mlt!(atmos)
 
 # Call solver 
-solver_accel.solve_energy!(atmos, surf_state=0, modplot=10, verbose=true, 
-                            dry_convect=true, accel=true, extrap=false,
-                            max_steps=3000, min_steps=50, use_mlt=true,
-                            dt_max=200.0, F_losspct_conv=0.1)
+# solver_accel.solve_energy!(atmos, surf_state=0, modplot=10, verbose=true, 
+#                             dry_convect=true, accel=true, extrap=false,
+#                             max_steps=3000, min_steps=50, use_mlt=true,
+#                             dt_max=200.0, F_losspct_conv=0.1)
 
 # solver_cvode.solve_energy!(atmos, surf_state=2, verbose=true, dry_convect=true,  max_steps=500)
 
