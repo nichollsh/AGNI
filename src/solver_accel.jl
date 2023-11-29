@@ -275,12 +275,13 @@ module solver_accel
             # ----------------------------------------------------------
             # Recalculate thermodynamic properties at each layer (+ height & gravity)
             # ---------------------------------------------------------- 
-            if (modprop > 0) && (mod(step, modprop) == 0)
-                if mod(step,modprint) == 0
-                    @printf("(props) ")
-                end
-                atmosphere.calc_layer_props!(atmos)
-            end 
+            # if (modprop > 0) && (mod(step, modprop) == 0)
+            #     if mod(step,modprint) == 0
+            #         @printf("(props) ")
+            #     end
+            #     atmosphere.calc_layer_props!(atmos)
+            # end 
+            # Commented out: this is already done in the radtrans call
 
             if mod(step,modprint) == 0
                 @printf("\n")
