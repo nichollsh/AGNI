@@ -140,7 +140,7 @@ module plotting
             end 
         end
         if length(convective_p) > 0
-            scatter!(plt1, convective_t, convective_p, color="goldenrod2", label="Conv.", markersize=2, markeralpha=0.8) 
+            scatter!(plt1, convective_t, convective_p, color="goldenrod2", label="Cnvct", markersize=2, markeralpha=0.8) 
         end 
         
         xlabel!(plt1, "Temperature [K]")

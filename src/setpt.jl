@@ -214,7 +214,7 @@ module setpt
         end 
 
         if phys.lookup_safe("L_vap",gas) < 1e-20
-            return
+            return nothing
         end
         
         i_gas = findfirst(==(gas), atmos.gases)

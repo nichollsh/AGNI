@@ -41,9 +41,10 @@ module solver_accel
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
     - `update_tstar::Bool=false`        update tstar BC to be equal to tmpl[end]
     - `dry_convect::Bool=true`          enable dry convection
-    - `h2o_convect::Bool=false`         enable naive steam convection (not supported by MLT scheme)
+    - `h2o_convect::Bool=false`         enable naive steam condensation
     - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=false`           include sensible heating 
+    - `modprop::Int=1`                  frequency at which to update thermodynamic properties (0 => never)
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `accel::Bool=true`                enable accelerated fast period at the start 
@@ -62,7 +63,7 @@ module solver_accel
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, update_tstar::Bool=false,
                             dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=true,
-                            sens_heat::Bool=false,
+                            sens_heat::Bool=false, modprop::Int=5,
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, extrap::Bool=false, adams::Bool=true,
                             dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=300,
@@ -80,7 +81,7 @@ module solver_accel
         clamping     = false  # Require convective regions to be 'frozen' in time
 
         crit_con     = 10.0   # Introduce convection when F_losspct < crit_con * F_losspct_conv
-        wait_con     = 300    # Introduce convection after this many steps, if ^^ is not already true
+        wait_con     = 250    # Introduce convection after this many steps, if ^^ is not already true
 
         modprint     = 25     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
@@ -190,7 +191,7 @@ module solver_accel
             end
 
             # End of the initial fast period
-            if accel && (step > 2) && ( (dtmp_comp < dtmp_accel) || ( step/max_steps > 0.3)  || flag_prev ) 
+            if accel && (step > len_hist) && ( (dtmp_comp < dtmp_accel) || ( step/max_steps > 0.3)  || flag_prev ) 
                 accel = false 
                 stopaccel = true
             end
@@ -256,18 +257,32 @@ module solver_accel
                 end
             end
 
-            # Has convection occurred?
-            if (step >= wait_con) || (F_losspct < crit_con * F_losspct_conv)
+            # Introduce convection schemes
+            if ((step >= wait_con) || ( (F_losspct < crit_con * F_losspct_conv) && (step > 5))) && !start_con
                 start_con = true 
+                @printf("(intro convect) ")
             end
 
             if mod(step,modprint) == 0
                 if extrap && (dtmp_comp > dtmp_extrap)
-                    @printf("(extrap)")
+                    @printf("(extrap) ")
                 end 
                 if smooth
-                    @printf("(smooth)")
+                    @printf("(smooth) ")
                 end 
+            end
+
+            # ----------------------------------------------------------
+            # Recalculate thermodynamic properties at each layer (+ height & gravity)
+            # ---------------------------------------------------------- 
+            if (modprop > 0) && (mod(step, modprop) == 0)
+                if mod(step,modprint) == 0
+                    @printf("(props) ")
+                end
+                atmosphere.calc_layer_props!(atmos)
+            end 
+
+            if mod(step,modprint) == 0
                 @printf("\n")
             end
 
@@ -367,21 +382,17 @@ module solver_accel
             dtmp[atmos.clamped] .= 0.0
             atmos.tmp += dtmp
 
-            # display(dtmp)
-
             # Dry convective adjustment
             adj_changed = 0
             if dryadj_steps > 0 && dry_convect && !use_mlt && start_con
-                tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
 
                 # do adjustment steps
-                for _ in 1:dryadj_steps
-                    atmosphere.adjust_dry!(atmos)
-                end
+                tmp_tnd = atmosphere.adjust_dry(atmos, dryadj_steps)
+                clamp!(tmp_tnd, -1.0 * dtmp_clip, dtmp_clip)
                 
                 # check which levels were changed
                 for i in 1:atmos.nlev_c
-                    if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
+                    if abs(tmp_tnd[i]) > 0.01
                         adj_changed += 1
                         if clamping
                             atmos.clamped[i] = true
@@ -391,18 +402,30 @@ module solver_accel
                         end
                     end
                 end 
+
+                atmos.tmp +=  tmp_tnd
             end
 
-            # H2O moist convection
+            # H2O hard moist convection
             if h2oadj_steps > 0 && h2o_convect && start_con
-                tmp_before_adj = ones(Float64, atmos.nlev_c) .* atmos.tmp
-                setpt.condensing!(atmos, "H2O")
+
+                # do adjustment steps
+                tmp_tnd = atmosphere.adjust_moist(atmos, "H2O")
+                
+                # check which levels were changed
                 for i in 1:atmos.nlev_c
-                    if abs(tmp_before_adj[i] - atmos.tmp[i]) > 0.1 
+                    if abs(tmp_tnd[i]) > 0.01
                         adj_changed += 1
-                        atmos.mask_c[i]  = atmos.mask_c_decay
+                        if clamping
+                            atmos.clamped[i] = true
+                            atmos.mask_c[i] += 99999
+                        else 
+                            atmos.mask_c[i]  = atmos.mask_c_decay
+                        end
                     end
-                end
+                end 
+
+                atmos.tmp += tmp_tnd
             end
 
              # Smooth temperature profile (if required)
