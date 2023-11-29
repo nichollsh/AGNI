@@ -1044,7 +1044,6 @@ module atmosphere
                 atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw", atmos.gases[i_gas]) / atmos.layer_mmw[i]
             end
         end 
-        calc_layer_props!(atmos)
 
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
                                 atmos.atm, atmos.cld, atmos.aer, 
@@ -1187,52 +1186,97 @@ module atmosphere
         return nothing
     end
 
-     # Dry convective adjustment, single step
-     function adjust_dry!(atmos::atmosphere.Atmos_t)
+     # Dry convective adjustment (returning the temperature tendancy without modifying the atmos struct)
+     function adjust_dry(atmos::atmosphere.Atmos_t, nsteps::Int)
 
-        # Downward pass
-        for i in 2:atmos.nlev_c
+        tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
+        tmp_tnd = zeros(Float64, atmos.nlev_c)  # temperature tendency
 
-            T1 = atmos.tmp[i-1]    # upper layer
-            p1 = atmos.p[i-1]
+        tmp_old[:] .+= atmos.tmp[:]
 
-            T2 = atmos.tmp[i]  # lower layer
-            p2 = atmos.p[i]
-            
-            cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +  atmos.layer_cp[i] * atmos.layer_mmw[i])
-            pfact = (p1/p2)^(phys.R_gas / cp)
-            
-            # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
-            if T1 < T2*pfact
-                Tbar = 0.5 * ( T1 + T2 )
-                T2 = 2.0 * Tbar / (1.0 + pfact)
-                T1 = T2 * pfact
-                atmos.tmp[i-1] = T1
-                atmos.tmp[i]   = T2
+        for i in 1:nsteps
+
+            # Downward pass
+            for i in 2:atmos.nlev_c
+
+                T1 = atmos.tmp[i-1]    # upper layer
+                p1 = atmos.p[i-1]
+
+                T2 = atmos.tmp[i]  # lower layer
+                p2 = atmos.p[i]
+                
+                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +  atmos.layer_cp[i] * atmos.layer_mmw[i])
+                pfact = (p1/p2)^(phys.R_gas / cp)
+                
+                # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
+                if T1 < T2*pfact
+                    Tbar = 0.5 * ( T1 + T2 )
+                    T2 = 2.0 * Tbar / (1.0 + pfact)
+                    T1 = T2 * pfact
+                    atmos.tmp[i-1] = T1
+                    atmos.tmp[i]   = T2
+                end
+            end
+
+            # Upward pass
+            for i in atmos.nlev_c:2
+
+                T1 = atmos.tmp[i-1]
+                p1 = atmos.p[i-1]
+
+                T2 = atmos.tmp[i]
+                p2 = atmos.p[i]
+                
+                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + atmos.layer_cp[i] * atmos.layer_mmw[i])
+                pfact = (p1/p2)^(phys.R_gas / cp)
+
+                if T1 < T2*pfact
+                    Tbar = 0.5 * ( T1 + T2 )
+                    T2 = 2.0 * Tbar / ( 1.0 + pfact)
+                    T1 = T2 * pfact
+                    atmos.tmp[i-1] = T1
+                    atmos.tmp[i]   = T2 
+                end 
             end
         end
+        
+        # Calculate tendency
+        tmp_tnd[:] .= atmos.tmp[:] .- tmp_old[:]
 
-        # Upward pass
-        for i in atmos.nlev_c:2
+        # Restore temperature array
+        atmos.tmp[:] .= tmp_old[:]
 
-            T1 = atmos.tmp[i-1]
-            p1 = atmos.p[i-1]
+        return tmp_tnd
+    end
 
-            T2 = atmos.tmp[i]
-            p2 = atmos.p[i]
-            
-            cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + atmos.layer_cp[i] * atmos.layer_mmw[i])
-            pfact = (p1/p2)^(phys.R_gas / cp)
+    # Moist hard convective adjustment (returning the temperature tendancy without modifying the atmos struct)
+    function adjust_moist(atmos::atmosphere.Atmos_t, gas::String)
 
-            if T1 < T2*pfact
-                Tbar = 0.5 * ( T1 + T2 )
-                T2 = 2.0 * Tbar / ( 1.0 + pfact)
-                T1 = T2 * pfact
-                atmos.tmp[i-1] = T1
-                atmos.tmp[i]   = T2 
-            end 
+        tmp_new = zeros(Float64, atmos.nlev_c)  # new temperatures
+        tmp_tnd = zeros(Float64, atmos.nlev_c)  # temperature tendency
+        tmp_new[:] .+= atmos.tmp[:]
+
+        i_gas = findfirst(==(gas), atmos.gases)
+
+        # Check if each level is condensing. If it is, place on phase curve
+        for i in 1:atmos.nlev_c
+
+            x = atmos.layer_x[i,i_gas]
+            if x < 1.0e-10 
+                continue
+            end
+
+            # Cell centre only
+            Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
+            if atmos.tmp[i] < Tsat
+                tmp_new[i] = Tsat
+            end
         end
-        return nothing
+        
+        # Calculate tendency
+        tmp_tnd[:] .=  tmp_new[:] .- atmos.tmp[:]
+
+        return tmp_tnd
     end
 
     # Set cell edge temperatures from cell centres
