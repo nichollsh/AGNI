@@ -121,6 +121,11 @@ module atmosphere
         flux_c::Array       # Dry convective fluxes from MLT
         K_h::Array          # Eddy diffusion coefficient for heat
 
+        # Cloud
+        re::Array   # Effective radius of the droplets [m] (drizzle forms above 20 microns)
+        lwm::Array  # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
+        clfr::Array # Water cloud fraction - how much of the current cell turns into cloud? 0 : clear sky cell ; 1 : the cloud takes over the entire area of the cell (just leave at 1 for 1D runs)
+
         # Total energy flux
         flux_tot::Array     # Total upward-directed flux at cell edges
 
@@ -276,6 +281,8 @@ module atmosphere
         atmos.control.l_cont_gen =  flag_gcontinuum
         atmos.control.l_aerosol =   flag_aerosol
         atmos.control.l_cloud =     flag_cloud
+        atmos.control.l_drop =      flag_cloud
+        atmos.control.l_ice  =      false
 
         # Initialise temperature grid to be isothermal
         atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tstar
@@ -287,6 +294,11 @@ module atmosphere
         atmos.zl         = zeros(Float64, atmos.nlev_l)
         atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
         
+        # Initialise cloud properties
+        atmos.re         = zeros(Float64, atmos.nlev_c) 
+        atmos.lwm        = zeros(Float64, atmos.nlev_c)
+        atmos.clfr       = zeros(Float64, atmos.nlev_c) 
+
         # Read mole fractions
         if isnothing(mf_dict) && isnothing(mf_path)
             error("No mole fractions provided")
@@ -567,7 +579,6 @@ module atmosphere
             error("atmosphere parameters have not been set")
         end
 
-        atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
         atmos.cld.n_condensed = 0
         atmos.atm.n_profile = 0
 
@@ -881,7 +892,18 @@ module atmosphere
         atmos.dimen.nd_phf_term_cloud_prsc  = 1
 
         if atmos.control.l_cloud
-            error("Clouds not implemented")
+            atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_type_homogen # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen ; Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
+            atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand           # Maximum/random overlap in a mixed column (-C 2)
+            atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous        # Homogeneous cloud
+            atmos.control.i_st_water  = 5                                      # Liquid Water Droplet type 5 (-d 5)
+            atmos.control.i_cnv_water = 5                                      # Convective Liquid Water Droplet type 5
+            atmos.control.i_st_ice    = 11                                     # Water Ice type 11 (-i 11)
+            atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11 
+
+            
+            atmos.cld.type_condensed[1] = ip_clcmp_st_water
+            atmos.cld.n_cloud_type      = 1
+            atmos.cld.i_cloud_type[1]   = ip_cloud_type_homogen
         else
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
@@ -1003,6 +1025,16 @@ module atmosphere
             if !lw
                 atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_dir, :] .= atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :]
             end
+        end
+
+        ###################################################
+        # Cloud information
+        ###################################################
+
+        if atmos.control.l_cloud
+            atmos.cld.w_cloud[1,:]               .= atmos.clfr[:]
+            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.lwm[:]
+            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.re[:]
         end
 
         ###################################################
