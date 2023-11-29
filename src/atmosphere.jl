@@ -901,9 +901,9 @@ module atmosphere
             atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11 
 
             
-            atmos.cld.type_condensed[1] = ip_clcmp_st_water
+            atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
             atmos.cld.n_cloud_type      = 1
-            atmos.cld.i_cloud_type[1]   = ip_cloud_type_homogen
+            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
         else
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
@@ -1057,6 +1057,8 @@ module atmosphere
         atmos.atm.t[1, :] .= atmos.tmp[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
+
+        calc_layer_props!(atmos)
 
         if lw
             atmos.bound.t_ground[1] = atmos.tstar
