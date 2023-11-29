@@ -41,7 +41,7 @@ mf_dict         = Dict([
                         # ("N2" , 1.41003)
                         ])
 
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Reach/Reach"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
