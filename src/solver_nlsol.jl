@@ -104,7 +104,8 @@ module solver_nlsol
             
             # Pass to du
             for i in 1:atmos.nlev_c 
-                du[i] = atmos.heating_rate[i] * atmos.layer_cp[i]
+                # du[i] = atmos.heating_rate[i] * atmos.layer_cp[i]
+                du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
             end
             
             # ----------------------------------------------------------
@@ -117,15 +118,15 @@ module solver_nlsol
                 F_BOA_tot = atmos.flux_tot[end-1]
                 F_loss    = abs( F_TOA_tot-F_BOA_tot )
 
-                H_max = maximum(du) * 1000.0
-                H_med = median(du) * 1000.0
+                H_max = maximum(du) 
+                H_med = median(du)
                 
-                @printf("    F_rad^OLR   = %+.3e W m-2  \n", F_OLR_rad)
-                @printf("    F_tot^TOA   = %+.3e W m-2  \n", F_TOA_tot)
-                @printf("    F_tot^BOA   = %+.3e W m-2  \n", F_BOA_tot)
-                @printf("    F_tot^loss  = %+.4f W m-2  \n", F_loss)
-                @printf("    HR_max      = %+.2f mK day-1\n", H_max)
-                @printf("    HR_med      = %+.2f mK day-1\n", H_med)
+                @printf("    F_rad^OLR   = %+.2e W m-2  \n", F_OLR_rad)
+                @printf("    F_tot^TOA   = %+.2e W m-2  \n", F_TOA_tot)
+                @printf("    F_tot^BOA   = %+.2e W m-2  \n", F_BOA_tot)
+                @printf("    F_tot^loss  = %+.2e W m-2  \n", F_loss)
+                @printf("    HR_max      = %+.2e K day-1\n", H_max)
+                @printf("    HR_med      = %+.2e K day-1\n", H_med)
                 println(" ")
             end
 
