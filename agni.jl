@@ -20,7 +20,7 @@ push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
 import setpt
 import plotting 
-import solver_accel
+import solver_tstep
 import solver_nlsol
 import phys
 
@@ -63,7 +63,6 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          skin_k=2.0,
                          tmp_magma=2500.0,
                          tmp_floor=2.0,
-                         res_switching=false,
                          thermo_functions=true,
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
@@ -71,7 +70,7 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"out/pt.csv")
-setpt.isothermal!(atmos, 1500.0)
+setpt.isothermal!(atmos, 1000.0)
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
@@ -96,7 +95,7 @@ println("Running model...")
 # atmosphere.mlt!(atmos)
 
 # Call solver 
-solver_accel.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
+solver_tstep.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
                             dry_convect=false, h2o_convect=false,
                             accel=true, extrap=false, rtol=5.0e-2, atol=1.0,
                             max_steps=500, min_steps=50, use_mlt=true,
