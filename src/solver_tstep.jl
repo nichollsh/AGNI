@@ -83,7 +83,7 @@ module solver_tstep
         p_large      = 1e5    # A characteristic large pressure [Pa] 
 
         if verbose
-            modprint=5
+            modprint=10
         end
 
         # Validate inputs

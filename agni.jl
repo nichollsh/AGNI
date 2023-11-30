@@ -20,28 +20,26 @@ push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
 import setpt
 import plotting 
-import solver_tstep
-import solver_nlsol
 import phys
 
 
 # Configuration options
 tstar           = 3000.0    # Surface temperature [kelvin]
-toa_heating     = 800.0     # Instellation flux [W m-2]
+toa_heating     = 418.0     # Instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
-nlev_centre     = 50  
+nlev_centre     = 70  
 p_surf          = 200.0    # bar
-p_top           = 1e-6      # bar 
+p_top           = 1e-5      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 0.9),
-                        ("CO2" , 0.1),
+                        ("H2O" , 1.0),
+                        # ("CO2" , 0.1),
                         # ("H2" , 1.0),
                         # ("CO" , 90.58514),
                         # ("N2" , 1.41003)
                         ])
 
-spfile_name   = "res/spectral_files/Mallard/Mallard"
+spfile_name   = "res/spectral_files/Oak/Oak"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
@@ -63,7 +61,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          skin_k=2.0,
                          tmp_magma=2500.0,
                          tmp_floor=2.0,
-                         thermo_functions=true,
+                         thermo_functions=false,
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
@@ -72,7 +70,7 @@ println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"out/pt.csv")
 # setpt.isothermal!(atmos, 1000.0)
 # setpt.prevent_surfsupersat!(atmos)
-# setpt.dry_adiabat!(atmos)
+setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
 # setpt.stratosphere!(atmos, 500.0)
 
@@ -87,21 +85,23 @@ atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 println("Running model...")
 
 # Calculate LW and SW fluxes (once)
-# atmosphere.radtrans!(atmos, true)
-# atmosphere.radtrans!(atmos, false)
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
 
 # Calculate convective fluxes (once)
 # println("MLT: calculating fluxes")
 # atmosphere.mlt!(atmos)
 
-# Call solver 
-solver_tstep.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
-                            dry_convect=false, h2o_convect=false,
-                            accel=true, extrap=false, rtol=5.0e-2, atol=1.0,
-                            max_steps=600, min_steps=50, use_mlt=true,
-                            dt_max=200.0, F_losspct_conv=0.1)
+# Call solver(s)
+# import solver_tstep
+# solver_tstep.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
+#                             dry_convect=true, h2o_convect=false,
+#                             accel=true, extrap=false, rtol=5.0e-3, atol=1.0,
+#                             max_steps=1000, min_steps=50, use_mlt=true,
+#                             dt_max=200.0, F_losspct_conv=1.0)
 
-solver_nlsol.solve_energy!(atmos, surf_state=1, verbose=true, dry_convect=false,  max_steps=2000)
+# import solver_nlsol
+# solver_nlsol.solve_energy!(atmos, surf_state=1, verbose=true, dry_convect=false, max_steps=5000)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))

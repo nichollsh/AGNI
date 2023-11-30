@@ -1,9 +1,9 @@
 # AGNI
-Time-stepped radiative-convective solver designed for integration into a coupled atmosphere-interior code.   
+Radiative-convective solver designed for integration into a coupled atmosphere-interior code.   
 
-AGNI relies on SOCRATES (2306) for calculating the radiative-transfer. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). SOCRATES is setup here to include shortwave irradiation from the star, Rayleigh scattering, and continuum absorption / CIA.        
+AGNI relies on SOCRATES (2306) for calculating radiances. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, and continuum absorption / CIA.        
 
-Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Two convection parameterisations are included: convective adjustment (directly manipulating the temperature arrays), and mixing length theory (calculating convective energy fluxes). Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files. Integration is primarily via a first-order Euler method with various acceleration options, however it is also possible to activate a high-order stiff integrator with automatic switching (Sundials CVODE Adams-Moulton).
+Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Two convection parameterisations are included: convective adjustment (directly manipulating the temperature arrays), and mixing length theory (calculating convective energy fluxes). Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files. The model first uses a multistep Adams-Bashforth integrator which integrates the heating rates at each level until fluxes are roughly balanced; this state then provides the initial guess for a Newton-Raphson method which achieves flux continuity.
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
@@ -72,19 +72,19 @@ To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.
 
 
 ### Example outputs
-Pure steam runaway greenhouse.
+Pure steam runaway greenhouse (OLR versus surface temperature).
 <p float="left">
-  <img src="doc/example_runaway/curve.png" width="500" />
+  <img src="doc/example_runaway/curve.png" height="350" />
 </p>
 
-Calculating fluxes with SOCRATES, without solving for RCE.
+Prescribed dry adiabat with a calculation of radiative flux.
 <p float="left">
-  <img src="doc/example_nosolve/pt.png" width="350" />
-  <img src="doc/example_nosolve/fl.png" width="350" /> 
+  <img src="doc/example_nosolve/pt.jpg" height="300" />
+  <img src="doc/example_nosolve/fl.jpg" height="300" /> 
 </p>
 
-Solving for RCE with accelerated time-stepping. (Outdated plot).
+Solution at RCE with radiative and convective fluxes (using MLT).
 <p float="left">
-  <img src="doc/example_withsolve/pt.png" width="350"/>
-  <img src="doc/example_withsolve/fl.png" width="350" /> 
+  <img src="doc/example_withsolve/pt.jpg" height="300"/>
+  <img src="doc/example_withsolve/fl.jpg" height="300" /> 
 </p>
