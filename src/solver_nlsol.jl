@@ -127,7 +127,9 @@ module solver_nlsol
         # sol = solve(prob_ss, DynamicSS(CVODE_BDF()), dt=1.0e-3,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
 
         prob_nl = NonlinearProblem(objective, u0, p)
-        sol = solve(prob_nl, NewtonRaphson(autodiff=false), dt=50.0, abstol=1e-1, reltol=1e-3, maxiters=max_steps)
+        sol = solve(prob_nl, NewtonRaphson(autodiff=false), 
+                    dt=50.0, abstol=1e-1, reltol=1e-3, 
+                    maxiters=max_steps)
 
         if sol.retcode == :Success
             println("NLSolver: Iterations completed (converged)")
