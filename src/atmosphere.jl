@@ -546,8 +546,8 @@ module atmosphere
             end
         end
     
-        # Set bottom layer to be very small
-        # atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.999)
+        # Set bottom layer to be quite small
+        atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.9)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p =    zeros(Float64, atmos.nlev_c)
@@ -1316,13 +1316,9 @@ module atmosphere
         top_old_e = atmos.tmpl[1]
         tstar_old = atmos.tstar
 
-        # Interpolate temperature to bulk cell-edge values 
-        # itp = Interpolator(atmos.p, atmos.tmp)
-        # atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
-
-        for i in 2:atmos.nlev_c
-            atmos.tmpl[i] = sqrt(atmos.tmp[i-1]*atmos.tmp[i])
-        end 
+        # Interpolate temperature to bulk cell-edge values using a log-pressure grid
+        itp = Interpolator(log.(atmos.p), atmos.tmp)
+        atmos.tmpl[2:end-1] .= itp.(log.(atmos.pl[2:end-1]))
 
         # Extrapolate top boundary temperature
         grad_dt = atmos.tmp[1] - atmos.tmp[2]
@@ -1336,8 +1332,8 @@ module atmosphere
         # Calculate bottom boundary temperature
         if (surf_state == 0) || (surf_state == 2)
             # Extrapolate tmpl[end]
-            grad_dt = atmos.tmp[end]-atmos.tmpl[end-1]
-            grad_dp = atmos.p[end]-atmos.pl[end-1]
+            grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
+            grad_dp = atmos.p[end]-atmos.p[end-1]
             atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
 
             # Conductive skin
@@ -1356,7 +1352,7 @@ module atmosphere
             # Fixed => do nothing
             atmos.tmpl[end] = bot_old_e
         else 
-            error("Invalid surface state $(surf_state)")
+            error("Invalid surface state ($surf_state)")
         end 
         
 
@@ -1366,8 +1362,8 @@ module atmosphere
         # much control over the temperature profile at small scales.
         if back_interp
             clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
-            itp = Interpolator(atmos.pl, atmos.tmpl)  
-            atmos.tmp[:] .= itp.(atmos.p[:])
+            itp = Interpolator(log.(atmos.pl), atmos.tmpl)  
+            atmos.tmp[:] .= itp.(log.(atmos.p[:]))
         end
 
         return nothing
