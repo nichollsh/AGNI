@@ -442,6 +442,9 @@ module solver_tstep
             # ----------------------------------------------------------
             # Set remaining temperature values 
             # ---------------------------------------------------------- 
+            # Temperature domain
+            clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
+
             # Set cell-edge values (particularly important for handling conductive skin)
             if (surf_state == 2) && (step <= 20)
                 atmosphere.set_tmpl_from_tmp!(atmos, 1, limit_change=true)  # don't allow tmpl to drift during accelerated phase
@@ -454,8 +457,7 @@ module solver_tstep
                 atmos.tstar = tmpl[end]
             end
 
-            # Temperature floor
-            clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
+            # Temperature domain
             clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
             
             # ----------------------------------------------------------

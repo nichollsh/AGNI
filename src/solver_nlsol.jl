@@ -46,7 +46,6 @@ module solver_nlsol
                             max_steps::Int=500
                             )
 
-
         call::Int = 0
         modprint::Int=25
 
@@ -60,14 +59,25 @@ module solver_nlsol
             if mod(call,modprint) == 0 
                 println("    call $call")
             end
-            
+
+            atmos.mask_c[:] .-= 1.0
+            atmos.mask_p[:] .-= 1.0
 
             # ----------------------------------------------------------
             # Set atmosphere
-            # ---------------------------------------------------------- 
+            # ----------------------------------------------------------
+            # Read new guess
             for i in 1:atmos.nlev_c
                 atmos.tmp[i] = u[i]
             end
+
+            # Check that guess is finite (no NaNs, no Infs)
+            if !(all(isfinite, atmos.tmp) && all(isfinite, atmos.tmpl))
+                display(atmos.tmp)
+                error("Temperature array contains NaNs and/or Infs")
+            end 
+
+            # Limit temperature domain
             clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Interpolate temperature to cell-edge values 
@@ -85,7 +95,7 @@ module solver_nlsol
 
             # Convection
             if dry_convect
-                atmosphere.mlt!(atmos)
+                atmosphere.mlt!(atmos, pmin=100.0)
                 atmos.flux_tot += atmos.flux_c
             end
 
@@ -95,6 +105,11 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
+            # Check fluxes are real numbers
+            if !all(isfinite, atmos.flux_tot)
+                display(atmos.flux_tot)
+                error("Flux array contains NaNs")
+            end
 
             # ----------------------------------------------------------
             # Set du array
@@ -104,8 +119,8 @@ module solver_nlsol
             
             # Pass to du
             for i in 1:atmos.nlev_c 
-                # du[i] = atmos.heating_rate[i] * atmos.layer_cp[i]
-                du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
+                du[i] = atmos.heating_rate[i] #* atmos.layer_cp[i]
+                # du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
             end
             
             # ----------------------------------------------------------
@@ -137,16 +152,16 @@ module solver_nlsol
         # Call solver
         # ---------------------------------------------------------- 
 
-        println("NLSolver: Begin chi-squared minimisation")
+        println("NLSolver: Begin root finding method")
 
         u0 = zeros(Float64, atmos.nlev_c)
         u0[:] .= atmos.tmp[:]
 
-        p = 2.0
+        p = 2.0  # dummy parameter
 
         prob_nl = NonlinearProblem(objective, u0, p)
         sol = solve(prob_nl, NewtonRaphson(autodiff=false), 
-                    dt=0.1, abstol=1e-1, reltol=1e-3, 
+                    dt=0.1, abstol=1e-2, reltol=1e-5, 
                     maxiters=max_steps)
 
         if SciMLBase.successful_retcode(sol)
@@ -171,8 +186,8 @@ module solver_nlsol
         @printf("    rad_OLR   = %.2e W m-2         \n", atmos.flux_u_lw[1])
         @printf("    tot_TOA   = %.2e W m-2         \n", atmos.flux_tot[1])
         @printf("    tot_BOA   = %.2e W m-2         \n", atmos.flux_tot[end])
-        @printf("    loss      = %.4f W m-2         \n", loss)
-        @printf("    loss      = %.4f %%            \n", loss_pct)
+        @printf("    loss      = %.2e W m-2         \n", loss)
+        @printf("    loss      = %.2e %%            \n", loss_pct)
         @printf("\n")
 
     end # end solve_root
