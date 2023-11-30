@@ -26,22 +26,22 @@ import phys
 
 
 # Configuration options
-tstar           = 1960.0    # Surface temperature [kelvin]
-toa_heating     = 510.0     # Instellation flux [W m-2]
+tstar           = 3000.0    # Surface temperature [kelvin]
+toa_heating     = 800.0     # Instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
 nlev_centre     = 50  
-p_surf          = 100.0    # bar
-p_top           = 1e-5      # bar 
+p_surf          = 200.0    # bar
+p_top           = 1e-6      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 1.0),
-                        # ("CO2" , 0.1),
+                        ("H2O" , 0.9),
+                        ("CO2" , 0.1),
                         # ("H2" , 1.0),
                         # ("CO" , 90.58514),
                         # ("N2" , 1.41003)
                         ])
 
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Mallard/Mallard"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
@@ -70,7 +70,7 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"out/pt.csv")
-setpt.isothermal!(atmos, 1000.0)
+# setpt.isothermal!(atmos, 1000.0)
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
@@ -98,7 +98,7 @@ println("Running model...")
 solver_tstep.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
                             dry_convect=false, h2o_convect=false,
                             accel=true, extrap=false, rtol=5.0e-2, atol=1.0,
-                            max_steps=500, min_steps=50, use_mlt=true,
+                            max_steps=600, min_steps=50, use_mlt=true,
                             dt_max=200.0, F_losspct_conv=0.1)
 
 solver_nlsol.solve_energy!(atmos, surf_state=1, verbose=true, dry_convect=false,  max_steps=2000)

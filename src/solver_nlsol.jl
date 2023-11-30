@@ -47,15 +47,11 @@ module solver_nlsol
                             )
 
 
-        bot_orig_e = atmos.tmpl[end]
         call::Int = 0
         modprint::Int=25
 
         if verbose 
             modprint = 10
-        end
-        if max_steps < modprint
-            modprint = 2
         end
 
         function objective(du, u, p)
@@ -99,13 +95,37 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
+
+            # ----------------------------------------------------------
+            # Set du array
+            # ---------------------------------------------------------- 
+            # Calculate heating rates
+            atmosphere.calc_hrates!(atmos)
+            
+            # Pass to du
             for i in 1:atmos.nlev_c 
-                du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
+                du[i] = atmos.heating_rate[i] * atmos.layer_cp[i]
             end
             
+            # ----------------------------------------------------------
+            # Print info
+            # ---------------------------------------------------------- 
             if mod(call,modprint) == 0 
-                println("    Max df = $(maximum(abs.(du)))")
-                println("    Avg df = $(mean(abs.(du)))")
+                F_OLR_rad = atmos.flux_u_lw[1]
+    
+                F_TOA_tot = atmos.flux_tot[1]
+                F_BOA_tot = atmos.flux_tot[end-1]
+                F_loss    = abs( F_TOA_tot-F_BOA_tot )
+
+                H_max = maximum(du) * 1000.0
+                H_med = median(du) * 1000.0
+                
+                @printf("    F_rad^OLR   = %+.3e W m-2  \n", F_OLR_rad)
+                @printf("    F_tot^TOA   = %+.3e W m-2  \n", F_TOA_tot)
+                @printf("    F_tot^BOA   = %+.3e W m-2  \n", F_BOA_tot)
+                @printf("    F_tot^loss  = %+.4f W m-2  \n", F_loss)
+                @printf("    HR_max      = %+.2f mK day-1\n", H_max)
+                @printf("    HR_med      = %+.2f mK day-1\n", H_med)
                 println(" ")
             end
 
@@ -123,19 +143,17 @@ module solver_nlsol
 
         p = 2.0
 
-        # prob_ss = SteadyStateProblem(objective, u0, p)
-        # sol = solve(prob_ss, DynamicSS(CVODE_BDF()), dt=1.0e-3,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
-
         prob_nl = NonlinearProblem(objective, u0, p)
         sol = solve(prob_nl, NewtonRaphson(autodiff=false), 
-                    dt=50.0, abstol=1e-1, reltol=1e-3, 
+                    dt=0.1, abstol=1e-1, reltol=1e-3, 
                     maxiters=max_steps)
 
-        if sol.retcode == :Success
+        if SciMLBase.successful_retcode(sol)
             println("NLSolver: Iterations completed (converged)")
         else
             println("NLSolver: Iterations completed (maximum iterations or failure)")
         end
+        println(" ")
 
         # ----------------------------------------------------------
         # Extract solution
@@ -148,7 +166,7 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         loss = atmos.flux_tot[1] - atmos.flux_tot[end]
         loss_pct = loss/atmos.flux_tot[1]*100.0
-        @printf("NLSolver: Final total fluxes [W m-2] \n")
+        @printf("NLSolver: Endpoint fluxes [W m-2] \n")
         @printf("    rad_OLR   = %.2e W m-2         \n", atmos.flux_u_lw[1])
         @printf("    tot_TOA   = %.2e W m-2         \n", atmos.flux_tot[1])
         @printf("    tot_BOA   = %.2e W m-2         \n", atmos.flux_tot[end])
