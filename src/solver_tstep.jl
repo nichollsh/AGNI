@@ -6,7 +6,7 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
-module solver_accel
+module solver_tstep
 
     # Include libraries
     include("../socrates/julia/src/SOCRATES.jl")
@@ -77,9 +77,7 @@ module solver_accel
         dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
         smooth_stp   = 400    # Number of steps for which to apply smoothing
         smooth       = true   # Currently smoothing?
-        clamping     = true   # Freeze radiative layers when convection is first introduced
         wait_con     = 200    # Introduce convection after this many steps, if ^^ is not already true
-        clamp_len    = 150    # Number of iterations after wait_con for which radiative layers are fixed in tiome
 
         modprint     = 25     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
@@ -128,7 +126,6 @@ module solver_accel
         drel_dt::Float64   = Inf         # Rate of relative temperature change
         drel_dt_prev::Float64 = Inf      # Previous ^
         start_con          = false       # Convection has been started at any point
-        clamp_rad          = false       # Clamp radiative layers
 
         oscil       = falses(atmos.nlev_c)          # layers which are oscillating
         dt          = ones(Float64,  atmos.nlev_c)  # time-step [days]
@@ -259,12 +256,7 @@ module solver_accel
             # Introduce convection schemes
             if !start_con && (step >= wait_con) && (dry_convect || h2o_convect)
                 start_con = true 
-                clamp_rad = clamping
                 @printf("(intro convect) ")
-            end
-
-            if clamp_rad && (step >= wait_con + clamp_len)
-                clamp_rad = false
             end
 
             if mod(step,modprint) == 0
@@ -372,13 +364,6 @@ module solver_accel
 
             # Limit change as appropriate
             clamp!(dtmp, -1.0 * dtmp_clip, dtmp_clip)
-            if clamp_rad
-                for i in 1:atmos.nlev_c
-                    if !(atmos.mask_c[i]>0)  # act on radiative layers
-                        dtmp[i] = 0.0
-                    end
-                end
-            end
 
             # Take step
             atmos.time += dt
@@ -583,7 +568,7 @@ module solver_accel
             # - solver is not being accelerated in any sense
             flag_prev = flag_this
             flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv) && (F_losspct < F_losspct_conv) 
-            success   = flag_this && flag_prev && !smooth && !accel && !stopaccel && !clamp_rad && (step > min_steps) && (start_con || (!dry_convect && !h2o_convect))
+            success   = flag_this && flag_prev && !smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!dry_convect && !h2o_convect))
             
             # --------------------------------------
             # Sleep in order to capture keyboard interrupt
