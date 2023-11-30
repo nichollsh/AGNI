@@ -6,7 +6,7 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
-module solver_cvode
+module solver_nlsol
 
     # Include libraries
     include("../socrates/julia/src/SOCRATES.jl")
@@ -18,21 +18,17 @@ module solver_cvode
     using LinearAlgebra
 
     using SciMLBase
-    using SteadyStateDiffEq
-    using Sundials
+    using NonlinearSolve
 
     import atmosphere 
     import phys
 
     """
-    **Obtain radiative-convective equilibrium using a CVODE solver.**
+    **Obtain radiative-convective equilibrium using a matrix method.**
 
-    Time-steps the temperature profile with the heating rates to obtain global and 
-    local energy balance. Uses a high-order adaptive stiff ODE integrator from the
-    Sundials library (CVode Adams-Moulton) to obtain an accurate solution. 
-    
-    This is very expensive, so it's best to get close to the solution by using
-    the functions in solver_euler.jl, and then using this one afterwards.
+    Solves the non-linear system of equations defined by the flux field
+    divergence, minimising flux loss across a cell by iterating the temperature
+    profile.
 
     Not compatible with convective adjustment; MLT must be used.
 
@@ -42,12 +38,12 @@ module solver_cvode
     - `verbose::Bool=false`             verbose output?
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
-    - `max_steps::Int=50`               maximum number of solver steps
+    - `max_steps::Int=500`              maximum number of solver steps
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, verbose::Bool=false,
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=200
+                            max_steps::Int=500
                             )
 
 
@@ -56,13 +52,13 @@ module solver_cvode
         modprint::Int=25
 
         if verbose 
-            modprint = 2
+            modprint = 10
         end
         if max_steps < modprint
             modprint = 2
         end
 
-        function objective(du, u, p, t)
+        function objective(du, u, p)
 
             call += 1
             if mod(call,modprint) == 0 
@@ -76,7 +72,7 @@ module solver_cvode
             for i in 1:atmos.nlev_c
                 atmos.tmp[i] = u[i]
             end
-            clamp!(atmos.tmp, atmos.tmp_floor, Inf)
+            clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Interpolate temperature to cell-edge values 
             atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
@@ -103,17 +99,13 @@ module solver_cvode
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
-            # ----------------------------------------------------------
-            # Calculate heating rate in each layer (should be minimised)
-            # ---------------------------------------------------------- 
-            atmosphere.calc_hrates!(atmos)
             for i in 1:atmos.nlev_c 
-                du[i] = atmos.heating_rate[i]
+                du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
             end
             
             if mod(call,modprint) == 0 
-                println("    Max hr = $(maximum(abs.(du)))")
-                println("    Avg hr = $(mean(abs.(du)))")
+                println("    Max df = $(maximum(abs.(du)))")
+                println("    Avg df = $(mean(abs.(du)))")
                 println(" ")
             end
 
@@ -124,42 +116,42 @@ module solver_cvode
         # Call solver
         # ---------------------------------------------------------- 
 
-        println("RCSolver: Begin SUNDIALS CVODE integration")
+        println("NLSolver: Begin chi-squared minimisation")
 
         u0 = zeros(Float64, atmos.nlev_c)
         u0[:] .= atmos.tmp[:]
 
         p = 2.0
 
-        prob_ss = SteadyStateProblem(objective, u0, p)
-        sol = solve(prob_ss, DynamicSS(CVODE_BDF()), dt=1.0e-3,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
+        # prob_ss = SteadyStateProblem(objective, u0, p)
+        # sol = solve(prob_ss, DynamicSS(CVODE_BDF()), dt=1.0e-3,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
 
-        # prob_nl = NonlinearProblem(objective, u0, p)
-        # sol = solve(prob_nl, LevenbergMarquardt(autodiff=false), dt=200.0, abstol=1e-1, reltol=1e-2, maxiters=max_steps)
+        prob_nl = NonlinearProblem(objective, u0, p)
+        sol = solve(prob_nl, NewtonRaphson(autodiff=false), dt=50.0, abstol=1e-1, reltol=1e-3, maxiters=max_steps)
 
         if sol.retcode == :Success
-            println("RCSolver: Iterations completed (converged)")
+            println("NLSolver: Iterations completed (converged)")
         else
-            println("RCSolver: Iterations completed (maximum iterations or failure)")
+            println("NLSolver: Iterations completed (maximum iterations or failure)")
         end
 
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
         atmos.tmp[:] .= sol.u[:]
-        objective(zeros(Float64, atmos.nlev_c), atmos.tmp, p, 2.0e20)
+        objective(zeros(Float64, atmos.nlev_c), atmos.tmp, p)
 
         # ----------------------------------------------------------
         # Print info
         # ---------------------------------------------------------- 
         loss = atmos.flux_tot[1] - atmos.flux_tot[end]
         loss_pct = loss/atmos.flux_tot[1]*100.0
-        @printf("RCSolver: Final total fluxes [W m-2] \n")
+        @printf("NLSolver: Final total fluxes [W m-2] \n")
         @printf("    rad_OLR   = %.2e W m-2         \n", atmos.flux_u_lw[1])
         @printf("    tot_TOA   = %.2e W m-2         \n", atmos.flux_tot[1])
         @printf("    tot_BOA   = %.2e W m-2         \n", atmos.flux_tot[end])
-        @printf("    loss      = %.2f W m-2         \n", loss)
-        @printf("    loss      = %.2f %%            \n", loss_pct)
+        @printf("    loss      = %.4f W m-2         \n", loss)
+        @printf("    loss      = %.4f %%            \n", loss_pct)
         @printf("\n")
 
     end # end solve_root
