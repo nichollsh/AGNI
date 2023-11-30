@@ -14,8 +14,6 @@ module solver_tstep
     using Printf
     using Statistics
     using Revise
-    # using PCHIPInterpolation
-    # using LinearAlgebra
 
     import atmosphere 
     import phys
@@ -75,9 +73,9 @@ module solver_tstep
 
         # Run parameters
         dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
-        smooth_stp   = 400    # Number of steps for which to apply smoothing
+        smooth_stp   = 350    # Number of steps for which to apply smoothing
         smooth       = true   # Currently smoothing?
-        wait_con     = 200    # Introduce convection after this many steps, if ^^ is not already true
+        wait_con     = 150    # Introduce convection after this many steps, if ^^ is not already true
 
         modprint     = 25     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
@@ -590,7 +588,7 @@ module solver_tstep
         @printf("    local loss  = %.2f %%     \n", F_losspct)
         @printf("\n")
 
-        @printf("TSSolver: Final fluxes [W m-2] \n")
+        @printf("TSSolver: Endpoint fluxes [W m-2] \n")
         @printf("    rad_OLR   = %.2e W m-2         \n", F_OLR_rad)
         @printf("    rad_TOA   = %.2e W m-2         \n", F_TOA_rad)
         @printf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
@@ -606,6 +604,9 @@ module solver_tstep
         if F_TOA_tot*F_BOA_tot < 0
             @printf("WARNING: TOA and BOA total fluxes have different signs\n")
         end
+
+        rm(joinpath(atmos.OUT_DIR,"fluxes.png"), force=true)
+        rm(joinpath(atmos.OUT_DIR,"solver.png"), force=true)
         return nothing
 
     end # end solve_time
