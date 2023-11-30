@@ -75,6 +75,7 @@ module atmosphere
         pl::Array           # ce pressure
         z::Array            # cc height 
         zl::Array           # ce height 
+        time::Array         # time [days]
 
         tmp_floor::Float64      # Temperature floor to prevent numerics [K]
         tmp_ceiling::Float64    # Temperature ceiling to prevent numerics [K]
@@ -116,12 +117,13 @@ module atmosphere
         flux_sens::Float64  # Turbulent flux
 
         # Convection 
-        mask_c::Array       # Layers which are (recently) convective (value is >0)
-        mask_c_decay::Int   # How long is 'recent' in terms of convection?
+        mask_c::Array       # Layers which are (or were recently) convective (value is set to >0)
+        mask_decay::Int     # How long is 'recent'
         flux_c::Array       # Dry convective fluxes from MLT
-        K_h::Array          # Eddy diffusion coefficient for heat
+        Kzz::Array          # Eddy diffusion coefficient from MLT
 
         # Cloud
+        mask_p::Array       # Layers which are (or were recently) condensing liquid
         re::Array   # Effective radius of the droplets [m] (drizzle forms above 20 microns)
         lwm::Array  # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
         clfr::Array # Water cloud fraction - how much of the current cell turns into cloud? 0 : clear sky cell ; 1 : the cloud takes over the entire area of the cell (just leave at 1 for 1D runs)
@@ -131,9 +133,6 @@ module atmosphere
 
         # Heating rate 
         heating_rate::Array # radiative heating rate [K/day]
-
-        # Clamped layers (temperature fixed in time)
-        clamped::Array
 
         Atmos_t() = new()
     end
@@ -249,9 +248,9 @@ module atmosphere
         atmos.thermo_funct  = thermo_functions
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
-        atmos.tmp_ceiling =     6000.0
+        atmos.tmp_ceiling =     5000.0
 
-        atmos.nlev_c         =  max(nlev_centre,10)
+        atmos.nlev_c         =  max(nlev_centre,30)
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.1)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
@@ -259,7 +258,7 @@ module atmosphere
         atmos.tstar =           max(tstar, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-3, gravity)
         
-        atmos.mask_c_decay =    15 
+        atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
         atmos.U =               max(0,U)
 
@@ -548,7 +547,7 @@ module atmosphere
         end
     
         # Set bottom layer to be very small
-        atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.999)
+        # atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.999)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p =    zeros(Float64, atmos.nlev_c)
@@ -579,6 +578,7 @@ module atmosphere
             error("atmosphere parameters have not been set")
         end
 
+        atmos.time = zeros(Float64, atmos.nlev_c)
         
         atmos.atm.n_profile = 0
 
@@ -931,15 +931,14 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
+        atmos.mask_p =            zeros(Float64, atmos.nlev_c)
         atmos.mask_c =            zeros(Float64, atmos.nlev_c)
         atmos.flux_c =            zeros(Float64, atmos.nlev_l)
-        atmos.K_h =               zeros(Float64, atmos.nlev_l)
+        atmos.Kzz =               zeros(Float64, atmos.nlev_l)
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
 
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
-
-        atmos.clamped =           falses(atmos.nlev_c)
 
         # Mark as allocated
         atmos.is_alloc = true
@@ -1128,75 +1127,64 @@ module atmosphere
 
     # Calculate sensible heat flux (turbulence at surface boundary)
     function sensible!(atmos::atmosphere.Atmos_t)
-        # sensible heat flux (TKE scheme for this 1D case)
-        # transports energy from the bottom level (at tmpl[end]) to the bottom node (at tmp[end])
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmpl[end] - atmos.tmp[end])
+        # TKE scheme for this 1D case
+        # transports energy from the surface to the bottom node
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tstar-atmos.tmp[end])
         return nothing
     end
 
-    # Calculate dry convective fluxes using mixing length theory
-    function mlt!(atmos::atmosphere.Atmos_t)
 
-        # Follows a method similar to that of the VPL climate model (atmos).
-        # - Lincowski et al., 2018
-        # - Meadows et al., 2023
-        # - Blackadar, 1962
-        # - Robinson & Crisp, 2018
+    # Calculate dry convective fluxes using mixing length theory 
+    function mlt!(atmos)
 
-        # F_c   = -rho c_p K_h ( dT/dz + gamma )    , convective flux
-        # gamma = g/c_p                             , dry lapse rate
-        # K_h   = l^2 sqrt[-g/T ( dT/dz + gamma )]  , eddy diffusion for heat
-        # l     = kz / (1 + kz/l0)                  , mixing length
-        # l0    = f_z * H                           , mixing length in a free atmosphere
-        # H     = RT / (mu g)                       , pressure scale height
+        # Follows a method similar to that in Lee+23 
+        # - Joyce & Tayar (2023)
+        # - Robinson & Marley (2014)
 
-        # K_h is set to zero under stable conditions
-        # f_z is set to unity (c.f. SPIDER, ATMO)
-        # c_p has units of J k-1 kg-1
-        # mu has units of kg mol-1
-        # k is von karman's constant 
-        
-        # F_c is calculated at every level EDGE (not level centre)
+        # F_c is calculated at every level edge, like radiative fluxes
 
-        # Variables
-        Γ_ad::Float64 = 0.0     # Adiabatic lapse rate
-        dTdz::Float64 = 0.0     # Profile dTdz
-        grav::Float64 = 0.0     # Average gravity at level edge
-        c_p::Float64  = 0.0     # Average c_p at level edge
-        rho::Float64  = 0.0     # Average rho at level edge
-        mu::Float64   = 0.0     # Average mu at level edge
-        l::Float64    = 0.0     # Mixing length
-        H::Float64    = 0.0     # Scale height   
-        f_z::Float64  = 1.0     # Mixing length scale parameter     
-
-        # Reset convection
+        # Reset arrays
         atmos.flux_c[:] .= 0.0
-        atmos.K_h[:]    .= 0.0
-        
-        # Loop from top downwards
-        for i in 2:atmos.nlev_l-1
+        atmos.Kzz[:] .= 0.0
 
-            grav = sqrt(atmos.layer_grav[i] * atmos.layer_grav[i-1])
-            mu   = sqrt(atmos.layer_mmw[i]  * atmos.layer_mmw[i-1] )
-            c_p  = sqrt(atmos.layer_cp[i]   * atmos.layer_cp[i-1]  )
+        # Mixing length parameter 
+        alpha = 1.0
 
-            Γ_ad = grav/c_p
-            dTdz = (atmos.tmp[i] - atmos.tmp[i-1]) / (atmos.z[i] - atmos.z[i-1])
+        # Loop from bottom upwards
+        for i in range(start=atmos.nlev_l-1 , step=-1, stop=2)
+
+            m1 = atmos.layer_mass[i-1]
+            m2 = atmos.layer_mass[i]
+            mt = m1+m2
+
+            grav = (atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1)/mt
+            mu   = (atmos.layer_mmw[i]  * m2 + atmos.layer_mmw[i-1]  * m1)/mt
+            c_p  = (atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1)/mt
+
+            grad_ad = (phys.R_gas / mu) / c_p
+            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) ) / ( log(atmos.p[i-1]/atmos.p[i]) )
 
             # Check instability
-            if (dTdz < 0.0) && ( abs(dTdz) > abs(Γ_ad))
+            if (grad_pr > grad_ad)
 
-                atmos.mask_c[i]   = atmos.mask_c_decay
-                atmos.mask_c[i-1] = atmos.mask_c_decay
-            
-                rho = sqrt(atmos.layer_density[i] * atmos.layer_density[i-1])
+                rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
+
+                atmos.mask_c[i]   = atmos.mask_decay
+                atmos.mask_c[i-1] = atmos.mask_decay
+                
+                # Pressure scale height and ML
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
+                l = alpha * H
 
-                l = phys.k_vk * atmos.zl[i] / ( 1.0 + phys.k_vk * atmos.zl[i] / (f_z * H) )
+                # Characteristic velocity (from Brunt-Vasalla frequency of parcel oscillations)
+                w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
-                atmos.K_h[i] = l * l * sqrt( -grav/atmos.tmpl[i] * (dTdz + Γ_ad) )
+                # Convective flux
+                f = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
+                atmos.flux_c[i] = f
 
-                atmos.flux_c[i] = -1.0 * rho * c_p * atmos.K_h[i] * (dTdz + Γ_ad)
+                # Thermal eddy diffusion coefficient
+                atmos.Kzz[i] = w * l
             
             end
         end
@@ -1329,8 +1317,12 @@ module atmosphere
         tstar_old = atmos.tstar
 
         # Interpolate temperature to bulk cell-edge values 
-        itp = Interpolator(atmos.p, atmos.tmp)
-        atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
+        # itp = Interpolator(atmos.p, atmos.tmp)
+        # atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
+
+        for i in 2:atmos.nlev_c
+            atmos.tmpl[i] = sqrt(atmos.tmp[i-1]*atmos.tmp[i])
+        end 
 
         # Extrapolate top boundary temperature
         grad_dt = atmos.tmp[1] - atmos.tmp[2]
@@ -1485,6 +1477,7 @@ module atmosphere
         var_tmagma =    defVar(ds, "tmagma",        Float64, (), attrib = OrderedDict("units" => "K"))      # Magma temperature
         var_fray =      defVar(ds, "flag_rayleigh", Char, ())  # Includes rayleigh scattering?
         var_fcon =      defVar(ds, "flag_continuum",Char, ())  # Includes continuum absorption?
+        var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())  # Includes clouds?
 
         #     Store data
         var_tstar[1] =  atmos.tstar 
@@ -1502,8 +1495,13 @@ module atmosphere
         else
             var_fcon[1] = 'n'
         end 
-        
 
+        if atmos.control.l_cloud
+            var_fcld[1] = 'y'
+        else
+            var_fcld[1] = 'n'
+        end 
+        
         # ----------------------
         # Vector quantities
         #    Create variables
@@ -1528,6 +1526,7 @@ module atmosphere
         var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fc =        defVar(ds, "fl_C",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",  Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
+        var_kzz =       defVar(ds, "Kzz",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
         var_bs =        defVar(ds, "bandmin",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
         var_bl =        defVar(ds, "bandmax",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
 
@@ -1571,6 +1570,8 @@ module atmosphere
         var_fc[:] =     atmos.flux_c
 
         var_hr[:] =     atmos.heating_rate
+
+        var_kzz[:] =    atmos.Kzz
 
         var_bs[:] =     atmos.bands_min
         var_bl[:] =     atmos.bands_max
