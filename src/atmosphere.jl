@@ -203,7 +203,7 @@ module atmosphere
                     mf_path =                   nothing,
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
-                    tmp_floor::Float64 =        50.0,
+                    tmp_floor::Float64 =        80.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
                     tmp_magma::Float64 =        3000.0,
@@ -250,7 +250,7 @@ module atmosphere
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     5000.0
 
-        atmos.nlev_c         =  max(nlev_centre,30)
+        atmos.nlev_c         =  max(nlev_centre,45)
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.1)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
@@ -546,8 +546,9 @@ module atmosphere
             end
         end
     
-        # Set bottom layer to be quite small
-        atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.9)
+        # Set bottom and top layers to be quite small  (to avoid giving the extrapolation too much control)
+        atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.99)
+        atmos.pl[2]     = min(atmos.pl[2]    , atmos.pl[1]   / 0.99)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p =    zeros(Float64, atmos.nlev_c)
@@ -1134,14 +1135,24 @@ module atmosphere
     end
 
 
-    # Calculate dry convective fluxes using mixing length theory 
-    function mlt!(atmos)
+    """
+    **Calculate dry convective fluxes using mixing length theory.**
 
-        # Follows a method similar to that in Lee+23 
-        # - Joyce & Tayar (2023)
-        # - Robinson & Marley (2014)
+    Uses the mixing length formulation outlined by Joyce & Tayar (2023), which 
+    was also implemented in Lee et al. (2023), and partially outlined in an 
+    earlier paper by Robinson & Marley (2014).
 
-        # F_c is calculated at every level edge, like radiative fluxes
+    Convective energy transport fluxes are calculated at every level edge, just 
+    like the radiative fluxes. This is not compatible with moist convection. By 
+    using MLT to parameterise convection, we can also calculate Kzz directly.
+
+    The mixing length parameter is fixed at unity.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `pmin::Float64=0.0`               pressure below which convection is disabled.
+    """
+    function mlt!(atmos; pmin::Float64=0.0)
 
         # Reset arrays
         atmos.flux_c[:] .= 0.0
@@ -1151,7 +1162,11 @@ module atmosphere
         alpha = 1.0
 
         # Loop from bottom upwards
-        for i in range(start=atmos.nlev_l-1 , step=-1, stop=2)
+        for i in range(start=atmos.nlev_l-1 , step=-1, stop=3) 
+
+            if atmos.p[i] < pmin
+                continue
+            end
 
             m1 = atmos.layer_mass[i-1]
             m2 = atmos.layer_mass[i]
@@ -1191,7 +1206,15 @@ module atmosphere
         return nothing
     end # end of mlt
 
-    # Calculate heating rates at cell-centres
+    """
+    **Calculate heating rates at cell-centres from the total flux.**
+
+    Requires the total flux to have already been set (atmos.flux_tot). Heating 
+    rates are calculated in units of kelvin per day.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    """
     function calc_hrates!(atmos::atmosphere.Atmos_t)
 
         dF::Float64 = 0.0
@@ -1310,8 +1333,6 @@ module atmosphere
     # Set cell edge temperatures from cell centres
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false, back_interp::Bool=false)
 
-        clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
-
         bot_old_e = atmos.tmpl[end]
         top_old_e = atmos.tmpl[1]
         tstar_old = atmos.tstar
@@ -1321,9 +1342,10 @@ module atmosphere
         atmos.tmpl[2:end-1] .= itp.(log.(atmos.pl[2:end-1]))
 
         # Extrapolate top boundary temperature
-        grad_dt = atmos.tmp[1] - atmos.tmp[2]
-        grad_dp = atmos.p[1]   - atmos.p[2]
-        atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
+        # grad_dt = atmos.tmp[1] - atmos.tmp[2]
+        # grad_dp = atmos.p[1]   - atmos.p[2]
+        # atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
+        atmos.tmpl[1] = atmos.tmp[1]
 
         if limit_change
             atmos.tmpl[1] = 0.9 * atmos.tmpl[1] + 0.1 * top_old_e
@@ -1365,6 +1387,9 @@ module atmosphere
             itp = Interpolator(log.(atmos.pl), atmos.tmpl)  
             atmos.tmp[:] .= itp.(log.(atmos.p[:]))
         end
+
+        # Limit domain
+        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
 
         return nothing
     end 
