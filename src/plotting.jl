@@ -142,6 +142,19 @@ module plotting
         if length(convective_p) > 0
             scatter!(plt1, convective_t, convective_p, color="goldenrod2", label="Cnvct", markersize=2, markeralpha=0.8) 
         end 
+
+        # Plot phase change mask 
+        pchange_p = []
+        pchange_t = []
+        for i in 1:atmos.nlev_c
+            if atmos.mask_p[i] > 0
+                append!(pchange_p, atmos.p[i]*1e-5)
+                append!(pchange_t, atmos.tmp[i])
+            end 
+        end
+        if length(pchange_p) > 0
+            scatter!(plt1, pchange_t, pchange_p, color="dodgerblue", label="Phase", markersize=2, markeralpha=0.8) 
+        end 
         
         xlabel!(plt1, "Temperature [K]")
         ylabel!(plt1, "Pressure [bar]")
@@ -157,7 +170,7 @@ module plotting
             poshr[i] = (atmos.heating_rate[i] >= 0)
         end 
 
-        xlims  = (1e-3, maximum(abshr))
+        xlims  = (1e-5, maximum(abshr))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         # Create plot 2
@@ -276,10 +289,13 @@ module plotting
         xlims  = (1e-1, max_fl * 1.5)
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
-        # Overplot convection mask
+        # Overplot convection and condensation mask
         for i in 1:atmos.nlev_c
             if atmos.mask_c[i] > 0
                 plot!(plt, [xlims[1],xlims[2]], [atmos.p[i]/1.0e5, atmos.p[i]/1e5], opacity=0.2, linewidth=3.5, color="goldenrod2", label="")
+            end 
+            if atmos.mask_p[i] > 0
+                plot!(plt, [xlims[1],xlims[2]], [atmos.p[i]/1.0e5, atmos.p[i]/1e5], opacity=0.2, linewidth=3.5, color="dodgerblue", label="")
             end 
         end
 

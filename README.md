@@ -54,8 +54,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 -  `(@v1.9) pkg> add Glob`
 -  `(@v1.9) pkg> add ArgParse`
 -  `(@v1.9) pkg> add SciMLBase`
--  `(@v1.9) pkg> add SteadyStateDiffEq`
--  `(@v1.9) pkg> add Sundials`
+-  `(@v1.9) pkg> add NonlinearSolve`
 -  `(@v1.9) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`
@@ -89,9 +88,3 @@ Solving for RCE with accelerated time-stepping. (Outdated plot).
   <img src="doc/example_withsolve/pt.png" width="350"/>
   <img src="doc/example_withsolve/fl.png" width="350" /> 
 </p>
-
-An attempt at solving for Earth's temperature profile. The ~100 K accuracy here wouldn't be good enough for Earth system modelling, but it's probably good enough for magma ocean modelling.
-<p float="left">
-  <img src="doc/example_earth/comparison.png" width="500"/>
-</p>
-
