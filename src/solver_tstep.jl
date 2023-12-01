@@ -19,7 +19,6 @@ module solver_tstep
     import phys
     import setpt
     import plotting
-    import moving_average
 
    
     """
@@ -410,13 +409,9 @@ module solver_tstep
             # (Optionally) Smooth temperature profile for stability
             # ---------------------------------------------------------- 
 
-            if smooth && (smooth_width > 2) 
-                if mod(smooth_width,2) == 0
-                    smooth_width += 1
-                end
-                atmos.tmp = moving_average.hma(atmos.tmp, smooth_width)
-            end 
-            clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
+            if smooth && (smooth_width > 2)
+                atmosphere.smooth_centres!(atmos, smooth_width)
+            end
 
             # ----------------------------------------------------------
             # Accelerate solver with time-extrapolation
