@@ -20,7 +20,8 @@ module atmosphere
     using DelimitedFiles
     using PCHIPInterpolation
     using LinearAlgebra
-
+    
+    import moving_average
     import phys
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -547,8 +548,8 @@ module atmosphere
         end
     
         # Set bottom and top layers to be quite small  (to avoid giving the extrapolation too much control)
-        atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.99)
-        atmos.pl[2]     = min(atmos.pl[2]    , atmos.pl[1]   / 0.99)
+        # atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.999)
+        # atmos.pl[2]     = min(atmos.pl[2]    , atmos.pl[1]   / 0.999)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p =    zeros(Float64, atmos.nlev_c)
@@ -762,7 +763,7 @@ module atmosphere
 
         # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
         # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
-        atmos.control.i_direct_tau = 1
+        atmos.control.i_direct_tau = 2
 
 
         ############################################
@@ -1330,6 +1331,20 @@ module atmosphere
         return tmp_tnd
     end
 
+    # Smooth temperature at cell-centres 
+    function smooth_centres!(atmos::atmosphere.Atmos_t, width::Int)
+
+        if width > 2
+            if mod(width,2) == 0
+                width += 1 # window width has to be an odd number
+            end
+            atmos.tmp = moving_average.hma(atmos.tmp, width)
+        end 
+        clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
+
+        return nothing
+    end
+
     # Set cell edge temperatures from cell centres
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false, back_interp::Bool=false)
 
@@ -1337,26 +1352,25 @@ module atmosphere
         top_old_e = atmos.tmpl[1]
         tstar_old = atmos.tstar
 
-        # Interpolate temperature to bulk cell-edge values using a log-pressure grid
+        # Interpolate temperature to bulk cell-edge values (log-linear)
         itp = Interpolator(log.(atmos.p), atmos.tmp)
         atmos.tmpl[2:end-1] .= itp.(log.(atmos.pl[2:end-1]))
 
-        # Extrapolate top boundary temperature
-        # grad_dt = atmos.tmp[1] - atmos.tmp[2]
-        # grad_dp = atmos.p[1]   - atmos.p[2]
-        # atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
-        atmos.tmpl[1] = atmos.tmp[1]
+        # Extrapolate top edge temperature (log-linear)
+        grad_dt = atmos.tmp[1] - atmos.tmp[2]
+        grad_dp = log(atmos.p[1]/atmos.p[2])
+        atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log(atmos.pl[1]/atmos.p[1])
 
         if limit_change
             atmos.tmpl[1] = 0.9 * atmos.tmpl[1] + 0.1 * top_old_e
         end
 
-        # Calculate bottom boundary temperature
+        # Calculate bottom edge temperature
         if (surf_state == 0) || (surf_state == 2)
-            # Extrapolate tmpl[end]
+            # Extrapolate (log-linear)
             grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
-            grad_dp = atmos.p[end]-atmos.p[end-1]
-            atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
+            grad_dp = log(atmos.p[end]/atmos.p[end-1])
+            atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
             # Conductive skin
             if surf_state == 2
@@ -1370,13 +1384,14 @@ module atmosphere
                 atmos.tstar     = 0.7 * atmos.tstar     + 0.3 * tstar_old
             end 
 
+        # Fixed => do nothing
         elseif (surf_state == 1)
-            # Fixed => do nothing
             atmos.tmpl[end] = bot_old_e
+
+        # Invalid case
         else 
             error("Invalid surface state ($surf_state)")
         end 
-        
 
         # Second interpolation back to cell-centres.
         # This can help prevent grid-imprinting issues, but in some cases it can 
