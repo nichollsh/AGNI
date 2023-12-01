@@ -24,7 +24,7 @@ import phys
 
 
 # Configuration options
-tstar           = 3000.0    # Surface temperature [kelvin]
+tstar           = 1960.0    # Surface temperature [kelvin]
 toa_heating     = 418.0     # Instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
@@ -94,12 +94,12 @@ println("Running model...")
 
 
 # Call solver(s)
-dry_convect = true
+dry_convect = false
 
 import solver_tstep
 solver_tstep.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
                             dry_convect=dry_convect, h2o_convect=false,
-                            accel=true, extrap=false, rtol=5.0e-3, atol=1.0,
+                            accel=true, extrap=false, rtol=5.0e-3, atol=1.0e-2,
                             max_steps=400, min_steps=50, use_mlt=true,
                             dt_max=200.0, F_losspct_conv=1.0)
 

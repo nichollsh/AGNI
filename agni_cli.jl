@@ -282,7 +282,7 @@ if convect_adj || convect_mlt
         error("Both dry convection schemes are enabled! Pick only one at a time")
     end 
 
-    if convect_adj && cvode 
+    if convect_adj && nlsol 
         error("Non-linear solver isn't compatible with convective adjustment")
     end
 end
@@ -366,7 +366,7 @@ else
                          dtmp_conv=cc_tmpabs,drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel, F_losspct_conv=cc_floss
                          )
     
-    # Do CVODE integration
+    # Do newton-rapshon iterations
     if nlsolve
         import solver_nlsol
         solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, max_steps=2000, verbose=verbose)

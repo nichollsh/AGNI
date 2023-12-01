@@ -18,6 +18,7 @@ module solver_nlsol
     using LinearAlgebra
 
     using SciMLBase
+    using LinearSolve
     using NonlinearSolve
 
     import atmosphere 
@@ -119,8 +120,8 @@ module solver_nlsol
             
             # Pass to du
             for i in 1:atmos.nlev_c 
-                du[i] = atmos.heating_rate[i] #* atmos.layer_cp[i]
-                # du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
+                # du[i] = atmos.heating_rate[i] #* atmos.layer_cp[i]
+                du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
             end
             
             # ----------------------------------------------------------
@@ -147,6 +148,13 @@ module solver_nlsol
 
             return nothing
         end # end objective function
+
+        # ----------------------------------------------------------
+        # Prepare
+        # ---------------------------------------------------------- 
+
+        atmosphere.smooth_centres!(atmos, 5)
+        atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
         
         # ----------------------------------------------------------
         # Call solver
@@ -160,8 +168,8 @@ module solver_nlsol
         p = 2.0  # dummy parameter
 
         prob_nl = NonlinearProblem(objective, u0, p)
-        sol = solve(prob_nl, NewtonRaphson(autodiff=false), 
-                    dt=0.1, abstol=1e-2, reltol=1e-5, 
+        sol = solve(prob_nl, NewtonRaphson(autodiff=false), # , linsolve=QRFactorization()
+                    dt=0.01, abstol=1e-4, reltol=1e-5, 
                     maxiters=max_steps)
 
         if SciMLBase.successful_retcode(sol)
