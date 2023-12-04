@@ -134,7 +134,7 @@ module solver_nlsol
         # Call solver
         # ---------------------------------------------------------- 
 
-        println("NLSolver: Begin root finding method")
+        println("NLSolver: begin Newton-Raphson-Backtracking iterations")
 
 
         atmosphere.smooth_centres!(atmos, 5)

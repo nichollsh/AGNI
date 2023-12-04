@@ -67,8 +67,8 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-setpt.fromcsv!(atmos,"pt.csv")
-# setpt.isothermal!(atmos, tstar-200.0)
+# setpt.fromcsv!(atmos,"pt.csv")
+setpt.isothermal!(atmos, tstar-200.0)
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
@@ -96,15 +96,15 @@ println("Running model...")
 # Call solver(s)
 dry_convect = true
 
-# import solver_tstep
-# solver_tstep.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
-#                             dry_convect=dry_convect, h2o_convect=false,
-#                             accel=true, extrap=false, rtol=5.0e-3, atol=1.0e-2,
-#                             max_steps=400, min_steps=50, use_mlt=true,
-#                             dt_max=200.0, F_losspct_conv=1.0)
+import solver_tstep
+solver_tstep.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
+                            dry_convect=dry_convect, h2o_convect=false,
+                            accel=true, extrap=false, rtol=5.0e-3, atol=1.0e-2,
+                            max_steps=400, min_steps=50, use_mlt=true,
+                            dt_max=200.0, F_losspct_conv=1.0)
 
-import solver_nlsol
-solver_nlsol.solve_energy!(atmos, surf_state=1, verbose=true, dry_convect=dry_convect, max_steps=200)
+# import solver_nlsol
+# solver_nlsol.solve_energy!(atmos, surf_state=1, verbose=true, dry_convect=dry_convect, max_steps=200)
 
 # Write arrays
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
