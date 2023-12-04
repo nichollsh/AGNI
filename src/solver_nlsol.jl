@@ -17,13 +17,14 @@ module solver_nlsol
     using PCHIPInterpolation
     using LinearAlgebra
 
-    using SciMLBase
-    using LinearSolve
-    using NonlinearSolve
+    using NLsolve
+    using LineSearches
 
     import atmosphere 
     import phys
 
+
+    
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
 
@@ -44,36 +45,27 @@ module solver_nlsol
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, verbose::Bool=false,
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=500
+                            max_steps::Int=500, atol::Float64=1.0e-4
                             )
 
-        call::Int = 0
-        modprint::Int=25
+        modprint = 10
+        call = 0
 
-        if verbose 
-            modprint = 10
-        end
-
-        function objective(du, u, p)
+        # Objective function
+        function fev!(F,x)
 
             call += 1
-            if mod(call,modprint) == 0 
-                println("    call $call")
-            end
-
-            atmos.mask_c[:] .-= 1.0
-            atmos.mask_p[:] .-= 1.0
-
+           
             # ----------------------------------------------------------
             # Set atmosphere
             # ----------------------------------------------------------
             # Read new guess
             for i in 1:atmos.nlev_c
-                atmos.tmp[i] = u[i]
+                atmos.tmp[i] = x[i]
             end
 
             # Check that guess is finite (no NaNs, no Infs)
-            if !(all(isfinite, atmos.tmp) && all(isfinite, atmos.tmpl))
+            if !all(isfinite, atmos.tmp)
                 display(atmos.tmp)
                 error("Temperature array contains NaNs and/or Infs")
             end 
@@ -84,9 +76,6 @@ module solver_nlsol
             # Interpolate temperature to cell-edge values 
             atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
             
-            # ----------------------------------------------------------
-            # Get fluxes 
-            # ---------------------------------------------------------- 
             atmos.flux_tot[:] .= 0.0
 
             # Radiation
@@ -112,49 +101,34 @@ module solver_nlsol
                 error("Flux array contains NaNs")
             end
 
-            # ----------------------------------------------------------
-            # Set du array
-            # ---------------------------------------------------------- 
-            # Calculate heating rates
-            atmosphere.calc_hrates!(atmos)
-            
-            # Pass to du
+            # Pass outward
             for i in 1:atmos.nlev_c 
-                # du[i] = atmos.heating_rate[i] #* atmos.layer_cp[i]
-                du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
+                F[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
             end
-            
-            # ----------------------------------------------------------
-            # Print info
-            # ---------------------------------------------------------- 
-            if mod(call,modprint) == 0 
+
+            if mod(call, modprint) == 0
                 F_OLR_rad = atmos.flux_u_lw[1]
-    
+            
                 F_TOA_tot = atmos.flux_tot[1]
                 F_BOA_tot = atmos.flux_tot[end-1]
                 F_loss    = abs( F_TOA_tot-F_BOA_tot )
 
-                H_max = maximum(du) 
-                H_med = median(du)
+                r_max = maximum(F) 
+                r_med = median(F)
                 
+                @printf("    call %d \n",  call )
                 @printf("    F_rad^OLR   = %+.2e W m-2  \n", F_OLR_rad)
                 @printf("    F_tot^TOA   = %+.2e W m-2  \n", F_TOA_tot)
                 @printf("    F_tot^BOA   = %+.2e W m-2  \n", F_BOA_tot)
                 @printf("    F_tot^loss  = %+.2e W m-2  \n", F_loss)
-                @printf("    HR_max      = %+.2e K day-1\n", H_max)
-                @printf("    HR_med      = %+.2e K day-1\n", H_med)
+                @printf("    r_max       = %+.2e W m-2  \n", r_max)
+                @printf("    r_med       = %+.2e W m-2  \n", r_med)
                 println(" ")
             end
 
             return nothing
-        end # end objective function
+        end 
 
-        # ----------------------------------------------------------
-        # Prepare
-        # ---------------------------------------------------------- 
-
-        atmosphere.smooth_centres!(atmos, 5)
-        atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
         
         # ----------------------------------------------------------
         # Call solver
@@ -162,35 +136,34 @@ module solver_nlsol
 
         println("NLSolver: Begin root finding method")
 
-        u0 = zeros(Float64, atmos.nlev_c)
-        u0[:] .= atmos.tmp[:]
 
-        p = 2.0  # dummy parameter
+        atmosphere.smooth_centres!(atmos, 5)
+        atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
 
-        prob_nl = NonlinearProblem(objective, u0, p)
-        sol = solve(prob_nl, NewtonRaphson(autodiff=false), # , linsolve=QRFactorization()
-                    dt=0.01, abstol=1e-4, reltol=1e-5, 
-                    maxiters=max_steps)
+        x0 = zeros(Float64, atmos.nlev_c)
+        x0[:] .= atmos.tmp[:]
 
-        if SciMLBase.successful_retcode(sol)
-            println("NLSolver: Iterations completed (converged)")
-        else
-            println("NLSolver: Iterations completed (maximum iterations or failure)")
-        end
-        println(" ")
+        sol = nlsolve(fev!, x0, method = :newton, linesearch = BackTracking(), iterations=max_steps, ftol=atol)
 
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
-        atmos.tmp[:] .= sol.u[:]
-        objective(zeros(Float64, atmos.nlev_c), atmos.tmp, p)
+
+        if !converged(sol)
+            @printf("    stopping atmosphere iterations before convergence \n\n")
+        else
+            @printf("    convergence criteria met (%d iterations) \n\n", sol.iterations)
+        end
+
+        atmos.tmp[:] .= sol.zero[:]
+        fev!(zeros(Float64, atmos.nlev_c), atmos.tmp)
 
         # ----------------------------------------------------------
         # Print info
         # ---------------------------------------------------------- 
         loss = atmos.flux_tot[1] - atmos.flux_tot[end]
         loss_pct = loss/atmos.flux_tot[1]*100.0
-        @printf("NLSolver: Endpoint fluxes [W m-2] \n")
+        @printf("    endpoint fluxes \n")
         @printf("    rad_OLR   = %.2e W m-2         \n", atmos.flux_u_lw[1])
         @printf("    tot_TOA   = %.2e W m-2         \n", atmos.flux_tot[1])
         @printf("    tot_BOA   = %.2e W m-2         \n", atmos.flux_tot[end])

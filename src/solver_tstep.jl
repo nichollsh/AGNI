@@ -575,9 +575,9 @@ module solver_tstep
 
         # Print information about the final state
         if !success
-            @printf("TSSolver: Stopping atmosphere iterations before convergence \n")
+            @printf("    stopping atmosphere iterations before convergence \n")
         else
-            @printf("TSSolver: Convergence criteria met (%d iterations) \n", step)
+            @printf("    convergence criteria met (%d iterations) \n", step)
         end
         @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
         @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
@@ -585,7 +585,7 @@ module solver_tstep
         @printf("    local loss  = %.2f %%     \n", F_losspct)
         @printf("\n")
 
-        @printf("TSSolver: Endpoint fluxes [W m-2] \n")
+        @printf("    endpoint fluxes \n")
         @printf("    rad_OLR   = %.2e W m-2         \n", F_OLR_rad)
         @printf("    rad_TOA   = %.2e W m-2         \n", F_TOA_rad)
         @printf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
