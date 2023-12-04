@@ -99,6 +99,8 @@ module setpt
 
         itp = Interpolator(pl, tmpl) # Cell centres 
         atmos.tmp[:] .= itp.(atmos.p[:])
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -109,6 +111,8 @@ module setpt
         end 
         atmos.tmpl[1:end-1] .= set_tmp 
         atmos.tmp[:] .= set_tmp
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end 
 
@@ -136,6 +140,7 @@ module setpt
         dp = atmos.p[1]-atmos.pl[2]
         atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
 
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end 
 
@@ -162,6 +167,8 @@ module setpt
         if strat
             atmos.tmpl[1] = strat_tmp 
         end
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -202,6 +209,8 @@ module setpt
                 atmosphere.generate_pgrid!(atmos, switch=atmos.res_switching)
             end
         end 
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -239,7 +248,9 @@ module setpt
                 atmos.tmpl[i] = Tsat
             end
         end
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
-end 
+end # end module

@@ -52,7 +52,6 @@ module solver_tstep
     - `dt_max::Float64=500.0            maximum time-step outside of the accelerated phase
     - `max_steps::Int=1000`             maximum number of solver steps
     - `min_steps::Int=300`              minimum number of solver steps
-    - `dtmp_conv::Float64=1.0`          convergence: maximum rolling change in temperature  (dtmp) [K]
     - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
     - `drel_F_conv::Float64=0.1`        convergence: maximum relative change in F_TOA_rad for convergence [%]
     - `F_losspct_conv::Float64=1.0`     convergence: maximum relative local radiative flux loss [%]
@@ -65,10 +64,10 @@ module solver_tstep
                             accel::Bool=true, extrap::Bool=false, adams::Bool=true,
                             dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=300,
                             rtol::Float64=4.0e-5, atol::Float64=1.0e-1,
-                            dtmp_conv::Float64=1.0, drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=1.0
+                            drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=1.0
                             )
 
-        println("TSSolver: Begin accelerated timestepping")
+        println("TSSolver: begin accelerated timestepping")
 
         # Run parameters
         dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
@@ -100,7 +99,6 @@ module solver_tstep
         if verbose
             @printf("    convergence criteria       \n")
             @printf("    step count  > %d           \n", min_steps)
-            @printf("    dtmp trend  < %.3f K       \n", dtmp_conv)
             @printf("    dtmp/tmp/dt < %.3f K day-1 \n", drel_dt_conv)
             @printf("    dF/F (TOA)  < %.3f %%      \n", drel_F_conv)
             @printf("    F_loc loss  < %.3f %%      \n", F_losspct_conv)
@@ -268,12 +266,12 @@ module solver_tstep
             # ----------------------------------------------------------
             # Recalculate thermodynamic properties at each layer (+ height & gravity)
             # ---------------------------------------------------------- 
-            # if (modprop > 0) && (mod(step, modprop) == 0)
-            #     if mod(step,modprint) == 0
-            #         @printf("(props) ")
-            #     end
-            #     atmosphere.calc_layer_props!(atmos)
-            # end 
+            if (modprop > 0) && (mod(step, modprop) == 0)
+                if mod(step,modprint) == 0
+                    @printf("(props) ")
+                end
+                atmosphere.calc_layer_props!(atmos)
+            end 
             # Commented out: this is already done in the radtrans call
 
             if mod(step,modprint) == 0
@@ -556,13 +554,12 @@ module solver_tstep
             # Convergence check
             # -------------------------------------- 
             # Requires that:
-            # - minimal rolling temperature change for two iters
             # - minimal rate (dT/dt) of temperature change for two iters
             # - minimal change to net radiative flux at TOA for two iters
             # - minimal flux loss between neighbouring layers
             # - solver is not being accelerated in any sense
             flag_prev = flag_this
-            flag_this = (dtmp_comp < dtmp_conv) && (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv) && (F_losspct < F_losspct_conv) 
+            flag_this = (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv) && (F_losspct < F_losspct_conv) 
             success   = flag_this && flag_prev && !smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!dry_convect && !h2o_convect))
             
             # --------------------------------------

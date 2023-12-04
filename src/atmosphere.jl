@@ -439,6 +439,10 @@ module atmosphere
             error(" atmosphere parameters have not been set")
         end
 
+        # Set pressure arrays in SOCRATES 
+        atmos.atm.p[1, :] .= atmos.p[:]
+        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+
         # mmw, cp, rho
         atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
         atmos.layer_density = zeros(Float64, atmos.nlev_c)
@@ -1051,7 +1055,6 @@ module atmosphere
 
         ####################################################
         # Temperature
-        ####################################################
 
         clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
@@ -1061,7 +1064,7 @@ module atmosphere
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
-        calc_layer_props!(atmos)
+        # calc_layer_props!(atmos)
 
         if lw
             atmos.bound.t_ground[1] = atmos.tstar
