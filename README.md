@@ -53,8 +53,8 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 -  `(@v1.9) pkg> add DataStructures`
 -  `(@v1.9) pkg> add Glob`
 -  `(@v1.9) pkg> add ArgParse`
--  `(@v1.9) pkg> add SciMLBase`
--  `(@v1.9) pkg> add NonlinearSolve`
+-  `(@v1.9) pkg> add NLsolve`
+-  `(@v1.9) pkg> add LineSearches`
 -  `(@v1.9) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`
