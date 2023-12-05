@@ -24,11 +24,11 @@ import phys
 
 
 # Configuration options
-tstar           = 3000.0    # Surface temperature [kelvin]
-toa_heating     = 418.0     # Instellation flux [W m-2]
+tstar           = 2450.0    # Surface temperature [kelvin]
+toa_heating     = 3.0/8.0 * 1361.0 * (1-0.18) * 35.6
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
-nlev_centre     = 60  
+nlev_centre     = 90  
 p_surf          = 270.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
@@ -53,7 +53,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
-                         flag_rayleigh=false,
+                         flag_rayleigh=true,
                          flag_cloud=false,
                          overlap_method=4,
                          zenith_degrees=48.19,
@@ -61,14 +61,14 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          skin_k=2.0,
                          tmp_magma=2500.0,
                          tmp_floor=2.0,
-                         thermo_functions=false,
+                         thermo_functions=true,
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-# setpt.fromcsv!(atmos,"pt.csv")
-setpt.isothermal!(atmos, tstar-200.0)
+setpt.fromcsv!(atmos,"pt.csv")
+# setpt.isothermal!(atmos, tstar-200.0)
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
@@ -95,20 +95,22 @@ println("Running model...")
 
 # Call solver(s)
 dry_convect = true
+surf_state  = 0
 
-import solver_tstep
-solver_tstep.solve_energy!(atmos, surf_state=0, modplot=10, modprop=5, verbose=true, 
-                            dry_convect=dry_convect, h2o_convect=false,
-                            accel=true, extrap=false, rtol=5.0e-3, atol=1.0e-2,
-                            max_steps=400, min_steps=50, use_mlt=true,
-                            dt_max=200.0, F_losspct_conv=1.0)
+# import solver_tstep
+# solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
+#                             dry_convect=dry_convect, h2o_convect=false,
+#                             accel=true, extrap=false, rtol=1.0e-3, atol=1.0e-2,
+#                             max_steps=800, min_steps=200, use_mlt=true,
+#                             dt_max=200.0, F_losspct_conv=1.0)
 
-# import solver_nlsol
-# solver_nlsol.solve_energy!(atmos, surf_state=1, verbose=true, dry_convect=dry_convect, max_steps=200)
+
+import solver_nlsol
+solver_nlsol.solve_energy!(atmos, surf_state=surf_state, verbose=true, dry_convect=dry_convect, max_steps=100)
 
 # Write arrays
-atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
+atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Save plots

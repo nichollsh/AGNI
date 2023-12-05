@@ -138,10 +138,6 @@ s = ArgParseSettings()
     "--cloud"
         help = "Include cloud optical properties in the radiative transfer."
         action = :store_true
-    "--convcrit_tmpabs"
-        help = "Convergence criterion on dtmp [K]."
-        arg_type = Float64
-        default = 5.0
     "--convcrit_tmprel"
         help = "Convergence criterion on dtmp/tmp/dt [day-1]."
         arg_type = Float64
@@ -210,7 +206,6 @@ convect_mlt     = args["convect_mlt"]
 no_accel        = args["noaccel"]
 roverlap        = args["roverlap"]
 nlsolve         = args["nlsolve"]
-cc_tmpabs       = args["convcrit_tmpabs"]
 cc_tmprel       = args["convcrit_tmprel"]
 cc_fradrel      = args["convcrit_fradrel"]
 cc_floss        = args["convcrit_flosspct"]

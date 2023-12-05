@@ -26,7 +26,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * Julia (version 1.9.1 or later)
 * Python (version 3.10 or later)
 * NumPy and SciPy
-* gfortran
+* gfortran (NB: do not use ifort or aocc)
 * netcdf-fortran
 * make
 * OpenMP
