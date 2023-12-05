@@ -1150,20 +1150,24 @@ module atmosphere
     like the radiative fluxes. This is not compatible with moist convection. By 
     using MLT to parameterise convection, we can also calculate Kzz directly.
 
-    The mixing length parameter is fixed at unity.
+    The mixing length is set to asymptotically approach H (for z>>H) or z (for 
+    z<H) as per Blackadar (1962). Or alternatively it can be set equal to H.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `pmin::Float64=0.0`               pressure below which convection is disabled.
+    - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
     """
-    function mlt!(atmos; pmin::Float64=0.0)
+    function mlt!(atmos; pmin::Float64=0.0, mltype::Int=1)
 
         # Reset arrays
         atmos.flux_c[:] .= 0.0
         atmos.Kzz[:] .= 0.0
 
-        # Mixing length parameter 
-        alpha = 1.0
+        # Work variables 
+        H::Float64 = 0.0
+        l::Float64 = 0.0
+        w::Float64 = 0.0
 
         # Loop from bottom upwards
         for i in range(start=atmos.nlev_l-1 , step=-1, stop=3) 
@@ -1191,16 +1195,26 @@ module atmosphere
                 atmos.mask_c[i]   = atmos.mask_decay
                 atmos.mask_c[i-1] = atmos.mask_decay
                 
-                # Pressure scale height and ML
+                # Pressure scale height
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
-                l = alpha * H
+
+                # Mixing length
+                if mltype == 0
+                    # Fixed
+                    l = H
+                elseif mltype == 1
+                    # Asymptotic 
+                    l = phys.k_vk * atmos.zl[i] / (1 + phys.k_vk * atmos.zl[i]/H)
+                else 
+                    # Otherwise
+                    error("Invalid mixing length type selected")
+                end
 
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel oscillations)
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
                 # Convective flux
-                f = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
-                atmos.flux_c[i] = f
+                atmos.flux_c[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
 
                 # Thermal eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
@@ -1442,6 +1456,7 @@ module atmosphere
 
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
 
+        # Remove old file if exists
         rm(fname, force=true)
 
         open(fname, "w") do f
@@ -1457,18 +1472,19 @@ module atmosphere
     # Write current cell-edge fluxes to a CSV file
     function write_fluxes(atmos::atmosphere.Atmos_t, fname::String)
 
+        # Remove old file if exists
         rm(fname, force=true)
 
         open(fname, "w") do f
-            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C       \n")
-            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2] \n")
+            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C           , tot      \n")
+            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
             for i in 1:atmos.nlev_l
-                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
+                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e, %+1.4e \n", 
                           atmos.pl[i], 
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
-                          atmos.flux_c[i]
+                          atmos.flux_c[i],    atmos.flux_tot[i]
                           )
             end
         end
@@ -1564,6 +1580,7 @@ module atmosphere
         var_fu =        defVar(ds, "fl_U",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fc =        defVar(ds, "fl_C",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_ft =        defVar(ds, "fl_tot", Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",  Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_kzz =       defVar(ds, "Kzz",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
         var_bs =        defVar(ds, "bandmin",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
@@ -1607,6 +1624,7 @@ module atmosphere
         var_fn[:] =     atmos.flux_n
 
         var_fc[:] =     atmos.flux_c
+        var_ft[:] =     atmos.flux_tot
 
         var_hr[:] =     atmos.heating_rate
 
