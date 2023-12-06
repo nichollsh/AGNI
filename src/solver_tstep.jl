@@ -45,7 +45,6 @@ module solver_tstep
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `accel::Bool=true`                enable accelerated fast period at the start 
-    - `extrap::Bool=false`              enable extrapolation forward in time 
     - `adams::Bool=true`                use Adams-Bashforth integrator
     - `rtol::Bool=4.0e-5`               relative tolerence
     - `atol::Bool=1.0e-1`               absolute tolerence
@@ -61,7 +60,7 @@ module solver_tstep
                             dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=true,
                             sens_heat::Bool=false, modprop::Int=1,
                             verbose::Bool=true, modplot::Int=0,
-                            accel::Bool=true, extrap::Bool=false, adams::Bool=true,
+                            accel::Bool=true, adams::Bool=true,
                             dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=300,
                             rtol::Float64=4.0e-5, atol::Float64=1.0e-1,
                             drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=1.0
@@ -71,9 +70,9 @@ module solver_tstep
 
         # Run parameters
         dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
-        smooth_stp   = 350    # Number of steps for which to apply smoothing
+        smooth_stp   = 150    # Number of steps for which to apply smoothing
         smooth       = true   # Currently smoothing?
-        wait_con     = 150    # Introduce convection after this many steps, if ^^ is not already true
+        wait_con     = 50    # Introduce convection after this many steps, if ^^ is not already true
 
         modprint     = 25     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
@@ -87,8 +86,8 @@ module solver_tstep
         # Validate inputs
         wait_con  = max(wait_con, 1)
         min_steps = max(min_steps,wait_con+100)
-        min_steps = max(min_steps,smooth_stp+100)
-        max_steps = max(min_steps+100, max_steps)
+        min_steps = max(min_steps,smooth_stp+50)
+        max_steps = max(min_steps+50, max_steps)
         len_hist  = max(min(len_hist, max_steps-1), 5)
         modprint  = max(modprint, 1)
 
@@ -186,11 +185,6 @@ module solver_tstep
                 stopaccel = true
             end
 
-            # Stop extrapolation towards end
-            if ((step/max_steps > 0.9) && (step > 2)) || flag_prev
-                extrap = false
-            end 
-
             # Handle phases
             if accel
                 # Fast phase
@@ -254,13 +248,8 @@ module solver_tstep
                 @printf("(intro convect) ")
             end
 
-            if mod(step,modprint) == 0
-                if extrap 
-                    @printf("(extrap) ")
-                end 
-                if smooth
-                    @printf("(smooth) ")
-                end 
+            if (mod(step,modprint) == 0) && smooth
+                @printf("(smooth) ")
             end
 
             # ----------------------------------------------------------
@@ -409,27 +398,6 @@ module solver_tstep
             if smooth && (smooth_width > 2)
                 atmosphere.smooth_centres!(atmos, smooth_width)
             end
-
-            # ----------------------------------------------------------
-            # Accelerate solver with time-extrapolation
-            # ---------------------------------------------------------- 
-            # (at higher pressures, when appropriate) 
-            ex_lookback     = 20
-            ex_lookback     = min(len_hist-1, ex_lookback)
-            ex_dtmp_clip    = dtmp_clip
-            if !accel && extrap && ( mod(step,ex_lookback+1) == 0)
-                # don't extrapolate surface when handling skin
-                ex_endlvl = atmos.nlev_c
-                if surf_state == 2
-                    ex_endlvl -= 1
-                end
-                # extrapolate each level
-                for i in 1:ex_endlvl 
-                    if (atmos.p[i] > p_large) && !oscil[i]
-                        atmos.tmp[i]  += max(-ex_dtmp_clip, min(ex_dtmp_clip, atmos.tmp[i]  - hist_tmp[end-ex_lookback,i]  ))
-                    end 
-                end 
-            end 
 
             # ----------------------------------------------------------
             # Set remaining temperature values 
