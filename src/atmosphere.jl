@@ -1314,12 +1314,12 @@ module atmosphere
         return tmp_tnd
     end
 
-    # Moist hard convective adjustment (returning the temperature tendency without modifying the atmos struct)
-    function adjust_moist(atmos::atmosphere.Atmos_t, gas::String)
+    # Apply condensation according to vapour-liquid coexistance curve (return mask of condensing levels)
+    function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
-        tmp_new = zeros(Float64, atmos.nlev_c)  # new temperatures
-        tmp_tnd = zeros(Float64, atmos.nlev_c)  # temperature tendency
-        tmp_new[:] .+= atmos.tmp[:]
+        tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
+        tmp_old[:] .= atmos.tmp[:]
+        changed = falses(atmos.nlev_c)
 
         i_gas = findfirst(==(gas), atmos.gases)
 
@@ -1335,6 +1335,7 @@ module atmosphere
             Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
             if atmos.tmp[i] < Tsat
                 tmp_new[i] = Tsat
+                changed[i] = true 
                 
                 atmos.re[i]   = 1.0e-5  # 10 micron droplets
                 atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
@@ -1346,10 +1347,7 @@ module atmosphere
             end
         end
         
-        # Calculate tendency
-        tmp_tnd[:] .=  tmp_new[:] .- atmos.tmp[:]
-
-        return tmp_tnd
+        return changed
     end
 
     # Smooth temperature at cell-centres 
