@@ -1251,7 +1251,7 @@ module atmosphere
         return nothing
     end
 
-     # Dry convective adjustment (returning the temperature tendancy without modifying the atmos struct)
+     # Dry convective adjustment (returning the temperature tendency without modifying the atmos struct)
      function adjust_dry(atmos::atmosphere.Atmos_t, nsteps::Int)
 
         tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
@@ -1314,7 +1314,7 @@ module atmosphere
         return tmp_tnd
     end
 
-    # Moist hard convective adjustment (returning the temperature tendancy without modifying the atmos struct)
+    # Moist hard convective adjustment (returning the temperature tendency without modifying the atmos struct)
     function adjust_moist(atmos::atmosphere.Atmos_t, gas::String)
 
         tmp_new = zeros(Float64, atmos.nlev_c)  # new temperatures
@@ -1339,6 +1339,10 @@ module atmosphere
                 atmos.re[i]   = 1.0e-5  # 10 micron droplets
                 atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
                 atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
+            else 
+                atmos.re[i]   = 0.0
+                atmos.lwm[i]  = 0.0
+                atmos.clfr[i] = 0.0
             end
         end
         

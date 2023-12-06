@@ -41,11 +41,13 @@ module solver_nlsol
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=500`              maximum number of solver steps
+    - `use_linesearch::Bool=false`      use linesearch to ensure global convergence
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int=1, verbose::Bool=false,
+                            surf_state::Int=1,
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=500, atol::Float64=1.0e-2
+                            max_steps::Int=500, atol::Float64=1.0e-3,
+                            use_linesearch::Bool=false
                             )
 
         # Objective function
@@ -81,7 +83,7 @@ module solver_nlsol
 
             # +Dry convection
             if dry_convect
-                atmosphere.mlt!(atmos, pmin=100.0)
+                atmosphere.mlt!(atmos, pmin=1.0)
                 atmos.flux_tot += atmos.flux_c
             end
 
@@ -97,7 +99,7 @@ module solver_nlsol
                 error("Flux array contains NaNs and/or Infs")
             end
 
-            # Pass outward
+            # Pass residuals outward
             for i in 1:atmos.nlev_c 
                 F[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
             end
@@ -109,22 +111,27 @@ module solver_nlsol
         # ----------------------------------------------------------
         # Call solver
         # ---------------------------------------------------------- 
-
-        println("NLSolver: begin Newton-Raphson-Backtracking iterations")
+        the_ls = Static()
+        if use_linesearch 
+            the_ls = BackTracking()
+            println("NLSolver: begin Newton-Raphson iterations (with backtracking linesearch)") 
+        else
+            println("NLSolver: begin Newton-Raphson iterations") 
+        end 
 
         atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
 
         x0 = zeros(Float64, atmos.nlev_c)
         x0[:] .= atmos.tmp[:]
 
-        sol = nlsolve(fev!, x0, method = :newton, linesearch = BackTracking(), iterations=max_steps, ftol=atol, show_trace=true)
+        sol = nlsolve(fev!, x0, method = :newton, linesearch = the_ls, iterations=max_steps, ftol=atol, show_trace=true)
 
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
 
         if !converged(sol)
-            @printf("    stopping atmosphere iterations before convergence \n\n")
+            @printf("    stopping atmosphere iterations before convergence (maybe try enabling linesearch) \n\n")
         else
             @printf("    convergence criteria met (%d iterations) \n\n", sol.iterations)
         end
