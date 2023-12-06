@@ -46,8 +46,8 @@ module solver_tstep
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `adams::Bool=true`                use Adams-Bashforth integrator
-    - `rtol::Bool=4.0e-5`               relative tolerence
-    - `atol::Bool=1.0e-1`               absolute tolerence
+    - `rtol::Bool=1.0e-4`               relative tolerence
+    - `atol::Bool=1.0e-2`               absolute tolerence
     - `dt_max::Float64=500.0            maximum time-step outside of the accelerated phase
     - `max_steps::Int=1000`             maximum number of solver steps
     - `min_steps::Int=300`              minimum number of solver steps
@@ -62,7 +62,7 @@ module solver_tstep
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, adams::Bool=true,
                             dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=300,
-                            rtol::Float64=4.0e-5, atol::Float64=1.0e-1,
+                            rtol::Float64=1.0e-4, atol::Float64=1.0e-2,
                             drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=1.0
                             )
 
@@ -74,11 +74,11 @@ module solver_tstep
         smooth       = true   # Currently smoothing?
         wait_con     = 50     # Introduce convection after this many steps, if ^^ is not already true
 
-        modprint     = 25     # Frequency to print when verbose==false
+        modprint     = 50     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
         H_large      = 1.0e5  # A characteristic large heating rate [K/day]
 
-        do_condense  = false  # Allow condensation ever (overwritten according to condensate)?
+        do_condense  = false  # Allow condensation ever? (overwritten according to condensate)
         is_condense  = false  # Is condensation currently enabled?
 
         if condensate != "" 
