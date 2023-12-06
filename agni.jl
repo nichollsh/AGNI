@@ -99,7 +99,7 @@ surf_state  = 0
 
 import solver_tstep
 solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
-                            dry_convect=dry_convect, h2o_convect=false,
+                            dry_convect=dry_convect,
                             accel=true, rtol=1.0e-4, atol=1.0e-2,
                             max_steps=600, min_steps=200, use_mlt=true,
                             dt_max=100.0, F_losspct_conv=1.0)
