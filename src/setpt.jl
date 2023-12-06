@@ -240,6 +240,13 @@ module setpt
             Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
             if atmos.tmp[i] < Tsat
                 atmos.tmp[i] = Tsat
+                atmos.re[i]   = 1.0e-5  # 10 micron droplets
+                atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
+                atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
+            else 
+                atmos.re[i]   = 0.0
+                atmos.lwm[i]  = 0.0
+                atmos.clfr[i] = 0.0
             end
                 
             # Cell edge
