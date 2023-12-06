@@ -123,11 +123,12 @@ module atmosphere
         flux_c::Array       # Dry convective fluxes from MLT
         Kzz::Array          # Eddy diffusion coefficient from MLT
 
-        # Cloud
+        # Cloud and condensation
+        flux_p::Array       # Flux produced from condensation
         mask_p::Array       # Layers which are (or were recently) condensing liquid
-        re::Array   # Effective radius of the droplets [m] (drizzle forms above 20 microns)
-        lwm::Array  # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
-        clfr::Array # Water cloud fraction - how much of the current cell turns into cloud? 0 : clear sky cell ; 1 : the cloud takes over the entire area of the cell (just leave at 1 for 1D runs)
+        re::Array           # Effective radius of the droplets [m] (drizzle forms above 20 microns)
+        lwm::Array          # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
+        clfr::Array         # Water cloud fraction - how much of the current cell turns into cloud? 0 : clear sky cell ; 1 : the cloud takes over the entire area of the cell (just leave at 1 for 1D runs)
 
         # Total energy flux
         flux_tot::Array     # Total upward-directed flux at cell edges
@@ -938,6 +939,7 @@ module atmosphere
         atmos.flux_sens =         0.0
 
         atmos.mask_p =            zeros(Float64, atmos.nlev_c)
+        atmos.flux_p =            zeros(Float64, atmos.nlev_l)
         atmos.mask_c =            zeros(Float64, atmos.nlev_c)
         atmos.flux_c =            zeros(Float64, atmos.nlev_l)
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
@@ -1334,7 +1336,7 @@ module atmosphere
             # Cell centre only
             Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
             if atmos.tmp[i] < Tsat
-                tmp_new[i] = Tsat
+                atmos.tmp[i] = Tsat
                 changed[i] = true 
                 
                 atmos.re[i]   = 1.0e-5  # 10 micron droplets
@@ -1535,6 +1537,7 @@ module atmosphere
         var_fray =      defVar(ds, "flag_rayleigh", Char, ())  # Includes rayleigh scattering?
         var_fcon =      defVar(ds, "flag_continuum",Char, ())  # Includes continuum absorption?
         var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())  # Includes clouds?
+        var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())  # Using thermodynamic functions
 
         #     Store data
         var_tstar[1] =  atmos.tstar 
@@ -1557,6 +1560,12 @@ module atmosphere
             var_fcld[1] = 'y'
         else
             var_fcld[1] = 'n'
+        end 
+
+        if atmos.thermo_funct
+            var_tfun[1] = 'y'
+        else
+            var_tfun[1] = 'n'
         end 
         
         # ----------------------
@@ -1582,6 +1591,7 @@ module atmosphere
         var_fu =        defVar(ds, "fl_U",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fc =        defVar(ds, "fl_C",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fp =        defVar(ds, "fl_P",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ft =        defVar(ds, "fl_tot", Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",  Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_kzz =       defVar(ds, "Kzz",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
@@ -1626,8 +1636,10 @@ module atmosphere
         var_fn[:] =     atmos.flux_n
 
         var_fc[:] =     atmos.flux_c
-        var_ft[:] =     atmos.flux_tot
 
+        var_fp[:] =     atmos.flux_p
+
+        var_ft[:] =     atmos.flux_tot
         var_hr[:] =     atmos.heating_rate
 
         var_kzz[:] =    atmos.Kzz
