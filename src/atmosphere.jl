@@ -124,7 +124,6 @@ module atmosphere
         Kzz::Array          # Eddy diffusion coefficient from MLT
 
         # Cloud and condensation
-        flux_p::Array       # Flux produced from condensation
         mask_p::Array       # Layers which are (or were recently) condensing liquid
         re::Array           # Effective radius of the droplets [m] (drizzle forms above 20 microns)
         lwm::Array          # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
@@ -899,8 +898,8 @@ module atmosphere
         atmos.dimen.nd_phf_term_cloud_prsc  = 1
 
         if atmos.control.l_cloud
-            atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
-            atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_type_homogen # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen ; Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
+            atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_homogen # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen ; Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
+            atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_mix_max      # Goes with ip_max_rand
             atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand           # Maximum/random overlap in a mixed column (-C 2)
             atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous        # Homogeneous cloud
             atmos.control.i_st_water  = 5                                      # Liquid Water Droplet type 5 (-d 5)
@@ -939,7 +938,6 @@ module atmosphere
         atmos.flux_sens =         0.0
 
         atmos.mask_p =            zeros(Float64, atmos.nlev_c)
-        atmos.flux_p =            zeros(Float64, atmos.nlev_l)
         atmos.mask_c =            zeros(Float64, atmos.nlev_c)
         atmos.flux_c =            zeros(Float64, atmos.nlev_l)
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
@@ -1167,13 +1165,15 @@ module atmosphere
         atmos.Kzz[:] .= 0.0
 
         # Work variables 
-        H::Float64 = 0.0
-        l::Float64 = 0.0
-        w::Float64 = 0.0
+        H = 0.0; l = 0.0; w = 0.0
+        m1 = 0.0; m2 = 0.0; mt = 0.0
+        grav = 0.0; mu = 0.0; c_p = 0.0; rho = 0.0
+        grad_ad = 0.0; grad_pr = 0.0
 
         # Loop from bottom upwards
         for i in range(start=atmos.nlev_l-1 , step=-1, stop=3) 
 
+            # Optionally skip low pressures 
             if atmos.p[i] < pmin
                 continue
             end
@@ -1191,6 +1191,12 @@ module atmosphere
 
             # Check instability
             if (grad_pr > grad_ad)
+
+                # Check if this layer is condensing (this shouldn't ever be
+                # true, because the condensation curve dT/dp is too shallow)
+                if atmos.mask_p[i] > 0
+                    println("    WARNING: Somehow unstable to dry convection in a condensing region!")
+                end 
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
@@ -1319,8 +1325,6 @@ module atmosphere
     # Apply condensation according to vapour-liquid coexistance curve (return mask of condensing levels)
     function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
-        tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
-        tmp_old[:] .= atmos.tmp[:]
         changed = falses(atmos.nlev_c)
 
         i_gas = findfirst(==(gas), atmos.gases)
@@ -1591,7 +1595,6 @@ module atmosphere
         var_fu =        defVar(ds, "fl_U",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fc =        defVar(ds, "fl_C",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fp =        defVar(ds, "fl_P",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ft =        defVar(ds, "fl_tot", Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",  Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_kzz =       defVar(ds, "Kzz",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
@@ -1636,8 +1639,6 @@ module atmosphere
         var_fn[:] =     atmos.flux_n
 
         var_fc[:] =     atmos.flux_c
-
-        var_fp[:] =     atmos.flux_p
 
         var_ft[:] =     atmos.flux_tot
         var_hr[:] =     atmos.heating_rate
