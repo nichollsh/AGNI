@@ -37,42 +37,22 @@ module solver_nlsol
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
-    - `verbose::Bool=false`             verbose output?
+    - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=500`              maximum number of solver steps
     - `use_linesearch::Bool=false`      use linesearch to ensure global convergence
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int=1,
+                            surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=500, atol::Float64=1.0e-3,
                             use_linesearch::Bool=false
                             )
 
-        # Objective function
-        function fev!(F,x)
-           
-            # Read new guess
-            for i in 1:atmos.nlev_c
-                atmos.tmp[i] = x[i]
-            end
+        # Add fluxes to flux_tot 
+        function flx!()
 
-            # Check that guess is finite (no NaNs, no Infs)
-            if !all(isfinite, atmos.tmp)
-                display(atmos.tmp)
-                error("Temperature array contains NaNs and/or Infs")
-            end 
-
-            # Limit temperature domain
-            clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
-
-            # Interpolate temperature to cell-edge values 
-            atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
-
-            # Calculate layer properties 
-            atmosphere.calc_layer_props!(atmos)
-            
             # Reset fluxes
             atmos.flux_tot[:] .= 0.0
 
@@ -98,6 +78,35 @@ module solver_nlsol
                 display(atmos.flux_tot)
                 error("Flux array contains NaNs and/or Infs")
             end
+
+            return nothing
+        end 
+
+        # Objective function
+        function fev!(F,x)
+           
+            # Read new guess
+            for i in 1:atmos.nlev_c
+                atmos.tmp[i] = x[i]
+            end
+
+            # Check that guess is finite (no NaNs, no Infs)
+            if !all(isfinite, atmos.tmp)
+                display(atmos.tmp)
+                error("Temperature array contains NaNs and/or Infs")
+            end 
+
+            # Limit temperature domain
+            clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
+
+            # Interpolate temperature to cell-edge values 
+            atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
+
+            # Calculate layer properties 
+            atmosphere.calc_layer_props!(atmos)
+            
+            # Add up fluxes
+            flx!()
 
             # Pass residuals outward
             for i in 1:atmos.nlev_c 

@@ -38,7 +38,7 @@ module solver_tstep
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
     - `update_tstar::Bool=false`        update tstar BC to be equal to tmpl[end]
     - `dry_convect::Bool=true`          enable dry convection
-    - `h2o_convect::Bool=false`         enable naive steam condensation
+    - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=false`           include sensible heating 
     - `modprop::Int=1`                  frequency at which to update thermodynamic properties (0 => never)
@@ -57,7 +57,7 @@ module solver_tstep
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, update_tstar::Bool=false,
-                            dry_convect::Bool=true, h2o_convect::Bool=false, use_mlt::Bool=true,
+                            dry_convect::Bool=true, condensate::String="", use_mlt::Bool=true,
                             sens_heat::Bool=false, modprop::Int=1,
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, adams::Bool=true,
@@ -72,12 +72,22 @@ module solver_tstep
         dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
         smooth_stp   = 150    # Number of steps for which to apply smoothing
         smooth       = true   # Currently smoothing?
-        wait_con     = 50    # Introduce convection after this many steps, if ^^ is not already true
+        wait_con     = 50     # Introduce convection after this many steps, if ^^ is not already true
 
         modprint     = 25     # Frequency to print when verbose==false
         len_hist     = 10     # Number of previous states to store
         H_large      = 1.0e5  # A characteristic large heating rate [K/day]
-        p_large      = 1e5    # A characteristic large pressure [Pa] 
+
+        do_condense  = false  # Allow condensation ever (overwritten according to condensate)?
+        is_condense  = false  # Is condensation currently enabled?
+
+        if condensate != "" 
+            if condensate in atmos.gases
+                do_condense = true 
+            else 
+                error("Invalid condensate ('$condensate')")
+            end 
+        end 
 
         if verbose
             modprint=10
@@ -193,7 +203,7 @@ module solver_tstep
                 end
                 dtmp_clip    = 50.0
                 dryadj_steps = 4
-                h2oadj_steps = 2
+                is_condense  = do_condense
                 dt_min_step  = 1.0e-1
                 dt_max_step  = 120.0
                 rtol_step    = rtol
@@ -204,7 +214,7 @@ module solver_tstep
                 # Slow phase
                 dtmp_clip    = 5.0
                 dryadj_steps = 16
-                h2oadj_steps = 2
+                is_condense  = do_condense
                 dt_min_step  = 5.0e-5
                 dt_max_step  = max(dt_max, 1.0e-2)
                 rtol_step    = rtol
@@ -221,7 +231,7 @@ module solver_tstep
                     atmos.tmp[:]  .= (hist_tmp[end,:]  .+ hist_tmp[end-1,:]  .+ hist_tmp[end-2,:] ) ./ 3.0
                     dt[:]         .= 1.0e-1
                     dryadj_steps = 0 # no adjustment in this step
-                    h2oadj_steps = 0 # ^^
+                    is_condense  = false 
                     step_stopaccel = step
                 end
 
@@ -242,10 +252,10 @@ module solver_tstep
                 end
             end
 
-            # Introduce convection schemes
-            if !start_con && (step >= wait_con) && (dry_convect || h2o_convect)
+            # Introduce convection and condensation schemes
+            if !start_con && (step >= wait_con) && (dry_convect || do_condense)
                 start_con = true 
-                @printf("(intro convect) ")
+                @printf("(intro convect/condense) ")
             end
 
             if (mod(step,modprint) == 0) && smooth
@@ -374,21 +384,19 @@ module solver_tstep
                 atmos.tmp +=  tmp_tnd
             end
 
-            # H2O hard moist convection
-            if h2oadj_steps > 0 && h2o_convect && start_con
+            # Apply condensation
+            if is_condense && start_con
 
-                # do adjustment steps
-                tmp_tnd = atmosphere.adjust_moist(atmos, "H2O")
+                lvl_condensing = atmosphere.apply_vlcc!(atmos, condensate)
                 
                 # check which levels were changed
                 for i in 1:atmos.nlev_c
-                    if abs(tmp_tnd[i]) > 0.01
+                    if lvl_condensing[i]
                         adj_changed += 1
                         atmos.mask_p[i]  = atmos.mask_decay
                     end
                 end 
 
-                atmos.tmp += tmp_tnd
             end
 
             # ----------------------------------------------------------
@@ -488,7 +496,7 @@ module solver_tstep
                 @printf("    F_tot^loss  = %+.2f W m-2  \n", F_loss)
                 @printf("    HR_typical  = %+.4f K day-1\n", H_stat)
 
-                if ( (dryadj_steps > 0) && !use_mlt) || ((h2oadj_steps > 0) && h2o_convect)
+                if ( (dryadj_steps > 0) && !use_mlt) || is_condense
                     @printf("    count_adj   = %d layers   \n", adj_changed)
                 end
                 @printf("\n")
@@ -527,7 +535,7 @@ module solver_tstep
             # - solver is not being accelerated in any sense
             flag_prev = flag_this
             flag_this = (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv) && (F_losspct < F_losspct_conv) 
-            success   = flag_this && flag_prev && !smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!dry_convect && !h2o_convect))
+            success   = flag_this && flag_prev && !smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!dry_convect && !do_condense))
             
             # --------------------------------------
             # Sleep in order to capture keyboard interrupt

@@ -63,7 +63,7 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file)
 # Call solver 
 println("Starting solver")
 solver_tstep.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true,
-                           dry_convect=true, h2o_convect=true, sens_heat=true, 
+                           dry_convect=true, condensate="H2O", sens_heat=true, 
                            dt_max=2.0, max_steps=300)
 
 # Write arrays
