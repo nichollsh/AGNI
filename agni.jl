@@ -24,8 +24,8 @@ import phys
 
 
 # Configuration options
-tstar           = 2490.0    # Surface temperature [kelvin]
-toa_heating     = 3.0/8.0 * 1361.0 * (1-0.18) * 35.6 # * 0.98 
+tstar           = 1250.0    # Surface temperature [kelvin]
+toa_heating     = 3.0/8.0 * 1361.0 * (1-0.18) * 0.98 
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
 nlev_centre     = 50  
@@ -39,7 +39,7 @@ mf_dict         = Dict([
                         # ("N2" , 1.41003)
                         ])
 
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Reach_cloud/Reach"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
@@ -54,7 +54,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
                          flag_rayleigh=true,
-                         flag_cloud=false,
+                         flag_cloud=true,
                          overlap_method=4,
                          zenith_degrees=48.19,
                          skin_d=0.01,
@@ -95,7 +95,7 @@ println("Running model...")
 
 # Call solver(s)
 dry_convect = true
-condensate  = ""
+condensate  = "H2O"
 surf_state  = 0
 
 import solver_tstep
@@ -106,10 +106,10 @@ solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, 
                             dt_max=150.0, F_losspct_conv=1.0)
 
 
-import solver_nlsol
-solver_nlsol.solve_energy!(atmos, surf_state=surf_state,
-                            dry_convect=dry_convect, condensate=condensate,
-                            max_steps=100)
+# import solver_nlsol
+# solver_nlsol.solve_energy!(atmos, surf_state=surf_state,
+#                             dry_convect=dry_convect, condensate=condensate,
+#                             max_steps=100)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
