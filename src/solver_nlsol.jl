@@ -14,7 +14,6 @@ module solver_nlsol
     using Printf
     using Statistics
     using Revise
-    using PCHIPInterpolation
     using LinearAlgebra
 
     using NLsolve
@@ -22,8 +21,6 @@ module solver_nlsol
 
     import atmosphere 
     import phys
-
-
     
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
@@ -50,40 +47,27 @@ module solver_nlsol
                             use_linesearch::Bool=false
                             )
 
-        # Add fluxes to flux_tot 
-        function flx!()
-
-            # Reset fluxes
-            atmos.flux_tot[:] .= 0.0
-
-            # +Radiation
-            atmosphere.radtrans!(atmos, true)
-            atmosphere.radtrans!(atmos, false)
-            atmos.flux_tot += atmos.flux_n
-
-            # +Dry convection
-            if dry_convect
-                atmosphere.mlt!(atmos, pmin=1.0)
-                atmos.flux_tot += atmos.flux_c
-            end
-
-            # +Turbulence
-            if sens_heat
-                atmosphere.sensible!(atmos)
-                atmos.flux_tot[end] += atmos.flux_sens
-            end
-
-            # Check fluxes are real numbers
-            if !all(isfinite, atmos.flux_tot)
-                display(atmos.flux_tot)
-                error("Flux array contains NaNs and/or Infs")
-            end
-
-            return nothing
+        # Validate condensation case
+        do_condense  = false 
+        i_gas        = -1
+        if condensate != "" 
+            if condensate in atmos.gases
+                do_condense = true 
+                i_gas = findfirst(==(gas), atmos.gases)
+            else 
+                error("Invalid condensate ('$condensate')")
+            end 
         end 
 
-        # Objective function
+        # Work arrays 
+        pwr = zeros(Float64, atmos.nlev_c)  # power delivery into each cell
+
+        # Objective function to solve for
         function fev!(F,x)
+
+            # Reset values
+            atmos.mask_c[:] .= 0.0
+            atmos.mask_p[:] .= 0.0
            
             # Read new guess
             for i in 1:atmos.nlev_c
@@ -105,13 +89,70 @@ module solver_nlsol
             # Calculate layer properties 
             atmosphere.calc_layer_props!(atmos)
             
-            # Add up fluxes
-            flx!()
+            # Reset fluxes
+            atmos.flux_tot[:] .= 0.0
+
+            # +Radiation
+            atmosphere.radtrans!(atmos, true)
+            atmosphere.radtrans!(atmos, false)
+            atmos.flux_tot += atmos.flux_n
+
+            # +Dry convection
+            if dry_convect
+                atmosphere.mlt!(atmos, pmin=1.0)
+                atmos.flux_tot += atmos.flux_c
+            end
+
+            # +Turbulence
+            if sens_heat
+                atmosphere.sensible!(atmos)
+                atmos.flux_tot[end] += atmos.flux_sens
+            end
+
+            # Calculate power into in each cell
+            pwr[1:end] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
+
+            # +Condensation
+            if do_condense
+                
+                # This handled by requiring that the residuals (i.e. the power
+                # being delivered into a cell) can only be positive in regions 
+                # where condensation is occuring, because they cannot be allowed 
+                # to cool down. All internal production (i.e. negative power 
+                # delivery) yields extra condensate, not a change in temp.
+
+                # Check if each level is condensing. 
+                for i in 1:atmos.nlev_c
+
+                    x = atmos.layer_x[i,i_gas]
+                    if x < 1.0e-10 
+                        continue
+                    end
+
+                    Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
+                    if atmos.tmp[i] < Tsat
+                        pwr[i] = max(pwr[i], 0.0)
+
+                        atmos.mask_p[i] = atmos.mask_decay 
+                        atmos.re[i]   = 1.0e-5  # 10 micron droplets
+                        atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
+                        atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
+                    else 
+                        atmos.re[i]   = 0.0
+                        atmos.lwm[i]  = 0.0
+                        atmos.clfr[i] = 0.0
+                    end
+                end
+            end 
+
+            # Check fluxes are real numbers
+            if !all(isfinite, atmos.flux_tot)
+                display(atmos.flux_tot)
+                error("Flux array contains NaNs and/or Infs")
+            end
 
             # Pass residuals outward
-            for i in 1:atmos.nlev_c 
-                F[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
-            end
+            F[:] .= pwr[:]
 
             return nothing
         end 
@@ -133,7 +174,8 @@ module solver_nlsol
         x0 = zeros(Float64, atmos.nlev_c)
         x0[:] .= atmos.tmp[:]
 
-        sol = nlsolve(fev!, x0, method = :newton, linesearch = the_ls, iterations=max_steps, ftol=atol, show_trace=true)
+        sol = nlsolve(fev!, x0, method = :newton, linesearch = the_ls, 
+                        iterations=max_steps, ftol=atol, show_trace=true)
 
         # ----------------------------------------------------------
         # Extract solution
@@ -147,6 +189,7 @@ module solver_nlsol
 
         atmos.tmp[:] .= sol.zero[:]
         fev!(zeros(Float64, atmos.nlev_c), atmos.tmp)
+        atmosphere.calc_hrates!(atmos)
 
         # ----------------------------------------------------------
         # Print info
@@ -161,5 +204,6 @@ module solver_nlsol
         @printf("    loss      = %+.2e %%        \n", loss_pct)
         @printf("\n")
 
-    end # end solve_root
+    end # end solve_energy 
+
 end 
