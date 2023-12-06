@@ -53,7 +53,7 @@ module solver_nlsol
         if condensate != "" 
             if condensate in atmos.gases
                 do_condense = true 
-                i_gas = findfirst(==(gas), atmos.gases)
+                i_gas = findfirst(==(condensate), atmos.gases)
             else 
                 error("Invalid condensate ('$condensate')")
             end 
@@ -66,8 +66,8 @@ module solver_nlsol
         function fev!(F,x)
 
             # Reset values
-            atmos.mask_c[:] .= 0.0
-            atmos.mask_p[:] .= 0.0
+            atmos.mask_c[:] .= 0
+            atmos.mask_p[:] .= 0
            
             # Read new guess
             for i in 1:atmos.nlev_c
@@ -109,7 +109,7 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
-            # Calculate power into in each cell
+            # Calculate power into each cell
             pwr[1:end] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
 
             # +Condensation
@@ -121,7 +121,6 @@ module solver_nlsol
                 # to cool down. All internal production (i.e. negative power 
                 # delivery) yields extra condensate, not a change in temp.
 
-                # Check if each level is condensing. 
                 for i in 1:atmos.nlev_c
 
                     x = atmos.layer_x[i,i_gas]
@@ -129,7 +128,8 @@ module solver_nlsol
                         continue
                     end
 
-                    Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
+                    # Layer is condensing if T < T_dew
+                    Tsat = phys.calc_Tdew(condensate,atmos.p[i] * x )
                     if atmos.tmp[i] < Tsat
                         pwr[i] = max(pwr[i], 0.0)
 

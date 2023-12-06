@@ -3,7 +3,7 @@ Radiative-convective solver designed for integration into a coupled atmosphere-i
 
 AGNI relies on SOCRATES (2306) for calculating radiances. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, and continuum absorption / CIA.        
 
-Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Two convection parameterisations are included: convective adjustment (directly manipulating the temperature arrays), and mixing length theory (calculating convective energy fluxes). Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files. The model first uses a multistep Adams-Bashforth integrator which integrates the heating rates at each level until fluxes are roughly balanced; this state then provides the initial guess for a Newton-Raphson-Backtracking method which achieves stricter flux continuity.
+Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Two convection parameterisations are included: convective adjustment (directly manipulating the temperature arrays), and mixing length theory (calculating convective energy fluxes). Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files. The model first uses a multistep Adams-Bashforth integrator which integrates the heating rates at each level until fluxes are roughly balanced; this state then provides the initial guess for a Newton-Raphson-Backtracking method which achieves strict flux continuity.
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
@@ -19,6 +19,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * `agni_cli.jl`     - AGNI executable with command-line interface
 * `demo_steamrun.jl`- Script to demonstrate the pure-steam runaway greenhouse effect
 * `demo_earth.jl`   - Script to demonstrate solving for Earth's temperature structure
+* `demo_hotdry.jl`  - Script to demonstrate solving for a hot and dry post-runaway steam atmosphere
 * `demo_tests.jl`   - Script containing quick tests for verifying that the basics of the model are functioning
 
 
