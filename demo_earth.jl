@@ -20,7 +20,7 @@ push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
 import setpt
 import plotting 
-import solver_accel
+import solver_tstep
 import phys
 
 
@@ -62,9 +62,9 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file)
 
 # Call solver 
 println("Starting solver")
-solver_accel.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true, extrap=false,
-                        dry_convect=true, h2o_convect=true, sens_heat=true, 
-                        dt_max=2.0, max_steps=300)
+solver_tstep.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true,
+                           dry_convect=true, condensate="H2O", sens_heat=true, 
+                           dt_max=2.0, max_steps=300)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))

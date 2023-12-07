@@ -19,8 +19,8 @@ module phys
     # Stefan-boltzmann constant, W m−2 K−4
     const sigma = 5.670367e-8 
 
-    # Von Karman constant
-    const k_vk = 0.40
+    # Von Karman constant, dimensionless
+    const k_vk = 0.40  # Hogstrom 1988
 
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict([
@@ -353,6 +353,22 @@ module phys
         return out 
     end 
 
+    # Temperature dependent latent heat interpolation, J kg-1 
+    function interp_Lv(gas::String, tmp::Float64)
+        out = 0.0
+
+        # Get molar mass for this molecule 
+        mmw = 0.0
+        if gas in keys(lookup_mmw)
+            mmw = lookup_mmw[gas]  # kg mol-1
+        else 
+            return 0.0
+        end 
+
+        error("Temperature-dependent latent heat not yet implemented")
+
+    end 
+
     # Get values from thermodynamic property lookup tables 
     function lookup_safe(prop::String,gas::String;tmp::Float64=-1.0)
 
@@ -364,6 +380,7 @@ module phys
         # Find table 
         if prop == "l_vap"
             table = lookup_L_vap
+            # funct = interp_Lv
         elseif prop == "p_trip"
             table = lookup_P_trip
         elseif prop == "t_trip"
