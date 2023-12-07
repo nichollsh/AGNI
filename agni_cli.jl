@@ -71,13 +71,13 @@ s = ArgParseSettings()
         arg_type = Float64
         default = trppt_default
     "--surface"
-        help = "Surface state (0: free, 1: fixed at T(p_surf), 2: conductive skin)."
+        help = "Surface state (0: free, 1: constant, 2: conductive skin)."
         arg_type = Int
         default = 0
     "--skin_d"
         help = "Conductive skin thickness [m]."
         arg_type = Float64
-        default = 0.05
+        default = 0.01
     "--skin_k"
         help = "Conductive skin thermal conductivity [W m-1 K-1]."
         arg_type = Float64
@@ -109,17 +109,17 @@ s = ArgParseSettings()
     "--nlevels"
         help = "Number of model levels."
         arg_type = Int
-        default = 100
+        default = 80
     "--once"
-        help = "Just calculate fluxes once - don't iterate."
+        help = "Just calculate fluxes once - don't solve for RCE."
         action = :store_true
-    "--cvode"
-        help = "Run CVODE integration after Euler integration has completed."
+    "--nlsolve"
+        help = "Use non-linear solver to obtain solution once time-stepped method has finished."
         action = :store_true
     "--nsteps"
-        help = "Maximum number of solver steps."
+        help = "Maximum number of time-stepped solver steps."
         arg_type = Int
-        default = 250
+        default = 2000
     "--convect_adj"
         help = "Enable convection via dry adjustment."
         action = :store_true
@@ -129,16 +129,15 @@ s = ArgParseSettings()
     "--noaccel"
         help = "Disable model acceleration."
         action = :store_true
-    "--equivext"
-        help = "Use equivalent extinction for computing overlapping absorption. Otherwise, random overlap will be used."
+    "--roverlap"
+        help = "Use random overlap for computing overlapping absorption. Otherwise, equivalent extinction will be used."
         action = :store_true
     "--rscatter"
         help = "Include rayleigh scattering."
         action = :store_true
-    "--convcrit_tmpabs"
-        help = "Convergence criterion on dtmp [K]."
-        arg_type = Float64
-        default = 5.0
+    "--cloud"
+        help = "Include cloud optical properties in the radiative transfer."
+        action = :store_true
     "--convcrit_tmprel"
         help = "Convergence criterion on dtmp/tmp/dt [day-1]."
         arg_type = Float64
@@ -194,6 +193,7 @@ ini_sat         = args["ini_sat"]
 trppt           = args["trppt"]
 star_file       = args["star"]
 rscatter        = args["rscatter"]
+cloud           = args["cloud"]
 verbose         = args["verbose"]
 animate         = args["animate"]
 surf_state      = args["surface"]
@@ -204,9 +204,8 @@ max_steps       = args["nsteps"]
 convect_adj     = args["convect_adj"]
 convect_mlt     = args["convect_mlt"]
 no_accel        = args["noaccel"]
-equivext        = args["equivext"]
-cvode           = args["cvode"]
-cc_tmpabs       = args["convcrit_tmpabs"]
+roverlap        = args["roverlap"]
+nlsolve         = args["nlsolve"]
 cc_tmprel       = args["convcrit_tmprel"]
 cc_fradrel      = args["convcrit_fradrel"]
 cc_floss        = args["convcrit_flosspct"]
@@ -263,10 +262,10 @@ if x_path != ""
 end
 
 # Overlap method
-if equivext
-    overlap = 4
-else 
+if roverlap
     overlap = 2
+else 
+    overlap = 4
 end
 
 # Convection scheme
@@ -275,11 +274,11 @@ if convect_adj || convect_mlt
     dry_convect = true 
 
     if convect_adj && convect_mlt
-        error("Both convection schemes are enabled! Pick only one at a time")
+        error("Both dry convection schemes are enabled! Pick only one at a time")
     end 
 
-    if convect_adj && cvode 
-        error("CVODE integration isn't compatible with convective adjustment")
+    if convect_adj && nlsol 
+        error("Non-linear solver isn't compatible with convective adjustment")
     end
 end
 
@@ -299,7 +298,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          tmp_floor=tmp_floor,
                          overlap_method=overlap,
                          flag_gcontinuum=true,
-                         flag_rayleigh=rscatter
+                         flag_rayleigh=rscatter,
+                         flag_cloud=cloud
                          )
 atmosphere.allocate!(atmos; 
                         spfile_has_star=spfile_has_star, 
@@ -335,9 +335,12 @@ end
 
 # Just once or iterate?
 if oneshot
-    println("RadTrans: Calculating fluxes")
+    println("Calculating fluxes")
     atmosphere.radtrans!(atmos, true)
     atmosphere.radtrans!(atmos, false)
+    if convect_mlt
+        atmosphere.mlt!(atmos)
+    end
 else
 
     if animate 
@@ -350,18 +353,18 @@ else
     end
 
     # Do accelerated integration
-    import solver_accel
-    solver_accel.solve_energy!(atmos, 
+    import solver_tstep
+    solver_tstep.solve_energy!(atmos, 
                          modplot=modplot, verbose=verbose, 
                          surf_state=surf_state, dry_convect=dry_convect, use_mlt=convect_mlt,
-                         max_steps=max_steps, accel=!no_accel, extrap=!no_accel,
-                         dtmp_conv=cc_tmpabs,drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel, F_losspct_conv=cc_floss
+                         max_steps=max_steps, accel=!no_accel,
+                         drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel, F_losspct_conv=cc_floss
                          )
     
-    # Do CVODE integration
-    if cvode
-        import solver_cvode 
-        solver_cvode.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, max_steps=100, verbose=verbose)
+    # Do newton-rapshon iterations
+    if nlsolve
+        import solver_nlsol
+        solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, max_steps=2000, verbose=verbose)
     end
 end
 
@@ -374,11 +377,11 @@ atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Final plots 
 if animate && !oneshot
-    println("Atmosphere: Making animation")
+    println("Making animation")
     plotting.anim_solver(atmos)
 end 
 if plot 
-    println("Atmosphere: Making plots")
+    println("Making plots")
     plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
     plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
 end 

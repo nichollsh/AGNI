@@ -99,6 +99,8 @@ module setpt
 
         itp = Interpolator(pl, tmpl) # Cell centres 
         atmos.tmp[:] .= itp.(atmos.p[:])
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -109,6 +111,8 @@ module setpt
         end 
         atmos.tmpl[1:end-1] .= set_tmp 
         atmos.tmp[:] .= set_tmp
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end 
 
@@ -136,6 +140,7 @@ module setpt
         dp = atmos.p[1]-atmos.pl[2]
         atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
 
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end 
 
@@ -162,6 +167,8 @@ module setpt
         if strat
             atmos.tmpl[1] = strat_tmp 
         end
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -202,6 +209,8 @@ module setpt
                 atmosphere.generate_pgrid!(atmos, switch=atmos.res_switching)
             end
         end 
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -231,6 +240,13 @@ module setpt
             Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
             if atmos.tmp[i] < Tsat
                 atmos.tmp[i] = Tsat
+                atmos.re[i]   = 1.0e-5  # 10 micron droplets
+                atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
+                atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
+            else 
+                atmos.re[i]   = 0.0
+                atmos.lwm[i]  = 0.0
+                atmos.clfr[i] = 0.0
             end
                 
             # Cell edge
@@ -239,7 +255,9 @@ module setpt
                 atmos.tmpl[i] = Tsat
             end
         end
+
+        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
-end 
+end # end module
