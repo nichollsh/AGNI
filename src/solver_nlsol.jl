@@ -14,15 +14,14 @@ module solver_nlsol
     using Printf
     using Statistics
     using Revise
-    using PCHIPInterpolation
     using LinearAlgebra
 
-    using SciMLBase
-    using NonlinearSolve
+    using NLsolve
+    using LineSearches
 
     import atmosphere 
     import phys
-
+    
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
 
@@ -35,124 +34,176 @@ module solver_nlsol
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
-    - `verbose::Bool=false`             verbose output?
+    - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=500`              maximum number of solver steps
+    - `use_linesearch::Bool=false`      use linesearch to ensure global convergence
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int=1, verbose::Bool=false,
+                            surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=500
+                            max_steps::Int=500, atol::Float64=1.0e-3,
+                            use_linesearch::Bool=false
                             )
 
+        # Validate condensation case
+        do_condense  = false 
+        i_gas        = -1
+        if condensate != "" 
+            if condensate in atmos.gases
+                do_condense = true 
+                i_gas = findfirst(==(condensate), atmos.gases)
+            else 
+                error("Invalid condensate ('$condensate')")
+            end 
+        end 
 
-        bot_orig_e = atmos.tmpl[end]
-        call::Int = 0
-        modprint::Int=25
+        # Work arrays 
+        pwr = zeros(Float64, atmos.nlev_c)  # power delivery into each cell
 
-        if verbose 
-            modprint = 10
-        end
-        if max_steps < modprint
-            modprint = 2
-        end
+        # Objective function to solve for
+        function fev!(F,x)
 
-        function objective(du, u, p)
-
-            call += 1
-            if mod(call,modprint) == 0 
-                println("    call $call")
-            end
-            
-
-            # ----------------------------------------------------------
-            # Set atmosphere
-            # ---------------------------------------------------------- 
+            # Reset values
+            atmos.mask_c[:] .= 0
+            atmos.mask_p[:] .= 0
+           
+            # Read new guess
             for i in 1:atmos.nlev_c
-                atmos.tmp[i] = u[i]
+                atmos.tmp[i] = x[i]
             end
+
+            # Check that guess is finite (no NaNs, no Infs)
+            if !all(isfinite, atmos.tmp)
+                display(atmos.tmp)
+                error("Temperature array contains NaNs and/or Infs")
+            end 
+
+            # Limit temperature domain
             clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Interpolate temperature to cell-edge values 
             atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
+
+            # Calculate layer properties 
+            atmosphere.calc_layer_props!(atmos)
             
-            # ----------------------------------------------------------
-            # Get fluxes 
-            # ---------------------------------------------------------- 
+            # Reset fluxes
             atmos.flux_tot[:] .= 0.0
 
-            # Radiation
+            # +Radiation
             atmosphere.radtrans!(atmos, true)
             atmosphere.radtrans!(atmos, false)
             atmos.flux_tot += atmos.flux_n
 
-            # Convection
+            # +Dry convection
             if dry_convect
-                atmosphere.mlt!(atmos)
+                atmosphere.mlt!(atmos, pmin=1.0)
                 atmos.flux_tot += atmos.flux_c
             end
 
-            # Turbulence
+            # +Turbulence
             if sens_heat
                 atmosphere.sensible!(atmos)
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
-            for i in 1:atmos.nlev_c 
-                du[i] = atmos.flux_tot[i] - atmos.flux_tot[i+1]
-            end
-            
-            if mod(call,modprint) == 0 
-                println("    Max df = $(maximum(abs.(du)))")
-                println("    Avg df = $(mean(abs.(du)))")
-                println(" ")
+            # Calculate power into each cell
+            pwr[1:end] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
+
+            # +Condensation
+            if do_condense
+                
+                # This handled by requiring that the residuals (i.e. the power
+                # being delivered into a cell) can only be positive in regions 
+                # where condensation is occuring, because they cannot be allowed 
+                # to cool down. All internal production (i.e. negative power 
+                # delivery) yields extra condensate, not a change in temp.
+
+                for i in 1:atmos.nlev_c
+
+                    x = atmos.layer_x[i,i_gas]
+                    if x < 1.0e-10 
+                        continue
+                    end
+
+                    # Layer is condensing if T < T_dew
+                    Tsat = phys.calc_Tdew(condensate,atmos.p[i] * x )
+                    if atmos.tmp[i] < Tsat
+                        pwr[i] = max(pwr[i], 0.0)
+
+                        atmos.mask_p[i] = atmos.mask_decay 
+                        atmos.re[i]   = 1.0e-5  # 10 micron droplets
+                        atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
+                        atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
+                    else 
+                        atmos.re[i]   = 0.0
+                        atmos.lwm[i]  = 0.0
+                        atmos.clfr[i] = 0.0
+                    end
+                end
+            end 
+
+            # Check fluxes are real numbers
+            if !all(isfinite, atmos.flux_tot)
+                display(atmos.flux_tot)
+                error("Flux array contains NaNs and/or Infs")
             end
 
+            # Pass residuals outward
+            F[:] .= pwr[:]
+
             return nothing
-        end # end objective function
+        end 
+
         
         # ----------------------------------------------------------
         # Call solver
         # ---------------------------------------------------------- 
-
-        println("NLSolver: Begin chi-squared minimisation")
-
-        u0 = zeros(Float64, atmos.nlev_c)
-        u0[:] .= atmos.tmp[:]
-
-        p = 2.0
-
-        # prob_ss = SteadyStateProblem(objective, u0, p)
-        # sol = solve(prob_ss, DynamicSS(CVODE_BDF()), dt=1.0e-3,  abstol=1e-3, reltol=1e-5, maxiters=max_steps)
-
-        prob_nl = NonlinearProblem(objective, u0, p)
-        sol = solve(prob_nl, NewtonRaphson(autodiff=false), dt=50.0, abstol=1e-1, reltol=1e-3, maxiters=max_steps)
-
-        if sol.retcode == :Success
-            println("NLSolver: Iterations completed (converged)")
+        the_ls = Static()
+        if use_linesearch 
+            the_ls = BackTracking()
+            println("NLSolver: begin Newton-Raphson iterations (with backtracking linesearch)") 
         else
-            println("NLSolver: Iterations completed (maximum iterations or failure)")
-        end
+            println("NLSolver: begin Newton-Raphson iterations") 
+        end 
+
+        atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
+
+        x0 = zeros(Float64, atmos.nlev_c)
+        x0[:] .= atmos.tmp[:]
+
+        sol = nlsolve(fev!, x0, method = :newton, linesearch = the_ls, 
+                        iterations=max_steps, ftol=atol, show_trace=true)
 
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
-        atmos.tmp[:] .= sol.u[:]
-        objective(zeros(Float64, atmos.nlev_c), atmos.tmp, p)
+
+        if !converged(sol)
+            @printf("    stopping atmosphere iterations before convergence (maybe try enabling linesearch) \n\n")
+        else
+            @printf("    convergence criteria met (%d iterations) \n\n", sol.iterations)
+        end
+
+        atmos.tmp[:] .= sol.zero[:]
+        fev!(zeros(Float64, atmos.nlev_c), atmos.tmp)
+        atmosphere.calc_hrates!(atmos)
 
         # ----------------------------------------------------------
         # Print info
         # ---------------------------------------------------------- 
         loss = atmos.flux_tot[1] - atmos.flux_tot[end]
         loss_pct = loss/atmos.flux_tot[1]*100.0
-        @printf("NLSolver: Final total fluxes [W m-2] \n")
-        @printf("    rad_OLR   = %.2e W m-2         \n", atmos.flux_u_lw[1])
-        @printf("    tot_TOA   = %.2e W m-2         \n", atmos.flux_tot[1])
-        @printf("    tot_BOA   = %.2e W m-2         \n", atmos.flux_tot[end])
-        @printf("    loss      = %.4f W m-2         \n", loss)
-        @printf("    loss      = %.4f %%            \n", loss_pct)
+        @printf("    endpoint fluxes \n")
+        @printf("    rad_OLR   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
+        @printf("    tot_TOA   = %+.2e W m-2     \n", atmos.flux_tot[1])
+        @printf("    tot_BOA   = %+.2e W m-2     \n", atmos.flux_tot[end])
+        @printf("    loss      = %+.2e W m-2     \n", loss)
+        @printf("    loss      = %+.2e %%        \n", loss_pct)
         @printf("\n")
 
-    end # end solve_root
+    end # end solve_energy 
+
 end 

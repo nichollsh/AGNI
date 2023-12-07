@@ -20,7 +20,8 @@ module atmosphere
     using DelimitedFiles
     using PCHIPInterpolation
     using LinearAlgebra
-
+    
+    import moving_average
     import phys
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -122,11 +123,11 @@ module atmosphere
         flux_c::Array       # Dry convective fluxes from MLT
         Kzz::Array          # Eddy diffusion coefficient from MLT
 
-        # Cloud
+        # Cloud and condensation
         mask_p::Array       # Layers which are (or were recently) condensing liquid
-        re::Array   # Effective radius of the droplets [m] (drizzle forms above 20 microns)
-        lwm::Array  # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
-        clfr::Array # Water cloud fraction - how much of the current cell turns into cloud? 0 : clear sky cell ; 1 : the cloud takes over the entire area of the cell (just leave at 1 for 1D runs)
+        re::Array           # Effective radius of the droplets [m] (drizzle forms above 20 microns)
+        lwm::Array          # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
+        clfr::Array         # Water cloud fraction - how much of the current cell turns into cloud? 0 : clear sky cell ; 1 : the cloud takes over the entire area of the cell (just leave at 1 for 1D runs)
 
         # Total energy flux
         flux_tot::Array     # Total upward-directed flux at cell edges
@@ -203,7 +204,7 @@ module atmosphere
                     mf_path =                   nothing,
                     zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
-                    tmp_floor::Float64 =        50.0,
+                    tmp_floor::Float64 =        80.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
                     tmp_magma::Float64 =        3000.0,
@@ -250,7 +251,7 @@ module atmosphere
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     5000.0
 
-        atmos.nlev_c         =  max(nlev_centre,30)
+        atmos.nlev_c         =  max(nlev_centre,45)
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.1)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
@@ -438,6 +439,10 @@ module atmosphere
             error(" atmosphere parameters have not been set")
         end
 
+        # Set pressure arrays in SOCRATES 
+        atmos.atm.p[1, :] .= atmos.p[:]
+        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+
         # mmw, cp, rho
         atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
         atmos.layer_density = zeros(Float64, atmos.nlev_c)
@@ -546,8 +551,9 @@ module atmosphere
             end
         end
     
-        # Set bottom layer to be very small
+        # Set bottom and top layers to be quite small  (to avoid giving the extrapolation too much control)
         # atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.999)
+        # atmos.pl[2]     = min(atmos.pl[2]    , atmos.pl[1]   / 0.999)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p =    zeros(Float64, atmos.nlev_c)
@@ -719,7 +725,6 @@ module atmosphere
         atmos.dimen.nd_aerosol_mode           = 1
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
-        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
@@ -762,6 +767,8 @@ module atmosphere
         # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
         # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
         atmos.control.i_direct_tau = 1
+
+        atmos.control.n_order_forward = 2
 
 
         ############################################
@@ -892,25 +899,31 @@ module atmosphere
         atmos.dimen.nd_phf_term_cloud_prsc  = 1
 
         if atmos.control.l_cloud
-            atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_type_homogen
-            atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_type_homogen # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen ; Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
+            atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_homogen # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen ; Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
+            atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_mix_max      # Goes with ip_max_rand
             atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand           # Maximum/random overlap in a mixed column (-C 2)
             atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous        # Homogeneous cloud
             atmos.control.i_st_water  = 5                                      # Liquid Water Droplet type 5 (-d 5)
             atmos.control.i_cnv_water = 5                                      # Convective Liquid Water Droplet type 5
             atmos.control.i_st_ice    = 11                                     # Water Ice type 11 (-i 11)
-            atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11 
-
-            atmos.cld.n_condensed       = 1
-            atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
-            atmos.cld.n_cloud_type      = 1
-            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
+            atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11
         else
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
             atmos.cld.n_condensed = 0
         end
 
+        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
+
+        if atmos.control.l_cloud
+            atmos.cld.n_condensed       = 1
+            atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
+            atmos.cld.n_cloud_type      = 1
+            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
+            atmos.cld.i_condensed_param[1] = 5
+        else
+            atmos.cld.n_condensed = 0
+        end
 
         atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
 
@@ -982,11 +995,11 @@ module atmosphere
 
         atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
 
-        # Set the two-stream approximation to be used
+        # Set the two-stream approximation to be used (-t f)
         if lw
-            atmos.control.i_2stream = 12 # -t 12, as per UKMO recommendation
+            atmos.control.i_2stream = 12 # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
         else
-            atmos.control.i_2stream = 16 # as per Cl_run_cdf 
+            atmos.control.i_2stream = 16 # Practical improved fl ux method (original form of 1980)
         end
 
         #####################################
@@ -994,16 +1007,22 @@ module atmosphere
         # see src/aux/angular_control_cdf.f
         #####################################
 
-        atmos.control.l_rescale = false # Cl_run_cdf default  (+R for true)
+        # Cl_run_cdf +R flag
+        atmos.control.l_rescale = true
         if atmos.control.l_rescale
             atmos.control.l_henyey_greenstein_pf = true
         end
 
-        atmos.control.i_solver = 13 # -v 13: 
-        # the solver used for the two-stream calculations. 
-        # 13 is recommended for clear-sky, 
-        # 16 is recommended for cloudy-sky,
-        # 17 is recommended for cloud with separate stratiform and convective regions.
+        # The internal SOCRATES solver used for the two-stream calculations (-v flag)
+        if atmos.control.l_cloud
+            # 16 is recommended for cloudy-sky
+            # 17 is recommended for cloud with separate stratiform and convective regions
+            atmos.control.i_solver = 16 
+        else 
+            # 13 is recommended for clear-sky
+            atmos.control.i_solver = 13  
+        end 
+        
 
         #      Arrays of fluxes must be of the full size.
         atmos.dimen.nd_2sg_profile =        atmos.dimen.nd_profile
@@ -1049,7 +1068,6 @@ module atmosphere
 
         ####################################################
         # Temperature
-        ####################################################
 
         clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
@@ -1059,7 +1077,7 @@ module atmosphere
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
-        calc_layer_props!(atmos)
+        # calc_layer_props!(atmos)
 
         if lw
             atmos.bound.t_ground[1] = atmos.tstar
@@ -1134,24 +1152,44 @@ module atmosphere
     end
 
 
-    # Calculate dry convective fluxes using mixing length theory 
-    function mlt!(atmos)
+    """
+    **Calculate dry convective fluxes using mixing length theory.**
 
-        # Follows a method similar to that in Lee+23 
-        # - Joyce & Tayar (2023)
-        # - Robinson & Marley (2014)
+    Uses the mixing length formulation outlined by Joyce & Tayar (2023), which 
+    was also implemented in Lee et al. (2023), and partially outlined in an 
+    earlier paper by Robinson & Marley (2014).
 
-        # F_c is calculated at every level edge, like radiative fluxes
+    Convective energy transport fluxes are calculated at every level edge, just 
+    like the radiative fluxes. This is not compatible with moist convection. By 
+    using MLT to parameterise convection, we can also calculate Kzz directly.
+
+    The mixing length is set to asymptotically approach H (for z>>H) or z (for 
+    z<H) as per Blackadar (1962). Or alternatively it can be set equal to H.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `pmin::Float64=0.0`               pressure below which convection is disabled.
+    - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
+    """
+    function mlt!(atmos; pmin::Float64=0.0, mltype::Int=1)
 
         # Reset arrays
         atmos.flux_c[:] .= 0.0
         atmos.Kzz[:] .= 0.0
 
-        # Mixing length parameter 
-        alpha = 1.0
+        # Work variables 
+        H = 0.0; l = 0.0; w = 0.0
+        m1 = 0.0; m2 = 0.0; mt = 0.0
+        grav = 0.0; mu = 0.0; c_p = 0.0; rho = 0.0
+        grad_ad = 0.0; grad_pr = 0.0
 
         # Loop from bottom upwards
-        for i in range(start=atmos.nlev_l-1 , step=-1, stop=2)
+        for i in range(start=atmos.nlev_l-1 , step=-1, stop=3) 
+
+            # Optionally skip low pressures 
+            if atmos.p[i] < pmin
+                continue
+            end
 
             m1 = atmos.layer_mass[i-1]
             m2 = atmos.layer_mass[i]
@@ -1167,21 +1205,37 @@ module atmosphere
             # Check instability
             if (grad_pr > grad_ad)
 
+                # Check if this layer is condensing (this shouldn't ever be
+                # true, because the condensation curve dT/dp is too shallow)
+                if atmos.mask_p[i] > 0
+                    println("    WARNING: Somehow unstable to dry convection in a condensing region!")
+                end 
+
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
                 atmos.mask_c[i]   = atmos.mask_decay
                 atmos.mask_c[i-1] = atmos.mask_decay
                 
-                # Pressure scale height and ML
+                # Pressure scale height
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
-                l = alpha * H
+
+                # Mixing length
+                if mltype == 0
+                    # Fixed
+                    l = H
+                elseif mltype == 1
+                    # Asymptotic 
+                    l = phys.k_vk * atmos.zl[i] / (1 + phys.k_vk * atmos.zl[i]/H)
+                else 
+                    # Otherwise
+                    error("Invalid mixing length type selected")
+                end
 
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel oscillations)
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
                 # Convective flux
-                f = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
-                atmos.flux_c[i] = f
+                atmos.flux_c[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
 
                 # Thermal eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
@@ -1191,7 +1245,15 @@ module atmosphere
         return nothing
     end # end of mlt
 
-    # Calculate heating rates at cell-centres
+    """
+    **Calculate heating rates at cell-centres from the total flux.**
+
+    Requires the total flux to have already been set (atmos.flux_tot). Heating 
+    rates are calculated in units of kelvin per day.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    """
     function calc_hrates!(atmos::atmosphere.Atmos_t)
 
         dF::Float64 = 0.0
@@ -1210,7 +1272,7 @@ module atmosphere
         return nothing
     end
 
-     # Dry convective adjustment (returning the temperature tendancy without modifying the atmos struct)
+     # Dry convective adjustment (returning the temperature tendency without modifying the atmos struct)
      function adjust_dry(atmos::atmosphere.Atmos_t, nsteps::Int)
 
         tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
@@ -1273,12 +1335,10 @@ module atmosphere
         return tmp_tnd
     end
 
-    # Moist hard convective adjustment (returning the temperature tendancy without modifying the atmos struct)
-    function adjust_moist(atmos::atmosphere.Atmos_t, gas::String)
+    # Apply condensation according to vapour-liquid coexistance curve (return mask of condensing levels)
+    function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
-        tmp_new = zeros(Float64, atmos.nlev_c)  # new temperatures
-        tmp_tnd = zeros(Float64, atmos.nlev_c)  # temperature tendency
-        tmp_new[:] .+= atmos.tmp[:]
+        changed = falses(atmos.nlev_c)
 
         i_gas = findfirst(==(gas), atmos.gases)
 
@@ -1293,52 +1353,62 @@ module atmosphere
             # Cell centre only
             Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
             if atmos.tmp[i] < Tsat
-                tmp_new[i] = Tsat
+                atmos.tmp[i] = Tsat
+                changed[i] = true 
                 
                 atmos.re[i]   = 1.0e-5  # 10 micron droplets
                 atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
                 atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
+            else 
+                atmos.re[i]   = 0.0
+                atmos.lwm[i]  = 0.0
+                atmos.clfr[i] = 0.0
             end
         end
         
-        # Calculate tendency
-        tmp_tnd[:] .=  tmp_new[:] .- atmos.tmp[:]
+        return changed
+    end
 
-        return tmp_tnd
+    # Smooth temperature at cell-centres 
+    function smooth_centres!(atmos::atmosphere.Atmos_t, width::Int)
+
+        if width > 2
+            if mod(width,2) == 0
+                width += 1 # window width has to be an odd number
+            end
+            atmos.tmp = moving_average.hma(atmos.tmp, width)
+        end 
+        clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
+
+        return nothing
     end
 
     # Set cell edge temperatures from cell centres
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false, back_interp::Bool=false)
 
-        clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
-
         bot_old_e = atmos.tmpl[end]
         top_old_e = atmos.tmpl[1]
         tstar_old = atmos.tstar
 
-        # Interpolate temperature to bulk cell-edge values 
-        # itp = Interpolator(atmos.p, atmos.tmp)
-        # atmos.tmpl[2:end-1] .= itp.(atmos.pl[2:end-1])
+        # Interpolate temperature to bulk cell-edge values (log-linear)
+        itp = Interpolator(log.(atmos.p), atmos.tmp)
+        atmos.tmpl[2:end-1] .= itp.(log.(atmos.pl[2:end-1]))
 
-        for i in 2:atmos.nlev_c
-            atmos.tmpl[i] = sqrt(atmos.tmp[i-1]*atmos.tmp[i])
-        end 
-
-        # Extrapolate top boundary temperature
+        # Extrapolate top edge temperature (log-linear)
         grad_dt = atmos.tmp[1] - atmos.tmp[2]
-        grad_dp = atmos.p[1]   - atmos.p[2]
-        atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * (atmos.pl[1] - atmos.p[1])
+        grad_dp = log(atmos.p[1]/atmos.p[2])
+        atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log(atmos.pl[1]/atmos.p[1])
 
         if limit_change
             atmos.tmpl[1] = 0.9 * atmos.tmpl[1] + 0.1 * top_old_e
         end
 
-        # Calculate bottom boundary temperature
+        # Calculate bottom edge temperature
         if (surf_state == 0) || (surf_state == 2)
-            # Extrapolate tmpl[end]
-            grad_dt = atmos.tmp[end]-atmos.tmpl[end-1]
-            grad_dp = atmos.p[end]-atmos.pl[end-1]
-            atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * (atmos.pl[end] - atmos.p[end])
+            # Extrapolate (log-linear)
+            grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
+            grad_dp = log(atmos.p[end]/atmos.p[end-1])
+            atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
             # Conductive skin
             if surf_state == 2
@@ -1352,13 +1422,14 @@ module atmosphere
                 atmos.tstar     = 0.7 * atmos.tstar     + 0.3 * tstar_old
             end 
 
+        # Fixed => do nothing
         elseif (surf_state == 1)
-            # Fixed => do nothing
             atmos.tmpl[end] = bot_old_e
+
+        # Invalid case
         else 
-            error("Invalid surface state $(surf_state)")
+            error("Invalid surface state ($surf_state)")
         end 
-        
 
         # Second interpolation back to cell-centres.
         # This can help prevent grid-imprinting issues, but in some cases it can 
@@ -1366,9 +1437,12 @@ module atmosphere
         # much control over the temperature profile at small scales.
         if back_interp
             clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
-            itp = Interpolator(atmos.pl, atmos.tmpl)  
-            atmos.tmp[:] .= itp.(atmos.p[:])
+            itp = Interpolator(log.(atmos.pl), atmos.tmpl)  
+            atmos.tmp[:] .= itp.(log.(atmos.p[:]))
         end
+
+        # Limit domain
+        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
 
         return nothing
     end 
@@ -1403,6 +1477,7 @@ module atmosphere
 
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
 
+        # Remove old file if exists
         rm(fname, force=true)
 
         open(fname, "w") do f
@@ -1418,18 +1493,19 @@ module atmosphere
     # Write current cell-edge fluxes to a CSV file
     function write_fluxes(atmos::atmosphere.Atmos_t, fname::String)
 
+        # Remove old file if exists
         rm(fname, force=true)
 
         open(fname, "w") do f
-            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C       \n")
-            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2] \n")
+            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C           , tot      \n")
+            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
             for i in 1:atmos.nlev_l
-                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
+                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e, %+1.4e \n", 
                           atmos.pl[i], 
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
-                          atmos.flux_c[i]
+                          atmos.flux_c[i],    atmos.flux_tot[i]
                           )
             end
         end
@@ -1478,6 +1554,7 @@ module atmosphere
         var_fray =      defVar(ds, "flag_rayleigh", Char, ())  # Includes rayleigh scattering?
         var_fcon =      defVar(ds, "flag_continuum",Char, ())  # Includes continuum absorption?
         var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())  # Includes clouds?
+        var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())  # Using thermodynamic functions
 
         #     Store data
         var_tstar[1] =  atmos.tstar 
@@ -1500,6 +1577,12 @@ module atmosphere
             var_fcld[1] = 'y'
         else
             var_fcld[1] = 'n'
+        end 
+
+        if atmos.thermo_funct
+            var_tfun[1] = 'y'
+        else
+            var_tfun[1] = 'n'
         end 
         
         # ----------------------
@@ -1525,6 +1608,7 @@ module atmosphere
         var_fu =        defVar(ds, "fl_U",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fc =        defVar(ds, "fl_C",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_ft =        defVar(ds, "fl_tot", Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",  Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_kzz =       defVar(ds, "Kzz",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
         var_bs =        defVar(ds, "bandmin",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
@@ -1569,6 +1653,7 @@ module atmosphere
 
         var_fc[:] =     atmos.flux_c
 
+        var_ft[:] =     atmos.flux_tot
         var_hr[:] =     atmos.heating_rate
 
         var_kzz[:] =    atmos.Kzz
