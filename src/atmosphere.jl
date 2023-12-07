@@ -1007,16 +1007,21 @@ module atmosphere
         # see src/aux/angular_control_cdf.f
         #####################################
 
-        atmos.control.l_rescale = true # Cl_run_cdf default  (+R for true)
+        atmos.control.l_rescale = true
         if atmos.control.l_rescale
             atmos.control.l_henyey_greenstein_pf = true
         end
 
-        atmos.control.i_solver = 16 # -v 13: 
-        # the solver used for the two-stream calculations. 
-        # 13 is recommended for clear-sky, 
-        # 16 is recommended for cloudy-sky,
-        # 17 is recommended for cloud with separate stratiform and convective regions.
+        # The internal SOCRATES solver used for the two-stream calculations (-v flag)
+        if atmos.control.l_cloud
+            # 16 is recommended for cloudy-sky
+            # 17 is recommended for cloud with separate stratiform and convective regions
+            atmos.control.i_solver = 16 
+        else 
+            # 13 is recommended for clear-sky
+            atmos.control.i_solver = 13  
+        end 
+        
 
         #      Arrays of fluxes must be of the full size.
         atmos.dimen.nd_2sg_profile =        atmos.dimen.nd_profile
