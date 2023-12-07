@@ -725,7 +725,6 @@ module atmosphere
         atmos.dimen.nd_aerosol_mode           = 1
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
-        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
@@ -767,7 +766,9 @@ module atmosphere
 
         # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
         # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
-        atmos.control.i_direct_tau = 2
+        atmos.control.i_direct_tau = 1
+
+        atmos.control.n_order_forward = 2
 
 
         ############################################
@@ -905,18 +906,24 @@ module atmosphere
             atmos.control.i_st_water  = 5                                      # Liquid Water Droplet type 5 (-d 5)
             atmos.control.i_cnv_water = 5                                      # Convective Liquid Water Droplet type 5
             atmos.control.i_st_ice    = 11                                     # Water Ice type 11 (-i 11)
-            atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11 
-
-            atmos.cld.n_condensed       = 1
-            atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
-            atmos.cld.n_cloud_type      = 1
-            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
+            atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11
         else
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
             atmos.cld.n_condensed = 0
         end
 
+        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
+
+        if atmos.control.l_cloud
+            atmos.cld.n_condensed       = 1
+            atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
+            atmos.cld.n_cloud_type      = 1
+            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
+            atmos.cld.i_condensed_param[1] = 5
+        else
+            atmos.cld.n_condensed = 0
+        end
 
         atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
 
@@ -1000,12 +1007,12 @@ module atmosphere
         # see src/aux/angular_control_cdf.f
         #####################################
 
-        atmos.control.l_rescale = false # Cl_run_cdf default  (+R for true)
+        atmos.control.l_rescale = true # Cl_run_cdf default  (+R for true)
         if atmos.control.l_rescale
             atmos.control.l_henyey_greenstein_pf = true
         end
 
-        atmos.control.i_solver = 13 # -v 13: 
+        atmos.control.i_solver = 16 # -v 13: 
         # the solver used for the two-stream calculations. 
         # 13 is recommended for clear-sky, 
         # 16 is recommended for cloudy-sky,
