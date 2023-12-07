@@ -995,11 +995,11 @@ module atmosphere
 
         atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
 
-        # Set the two-stream approximation to be used
+        # Set the two-stream approximation to be used (-t f)
         if lw
-            atmos.control.i_2stream = 12 # -t 12, as per UKMO recommendation
+            atmos.control.i_2stream = 12 # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
         else
-            atmos.control.i_2stream = 16 # as per Cl_run_cdf 
+            atmos.control.i_2stream = 16 # Practical improved fl ux method (original form of 1980)
         end
 
         #####################################
@@ -1007,6 +1007,7 @@ module atmosphere
         # see src/aux/angular_control_cdf.f
         #####################################
 
+        # Cl_run_cdf +R flag
         atmos.control.l_rescale = true
         if atmos.control.l_rescale
             atmos.control.l_henyey_greenstein_pf = true
