@@ -29,7 +29,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400))
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400), guidefontsize=9)
 
         # Plot temperature
         scatter!(plt, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
@@ -54,7 +54,7 @@ module plotting
 
         
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, size=(500,400))
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, size=(500,400), guidefontsize=9)
 
         # Plot mole fractions for each gas
         min_x = 1.0e-3
@@ -203,7 +203,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         w = 2.8
-        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi)
+        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, guidefontsize=9)
 
         col_u = "brown3"
         col_d = "seagreen"
@@ -309,6 +309,77 @@ module plotting
 
         return nothing
     end
+
+    """
+    Plot emission spectrum at the TOA
+    """
+    function plot_emission(atmos, fname; dpi::Int=250)
+
+        # Get data
+        x = zeros(Float64, atmos.nbands)
+        y = zeros(Float64, atmos.nbands)
+
+        for ba in 1:atmos.nbands
+            # x value - band centres [nm]
+            x[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
+            
+            # y value - spectral flux [erg s-1 cm-2 nm-1]
+            w  = (atmos.bands_max[ba] - atmos.bands_min[ba]) * 1.0e9 # band width in nm
+            f  = atmos.band_u_lw[1, ba] + atmos.band_u_sw[1, ba] # raw flux in W.m-2
+            ff = f / w * 1000.0 # converted to erg s-1 cm-2 nm-1
+            y[ba] = ff
+        end
+
+        # Make plot
+        plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
+
+        plot!(plt, x, y, label="", color="black")
+
+        xlims  = (minimum(x), min(maximum(x), 20000.0))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+
+        ylims  = (minimum(y) / 2, maximum(y) * 2)
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
+        xlabel!(plt, "Wavelength [nm]")
+        ylabel!(plt, "Spectral flux density [erg s-1 cm-2 nm-1]")
+        yaxis!(plt, yscale=:log10, ylims=ylims, yticks=yticks)
+        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+
+        savefig(plt, fname)
+
+        return nothing 
+    end 
+
+    """
+    Plot spectral albedo (ratio of LW_UP to SW_DN)
+    """
+    function plot_albedo(atmos, fname; dpi::Int=250)
+
+        # Get data
+        x = zeros(Float64, atmos.nbands)
+        y = zeros(Float64, atmos.nbands)
+
+        for ba in 1:atmos.nbands
+            # x value - band centres [nm]
+            x[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
+            
+            # y value - spectral albedo [dimensionless]
+            y[ba] = atmos.band_u_lw[1, ba]/atmos.band_d_sw[1, ba]
+        end
+
+        # Make plot
+        plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
+
+        plot!(plt, x, y, label="", color="black")
+
+        xlabel!(plt, "Wavelength [nm]")
+        ylabel!(plt, "Spectral albedo")
+
+        savefig(plt, fname)
+
+        return nothing 
+    end 
 
     """
     Animate output frames from solver, using ffmpeg
