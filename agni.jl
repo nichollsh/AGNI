@@ -39,7 +39,7 @@ mf_dict         = Dict([
                         # ("N2" , 1.41003)
                         ])
 
-spfile_name   = "res/spectral_files/Reach_cloud/Reach"
+spfile_name   = "res/spectral_files/Oak/Oak"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
@@ -54,7 +54,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
                          flag_rayleigh=true,
-                         flag_cloud=true,
+                         flag_cloud=false,
                          overlap_method=4,
                          zenith_degrees=48.19,
                          skin_d=0.01,
@@ -121,6 +121,7 @@ plotting.anim_solver(atmos)
 plotting.plot_x(atmos,      joinpath(atmos.OUT_DIR,"mf.pdf"))
 plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
 plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
+plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"em.pdf"))
 
 # Deallocate atmosphere
 println("Deallocating arrays")
