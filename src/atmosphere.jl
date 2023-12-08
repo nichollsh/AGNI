@@ -58,6 +58,7 @@ module atmosphere
         overlap_method::Int
 
         # Band edge wavelengths [m]
+        nbands::Int
         bands_min::Array
         bands_max::Array
 
@@ -99,7 +100,7 @@ module atmosphere
         layer_grav::Array       # gravity [m s-2]
         layer_mass::Array       # mass per unit area [kg m-2]
 
-        # Calculated radiative fluxes (W m-2)
+        # Calculated bolometric radiative fluxes (W m-2)
         flux_d_lw::Array  # down component, lw 
         flux_u_lw::Array  # up component, lw
         flux_n_lw::Array  # net upward, lw
@@ -111,6 +112,15 @@ module atmosphere
         flux_d::Array    # down component, lw+sw 
         flux_u::Array    # up component, lw+sw 
         flux_n::Array    # net upward, lw+sw 
+
+        # Calculated per-band radiative fluxes (W m-2)
+        band_d_lw::Array  # down component, lw 
+        band_u_lw::Array  # up component, lw
+        band_n_lw::Array  # net upward, lw
+
+        band_d_sw::Array  # down component, sw 
+        band_u_sw::Array  # up component, sw
+        band_n_sw::Array  # net upward, sw
 
         # Sensible heating
         C_d::Float64        # Turbulent exchange coefficient [dimensionless]
@@ -665,10 +675,11 @@ module atmosphere
             n_channel = 1
         end
 
+        atmos.nbands = atmos.spectrum.Basic.n_band
         atmos.bands_max = zeros(Float64, atmos.spectrum.Basic.n_band)
         atmos.bands_min = zeros(Float64, atmos.spectrum.Basic.n_band)
 
-        for i in 1:atmos.spectrum.Basic.n_band
+        for i in 1:atmos.nbands
             atmos.bands_min[i] = atmos.spectrum.Basic.wavelength_short[i]
             atmos.bands_max[i] = atmos.spectrum.Basic.wavelength_long[i]
         end 
@@ -941,6 +952,14 @@ module atmosphere
         atmos.flux_d =            zeros(Float64, atmos.nlev_l)
         atmos.flux_u =            zeros(Float64, atmos.nlev_l)
         atmos.flux_n =            zeros(Float64, atmos.nlev_l)
+        
+        atmos.band_d_lw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
+        atmos.band_u_lw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
+        atmos.band_n_lw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
+
+        atmos.band_d_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
+        atmos.band_u_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
+        atmos.band_n_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
 
         atmos.flux_sens =         0.0
 
@@ -1105,12 +1124,20 @@ module atmosphere
         # Store new fluxes in atmos struct
         if lw 
             # LW case
-            atmos.flux_u_lw[:] .= 0.0
-            atmos.flux_d_lw[:] .= 0.0
-            atmos.flux_n_lw[:] .= 0.0
-            for lv in 1:atmos.nlev_l                # sum over levels
-                for ch in 1:atmos.dimen.nd_channel  # sum over channels
-                    idx = lv+(ch-1)*atmos.nlev_l
+            fill!(atmos.flux_u_lw, 0.0)
+            fill!(atmos.flux_d_lw, 0.0)
+            fill!(atmos.flux_n_lw, 0.0)
+            fill!(atmos.band_u_lw, 0.0)
+            fill!(atmos.band_d_lw, 0.0)
+            fill!(atmos.band_n_lw, 0.0)
+            for lv in 1:atmos.nlev_l      # sum over levels
+                for ba in 1:atmos.nbands  # sum over bands
+                    idx = lv+(ba-1)*atmos.nlev_l
+
+                    atmos.band_d_lw[lv,ba] = atmos.radout.flux_down[idx]
+                    atmos.band_u_lw[lv,ba] = atmos.radout.flux_up[idx]
+                    atmos.band_n_lw[lv,ba] = atmos.band_u_lw[lv,ba] - atmos.band_d_lw[lv,ba]
+
                     atmos.flux_d_lw[lv] += max(0.0, atmos.radout.flux_down[idx])
                     atmos.flux_u_lw[lv] += max(0.0, atmos.radout.flux_up[idx])
                 end 
@@ -1119,12 +1146,20 @@ module atmosphere
             atmos.is_out_lw = true 
         else
             # SW case
-            atmos.flux_u_sw[:] .= 0.0
-            atmos.flux_d_sw[:] .= 0.0
-            atmos.flux_n_sw[:] .= 0.0
+            fill!(atmos.flux_u_sw, 0.0)
+            fill!(atmos.flux_d_sw, 0.0)
+            fill!(atmos.flux_n_sw, 0.0)
+            fill!(atmos.band_u_sw, 0.0)
+            fill!(atmos.band_d_sw, 0.0)
+            fill!(atmos.band_n_sw, 0.0)
             for lv in 1:atmos.nlev_l                # sum over levels
-                for ch in 1:atmos.dimen.nd_channel  # sum over channels
-                    idx = lv+(ch-1)*atmos.nlev_l
+                for ba in 1:atmos.dimen.nd_channel  # sum over bands
+                    idx = lv+(ba-1)*atmos.nlev_l
+
+                    atmos.band_d_sw[lv,ba] = atmos.radout.flux_down[idx]
+                    atmos.band_u_sw[lv,ba] = atmos.radout.flux_up[idx]
+                    atmos.band_n_sw[lv,ba] = atmos.band_u_sw[lv,ba] - atmos.band_d_sw[lv,ba]
+
                     atmos.flux_d_sw[lv] += max(0.0, atmos.radout.flux_down[idx])
                     atmos.flux_u_sw[lv] += max(0.0, atmos.radout.flux_up[idx])
                 end 
@@ -1535,15 +1570,14 @@ module atmosphere
 
         ngases = length(atmos.gases)
         nchars = 16
-        nbands = length(atmos.bands_min)
 
         # ----------------------
         # Create dimensions
-        defDim(ds, "nlev_c", nlev_c)    # Cell centres
-        defDim(ds, "nlev_l", nlev_l)    # Cell edges
-        defDim(ds, "ngases", ngases)    # Gases
-        defDim(ds, "nchars", nchars)    # Length of string containing gas names
-        defDim(ds, "nbands", nbands)    # Number of spectral channels
+        defDim(ds, "nlev_c", nlev_c)        # Cell centres
+        defDim(ds, "nlev_l", nlev_l)        # Cell edges
+        defDim(ds, "ngases", ngases)        # Gases
+        defDim(ds, "nchars", nchars)        # Length of string containing gas names
+        defDim(ds, "nbands", atmos.nbands)  # Number of spectral bands
 
         # ----------------------
         # Scalar quantities  
@@ -1611,8 +1645,14 @@ module atmosphere
         var_ft =        defVar(ds, "fl_tot", Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",  Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_kzz =       defVar(ds, "Kzz",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
-        var_bs =        defVar(ds, "bandmin",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
-        var_bl =        defVar(ds, "bandmax",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
+        var_bmin =      defVar(ds, "bandmin",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
+        var_bmax =      defVar(ds, "bandmax",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
+        var_bdl =       defVar(ds, "ba_D_LW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bul =       defVar(ds, "ba_U_LW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bnl =       defVar(ds, "ba_N_LW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bds =       defVar(ds, "ba_D_SW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bus =       defVar(ds, "ba_U_SW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bns =       defVar(ds, "ba_N_SW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
 
         #     Store data
         var_p[:] =      atmos.p
@@ -1658,8 +1698,19 @@ module atmosphere
 
         var_kzz[:] =    atmos.Kzz
 
-        var_bs[:] =     atmos.bands_min
-        var_bl[:] =     atmos.bands_max
+        var_bmin[:] =   atmos.bands_min
+        var_bmax[:] =   atmos.bands_max
+
+        for lv in 1:atmos.nlev_l 
+            for ba in 1:atmos.nbands
+                var_bul[ba, lv] = atmos.band_u_lw[lv, ba]
+                var_bdl[ba, lv] = atmos.band_d_lw[lv, ba]
+                var_bnl[ba, lv] = atmos.band_n_lw[lv, ba]
+                var_bus[ba, lv] = atmos.band_u_sw[lv, ba]
+                var_bds[ba, lv] = atmos.band_d_sw[lv, ba]
+                var_bns[ba, lv] = atmos.band_n_sw[lv, ba]
+            end 
+        end 
 
         # ----------------------
         # Close
