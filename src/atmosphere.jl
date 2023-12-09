@@ -50,6 +50,7 @@ module atmosphere
         # SOCRATES parameters
         all_channels::Bool 
         spectral_file::String 
+        star_file::String 
         albedo_s::Float64 
         zenith_degrees::Float64 
         toa_heating::Float64 
@@ -263,11 +264,11 @@ module atmosphere
 
         atmos.nlev_c         =  max(nlev_centre,45)
         atmos.nlev_l         =  atmos.nlev_c + 1
-        atmos.zenith_degrees =  max(min(zenith_degrees,90.0), 0.1)
+        atmos.zenith_degrees =  max(min(zenith_degrees,89.5), 0.5)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.toa_heating =     max(toa_heating, 0.0)
         atmos.tstar =           max(tstar, atmos.tmp_floor)
-        atmos.grav_surf =       max(1.0e-3, gravity)
+        atmos.grav_surf =       max(1.0e-4, gravity)
         
         atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
@@ -614,6 +615,13 @@ module atmosphere
         end 
         if !isfile(stellar_spectrum) && !spfile_has_star
             error("Stellar spectrum file '$(stellar_spectrum)' does not exist")
+        end
+
+        # Record location
+        if !spfile_has_star
+            atmos.star_file = abspath(stellar_spectrum)
+        else 
+            atmos.star_file = "IN_SPECTRAL_FILE"
         end
 
         # Spectral file to be loaded
@@ -1585,15 +1593,30 @@ module atmosphere
         var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # BOA LW BC
         var_toah =      defVar(ds, "toa_heating",   Float64, (), attrib = OrderedDict("units" => "W m-2"))  # TOA SW BC
         var_tmagma =    defVar(ds, "tmagma",        Float64, (), attrib = OrderedDict("units" => "K"))      # Magma temperature
-        var_fray =      defVar(ds, "flag_rayleigh", Char, ())  # Includes rayleigh scattering?
-        var_fcon =      defVar(ds, "flag_continuum",Char, ())  # Includes continuum absorption?
-        var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())  # Includes clouds?
-        var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())  # Using thermodynamic functions
+        var_tmin =      defVar(ds, "tfloor",        Float64, (), attrib = OrderedDict("units" => "K"))      # Minimum temperature
+        var_tmax =      defVar(ds, "tceiling",      Float64, (), attrib = OrderedDict("units" => "K"))      # Maximum temperature
+        var_plrad =     defVar(ds, "planet_radius", Float64, (), attrib = OrderedDict("units" => "m"))      # Value taken for planet radius
+        var_gsurf =     defVar(ds, "surf_gravity",  Float64, (), attrib = OrderedDict("units" => "m s-2"))  # Surface gravity
+        var_albsurf =   defVar(ds, "surf_albedo",   Float64, ())                                            # Surface albedo
+        var_fray =      defVar(ds, "flag_rayleigh", Char, ())                                               # Includes rayleigh scattering?
+        var_fcon =      defVar(ds, "flag_continuum",Char, ())                                               # Includes continuum absorption?
+        var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())                                               # Includes clouds?
+        var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())                                               # Using thermodynamic functions
+        var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg"))    # Zenith angle of direct stellar radiation
+        var_sknd =      defVar(ds, "cond_skin_d"   ,Float64, (), attrib = OrderedDict("units" => "m"))      # Conductive skin thickness
+        var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1"))    # Conductive skin thermal conductivity
+        var_specfile =  defVar(ds, "specfile"      ,String, ())
+        var_starfile =  defVar(ds, "starfile"      ,String, ())
 
         #     Store data
-        var_tstar[1] =  atmos.tstar 
-        var_toah[1] =   atmos.toa_heating
-        var_tmagma[1] = atmos.tmp_magma
+        var_tstar[1] =      atmos.tstar 
+        var_toah[1] =       atmos.toa_heating
+        var_tmagma[1] =     atmos.tmp_magma
+        var_tmin[1] =       atmos.tmp_floor
+        var_tmax[1] =       atmos.tmp_ceiling
+        var_plrad[1]  =     atmos.rp
+        var_gsurf[1] =      atmos.grav_surf
+        var_albsurf[1] =    atmos.albedo_s
 
         if atmos.control.l_rayleigh
             var_fray[1] = 'y'
@@ -1618,41 +1641,48 @@ module atmosphere
         else
             var_tfun[1] = 'n'
         end 
+
+        var_znth[1] = atmos.zenith_degrees
+        var_sknd[1] = atmos.skin_d
+        var_sknk[1] = atmos.skin_k
+
+        var_specfile[1] = atmos.spectral_file
+        var_starfile[1] = atmos.star_file
         
         # ----------------------
         # Vector quantities
         #    Create variables
-        var_p =         defVar(ds, "p",      Float64, ("nlev_c",), attrib = OrderedDict("units" => "Pa"))
-        var_pl =        defVar(ds, "pl",     Float64, ("nlev_l",), attrib = OrderedDict("units" => "Pa"))
-        var_tmp =       defVar(ds, "tmp",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "K"))
-        var_tmpl =      defVar(ds, "tmpl",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "K"))
-        var_z =         defVar(ds, "z",      Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
-        var_zl =        defVar(ds, "zl",     Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
-        var_grav =      defVar(ds, "gravity",Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
-        var_mmw =       defVar(ds, "mmw",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
-        var_gases =     defVar(ds, "gases",  Char,    ("nchars", "ngases")) # Transposed cf AEOLUS because of how Julia stores arrays
-        var_x =         defVar(ds, "x_gas",  Float64, ("ngases", "nlev_c")) # ^^
-        var_fdl =       defVar(ds, "fl_D_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_ful =       defVar(ds, "fl_U_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fnl =       defVar(ds, "fl_N_LW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fds =       defVar(ds, "fl_D_SW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fus =       defVar(ds, "fl_U_SW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fns =       defVar(ds, "fl_N_SW",Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fd =        defVar(ds, "fl_D",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fu =        defVar(ds, "fl_U",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fn =        defVar(ds, "fl_N",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fc =        defVar(ds, "fl_C",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_ft =        defVar(ds, "fl_tot", Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_hr =        defVar(ds, "hrate",  Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
-        var_kzz =       defVar(ds, "Kzz",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
-        var_bmin =      defVar(ds, "bandmin",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
-        var_bmax =      defVar(ds, "bandmax",Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
-        var_bdl =       defVar(ds, "ba_D_LW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bul =       defVar(ds, "ba_U_LW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bnl =       defVar(ds, "ba_N_LW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bds =       defVar(ds, "ba_D_SW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bus =       defVar(ds, "ba_U_SW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bns =       defVar(ds, "ba_N_SW",Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_p =         defVar(ds, "p",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "Pa"))
+        var_pl =        defVar(ds, "pl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "Pa"))
+        var_tmp =       defVar(ds, "tmp",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "K"))
+        var_tmpl =      defVar(ds, "tmpl",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "K"))
+        var_z =         defVar(ds, "z",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
+        var_zl =        defVar(ds, "zl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
+        var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
+        var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
+        var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf AEOLUS because of how Julia stores arrays
+        var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c")) # ^^
+        var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fds =       defVar(ds, "fl_D_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fus =       defVar(ds, "fl_U_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fns =       defVar(ds, "fl_N_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fd =        defVar(ds, "fl_D",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fu =        defVar(ds, "fl_U",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fn =        defVar(ds, "fl_N",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fc =        defVar(ds, "fl_C",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_ft =        defVar(ds, "fl_tot",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_hr =        defVar(ds, "hrate",     Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
+        var_kzz =       defVar(ds, "Kzz",       Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
+        var_bmin =      defVar(ds, "bandmin",   Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
+        var_bmax =      defVar(ds, "bandmax",   Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
+        var_bdl =       defVar(ds, "ba_D_LW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bul =       defVar(ds, "ba_U_LW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bnl =       defVar(ds, "ba_N_LW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bds =       defVar(ds, "ba_D_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bus =       defVar(ds, "ba_U_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
 
         #     Store data
         var_p[:] =      atmos.p
