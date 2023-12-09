@@ -20,6 +20,7 @@ module atmosphere
     using DelimitedFiles
     using PCHIPInterpolation
     using LinearAlgebra
+    using Dates
     
     import moving_average
     import phys
@@ -1570,17 +1571,30 @@ module atmosphere
         rm(fname, force=true)
         ds = Dataset(fname,"c")
 
-        # Prepare
+        # Global attributes
         ds.attrib["description"] = "AGNI atmosphere data"
+        ds.attrib["date"]        = Dates.format(now(), "yyyy-u-dd HH:MM:SS")
+        ds.attrib["hostname"]    = gethostname()
 
+        plat = ""
+        if Sys.isapple()
+            plat = "Darwin"
+        elseif Sys.iswindows()
+            plat = "Windows"
+        elseif Sys.islinux()
+            plat = "Linux"
+        else 
+            plat = "Generic"
+        end
+        ds.attrib["platform"] = plat
+        
+        # ----------------------
+        # Create dimensions
         nlev_c = Int(atmos.nlev_c)
         nlev_l = nlev_c + 1
-
         ngases = length(atmos.gases)
         nchars = 16
 
-        # ----------------------
-        # Create dimensions
         defDim(ds, "nlev_c", nlev_c)        # Cell centres
         defDim(ds, "nlev_l", nlev_l)        # Cell edges
         defDim(ds, "ngases", ngases)        # Gases
@@ -1605,8 +1619,8 @@ module atmosphere
         var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg"))    # Zenith angle of direct stellar radiation
         var_sknd =      defVar(ds, "cond_skin_d"   ,Float64, (), attrib = OrderedDict("units" => "m"))      # Conductive skin thickness
         var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1"))    # Conductive skin thermal conductivity
-        var_specfile =  defVar(ds, "specfile"      ,String, ())
-        var_starfile =  defVar(ds, "starfile"      ,String, ())
+        var_specfile =  defVar(ds, "specfile"      ,String, ())     # Path to spectral file when read
+        var_starfile =  defVar(ds, "starfile"      ,String, ())     # Path to star file when read
 
         #     Store data
         var_tstar[1] =      atmos.tstar 
@@ -1648,7 +1662,7 @@ module atmosphere
 
         var_specfile[1] = atmos.spectral_file
         var_starfile[1] = atmos.star_file
-        
+
         # ----------------------
         # Vector quantities
         #    Create variables
