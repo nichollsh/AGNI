@@ -10,7 +10,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 ### Repository structure 
 * `README.md`       - This file
 * `LICENSE.txt`     - License for use and re-use
-* `doc/`            - Other documentation
+* `doc/`            - Further documentation
 * `out/`            - Output files
 * `res/`            - Resources
 * `src/`            - AGNI source code
