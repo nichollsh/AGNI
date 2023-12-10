@@ -21,8 +21,8 @@ s = ArgParseSettings()
         help = "Surface temperature [K]."
         arg_type = Float64
         required = true
-    "toa_heating"
-        help = "Shortwave downward flux top boundary condition [W m-2]."
+    "inst"
+        help = "Solar flux at the planet's orbital separation [W m-2]."
         arg_type = Float64
         required = true
     "gravity"
@@ -94,6 +94,14 @@ s = ArgParseSettings()
         help = "Direction of solar radiation beam measured from zenith [deg]."
         arg_type = Float64
         default = 54.74
+    "--inst_factor"
+        help = "Scale factor applied to instellation alongside the zenith angle"
+        arg_type = Float64
+        default = 0.25
+    "--albedo_b"
+        help = "Grey bond albedo applied to instellation"
+        arg_type = Float64
+        default = 0.0
     "--output"
         help = "Output directory relative to AGNI directory. This directory will be emptied before being used."
         arg_type = String
@@ -171,7 +179,9 @@ import plotting
 
 # Set the configuration options
 tstar           = args["tstar"]
-toa_heating     = args["toa_heating"]
+instellation    = args["inst"]
+s0_fact         = args["inst_factor"]
+albedo_b        = args["albedo_b"]
 gravity         = args["gravity"]
 radius          = args["radius"]
 p_surf          = args["psurf"]
@@ -287,7 +297,8 @@ println("Atmosphere: setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, tstar,
+                         instellation, s0_fact, albedo_b,
+                         tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,

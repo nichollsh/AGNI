@@ -26,7 +26,7 @@ import phys
 import plotting
 
 # Configuration options
-toa_heating     = 1000.0  # SW dflux top boundary condition [W m-2]
+instellation    = 1000.0  # Solar flux [W m-2]
 gravity         = 9.81
 radius          = 6.0e6
 nlev_centre     = 100
@@ -46,7 +46,8 @@ mkdir(output_dir)
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                         spectral_file,
-                        toa_heating, 1700.0,
+                        instellation, 1.0, 0.0,
+                        1700.0,
                         gravity, radius,
                         nlev_centre, p_surf, p_top,
                         mf_dict=mole_fractions,
