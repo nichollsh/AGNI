@@ -63,7 +63,8 @@ star_file     = "res/stellar_spectra/sun.txt"
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, tstar,
+                         toa_heating, 1.0, 0.0,
+                         tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict
@@ -112,7 +113,8 @@ star_file     = "res/stellar_spectra/sun.txt"
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, tstar,
+                         toa_heating, 1.0, 0.0,
+                         tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -159,7 +161,8 @@ star_file     = "res/stellar_spectra/sun.txt"
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, tstar,
+                         toa_heating, 1.0, 0.0,
+                         tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -209,7 +212,8 @@ star_file     = "res/stellar_spectra/sun.txt"
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, tstar,
+                         toa_heating, 1.0, 0.0,
+                         tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -257,7 +261,8 @@ star_file     = "res/stellar_spectra/trappist-1.txt"
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, tstar,
+                         toa_heating, 1.0, 0.0,
+                         tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
