@@ -26,7 +26,7 @@ import phys
 
 # Configuration options
 tstar           = 300.0     # LW uflux bottom boundary condition [kelvin]
-toa_heating     = 1367.0    # Daytime instellation flux [W m-2]
+instellation    = 1361.0    # Daytime instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
 nlev_centre     = 100  
@@ -49,7 +49,8 @@ println("Setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, tstar,
+                         toa_heating, 3.0/8.0, 0.12,
+                         tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_path=mf_path,

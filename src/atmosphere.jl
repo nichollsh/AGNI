@@ -48,16 +48,19 @@ module atmosphere
         bound::SOCRATES.StrBound
         radout::SOCRATES.StrOut
 
-        # SOCRATES parameters
-        all_channels::Bool 
-        spectral_file::String 
-        star_file::String 
-        albedo_s::Float64 
-        zenith_degrees::Float64 
-        toa_heating::Float64 
-        tstar::Float64 
-        grav_surf::Float64
-        overlap_method::Int
+        # Radiation parameters
+        all_channels::Bool              # Use all bands?
+        spectral_file::String           # Path to spectral file
+        star_file::String               # Path to star spectrum
+        albedo_b::Float64               # Enforced bond albedo (DO NOT USE ALONGSIDE CLOUD RADIATION EFFECTS)
+        albedo_s::Float64               # Surface albedo
+        zenith_degrees::Float64         # Solar zenith angle [deg]
+        toa_heating::Float64            # Derived downward shortwave radiation flux at topmost level [W m-2]
+        instellation::Float64           # Solar flux at top of atmopshere [W m-2]
+        s0_fact::Float64                # Scale factor to instellation (cronin+14)
+        tstar::Float64                  # Surface brightness temperature [K]
+        grav_surf::Float64              # Surface gravity [m s-2]
+        overlap_method::Int             # Absorber overlap method to be used
 
         # Band edge wavelengths [m]
         nbands::Int
@@ -179,7 +182,9 @@ module atmosphere
     - `ROOT_DIR::String`                AGNI root directory. 
     - `OUT_DIR::String`                 Output directory.
     - `spfile::String`                  path to spectral file.
-    - `toa_heating::Float64`            downward shortwave flux at the top of the atmosphere [W m-2].
+    - `instellation::Float64`           bolometric solar flux at the top of the atmosphere [W m-2]
+    - `s0_fact::Float64`                scale factor applied to instellation to account for planetary rotation (i.e. S_0^*/S_0 in Cronin+14)
+    - `albedo_b::Float64`               bond albedo scale factor applied to instellation in order to imitate shortwave reflection 
     - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
     - `radius::Float64`                 planet radius at the surface [m].
@@ -209,7 +214,8 @@ module atmosphere
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
                     spfile::String, 
-                    toa_heating::Float64, tstar::Float64,
+                    instellation::Float64, s0_fact::Float64, albedo_b::Float64,
+                    tstar::Float64,
                     gravity::Float64, radius::Float64,
                     nlev_centre::Int, p_surf::Float64, p_top::Float64;
                     mf_dict=                    nothing,
@@ -265,11 +271,14 @@ module atmosphere
 
         atmos.nlev_c         =  max(nlev_centre,45)
         atmos.nlev_l         =  atmos.nlev_c + 1
-        atmos.zenith_degrees =  max(min(zenith_degrees,89.5), 0.5)
-        atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
-        atmos.toa_heating =     max(toa_heating, 0.0)
         atmos.tstar =           max(tstar, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-4, gravity)
+        atmos.zenith_degrees =  max(min(zenith_degrees,89.5), 0.5)
+        atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
+        atmos.instellation =    max(instellation, 0.0)
+        atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
+        atmos.s0_fact =         max(s0_fact,0.0)
+        atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) * s0_fact * cosd(atmos.zenith_degrees)
         
         atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
@@ -1018,7 +1027,7 @@ module atmosphere
             end
              
             atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)   #   Convert the zenith angles to secants.
-            atmos.bound.solar_irrad[1] = atmos.toa_heating   # The file of solar irradiances.
+            atmos.bound.solar_irrad[1] = atmos.toa_heating / cosd(atmos.zenith_degrees)
         end
 
         atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
@@ -1605,6 +1614,9 @@ module atmosphere
         # Scalar quantities  
         #    Create variables
         var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # BOA LW BC
+        var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
+        var_s0fact =    defVar(ds, "s0_factor",     Float64, ())                                            # Scale factor applied to instellation
+        var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
         var_toah =      defVar(ds, "toa_heating",   Float64, (), attrib = OrderedDict("units" => "W m-2"))  # TOA SW BC
         var_tmagma =    defVar(ds, "tmagma",        Float64, (), attrib = OrderedDict("units" => "K"))      # Magma temperature
         var_tmin =      defVar(ds, "tfloor",        Float64, (), attrib = OrderedDict("units" => "K"))      # Minimum temperature
@@ -1624,6 +1636,9 @@ module atmosphere
 
         #     Store data
         var_tstar[1] =      atmos.tstar 
+        var_inst[1] =       atmos.instellation
+        var_s0fact[1] =     atmos.s0_fact
+        var_albbond[1] =    atmos.albedo_b
         var_toah[1] =       atmos.toa_heating
         var_tmagma[1] =     atmos.tmp_magma
         var_tmin[1] =       atmos.tmp_floor

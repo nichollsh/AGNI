@@ -25,7 +25,10 @@ import phys
 
 # Configuration options
 tstar           = 2490.0    # Surface temperature [kelvin]
-toa_heating     = 3.0/8.0 * 1361.0 * (1-0.18) * 35.6 
+instellation    = 1361.0 * 35.6 
+s0_factor       = 3.0/8.0
+albedo          = 0.18
+zenith          = 48.19
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
 nlev_centre     = 50  
@@ -44,14 +47,15 @@ println("Setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, tstar,
+                         instellation, s0_factor, albedo,
+                         tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
                          flag_rayleigh=true,
                          overlap_method=4,
-                         zenith_degrees=48.19,
+                         zenith_degrees=zenith,
                          tmp_floor=2.0,
                          thermo_functions=true,
                  )
