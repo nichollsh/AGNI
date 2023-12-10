@@ -25,6 +25,15 @@ s = ArgParseSettings()
         help = "Solar flux at the planet's orbital separation [W m-2]."
         arg_type = Float64
         required = true
+    "zenith_degrees"
+        help = "Direction of solar radiation beam measured from zenith [deg]."
+        arg_type = Float64
+    "inst_factor"
+        help = "Scale factor applied to instellation alongside the zenith angle"
+        arg_type = Float64
+    "albedo_b"
+        help = "Grey bond albedo applied to instellation"
+        arg_type = Float64
     "gravity"
         help = "Surface gravitational acceleration [m s-2]."
         arg_type = Float64
@@ -90,18 +99,6 @@ s = ArgParseSettings()
         help = "Grey surface albedo."
         arg_type = Float64
         default = 0.0
-    "--zenith_degrees"
-        help = "Direction of solar radiation beam measured from zenith [deg]."
-        arg_type = Float64
-        default = 54.74
-    "--inst_factor"
-        help = "Scale factor applied to instellation alongside the zenith angle"
-        arg_type = Float64
-        default = 0.25
-    "--albedo_b"
-        help = "Grey bond albedo applied to instellation"
-        arg_type = Float64
-        default = 0.0
     "--output"
         help = "Output directory relative to AGNI directory. This directory will be emptied before being used."
         arg_type = String
@@ -118,8 +115,8 @@ s = ArgParseSettings()
         help = "Number of model levels."
         arg_type = Int
         default = 80
-    "--once"
-        help = "Just calculate fluxes once - don't solve for RCE."
+    "--dtsolve"
+        help = "Use time-stepped solver to obtain a solution."
         action = :store_true
     "--nlsolve"
         help = "Use non-linear solver to obtain solution once time-stepped method has finished."
@@ -182,6 +179,7 @@ tstar           = args["tstar"]
 instellation    = args["inst"]
 s0_fact         = args["inst_factor"]
 albedo_b        = args["albedo_b"]
+zenith_degrees  = args["zenith_degrees"]
 gravity         = args["gravity"]
 radius          = args["radius"]
 p_surf          = args["psurf"]
@@ -191,13 +189,11 @@ spfile_name     = args["sp_file"]
 output_dir      = args["output"]
 x_dict          = args["x_dict"]
 x_path          = args["x_path"]
-oneshot         = args["once"]
 plot            = args["plot"]
 pt_path         = args["pt_path"]
 tstar_enforce   = args["tstar_enforce"]
 tmp_floor       = args["tmp_floor"]
 albedo_s        = args["albedo_s"]
-zenith_degrees  = args["zenith_degrees"]
 ini_dry         = args["ini_dry"]
 ini_sat         = args["ini_sat"]
 trppt           = args["trppt"]
@@ -215,6 +211,7 @@ convect_adj     = args["convect_adj"]
 convect_mlt     = args["convect_mlt"]
 no_accel        = args["noaccel"]
 roverlap        = args["roverlap"]
+dtsolve         = args["dtsolve"]
 nlsolve         = args["nlsolve"]
 cc_tmprel       = args["convcrit_tmprel"]
 cc_fradrel      = args["convcrit_fradrel"]
@@ -297,13 +294,12 @@ println("Atmosphere: setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         instellation, s0_fact, albedo_b,
+                         instellation, s0_fact, albedo_b, zenith_degrees,
                          tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          mf_path=mf_path,
-                         zenith_degrees=zenith_degrees,
                          albedo_s=albedo_s,
                          skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                          tmp_floor=tmp_floor,
@@ -344,26 +340,26 @@ if ini_sat
     end 
 end 
 
-# Just once or iterate?
-if oneshot
-    println("Calculating fluxes")
-    atmosphere.radtrans!(atmos, true)
-    atmosphere.radtrans!(atmos, false)
-    if convect_mlt
-        atmosphere.mlt!(atmos)
-    end
-else
+# Always run once
+println("Calculating initial fluxes")
+atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, false)
+if convect_mlt
+    atmosphere.mlt!(atmos)
+end
 
+if (surf_state > 2) || (surf_state < 0)
+    error("Invalid surface state '$surf_state'")
+end
+
+# Time-stepped solution
+if dtsolve
     if animate 
-        modplot = 1 
+        modplot = 10
     else
         modplot = 0
     end
-    if (surf_state > 2) || (surf_state < 0)
-        error("Invalid surface state '$surf_state'")
-    end
-
-    # Do accelerated integration
+    
     import solver_tstep
     solver_tstep.solve_energy!(atmos, 
                          modplot=modplot, verbose=verbose, 
@@ -371,23 +367,20 @@ else
                          max_steps=max_steps, accel=!no_accel,
                          drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel, F_losspct_conv=cc_floss
                          )
+end 
     
-    # Do newton-rapshon iterations
-    if nlsolve
-        import solver_nlsol
-        solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, max_steps=2000, verbose=verbose)
-    end
+# Newton-rapshon solution
+if nlsolve
+    import solver_nlsol
+    solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, max_steps=200)
 end
 
-# Write NetCDF file 
+# Write NetCDF and PT files
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
-
-# Write final PT profile and final fluxes 
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
-atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Final plots 
-if animate && !oneshot
+if animate
     println("Making animation")
     plotting.anim_solver(atmos)
 end 
