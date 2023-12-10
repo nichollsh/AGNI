@@ -8,6 +8,7 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
+
 module atmosphere
 
     # Import libraries
@@ -25,14 +26,19 @@ module atmosphere
     import moving_average
     import phys
 
+    AGNI_VERSION     = "0.1"
+    SOCRATES_VERSION = "2306"
+
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
 
         # Track state of atmos struct
-        is_param::Bool  # Params have been set
-        is_alloc::Bool  # Arrays have been allocated
-        is_out_lw::Bool # Contains data for LW calculation
-        is_out_sw::Bool # Contains data for SW calculation
+        is_param::Bool      # Params have been set
+        is_alloc::Bool      # Arrays have been allocated
+        is_solved::Bool     # Current atmosphere state represents the result of a solver
+        is_converged::Bool  # Current atmosphere state is converged
+        is_out_lw::Bool     # Contains data for LW calculation
+        is_out_sw::Bool     # Contains data for SW calculation
 
         # Directories
         ROOT_DIR::String
@@ -185,6 +191,7 @@ module atmosphere
     - `instellation::Float64`           bolometric solar flux at the top of the atmosphere [W m-2]
     - `s0_fact::Float64`                scale factor applied to instellation to account for planetary rotation (i.e. S_0^*/S_0 in Cronin+14)
     - `albedo_b::Float64`               bond albedo scale factor applied to instellation in order to imitate shortwave reflection 
+    - `zenith_degrees::Float64`         angle of radiation from the star, relative to the zenith [degrees].
     - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
     - `radius::Float64`                 planet radius at the surface [m].
@@ -193,7 +200,6 @@ module atmosphere
     - `p_top::Float64`                  total top of atmosphere pressure [bar].
     - `mf_dict=nothing`                 dictionary of mole fractions in the format (key,value)=(gas,mf).
     - `mf_path=nothing`                 path to file containing mole fractions at each level.
-    - `zenith_degrees::Float64=54.74`   angle of radiation from the star, relative to the zenith [degrees].
     - `albedo_s::Float64=0.0`           surface albedo.
     - `tmp_floor::Float64=50.0`         temperature floor [K].
     - `C_d::Float64=0.001`              turbulent heat exchange coefficient [dimensionless].
@@ -214,13 +220,12 @@ module atmosphere
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
                     spfile::String, 
-                    instellation::Float64, s0_fact::Float64, albedo_b::Float64,
+                    instellation::Float64, s0_fact::Float64, albedo_b::Float64, zenith_degrees::Float64,
                     tstar::Float64,
                     gravity::Float64, radius::Float64,
                     nlev_centre::Int, p_surf::Float64, p_top::Float64;
                     mf_dict=                    nothing,
                     mf_path =                   nothing,
-                    zenith_degrees::Float64 =   54.74,
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        80.0,
                     C_d::Float64 =              0.001,
@@ -416,6 +421,8 @@ module atmosphere
 
         # Record that the parameters are set
         atmos.is_param = true
+        atmos.is_solved = false 
+        atmos.is_converged = false
         return nothing
     end
 
@@ -1581,19 +1588,20 @@ module atmosphere
         ds = Dataset(fname,"c")
 
         # Global attributes
-        ds.attrib["description"] = "AGNI atmosphere data"
-        ds.attrib["date"]        = Dates.format(now(), "yyyy-u-dd HH:MM:SS")
-        ds.attrib["hostname"]    = gethostname()
+        ds.attrib["description"]        = "AGNI atmosphere data"
+        ds.attrib["date"]               = Dates.format(now(), "yyyy-u-dd HH:MM:SS")
+        ds.attrib["hostname"]           = gethostname()
+        ds.attrib["username"]           = ENV["USER"]
+        ds.attrib["AGNI_version"]       = AGNI_VERSION
+        ds.attrib["SOCRATES_version"]   = SOCRATES_VERSION 
 
-        plat = ""
+        plat = "Generic"
         if Sys.isapple()
             plat = "Darwin"
         elseif Sys.iswindows()
             plat = "Windows"
         elseif Sys.islinux()
             plat = "Linux"
-        else 
-            plat = "Generic"
         end
         ds.attrib["platform"] = plat
         
@@ -1615,7 +1623,7 @@ module atmosphere
         #    Create variables
         var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # BOA LW BC
         var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
-        var_s0fact =    defVar(ds, "s0_factor",     Float64, ())                                            # Scale factor applied to instellation
+        var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
         var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
         var_toah =      defVar(ds, "toa_heating",   Float64, (), attrib = OrderedDict("units" => "W m-2"))  # TOA SW BC
         var_tmagma =    defVar(ds, "tmagma",        Float64, (), attrib = OrderedDict("units" => "K"))      # Magma temperature
@@ -1627,7 +1635,9 @@ module atmosphere
         var_fray =      defVar(ds, "flag_rayleigh", Char, ())                                               # Includes rayleigh scattering?
         var_fcon =      defVar(ds, "flag_continuum",Char, ())                                               # Includes continuum absorption?
         var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())                                               # Includes clouds?
-        var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())                                               # Using thermodynamic functions
+        var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())                                               # Using temperature-dependent thermodynamic functions
+        var_ssol =      defVar(ds, "solved"        ,Char, ())                                               # Has a solver been used?
+        var_scon =      defVar(ds, "converged"     ,Char, ())                                               # Did the solver converge?
         var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg"))    # Zenith angle of direct stellar radiation
         var_sknd =      defVar(ds, "cond_skin_d"   ,Float64, (), attrib = OrderedDict("units" => "m"))      # Conductive skin thickness
         var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1"))    # Conductive skin thermal conductivity
@@ -1639,6 +1649,7 @@ module atmosphere
         var_inst[1] =       atmos.instellation
         var_s0fact[1] =     atmos.s0_fact
         var_albbond[1] =    atmos.albedo_b
+        var_znth[1] =       atmos.zenith_degrees
         var_toah[1] =       atmos.toa_heating
         var_tmagma[1] =     atmos.tmp_magma
         var_tmin[1] =       atmos.tmp_floor
@@ -1671,7 +1682,18 @@ module atmosphere
             var_tfun[1] = 'n'
         end 
 
-        var_znth[1] = atmos.zenith_degrees
+        if atmos.is_solved
+            var_ssol[1] = 'y'
+        else 
+            var_ssol[1] = 'n'
+        end
+
+        if atmos.is_converged
+            var_scon[1] = 'y'
+        else 
+            var_scon[1] = 'n'
+        end
+
         var_sknd[1] = atmos.skin_d
         var_sknk[1] = atmos.skin_k
 

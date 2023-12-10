@@ -29,6 +29,7 @@ tstar           = 300.0     # LW uflux bottom boundary condition [kelvin]
 instellation    = 1361.0    # Daytime instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
+theta           = 20.0
 nlev_centre     = 100  
 p_surf          = 1.0       # bar
 p_top           = 1e-7      # bar 
@@ -49,14 +50,13 @@ println("Setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, 3.0/8.0, 0.12,
+                         toa_heating, 3.0/8.0, 0.12, theta,
                          tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_path=mf_path,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,  # the RFM profile does not include scattering
-                         zenith_degrees=20.0,
                          overlap_method=4
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file)

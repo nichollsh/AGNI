@@ -46,7 +46,7 @@ mkdir(output_dir)
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                         spectral_file,
-                        instellation, 1.0, 0.0,
+                        instellation, 1.0, 0.0, 48.19,
                         1700.0,
                         gravity, radius,
                         nlev_centre, p_surf, p_top,

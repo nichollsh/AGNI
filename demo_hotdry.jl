@@ -47,7 +47,7 @@ println("Setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         instellation, s0_factor, albedo,
+                         instellation, s0_factor, albedo, zenith,
                          tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
@@ -55,7 +55,6 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_gcontinuum=true,
                          flag_rayleigh=true,
                          overlap_method=4,
-                         zenith_degrees=zenith,
                          tmp_floor=2.0,
                          thermo_functions=true,
                  )

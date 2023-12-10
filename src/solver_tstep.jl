@@ -546,10 +546,13 @@ module solver_tstep
         end # end main loop
 
         # Print information about the final state
+        atmos.is_solved = true
         if !success
             @printf("    stopping atmosphere iterations before convergence \n")
+            atmos.is_converged = false
         else
             @printf("    convergence criteria met (%d iterations) \n", step)
+            atmos.is_converged = true
         end
         @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
         @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)

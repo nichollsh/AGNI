@@ -181,10 +181,14 @@ module solver_nlsol
         # Extract solution
         # ---------------------------------------------------------- 
 
+        atmos.is_solved = true
+
         if !converged(sol)
             @printf("    stopping atmosphere iterations before convergence (maybe try enabling linesearch) \n\n")
+            atmos.is_converged = false 
         else
             @printf("    convergence criteria met (%d iterations) \n\n", sol.iterations)
+            atmos.is_converged = true
         end
 
         atmos.tmp[:] .= sol.zero[:]

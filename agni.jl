@@ -28,6 +28,7 @@ tstar           = 1250.0    # Surface temperature [kelvin]
 instellation    = 1361.0
 albedo_b        = 0.18
 radius          = 6.37e6    # metres
+zenith          = 48.19
 gravity         = 9.81      # m s-2
 nlev_centre     = 50  
 p_surf          = 270.0    # bar
@@ -49,7 +50,7 @@ println("Setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         instellation, 3.0/8.0, albedo_b,
+                         instellation, 3.0/8.0, albedo_b, zenith,
                          tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
@@ -58,7 +59,6 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=true,
                          flag_cloud=false,
                          overlap_method=4,
-                         zenith_degrees=48.19,
                          skin_d=0.01,
                          skin_k=2.0,
                          tmp_magma=2500.0,
