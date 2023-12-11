@@ -7,7 +7,7 @@ Surface boundary conditions are intended to be set by an interior model, so AGNI
     
 Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
 
-### Repository structure 
+## Repository structure 
 * `README.md`       - This file
 * `LICENSE.txt`     - License for use and re-use
 * `doc/`            - Further documentation
@@ -23,7 +23,7 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * `demo_tests.jl`   - Script containing quick tests for verifying that the basics of the model are functioning
 
 
-### Requirements
+## Requirements
 * Julia (version 1.9.1 or later)
 * Python (version 3.10 or later)
 * NumPy and SciPy
@@ -32,12 +32,12 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 * make
 * OpenMP
 
-### Supported platforms
+## Supported platforms
 * MacOS (ARM and x86-64)
 * Ubuntu (x86-64)
 
 
-### Installation instructions
+## Installation instructions
 - `$ cd socrates`
 - `$ cp ../res/Mk_cmd_PLAT ./make/Mk_cmd` where PLAT is your platform
 - `$ ./build_code`
@@ -66,26 +66,34 @@ Pronounced: *ag-nee*. Named after the fire deity of Hinduism.
 -  `$ cd ../../..`   
 You should end up in the root directory of the repository.    
 
-### Running the code
+## Running the code
 For the command line interface, run `$ ./agni_cli.jl` (pass `--help` for help).     
 To debug the program, run `$ ./agni.jl` in the root directory of the repository.       
 To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.     
 
 
-### Example outputs
-Pure steam runaway greenhouse (OLR versus surface temperature).
+## Example outputs
+### Pure steam runaway greenhouse
+Plotting OLR versus surface temperature yields the characteristic plateau; outgoing radiation decouples from the surface temperature due to a deep condensing layer.
 <p float="left">
   <img src="doc/example_runaway/curve.png" height="350" />
 </p>
 
-Prescribed dry adiabat with a calculation of radiative flux.
+### Prescribed dry adiabat
+In this case, radiative fluxes (right) are calculated according to a temperature profile (left) prescribed to be following a dry adiabat.
 <p float="left">
   <img src="doc/example_nosolve/pt.jpg" height="300" />
   <img src="doc/example_nosolve/fl.jpg" height="300" /> 
 </p>
 
-Solution at RCE with radiative and convective fluxes (using MLT).
+### Radiative-convective solution
+The temperature profile (left) is solved such that energy is globally and locally conserved (right). Convection is parameterised using mixing length theory.
 <p float="left">
   <img src="doc/example_withsolve/pt.jpg" height="300"/>
   <img src="doc/example_withsolve/fl.jpg" height="300" /> 
+</p>
+We can then plot the outgoing emission spectrum and normalised contribution function (318 correlated-k bands).
+<p float="left">
+  <img src="doc/example_withsolve/em.jpg" height="290"/>
+  <img src="doc/example_withsolve/cf.jpg" height="290" /> 
 </p>

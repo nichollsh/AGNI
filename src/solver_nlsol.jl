@@ -39,12 +39,14 @@ module solver_nlsol
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=500`              maximum number of solver steps
     - `use_linesearch::Bool=false`      use linesearch to ensure global convergence
+    - `calc_cf_end::Bool=true`          calculate contribution function at convergence
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=500, atol::Float64=1.0e-3,
-                            use_linesearch::Bool=false
+                            use_linesearch::Bool=false,
+                            calc_cf_end::Bool=true
                             )
 
         # Validate condensation case
@@ -61,6 +63,7 @@ module solver_nlsol
 
         # Work arrays 
         pwr = zeros(Float64, atmos.nlev_c)  # power delivery into each cell
+        calc_cf = false
 
         # Objective function to solve for
         function fev!(F,x)
@@ -93,7 +96,7 @@ module solver_nlsol
             atmos.flux_tot[:] .= 0.0
 
             # +Radiation
-            atmosphere.radtrans!(atmos, true)
+            atmosphere.radtrans!(atmos, true, calc_cf=calc_cf)
             atmosphere.radtrans!(atmos, false)
             atmos.flux_tot += atmos.flux_n
 
@@ -182,6 +185,7 @@ module solver_nlsol
         # ---------------------------------------------------------- 
 
         atmos.is_solved = true
+        calc_cf = calc_cf_end
 
         if !converged(sol)
             @printf("    stopping atmosphere iterations before convergence (maybe try enabling linesearch) \n\n")

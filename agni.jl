@@ -72,8 +72,8 @@ println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"pt.csv")
 # setpt.isothermal!(atmos, tstar-300.0)
 # setpt.prevent_surfsupersat!(atmos)
-setpt.dry_adiabat!(atmos)
-setpt.condensing!(atmos, "H2O")
+# setpt.dry_adiabat!(atmos)
+# setpt.condensing!(atmos, "H2O")
 # setpt.stratosphere!(atmos, 500.0)
 
 # Create output directory
@@ -87,7 +87,7 @@ atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 println("Running model...")
 
 # Calculate LW and SW fluxes (once)
-atmosphere.radtrans!(atmos, true)
+atmosphere.radtrans!(atmos, true, calc_cf=true)
 atmosphere.radtrans!(atmos, false)
 
 # Calculate convective fluxes (once)
@@ -96,9 +96,9 @@ atmosphere.radtrans!(atmos, false)
 
 
 # Call solver(s)
-dry_convect = true
-condensate  = "H2O"
-surf_state  = 0
+# dry_convect = true
+# condensate  = "H2O"
+# surf_state  = 0
 
 # import solver_tstep
 # solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
@@ -119,11 +119,13 @@ atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Save plots
+println("Making plots")
 plotting.anim_solver(atmos)
 plotting.plot_x(atmos,      joinpath(atmos.OUT_DIR,"mf.pdf"))
-plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
-plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
-plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"em.pdf"))
+plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.pdf"))
+plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.pdf"))
+plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.pdf"))
+plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.pdf"))
 
 # Deallocate atmosphere
 println("Deallocating arrays")
