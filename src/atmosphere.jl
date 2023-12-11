@@ -68,10 +68,10 @@ module atmosphere
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
 
-        # Band edge wavelengths [m]
+        # Band edges 
         nbands::Int
-        bands_min::Array
-        bands_max::Array
+        bands_min::Array    # Lower wavelength [m]
+        bands_max::Array    # Upper wavelength [m]
 
         # Pressure-temperature grid (with i=1 at the top of the model)
         nlev_c::Int         # Cell centre (count)
@@ -132,6 +132,9 @@ module atmosphere
         band_d_sw::Array  # down component, sw 
         band_u_sw::Array  # up component, sw
         band_n_sw::Array  # net upward, sw
+
+        # Contribution function (to outgoing flux) per-band
+        contfunc_norm::Array    # LW+SW, and normalised by maximum value at each wavelength
 
         # Sensible heating
         C_d::Float64        # Turbulent exchange coefficient [dimensionless]
@@ -301,14 +304,18 @@ module atmosphere
         atmos.p_boa =           p_surf * 1.0e+5
         atmos.rp =              max(1.0, radius)
 
-        atmos.control.l_gas =       true
-        atmos.control.l_rayleigh =  flag_rayleigh
-        atmos.control.l_continuum = flag_continuum
-        atmos.control.l_cont_gen =  flag_gcontinuum
-        atmos.control.l_aerosol =   flag_aerosol
-        atmos.control.l_cloud =     flag_cloud
-        atmos.control.l_drop =      flag_cloud
-        atmos.control.l_ice  =      false
+        # absorption contributors
+        atmos.control.l_gas =           true
+        atmos.control.l_rayleigh =      flag_rayleigh
+        atmos.control.l_continuum =     flag_continuum
+        atmos.control.l_cont_gen =      flag_gcontinuum
+        atmos.control.l_aerosol =       flag_aerosol
+        atmos.control.l_cloud =         flag_cloud
+        atmos.control.l_drop =          flag_cloud
+        atmos.control.l_ice  =          false
+
+        # store contribution function?
+        # atmos.control.l_contrib_func_band = false
 
         # Initialise temperature grid to be isothermal
         atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tstar
@@ -986,6 +993,8 @@ module atmosphere
         atmos.band_u_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
         atmos.band_n_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
 
+        atmos.contfunc_norm =     zeros(Float64, (atmos.nlev_c,atmos.nbands))
+
         atmos.flux_sens =         0.0
 
         atmos.mask_p =            zeros(Float64, atmos.nlev_c)
@@ -1003,7 +1012,7 @@ module atmosphere
         return nothing
     end  # end of allocate
 
-    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool)
+    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf=false)
         if !atmos.is_alloc
             error("atmosphere arrays have not been allocated")
         end
@@ -1133,7 +1142,9 @@ module atmosphere
 
         ######################################################
         # Run radiative transfer model
-        ######################################################        
+        ######################################################   
+        
+        atmos.control.l_contrib_func_band = calc_cf
 
         for i_gas in 1:length(atmos.gases)
             for i in 1:atmos.nlev_c 
@@ -1167,6 +1178,16 @@ module atmosphere
                     atmos.flux_u_lw[lv] += max(0.0, atmos.radout.flux_up[idx])
                 end 
                 atmos.flux_n_lw[lv] = atmos.flux_u_lw[lv] - atmos.flux_d_lw[lv] 
+            end
+
+            # Normalised contribution function (only LW stream contributes)
+            fill!(atmos.contfunc_norm,0.0)
+            if calc_cf
+                for ba in 1:atmos.dimen.nd_channel
+                    for lv in 1:atmos.nlev_c               
+                        atmos.contfunc_norm[lv,ba] = atmos.radout.contrib_funcf_band[1,lv,ba]/maximum(atmos.radout.contrib_funcf_band[1,:,ba])
+                    end 
+                end
             end
             atmos.is_out_lw = true 
         else
@@ -1734,6 +1755,7 @@ module atmosphere
         var_bds =       defVar(ds, "ba_D_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
         var_bus =       defVar(ds, "ba_U_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
         var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
+        var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c"))
 
         #     Store data
         var_p[:] =      atmos.p
@@ -1790,6 +1812,12 @@ module atmosphere
                 var_bus[ba, lv] = atmos.band_u_sw[lv, ba]
                 var_bds[ba, lv] = atmos.band_d_sw[lv, ba]
                 var_bns[ba, lv] = atmos.band_n_sw[lv, ba]
+            end 
+        end 
+
+        for lc in 1:atmos.nlev_c
+            for ba in 1:atmos.nbands
+                var_cfn[ba, lc] = atmos.contfunc_norm[lc, ba]
             end 
         end 
 

@@ -335,7 +335,7 @@ module plotting
 
         plot!(plt, x, y, label="", color="black")
 
-        xlims  = (minimum(x), min(maximum(x), 20000.0))
+        xlims  = (minimum(x), min(maximum(x), 50000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         ylims  = (minimum(y) / 2, maximum(y) * 2)
@@ -345,6 +345,57 @@ module plotting
         ylabel!(plt, "Spectral flux density [erg s-1 cm-2 nm-1]")
         yaxis!(plt, yscale=:log10, ylims=ylims, yticks=yticks)
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+
+        savefig(plt, fname)
+
+        return nothing 
+    end 
+
+    """
+    Plot contribution function (per band)
+    """
+    function plot_contfunc(atmos, fname; dpi::Int=250)
+
+        # Get data
+        x = zeros(Float64, atmos.nbands)    # band centres (reverse order)
+        y = zeros(Float64, atmos.nlev_c)    # pressure levels
+        z = zeros(Float64, (atmos.nlev_c,atmos.nbands))
+
+        # x value - band centres [nm]
+        for ba in 1:atmos.nbands
+            br = atmos.nbands - ba + 1
+            x[br] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
+        end
+
+        # y value - pressures [bar]
+        for i in 1:atmos.nlev_c 
+            y[i] = atmos.p[i] * 1.0e-5
+        end 
+
+        # z value - log'd and normalised contribution function 
+        cf_min = 1.0e-9
+        for ba in 1:atmos.nbands
+            for i in 1:atmos.nlev_c 
+                br = atmos.nbands - ba + 1
+                z[i,br] = log10(max(atmos.contfunc_norm[i,ba],cf_min))
+            end 
+        end 
+
+        # Make plot
+        plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9, colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
+
+        heatmap!(plt, x,y,z, c=:devon)
+
+        xlims  = (minimum(x), maximum(x))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        xlabel!(plt, "Wavelength [nm]")
+        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+
+        ylims  = (y[1], y[end])
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
 
         savefig(plt, fname)
 

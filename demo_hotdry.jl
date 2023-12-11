@@ -92,12 +92,13 @@ solver_nlsol.solve_energy!(atmos, surf_state=surf_state,
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
 atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
-atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Save plots
-plotting.plot_x(atmos,      joinpath(atmos.OUT_DIR,"mf.pdf"))
 plotting.plot_pt(atmos,     joinpath(atmos.OUT_DIR,"pt.pdf"))
 plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"fl.pdf"))
+plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.pdf"))
+plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.pdf"))
+
 
 # Deallocate atmosphere
 println("Deallocating arrays")
