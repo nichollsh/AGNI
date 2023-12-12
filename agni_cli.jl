@@ -28,12 +28,15 @@ s = ArgParseSettings()
     "zenith_degrees"
         help = "Direction of solar radiation beam measured from zenith [deg]."
         arg_type = Float64
+        required = true
     "inst_factor"
         help = "Scale factor applied to instellation alongside the zenith angle"
         arg_type = Float64
+        required = true
     "albedo_b"
         help = "Grey bond albedo applied to instellation"
         arg_type = Float64
+        required = true
     "gravity"
         help = "Surface gravitational acceleration [m s-2]."
         arg_type = Float64
