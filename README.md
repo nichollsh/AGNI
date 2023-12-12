@@ -3,10 +3,8 @@ Radiative-convective solver designed for integration into a coupled atmosphere-i
 
 AGNI relies on SOCRATES (2306) for calculating radiances. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption / CIA.        
 
-Surface boundary conditions are intended to be set by an interior model, so AGNI won't work as well for cooler planets. The model also includes a parameterised conductive 'skin' with a prescribed thickness and conductivity, allowing the surface temperature to be calculated according to the required conductive flux. Two convection parameterisations are included: convective adjustment (directly manipulating the temperature arrays), and mixing length theory (calculating convective energy fluxes). Results are optionally plotted (and animated), and may be saved as NetCDF or CSV files. The model first uses a multistep Adams-Bashforth integrator which integrates the heating rates at each level until fluxes are roughly balanced; this state then provides the initial guess for a Newton-Raphson-Backtracking method which achieves strict flux continuity.
+Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki/An-overview) on GitHub for information about the model. 
     
-Pronounced: *ag-nee*. Named after the fire deity of Hinduism.      
-
 ## Repository structure 
 * `README.md`       - This file
 * `LICENSE.txt`     - License for use and re-use
@@ -71,29 +69,3 @@ For the command line interface, run `$ ./agni_cli.jl` (pass `--help` for help).
 To debug the program, run `$ ./agni.jl` in the root directory of the repository.       
 To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.     
 
-
-## Example outputs
-### Pure steam runaway greenhouse
-Plotting OLR versus surface temperature yields the characteristic plateau; outgoing radiation decouples from the surface temperature due to a deep condensing layer.
-<p float="left">
-  <img src="doc/example_runaway/curve.png" height="350" />
-</p>
-
-### Prescribed dry adiabat
-In this case, radiative fluxes (right) are calculated according to a temperature profile (left) prescribed to be following a dry adiabat.
-<p float="left">
-  <img src="doc/example_nosolve/pt.jpg" height="300" />
-  <img src="doc/example_nosolve/fl.jpg" height="300" /> 
-</p>
-
-### Radiative-convective solution
-The temperature profile (left) is solved such that energy is globally and locally conserved (right). Convection is parameterised using mixing length theory.
-<p float="left">
-  <img src="doc/example_withsolve/pt.jpg" height="300"/>
-  <img src="doc/example_withsolve/fl.jpg" height="300" /> 
-</p>
-We can then plot the outgoing emission spectrum and normalised contribution function (318 correlated-k bands).
-<p float="left">
-  <img src="doc/example_withsolve/em.jpg" height="290"/>
-  <img src="doc/example_withsolve/cf.jpg" height="290" /> 
-</p>
