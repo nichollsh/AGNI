@@ -91,7 +91,7 @@ module solver_nlsol
             atmosphere.set_tmpl_from_tmp!(atmos)
 
             # Set bottom edge temperature 
-            if (surf_state < 1) || (surf_state > 2)
+            if (surf_state < 0) || (surf_state > 2)
                 # Error cases
                 error("Invalid surface state ($surf_state)")
 
