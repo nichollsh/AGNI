@@ -326,7 +326,7 @@ module atmosphere
         atmos.z          = zeros(Float64, atmos.nlev_c)
         atmos.zl         = zeros(Float64, atmos.nlev_l)
         atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
-        
+
         # Initialise cloud properties
         atmos.re         = zeros(Float64, atmos.nlev_c) 
         atmos.lwm        = zeros(Float64, atmos.nlev_c)
@@ -1121,6 +1121,7 @@ module atmosphere
 
         ####################################################
         # Temperature
+        ###################################################
 
         clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
@@ -1464,12 +1465,20 @@ module atmosphere
         return nothing
     end
 
-    # Set cell edge temperatures from cell centres
-    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t, surf_state::Int; limit_change::Bool=false, back_interp::Bool=false)
+    """
+    **Set cell-edge temperatures from cell-centre values.**
 
-        bot_old_e = atmos.tmpl[end]
+    Uses interpolation within the bulk of the column and extrapolation for the 
+    topmost edge. Does not set the bottommost edge.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `limit_change::Bool=false`        limit change relative to old value
+    - `back_interp::Bool=false`         interpolate resultant tmpl back to tmp (should be avoided)
+    """
+    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t; limit_change::Bool=false, back_interp::Bool=false)
+
         top_old_e = atmos.tmpl[1]
-        tstar_old = atmos.tstar
 
         # Interpolate temperature to bulk cell-edge values (log-linear)
         itp = Interpolator(log.(atmos.p), atmos.tmp)
@@ -1479,38 +1488,9 @@ module atmosphere
         grad_dt = atmos.tmp[1] - atmos.tmp[2]
         grad_dp = log(atmos.p[1]/atmos.p[2])
         atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log(atmos.pl[1]/atmos.p[1])
-
         if limit_change
             atmos.tmpl[1] = 0.9 * atmos.tmpl[1] + 0.1 * top_old_e
         end
-
-        # Calculate bottom edge temperature
-        if (surf_state == 0) || (surf_state == 2)
-            # Extrapolate (log-linear)
-            grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
-            grad_dp = log(atmos.p[end]/atmos.p[end-1])
-            atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
-
-            # Conductive skin
-            if surf_state == 2
-                # Set tstar such that the skin carries the required flux
-                atmos.tstar = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
-                atmos.tstar = max(atmos.tmp_floor, atmos.tstar)
-            end
-
-            if limit_change
-                atmos.tmpl[end] = 0.7 * atmos.tmpl[end] + 0.3 * bot_old_e
-                atmos.tstar     = 0.7 * atmos.tstar     + 0.3 * tstar_old
-            end 
-
-        # Fixed => do nothing
-        elseif (surf_state == 1)
-            atmos.tmpl[end] = bot_old_e
-
-        # Invalid case
-        else 
-            error("Invalid surface state ($surf_state)")
-        end 
 
         # Second interpolation back to cell-centres.
         # This can help prevent grid-imprinting issues, but in some cases it can 
