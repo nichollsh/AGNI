@@ -414,11 +414,29 @@ module solver_tstep
             clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Set cell-edge values (particularly important for handling conductive skin)
-            if (surf_state == 2) && (step <= 20)
-                atmosphere.set_tmpl_from_tmp!(atmos, 1, limit_change=true)  # don't allow tmpl to drift during accelerated phase
-            else 
-                atmosphere.set_tmpl_from_tmp!(atmos, surf_state, limit_change=true)
-            end
+            atmosphere.set_tmpl_from_tmp!(atmos, limit_change=true)
+
+            # Set bottom edge temperature 
+            if (surf_state < 0) || (surf_state > 2)
+                # Error cases
+                error("Invalid surface state ($surf_state)")
+
+            elseif (surf_state == 0)
+                # Extrapolate (log-linear)
+                grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
+                grad_dp = log(atmos.p[end]/atmos.p[end-1])
+                atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
+
+            # elseif (surf_state==1) 
+            #   do nothing in this case
+                
+            elseif (surf_state == 2) && (step > 15)
+                # Conductive skin
+                atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
+                atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
+                atmos.tstar = atmos.tmpl[end]
+
+            end 
 
             # Update tstar?
             if update_tstar 
@@ -544,6 +562,10 @@ module solver_tstep
             atexit(exit)
 
         end # end main loop
+
+        # Calculate final fluxes for CF and emission spectrum 
+        atmosphere.radtrans!(atmos, false)
+        atmosphere.radtrans!(atmos, true, calc_cf=true)
 
         # Print information about the final state
         atmos.is_solved = true

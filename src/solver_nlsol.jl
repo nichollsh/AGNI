@@ -38,6 +38,7 @@ module solver_nlsol
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=500`              maximum number of solver steps
+    - `atol::Int=1.0e-3`                maximum residual at convergence
     - `use_linesearch::Bool=false`      use linesearch to ensure global convergence
     - `calc_cf_end::Bool=true`          calculate contribution function at convergence
     """
@@ -62,7 +63,7 @@ module solver_nlsol
         end 
 
         # Work arrays 
-        pwr = zeros(Float64, atmos.nlev_c)  # power delivery into each cell
+        resid = zeros(Float64, atmos.nlev_c+1)  # residuals
         calc_cf = false
 
         # Objective function to solve for
@@ -86,8 +87,30 @@ module solver_nlsol
             # Limit temperature domain
             clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
-            # Interpolate temperature to cell-edge values 
-            atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
+            # Interpolate temperature to cell-edge values (not incl. bottommost value)
+            atmosphere.set_tmpl_from_tmp!(atmos)
+
+            # Set bottom edge temperature 
+            if (surf_state < 1) || (surf_state > 2)
+                # Error cases
+                error("Invalid surface state ($surf_state)")
+
+            elseif (surf_state == 0)
+                # Extrapolate (log-linear)
+                grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
+                grad_dp = log(atmos.p[end]/atmos.p[end-1])
+                atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
+
+            elseif (surf_state == 2)
+                # Conductive skin
+                atmos.tmpl[end] = x[end]
+            end 
+            atmos.tmpl[end] = clamp(atmos.tmpl[end], atmos.tmp_floor, atmos.tmp_ceiling)
+
+            # Set tstar in conductive case
+            if (surf_state == 2)
+                atmos.tstar = atmos.tmpl[end]
+            end
 
             # Calculate layer properties 
             atmosphere.calc_layer_props!(atmos)
@@ -112,8 +135,16 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
-            # Calculate power into each cell
-            pwr[1:end] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
+            # Calculate (some) residuals from flux divergence
+            resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
+
+            # Calculate residual from surface (if surf_state==2)
+            if (surf_state == 2)
+                resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
+            else
+                resid[end] = 0.0
+            end
+
 
             # +Condensation
             if do_condense
@@ -134,7 +165,7 @@ module solver_nlsol
                     # Layer is condensing if T < T_dew
                     Tsat = phys.calc_Tdew(condensate,atmos.p[i] * x )
                     if atmos.tmp[i] < Tsat
-                        pwr[i] = max(pwr[i], 0.0)
+                        resid[i] = max(resid[i], 0.0)
 
                         atmos.mask_p[i] = atmos.mask_decay 
                         atmos.re[i]   = 1.0e-5  # 10 micron droplets
@@ -148,21 +179,21 @@ module solver_nlsol
                 end
             end 
 
-            # Check fluxes are real numbers
-            if !all(isfinite, atmos.flux_tot)
-                display(atmos.flux_tot)
-                error("Flux array contains NaNs and/or Infs")
+            # Check that residuals are real numbers
+            if !all(isfinite, resid)
+                display(resid)
+                error("Residual array contains NaNs and/or Infs")
             end
 
             # Pass residuals outward
-            F[:] .= pwr[:]
+            F[:] .= resid[:]
 
             return nothing
         end 
 
         
         # ----------------------------------------------------------
-        # Call solver
+        # Call the solver
         # ---------------------------------------------------------- 
         the_ls = Static()
         if use_linesearch 
@@ -172,11 +203,14 @@ module solver_nlsol
             println("NLSolver: begin Newton-Raphson iterations") 
         end 
 
-        atmosphere.set_tmpl_from_tmp!(atmos, surf_state)
+        # Allocate x array
+        #   1:end-1 => cell centre temperatures 
+        #   end     => bottom cell edge temperature
+        x0 = zeros(Float64, atmos.nlev_c+1) 
+        x0[1:end-1] .= atmos.tmp[1:end]
+        x0[end] = x0[end-1]
 
-        x0 = zeros(Float64, atmos.nlev_c)
-        x0[:] .= atmos.tmp[:]
-
+        # Start nonlinear solver
         sol = nlsolve(fev!, x0, method = :newton, linesearch = the_ls, 
                         iterations=max_steps, ftol=atol, show_trace=true)
 
@@ -195,8 +229,11 @@ module solver_nlsol
             atmos.is_converged = true
         end
 
-        atmos.tmp[:] .= sol.zero[:]
-        fev!(zeros(Float64, atmos.nlev_c), atmos.tmp)
+        for i in 1:atmos.nlev_c 
+            atmos.tmp[i] = sol.zero[i]
+        end 
+        surf_state = 1
+        fev!(zeros(Float64, atmos.nlev_c+1), atmos.tmp)
         atmosphere.calc_hrates!(atmos)
 
         # ----------------------------------------------------------
@@ -206,6 +243,10 @@ module solver_nlsol
         loss_pct = loss/atmos.flux_tot[1]*100.0
         @printf("    endpoint fluxes \n")
         @printf("    rad_OLR   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
+        if (surf_state == 2)
+            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tstar)
+            @printf("    cond_skin = %+.2e W m-2 \n", F_skin)
+        end
         @printf("    tot_TOA   = %+.2e W m-2     \n", atmos.flux_tot[1])
         @printf("    tot_BOA   = %+.2e W m-2     \n", atmos.flux_tot[end])
         @printf("    loss      = %+.2e W m-2     \n", loss)

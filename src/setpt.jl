@@ -86,19 +86,21 @@ module setpt
         end
 
         # Extend loaded grid isothermally to lower pressures (prevent domain error)
-        pushfirst!(pl,   atmos.pl[1]/1.1)
-        pushfirst!(tmpl, tmpl[1]  )
+        if (atmos.pl[1] < pl[1])
+            pushfirst!(pl,   atmos.pl[1]/1.1)
+            pushfirst!(tmpl, tmpl[1]  )
+        end
 
         # Extend loaded grid isothermally to higher pressures 
-        push!(pl,   atmos.pl[end]*1.1)
-        push!(tmpl, tmpl[end])
+        if (atmos.pl[end] > pl[end])
+            push!(pl,   atmos.pl[end]*1.1)
+            push!(tmpl, tmpl[end])
+        end
 
         # Interpolate from the loaded grid to existing one
-        itp = Interpolator(pl, tmpl) # Cell edges 
-        atmos.tmpl[:] .= itp.(atmos.pl[:])
-
-        itp = Interpolator(pl, tmpl) # Cell centres 
-        atmos.tmp[:] .= itp.(atmos.p[:])
+        itp = Interpolator(pl, tmpl) 
+        atmos.tmpl[:] .= itp.(atmos.pl[:])  # Cell edges 
+        atmos.tmp[:]  .= itp.(atmos.p[:])   # Cell centres 
 
         atmosphere.calc_layer_props!(atmos)
         return nothing
