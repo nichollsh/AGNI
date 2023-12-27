@@ -15,11 +15,12 @@ module plotting
     using Revise
 
     import atmosphere
+    import phys
 
     """
     Plot the temperature-pressure profile.
     """
-    function plot_pt(atmos, fname; dpi::Int=250)
+    function plot_pt(atmos, fname; dpi::Int=250, incl_magma::Bool=false)
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -32,6 +33,9 @@ module plotting
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400), guidefontsize=9)
 
         # Plot temperature
+        if incl_magma
+            scatter!(plt, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
+        end
         scatter!(plt, [atmos.tstar], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
         plot!(plt, arr_T, arr_P, lc="black", lw=2, label=L"T(p)")
         xlabel!(plt, "Temperature [K]")
@@ -313,32 +317,60 @@ module plotting
     """
     Plot emission spectrum at the TOA
     """
-    function plot_emission(atmos, fname; dpi::Int=250)
+    function plot_emission(atmos, fname; dpi::Int=250, planck_tmp::Float64=0.0)
 
-        # Get data
-        x = zeros(Float64, atmos.nbands)
-        y = zeros(Float64, atmos.nbands)
+        # Check that we have data 
+        if !(atmos.is_out_lw && atmos.is_out_sw)
+            error("Cannot plot emission spectrum because radiances have not been calculated")
+        end
 
+        # Get emission spectrum data
+        xe = zeros(Float64, atmos.nbands)
+        ye = zeros(Float64, atmos.nbands)
         for ba in 1:atmos.nbands
             # x value - band centres [nm]
-            x[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
+            xe[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
             
             # y value - spectral flux [erg s-1 cm-2 nm-1]
             w  = (atmos.bands_max[ba] - atmos.bands_min[ba]) * 1.0e9 # band width in nm
-            f  = atmos.band_u_lw[1, ba] + atmos.band_u_sw[1, ba] # raw flux in W.m-2
+            f  = atmos.band_u_lw[1, ba] + atmos.band_u_sw[1, ba] # raw flux in W m-2
             ff = f / w * 1000.0 # converted to erg s-1 cm-2 nm-1
-            y[ba] = ff
+            ye[ba] = ff
         end
+
+        # Get planck function values 
+        plot_planck = false
+        nsamps = 300
+        if planck_tmp > 1.0 
+            plot_planck = true
+            xp = 10 .^ range( log10(xe[1]), stop=log10(xe[end]), length=nsamps)
+            yp = zeros(Float64, nsamps)
+            for i in 1:nsamps 
+                lambda = xp[i] * 1.0e-9 # metres
+
+                # Calculate planck function value [W m-2 sr-1 m-1]
+                # http://spiff.rit.edu/classes/phys317/lectures/planck.html
+                yp[i] = 2.0 * phys.h_pl * phys.c_vac^2 / lambda^5.0   *   1.0 / ( exp(phys.h_pl * phys.c_vac / (lambda * phys.k_B * planck_tmp)) - 1.0)
+
+                # Integrate solid angle (hemisphere), scale by albedo, convert units
+                yp[i] = yp[i] * pi * 1.0e-9 # [W m-2 nm-1]
+                yp[i] = yp[i] * (1.0 - atmos.albedo_s)
+                yp[i] = yp[i] * 1000.0 # [erg s-1 cm-2 nm-1]
+            end 
+        end 
 
         # Make plot
         plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
 
-        plot!(plt, x, y, label="", color="black")
+        if plot_planck
+            plot!(plt, xp, yp, label="Surface",  color="brown3") # surface planck function
+        end
+        plot!(plt, xe, ye, label="Outgoing spectrum", color="black")  # emission spectrum
 
-        xlims  = (minimum(x), min(maximum(x), 50000.0))
+        xlims  = (minimum(xe), min(maximum(xe), 50000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
-        ylims  = (minimum(y) / 2, maximum(y) * 2)
+        ylims  = (minimum(ye) / 2, maximum(ye) * 2)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         xlabel!(plt, "Wavelength [nm]")
@@ -355,6 +387,11 @@ module plotting
     Plot contribution function (per band)
     """
     function plot_contfunc(atmos, fname; dpi::Int=250)
+
+        # Check that we have data 
+        if !atmos.is_out_lw
+            error("Cannot plot contribution function because radiances have not been calculated")
+        end
 
         # Get data
         x = zeros(Float64, atmos.nbands)    # band centres (reverse order)
@@ -406,6 +443,11 @@ module plotting
     Plot spectral albedo (ratio of LW_UP to SW_DN)
     """
     function plot_albedo(atmos, fname; dpi::Int=250)
+
+        # Check that we have data 
+        if !(atmos.is_out_lw && atmos.is_out_sw)
+            error("Cannot plot contribution function because radiances have not been calculated")
+        end
 
         # Get data
         x = zeros(Float64, atmos.nbands)

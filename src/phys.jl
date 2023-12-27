@@ -14,13 +14,22 @@ module phys
     # - NIST
 
     # Universal gas constant, J K-1 mol-1
-    const R_gas = 8.31446261815324 
+    const R_gas = 8.314462618 # NIST CODATA
 
     # Stefan-boltzmann constant, W m−2 K−4
-    const sigma = 5.670367e-8 
+    const sigma =  5.670374419e-8 # NIST CODATA
 
     # Von Karman constant, dimensionless
     const k_vk = 0.40  # Hogstrom 1988
+
+    # Planck's constant, J s
+    const h_pl = 6.62607015e-34  # NIST CODATA
+
+    # Boltzmann constant, J K-1 
+    const k_B = 1.380649e-23 # NIST CODATA
+
+    # Speed of light, m s-1
+    const c_vac = 299792458.0 # NIST CODATA
 
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict([
