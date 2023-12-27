@@ -63,7 +63,11 @@ module solver_nlsol
         end 
 
         # Work arrays 
-        resid = zeros(Float64, atmos.nlev_c+1)  # residuals
+        arr_len = atmos.nlev_c 
+        if (surf_state == 2)
+            arr_len += 1
+        end
+        resid = zeros(Float64, arr_len)  # residuals
         calc_cf = false
 
         # Objective function to solve for
@@ -135,16 +139,13 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
-            # Calculate (some) residuals from flux divergence
-            resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
-
-            # Calculate residual from surface (if surf_state==2)
+            # Calculate residuals
             if (surf_state == 2)
+                resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
                 resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
-            else
-                resid[end] = 0.0
+            else 
+                resid[1:end] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
             end
-
 
             # +Condensation
             if do_condense
@@ -204,11 +205,19 @@ module solver_nlsol
         end 
 
         # Allocate x array
-        #   1:end-1 => cell centre temperatures 
-        #   end     => bottom cell edge temperature
-        x0 = zeros(Float64, atmos.nlev_c+1) 
-        x0[1:end-1] .= atmos.tmp[1:end]
-        x0[end] = x0[end-1]
+        # Array storage structure:
+        #   in the surf_state=2 case
+        #       1:end-1 => cell centre temperatures 
+        #       end     => bottom cell edge temperature
+        #   other cases 
+        #       1:end => cell centre temperatures
+        x0 = zeros(Float64, arr_len) 
+        for i in 1:atmos.nlev_c
+            x0[i] = atmos.tmp[i]
+        end 
+        if (surf_state==2)
+            x0[end] = x0[atmos.nlev_c]
+        end
 
         # Start nonlinear solver
         sol = nlsolve(fev!, x0, method = :newton, linesearch = the_ls, 
@@ -229,11 +238,11 @@ module solver_nlsol
             atmos.is_converged = true
         end
 
-        for i in 1:atmos.nlev_c 
-            atmos.tmp[i] = sol.zero[i]
+        final_x = zeros(Float64, arr_len)
+        for i in 1:arr_len
+            final_x[i] = sol.zero[i]
         end 
-        surf_state = 1
-        fev!(zeros(Float64, atmos.nlev_c+1), atmos.tmp)
+        fev!(zeros(Float64, arr_len), final_x)
         atmosphere.calc_hrates!(atmos)
 
         # ----------------------------------------------------------
