@@ -13,6 +13,7 @@ ENV["GKSwstype"] = "100"
 
 # Include libraries
 using Revise
+using ProfileView
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
@@ -69,8 +70,8 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-# setpt.fromcsv!(atmos,"pt.csv")
-setpt.isothermal!(atmos, tstar-300.0)
+setpt.fromcsv!(atmos,"pt.csv")
+# setpt.isothermal!(atmos, tstar-300.0)
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
@@ -100,17 +101,17 @@ dry_convect = true
 condensate  = ""
 surf_state  = 2
 
-import solver_tstep
-solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
-                            dry_convect=dry_convect, condensate=condensate,
-                            accel=true, rtol=1.0e-4, atol=1.0e-2,
-                            max_steps=450, min_steps=200, use_mlt=true,
-                            dt_max=150.0, F_losspct_conv=1.0)
+# import solver_tstep
+# solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
+#                             dry_convect=dry_convect, condensate=condensate,
+#                             accel=true, rtol=1.0e-4, atol=1.0e-2,
+#                             max_steps=400, min_steps=200, use_mlt=true,
+#                             dt_max=150.0, F_losspct_conv=1.0)
 
 import solver_nlsol
 solver_nlsol.solve_energy!(atmos, surf_state=surf_state,
                             dry_convect=dry_convect, condensate=condensate,
-                            max_steps=100, atol=1.0e-5)
+                            max_steps=100, atol=0.1)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
