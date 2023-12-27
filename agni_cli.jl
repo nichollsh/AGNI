@@ -1,4 +1,4 @@
-#!/usr/bin/env -S julia --color=yes --startup-file=no
+#!/usr/bin/env -S julia --color=no --startup-file=no
 
 # -------------
 # AGNI executable file with command line arguments
@@ -71,7 +71,7 @@ s = ArgParseSettings()
     "--tmp_floor"
         help = "Minimum temperature allowed in the model - prevents numerical issues [K]."
         arg_type = Float64
-        default = 10.0
+        default = 0.5
     "--ini_dry"
         help = "Initialise on a dry adiabat, with an isothermal stratosphere at this temperature."
         action = :store_true
@@ -136,6 +136,9 @@ s = ArgParseSettings()
         action = :store_true
     "--noaccel"
         help = "Disable model acceleration."
+        action = :store_true
+    "--linesearch"
+        help = "Enable linesearch with nonlinear solver."
         action = :store_true
     "--roverlap"
         help = "Use random overlap for computing overlapping absorption. Otherwise, equivalent extinction will be used."
@@ -213,6 +216,7 @@ max_steps       = args["nsteps"]
 convect_adj     = args["convect_adj"]
 convect_mlt     = args["convect_mlt"]
 no_accel        = args["noaccel"]
+linesearch      = args["linesearch"]
 roverlap        = args["roverlap"]
 dtsolve         = args["dtsolve"]
 nlsolve         = args["nlsolve"]
@@ -293,7 +297,7 @@ if convect_adj || convect_mlt
 end
 
 # Setup atmosphere
-println("Atmosphere: setting up")
+println("Setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
@@ -343,17 +347,20 @@ if ini_sat
     end 
 end 
 
-# Always run once
-println("Calculating initial fluxes")
-atmosphere.radtrans!(atmos, true)
-atmosphere.radtrans!(atmos, false)
-if convect_mlt
-    atmosphere.mlt!(atmos)
-end
-
-if (surf_state > 2) || (surf_state < 0)
-    error("Invalid surface state '$surf_state'")
-end
+# Oneshot case
+if !(dtsolve || nlsolve)
+    atmosphere.radtrans!(atmos, true)
+    atmosphere.radtrans!(atmos, false)
+    if convect_mlt
+        atmosphere.mlt!(atmos)
+    end
+else 
+    # Otherwise we will be solving with some method,
+    # so check that the surface state is reasonable
+    if (surf_state > 2) || (surf_state < 0)
+        error("Invalid surface state '$surf_state'")
+    end
+end    
 
 # Time-stepped solution
 if dtsolve
@@ -367,15 +374,17 @@ if dtsolve
     solver_tstep.solve_energy!(atmos, 
                          modplot=modplot, verbose=verbose, 
                          surf_state=surf_state, dry_convect=dry_convect, use_mlt=convect_mlt,
-                         max_steps=max_steps, accel=!no_accel,
+                         max_steps=max_steps, accel=!no_accel, dt_max=150.0, rtol=1.0e-4, atol=1.0e-2,
                          drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel, F_losspct_conv=cc_floss
                          )
 end 
     
-# Newton-rapshon solution
+# Newton-Rapshon solution
 if nlsolve
     import solver_nlsol
-    solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, max_steps=200)
+    solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, 
+                                max_steps=200, atol=1e-2, use_linesearch=linesearch,
+                                calc_cf_end=plot)
 end
 
 # Write NetCDF and PT files
