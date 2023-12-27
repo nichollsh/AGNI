@@ -136,7 +136,7 @@ module solver_tstep
         dtmp        = zeros(Float64, atmos.nlev_c)  # temperature step [K]
 
         # Variables
-        step      = 0           # Current step number
+        step      = 0          # Current step number
         success   = false       # Convergence criteria met
         flag_prev = false       # Previous iteration is meeting convergence
         flag_this = false       # Current iteration is meeting convergence
@@ -519,10 +519,10 @@ module solver_tstep
             # -------------------------------------- 
             if (modplot > 0) && (mod(step,modplot) == 0)
                 plotting.plot_solver(atmos, @sprintf("%s/solver.png", atmos.OUT_DIR), hist_tmpl=hist_tmpl, incl_magma=plt_magma, step=step)
-                cp(@sprintf("%s/solver.png", atmos.OUT_DIR), @sprintf("%s/zzframe_%04d.png", atmos.OUT_DIR, step))
+                cp(@sprintf("%s/solver.png", atmos.OUT_DIR), @sprintf("%s/zzframe_%04d.png", atmos.OUT_DIR, step), force=true)
 
                 plotting.plot_fluxes(atmos, @sprintf("%s/fluxes.png", atmos.OUT_DIR))
-                cp(@sprintf("%s/fluxes.png", atmos.OUT_DIR), @sprintf("%s/zyframe_%04d.png", atmos.OUT_DIR, step))
+                cp(@sprintf("%s/fluxes.png", atmos.OUT_DIR), @sprintf("%s/zyframe_%04d.png", atmos.OUT_DIR, step), force=true)
             end 
 
             # --------------------------------------
