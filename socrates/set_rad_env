@@ -2,7 +2,7 @@
 #
 #  Initialization script for radiation code
 #
-RAD_DIR=/Users/nichollsh/Projects/AGNI/socrates
+RAD_DIR=/home/n/nichollsh/Projects/PROTEUS/AGNI/socrates
 RAD_BIN=${RAD_DIR}/bin
 RAD_DATA=${RAD_DIR}/data
 RAD_SCRIPT=${RAD_DIR}/sbin
@@ -21,5 +21,5 @@ export MANPATH
 export PYTHONPATH
 #
 ulimit -s unlimited
-LIBCDF_PATH=/opt/homebrew/Cellar/netcdf-fortran/4.6.1/lib
+LIBCDF_PATH=/usr/lib/
 export LD_LIBRARY_PATH=$LIBCDF_PATH:$LD_LIBRARY_PATH

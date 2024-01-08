@@ -43,17 +43,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki/An-overview) on G
 - `$ cd julia`
 - `$ julia`
 - `julia> ]`
-- `(@v1.9) pkg> add OffsetArrays`
--  `(@v1.9) pkg> add Revise`
--  `(@v1.9) pkg> add PCHIPInterpolation`
--  `(@v1.9) pkg> add LaTeXStrings`
--  `(@v1.9) pkg> add Plots`
--  `(@v1.9) pkg> add NCDatasets`
--  `(@v1.9) pkg> add DataStructures`
--  `(@v1.9) pkg> add Glob`
--  `(@v1.9) pkg> add ArgParse`
--  `(@v1.9) pkg> add NLsolve`
--  `(@v1.9) pkg> add LineSearches`
+-  `(@v1.9) pkg> add OffsetArrays Revise PCHIPInterpolation Plots NCDatasets DataStructures Glob ArgParse NLsolve LineSearches`
 -  `(@v1.9) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`
