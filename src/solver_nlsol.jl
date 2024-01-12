@@ -68,6 +68,7 @@ module solver_nlsol
             arr_len += 1
         end
         resid = zeros(Float64, arr_len)  # residuals
+        crate = zeros(Float64, atmos.nlev_c)  # condensation rate [mm/hr]
         calc_cf = false
 
         # Objective function to solve for
@@ -129,7 +130,7 @@ module solver_nlsol
 
             # +Dry convection
             if dry_convect
-                atmosphere.mlt!(atmos, pmin=1.0)
+                atmosphere.mlt!(atmos)
                 atmos.flux_tot += atmos.flux_c
             end
 
@@ -149,12 +150,10 @@ module solver_nlsol
 
             # +Condensation
             if do_condense
-                
-                # This handled by requiring that the residuals (i.e. the power
-                # being delivered into a cell) can only be positive in regions 
-                # where condensation is occuring, because they cannot be allowed 
-                # to cool down. All internal production (i.e. negative power 
-                # delivery) yields extra condensate, not a change in temp.
+
+                a = 1.0
+                g = 1.0
+                f = 0.0
 
                 for i in 1:atmos.nlev_c
 
@@ -165,17 +164,20 @@ module solver_nlsol
 
                     # Layer is condensing if T < T_dew
                     Tsat = phys.calc_Tdew(condensate,atmos.p[i] * x )
-                    if atmos.tmp[i] < Tsat
-                        resid[i] = max(resid[i], 0.0)
-
+                    g = 1.0 - exp(a * (Tsat - atmos.tmp[i]))
+                    f = resid[i]
+                    resid[i] = f * g
+                    if atmos.tmp[i] <= Tsat+0.1
                         atmos.mask_p[i] = atmos.mask_decay 
-                        atmos.re[i]   = 1.0e-5  # 10 micron droplets
-                        atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
-                        atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
+                        crate[i]        = -1.0 * f / (phys.lookup_safe("l_vap",condensate) * 1000.0) * 3.6e6
+                        atmos.re[i]     = 1.0e-5  # 10 micron droplets
+                        atmos.lwm[i]    = 0.8     # 80% of the saturated vapor turns into cloud
+                        atmos.clfr[i]   = 1.0     # The cloud takes over the entire cell
                     else 
-                        atmos.re[i]   = 0.0
-                        atmos.lwm[i]  = 0.0
-                        atmos.clfr[i] = 0.0
+                        crate[i] = 0.0
+                        atmos.re[i]    = 0.0
+                        atmos.lwm[i]   = 0.0
+                        atmos.clfr[i]  = 0.0
                     end
                 end
             end 
@@ -244,6 +246,7 @@ module solver_nlsol
         end 
         fev!(zeros(Float64, arr_len), final_x)
         atmosphere.calc_hrates!(atmos)
+        display(crate)
 
         # ----------------------------------------------------------
         # Print info
