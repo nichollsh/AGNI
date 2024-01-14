@@ -24,24 +24,23 @@ import phys
 
 
 # Configuration options
-tstar           = 1300.0    # Surface temperature [kelvin]
-instellation    = 1361.0
-albedo_b        = 0.18
+tstar           = 2521.86    # Surface temperature [kelvin]
+instellation    = 1.030e+03
+albedo_b        = 0.1
 radius          = 6.37e6    # metres
 zenith          = 48.19
 gravity         = 9.81      # m s-2
-nlev_centre     = 50  
-p_surf          = 270.0    # bar
+nlev_centre     = 70  
+p_surf          = 250.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 1.0),
-                        # ("CO2" , 0.1),
-                        # ("H2" , 1.0),
-                        # ("CO" , 90.58514),
-                        # ("N2" , 1.41003)
+                        ("H2O" , 0.05),
+                        ("CO2" , 0.8),
+                        ("CO" ,  0.1),
+                        ("N2" ,  0.05)
                         ])
 
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Mallard/Mallard"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
@@ -61,7 +60,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=4,
                          skin_d=0.01,
                          skin_k=2.0,
-                         tmp_magma=2500.0,
+                         tmp_magma=2600.0,
                          tmp_floor=2.0,
                          thermo_functions=true,
                  )
@@ -69,8 +68,8 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
-setpt.fromcsv!(atmos,"pt.csv")
-# setpt.isothermal!(atmos, tstar-300.0)
+# setpt.fromcsv!(atmos,"pt.csv")
+setpt.isothermal!(atmos, tstar-300.0)
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
@@ -97,8 +96,8 @@ println("Running model...")
 
 # Call solver(s)
 dry_convect = true
-condensate  = "H2O"
-surf_state  = 1
+condensate  = ""
+surf_state  = 2
 
 # import solver_tstep
 # solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 

@@ -83,7 +83,7 @@ s = ArgParseSettings()
         arg_type = Float64
         default = trppt_default
     "--surface"
-        help = "Surface state (0: free, 1: constant, 2: conductive skin)."
+        help = "Surface state (0: extrapolate (do not update tstar), 1: fixed at tstar, 2: extrapolate (update tstar according to conductive skin)."
         arg_type = Int
         default = 0
     "--skin_d"
