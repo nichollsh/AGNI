@@ -68,7 +68,7 @@ module solver_nlsol
             arr_len += 1
         end
         resid = zeros(Float64, arr_len)  # residuals
-        crate = zeros(Float64, atmos.nlev_c)  # condensation rate [mm/hr]
+        prate = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
         calc_cf = false
 
         # Objective function to solve for
@@ -100,22 +100,18 @@ module solver_nlsol
                 # Error cases
                 error("Invalid surface state ($surf_state)")
 
-            elseif (surf_state == 0)
+            elseif (surf_state != 1)
                 # Extrapolate (log-linear)
                 grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
                 grad_dp = log(atmos.p[end]/atmos.p[end-1])
                 atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
-            elseif (surf_state == 2)
-                # Conductive skin
-                atmos.tmpl[end] = x[end]
+                if (surf_state == 2)
+                    # Conductive skin
+                    atmos.tstar = x[end]
+                end
             end 
             atmos.tmpl[end] = clamp(atmos.tmpl[end], atmos.tmp_floor, atmos.tmp_ceiling)
-
-            # Set tstar in conductive case
-            if (surf_state == 2)
-                atmos.tstar = atmos.tmpl[end]
-            end
 
             # Calculate layer properties 
             atmosphere.calc_layer_props!(atmos)
@@ -169,12 +165,12 @@ module solver_nlsol
                     resid[i] = f * g
                     if atmos.tmp[i] <= Tsat+0.1
                         atmos.mask_p[i] = atmos.mask_decay 
-                        crate[i]        = -1.0 * f / (phys.lookup_safe("l_vap",condensate) * 1000.0) * 3.6e6
+                        prate[i]        = -1.0 * f / ( phys.lookup_safe("l_vap",condensate) * (atmos.zl[i] - atmos.zl[i+1])) * 86.4 # g cm-3 day-1
                         atmos.re[i]     = 1.0e-5  # 10 micron droplets
                         atmos.lwm[i]    = 0.8     # 80% of the saturated vapor turns into cloud
                         atmos.clfr[i]   = 1.0     # The cloud takes over the entire cell
                     else 
-                        crate[i] = 0.0
+                        prate[i] = 0.0
                         atmos.re[i]    = 0.0
                         atmos.lwm[i]   = 0.0
                         atmos.clfr[i]  = 0.0
@@ -246,7 +242,7 @@ module solver_nlsol
         end 
         fev!(zeros(Float64, arr_len), final_x)
         atmosphere.calc_hrates!(atmos)
-        display(crate)
+        # display(prate)
 
         # ----------------------------------------------------------
         # Print info
