@@ -65,21 +65,22 @@ s = ArgParseSettings()
         help = "Path to a CSV file containing a T(p) profile to load. Columns of file should be [Pa, K]"
         arg_type = String 
         default = ""
-    "--tstar_enforce"
-        help = "Do not allow the PT profile provided by `pt_path`` to overwrite the value of `tstar`"
-        action = :store_true
     "--tmp_floor"
         help = "Minimum temperature allowed in the model - prevents numerical issues [K]."
         arg_type = Float64
         default = 0.5
+    "--ini_iso"
+        help = "Initialise with an isothermal state at this temperature [K]."
+        arg_type = Float64
+        default = trppt_default
     "--ini_dry"
-        help = "Initialise on a dry adiabat, with an isothermal stratosphere at this temperature."
+        help = "Initialise on a dry adiabat."
         action = :store_true
     "--ini_sat"
         help = "Check each level for saturation and set to the saturation coexistance curve when T < T_dew."
         action = :store_true
     "--trppt"
-        help = "Apply an isothermal stratosphere at this temperature."
+        help = "Apply an isothermal stratosphere at this temperature [K]."
         arg_type = Float64
         default = trppt_default
     "--surface"
@@ -197,9 +198,9 @@ x_dict          = args["x_dict"]
 x_path          = args["x_path"]
 plot            = args["plot"]
 pt_path         = args["pt_path"]
-tstar_enforce   = args["tstar_enforce"]
 tmp_floor       = args["tmp_floor"]
 albedo_s        = args["albedo_s"]
+ini_iso         = args["ini_iso"]
 ini_dry         = args["ini_dry"]
 ini_sat         = args["ini_sat"]
 trppt           = args["trppt"]
@@ -325,13 +326,12 @@ atmosphere.allocate!(atmos;
 if !(pt_path == "")
     setpt.fromcsv!(atmos, abspath(pt_path))
 end 
-#    Do not allow overwriting of tstar
-if tstar_enforce
-    atmos.tstar = tstar 
-    atmos.tmpl[end] = tstar
-end
+#    Apply isothermal state
+if ini_iso > trppt_default+1.0e-9
+    setpt.isothermal!(atmos, ini_iso)
+end 
 #    Prevent surface supersaturation
-setpt.prevent_surfsupersat!(atmos)
+# setpt.prevent_surfsupersat!(atmos)
 #    Apply dry adiabat if required
 if ini_dry
     setpt.dry_adiabat!(atmos)
@@ -383,7 +383,7 @@ end
 if nlsolve
     import solver_nlsol
     solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, 
-                                max_steps=200, atol=1e-2, use_linesearch=linesearch,
+                                max_steps=250, atol=1e-3, use_linesearch=linesearch,
                                 calc_cf_end=plot)
 end
 
