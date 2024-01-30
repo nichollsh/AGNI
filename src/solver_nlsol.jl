@@ -38,14 +38,14 @@ module solver_nlsol
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=500`              maximum number of solver steps
-    - `atol::Int=1.0e-3`                maximum residual at convergence
+    - `atol::Float64=1.0e-3`            maximum residual at convergence
     - `use_linesearch::Bool=false`      use linesearch to ensure global convergence
     - `calc_cf_end::Bool=true`          calculate contribution function at convergence
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=500, atol::Float64=1.0e-3,
+                            max_steps::Int=500, atol::Float64=1.0e-3, 
                             use_linesearch::Bool=false,
                             calc_cf_end::Bool=true
                             )
@@ -58,7 +58,7 @@ module solver_nlsol
                 do_condense = true 
                 i_gas = findfirst(==(condensate), atmos.gases)
             else 
-                error("Invalid condensate ('$condensate')")
+                error("Invalid condensate '$condensate'")
             end 
         end 
 
@@ -67,9 +67,12 @@ module solver_nlsol
         if (surf_state == 2)
             arr_len += 1
         end
+        calc_cf = false
         resid = zeros(Float64, arr_len)  # residuals
         prate = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
-        calc_cf = false
+        tmp_0 = zeros(Float64, atmos.nlev_c)  # initial guess for cell-centre temperatures
+        tmp_0[:] .= atmos.tmp[:]
+        
 
         # Objective function to solve for
         function fev!(F,x)
@@ -194,48 +197,58 @@ module solver_nlsol
         # ----------------------------------------------------------
         # Call the solver
         # ---------------------------------------------------------- 
+
+        # Linesearch?
         the_ls = Static()
         if use_linesearch 
+            println("NLSolve: begin Newton-Raphson iterations (with backtracking linesearch)") 
             the_ls = BackTracking()
-            println("NLSolver: begin Newton-Raphson iterations (with backtracking linesearch)") 
         else
-            println("NLSolver: begin Newton-Raphson iterations") 
+            println("NLSolve: begin Newton-Raphson iterations") 
         end 
-
-        # Allocate x array
+       
+        success = false
+            
+        # Allocate initial guess for the x array, as well as a,b arrays
         # Array storage structure:
         #   in the surf_state=2 case
         #       1:end-1 => cell centre temperatures 
         #       end     => bottom cell edge temperature
         #   other cases 
         #       1:end => cell centre temperatures
-        x0 = zeros(Float64, arr_len) 
+        x0    = zeros(Float64, arr_len) 
         for i in 1:atmos.nlev_c
-            x0[i] = atmos.tmp[i]
+            x0[i]    = clamp(tmp_0[i], atmos.tmp_floor , atmos.tmp_ceiling)
         end 
         if (surf_state==2)
-            x0[end] = x0[atmos.nlev_c]
+            x0[end] = tmp_0[atmos.nlev_c] + 1.0
         end
 
         # Start nonlinear solver
-        sol = nlsolve(fev!, x0, method = :newton, linesearch = the_ls, 
+        sol = nlsolve(fev!, x0, 
+                        method = :newton, linesearch = the_ls, autodiff=:central,
                         iterations=max_steps, ftol=atol, show_trace=true)
+
+        # Check result
+        if !converged(sol)
+            @printf("    stopping atmosphere iterations before convergence (maybe try enabling linesearch or providing a better initial guess) \n\n")
+            success = false
+        else
+            @printf("    convergence criteria met (%d iterations) \n\n", sol.iterations)
+            success = true
+        end
 
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
 
         atmos.is_solved = true
-        calc_cf = calc_cf_end
-
-        if !converged(sol)
-            @printf("    stopping atmosphere iterations before convergence (maybe try enabling linesearch) \n\n")
-            atmos.is_converged = false 
-        else
-            @printf("    convergence criteria met (%d iterations) \n\n", sol.iterations)
+        if success
             atmos.is_converged = true
+        else 
+            atmos.is_converged = false 
         end
-
+        calc_cf = calc_cf_end
         final_x = zeros(Float64, arr_len)
         for i in 1:arr_len
             final_x[i] = sol.zero[i]
@@ -261,6 +274,7 @@ module solver_nlsol
         @printf("    loss      = %+.2e %%        \n", loss_pct)
         @printf("\n")
 
+        return success
     end # end solve_energy 
 
 end 
