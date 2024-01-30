@@ -24,14 +24,14 @@ import phys
 
 
 # Configuration options
-tstar           = 1774.1    # Surface temperature [kelvin]
-instellation    = 1.031e+03
+tstar           = 2800.0    # Surface temperature [kelvin]
+instellation    = 1000.0
 albedo_b        = 0.0
 radius          = 6.37e6    # metres
 zenith          = 48.19
 gravity         = 9.81      # m s-2
 nlev_centre     = 50  
-p_surf          = 558.87793    # bar
+p_surf          = 280.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
                         ("H2O" , 1.0),
@@ -60,8 +60,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=4,
                          skin_d=0.01,
                          skin_k=2.0,
-                         tmp_magma=1774.1,
-                         tmp_floor=0.00001,
+                         tmp_magma=2800.0,
+                         tmp_floor=0.5,
                          thermo_functions=false,
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
@@ -69,11 +69,11 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"pt.csv")
-# setpt.isothermal!(atmos, tstar-400.0)
+setpt.isothermal!(atmos, tstar-400.0)
 # setpt.prevent_surfsupersat!(atmos)
-setpt.dry_adiabat!(atmos)
+# setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
-setpt.stratosphere!(atmos, 500.0)
+# setpt.stratosphere!(atmos, 500.0)
 
 # Create output directory
 rm(output_dir,force=true,recursive=true)
@@ -99,12 +99,12 @@ dry_convect = true
 condensate  = ""
 surf_state  = 2
 
-import solver_tstep
-solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
-                            dry_convect=dry_convect, condensate=condensate,
-                            accel=true, rtol=1.0e-4, atol=1.0e-2,
-                            max_steps=400, min_steps=200, use_mlt=true,
-                            dt_max=150.0, F_losspct_conv=1.0)
+# import solver_tstep
+# solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
+#                             dry_convect=dry_convect, condensate=condensate,
+#                             accel=true, rtol=1.0e-4, atol=1.0e-2,
+#                             max_steps=400, min_steps=200, use_mlt=true,
+#                             dt_max=150.0, F_losspct_conv=1.0)
 
 import solver_nlsol
 solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
