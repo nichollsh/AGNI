@@ -294,7 +294,9 @@ atmosphere.deallocate!(atmos)
 println(" ")
 if passing
     println("SUCCESS - all tests passed")
+    exit(0)
 else 
     println("WARNING - some tests failed")
+    exit(1)
 end
 
