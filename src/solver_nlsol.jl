@@ -68,9 +68,19 @@ module solver_nlsol
             error("Invalid surface state ($surf_state)")
         end
 
+        # Dimensionality
+        arr_len = atmos.nlev_c 
+        if (surf_state == 2)
+            arr_len += 1
+        end
+
         # Work arrays 
         calc_cf = false
         prate = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
+        rf      = zeros(Float64, arr_len)  # Forward difference
+        rb      = zeros(Float64, arr_len)  # Backward difference
+        tmp_s   = zeros(Float64, arr_len)  # Perturbed temperature array 
+        s       = 0.0
 
 
         # Calculate the (remaining) temperatures  
@@ -146,17 +156,18 @@ module solver_nlsol
 
                 for i in 1:atmos.nlev_c
 
-                    mf = atmos.layer_x[i,i_gas]
-                    if mf < 1.0e-10 
+                    pp = atmos.layer_x[i,i_gas] * atmos.p[i]
+                    if pp < 1.0e-10 
                         continue
                     end
 
                     # Layer is condensing if T < T_dew
-                    Tsat = phys.calc_Tdew(condensate,atmos.p[i] * mf )
+                    Tsat = phys.calc_Tdew(condensate, pp )
                     g = 1.0 - exp(a * (Tsat - atmos.tmp[i]))
                     f = resid[i]
                     resid[i] = f * g
-                    if atmos.tmp[i] <= Tsat+0.1
+                    if atmos.tmp[i] < Tsat
+                        println("Condensing at level $i")
                         atmos.mask_p[i] = atmos.mask_decay 
                         prate[i]        = -1.0 * f / ( phys.lookup_safe("l_vap",condensate) * (atmos.zl[i] - atmos.zl[i+1])) * 86.4 # g cm-3 day-1
                         atmos.re[i]     = 1.0e-5  # 10 micron droplets
@@ -186,16 +197,7 @@ module solver_nlsol
             # Evalulate residuals at x
             fev!(x, resid)
 
-            len_x = length(x)
-
-            # Work variables 
-            tmp_s   = zeros(Float64, len_x)  # Perturbed temperature array 
-            s       = 0.0                           # Row perturbation
-            rf      = zeros(Float64, len_x)  # Forward difference
-            rb      = zeros(Float64, len_x)  # Backward difference
-            drdt    = zeros(Float64, len_x)  # Jacobian row
-
-            for i in 1:len_x  # for each x
+            for i in 1:arr_len  # for each x
 
                 # Calculate perturbation
                 s = x[i] * fdw
@@ -206,16 +208,12 @@ module solver_nlsol
                 fev!(tmp_s, rf)
 
                 # Backward
-                tmp_s[:] .= x[:]
-                tmp_s[i] -= s * 0.5
+                tmp_s[i] -= s    # Only need to modify this level; rest were set during the forward phase
                 fev!(tmp_s, rb)
 
-                # Central difference
-                drdt[:] .= ( (rf[:] .- rb[:]) ./ s )
-
                 # Set jacobian
-                for j in 1:len_x  # for each r
-                    jacob[j,i] = drdt[j]
+                for j in 1:arr_len  # for each r
+                    jacob[j,i] = (rf[j] - rb[j]) / s
                 end 
             end 
 
@@ -229,15 +227,7 @@ module solver_nlsol
             # Evalulate residuals at x
             fev!(x, resid)
 
-            len_x = length(x)
-
-            # Work variables 
-            tmp_s   = zeros(Float64, len_x)  # Perturbed temperature array 
-            s       = 0.0                           # Row perturbation
-            rf      = zeros(Float64, len_x)  # Forward difference
-            drdt    = zeros(Float64, len_x)  # Jacobian row
-
-            for i in 1:len_x  # for each x
+            for i in 1:arr_len  # for each x
 
                 # Calculate perturbation
                 s = x[i] * fdw
@@ -247,12 +237,9 @@ module solver_nlsol
                 tmp_s[i] += s
                 fev!(tmp_s, rf)
 
-                # Forward difference
-                drdt[:] .= ( (rf[:] .- resid[:]) ./ s )
-
                 # Set jacobian
-                for j in 1:len_x  # for each r
-                    jacob[j,i] = drdt[j]
+                for j in 1:arr_len  # for each r
+                    jacob[j,i] =  (rf[j] - resid[j]) / s
                 end 
             end 
 
@@ -265,11 +252,6 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         println("Begin Newton-Raphson iterations") 
 
-        arr_len = atmos.nlev_c 
-        if (surf_state == 2)
-            arr_len += 1
-        end
-       
         # Allocate initial guess for the x array, as well as a,b arrays
         # Array storage structure:
         #   in the surf_state=2 case

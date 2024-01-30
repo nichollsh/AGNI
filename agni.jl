@@ -61,8 +61,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          skin_d=0.01,
                          skin_k=2.0,
                          tmp_magma=2800.1,
-                         tmp_floor=0.00001,
-                         thermo_functions=true,
+                         tmp_floor=0.1,
+                         thermo_functions=false,
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
