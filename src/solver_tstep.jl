@@ -66,7 +66,7 @@ module solver_tstep
                             drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=1.0
                             )
 
-        println("TSSolver: begin accelerated timestepping")
+        println("Begin accelerated timestepping")
 
         # Run parameters
         dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
