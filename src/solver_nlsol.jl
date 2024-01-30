@@ -16,11 +16,10 @@ module solver_nlsol
     using Revise
     using LinearAlgebra
 
-    using NLsolve
-    using LineSearches
-
     import atmosphere 
     import phys
+    import plotting
+
     
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
@@ -37,17 +36,17 @@ module solver_nlsol
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
-    - `max_steps::Int=500`              maximum number of solver steps
-    - `atol::Float64=1.0e-3`            maximum residual at convergence
-    - `use_linesearch::Bool=false`      use linesearch to ensure global convergence
+    - `max_steps::Int=200`              maximum number of solver steps
+    - `atol::Float64=1.0e-2`            maximum residual at convergence
+    - `cdw::Float64=5.0e-3`             relative width of the "difference" in the central-difference calculations
     - `calc_cf_end::Bool=true`          calculate contribution function at convergence
+    - `modplot::Int=0`                  iteration frequency at which to make plots
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=500, atol::Float64=1.0e-3, 
-                            use_linesearch::Bool=false,
-                            calc_cf_end::Bool=true
+                            max_steps::Int=200, atol::Float64=1.0e-2, cdw::Float64=5.0e-3,
+                            calc_cf_end::Bool=true, modplot::Int=1
                             )
 
         # Validate condensation case
@@ -63,19 +62,11 @@ module solver_nlsol
         end 
 
         # Work arrays 
-        arr_len = atmos.nlev_c 
-        if (surf_state == 2)
-            arr_len += 1
-        end
         calc_cf = false
-        resid = zeros(Float64, arr_len)  # residuals
         prate = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
-        tmp_0 = zeros(Float64, atmos.nlev_c)  # initial guess for cell-centre temperatures
-        tmp_0[:] .= atmos.tmp[:]
-        
 
         # Objective function to solve for
-        function fev!(F,x)
+        function fev!(x::Array,resid::Array)
 
             # Reset values
             atmos.mask_c[:] .= 0
@@ -187,28 +178,63 @@ module solver_nlsol
                 error("Residual array contains NaNs and/or Infs")
             end
 
-            # Pass residuals outward
-            F[:] .= resid[:]
+            return nothing
+        end  # end fev
+
+        # Calculating the jacobian of f at x using a central-difference method
+        function jac!(x::Array, jacob::Array)
+
+            # Reset jacobian 
+            fill!(jacob, 0.0)
+
+            len_x = length(x)
+
+            # Work variables 
+            tmp_s   = zeros(Float64, len_x)  # Perturbed temperature array 
+            s       = 0.0                           # Row perturbation
+            rf      = zeros(Float64, len_x)  # Forward difference
+            rb      = zeros(Float64, len_x)  # Backward difference
+            drdt    = zeros(Float64, len_x)  # Jacobian row
+
+            for i in 1:len_x  # for each x
+
+                # Calculate perturbation
+                s = x[i] * cdw
+
+                # Forward
+                tmp_s[:] .= x[:]
+                tmp_s[i] += s
+                fev!(tmp_s, rf)
+
+                # Backward
+                tmp_s[:] .= x[:]
+                tmp_s[i] -= s
+                fev!(tmp_s, rb)
+
+                # Central difference
+                drdt[:] .= ( (rf[:] .- rb[:]) ./ (2.0 * s) )
+
+                # Set jacobian
+                for j in 1:len_x  # for each r
+                    jacob[j,i] = drdt[j]
+                end 
+            end 
 
             return nothing
-        end 
+        end # end jac
 
         
         # ----------------------------------------------------------
-        # Call the solver
+        # Setup initial guess
         # ---------------------------------------------------------- 
 
-        # Linesearch?
-        the_ls = Static()
-        if use_linesearch 
-            println("NLSolve: begin Newton-Raphson iterations (with backtracking linesearch)") 
-            the_ls = BackTracking()
-        else
-            println("NLSolve: begin Newton-Raphson iterations") 
-        end 
+        println("NLSolve: begin Newton-Raphson iterations") 
+
+        arr_len = atmos.nlev_c 
+        if (surf_state == 2)
+            arr_len += 1
+        end
        
-        success = false
-            
         # Allocate initial guess for the x array, as well as a,b arrays
         # Array storage structure:
         #   in the surf_state=2 case
@@ -216,44 +242,105 @@ module solver_nlsol
         #       end     => bottom cell edge temperature
         #   other cases 
         #       1:end => cell centre temperatures
-        x0    = zeros(Float64, arr_len) 
+        x_ini    = zeros(Float64, arr_len) 
         for i in 1:atmos.nlev_c
-            x0[i]    = clamp(tmp_0[i], atmos.tmp_floor , atmos.tmp_ceiling)
+            x_ini[i]    = clamp(atmos.tmp[i], atmos.tmp_floor , atmos.tmp_ceiling)
         end 
         if (surf_state==2)
-            x0[end] = tmp_0[atmos.nlev_c] + 1.0
+            x_ini[end] = atmos.tmp[atmos.nlev_c] + 1.0
         end
 
-        # Start nonlinear solver
-        sol = nlsolve(fev!, x0, 
-                        method = :newton, linesearch = the_ls, autodiff=:central,
-                        iterations=max_steps, ftol=atol, show_trace=true)
+        # ----------------------------------------------------------
+        # Solver loop
+        # ---------------------------------------------------------- 
+        step::Int =     0       # Step number
+        code::Int =     -1      # Status code 
+        modprint::Int = 1       # Print frequency
+        solving::Bool = true    # Currently solving?
+        ssf::Float64  = 1.0     # Step scale factor
+        
 
+        b::Array      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
+        x_cur::Array  = zeros(Float64, arr_len)               # Array to solve for (i)
+        x_old::Array  = zeros(Float64, arr_len)               # Old ^ (i-1)
+        x_dif::Array  = zeros(Float64, arr_len)               # Change in x (i-1 to i)
+        r::Array      = zeros(Float64, arr_len)               # Residuals (i)
+
+        x_cur[:] .= x_ini[:]
+        r .+= 1.0e99
+
+        @printf("    step  resid_med  resid_max  xvals_med  xvals_max  \n")
+        while solving 
+            # Check convergence
+            if maximum(abs.(r)) < atol 
+                code = 0
+                solving = false 
+                break
+            end
+
+            step += 1
+            if step > max_steps
+                code = 1 
+                solving = false
+                break 
+            end 
+            if mod(step,modprint) == 0 
+                @printf("    %4d", step)
+            end
+
+            # Evaluate F and J
+            fev!(x_cur, r)
+            jac!(x_cur, b) 
+
+            # Check if jacobian is singular 
+            # if det(b) < 1.0e-99
+            #     code = 2
+            #     solving = false
+            #     break
+            # end 
+
+            # Newton-Raphson step 
+            x_dif = -b\r
+            x_old[:] = x_cur[:]
+            x_cur[:] .= x_old[:] .+ (x_dif[:] .* ssf)
+
+            # Plot?
+            if modplot > 0
+                if mod(step, modplot) == 0
+                    plotting.plot_pt(atmos,  @sprintf("%s/solver.png", atmos.OUT_DIR), incl_magma=(surf_state==2))
+                end 
+            end 
+                
+            # Inform user
+            if mod(step,modprint) == 0 
+                r_med = median(r)
+                r_max = r[argmax(abs.(r))]
+                x_med = median(x_cur)
+                x_max = x_cur[argmax(abs.(x_cur))]
+                @printf("  %+.2e  %+.2e  %+.2e  %+.2e  \n", r_med, r_max, x_med, x_max)
+            end
+
+        end # end solver loop
+        
         # Check result
-        if !converged(sol)
-            @printf("    stopping atmosphere iterations before convergence (maybe try enabling linesearch or providing a better initial guess) \n\n")
-            success = false
-        else
-            @printf("    convergence criteria met (%d iterations) \n\n", sol.iterations)
-            success = true
+        atmos.is_solved = true
+        atmos.is_converged = false 
+        if code == 0
+            println("    success")
+            atmos.is_converged = true
+        elseif code == 1
+            println("    failure (maximum iterations reached)")
+        elseif code == 2
+            println("    failure (singular jacobian)")
+        else 
+            println("    failure (unhandled)")
         end
 
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
-
-        atmos.is_solved = true
-        if success
-            atmos.is_converged = true
-        else 
-            atmos.is_converged = false 
-        end
         calc_cf = calc_cf_end
-        final_x = zeros(Float64, arr_len)
-        for i in 1:arr_len
-            final_x[i] = sol.zero[i]
-        end 
-        fev!(zeros(Float64, arr_len), final_x)
+        fev!(x_cur, zeros(Float64, arr_len))
         atmosphere.calc_hrates!(atmos)
         # display(prate)
 
@@ -274,7 +361,7 @@ module solver_nlsol
         @printf("    loss      = %+.2e %%        \n", loss_pct)
         @printf("\n")
 
-        return success
+        return atmos.is_converged
     end # end solve_energy 
 
 end 
