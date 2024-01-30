@@ -38,14 +38,16 @@ module solver_nlsol
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=200`              maximum number of solver steps
     - `atol::Float64=1.0e-2`            maximum residual at convergence
-    - `cdw::Float64=5.0e-3`             relative width of the "difference" in the central-difference calculations
-    - `calc_cf_end::Bool=true`          calculate contribution function at convergence
+    - `fdw::Float64=5.0e-3`             relative width of the "difference" in the finite-difference calculations
+    - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
+    - `calc_cf_end::Bool=true`          calculate contribution function?
     - `modplot::Int=0`                  iteration frequency at which to make plots
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=200, atol::Float64=1.0e-2, cdw::Float64=5.0e-3,
+                            max_steps::Int=200, atol::Float64=1.0e-2, 
+                            fdw::Float64=1.0e-4, use_cendiff::Bool=false,
                             calc_cf_end::Bool=true, modplot::Int=1
                             )
 
@@ -61,9 +63,41 @@ module solver_nlsol
             end 
         end 
 
+        # Validate surf_state
+        if (surf_state < 0) || (surf_state > 2)
+            error("Invalid surface state ($surf_state)")
+        end
+
         # Work arrays 
         calc_cf = false
         prate = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
+
+
+        # Calculate the (remaining) temperatures  
+        function _set_tmps!(_x::Array)
+            # Read new guess
+            for i in 1:atmos.nlev_c
+                atmos.tmp[i] = _x[i]
+            end
+            clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
+
+            # Interpolate temperature to cell-edge values (not incl. bottommost value)
+            atmosphere.set_tmpl_from_tmp!(atmos)
+
+            # Set bottom edge temperature 
+            if (surf_state != 1)
+                # Extrapolate (log-linear)
+                grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
+                grad_dp = log(atmos.p[end]/atmos.p[end-1])
+                atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
+
+                if (surf_state == 2) # Conductive skin
+                    atmos.tstar = _x[end]
+                end
+            end 
+            
+            return nothing
+        end # end set_tmps
 
         # Objective function to solve for
         function fev!(x::Array,resid::Array)
@@ -72,44 +106,9 @@ module solver_nlsol
             atmos.mask_c[:] .= 0
             atmos.mask_p[:] .= 0
            
-            # Read new guess
-            for i in 1:atmos.nlev_c
-                atmos.tmp[i] = x[i]
-            end
+            # Set temperatures 
+            _set_tmps!(x)
 
-            # Check that guess is finite (no NaNs, no Infs)
-            if !all(isfinite, atmos.tmp)
-                display(atmos.tmp)
-                error("Temperature array contains NaNs and/or Infs")
-            end 
-
-            # Limit temperature domain
-            clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
-
-            # Interpolate temperature to cell-edge values (not incl. bottommost value)
-            atmosphere.set_tmpl_from_tmp!(atmos)
-
-            # Set bottom edge temperature 
-            if (surf_state < 0) || (surf_state > 2)
-                # Error cases
-                error("Invalid surface state ($surf_state)")
-
-            elseif (surf_state != 1)
-                # Extrapolate (log-linear)
-                grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
-                grad_dp = log(atmos.p[end]/atmos.p[end-1])
-                atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
-
-                if (surf_state == 2)
-                    # Conductive skin
-                    atmos.tstar = x[end]
-                end
-            end 
-            atmos.tmpl[end] = clamp(atmos.tmpl[end], atmos.tmp_floor, atmos.tmp_ceiling)
-
-            # Calculate layer properties 
-            atmosphere.calc_layer_props!(atmos)
-            
             # Reset fluxes
             atmos.flux_tot[:] .= 0.0
 
@@ -147,13 +146,13 @@ module solver_nlsol
 
                 for i in 1:atmos.nlev_c
 
-                    x = atmos.layer_x[i,i_gas]
-                    if x < 1.0e-10 
+                    mf = atmos.layer_x[i,i_gas]
+                    if mf < 1.0e-10 
                         continue
                     end
 
                     # Layer is condensing if T < T_dew
-                    Tsat = phys.calc_Tdew(condensate,atmos.p[i] * x )
+                    Tsat = phys.calc_Tdew(condensate,atmos.p[i] * mf )
                     g = 1.0 - exp(a * (Tsat - atmos.tmp[i]))
                     f = resid[i]
                     resid[i] = f * g
@@ -181,11 +180,11 @@ module solver_nlsol
             return nothing
         end  # end fev
 
-        # Calculating the jacobian of f at x using a central-difference method
-        function jac!(x::Array, jacob::Array)
+        # Calculate the jacobian and residuals at x using a central-difference method
+        function calc_jac_res_cendiff!(x::Array, jacob::Array, resid::Array)
 
-            # Reset jacobian 
-            fill!(jacob, 0.0)
+            # Evalulate residuals at x
+            fev!(x, resid)
 
             len_x = length(x)
 
@@ -199,20 +198,20 @@ module solver_nlsol
             for i in 1:len_x  # for each x
 
                 # Calculate perturbation
-                s = x[i] * cdw
+                s = x[i] * fdw
 
                 # Forward
                 tmp_s[:] .= x[:]
-                tmp_s[i] += s
+                tmp_s[i] += s * 0.5
                 fev!(tmp_s, rf)
 
                 # Backward
                 tmp_s[:] .= x[:]
-                tmp_s[i] -= s
+                tmp_s[i] -= s * 0.5
                 fev!(tmp_s, rb)
 
                 # Central difference
-                drdt[:] .= ( (rf[:] .- rb[:]) ./ (2.0 * s) )
+                drdt[:] .= ( (rf[:] .- rb[:]) ./ s )
 
                 # Set jacobian
                 for j in 1:len_x  # for each r
@@ -221,14 +220,50 @@ module solver_nlsol
             end 
 
             return nothing
-        end # end jac
+        end # end jr_cd
+
+
+        # Calculate the jacobian and residuals at x using a forward-difference method
+        function calc_jac_res_fordiff!(x::Array, jacob::Array, resid::Array)
+
+            # Evalulate residuals at x
+            fev!(x, resid)
+
+            len_x = length(x)
+
+            # Work variables 
+            tmp_s   = zeros(Float64, len_x)  # Perturbed temperature array 
+            s       = 0.0                           # Row perturbation
+            rf      = zeros(Float64, len_x)  # Forward difference
+            drdt    = zeros(Float64, len_x)  # Jacobian row
+
+            for i in 1:len_x  # for each x
+
+                # Calculate perturbation
+                s = x[i] * fdw
+
+                # Forward
+                tmp_s[:] .= x[:]
+                tmp_s[i] += s
+                fev!(tmp_s, rf)
+
+                # Forward difference
+                drdt[:] .= ( (rf[:] .- resid[:]) ./ s )
+
+                # Set jacobian
+                for j in 1:len_x  # for each r
+                    jacob[j,i] = drdt[j]
+                end 
+            end 
+
+            return nothing
+        end # end jr_fd
 
         
         # ----------------------------------------------------------
         # Setup initial guess
         # ---------------------------------------------------------- 
-
-        println("NLSolve: begin Newton-Raphson iterations") 
+        println("Begin Newton-Raphson iterations") 
 
         arr_len = atmos.nlev_c 
         if (surf_state == 2)
@@ -253,31 +288,51 @@ module solver_nlsol
         # ----------------------------------------------------------
         # Solver loop
         # ---------------------------------------------------------- 
-        step::Int =     0       # Step number
-        code::Int =     -1      # Status code 
-        modprint::Int = 1       # Print frequency
-        solving::Bool = true    # Currently solving?
-        ssf::Float64  = 1.0     # Step scale factor
-        
+        # Execution variables
+        ssf::Float64  =     0.99    # Step scale factor
+        modprint::Int =     1       # Print frequency
+        r_max_stuck    =    0.1     # Metric for when we say that the model is stuck (r_max_pchng < r_max_stuck)
+        abort_stuck::Int =  3       # How many iterations are we 'stuck' before aborting?
 
+        # Tracking variables
+        step::Int =         0       # Step number
+        code::Int =         -1      # Status code 
+        solving::Bool =     true    # Currently solving?
+
+        # Model statistics tracking
+        r_med::Float64 =    9.0    # Median residual
+        r_max::Float64 =    9.0    # Maximum residual (sign agnostic)
+        x_med::Float64 =    0.0    # Median solution
+        x_max::Float64 =    0.0    # Maximum solution (sign agnostic)
+        dx2nm::Float64 =    9.0    # Current value for 2-norm for the relative change in the solution array
+        r_max_pchng    =    1.0    # Relative pct change in r_max 
+        crrnt_stuck::Int =  0      # How long have we been 'stuck' for?
+
+        # Work variables
         b::Array      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
-        x_cur::Array  = zeros(Float64, arr_len)               # Array to solve for (i)
-        x_old::Array  = zeros(Float64, arr_len)               # Old ^ (i-1)
+        x_cur::Array  = zeros(Float64, arr_len)               # Current best solution (i)
+        x_old::Array  = zeros(Float64, arr_len)               # Previous best solution (i-1)
         x_dif::Array  = zeros(Float64, arr_len)               # Change in x (i-1 to i)
-        r::Array      = zeros(Float64, arr_len)               # Residuals (i)
+        r_cur::Array  = zeros(Float64, arr_len)               # Residuals (i)
+        r_old::Array  = zeros(Float64, arr_len)               # Residuals (i-1)
 
+        # Final setup
         x_cur[:] .= x_ini[:]
-        r .+= 1.0e99
+        r_cur .+= 1.0e99
+        r_old .+= 1.0e98
 
-        @printf("    step  resid_med  resid_max  xvals_med  xvals_max  \n")
+        @printf("    step  resid_med  resid_max  resid_cng  xvals_med  xvals_max  dx_twonrm  \n")
         while solving 
-            # Check convergence
-            if maximum(abs.(r)) < atol 
-                code = 0
-                solving = false 
-                break
-            end
 
+            # Update properties (cp, rho, etc.)
+            if !all(isfinite, x_cur)
+                display(x_cur)
+                error("Solution array contains NaNs and/or Infs")
+            end 
+            _set_tmps!(x_cur)
+            atmosphere.calc_layer_props!(atmos)
+
+            # Update step counter
             step += 1
             if step > max_steps
                 code = 1 
@@ -285,26 +340,61 @@ module solver_nlsol
                 break 
             end 
             if mod(step,modprint) == 0 
-                @printf("    %4d", step)
+                @printf("    %4d  ", step)
             end
 
-            # Evaluate F and J
-            fev!(x_cur, r)
-            jac!(x_cur, b) 
+            # Evaluate jacobian and residuals
+            r_old[:] .= r_cur[:]
+            if use_cendiff || (step == 1)
+                calc_jac_res_cendiff!(x_cur, b, r_cur) 
+            else
+                calc_jac_res_fordiff!(x_cur, b, r_cur) 
+            end 
+
+            # Check convergence
+            if maximum(abs.(r_cur)) < atol 
+                code = 0
+                solving = false
+                @printf("\n")
+                break
+            end
 
             # Check if jacobian is singular 
-            # if det(b) < 1.0e-99
-            #     code = 2
-            #     solving = false
-            #     break
-            # end 
+            if abs(det(b)) < 1.0e-30
+                code = 2
+                solving = false
+                @printf("\n")
+                break
+            end 
 
             # Newton-Raphson step 
-            x_dif = -b\r
+            x_dif = -b\r_cur
             x_old[:] = x_cur[:]
             x_cur[:] .= x_old[:] .+ (x_dif[:] .* ssf)
 
-            # Plot?
+            # Model statistics 
+            r_med   = median(r_cur)
+            r_max   = r_cur[argmax(abs.(r_cur))]
+            x_med   = median(x_cur)
+            x_max   = x_cur[argmax(abs.(x_cur))]
+            dx2nm   = sqrt(dot(x_dif,x_dif))
+            r_max_pchng = maximum( abs.( (r_cur .- r_old)./r_cur ) ) * 100.0
+            r_max_pchng = min(r_max_pchng, 1.0e99)
+
+            # Check if we are stuck 
+            if r_max_pchng < r_max_stuck
+                crrnt_stuck += 1
+            else 
+                crrnt_stuck = 0
+            end 
+            if crrnt_stuck > abort_stuck
+                code = 3 
+                solving = false 
+                @printf("\n")
+                break
+            end
+
+            # Plot
             if modplot > 0
                 if mod(step, modplot) == 0
                     plotting.plot_pt(atmos,  @sprintf("%s/solver.png", atmos.OUT_DIR), incl_magma=(surf_state==2))
@@ -313,11 +403,7 @@ module solver_nlsol
                 
             # Inform user
             if mod(step,modprint) == 0 
-                r_med = median(r)
-                r_max = r[argmax(abs.(r))]
-                x_med = median(x_cur)
-                x_max = x_cur[argmax(abs.(x_cur))]
-                @printf("  %+.2e  %+.2e  %+.2e  %+.2e  \n", r_med, r_max, x_med, x_max)
+                @printf("%+.2e  %+.2e  %.3e  %+.2e  %+.2e  %+.2e  \n", r_med, r_max, r_max_pchng, x_med, x_max, dx2nm)
             end
 
         end # end solver loop
@@ -329,12 +415,15 @@ module solver_nlsol
             println("    success")
             atmos.is_converged = true
         elseif code == 1
-            println("    failure (maximum iterations reached)")
+            println("    failure (maximum iterations)")
         elseif code == 2
             println("    failure (singular jacobian)")
+        elseif code == 3
+            println("    failure (local minimum)")
         else 
             println("    failure (unhandled)")
         end
+        println(" ")
 
         # ----------------------------------------------------------
         # Extract solution
