@@ -30,7 +30,7 @@ albedo_b        = 0.0
 radius          = 6.37e6    # metres
 zenith          = 48.19
 gravity         = 9.81      # m s-2
-nlev_centre     = 50  
+nlev_centre     = 40  
 p_surf          = 280.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
@@ -109,7 +109,7 @@ surf_state  = 2
 import solver_nlsol
 solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
                             dry_convect=dry_convect, condensate=condensate,
-                            max_steps=300, atol=1.0e-2, use_linesearch=false)
+                            max_steps=300, atol=1.0e-2, cdw=1.0e-3)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
