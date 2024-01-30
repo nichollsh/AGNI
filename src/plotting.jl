@@ -67,7 +67,7 @@ module plotting
             if minimum(arr_x) > 0.0
                 min_x = min(min_x, minimum(arr_x))
             end
-            plot!(arr_x, arr_P, label=gas, lw=2)
+            plot!(arr_x, arr_P, label=gas, lw=4, linealpha=0.7)
         end
 
         xlims  = (max(min_x, 1.0e-20)*0.5, 1.2)
@@ -370,7 +370,7 @@ module plotting
         xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 50000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
-        ylims  = (max(1.0e-10,minimum(ye)) / 2, maximum(ye) * 2)
+        ylims  = (max(1.0e-10,minimum(ye)) / 2, max(maximum(ye),maximum(yp)) * 2)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         xlabel!(plt, "Wavelength [nm]")

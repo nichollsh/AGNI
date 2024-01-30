@@ -55,14 +55,14 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
-                         flag_rayleigh=false,
+                         flag_rayleigh=true,
                          flag_cloud=false,
                          overlap_method=4,
                          skin_d=0.01,
                          skin_k=2.0,
-                         tmp_magma=2800.0,
-                         tmp_floor=0.5,
-                         thermo_functions=false,
+                         tmp_magma=2800.1,
+                         tmp_floor=0.00001,
+                         thermo_functions=true,
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
@@ -109,7 +109,7 @@ surf_state  = 2
 import solver_nlsol
 solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
                             dry_convect=dry_convect, condensate=condensate,
-                            max_steps=300, atol=1.0e-2, cdw=1.0e-3)
+                            max_steps=300, atol=1.0e-2)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
@@ -119,7 +119,7 @@ atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 # Save plots
 println("Making plots")
 plotting.anim_solver(atmos)
-plotting.plot_x(atmos,      joinpath(atmos.OUT_DIR,"mf.pdf"))
+plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.pdf"))
 plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.pdf"))
 plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.pdf"), incl_magma=(surf_state==2))
 plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.pdf"))
