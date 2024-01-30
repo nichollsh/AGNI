@@ -367,10 +367,10 @@ module plotting
         end
         plot!(plt, xe, ye, label="Outgoing spectrum", color="black")  # emission spectrum
 
-        xlims  = (minimum(xe), min(maximum(xe), 50000.0))
+        xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 50000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
-        ylims  = (minimum(ye) / 2, maximum(ye) * 2)
+        ylims  = (max(1.0e-10,minimum(ye)) / 2, maximum(ye) * 2)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         xlabel!(plt, "Wavelength [nm]")

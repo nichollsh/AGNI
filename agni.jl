@@ -24,23 +24,23 @@ import phys
 
 
 # Configuration options
-tstar           = 2521.86    # Surface temperature [kelvin]
-instellation    = 1.030e+03
-albedo_b        = 0.1
+tstar           = 1774.1    # Surface temperature [kelvin]
+instellation    = 1.031e+03
+albedo_b        = 0.0
 radius          = 6.37e6    # metres
 zenith          = 48.19
 gravity         = 9.81      # m s-2
-nlev_centre     = 70  
-p_surf          = 250.0    # bar
+nlev_centre     = 50  
+p_surf          = 558.87793    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
-                        ("H2O" , 0.05),
-                        ("CO2" , 0.8),
-                        ("CO" ,  0.1),
-                        ("N2" ,  0.05)
+                        ("H2O" , 1.0),
+                        # ("CO2" , 0.8),
+                        # ("CO" ,  0.1),
+                        # ("N2" ,  0.05)
                         ])
 
-spfile_name   = "res/spectral_files/Mallard/Mallard"
+spfile_name   = "res/spectral_files/Oak/Oak"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
@@ -55,25 +55,25 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
-                         flag_rayleigh=true,
+                         flag_rayleigh=false,
                          flag_cloud=false,
                          overlap_method=4,
                          skin_d=0.01,
                          skin_k=2.0,
-                         tmp_magma=2600.0,
-                         tmp_floor=2.0,
-                         thermo_functions=true,
+                         tmp_magma=1774.1,
+                         tmp_floor=0.00001,
+                         thermo_functions=false,
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"pt.csv")
-setpt.isothermal!(atmos, tstar-300.0)
+# setpt.isothermal!(atmos, tstar-400.0)
 # setpt.prevent_surfsupersat!(atmos)
-# setpt.dry_adiabat!(atmos)
+setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
-# setpt.stratosphere!(atmos, 500.0)
+setpt.stratosphere!(atmos, 500.0)
 
 # Create output directory
 rm(output_dir,force=true,recursive=true)
@@ -99,17 +99,17 @@ dry_convect = true
 condensate  = ""
 surf_state  = 2
 
-# import solver_tstep
-# solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
-#                             dry_convect=dry_convect, condensate=condensate,
-#                             accel=true, rtol=1.0e-4, atol=1.0e-2,
-#                             max_steps=400, min_steps=200, use_mlt=true,
-#                             dt_max=150.0, F_losspct_conv=1.0)
+import solver_tstep
+solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
+                            dry_convect=dry_convect, condensate=condensate,
+                            accel=true, rtol=1.0e-4, atol=1.0e-2,
+                            max_steps=400, min_steps=200, use_mlt=true,
+                            dt_max=150.0, F_losspct_conv=1.0)
 
 import solver_nlsol
-solver_nlsol.solve_energy!(atmos, surf_state=surf_state,
+solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
                             dry_convect=dry_convect, condensate=condensate,
-                            max_steps=100, atol=0.1)
+                            max_steps=300, atol=1.0e-2, use_linesearch=false)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
@@ -132,3 +132,4 @@ atmosphere.deallocate!(atmos)
 runtime = round(time() - tbegin, digits=2)
 println("Runtime: $runtime seconds")
 println("Goodbye")
+exit(0)

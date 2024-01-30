@@ -115,3 +115,4 @@ savefig(plt, "out/runaway_olr.pdf")
 atmosphere.deallocate!(atmos)
 
 println("Goodbye")
+exit(0)

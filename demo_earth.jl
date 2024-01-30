@@ -81,3 +81,4 @@ println("Deallocating arrays")
 atmosphere.deallocate!(atmos)
 
 println("Goodbye")
+exit(0)
