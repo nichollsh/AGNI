@@ -339,12 +339,10 @@ module plotting
         end
 
         # Get planck function values 
-        plot_planck = false
         nsamps = 300
+        xp = 10 .^ range( log10(xe[1]), stop=log10(xe[end]), length=nsamps)
+        yp = zeros(Float64, nsamps)
         if planck_tmp > 1.0 
-            plot_planck = true
-            xp = 10 .^ range( log10(xe[1]), stop=log10(xe[end]), length=nsamps)
-            yp = zeros(Float64, nsamps)
             for i in 1:nsamps 
                 lambda = xp[i] * 1.0e-9 # metres
 
@@ -362,7 +360,7 @@ module plotting
         # Make plot
         plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
 
-        if plot_planck
+        if planck_tmp > 1.0
             plot!(plt, xp, yp, label="Surface",  color="brown3") # surface planck function
         end
         plot!(plt, xe, ye, label="Outgoing spectrum", color="black")  # emission spectrum
