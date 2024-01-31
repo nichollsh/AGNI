@@ -31,7 +31,7 @@ albedo          = 0.18
 zenith          = 48.19
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
-nlev_centre     = 50  
+nlev_centre     = 60  
 p_surf          = 270.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
@@ -56,7 +56,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=true,
                          overlap_method=4,
                          tmp_floor=2.0,
-                         thermo_functions=true,
+                         thermo_functions=false,
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
@@ -75,14 +75,6 @@ println("Running model...")
 # Call solver(s)
 dry_convect = true
 surf_state  = 0
-
-import solver_tstep
-solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=100, modprop=5, verbose=true, 
-                            dry_convect=dry_convect, 
-                            accel=true, rtol=1.0e-4, atol=1.0e-2,
-                            max_steps=500, min_steps=200, use_mlt=true,
-                            dt_max=150.0, F_losspct_conv=1.0)
-
 
 import solver_nlsol
 solver_nlsol.solve_energy!(atmos, surf_state=surf_state,

@@ -79,9 +79,8 @@ module solver_nlsol
         prate = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
         rf      = zeros(Float64, arr_len)  # Forward difference
         rb      = zeros(Float64, arr_len)  # Backward difference
-        tmp_s   = zeros(Float64, arr_len)  # Perturbed temperature array 
-        s       = 0.0
-
+        x_s     = zeros(Float64, arr_len)  # Perturbed row, for jacobian
+        s       = 0.0                      # Row perturbation amount
 
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
@@ -203,13 +202,13 @@ module solver_nlsol
                 s = x[i] * fdw
 
                 # Forward
-                tmp_s[:] .= x[:]
-                tmp_s[i] += s * 0.5
-                fev!(tmp_s, rf)
+                x_s[:] .= x[:]
+                x_s[i] += s * 0.5
+                fev!(x_s, rf)
 
                 # Backward
-                tmp_s[i] -= s    # Only need to modify this level; rest were set during the forward phase
-                fev!(tmp_s, rb)
+                x_s[i] -= s    # Only need to modify this level; rest were set during the forward phase
+                fev!(x_s, rb)
 
                 # Set jacobian
                 for j in 1:arr_len  # for each r
@@ -219,7 +218,6 @@ module solver_nlsol
 
             return nothing
         end # end jr_cd
-
 
         # Calculate the jacobian and residuals at x using a forward-difference method
         function calc_jac_res_fordiff!(x::Array, jacob::Array, resid::Array)
@@ -233,9 +231,9 @@ module solver_nlsol
                 s = x[i] * fdw
 
                 # Forward
-                tmp_s[:] .= x[:]
-                tmp_s[i] += s
-                fev!(tmp_s, rf)
+                x_s[:] .= x[:]
+                x_s[i] += s
+                fev!(x_s, rf)
 
                 # Set jacobian
                 for j in 1:arr_len  # for each r
@@ -279,7 +277,6 @@ module solver_nlsol
         # Tracking variables
         step::Int =         0       # Step number
         code::Int =         -1      # Status code 
-        solving::Bool =     true    # Currently solving?
 
         # Model statistics tracking
         r_med::Float64 =    9.0    # Median residual
@@ -304,7 +301,7 @@ module solver_nlsol
         r_old .+= 1.0e98
 
         @printf("    step  resid_med  resid_max  resid_cng  xvals_med  xvals_max  dx_twonrm  \n")
-        while solving 
+        while true 
 
             # Update properties (cp, rho, etc.)
             if !all(isfinite, x_cur)
@@ -318,7 +315,6 @@ module solver_nlsol
             step += 1
             if step > max_steps
                 code = 1 
-                solving = false
                 break 
             end 
             if mod(step,modprint) == 0 
@@ -336,15 +332,13 @@ module solver_nlsol
             # Check convergence
             if maximum(abs.(r_cur)) < atol 
                 code = 0
-                solving = false
                 @printf("\n")
                 break
             end
 
             # Check if jacobian is singular 
-            if abs(det(b)) < 1.0e-30
+            if abs(det(b)) < 1.0e-80
                 code = 2
-                solving = false
                 @printf("\n")
                 break
             end 
@@ -371,7 +365,6 @@ module solver_nlsol
             end 
             if crrnt_stuck > abort_stuck
                 code = 3 
-                solving = false 
                 @printf("\n")
                 break
             end
