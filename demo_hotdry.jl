@@ -79,7 +79,7 @@ surf_state  = 0
 import solver_nlsol
 solver_nlsol.solve_energy!(atmos, surf_state=surf_state,
                             dry_convect=dry_convect,
-                            max_steps=100)
+                            max_steps=100, method=2)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
