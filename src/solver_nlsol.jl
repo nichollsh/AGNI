@@ -32,7 +32,7 @@ module solver_nlsol
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin
+    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: Tint | 4: Teff
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
@@ -40,6 +40,7 @@ module solver_nlsol
     - `atol::Float64=1.0e-2`            maximum residual at convergence
     - `fdw::Float64=5.0e-3`             relative width of the "difference" in the finite-difference calculations
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
+    - `method::Int=0`                   numerical method (0: Newton-Raphson, 1: Gauss-Newton, 2: Levenberg-Marquardt)
     - `calc_cf_end::Bool=true`          calculate contribution function?
     - `modplot::Int=0`                  iteration frequency at which to make plots
     """
@@ -47,7 +48,7 @@ module solver_nlsol
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=200, atol::Float64=1.0e-2, 
-                            fdw::Float64=1.0e-4, use_cendiff::Bool=false,
+                            fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=0,
                             calc_cf_end::Bool=true, modplot::Int=1
                             )
 
@@ -64,19 +65,19 @@ module solver_nlsol
         end 
 
         # Validate surf_state
-        if (surf_state < 0) || (surf_state > 2)
+        if (surf_state < 0) || (surf_state > 4)
             error("Invalid surface state ($surf_state)")
         end
 
         # Dimensionality
         arr_len = atmos.nlev_c 
-        if (surf_state == 2)
+        if (surf_state >= 2)
             arr_len += 1
         end
 
         # Work arrays 
         calc_cf = false
-        prate = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
+        prate =   zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
         rf      = zeros(Float64, arr_len)  # Forward difference
         rb      = zeros(Float64, arr_len)  # Backward difference
         x_s     = zeros(Float64, arr_len)  # Perturbed row, for jacobian
@@ -100,7 +101,7 @@ module solver_nlsol
                 grad_dp = log(atmos.p[end]/atmos.p[end-1])
                 atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
-                if (surf_state == 2) # Conductive skin
+                if (surf_state >= 2) # Surface brightness temperature
                     atmos.tstar = _x[end]
                 end
             end 
@@ -138,12 +139,20 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
-            # Calculate residuals
-            if (surf_state == 2)
+            # Calculate residuals subject to the boundary condition
+            if (surf_state == 0) || (surf_state == 1)
+                # Conserve fluxes with constant tstar
+                resid[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1] 
+            elseif (surf_state == 2)
+                # Conductive boundary layer
                 resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
                 resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
-            else 
-                resid[1:end] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
+            elseif (surf_state == 3)
+                # Fluxes equal to sigma*Tint^4
+                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_int
+            elseif (surf_state == 4)
+                # Fluxes equal to sigma*Teff^4 - ASF
+                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
             end
 
             # +Condensation
@@ -244,11 +253,40 @@ module solver_nlsol
             return nothing
         end # end jr_fd
 
+        # Cost function 
+        function cost(_r::Array)
+            # return maximum(abs.(_r))
+            return sqrt(sum(abs2,_r))
+        end 
+
         
         # ----------------------------------------------------------
         # Setup initial guess
         # ---------------------------------------------------------- 
-        println("Begin Newton-Raphson iterations") 
+        if method == 0
+            println("Begin Newton-Raphson iterations") 
+        elseif method == 1
+            println("Begin Gauss-Newton iterations") 
+        elseif method == 2
+            println("Begin Levenberg-Marquardt iterations") 
+        else 
+            error("Invalid method choice ($method)")
+        end
+
+        @printf("    surf   = %d\n", surf_state)
+        if (surf_state == 1)
+            @printf("    tstar  = %.2f K\n", atmos.tstar)
+        elseif (surf_state == 2)
+            @printf("    skin_d = %.2f m\n",         atmos.skin_d)
+            @printf("    skin_k = %.2f W K-1 m-1\n", atmos.skin_k)
+        elseif (surf_state == 3)
+            @printf("    tint   = %.2f K\n",     atmos.tint)
+            @printf("    Fint   = %.2f W m-2\n", atmos.flux_int)
+        elseif (surf_state == 4)
+            @printf("    teff   = %.2f K\n",     atmos.teff)
+            @printf("    Feff   = %.2f W m-2\n", atmos.flux_eff)
+        end 
+        
 
         # Allocate initial guess for the x array, as well as a,b arrays
         # Array storage structure:
@@ -261,7 +299,7 @@ module solver_nlsol
         for i in 1:atmos.nlev_c
             x_ini[i]    = clamp(atmos.tmp[i], atmos.tmp_floor , atmos.tmp_ceiling)
         end 
-        if (surf_state==2)
+        if (surf_state >= 2)
             x_ini[end] = atmos.tmp[atmos.nlev_c] + 1.0
         end
 
@@ -269,38 +307,45 @@ module solver_nlsol
         # Solver loop
         # ---------------------------------------------------------- 
         # Execution variables
-        ssf::Float64  =     0.99    # Step scale factor
         modprint::Int =     1       # Print frequency
-        r_max_stuck    =    0.1     # Metric for when we say that the model is stuck (r_max_pchng < r_max_stuck)
-        abort_stuck::Int =  3       # How many iterations are we 'stuck' before aborting?
 
         # Tracking variables
         step::Int =         0       # Step number
         code::Int =         -1      # Status code 
+        lml::Float64 =      10.0    # Levenberg-Marquardt lambda parameter
 
         # Model statistics tracking
-        r_med::Float64 =    9.0    # Median residual
-        r_max::Float64 =    9.0    # Maximum residual (sign agnostic)
-        x_med::Float64 =    0.0    # Median solution
-        x_max::Float64 =    0.0    # Maximum solution (sign agnostic)
-        dx2nm::Float64 =    9.0    # Current value for 2-norm for the relative change in the solution array
-        r_max_pchng    =    1.0    # Relative pct change in r_max 
-        crrnt_stuck::Int =  0      # How long have we been 'stuck' for?
+        r_med::Float64 =        9.0     # Median residual
+        r_max::Float64 =        9.0     # Maximum residual (sign agnostic)
+        x_med::Float64 =        0.0     # Median solution
+        x_max::Float64 =        0.0     # Maximum solution (sign agnostic)
+        dx2nm::Float64 =        9.0     # Current value for 2-norm for the relative change in the solution array
+        r_cur_2nm::Float64 =    0.01    # Two-norm of residuals 
+        r_old_2nm::Float64 =    0.02    # Previous ^
+        count_rej::Int =        0       # Number of rejected steps
+        reject::Bool =          false   # step was rejected?
 
         # Work variables
         b::Array      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
         x_cur::Array  = zeros(Float64, arr_len)               # Current best solution (i)
         x_old::Array  = zeros(Float64, arr_len)               # Previous best solution (i-1)
         x_dif::Array  = zeros(Float64, arr_len)               # Change in x (i-1 to i)
+        x_dla::Array  = zeros(Float64, arr_len)               # Change in x during the last accepted step
         r_cur::Array  = zeros(Float64, arr_len)               # Residuals (i)
         r_old::Array  = zeros(Float64, arr_len)               # Residuals (i-1)
+        r_tst::Array  = zeros(Float64, arr_len)               # Test for rejection residuals
+        dtd::Array    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
+        c_old::Float64 = 0.0
 
         # Final setup
         x_cur[:] .= x_ini[:]
+        for di in 1:arr_len 
+            dtd[di,di] = 1.0
+        end 
         r_cur .+= 1.0e99
         r_old .+= 1.0e98
 
-        @printf("    step  resid_med  resid_max  resid_cng  xvals_med  xvals_max  dx_twonrm  \n")
+        @printf("    step  resid_med  resid_max  resid_2nm  xvals_med  xvals_max  deltx_2nm  \n")
         while true 
 
             # Update properties (cp, rho, etc.)
@@ -322,7 +367,6 @@ module solver_nlsol
             end
 
             # Evaluate jacobian and residuals
-            r_old[:] .= r_cur[:]
             if use_cendiff || (step == 1)
                 calc_jac_res_cendiff!(x_cur, b, r_cur) 
             else
@@ -330,7 +374,8 @@ module solver_nlsol
             end 
 
             # Check convergence
-            if maximum(abs.(r_cur)) < atol 
+            c_old = cost(r_cur)
+            if c_old < atol 
                 code = 0
                 @printf("\n")
                 break
@@ -338,36 +383,64 @@ module solver_nlsol
 
             # Check if jacobian is singular 
             if abs(det(b)) < 1.0e-80
-                code = 2
-                @printf("\n")
-                break
+                if !use_cendiff
+                    # Switch to central-difference method
+                    use_cendiff = true 
+                    @printf("jacobian is singular!\n")
+                    continue 
+                else 
+                    # Give up
+                    code = 2
+                    @printf("\n")
+                    break
+                end 
             end 
 
-            # Newton-Raphson step 
-            x_dif = -b\r_cur
+            # Model step 
             x_old[:] = x_cur[:]
-            x_cur[:] .= x_old[:] .+ (x_dif[:] .* ssf)
+            if method == 0
+                # Newton-Raphson step 
+                x_dif = -b\r_cur
+                x_cur = x_old + x_dif
+
+            elseif method == 1
+                # Gauss-Newton step 
+                x_dif = -(b'*b) \ (b'*r_cur) 
+                x_cur = x_old + x_dif
+
+            elseif method == 2
+                # Levenberg-Marquardt step
+                #    Calculate damping parameter ("delayed gratification")
+                if r_cur_2nm < r_old_2nm
+                    lml /= 5.0
+                else 
+                    lml *= 1.5
+                end
+                #    Update our estimate of the solution
+                x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
+                x_cur = x_old + x_dif
+                #    Accept or reject this step (https://arxiv.org/pdf/1201.5885.pdf)
+                fev!(x_cur, r_tst)
+                reject = (1.0 - dot(x_dif, x_dla)/( sqrt(dot(x_dif,x_dif) * dot(x_dla,x_dla)) ))^2.0 * cost(r_tst) > c_old
+                if reject
+                    # reject step  
+                    x_cur[:] .= x_old[:]
+                    lml *= 10.0
+                    count_rej += 1
+                else 
+                    # accept step
+                    x_dla[:] .= x_dif[:]
+                end
+            end
 
             # Model statistics 
             r_med   = median(r_cur)
             r_max   = r_cur[argmax(abs.(r_cur))]
             x_med   = median(x_cur)
             x_max   = x_cur[argmax(abs.(x_cur))]
-            dx2nm   = sqrt(dot(x_dif,x_dif))
-            r_max_pchng = maximum( abs.( (r_cur .- r_old)./r_cur ) ) * 100.0
-            r_max_pchng = min(r_max_pchng, 1.0e99)
-
-            # Check if we are stuck 
-            if r_max_pchng < r_max_stuck
-                crrnt_stuck += 1
-            else 
-                crrnt_stuck = 0
-            end 
-            if crrnt_stuck > abort_stuck
-                code = 3 
-                @printf("\n")
-                break
-            end
+            dx2nm   = sqrt(sum(abs2,x_dif))
+            r_old_2nm   = r_cur_2nm
+            r_cur_2nm   = sqrt(sum(abs2,r_cur))
 
             # Plot
             if modplot > 0
@@ -378,7 +451,7 @@ module solver_nlsol
                 
             # Inform user
             if mod(step,modprint) == 0 
-                @printf("%+.2e  %+.2e  %.3e  %+.2e  %+.2e  %+.2e  \n", r_med, r_max, r_max_pchng, x_med, x_max, dx2nm)
+                @printf("%+.2e  %+.2e  %.3e  %+.2e  %+.2e  %+.2e  \n", r_med, r_max, r_cur_2nm, x_med, x_max, dx2nm)
             end
 
         end # end solver loop
@@ -398,6 +471,7 @@ module solver_nlsol
         else 
             println("    failure (unhandled)")
         end
+        @printf("    steps rejected: %d \n", count_rej)
         println(" ")
 
         # ----------------------------------------------------------

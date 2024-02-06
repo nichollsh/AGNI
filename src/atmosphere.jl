@@ -65,6 +65,8 @@ module atmosphere
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (cronin+14)
         tstar::Float64                  # Surface brightness temperature [K]
+        teff::Float64                   # Effective temperature of the planet [K]
+        tint::Float64                   # Internal temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
 
@@ -112,6 +114,9 @@ module atmosphere
         layer_mass::Array       # mass per unit area [kg m-2]
 
         # Calculated bolometric radiative fluxes (W m-2)
+        flux_int::Float64 # Interior flux  [W m-2] for surf_state=3
+        flux_eff::Float64 # Effective flux [W m-2] for surf_state=4
+
         flux_d_lw::Array  # down component, lw 
         flux_u_lw::Array  # up component, lw
         flux_n_lw::Array  # net upward, lw
@@ -237,6 +242,8 @@ module atmosphere
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
                     overlap_method::Int =       4,
+                    tint::Float64 =             0.0,
+                    teff::Float64 =             0.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -280,6 +287,8 @@ module atmosphere
         atmos.nlev_c         =  max(nlev_centre,45)
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.tstar =           max(tstar, atmos.tmp_floor)
+        atmos.tint =            max(0.0,tint)
+        atmos.teff =            max(0.0,teff)
         atmos.grav_surf =       max(1.0e-4, gravity)
         atmos.zenith_degrees =  max(min(zenith_degrees,89.5), 0.5)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
@@ -287,6 +296,9 @@ module atmosphere
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
         atmos.s0_fact =         max(s0_fact,0.0)
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) * s0_fact * cosd(atmos.zenith_degrees)
+
+        atmos.flux_int =        phys.sigma * (atmos.tint)^4            
+        atmos.flux_eff =        phys.sigma * (atmos.teff)^4 - atmos.toa_heating
         
         atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
@@ -1622,7 +1634,9 @@ module atmosphere
         # ----------------------
         # Scalar quantities  
         #    Create variables
-        var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # BOA LW BC
+        var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
+        var_teff =      defVar(ds, "teff",          Float64, (), attrib = OrderedDict("units" => "K"))      # Effective temperature [K]
+        var_tint =      defVar(ds, "tint",          Float64, (), attrib = OrderedDict("units" => "K"))      # Internal temperature [K]
         var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
         var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
         var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
@@ -1647,6 +1661,8 @@ module atmosphere
 
         #     Store data
         var_tstar[1] =      atmos.tstar 
+        var_teff[1] =       atmos.teff
+        var_tint[1] =       atmos.tint 
         var_inst[1] =       atmos.instellation
         var_s0fact[1] =     atmos.s0_fact
         var_albbond[1] =    atmos.albedo_b
