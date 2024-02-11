@@ -32,7 +32,7 @@ module solver_nlsol
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: Tint | 4: Teff
+    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: Tint
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
@@ -65,7 +65,7 @@ module solver_nlsol
         end 
 
         # Validate surf_state
-        if (surf_state < 0) || (surf_state > 4)
+        if (surf_state < 0) || (surf_state > 3)
             error("Invalid surface state ($surf_state)")
         end
 
@@ -150,9 +150,6 @@ module solver_nlsol
             elseif (surf_state == 3)
                 # Fluxes equal to sigma*Tint^4
                 resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_int
-            elseif (surf_state == 4)
-                # Fluxes equal to sigma*Teff^4 - ASF
-                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
             end
 
             # +Condensation
@@ -255,8 +252,8 @@ module solver_nlsol
 
         # Cost function 
         function cost(_r::Array)
-            # return maximum(abs.(_r))
-            return sqrt(sum(abs2,_r))
+            return maximum(abs.(_r))
+            # return norm(_r)
         end 
 
         
@@ -282,9 +279,6 @@ module solver_nlsol
         elseif (surf_state == 3)
             @printf("    tint   = %.2f K\n",     atmos.tint)
             @printf("    Fint   = %.2f W m-2\n", atmos.flux_int)
-        elseif (surf_state == 4)
-            @printf("    teff   = %.2f K\n",     atmos.teff)
-            @printf("    Feff   = %.2f W m-2\n", atmos.flux_eff)
         end 
         
 
@@ -312,7 +306,7 @@ module solver_nlsol
         # Tracking variables
         step::Int =         0       # Step number
         code::Int =         -1      # Status code 
-        lml::Float64 =      10.0    # Levenberg-Marquardt lambda parameter
+        lml::Float64 =      20.0    # Levenberg-Marquardt lambda parameter
 
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
@@ -367,6 +361,7 @@ module solver_nlsol
             end
 
             # Evaluate jacobian and residuals
+            r_old[:] .= r_cur[:]
             if use_cendiff || (step == 1)
                 calc_jac_res_cendiff!(x_cur, b, r_cur) 
             else
@@ -383,22 +378,14 @@ module solver_nlsol
 
             # Check if jacobian is singular 
             if abs(det(b)) < 1.0e-80
-                if !use_cendiff
-                    # Switch to central-difference method
-                    use_cendiff = true 
-                    @printf("jacobian is singular!\n")
-                    continue 
-                else 
-                    # Give up
-                    code = 2
-                    @printf("\n")
-                    break
-                end 
+                code = 2
+                @printf("\n")
+                break
             end 
 
             # Model step 
             x_old[:] = x_cur[:]
-            if method == 0
+            if (method == 0) || (step <= 2)
                 # Newton-Raphson step 
                 x_dif = -b\r_cur
                 x_cur = x_old + x_dif
@@ -416,12 +403,15 @@ module solver_nlsol
                 else 
                     lml *= 1.5
                 end
+
                 #    Update our estimate of the solution
                 x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
                 x_cur = x_old + x_dif
-                #    Accept or reject this step (https://arxiv.org/pdf/1201.5885.pdf)
                 fev!(x_cur, r_tst)
-                reject = (1.0 - dot(x_dif, x_dla)/( sqrt(dot(x_dif,x_dif) * dot(x_dla,x_dla)) ))^2.0 * cost(r_tst) > c_old
+
+                #    Accept or reject this step (https://arxiv.org/pdf/1201.5885.pdf)
+                # reject = (1.0 - dot(x_dif, x_dla)/(norm(x_dif)*norm(x_dla)) )^2.0 * cost(r_tst) > c_old
+                reject = false
                 if reject
                     # reject step  
                     x_cur[:] .= x_old[:]
@@ -429,18 +419,19 @@ module solver_nlsol
                     count_rej += 1
                 else 
                     # accept step
-                    x_dla[:] .= x_dif[:]
+                    x_dla = x_cur - x_old
                 end
             end
 
             # Model statistics 
+            fev!(x_cur, r_cur)
             r_med   = median(r_cur)
             r_max   = r_cur[argmax(abs.(r_cur))]
             x_med   = median(x_cur)
             x_max   = x_cur[argmax(abs.(x_cur))]
-            dx2nm   = sqrt(sum(abs2,x_dif))
+            dx2nm   = norm(x_dif)
             r_old_2nm   = r_cur_2nm
-            r_cur_2nm   = sqrt(sum(abs2,r_cur))
+            r_cur_2nm   = norm(r_cur)
 
             # Plot
             if modplot > 0
@@ -451,7 +442,11 @@ module solver_nlsol
                 
             # Inform user
             if mod(step,modprint) == 0 
-                @printf("%+.2e  %+.2e  %.3e  %+.2e  %+.2e  %+.2e  \n", r_med, r_max, r_cur_2nm, x_med, x_max, dx2nm)
+                reject_str = "A"
+                if reject
+                    reject_str = "R"
+                end
+                @printf("%+.2e  %+.2e  %.3e  %+.2e  %+.2e  %.3e %s\n", r_med, r_max, r_cur_2nm, x_med, x_max, dx2nm, reject_str)
             end
 
         end # end solver loop
