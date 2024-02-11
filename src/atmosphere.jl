@@ -65,7 +65,6 @@ module atmosphere
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (cronin+14)
         tstar::Float64                  # Surface brightness temperature [K]
-        teff::Float64                   # Effective temperature of the planet [K]
         tint::Float64                   # Internal temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
@@ -115,7 +114,6 @@ module atmosphere
 
         # Calculated bolometric radiative fluxes (W m-2)
         flux_int::Float64 # Interior flux  [W m-2] for surf_state=3
-        flux_eff::Float64 # Effective flux [W m-2] for surf_state=4
 
         flux_d_lw::Array  # down component, lw 
         flux_u_lw::Array  # up component, lw
@@ -215,8 +213,9 @@ module atmosphere
     - `tmp_magma::Float64=3000.0`       mantle temperature [K].
     - `skin_d::Float64=0.05`            skin thickness [m].
     - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
-    - `all_channels::Bool=true`         use all channels available for RT?
     - `overlap_method::Int=4`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
+    - `tint::Float64=0.0`               planet's interior brightness temperature BC [K]
+    - `all_channels::Bool=true`         use all channels available for RT?
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
     - `flag_continuum::Bool=false`      include continuum absorption?
@@ -243,7 +242,6 @@ module atmosphere
                     skin_k::Float64 =           2.0,
                     overlap_method::Int =       4,
                     tint::Float64 =             0.0,
-                    teff::Float64 =             0.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -288,7 +286,6 @@ module atmosphere
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.tstar =           max(tstar, atmos.tmp_floor)
         atmos.tint =            max(0.0,tint)
-        atmos.teff =            max(0.0,teff)
         atmos.grav_surf =       max(1.0e-4, gravity)
         atmos.zenith_degrees =  max(min(zenith_degrees,89.5), 0.5)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
@@ -298,7 +295,6 @@ module atmosphere
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) * s0_fact * cosd(atmos.zenith_degrees)
 
         atmos.flux_int =        phys.sigma * (atmos.tint)^4            
-        atmos.flux_eff =        phys.sigma * (atmos.teff)^4 - atmos.toa_heating
         
         atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
@@ -1635,7 +1631,6 @@ module atmosphere
         # Scalar quantities  
         #    Create variables
         var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
-        var_teff =      defVar(ds, "teff",          Float64, (), attrib = OrderedDict("units" => "K"))      # Effective temperature [K]
         var_tint =      defVar(ds, "tint",          Float64, (), attrib = OrderedDict("units" => "K"))      # Internal temperature [K]
         var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
         var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
@@ -1661,7 +1656,6 @@ module atmosphere
 
         #     Store data
         var_tstar[1] =      atmos.tstar 
-        var_teff[1] =       atmos.teff
         var_tint[1] =       atmos.tint 
         var_inst[1] =       atmos.instellation
         var_s0fact[1] =     atmos.s0_fact
