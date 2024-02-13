@@ -60,7 +60,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          skin_d=0.01,
                          skin_k=2.0,
                          tmp_magma=3000.0,
-                         tmp_floor=2.0,
+                         tmp_floor=5.0,
                          tint=0.0,
                          thermo_functions=false,
                  )
@@ -69,7 +69,7 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"pt.csv")
-setpt.isothermal!(atmos, tstar-50.0)
+setpt.isothermal!(atmos, tstar-200.0)
 # setpt.prevent_surfsupersat!(atmos)
 # setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
@@ -109,7 +109,12 @@ surf_state  = 0
 import solver_nlsol
 solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
                             dry_convect=dry_convect, condensate=condensate,
-                            max_steps=300, atol=1.0e-2, method=2)
+                            max_steps=3, atol=1.0e-2, method=2)
+
+import solver_optim
+solver_optim.solve_energy!(atmos, surf_state=surf_state, 
+                            dry_convect=dry_convect,
+                            max_steps=1000, atol=1.0e-1)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))

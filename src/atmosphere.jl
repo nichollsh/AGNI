@@ -280,7 +280,7 @@ module atmosphere
         atmos.thermo_funct  = thermo_functions
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
-        atmos.tmp_ceiling =     10000.0
+        atmos.tmp_ceiling =     5000.0
 
         atmos.nlev_c         =  max(nlev_centre,45)
         atmos.nlev_l         =  atmos.nlev_c + 1
