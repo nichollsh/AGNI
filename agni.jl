@@ -29,7 +29,7 @@ albedo_b        = 0.1
 radius          = 6.37e6    # metres
 zenith          = 48.19
 gravity         = 9.81      # m s-2
-nlev_centre     = 60  
+nlev_centre     = 45  
 p_surf          = 600.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
@@ -86,8 +86,8 @@ atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 println("Running model...")
 
 # Calculate LW and SW fluxes (once)
-# atmosphere.radtrans!(atmos, true, calc_cf=true)
-# atmosphere.radtrans!(atmos, false)
+atmosphere.radtrans!(atmos, true, calc_cf=true)
+atmosphere.radtrans!(atmos, false)
 
 # Calculate convective fluxes (once)
 # println("MLT: calculating fluxes")
@@ -106,15 +106,15 @@ surf_state  = 0
 #                             max_steps=400, min_steps=200, use_mlt=true,
 #                             dt_max=150.0, F_losspct_conv=1.0)
 
-import solver_nlsol
-solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
-                            dry_convect=dry_convect, condensate=condensate,
-                            max_steps=3, atol=1.0e-2, method=2)
+# import solver_nlsol
+# solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+#                             dry_convect=dry_convect, condensate=condensate,
+#                             max_steps=6, atol=1.0e-2, method=2)
 
-import solver_optim
-solver_optim.solve_energy!(atmos, surf_state=surf_state, 
-                            dry_convect=dry_convect,
-                            max_steps=1000, atol=1.0e-1)
+# import solver_optim
+# solver_optim.solve_energy!(atmos, surf_state=surf_state, 
+#                             dry_convect=dry_convect,
+#                             max_steps=100, atol=1.0e-1)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
@@ -124,11 +124,11 @@ atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 # Save plots
 println("Making plots")
 plotting.anim_solver(atmos)
-plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.pdf"))
-plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.pdf"))
-plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.pdf"), incl_magma=(surf_state==2))
-plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.pdf"))
-plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.pdf"), planck_tmp=atmos.tstar)
+plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
+plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
+plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(surf_state==2))
+plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"))
+plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"), planck_tmp=atmos.tstar)
 
 # Deallocate atmosphere
 println("Deallocating arrays")
