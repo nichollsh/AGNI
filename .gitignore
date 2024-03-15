@@ -20,5 +20,3 @@ out/*
 .vscode 
 __pycache__
 debug/
-
-
