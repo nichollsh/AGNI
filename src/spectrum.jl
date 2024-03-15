@@ -94,7 +94,6 @@ module spectrum
         ofl = ofl .* 1.0e6   # [erg s-1 cm-2 nm-1] -> [W m-3]
 
         # Write file
-        println("Opening file $star_file")
         open(star_file, "w") do f
 
             # Header
