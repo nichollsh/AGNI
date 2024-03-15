@@ -50,7 +50,7 @@ module plotting
     """
     Plot the composition of the atmosphere at each cell-centre location.
     """
-    function plot_x(atmos, fname)
+    function plot_x(atmos, fname; dpi::Int=250)
         
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
@@ -58,7 +58,7 @@ module plotting
 
         
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, size=(500,400), guidefontsize=9)
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(500,400), guidefontsize=9)
 
         # Plot mole fractions for each gas
         min_x = 1.0e-3

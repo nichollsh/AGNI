@@ -25,6 +25,7 @@ module atmosphere
     
     import moving_average
     import phys
+    import spectrum
 
     AGNI_VERSION     = "0.1"
     SOCRATES_VERSION = "2306"
@@ -658,15 +659,23 @@ module atmosphere
 
         # Spectral file to be loaded
         spectral_file_run  = joinpath([atmos.OUT_DIR, ".spfile_runtime"])  
+        socstar = joinpath([atmos.OUT_DIR, ".socstar"])  
+
 
         # Insert stellar spectrum 
         if !spfile_has_star
-            println("Python: inserting stellar spectrum")
-            runfile = joinpath([atmos.ROOT_DIR, "src", "insert_stellar.py"])
-            run(`python $runfile $(stellar_spectrum) $(atmos.spectral_file) $(spectral_file_run)`)
+            # println("Python: inserting stellar spectrum")
+            # runfile = joinpath([atmos.ROOT_DIR, "src", "insert_stellar.py"])
+            # run(`python $runfile $(stellar_spectrum) $(atmos.spectral_file) $(spectral_file_run)`)
+            wl, fl = spectrum.load_from_file(atmos.star_file)
+            spectrum.write_to_socrates_format(wl, fl, socstar)
+            spectrum.insert_stellar_spectrum(atmos.spectral_file, socstar, spectral_file_run)
+            
         elseif atmos.spectral_file != spectral_file_run
             cp(atmos.spectral_file,      spectral_file_run,      force=true)
             cp(atmos.spectral_file*"_k", spectral_file_run*"_k", force=true)
+        else 
+            error("Invalid spectral file / star file combination")
         end
 
         # Insert rayleigh scattering (optionally)

@@ -3,7 +3,7 @@ Radiative-convective solver designed for integration into a coupled atmosphere-i
 
 AGNI relies on SOCRATES (2306) for calculating radiances. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption / CIA.        
 
-Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki/An-overview) on GitHub for information about the model. 
+Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for information about the model. 
     
 ## Repository structure 
 * `README.md`       - This file
@@ -43,7 +43,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki/An-overview) on G
 - `$ cd julia`
 - `$ julia`
 - `julia> ]`
--  `(@v1.9) pkg> add OffsetArrays Revise PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse`
+-  `(@v1.9) pkg> add OffsetArrays Revise PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse BinnedStatistics`
 -  `(@v1.9) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`

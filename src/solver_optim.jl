@@ -15,10 +15,7 @@ module solver_optim
     using Statistics
     using Revise
     using LinearAlgebra
-    # using Optim
-    using PRIMA
-    # using NOMAD
-    # using BlackBoxOptim
+    using NOMAD
 
     import atmosphere 
     import phys
@@ -150,11 +147,9 @@ module solver_optim
         # Cost function 
         function cost(x::Array)
             cst = norm(fev(x))
-            println("Cost: $cst")
-            plotting.plot_pt(atmos,  @sprintf("%s/solver.png", atmos.OUT_DIR), incl_magma=(surf_state==2))
+            # @printf("Cost: %.3e \n", cst)
             return cst
         end 
-
 
 
         # ----------------------------------------------------------
@@ -193,54 +188,33 @@ module solver_optim
         # Solver
         # ---------------------------------------------------------- 
 
-        # res = optimize(cost, fill(atmos.tmp_floor, arr_len), fill(atmos.tmp_ceiling, arr_len), x_ini, 
-        #                 NelderMead(), 
-        #                 Optim.Options(
-        #                         iterations=max_steps, g_tol=atol, allow_f_increases=true, 
-        #                         show_trace=true, show_every=5, callback=_cback
-        #                     )
-        #                 )
-
-        # x_cur = Optim.minimizer(res)
-
-        x_cur, info = prima(cost, x_ini,
-                            ftarget=atol, maxfun=max_steps, rhoend=1.0e-99)
-
-
-        #  xl=fill(atmos.tmp_floor,arr_len), xu=fill(atmos.tstar+200,arr_len), 
-
-        # pb = NomadProblem(  arr_len, # number of inputs of the blackbox
-        #                     1, # number of outputs of the blackbox
-        #                     ["OBJ"], # type of outputs of the blackbox
-        #                     eval_fct;
-        #                     lower_bound=fill(atmos.tmp_floor,arr_len),
-        #                     upper_bound=fill(atmos.tmp_ceiling,arr_len),
-        #                     options=NOMAD.NomadOptions(
-        #                         display_stats= ["TIME", "BBE", "OBJ"]
-        #                     )
-        #                 )
-        # result = solve(pb, x_ini) 
-        # x_cur = result.x_best_feas
-
-        # res = bboptimize(cost, x_ini; SearchRange = (atmos.tmp_floor, atmos.tmp_ceiling), 
-        #             NumDimensions = arr_len, PopulationSize=25,
-        #             Method = :simultaneous_perturbation_stochastic_approximation)
-
-        # x_cur = best_fitness(res)
-
+        function eval_fct(x)
+            return (true, true, [cost(x)])
+        end
+        pb = NomadProblem(  arr_len, # number of inputs of the blackbox
+                            1, # number of outputs of the blackbox
+                            ["OBJ"], # type of outputs of the blackbox
+                            eval_fct;
+                            lower_bound=fill(atmos.tmp_floor,arr_len),
+                            upper_bound=fill(atmos.tmp_ceiling,arr_len),
+                            options=NOMAD.NomadOptions(
+                                display_stats= ["TIME", "BBE", "OBJ"],
+                                speculative_search=false
+                            )
+                        )
+        result = solve(pb, x_ini) 
+        x_cur = result.x_best_feas
 
         _set_tmps!(x_cur)
 
         # Check result
         atmos.is_solved = true
         atmos.is_converged = false 
-        if info.status == PRIMA.FTARGET_ACHIEVED
+        if result[0]
             println("    success")
             atmos.is_converged = true
-        elseif info.nf >= max_steps-1
-            println("    failure (maximum iterations)")
         else 
-            println("    failure (unhandled)")
+            println("    failure")
         end
         println(" ")
 
