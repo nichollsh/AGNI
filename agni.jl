@@ -23,13 +23,13 @@ import plotting
 import phys
 
 # Configuration options
-tstar           = 2700.0    # Surface temperature [kelvin]
+tstar           = 1800.0    # Surface temperature [kelvin]
 instellation    = 2000.0
 albedo_b        = 0.1
 radius          = 6.37e6    # metres
 zenith          = 48.19
 gravity         = 9.81      # m s-2
-nlev_centre     = 45  
+nlev_centre     = 70  
 p_surf          = 300.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
@@ -42,6 +42,10 @@ mf_dict         = Dict([
 spfile_name   = "res/spectral_files/Oak/Oak"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
+
+# Create output directory
+rm(output_dir,force=true,recursive=true)
+mkdir(output_dir)
 
 # Setup atmosphere
 println("Setting up")
@@ -69,25 +73,19 @@ atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 # Set PT profile 
 println("Setting initial T(p)")
 # setpt.fromcsv!(atmos,"pt.csv")
-setpt.isothermal!(atmos, tstar-200.0)
+# setpt.isothermal!(atmos, tstar-200.0)
 # setpt.prevent_surfsupersat!(atmos)
-# setpt.dry_adiabat!(atmos)
+setpt.dry_adiabat!(atmos)
 # setpt.condensing!(atmos, "H2O")
-# setpt.stratosphere!(atmos, 500.0)
-
-# Create output directory
-rm(output_dir,force=true,recursive=true)
-if !isdir(output_dir) && !isfile(output_dir)
-    mkdir(output_dir)
-end 
+setpt.stratosphere!(atmos, 500.0)
 
 atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
 println("Running model...")
 
 # Calculate LW and SW fluxes (once)
-# atmosphere.radtrans!(atmos, true, calc_cf=true)
-# atmosphere.radtrans!(atmos, false)
+atmosphere.radtrans!(atmos, true, calc_cf=true)
+atmosphere.radtrans!(atmos, false)
 
 # Calculate convective fluxes (once)
 # println("MLT: calculating fluxes")
@@ -99,16 +97,16 @@ dry_convect = true
 condensate  = ""
 surf_state  = 0
 
-import solver_tstep
-solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
-                            dry_convect=dry_convect, condensate=condensate,
-                            accel=true, rtol=1.0e-4, atol=1.0e-2, dt_max=150.0,
-                            max_steps=400, min_steps=200, use_mlt=true)
+# import solver_tstep
+# solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
+#                             dry_convect=dry_convect, condensate=condensate,
+#                             accel=true, rtol=1.0e-4, atol=1.0e-2, dt_max=150.0,
+#                             max_steps=400, min_steps=200, use_mlt=true)
 
-import solver_nlsol
-solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
-                            dry_convect=dry_convect, condensate=condensate,
-                            max_steps=6, atol=1.0e-2, method=2)
+# import solver_nlsol
+# solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+#                             dry_convect=dry_convect, condensate=condensate,
+#                             max_steps=6, atol=1.0e-2, method=2)
 
 # import solver_optim
 # solver_optim.solve_energy!(atmos, surf_state=surf_state, 
@@ -122,12 +120,13 @@ atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
 # Save plots
 println("Making plots")
-plotting.anim_solver(atmos)
-plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
-plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
-plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(surf_state==2))
-plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"))
-plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"), planck_tmp=atmos.tstar)
+# plotting.anim_solver(atmos)
+plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.pdf"))
+plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.pdf"))
+plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.pdf"), incl_magma=(surf_state==2))
+plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.pdf"))
+plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.pdf"), planck_tmp=atmos.tstar)
+plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.pdf"))
 
 # Deallocate atmosphere
 println("Deallocating arrays")

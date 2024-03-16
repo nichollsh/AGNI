@@ -14,25 +14,81 @@ module phys
     # - NIST
 
     # Universal gas constant, J K-1 mol-1
-    const R_gas = 8.314462618 # NIST CODATA
+    const R_gas::Float64 = 8.314462618 # NIST CODATA
 
     # Stefan-boltzmann constant, W m−2 K−4
-    const sigma =  5.670374419e-8 # NIST CODATA
+    const sigma::Float64 =  5.670374419e-8 # NIST CODATA
 
     # Von Karman constant, dimensionless
-    const k_vk = 0.40  # Hogstrom 1988
+    const k_vk::Float64 = 0.40  # Hogstrom 1988
 
     # Planck's constant, J s
-    const h_pl = 6.62607015e-34  # NIST CODATA
+    const h_pl::Float64 = 6.62607015e-34  # NIST CODATA
 
     # Boltzmann constant, J K-1 
-    const k_B = 1.380649e-23 # NIST CODATA
+    const k_B::Float64 = 1.380649e-23 # NIST CODATA
 
     # Speed of light, m s-1
-    const c_vac = 299792458.0 # NIST CODATA
+    const c_vac::Float64 = 299792458.0 # NIST CODATA
+
+    # Pretty-formatted names
+    const lookup_pretty = Dict{String, String}([
+        ("H2O",    "H₂O"      ), 
+        ("CO2",    "CO₂"      ), 
+        ("O3",     "O₃"       ), 
+        ("N2O",    "N₂O"      ), 
+        ("CO",     "CO"       ), 
+        ("CH4",    "CH₄"      ), 
+        ("O2",     "O₂"       ), 
+        ("NO",     "NO"       ), 
+        ("SO2",    "SO₂"      ), 
+        ("NO2",    "NO₂"      ), 
+        ("NH3",    "NH₃"      ), 
+        ("HNO3",   "HNO₃"     ), 
+        ("N2",     "N₂"       ), 
+        ("CFC11",  "CFC11"    ), 
+        ("CFC12",  "CFC12"    ), 
+        ("CFC113", "CFC113"   ), 
+        ("HCFC22", "HCFC22"   ), 
+        ("HFC125", "HFC125"   ), 
+        ("HFC134A","HFC134A"  ), 
+        ("CFC114", "CFC114"   ), 
+        ("TiO",    "TiO"      ), 
+        ("VO",     "VO"       ), 
+        ("H2",     "H2"       ), 
+        ("He",     "He"       ), 
+        ("OCS",    "OCS"      ), 
+        ("Na",     "Na"       ), 
+        ("K",      "K"        ), 
+        ("FeH",    "FeH"      ), 
+        ("CrH",    "CrH"      ), 
+        ("Li",     "Li"       ), 
+        ("Rb",     "Rb"       ), 
+        ("Cs",     "Cs"       ), 
+        ("PH3",    "PH₃"      ), 
+        ("C2H2",   "C₂H₂"     ), 
+        ("HCN",    "HCN"      ), 
+        ("H2S",    "H₂S"      ), 
+        ("Ar",     "Ar"       ), 
+        ("O",      "O"        ), 
+        ("N",      "N"        ), 
+        ("NO3",    "NO₃"      ), 
+        ("N2O5",   "N₂O₅"     ), 
+        ("HONO",   "HONO"     ), 
+        ("HO2NO2", "HO₂NO₂"   ), 
+        ("H2O2",   "H₂O₂"     ), 
+        ("C2H6",   "C₂H₆"     ), 
+        ("CH3",    "CH3"      ), 
+        ("H2CO",   "H₂CO"     ), 
+        ("HO2",    "HO₂"      ), 
+        ("HDO",    "HDO"      ), 
+        ("HCl",    "HCl"      ), 
+        ("HF",     "HF" )
+    ])
+
 
     # Molecule mean molecular weight, kg mol-1
-    const lookup_mmw = Dict([
+    const lookup_mmw = Dict{String, Float64}([
         ("H2O", 1.801530E-02 ), 
         ("CO2", 4.401000E-02 ), 
         ("O3", 4.799820E-02 ), 
@@ -87,7 +143,7 @@ module phys
     ])
 
     # Molecule heat capacity at constant pressure, J K-1 kg-1
-    const lookup_cp = Dict([
+    const lookup_cp = Dict{String, Float64}([
         ("H2O", 1.847000E+03), 
         ("CO2", 8.200000E+02), 
         ("CO",  1.040000E+03), 
@@ -101,7 +157,7 @@ module phys
     ])
 
     # Critical point temperature, K
-    const lookup_T_crit = Dict([
+    const lookup_T_crit = Dict{String, Float64}([
         ("H2O", 6.471000e+02), 
         ("CO2", 3.042000e+02), 
         ("CO", 1.134450e+02), 
@@ -115,7 +171,7 @@ module phys
     ])
 
     # Triple point temperature, K
-    const lookup_T_trip = Dict([
+    const lookup_T_trip = Dict{String, Float64}([
         ("H2O", 2.731500E+02), 
         ("CO2", 2.165400E+02), 
         ("CO", 6.795000E+01), 
@@ -130,7 +186,7 @@ module phys
     ])
 
     # Triple point pressure, Pa
-    const lookup_P_trip = Dict([
+    const lookup_P_trip = Dict{String, Float64}([
         ("H2O", 6.110000E+02),
         ("CO2", 5.185000E+05),
         ("CO", 1.530000E+04),
@@ -144,7 +200,7 @@ module phys
     ])
 
     # Latent heat of vapourisation, J kg-1
-    const lookup_L_vap= Dict([
+    const lookup_L_vap= Dict{String, Float64}([
         ("H2O", 2.493000E+06), 
         ("CO2", 3.970000E+05), 
         ("CO", 2.142857E+05), 
@@ -158,7 +214,7 @@ module phys
     ])
 
     # Shomate formulation for heat capacity, J K-1 kg-1
-    function shomate_cp(gas::String, tmp::Float64)
+    function shomate_cp(gas::String, tmp::Float64)::Float64
         out = 0.0
 
         # Get molar mass for this molecule 
@@ -379,7 +435,7 @@ module phys
     end 
 
     # Get values from thermodynamic property lookup tables 
-    function lookup_safe(prop::String,gas::String;tmp::Float64=-1.0)
+    function lookup_safe(prop::String,gas::String;tmp::Float64=-1.0)::Float64
 
         prop = lowercase(prop)
 
@@ -421,7 +477,7 @@ module phys
     end
 
     # Get saturation pressure at a given temperature
-    function calc_Psat(gas::String, T_eval::Float64)
+    function calc_Psat(gas::String, T_eval::Float64)::Float64
 
         # Get properties
         L = phys.lookup_safe("L_vap",gas)
@@ -438,7 +494,7 @@ module phys
     end
 
     # Get dew point temperature at a given pressure (derived from AEOLUS)
-    function calc_Tdew(gas::String, p_eval::Float64)
+    function calc_Tdew(gas::String, p_eval::Float64)::Float64
 
         # Get properties
         L = phys.lookup_safe("L_vap",gas)

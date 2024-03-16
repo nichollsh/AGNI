@@ -20,3 +20,4 @@ out/*
 .vscode 
 __pycache__
 debug/
+nogit_*
