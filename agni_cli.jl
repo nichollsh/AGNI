@@ -383,8 +383,7 @@ end
 if nlsolve
     import solver_nlsol
     solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, 
-                                max_steps=180, atol=1e-3, use_linesearch=linesearch,
-                                calc_cf_end=plot)
+                                max_steps=180, atol=1e-3)
 end
 
 # Write NetCDF and PT files

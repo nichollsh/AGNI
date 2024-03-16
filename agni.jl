@@ -26,7 +26,7 @@ import solver_nlsol
 
 function main()
     # Configuration options
-    tstar           = 2800.0    # Surface temperature [kelvin]
+    tstar           = 1800.0    # Surface temperature [kelvin]
     instellation    = 2000.0
     albedo_b        = 0.1
     radius          = 6.37e6    # metres
@@ -76,27 +76,18 @@ function main()
     # Set PT profile 
     println("Setting initial T(p)")
     # setpt.fromcsv!(atmos,"pt.csv")
-    # setpt.isothermal!(atmos, tstar-200.0)
+    setpt.isothermal!(atmos, tstar-200.0)
     # setpt.prevent_surfsupersat!(atmos)
-    setpt.dry_adiabat!(atmos)
+    # setpt.dry_adiabat!(atmos)
     # setpt.condensing!(atmos, "H2O")
-    setpt.stratosphere!(atmos, 500.0)
+    # setpt.stratosphere!(atmos, 500.0)
 
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
     println("Running model...")
 
-    # Calculate LW and SW fluxes (once)
-    atmosphere.radtrans!(atmos, true, calc_cf=true)
-    atmosphere.radtrans!(atmos, false)
-
-    # Calculate convective fluxes (once)
-    # println("MLT: calculating fluxes")
-    # atmosphere.mlt!(atmos)
-
-
     # Call solver(s)
-    dry_convect = false
+    dry_convect = true
     condensate  = ""
     surf_state  = 0
 
@@ -105,14 +96,22 @@ function main()
     #                             accel=true, rtol=1.0e-4, atol=1.0e-2, dt_max=150.0,
     #                             max_steps=300, min_steps=200, use_mlt=true)
 
-    # solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
-    #                             dry_convect=dry_convect, condensate=condensate,
-    #                             max_steps=10, atol=1.0e-3, method=2)
+    solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+                                dry_convect=dry_convect, condensate=condensate,
+                                max_steps=20, atol=1.0e-3, method=2)
 
     # import solver_optim
     # solver_optim.solve_energy!(atmos, surf_state=surf_state, 
     #                             dry_convect=dry_convect,
     #                             max_steps=100, atol=1.0e-1)
+
+    # Calculate LW and SW fluxes (once)
+    atmosphere.radtrans!(atmos, true, calc_cf=true)
+    atmosphere.radtrans!(atmos, false)
+
+    # Calculate convective fluxes (once)
+    # println("MLT: calculating fluxes")
+    # atmosphere.mlt!(atmos)
 
     # Write arrays
     atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
