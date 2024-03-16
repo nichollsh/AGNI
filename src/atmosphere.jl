@@ -1176,6 +1176,7 @@ module atmosphere
                                 atmos.bound, atmos.radout)
 
         # Store new fluxes in atmos struct
+        idx::Int = 1
         if lw 
             # LW case
             fill!(atmos.flux_u_lw, 0.0)
@@ -1277,10 +1278,10 @@ module atmosphere
         atmos.Kzz[:] .= 0.0
 
         # Work variables 
-        H = 0.0; l = 0.0; w = 0.0
-        m1 = 0.0; m2 = 0.0; mt = 0.0
-        grav = 0.0; mu = 0.0; c_p = 0.0; rho = 0.0
-        grad_ad = 0.0; grad_pr = 0.0
+        H::Float64 = 0.0; l::Float64 = 0.0; w::Float64 = 0.0
+        m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
+        grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
+        grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0
 
         # Loop from bottom upwards
         for i in range(start=atmos.nlev_l-1 , step=-1, stop=3) 
@@ -1495,7 +1496,7 @@ module atmosphere
     """
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t; limit_change::Bool=false, back_interp::Bool=false)
 
-        top_old_e = atmos.tmpl[1]
+        top_old_e::Float64 = atmos.tmpl[1]
 
         # Interpolate temperature to bulk cell-edge values (log-linear)
         itp = Interpolator(log.(atmos.p), atmos.tmp)
