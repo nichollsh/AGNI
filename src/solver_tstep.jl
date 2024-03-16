@@ -556,10 +556,6 @@ module solver_tstep
 
         end # end main loop
 
-        # Calculate final fluxes for CF and emission spectrum 
-        atmosphere.radtrans!(atmos, false)
-        atmosphere.radtrans!(atmos, true, calc_cf=true)
-
         # Print information about the final state
         atmos.is_solved = true
         if !success

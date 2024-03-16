@@ -39,14 +39,12 @@ module solver_optim
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=200`              maximum number of solver steps
     - `atol::Float64=1.0e-2`            maximum residual at convergence
-    - `calc_cf_end::Bool=true`          calculate contribution function?
     - `modplot::Int=0`                  iteration frequency at which to make plots
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1,
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=200, atol::Float64=1.0e-2, 
-                            calc_cf_end::Bool=true,
+                            max_steps::Int=200, atol::Float64=1.0e-2
                             )
 
         # Validate surf_state
@@ -59,9 +57,6 @@ module solver_optim
         if (surf_state >= 2)
             arr_len += 1
         end
-
-        # Work arrays 
-        calc_cf = false
 
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
@@ -105,7 +100,7 @@ module solver_optim
             atmos.flux_tot[:] .= 0.0
 
             # +Radiation
-            atmosphere.radtrans!(atmos, true, calc_cf=calc_cf)
+            atmosphere.radtrans!(atmos, true)
             atmosphere.radtrans!(atmos, false)
             atmos.flux_tot += atmos.flux_n
 
@@ -218,7 +213,6 @@ module solver_optim
         end
         println(" ")
 
-        calc_cf = calc_cf_end
         fev(x_cur)
         atmosphere.calc_hrates!(atmos)
 

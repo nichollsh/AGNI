@@ -41,7 +41,6 @@ module solver_nlsol
     - `fdw::Float64=5.0e-3`             relative width of the "difference" in the finite-difference calculations
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
     - `method::Int=0`                   numerical method (0: Newton-Raphson, 1: Gauss-Newton, 2: Levenberg-Marquardt)
-    - `calc_cf_end::Bool=true`          calculate contribution function?
     - `modplot::Int=0`                  iteration frequency at which to make plots
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
@@ -49,7 +48,7 @@ module solver_nlsol
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=200, atol::Float64=1.0e-2, 
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=0,
-                            calc_cf_end::Bool=true, modplot::Int=1
+                            modplot::Int=1
                             )
 
         # Validate condensation case
@@ -76,7 +75,6 @@ module solver_nlsol
         end
 
         # Work arrays 
-        calc_cf = false
         prate =   zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
         rf      = zeros(Float64, arr_len)  # Forward difference
         rb      = zeros(Float64, arr_len)  # Backward difference
@@ -123,7 +121,7 @@ module solver_nlsol
             atmos.flux_tot[:] .= 0.0
 
             # +Radiation
-            atmosphere.radtrans!(atmos, true, calc_cf=calc_cf)
+            atmosphere.radtrans!(atmos, true)
             atmosphere.radtrans!(atmos, false)
             atmos.flux_tot += atmos.flux_n
 
@@ -488,10 +486,8 @@ module solver_nlsol
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
-        calc_cf = calc_cf_end
         fev!(x_cur, zeros(Float64, arr_len))
         atmosphere.calc_hrates!(atmos)
-        # display(prate)
 
         # ----------------------------------------------------------
         # Print info
