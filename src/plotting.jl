@@ -56,9 +56,11 @@ module plotting
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
-                
-        savefig(plt, fname)
-        return nothing
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
     end
 
     """
@@ -76,7 +78,12 @@ module plotting
 
         # Plot mole fractions for each gas
         for (i_gas,gas) in enumerate(atmos.gases)  
-            plot!(atmos.layer_x[1:end,i_gas], arr_P, label=phys.lookup_pretty[gas], lw=4, linealpha=0.7)
+            if haskey(phys.lookup_color, gas)
+                c = phys.lookup_color[gas]
+            else 
+                c = "#"*bytes2hex(rand(UInt8, 3))
+            end 
+            plot!(atmos.layer_x[1:end,i_gas], arr_P, label=phys.lookup_pretty[gas], lw=4, linealpha=0.7, color=c)
         end
 
         xlims  = (max(minimum(atmos.layer_x), 1.0e-20)*0.5, 1.2)
@@ -90,7 +97,10 @@ module plotting
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
                 
-        savefig(plt, fname)
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
     end
 
     """
@@ -211,7 +221,7 @@ module plotting
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
-        ylims  = (arr_P[1]/2.0, arr_P[end]*2.0)
+        ylims  = (arr_P[1]*0.95, arr_P[end]*2.0)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         max_fl = log10(max(100.0, maximum(abs.(atmos.flux_tot)), maximum(atmos.flux_u), maximum(atmos.flux_d)))
@@ -220,7 +230,7 @@ module plotting
         xlims = (-xticks_pos[end], xticks_pos[end])
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
-        w = 2.8
+        w = 2.0
         plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, guidefontsize=9)
 
         col_r = "gray"
@@ -233,6 +243,9 @@ module plotting
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dash,  lw=w, lc=col_r, label="LW")
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=w, lc=col_r, label="LW+SW")
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=w, lc=col_n, label="UP+DN")
+
+        # Zero line 
+        plot!(plt, [0.0, 0.0], [arr_P[1], arr_P[end]], lw=0.4, lc="black", label="")
 
         # LW component
         if atmos.is_out_lw
@@ -264,7 +277,7 @@ module plotting
         end
 
         # Total flux
-        plot!(plt, _symlog.(atmos.flux_tot), arr_P, label="TOTAL", lw=w, lc=col_t, ls=:solid)
+        plot!(plt, _symlog.(atmos.flux_tot), arr_P, label="TOTAL", lw=w, lc=col_t, ls=:solid, linealpha=0.7)
 
         # Overplot convection and condensation mask
         for i in 1:atmos.nlev_c
@@ -285,9 +298,11 @@ module plotting
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
-        savefig(plt, fname)
 
-        return nothing
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
     end
 
     """
@@ -352,9 +367,10 @@ module plotting
         yaxis!(plt, yscale=:log10, ylims=ylims, yticks=yticks)
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
-        savefig(plt, fname)
-
-        return nothing 
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
     end 
 
     """
@@ -408,9 +424,10 @@ module plotting
         yflip!(plt)
         yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
 
-        savefig(plt, fname)
-
-        return nothing 
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
     end 
 
     """
@@ -443,9 +460,10 @@ module plotting
         xlabel!(plt, "Wavelength [nm]")
         ylabel!(plt, "Spectral albedo")
 
-        savefig(plt, fname)
-
-        return nothing 
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
     end 
 
     """
