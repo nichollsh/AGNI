@@ -252,8 +252,8 @@ module solver_nlsol
 
         # Cost function 
         function cost(_r::Array)
-            return maximum(abs.(_r))
-            # return norm(_r)
+            # return maximum(abs.(_r))
+            return norm(_r)
         end 
 
         
@@ -302,11 +302,13 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         # Execution variables
         modprint::Int =     1       # Print frequency
+        dx_rtol::Float64 = 3.0e-1   # Allowed relative change in x 
+        dx_atol::Float64 = 1.0e-4   # Allowed absolute change in x
 
         # Tracking variables
         step::Int =         0       # Step number
         code::Int =         -1      # Status code 
-        lml::Float64 =      20.0    # Levenberg-Marquardt lambda parameter
+        lml::Float64 =      2.0    # Levenberg-Marquardt lambda parameter
 
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
@@ -339,7 +341,7 @@ module solver_nlsol
         r_cur .+= 1.0e99
         r_old .+= 1.0e98
 
-        @printf("    step  resid_med  resid_max  resid_2nm  xvals_med  xvals_max  deltx_2nm  \n")
+        @printf("    step  resid_med  resid_max  resid_2nm  xvals_med  xvals_max  deltx_2nm  flags\n")
         while true 
 
             # Update properties (cp, rho, etc.)
@@ -360,12 +362,20 @@ module solver_nlsol
                 @printf("    %4d  ", step)
             end
 
+            # Reset flags 
+            #     Cd, Fd     = finite differencing type 
+            #     Nr, Gn, Lm = stepping algorithm
+            #     A, R       = accepted or rejected
+            stepflags::String = ""
+
             # Evaluate jacobian and residuals
             r_old[:] .= r_cur[:]
             if use_cendiff || (step == 1)
                 calc_jac_res_cendiff!(x_cur, b, r_cur) 
+                stepflags *= "Cd"
             else
                 calc_jac_res_fordiff!(x_cur, b, r_cur) 
+                stepflags *= "Fd"
             end 
 
             # Check convergence
@@ -388,12 +398,12 @@ module solver_nlsol
             if (method == 0) || (step <= 2)
                 # Newton-Raphson step 
                 x_dif = -b\r_cur
-                x_cur = x_old + x_dif
+                stepflags *= "Nr"
 
             elseif method == 1
                 # Gauss-Newton step 
                 x_dif = -(b'*b) \ (b'*r_cur) 
-                x_cur = x_old + x_dif
+                stepflags *= "Gn"
 
             elseif method == 2
                 # Levenberg-Marquardt step
@@ -406,25 +416,35 @@ module solver_nlsol
 
                 #    Update our estimate of the solution
                 x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
-                x_cur = x_old + x_dif
-                fev!(x_cur, r_tst)
+                stepflags *= "Lm"
+            end
 
-                #    Accept or reject this step (https://arxiv.org/pdf/1201.5885.pdf)
-                # reject = (1.0 - dot(x_dif, x_dla)/(norm(x_dif)*norm(x_dla)) )^2.0 * cost(r_tst) > c_old
-                reject = false
-                if reject
-                    # reject step  
-                    x_cur[:] .= x_old[:]
-                    lml *= 10.0
-                    count_rej += 1
-                else 
-                    # accept step
-                    x_dla = x_cur - x_old
-                end
+            # Limit step size 
+            for i in 1:arr_len
+                s = sign(x_dif[i])
+                v = min(abs(x_dif[i]), x_old[i]*dx_rtol + dx_atol)
+                x_dif[i] = s*v 
+            end 
+
+            # Step rejection 
+            x_cur = x_old + x_dif
+            fev!(x_cur, r_tst)
+            # reject = (1.0 - dot(x_dif, x_dla)/(norm(x_dif)*norm(x_dla)) )^2.0 * cost(r_tst) > c_old
+            reject = false
+            if reject
+                # reject step  
+                x_cur[:] .= x_old[:]
+                lml *= 10.0
+                count_rej += 1
+                stepflags *= "R"
+            else 
+                # accept step
+                x_dla = x_cur - x_old
+                r_cur[:] .= r_tst[:]
+                stepflags *= "A"
             end
 
             # Model statistics 
-            fev!(x_cur, r_cur)
             r_med   = median(r_cur)
             r_max   = r_cur[argmax(abs.(r_cur))]
             x_med   = median(x_cur)
@@ -442,11 +462,7 @@ module solver_nlsol
                 
             # Inform user
             if mod(step,modprint) == 0 
-                reject_str = "A"
-                if reject
-                    reject_str = "R"
-                end
-                @printf("%+.2e  %+.2e  %.3e  %+.2e  %+.2e  %.3e %s\n", r_med, r_max, r_cur_2nm, x_med, x_max, dx2nm, reject_str)
+                @printf("%+.2e  %+.2e  %.3e  %+.2e  %+.2e  %.3e  %s\n", r_med, r_max, r_cur_2nm, x_med, x_max, dx2nm, stepflags)
             end
 
         end # end solver loop

@@ -86,6 +86,19 @@ module phys
         ("HF",     "HF" )
     ])
 
+    # Pre-defined absorber colors 
+    const lookup_color = Dict{String, String}([
+        ("H2O", "#C720DD" ),
+        ("CO2", "#D24901" ),
+        ("H2" , "#008C01" ),
+        ("CH4", "#027FB1" ),
+        ("CO" , "#D1AC02" ),
+        ("N2" , "#870036" ),
+        ("S"  , "#FF8FA1" ),
+        ("O2" , "#00008B" ),
+        ("He" , "#30FF71" ),
+        ("NH3", "#675200" ),
+    ])
 
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict{String, Float64}([
