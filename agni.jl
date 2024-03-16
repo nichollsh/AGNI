@@ -91,14 +91,15 @@ function main()
     condensate  = ""
     surf_state  = 0
 
-    # solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
-    #                             dry_convect=dry_convect, condensate=condensate,
-    #                             accel=true, rtol=1.0e-4, atol=1.0e-2, dt_max=150.0,
-    #                             max_steps=300, min_steps=200, use_mlt=true)
-
-    solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+    solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
+                                modplot=10, modprop=5, verbose=true, 
                                 dry_convect=dry_convect, condensate=condensate,
-                                max_steps=20, atol=1.0e-3, method=2)
+                                accel=true, step_rtol=1.0e-3, step_atol=1.0e-2, dt_max=150.0,
+                                max_steps=400, min_steps=100, use_mlt=true)
+
+    # solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+    #                             dry_convect=dry_convect, condensate=condensate,
+    #                             max_steps=30, atol=1.0e-3, method=2)
 
     # import solver_optim
     # solver_optim.solve_energy!(atmos, surf_state=surf_state, 

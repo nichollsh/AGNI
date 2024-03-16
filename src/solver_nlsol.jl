@@ -70,7 +70,7 @@ module solver_nlsol
 
         # Dimensionality
         arr_len = atmos.nlev_c 
-        if (surf_state >= 2)
+        if (surf_state >= 2)  # states 2 and 3
             arr_len += 1
         end
 
@@ -93,14 +93,16 @@ module solver_nlsol
             atmosphere.set_tmpl_from_tmp!(atmos)
 
             # Set bottom edge temperature 
-            if (surf_state != 1)
+            if (surf_state != 1) 
+                # For state=1, tmpl[end] is held constant
+
                 # Extrapolate (log-linear)
                 grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
                 grad_dp = log(atmos.p[end]/atmos.p[end-1])
                 atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
-                if (surf_state >= 2) # Surface brightness temperature
-                    atmos.tstar = _x[end]
+                if (surf_state >= 2)  # states 2 and 3
+                    atmos.tstar = _x[end]  # Surface brightness temperature
                 end
             end 
             
