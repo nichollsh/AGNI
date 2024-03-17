@@ -37,23 +37,27 @@ module solver_nlsol
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=200`              maximum number of solver steps
-    - `atol::Float64=1.0e-2`            maximum residual at convergence
     - `fdw::Float64=5.0e-3`             relative width of the "difference" in the finite-difference calculations
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
     - `method::Int=0`                   numerical method (0: Newton-Raphson, 1: Gauss-Newton, 2: Levenberg-Marquardt)
     - `modplot::Int=0`                  iteration frequency at which to make plots
+    - `step_rtol::Float64=0.1`          step size: relative change in per-level temperature [dimensionless]
+    - `step_atol::Float64=1.0e-4`       step size: absolute change in per-level temperature [K]
+    - `conv_atol::Float64=1.0e-3`       convergence: absolute tolerance on per-level flux deviation [W m-2]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=200, atol::Float64=1.0e-2, 
+                            max_steps::Int=200,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=0,
-                            modplot::Int=1
+                            modplot::Int=1,
+                            step_rtol::Float64 = 0.1 ,  step_atol::Float64 = 1.0e-4,
+                            conv_atol::Float64=1.0e-3
                             )
 
         # Validate condensation case
-        do_condense  = false 
-        i_gas        = -1
+        do_condense::Bool  = false 
+        i_gas::Int         = -1
         if condensate != "" 
             if condensate in atmos.gases
                 do_condense = true 
@@ -68,18 +72,22 @@ module solver_nlsol
             error("Invalid surface state ($surf_state)")
         end
 
+        # Plot paths 
+        path_prf::String = @sprintf("%s/solver_prf.png", atmos.OUT_DIR)
+        path_flx::String = @sprintf("%s/solver_flx.png", atmos.OUT_DIR)
+
         # Dimensionality
-        arr_len = atmos.nlev_c 
+        arr_len::Int = atmos.nlev_c 
         if (surf_state >= 2)  # states 2 and 3
             arr_len += 1
         end
 
         # Work arrays 
-        prate =   zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
-        rf      = zeros(Float64, arr_len)  # Forward difference
-        rb      = zeros(Float64, arr_len)  # Backward difference
-        x_s     = zeros(Float64, arr_len)  # Perturbed row, for jacobian
-        s       = 0.0                      # Row perturbation amount
+        prate::Array{Float64,1} = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
+        rf::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference
+        rb::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference
+        x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
+        fd_s::Float64           = 0.0                      # Row perturbation amount
 
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
@@ -205,20 +213,20 @@ module solver_nlsol
             for i in 1:arr_len  # for each x
 
                 # Calculate perturbation
-                s = x[i] * fdw
+                fd_s = x[i] * fdw
 
                 # Forward
                 x_s[:] .= x[:]
-                x_s[i] += s * 0.5
+                x_s[i] += fd_s * 0.5
                 fev!(x_s, rf)
 
                 # Backward
-                x_s[i] -= s    # Only need to modify this level; rest were set during the forward phase
+                x_s[i] -= fd_s    # Only need to modify this level; rest were set during the forward phase
                 fev!(x_s, rb)
 
                 # Set jacobian
                 for j in 1:arr_len  # for each r
-                    jacob[j,i] = (rf[j] - rb[j]) / s
+                    jacob[j,i] = (rf[j] - rb[j]) / fd_s
                 end 
             end 
 
@@ -234,16 +242,16 @@ module solver_nlsol
             for i in 1:arr_len  # for each x
 
                 # Calculate perturbation
-                s = x[i] * fdw
+                fd_s = x[i] * fdw
 
                 # Forward
                 x_s[:] .= x[:]
-                x_s[i] += s
+                x_s[i] += fd_s
                 fev!(x_s, rf)
 
                 # Set jacobian
                 for j in 1:arr_len  # for each r
-                    jacob[j,i] =  (rf[j] - resid[j]) / s
+                    jacob[j,i] =  (rf[j] - resid[j]) / fd_s
                 end 
             end 
 
@@ -252,7 +260,6 @@ module solver_nlsol
 
         # Cost function 
         function cost(_r::Array)
-            # return maximum(abs.(_r))
             return norm(_r)
         end 
 
@@ -302,35 +309,34 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         # Execution variables
         modprint::Int =     1       # Print frequency
-        dx_rtol::Float64 = 3.0e-1   # Allowed relative change in x 
-        dx_atol::Float64 = 1.0e-4   # Allowed absolute change in x
-
+        
         # Tracking variables
         step::Int =         0       # Step number
         code::Int =         -1      # Status code 
-        lml::Float64 =      2.0    # Levenberg-Marquardt lambda parameter
+        lml::Float64 =      2.0     # Levenberg-Marquardt lambda parameter
 
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
         r_max::Float64 =        9.0     # Maximum residual (sign agnostic)
         x_med::Float64 =        0.0     # Median solution
         x_max::Float64 =        0.0     # Maximum solution (sign agnostic)
-        dx2nm::Float64 =        9.0     # Current value for 2-norm for the relative change in the solution array
+        iworst::Int =           0       # Level which is furthest from convergence
+        dxmax::Float64 =        9.0     # Maximum change in solution array
         r_cur_2nm::Float64 =    0.01    # Two-norm of residuals 
         r_old_2nm::Float64 =    0.02    # Previous ^
         count_rej::Int =        0       # Number of rejected steps
         reject::Bool =          false   # step was rejected?
 
         # Work variables
-        b::Array      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
-        x_cur::Array  = zeros(Float64, arr_len)               # Current best solution (i)
-        x_old::Array  = zeros(Float64, arr_len)               # Previous best solution (i-1)
-        x_dif::Array  = zeros(Float64, arr_len)               # Change in x (i-1 to i)
-        x_dla::Array  = zeros(Float64, arr_len)               # Change in x during the last accepted step
-        r_cur::Array  = zeros(Float64, arr_len)               # Residuals (i)
-        r_old::Array  = zeros(Float64, arr_len)               # Residuals (i-1)
-        r_tst::Array  = zeros(Float64, arr_len)               # Test for rejection residuals
-        dtd::Array    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
+        b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
+        x_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Current best solution (i)
+        x_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Previous best solution (i-1)
+        x_dif::Array{Float64,1}  = zeros(Float64, arr_len)               # Change in x (i-1 to i)
+        x_dla::Array{Float64,1}  = zeros(Float64, arr_len)               # Change in x during the last accepted step
+        r_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i)
+        r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i-1)
+        r_tst::Array{Float64,1}  = zeros(Float64, arr_len)               # Test for rejection residuals
+        dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
         c_old::Float64 = 0.0
 
         # Final setup
@@ -341,7 +347,7 @@ module solver_nlsol
         r_cur .+= 1.0e99
         r_old .+= 1.0e98
 
-        @printf("    step  resid_med  resid_max  resid_2nm  xvals_med  xvals_max  deltx_2nm  flags\n")
+        @printf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags\n")
         while true 
 
             # Update properties (cp, rho, etc.)
@@ -380,7 +386,7 @@ module solver_nlsol
 
             # Check convergence
             c_old = cost(r_cur)
-            if c_old < atol 
+            if c_old < conv_atol 
                 code = 0
                 @printf("\n")
                 break
@@ -419,12 +425,11 @@ module solver_nlsol
                 stepflags *= "Lm"
             end
 
-            # Limit step size 
-            for i in 1:arr_len
-                s = sign(x_dif[i])
-                v = min(abs(x_dif[i]), x_old[i]*dx_rtol + dx_atol)
-                x_dif[i] = s*v 
-            end 
+            # Limit step size according to atol,rtol
+            x_dif[:] .= sign.(x_dif[:])  .* min.(abs.(x_dif[:]), x_old[:].*step_rtol .+ step_atol)
+
+            # Limit step size in convective regions
+            # x_dif[atmos.mask_c.>0] .*= 0.5
 
             # Step rejection 
             x_cur = x_old + x_dif
@@ -446,28 +451,35 @@ module solver_nlsol
 
             # Model statistics 
             r_med   = median(r_cur)
-            r_max   = r_cur[argmax(abs.(r_cur))]
+            iworst  = argmax(abs.(r_cur))
+            r_max   = r_cur[iworst]
             x_med   = median(x_cur)
             x_max   = x_cur[argmax(abs.(x_cur))]
-            dx2nm   = norm(x_dif)
+            dxmax   = maximum(abs.(x_dif))
             r_old_2nm   = r_cur_2nm
             r_cur_2nm   = norm(r_cur)
 
             # Plot
             if modplot > 0
                 if mod(step, modplot) == 0
-                    plotting.plot_pt(atmos,  @sprintf("%s/solver.png", atmos.OUT_DIR), incl_magma=(surf_state==2))
+                    plotting.plot_pt(atmos,     path_prf, incl_magma=(surf_state==2))
+                    plotting.plot_fluxes(atmos, path_flx)
                 end 
             end 
                 
             # Inform user
             if mod(step,modprint) == 0 
-                @printf("%+.2e  %+.2e  %.3e  %+.2e  %+.2e  %.3e  %s\n", r_med, r_max, r_cur_2nm, x_med, x_max, dx2nm, stepflags)
+                @printf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-9s\n", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags)
             end
 
         end # end solver loop
         
-        # Check result
+        rm(path_prf, force=true)
+        rm(path_flx, force=true)
+        
+        # ----------------------------------------------------------
+        # Extract solution
+        # ---------------------------------------------------------- 
         atmos.is_solved = true
         atmos.is_converged = false 
         if code == 0
@@ -485,9 +497,6 @@ module solver_nlsol
         @printf("    steps rejected: %d \n", count_rej)
         println(" ")
 
-        # ----------------------------------------------------------
-        # Extract solution
-        # ---------------------------------------------------------- 
         fev!(x_cur, zeros(Float64, arr_len))
         atmosphere.calc_hrates!(atmos)
 
@@ -510,5 +519,4 @@ module solver_nlsol
 
         return atmos.is_converged
     end # end solve_energy 
-
 end 

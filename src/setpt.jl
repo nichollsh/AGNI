@@ -208,7 +208,7 @@ module setpt
                 end
 
                 # Generate new pressure grid 
-                atmosphere.generate_pgrid!(atmos, switch=atmos.res_switching)
+                atmosphere.generate_pgrid!(atmos)
             end
         end 
 

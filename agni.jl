@@ -26,15 +26,16 @@ import solver_nlsol
 
 function main()
     # Configuration options
-    tstar           = 1800.0    # Surface temperature [kelvin]
-    instellation    = 2000.0
-    albedo_b        = 0.1
-    radius          = 6.37e6    # metres
-    zenith          = 48.19
-    gravity         = 9.81      # m s-2
-    nlev_centre     = 35  
-    p_surf          = 300.0    # bar
-    p_top           = 1e-5      # bar 
+    tstar::Float64         = 1800.0    # Surface temperature [kelvin]
+    instellation::Float64  = 2000.0
+    albedo_b::Float64      = 0.1
+    asf_sf::Float64        = 3.0/8.0
+    radius::Float64        = 6.37e6    # metres
+    zenith::Float64        = 48.19
+    gravity::Float64       = 9.81      # m s-2
+    nlev_centre::Int       = 35  
+    p_surf::Float64        = 300.0    # bar
+    p_top::Float64         = 1e-5      # bar 
     mf_dict         = Dict([
                             ("H2O" , 1.0),
                             # ("CO2" , 0.8),
@@ -55,7 +56,7 @@ function main()
     atmos = atmosphere.Atmos_t()
     atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                             spfile_name,
-                            instellation, 3.0/8.0, albedo_b, zenith,
+                            instellation, asf_sf, albedo_b, zenith,
                             tstar,
                             gravity, radius,
                             nlev_centre, p_surf, p_top,
@@ -69,18 +70,18 @@ function main()
                             tmp_magma=3000.0,
                             tmp_floor=5.0,
                             tint=0.0,
-                            thermo_functions=false,
+                            thermo_functions=true,
                     )
     atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
     # Set PT profile 
     println("Setting initial T(p)")
     # setpt.fromcsv!(atmos,"pt.csv")
-    setpt.isothermal!(atmos, tstar-200.0)
+    # setpt.isothermal!(atmos, tstar-50.0)
     # setpt.prevent_surfsupersat!(atmos)
-    # setpt.dry_adiabat!(atmos)
+    setpt.dry_adiabat!(atmos)
     # setpt.condensing!(atmos, "H2O")
-    # setpt.stratosphere!(atmos, 500.0)
+    setpt.stratosphere!(atmos, 500.0)
 
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
@@ -91,15 +92,16 @@ function main()
     condensate  = ""
     surf_state  = 0
 
-    solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
-                                modplot=10, modprop=5, verbose=true, 
-                                dry_convect=dry_convect, condensate=condensate,
-                                accel=true, step_rtol=1.0e-3, step_atol=1.0e-2, dt_max=150.0,
-                                max_steps=400, min_steps=100, use_mlt=true)
-
-    # solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+    # solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
+    #                             modplot=10, modprop=5, verbose=true, 
     #                             dry_convect=dry_convect, condensate=condensate,
-    #                             max_steps=30, atol=1.0e-3, method=2)
+    #                             accel=true, step_rtol=1.0e-3, step_atol=1.0e-2, dt_max=150.0,
+    #                             max_steps=300, min_steps=100, use_mlt=true)
+
+
+    solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+                                dry_convect=dry_convect, condensate=condensate,
+                                max_steps=50, conv_atol=1.0e-3, method=0)
 
     # import solver_optim
     # solver_optim.solve_energy!(atmos, surf_state=surf_state, 
