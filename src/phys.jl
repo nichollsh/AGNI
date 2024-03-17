@@ -228,10 +228,8 @@ module phys
 
     # Shomate formulation for heat capacity, J K-1 kg-1
     function shomate_cp(gas::String, tmp::Float64)::Float64
-        out = 0.0
-
         # Get molar mass for this molecule 
-        mmw = 0.0
+        mmw::Float64 = 0.0
         if gas in keys(lookup_mmw)
             mmw = lookup_mmw[gas]  # kg mol-1
         else 
@@ -239,11 +237,11 @@ module phys
         end 
 
         # Coefficient base values 
-        cA = 0.0
-        cB = 0.0
-        cC = 0.0
-        cD = 0.0
-        cE = 0.0
+        cA::Float64 = 0.0
+        cB::Float64 = 0.0
+        cC::Float64 = 0.0
+        cD::Float64 = 0.0
+        cE::Float64 = 0.0
 
         # Set coefficients
         if gas == "H2O"
@@ -420,15 +418,10 @@ module phys
             return 0.0
         end 
 
-        # Evalulate heat capacity 
-        t1 = tmp/1000.0
-        t2 = t1*t1
-        out = cA + cB*t1 + cC*t2 + cD*t2*t1 + cE/t2
-
-        # Convert units to J K-1 kg-1
-        out /= mmw
-
-        return out 
+        # Evalulate heat capacity and convert units to J K-1 kg-1
+        t1::Float64 = tmp/1000.0
+        t2::Float64 = t1*t1
+        return (cA + cB*t1 + cC*t2 + cD*t2*t1 + cE/t2)/mmw 
     end 
 
     # Temperature dependent latent heat interpolation, J kg-1 
@@ -510,15 +503,17 @@ module phys
     function calc_Tdew(gas::String, p_eval::Float64)::Float64
 
         # Get properties
-        L = phys.lookup_safe("L_vap",gas)
+        L::Float64 = phys.lookup_safe("L_vap",gas)
         if L < 1e-20
             return 0.0
         end 
 
-        R = R_gas /  phys.lookup_safe("mmw",gas)
+        R::Float64 = R_gas /  phys.lookup_safe("mmw",gas)
+        Tref::Float64 = 0.0
+        pref::Float64 = 0.0
 
         # Avoid math error for p = 0
-        p = max(p_eval, 1.0e-100)
+        p::Float64 = max(p_eval, 1.0e-50)
 
         if gas == "H2O"
             Tref = 373.15 # K, boiling point of H2O at 1 atm 
@@ -560,8 +555,7 @@ module phys
             return 0.0
         end
 
-        Tsat = Tref/(1.0-(Tref*R/L)*log(p/pref))
-        return Tsat 
+        return Tref/(1.0-(Tref*R/L)*log(p/pref)) 
     end 
 
 end 

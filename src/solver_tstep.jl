@@ -60,26 +60,27 @@ module solver_tstep
                             sens_heat::Bool=false, modprop::Int=1,
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, adams::Bool=true,
-                            dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=300,
+                            dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=100,
                             step_rtol::Float64=1.0e-4, step_atol::Float64=1.0e-2,
                             conv_rtol::Float64=1.0e-4, conv_atol::Float64=1.0e-1
                             )
 
-        println("Begin accelerated timestepping")
+        if use_physical_dt
+            println("Begin physical timestepping")
+        else 
+            println("Begin accelerated timestepping")
+        end 
 
         # Run parameters
         dtmp_accel::Float64 = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
-        smooth_stp::Int     = 150    # Number of steps for which to apply smoothing
+        smooth_stp::Int     = 120    # Number of steps for which to apply smoothing
         do_smooth::Bool     = true   # Is smoothing allowed at ever?
-        is_smooth::Bool     = true   # Currently smoothing?
-        wait_con::Int       = 50     # Introduce convection after this many steps, if ^^ is not already true
-
+        wait_con::Int       = 30     # Introduce convection after this many steps, if ^^ is not already true
         modprint::Int       = 50     # Frequency to print when verbose==false
         len_hist::Int       = 10     # Number of previous states to store
         H_large::Float64    = 1.0e5  # A characteristic large heating rate [K/day]
 
         do_condense::Bool   = false  # Allow condensation ever? (overwritten according to condensate)
-        is_condense::Bool   = false  # Is condensation currently enabled?
 
         if condensate != "" 
             if condensate in atmos.gases
@@ -95,7 +96,7 @@ module solver_tstep
 
         # Validate inputs
         wait_con  = max(wait_con, 1)
-        min_steps = max(min_steps,wait_con+100)
+        min_steps = max(min_steps,wait_con+50)
         min_steps = max(min_steps,smooth_stp+50)
         max_steps = max(min_steps+50, max_steps)
         len_hist  = max(min(len_hist, max_steps-1), 5)
@@ -132,6 +133,8 @@ module solver_tstep
         F_tol::Float64       = F_tol_worst
 
         # Variables
+        is_condense::Bool   = false       # Is condensation currently enabled?
+        is_smooth::Bool     = true        # Currently smoothing?
         step::Int           = 0           # Current step number
         success::Bool       = false       # Convergence criteria met
         flag_prev::Bool     = false       # Previous iteration is meeting convergence
