@@ -110,7 +110,7 @@ s = ArgParseSettings()
     "--sp_file"
         help = "Spectral file path. Default is to Mallard."
         arg_type = String
-        default = "res/spectral_files/Mallard/Mallard"
+        default = "res/spectral_files/Mallard/Mallard.sf"
     "--star"
         help = "Path to stellar spectrum txt file. If not provided, spectral file is assumed to already include it."
         arg_type = String
@@ -138,9 +138,6 @@ s = ArgParseSettings()
     "--noaccel"
         help = "Disable model acceleration."
         action = :store_true
-    "--linesearch"
-        help = "Enable linesearch with nonlinear solver."
-        action = :store_true
     "--roverlap"
         help = "Use random overlap for computing overlapping absorption. Otherwise, equivalent extinction will be used."
         action = :store_true
@@ -150,18 +147,10 @@ s = ArgParseSettings()
     "--cloud"
         help = "Include cloud optical properties in the radiative transfer."
         action = :store_true
-    "--convcrit_tmprel"
-        help = "Convergence criterion on dtmp/tmp/dt [day-1]."
+    "--conv_atol"
+        help = "Convergence criterion on flux divergence [W m-2]"
         arg_type = Float64
-        default = 4.0
-    "--convcrit_fradrel"
-        help = "Convergence criterion on dfrad/frad [%]."
-        arg_type = Float64
-        default = 0.8
-    "--convcrit_flosspct"
-        help = "Convergence criterion on global flux loss [%]."
-        arg_type = Float64
-        default = 2.0
+        default = 1.0e-3
     "--plot"
         help = "Make plots."
         action = :store_true
@@ -217,13 +206,10 @@ max_steps       = args["nsteps"]
 convect_adj     = args["convect_adj"]
 convect_mlt     = args["convect_mlt"]
 no_accel        = args["noaccel"]
-linesearch      = args["linesearch"]
 roverlap        = args["roverlap"]
 dtsolve         = args["dtsolve"]
 nlsolve         = args["nlsolve"]
-cc_tmprel       = args["convcrit_tmprel"]
-cc_fradrel      = args["convcrit_fradrel"]
-cc_floss        = args["convcrit_flosspct"]
+cc_atol         = args["conv_atol"]
 
 if verbose 
     println("Command line arguments:")
@@ -375,7 +361,7 @@ if dtsolve
                          modplot=modplot, verbose=verbose, 
                          surf_state=surf_state, dry_convect=dry_convect, use_mlt=convect_mlt,
                          max_steps=max_steps, accel=!no_accel, dt_max=150.0, rtol=1.0e-4, atol=1.0e-2,
-                         drel_dt_conv=cc_tmprel, drel_F_conv=cc_fradrel, F_losspct_conv=cc_floss
+                         conv_atol=cc_atol
                          )
 end 
     
@@ -383,7 +369,7 @@ end
 if nlsolve
     import solver_nlsol
     solver_nlsol.solve_energy!(atmos, surf_state=surf_state, dry_convect=dry_convect, 
-                                max_steps=180, atol=1e-3)
+                                max_steps=180, atol=cc_atol)
 end
 
 # Write NetCDF and PT files
