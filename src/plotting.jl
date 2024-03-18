@@ -218,7 +218,7 @@ module plotting
     """
     Plot the fluxes at each pressure level
     """
-    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
+    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_int::Bool=false)
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]*0.95, arr_P[end]*2.0)
@@ -246,6 +246,11 @@ module plotting
 
         # Zero line 
         plot!(plt, [0.0, 0.0], [arr_P[1], arr_P[end]], lw=0.4, lc="black", label="")
+
+        # Interior flux
+        if incl_int
+            plot!(plt, [_symlog(atmos.flux_int)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="INT")
+        end
 
         # LW component
         if atmos.is_out_lw
@@ -388,9 +393,16 @@ module plotting
         y = zeros(Float64, atmos.nlev_c)    # pressure levels
         z = zeros(Float64, (atmos.nlev_c,atmos.nbands))
 
+        # Reversed?
+        reversed::Bool = (atmos.bands_min[1] > atmos.bands_min[end])
+
         # x value - band centres [nm]
         for ba in 1:atmos.nbands
-            br = atmos.nbands - ba + 1
+            if reversed
+                br = atmos.nbands - ba + 1
+            else 
+                br = ba 
+            end
             x[br] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
         end
 
@@ -402,8 +414,12 @@ module plotting
         # z value - log'd and normalised contribution function 
         cf_min = 1.0e-9
         for ba in 1:atmos.nbands
-            for i in 1:atmos.nlev_c 
+            if reversed
                 br = atmos.nbands - ba + 1
+            else 
+                br = ba 
+            end
+            for i in 1:atmos.nlev_c 
                 z[i,br] = log10(max(atmos.contfunc_norm[i,ba],cf_min))
             end 
         end 

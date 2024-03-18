@@ -49,6 +49,7 @@ module solver_tstep
     - `dt_max::Float64=500.0            maximum time-step outside of the accelerated phase
     - `max_steps::Int=1000`             maximum number of solver steps
     - `min_steps::Int=300`              minimum number of solver steps
+    - `max_runtime::Float64=400.0`      maximum runtime in wall-clock seconds
     - `step_rtol::Float64=1.0e-4`       step size: relative change in per-level temperature [dimensionless]
     - `step_atol::Float64=1.0e-2`       step size: absolute change in per-level temperature [K]
     - `conv_rtol::Float64=1.0e-4`       convergence: relative tolerance on per-level flux loss [dimensionless]
@@ -59,8 +60,8 @@ module solver_tstep
                             dry_convect::Bool=true, condensate::String="", use_mlt::Bool=true,
                             sens_heat::Bool=false, modprop::Int=1,
                             verbose::Bool=true, modplot::Int=0,
-                            accel::Bool=true, adams::Bool=true,
-                            dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=100,
+                            accel::Bool=true, adams::Bool=true, dt_max::Float64=500.0, 
+                            max_steps::Int=1000, min_steps::Int=100, max_runtime::Float64=400.0,
                             step_rtol::Float64=1.0e-4, step_atol::Float64=1.0e-2,
                             conv_rtol::Float64=1.0e-4, conv_atol::Float64=1.0e-1
                             )
@@ -70,6 +71,9 @@ module solver_tstep
         else 
             println("Begin accelerated timestepping")
         end 
+
+        # Start timer 
+        wct_start::Float64 = time()
 
         # Run parameters
         dtmp_accel::Float64 = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
@@ -175,6 +179,10 @@ module solver_tstep
                 error("Temperature array contains negative values")
             end
 
+            # Check time 
+            if time()-wct_start > max_runtime 
+                break
+            end 
 
             # ----------------------------------------------------------
             # Prepare for new iteration
@@ -233,18 +241,10 @@ module solver_tstep
                     step_stopaccel = step
                 end
 
-                # Solver is struggling
-                if (step > max_steps * 0.9)
-                    dt_max_step *= 0.5
-                    dtmp_clip *= 0.8
-
-                # Not struggling
-                else
-                    if is_smooth
-                        smooth_width = max(5, floor(Int, 0.08*atmos.nlev_c)) # 8% of levels, and >= 5
-                        dt_max_step *= 10.0
-                        this_rtol *= 12.0
-                    end
+                if is_smooth
+                    smooth_width = max(5, floor(Int, 0.08*atmos.nlev_c)) # 8% of levels, and >= 5
+                    dt_max_step *= 10.0
+                    this_rtol *= 12.0
                 end
             end
 
@@ -570,6 +570,11 @@ module solver_tstep
         @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
         @printf("    F_cri_worst = %+.2e W m-2  \n", F_cri_worst)
         @printf("    F_tol_worst = %+.2e W m-2  \n", F_tol_worst)
+        if use_physical_dt
+            @printf("    total_time  = %+.2e years  \n", atmos.time[1]/365.25)
+        else 
+            @printf("    max_time    = %+.2e years  \n", maximum(atmos.time)/365.25)
+        end 
         @printf("\n")
 
         @printf("    endpoint fluxes \n")

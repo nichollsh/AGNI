@@ -36,7 +36,8 @@ module solver_nlsol
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
-    - `max_steps::Int=200`              maximum number of solver steps
+    - `max_steps::Int=2000`             maximum number of solver steps
+    - `max_runtime::Float64=400.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=5.0e-3`             relative width of the "difference" in the finite-difference calculations
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
     - `method::Int=0`                   numerical method (0: Newton-Raphson, 1: Gauss-Newton, 2: Levenberg-Marquardt)
@@ -48,10 +49,10 @@ module solver_nlsol
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
-                            max_steps::Int=200,
+                            max_steps::Int=2000, max_runtime::Float64=400.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=0,
                             modplot::Int=1,
-                            step_rtol::Float64 = 0.1 ,  step_atol::Float64 = 1.0e-4,
+                            step_rtol::Float64 = 0.3 ,  step_atol::Float64 = 1.0e-3,
                             conv_atol::Float64=1.0e-3
                             )
 
@@ -71,6 +72,9 @@ module solver_nlsol
         if (surf_state < 0) || (surf_state > 3)
             error("Invalid surface state ($surf_state)")
         end
+
+        # Start timer 
+        wct_start::Float64 = time()
 
         # Plot paths 
         path_prf::String = @sprintf("%s/solver_prf.png", atmos.OUT_DIR)
@@ -118,7 +122,7 @@ module solver_nlsol
         end # end set_tmps
 
         # Objective function to solve for
-        function fev!(x::Array,resid::Array)
+        function _fev!(x::Array,resid::Array)
 
             # Reset values
             atmos.mask_c[:] .= 0
@@ -208,7 +212,7 @@ module solver_nlsol
         function calc_jac_res_cendiff!(x::Array, jacob::Array, resid::Array)
 
             # Evalulate residuals at x
-            fev!(x, resid)
+            _fev!(x, resid)
 
             for i in 1:arr_len  # for each x
 
@@ -218,11 +222,11 @@ module solver_nlsol
                 # Forward
                 x_s[:] .= x[:]
                 x_s[i] += fd_s * 0.5
-                fev!(x_s, rf)
+                _fev!(x_s, rf)
 
                 # Backward
                 x_s[i] -= fd_s    # Only need to modify this level; rest were set during the forward phase
-                fev!(x_s, rb)
+                _fev!(x_s, rb)
 
                 # Set jacobian
                 for j in 1:arr_len  # for each r
@@ -237,7 +241,7 @@ module solver_nlsol
         function calc_jac_res_fordiff!(x::Array, jacob::Array, resid::Array)
 
             # Evalulate residuals at x
-            fev!(x, resid)
+            _fev!(x, resid)
 
             for i in 1:arr_len  # for each x
 
@@ -247,7 +251,7 @@ module solver_nlsol
                 # Forward
                 x_s[:] .= x[:]
                 x_s[i] += fd_s
-                fev!(x_s, rf)
+                _fev!(x_s, rf)
 
                 # Set jacobian
                 for j in 1:arr_len  # for each r
@@ -324,15 +328,13 @@ module solver_nlsol
         dxmax::Float64 =        9.0     # Maximum change in solution array
         r_cur_2nm::Float64 =    0.01    # Two-norm of residuals 
         r_old_2nm::Float64 =    0.02    # Previous ^
-        count_rej::Int =        0       # Number of rejected steps
-        reject::Bool =          false   # step was rejected?
+
 
         # Work variables
         b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
         x_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Current best solution (i)
         x_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Previous best solution (i-1)
         x_dif::Array{Float64,1}  = zeros(Float64, arr_len)               # Change in x (i-1 to i)
-        x_dla::Array{Float64,1}  = zeros(Float64, arr_len)               # Change in x during the last accepted step
         r_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i)
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)               # Test for rejection residuals
@@ -344,8 +346,8 @@ module solver_nlsol
         for di in 1:arr_len 
             dtd[di,di] = 1.0
         end 
-        r_cur .+= 1.0e99
-        r_old .+= 1.0e98
+        fill!(r_cur, 1.0e99)
+        fill!(r_old, 1.0e98)
 
         @printf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags\n")
         while true 
@@ -357,6 +359,12 @@ module solver_nlsol
             end 
             _set_tmps!(x_cur)
             atmosphere.calc_layer_props!(atmos)
+
+            # Check time 
+            if time()-wct_start > max_runtime 
+                code = 3
+                break
+            end 
 
             # Update step counter
             step += 1
@@ -371,7 +379,6 @@ module solver_nlsol
             # Reset flags 
             #     Cd, Fd     = finite differencing type 
             #     Nr, Gn, Lm = stepping algorithm
-            #     A, R       = accepted or rejected
             stepflags::String = ""
 
             # Evaluate jacobian and residuals
@@ -428,26 +435,18 @@ module solver_nlsol
             # Limit step size according to atol,rtol
             x_dif[:] .= sign.(x_dif[:])  .* min.(abs.(x_dif[:]), x_old[:].*step_rtol .+ step_atol)
 
-            # Limit step size in convective regions
-            # x_dif[atmos.mask_c.>0] .*= 0.5
-
-            # Step rejection 
+            # Opportunistic extrapolation 
+            # x_cur = x_old + x_dif
+            # _fev!(x_cur, r_tst)
+            # for i in 1:arr_len 
+            #     if (abs(r_tst[i]) < abs(r_cur[i])) && (abs(r_cur[i]) < abs(r_old[i])) && (sign(r_tst[i])*sign(r_cur[i]) > 0) && (step>3)
+            #         x_dif[i] *= 1.2
+            #     end 
+            # end 
+            
+            # Next step 
             x_cur = x_old + x_dif
-            fev!(x_cur, r_tst)
-            # reject = (1.0 - dot(x_dif, x_dla)/(norm(x_dif)*norm(x_dla)) )^2.0 * cost(r_tst) > c_old
-            reject = false
-            if reject
-                # reject step  
-                x_cur[:] .= x_old[:]
-                lml *= 10.0
-                count_rej += 1
-                stepflags *= "R"
-            else 
-                # accept step
-                x_dla = x_cur - x_old
-                r_cur[:] .= r_tst[:]
-                stepflags *= "A"
-            end
+            _fev!(x_cur, r_cur)
 
             # Model statistics 
             r_med   = median(r_cur)
@@ -463,7 +462,7 @@ module solver_nlsol
             if modplot > 0
                 if mod(step, modplot) == 0
                     plotting.plot_pt(atmos,     path_prf, incl_magma=(surf_state==2))
-                    plotting.plot_fluxes(atmos, path_flx)
+                    plotting.plot_fluxes(atmos, path_flx, incl_int=(surf_state==3))
                 end 
             end 
                 
@@ -490,21 +489,20 @@ module solver_nlsol
         elseif code == 2
             println("    failure (singular jacobian)")
         elseif code == 3
-            println("    failure (local minimum)")
+            println("    failure (maximum time)")
         else 
             println("    failure (unhandled)")
         end
-        @printf("    steps rejected: %d \n", count_rej)
         println(" ")
 
-        fev!(x_cur, zeros(Float64, arr_len))
+        _fev!(x_cur, zeros(Float64, arr_len))
         atmosphere.calc_hrates!(atmos)
 
         # ----------------------------------------------------------
         # Print info
         # ---------------------------------------------------------- 
-        loss = atmos.flux_tot[1] - atmos.flux_tot[end]
-        loss_pct = loss/atmos.flux_tot[1]*100.0
+        loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
+        loss_pct = loss/maximum(atmos.flux_tot)*100.0
         @printf("    endpoint fluxes \n")
         @printf("    rad_OLR   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
         if (surf_state == 2)
