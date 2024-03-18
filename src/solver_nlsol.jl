@@ -42,9 +42,9 @@ module solver_nlsol
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
     - `method::Int=0`                   numerical method (0: Newton-Raphson, 1: Gauss-Newton, 2: Levenberg-Marquardt)
     - `modplot::Int=0`                  iteration frequency at which to make plots
-    - `step_rtol::Float64=0.1`          step size: relative change in per-level temperature [dimensionless]
-    - `step_atol::Float64=1.0e-4`       step size: absolute change in per-level temperature [K]
-    - `conv_atol::Float64=1.0e-3`       convergence: absolute tolerance on per-level flux deviation [W m-2]
+    - `step_rtol::Float64=5.0e-2`       step size: relative change in per-level temperature [dimensionless]
+    - `step_atol::Float64=5.0e-5`       step size: absolute change in per-level temperature [K]
+    - `conv_atol::Float64=1.0e-2`       convergence: absolute tolerance on per-level flux deviation [W m-2]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, condensate::String="",
@@ -52,7 +52,7 @@ module solver_nlsol
                             max_steps::Int=2000, max_runtime::Float64=400.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=0,
                             modplot::Int=1,
-                            step_rtol::Float64 = 0.3 ,  step_atol::Float64 = 1.0e-3,
+                            step_rtol::Float64 = 5.0e-2 ,  step_atol::Float64 = 1.0e-5,
                             conv_atol::Float64=1.0e-3
                             )
 
