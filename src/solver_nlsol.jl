@@ -42,8 +42,9 @@ module solver_nlsol
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
     - `method::Int=0`                   numerical method (0: Newton-Raphson, 1: Gauss-Newton, 2: Levenberg-Marquardt)
     - `modplot::Int=0`                  iteration frequency at which to make plots
-    - `step_rtol::Float64=5.0e-2`       step size: relative change in per-level temperature [dimensionless]
-    - `step_atol::Float64=5.0e-5`       step size: absolute change in per-level temperature [K]
+    - `step_rtol::Float64=0.8`          step size: relative change in per-level temperature [dimensionless]
+    - `step_atol::Float64=1.0`          step size: absolute change in per-level temperature [K]
+    - `step_fact::Float64=1.0e4`        step size: scale factor for maximum per-level step [K^2]
     - `conv_atol::Float64=1.0e-2`       convergence: absolute tolerance on per-level flux deviation [W m-2]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
@@ -52,8 +53,8 @@ module solver_nlsol
                             max_steps::Int=2000, max_runtime::Float64=400.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=0,
                             modplot::Int=1,
-                            step_rtol::Float64 = 5.0e-2 ,  step_atol::Float64 = 1.0e-5,
-                            conv_atol::Float64=1.0e-3
+                            step_rtol::Float64=0.99, step_atol::Float64=1.0, step_fact::Float64=1e5,
+                            conv_atol::Float64=1.0e-2
                             )
 
         # Validate condensation case
@@ -92,6 +93,9 @@ module solver_nlsol
         rb::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference
         x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
         fd_s::Float64           = 0.0                      # Row perturbation amount
+
+        # Convective flux scale factor 
+        convect_sf::Float64 = 1.0e-7
 
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
@@ -141,7 +145,34 @@ module solver_nlsol
 
             # +Dry convection
             if dry_convect
+                # Calc flux
                 atmosphere.mlt!(atmos)
+
+                # Stabilise
+                if convect_sf < 1.0
+                    # scale convective flux 
+                    atmos.flux_c *= convect_sf
+
+                    # # smooth profile so that it's locally convex
+                    # flux_c_tmp = zeros(Float64, atmos.nlev_l)
+                    # flux_c_tmp[:] .= atmos.flux_c[:]
+                    # for i in 2:atmos.nlev_l-1
+                    #     avg = 0.5*(atmos.flux_c[i-1]+atmos.flux_c[i+1])
+                    #     if atmos.flux_c[i] < avg/100.0
+                    #         flux_c_tmp[i] = avg
+                    #     end
+
+                    #     # set mask=false where flux is small
+                    #     if atmos.flux_c[i] < 1.0e-3
+                    #         atmos.mask_c[i] = 0
+                    #     end 
+                    # end 
+
+                    # # write to atmos struct 
+                    # atmos.flux_c[:] .= flux_c_tmp[:]
+                end
+
+                # Add to total flux
                 atmos.flux_tot += atmos.flux_c
             end
 
@@ -313,6 +344,7 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         # Execution variables
         modprint::Int =     1       # Print frequency
+        stabilise_mlt::Bool=true
         
         # Tracking variables
         step::Int =         0       # Step number
@@ -379,28 +411,51 @@ module solver_nlsol
             # Reset flags 
             #     Cd, Fd     = finite differencing type 
             #     Nr, Gn, Lm = stepping algorithm
+            #     Sc,R       = stabilise convection, reduced this step
             stepflags::String = ""
+
+            # Check convective stabilisation
+            if stabilise_mlt 
+                # We are stabilising
+                stepflags *= "Sc"
+                
+                # Check if sf needs to be increased
+                if c_old < 10.0*conv_atol
+                    if convect_sf < 1.0 
+                        # increase sf - reduce stabilisation
+                        stepflags *= "R"
+                        convect_sf = min(1.0, convect_sf*10.0)
+                        println("convect_sf = $convect_sf")
+                    else 
+                        # already at 1 - stop stabilising entirely
+                        stabilise_mlt = false
+                    end 
+                end
+            else
+                # No stabilisation at this point
+                convect_sf = 1.0 
+            end 
 
             # Evaluate jacobian and residuals
             r_old[:] .= r_cur[:]
             if use_cendiff || (step == 1)
                 calc_jac_res_cendiff!(x_cur, b, r_cur) 
-                stepflags *= "Cd"
+                stepflags *= "-Cd"
             else
                 calc_jac_res_fordiff!(x_cur, b, r_cur) 
-                stepflags *= "Fd"
+                stepflags *= "-Fd"
             end 
 
             # Check convergence
             c_old = cost(r_cur)
-            if c_old < conv_atol 
+            if (c_old < conv_atol) && !stabilise_mlt
                 code = 0
                 @printf("\n")
                 break
             end
 
             # Check if jacobian is singular 
-            if abs(det(b)) < 1.0e-80
+            if abs(det(b)) < 1.0e-90
                 code = 2
                 @printf("\n")
                 break
@@ -411,12 +466,12 @@ module solver_nlsol
             if (method == 0) || (step <= 2)
                 # Newton-Raphson step 
                 x_dif = -b\r_cur
-                stepflags *= "Nr"
+                stepflags *= "-Nr"
 
             elseif method == 1
                 # Gauss-Newton step 
                 x_dif = -(b'*b) \ (b'*r_cur) 
-                stepflags *= "Gn"
+                stepflags *= "-Gn"
 
             elseif method == 2
                 # Levenberg-Marquardt step
@@ -429,22 +484,31 @@ module solver_nlsol
 
                 #    Update our estimate of the solution
                 x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
-                stepflags *= "Lm"
+                stepflags *= "-Lm"
             end
 
             # Limit step size according to atol,rtol
             x_dif[:] .= sign.(x_dif[:])  .* min.(abs.(x_dif[:]), x_old[:].*step_rtol .+ step_atol)
 
-            # Opportunistic extrapolation 
-            # x_cur = x_old + x_dif
-            # _fev!(x_cur, r_tst)
-            # for i in 1:arr_len 
-            #     if (abs(r_tst[i]) < abs(r_cur[i])) && (abs(r_cur[i]) < abs(r_old[i])) && (sign(r_tst[i])*sign(r_cur[i]) > 0) && (step>3)
-            #         x_dif[i] *= 1.2
-            #     end 
-            # end 
-            
-            # Next step 
+            # Limit step size according to inverse temperature
+            for i in 1:atmos.nlev_c 
+                x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
+                if atmos.mask_c[i]>0
+                    x_dif[i] *= 0.7
+                end
+            end 
+
+            # Overall this means that the per-level step is always constrained 
+            # to satisfy the following two inequalities 
+            # dx < x * rtol + atol 
+            # dx < fact/x 
+            # Which will lead to a peak step-size at temperatures ~300K, and 
+            # should prevent temperatures becoming negative or shooting off 
+            # to infinity in all cases.
+            # In addition, the step size is reduced further in convective regions 
+            # since convection is a very unstable condition for the model.
+
+            # Take step 
             x_cur = x_old + x_dif
             _fev!(x_cur, r_cur)
 

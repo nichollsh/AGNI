@@ -564,10 +564,10 @@ module atmosphere
     to avoid numerical instabilities. 
     
     Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    - `boundary_scale::Float64`   scale factor for the thickness of the bottom-most cell.
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `boundary_scale::Float64=1.0e-3`  scale factor for the thickness of the bottom-most cell.
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-4)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-3)
 
         boundary_scale = max(min(boundary_scale, 1.0-1.0e-8), 1.0e-8)
 
@@ -1337,6 +1337,9 @@ module atmosphere
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
+                if i < atmos.nlev_c-1
+                    atmos.mask_c[i+1] = atmos.mask_decay
+                end
                 atmos.mask_c[i]   = atmos.mask_decay
                 atmos.mask_c[i-1] = atmos.mask_decay
                 

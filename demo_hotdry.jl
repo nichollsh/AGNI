@@ -9,7 +9,7 @@ println("Begin post-runaway demo")
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
-ENV["GKSwstype"] = "100"
+ENV["GKSwstype"]="nul"
 
 # Include libraries
 using Revise
@@ -38,7 +38,7 @@ mf_dict         = Dict([
                         ("H2O" , 1.0),
                         ])
 
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Oak/Oak.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
