@@ -26,7 +26,7 @@ import solver_nlsol
 
 function main()
     # Configuration options
-    tstar::Float64         = 2000.0    # Surface temperature [kelvin]
+    tstar::Float64         = 3000.0    # Surface temperature [kelvin]
     instellation::Float64  = 2000.0
     albedo_b::Float64      = 0.1
     asf_sf::Float64        = 3.0/8.0
@@ -34,7 +34,7 @@ function main()
     zenith::Float64        = 48.19
     gravity::Float64       = 9.81      # m s-2
     nlev_centre::Int       = 70  
-    p_surf::Float64        = 300.0    # bar
+    p_surf::Float64        = 10.0    # bar
     p_top::Float64         = 1e-5      # bar 
     mf_dict                = Dict([
                                 ("H2O" , 1.0),
@@ -90,13 +90,13 @@ function main()
     # Call solver(s)
     dry_convect = true
     condensate  = ""
-    surf_state  = 0
+    surf_state  = 2
 
-    # solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
-    #                             modplot=100, modprop=5, verbose=true, 
-    #                             dry_convect=dry_convect, condensate=condensate,
-    #                             accel=true, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
-    #                             max_steps=1000, min_steps=100, use_mlt=true)
+    solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
+                                modplot=100, modprop=5, verbose=true, 
+                                dry_convect=dry_convect, condensate=condensate,
+                                accel=true, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
+                                max_steps=1000, min_steps=100, use_mlt=true)
 
 
     solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
