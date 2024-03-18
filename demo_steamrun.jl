@@ -34,7 +34,7 @@ p_surf          = 300.0     # bar
 p_top           = 1e-8      # bar 
 mole_fractions  = Dict([("H2O", 1.0)])
 
-spectral_file = "res/spectral_files/Oak/Oak"
+spectral_file = "res/spectral_files/Oak/Oak.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir = "out/"
 

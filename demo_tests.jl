@@ -56,7 +56,7 @@ mf_dict         = Dict([
                         ("SO2" , 0.1),
                         ("O3"  , 0.2)
                         ])
-spfile_name   = "res/spectral_files/Reach/Reach"
+spfile_name   = "res/spectral_files/Reach/Reach.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
@@ -106,7 +106,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.8),
                         ("CO2" , 0.2),
                         ])
-spfile_name   = "res/spectral_files/Mallard/Mallard"
+spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
@@ -153,7 +153,7 @@ theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0),
                         ])
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Oak/Oak.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
@@ -203,7 +203,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.6),
                         ("CO2" , 0.4),
                         ])
-spfile_name   = "res/spectral_files/Mallard/Mallard"
+spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
@@ -251,7 +251,7 @@ theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0)
                         ])
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Oak/Oak.sf"
 star_file     = "res/stellar_spectra/trappist-1.txt"
 
 # Setup atmosphere

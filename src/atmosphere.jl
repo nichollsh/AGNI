@@ -57,6 +57,7 @@ module atmosphere
         radout::SOCRATES.StrOut
 
         # Radiation parameters
+        num_rt_eval::Int                # Total number of RT evaluations
         all_channels::Bool              # Use all bands?
         spectral_file::String           # Path to spectral file
         star_file::String               # Path to star spectrum
@@ -255,6 +256,8 @@ module atmosphere
             mkdir(OUT_DIR)
         end
 
+        atmos.num_rt_eval = 0
+
         atmos.dimen =       SOCRATES.StrDim()
         atmos.control =     SOCRATES.StrCtrl()
         atmos.spectrum =    SOCRATES.StrSpecData()
@@ -267,7 +270,6 @@ module atmosphere
         # Set the parameters (and make sure that they're reasonable)
         atmos.ROOT_DIR =        abspath(ROOT_DIR)
         atmos.OUT_DIR =         abspath(OUT_DIR)
-
         atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
         atmos.overlap_method =  Int(overlap_method)
@@ -557,15 +559,22 @@ module atmosphere
     """
     **Generate pressure grid.**
 
-    Equally log-spaced between p_boa and p_boa in the nominal configuration.
+    Equally log-spaced between p_boa and p_boa. The bottom-most cell is set with 
+    a bespoke of p_boa*(1-boundary_scale), which ensures that it is sufficiently thin
+    to avoid numerical instabilities. 
     
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `boundary_scale::Float64`   scale factor for the thickness of the bottom-most cell.
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-4)
+
+        boundary_scale = max(min(boundary_scale, 1.0-1.0e-8), 1.0e-8)
 
         # Logarithmically-spaced levels
-        atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
+        atmos.pl           = zeros(Float64, atmos.nlev_l)
+        atmos.pl[end]      = atmos.p_boa 
+        atmos.pl[1:end-1] .= 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa*(1.0-boundary_scale)), length=atmos.nlev_l-1)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p = zeros(Float64, atmos.nlev_c)
@@ -1042,13 +1051,15 @@ module atmosphere
         return nothing
     end  # end of allocate
 
-    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf=false)
+    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
         if !atmos.is_alloc
             error("atmosphere arrays have not been allocated")
         end
         if !atmos.is_param
             error("atmosphere parameters have not been set")
         end
+
+        atmos.num_rt_eval += 1
 
         # Longwave or shortwave calculation?
         if lw
@@ -1287,8 +1298,8 @@ module atmosphere
     function mlt!(atmos; pmin::Float64=0.0, mltype::Int=1)
 
         # Reset arrays
-        atmos.flux_c[:] .= 0.0
-        atmos.Kzz[:] .= 0.0
+        fill!(atmos.flux_c, 0.0)
+        fill!(atmos.Kzz,    0.0)
 
         # Work variables 
         H::Float64 = 0.0; l::Float64 = 0.0; w::Float64 = 0.0
@@ -1296,7 +1307,7 @@ module atmosphere
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
         grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0; grad_df::Float64 = 0.0
 
-        # Loop from bottom upwards
+        # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1 , step=-1, stop=3) 
 
             # Optionally skip low pressures 
