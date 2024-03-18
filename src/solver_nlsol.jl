@@ -92,9 +92,7 @@ module solver_nlsol
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
             # Read new guess
-            for i in 1:atmos.nlev_c
-                atmos.tmp[i] = _x[i]
-            end
+            atmos.tmp[:] .= _x[:]
             clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
             # Interpolate temperature to cell-edge values (not incl. bottommost value)
@@ -204,62 +202,8 @@ module solver_nlsol
             return nothing
         end  # end fev
 
-        # Calculate the jacobian and residuals at x using a central-difference method
-        function calc_jac_res_cendiff!(x::Array, jacob::Array, resid::Array)
-
-            # Evalulate residuals at x
-            fev!(x, resid)
-
-            for i in 1:arr_len  # for each x
-
-                # Calculate perturbation
-                fd_s = x[i] * fdw
-
-                # Forward
-                x_s[:] .= x[:]
-                x_s[i] += fd_s * 0.5
-                fev!(x_s, rf)
-
-                # Backward
-                x_s[i] -= fd_s    # Only need to modify this level; rest were set during the forward phase
-                fev!(x_s, rb)
-
-                # Set jacobian
-                for j in 1:arr_len  # for each r
-                    jacob[j,i] = (rf[j] - rb[j]) / fd_s
-                end 
-            end 
-
-            return nothing
-        end # end jr_cd
-
-        # Calculate the jacobian and residuals at x using a forward-difference method
-        function calc_jac_res_fordiff!(x::Array, jacob::Array, resid::Array)
-
-            # Evalulate residuals at x
-            fev!(x, resid)
-
-            for i in 1:arr_len  # for each x
-
-                # Calculate perturbation
-                fd_s = x[i] * fdw
-
-                # Forward
-                x_s[:] .= x[:]
-                x_s[i] += fd_s
-                fev!(x_s, rf)
-
-                # Set jacobian
-                for j in 1:arr_len  # for each r
-                    jacob[j,i] =  (rf[j] - resid[j]) / fd_s
-                end 
-            end 
-
-            return nothing
-        end # end jr_fd
-
         # Cost function 
-        function cost(_r::Array)
+        function cost(_r::Array)::Float64
             return norm(_r)
         end 
 
@@ -328,13 +272,21 @@ module solver_nlsol
         reject::Bool =          false   # step was rejected?
 
         # Work variables
-        b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
-        x_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Current best solution (i)
-        x_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Previous best solution (i-1)
+        #    jacobian stuff
+        b_ful::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
+        b_sub::Array{Float64,2}  = zeros(Float64, (arr_len, arr_len))
+        r_sub::Array{Float64, 1} = zeros(Float64, arr_len)
+        n_sub::Int               = arr_len 
+        x_dsub::Array{Float64,1} = zeros(Float64, arr_len)
+        map_sub::Array{Int,1}    = ones(Int, arr_len)
+        #    function stuff 
+        r_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Current residuals (i)
+        r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Previous residuals (i-1)
+        #    solution stuff
+        x_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Current solution (i)
+        x_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Previous solution (i-1)
         x_dif::Array{Float64,1}  = zeros(Float64, arr_len)               # Change in x (i-1 to i)
         x_dla::Array{Float64,1}  = zeros(Float64, arr_len)               # Change in x during the last accepted step
-        r_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i)
-        r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)               # Test for rejection residuals
         dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
         c_old::Float64 = 0.0
@@ -374,15 +326,9 @@ module solver_nlsol
             #     A, R       = accepted or rejected
             stepflags::String = ""
 
-            # Evaluate jacobian and residuals
+            # Evalulate residuals 
             r_old[:] .= r_cur[:]
-            if use_cendiff || (step == 1)
-                calc_jac_res_cendiff!(x_cur, b, r_cur) 
-                stepflags *= "Cd"
-            else
-                calc_jac_res_fordiff!(x_cur, b, r_cur) 
-                stepflags *= "Fd"
-            end 
+            fev!(x_cur, r_cur)
 
             # Check convergence
             c_old = cost(r_cur)
@@ -391,9 +337,78 @@ module solver_nlsol
                 @printf("\n")
                 break
             end
+   
+            # Evaluate jacobian
+            #    determine which rows are being perturbed 
+
+            if step < 15 || mod(step,10)==0
+                n_sub = arr_len 
+                map_sub = collect(Int, 1:1:arr_len)
+            else 
+                n_sub = 2
+                map_sub = [1]
+                for i in 2:arr_len-1 
+                    if r_cur[i] > conv_atol*20.0
+                        n_sub += 1
+                        push!(map_sub, i)
+                    end
+                end 
+                push!(map_sub, arr_len)
+            end
+            println("n_sub = $n_sub")
+
+            b_sub = zeros(Float64, (n_sub, n_sub))
+            r_sub = zeros(Float64, n_sub)
+            x_dsub = zeros(Float64, n_sub)
+            #    central difference method
+            if false #use_cendiff || (step == 1)
+                for i in 1:arr_len 
+                    # Calculate perturbation
+                    fd_s = x_cur[i] * fdw
+
+                    # Forward
+                    x_s[:] .= x_cur[:]
+                    x_s[i] += fd_s * 0.5
+                    fev!(x_s, rf)
+
+                    # Backward
+                    x_s[i] -= fd_s    # Only need to modify this level; rest were set during the forward phase
+                    fev!(x_s, rb)
+
+                    # Set jacobian
+                    for j in 1:arr_len  # for each r
+                        b_ful[j,i] = (rf[j] - rb[j]) / fd_s
+                    end 
+                end 
+                stepflags *= "Cd"
+
+            #    use forward difference method
+            else
+                for (i_sub,i_ful) in enumerate(map_sub)
+                    # Store base value 
+                    r_sub[i_sub] = r_cur[i_ful]
+
+                    # Calculate perturbation
+                    fd_s = x_cur[i_ful] * fdw
+    
+                    # Forward
+                    x_s[:] .= x_cur[:]
+                    x_s[i_ful] += fd_s
+                    fev!(x_s, rf)
+    
+                    # Set jacobian
+                    for (j_sub, j_ful) in enumerate(map_sub)  # for each r
+                        b_sub[j_sub,i_sub] =  (rf[j_ful] - r_cur[j_ful]) / fd_s
+                    end 
+                end 
+
+                stepflags *= "Fd"
+            end 
+
+            # display(r_sub)
 
             # Check if jacobian is singular 
-            if abs(det(b)) < 1.0e-80
+            if abs(det(b_sub)) < 1.0e-80
                 code = 2
                 @printf("\n")
                 break
@@ -403,12 +418,12 @@ module solver_nlsol
             x_old[:] = x_cur[:]
             if (method == 0) || (step <= 2)
                 # Newton-Raphson step 
-                x_dif = -b\r_cur
+                x_dsub = -b_sub\r_sub
                 stepflags *= "Nr"
 
             elseif method == 1
                 # Gauss-Newton step 
-                x_dif = -(b'*b) \ (b'*r_cur) 
+                x_dif = -(b_ful'*b_ful) \ (b_ful'*r_cur) 
                 stepflags *= "Gn"
 
             elseif method == 2
@@ -421,9 +436,15 @@ module solver_nlsol
                 end
 
                 #    Update our estimate of the solution
-                x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
+                x_dif = -(b_ful'*b_ful + lml * dtd) \ (b_ful' * r_cur)
                 stepflags *= "Lm"
             end
+
+            # Map to full matrix 
+            fill!(x_dif, 0.0)
+            for (i_sub,i_ful) in enumerate(map_sub) 
+                x_dif[i_ful] = x_dsub[i_sub]
+            end 
 
             # Limit step size according to atol,rtol
             x_dif[:] .= sign.(x_dif[:])  .* min.(abs.(x_dif[:]), x_old[:].*step_rtol .+ step_atol)
@@ -474,9 +495,6 @@ module solver_nlsol
 
         end # end solver loop
         
-        rm(path_prf, force=true)
-        rm(path_flx, force=true)
-        
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
@@ -485,6 +503,8 @@ module solver_nlsol
         if code == 0
             println("    success")
             atmos.is_converged = true
+            rm(path_prf, force=true)
+            rm(path_flx, force=true)
         elseif code == 1
             println("    failure (maximum iterations)")
         elseif code == 2
