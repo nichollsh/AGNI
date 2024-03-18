@@ -6,7 +6,7 @@
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
-ENV["GKSwstype"] = "100"
+ENV["GKSwstype"]="nul"
 
 println("Begin runaway demo")
 
