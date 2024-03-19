@@ -174,6 +174,30 @@ module setpt
         return nothing
     end
 
+    # Set atmosphere to have a log-linear T(p) profile
+    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp::Float64)
+
+        # Keep top_tmp below tstar value
+        top_tmp = min(top_tmp, atmos.tstar)
+
+        # Set surface and near-surface
+        atmos.tmpl[end] = atmos.tstar
+        atmos.tmpl[end-1] = atmos.tstar 
+
+        # Loop upwards from bottom of model, assuming temperatures are log-spaced
+        dtdi = (top_tmp - atmos.tstar)/(atmos.nlev_l-1)
+        for i in range(atmos.nlev_l-2,1,step=-1)
+            atmos.tmpl[i] = atmos.tmpl[i+1] + dtdi
+        end
+
+        # Set cell-centres 
+        atmos.tmp[1:end] .= 0.5 .* (atmos.tmpl[1:end-1] + atmos.tmpl[2:end])
+
+        atmosphere.calc_layer_props!(atmos)
+        return nothing
+    end
+
+
     # Ensure that the surface isn't supersaturated
     function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)
         if !(atmos.is_alloc && atmos.is_param) 

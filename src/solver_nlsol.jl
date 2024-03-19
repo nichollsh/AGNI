@@ -40,9 +40,9 @@ module solver_nlsol
     - `method::Int=0`                   numerical method (0: Newton-Raphson, 1: Gauss-Newton, 2: Levenberg-Marquardt)
     - `modplot::Int=0`                  iteration frequency at which to make plots
     - `stabilise_mlt::Bool=true`        stabilise convection by introducing it gradually
-    - `step_rtol::Float64=0.95`         step size: relative change in per-level temperature [dimensionless]
-    - `step_atol::Float64=1.0`          step size: absolute change in per-level temperature [K]
-    - `step_fact::Float64=8.0e4`        step size: scale factor for maximum per-level step [K^2]
+    - `step_rtol::Float64=1.0e-2`       step size: relative change in residuals [dimensionless]
+    - `step_atol::Float64=1.0e-1`       step size: absolute change in residuals [W m-2]
+    - `step_fact::Float64=8.0e4`        step size: scale factor for maximum per-level temperature step [K^2]
     - `conv_atol::Float64=1.0e-2`       convergence: absolute tolerance on per-level flux deviation [W m-2]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
@@ -51,7 +51,7 @@ module solver_nlsol
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=0,
                             modplot::Int=1, stabilise_mlt::Bool=true,
-                            step_rtol::Float64=0.95, step_atol::Float64=1.0, step_fact::Float64=8e4,
+                            step_rtol::Float64=1.0e-2, step_atol::Float64=1.0e-6, step_fact::Float64=8e4,
                             conv_atol::Float64=1.0e-2
                             )
 
@@ -93,7 +93,7 @@ module solver_nlsol
         fd_s::Float64           = 0.0                      # Row perturbation amount
 
         # Convective flux scale factor 
-        convect_sf::Float64 = 1.0e-7
+        convect_sf::Float64 = 1.0e-5
 
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
@@ -147,28 +147,14 @@ module solver_nlsol
                 atmosphere.mlt!(atmos)
 
                 # Stabilise?
-                if convect_sf < 1.0
-                    # scale convective flux 
-                    atmos.flux_c *= convect_sf
+                atmos.flux_c *= convect_sf
 
-                    # smooth profile so that it's locally convex
-                    flux_c_tmp = zeros(Float64, atmos.nlev_l)
-                    flux_c_tmp[:] .= atmos.flux_c[:]
-                    for i in 2:atmos.nlev_l-1
-                        avg = 0.5*(atmos.flux_c[i-1]+atmos.flux_c[i+1])
-                        if atmos.flux_c[i] < avg/100.0
-                            flux_c_tmp[i] = avg
-                        end
-
-                        # set mask=false where flux is small
-                        if atmos.flux_c[i] < 1.0e-5
-                            atmos.mask_c[i] = 0
-                        end 
-                    end 
-
-                    # write to atmos struct 
-                    atmos.flux_c[:] .= flux_c_tmp[:]
-                end
+                # Unmask where flux is small 
+                # for i in 1:atmos.nlev_c 
+                #     if atmos.flux_c[i]*atmos.flux_c[i+1] < 1.0e-3
+                #         atmos.mask_c[i] = 0
+                #     end 
+                # end 
 
                 # Add to total flux
                 atmos.flux_tot += atmos.flux_c
@@ -368,7 +354,7 @@ module solver_nlsol
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)               # Test for rejection residuals
         dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
-        c_old::Float64 = 0.0
+        c_cur::Float64 = 0.0    # current cost 
 
         # Final setup
         x_cur[:] .= x_ini[:]
@@ -378,7 +364,8 @@ module solver_nlsol
         fill!(r_cur, 1.0e99)
         fill!(r_old, 1.0e98)
 
-        # If not stabilising 
+        # Stabilise convection?
+        stabilise_mlt = stabilise_mlt && dry_convect
         if !stabilise_mlt
             convect_sf = 1.0
         end
@@ -422,11 +409,11 @@ module solver_nlsol
                 stepflags *= "Sc"
                 
                 # Check if sf needs to be increased
-                if c_old < 100.0*conv_atol
+                if c_cur < 100.0*conv_atol
                     if convect_sf < 1.0 
                         # increase sf - reduce stabilisation
-                        stepflags *= "R"
-                        convect_sf = min(1.0, convect_sf*3.0)
+                        stepflags *= "r"
+                        convect_sf = min(1.0, convect_sf*10.0)
                         println("convect_sf = $convect_sf")
                     else 
                         # already at 1 - stop stabilising entirely
@@ -449,8 +436,8 @@ module solver_nlsol
             end 
 
             # Check convergence
-            c_old = cost(r_cur)
-            if (c_old < conv_atol) && !stabilise_mlt
+            c_cur = cost(r_cur)
+            if (c_cur < conv_atol) && !stabilise_mlt
                 code = 0
                 @printf("\n")
                 break
@@ -489,9 +476,6 @@ module solver_nlsol
                 stepflags *= "Lm"
             end
 
-            # Limit step size according to atol,rtol (impacts low temperatures)
-            x_dif[:] .= sign.(x_dif[:])  .* min.(abs.(x_dif[:]), x_old[:].*step_rtol .+ step_atol)
-
             # Limit step size according to inverse temperature (impacts high temperatures)
             for i in 1:atmos.nlev_c 
                 x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
@@ -500,19 +484,21 @@ module solver_nlsol
                 end
             end 
 
-            clamp!(x_dif, -5, 5)
+            # Test new step 
+            x_cur[:] .= x_old[:] .+ x_dif[:]
+            _fev!(x_cur, r_tst)
 
-            # Overall this means that the per-level step is always constrained 
-            # to satisfy the following two inequalities 
-            # dx < x * rtol + atol 
-            # dx < fact/x 
-            # Which will lead to a peak step-size at temperatures ~300K, and 
-            # should prevent temperatures becoming negative or shooting off 
-            # to infinity in all cases.
-            # In addition, the step size is reduced further in convective regions 
-            # since convection is a very unstable condition for the model.
+            # Limit step size in regions where residuals have changed a lot and convection is occuring
+            # Otherwise, it's likely that the solver will skip-over the solution when it gets close, meaning that 
+            # instead of converging on the value it will forever bounce around it chaotically.
+            for i in 1:arr_len 
+                if (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
+                    x_dif[i] = clamp(x_dif[i], -5, 5)  # limit change to ±5 K
+                end 
+            end 
+            x_cur[:] .= x_old[:] .+ x_dif[:]
 
-            # Take step 
+            # Take the step 
             x_cur = x_old + x_dif
             _fev!(x_cur, r_cur)
 
@@ -571,16 +557,16 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
         loss_pct = loss/maximum(atmos.flux_tot)*100.0
-        @printf("    endpoint fluxes \n")
-        @printf("    rad_OLR   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
+        @printf("    summary \n")
+        @printf("    outgoing LW flux   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
         if (surf_state == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tstar)
-            @printf("    cond_skin = %+.2e W m-2 \n", F_skin)
+        @printf("    conduct. skin flux = %+.2e W m-2 \n", F_skin)
         end
-        @printf("    tot_TOA   = %+.2e W m-2     \n", atmos.flux_tot[1])
-        @printf("    tot_BOA   = %+.2e W m-2     \n", atmos.flux_tot[end])
-        @printf("    loss      = %+.2e W m-2     \n", loss)
-        @printf("    loss      = %+.2e %%        \n", loss_pct)
+        @printf("    total flux at TOA  = %+.2e W m-2     \n", atmos.flux_tot[1])
+        @printf("    total flux at BOA  = %+.2e W m-2     \n", atmos.flux_tot[end])
+        @printf("    column max. loss   = %+.2e W m-2  (%+.2e %%) \n", loss, loss_pct)
+        @printf("    final cost value   = %+.2e W m-2     \n", c_cur)
         @printf("\n")
 
         return atmos.is_converged

@@ -27,7 +27,7 @@ import solver_nlsol
 function main()
     # Configuration options
     tstar::Float64         = 3000.0    # Surface temperature [kelvin]
-    instellation::Float64  = 1000.0
+    instellation::Float64  = 2000.0
     albedo_b::Float64      = 0.1
     asf_sf::Float64        = 3.0/8.0
     radius::Float64        = 6.37e6    # metres
@@ -70,18 +70,18 @@ function main()
                             tmp_magma=3000.0,
                             tmp_floor=5.0,
                             tint=0.0,
-                            thermo_functions=false,
+                            thermo_functions=true,
                     )
     atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
     # Set PT profile 
     println("Setting initial T(p)")
     # setpt.fromcsv!(atmos,"pt.csv")
-    setpt.isothermal!(atmos, tstar*0.7)
+    # setpt.isothermal!(atmos, tstar*0.7)
     # setpt.prevent_surfsupersat!(atmos)
-    # setpt.dry_adiabat!(atmos)
+    setpt.dry_adiabat!(atmos)
     # setpt.condensing!(atmos, "H2O")
-    # setpt.stratosphere!(atmos, 800.0)
+    setpt.stratosphere!(atmos, 800.0)
 
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
@@ -101,13 +101,8 @@ function main()
 
     solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
                                 dry_convect=dry_convect, condensate=condensate,
-                                max_steps=2000, conv_atol=5.0e-1, method=0,
+                                max_steps=2000, conv_atol=1.0e-1, method=0,
                                 stabilise_mlt=true)
-
-    # import solver_optim
-    # solver_optim.solve_energy!(atmos, surf_state=surf_state, 
-    #                             dry_convect=dry_convect,
-    #                             max_steps=100, atol=1.0e-1)
 
     # Calculate LW and SW fluxes (once)
     atmosphere.radtrans!(atmos, true, calc_cf=true)
