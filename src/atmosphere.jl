@@ -277,14 +277,14 @@ module atmosphere
         atmos.thermo_funct  = thermo_functions
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
-        atmos.tmp_ceiling =     5000.0
+        atmos.tmp_ceiling =     2.0e4
 
-        atmos.nlev_c         =  max(nlev_centre,45)
+        atmos.nlev_c         =  max(nlev_centre,25)
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.tstar =           max(tstar, atmos.tmp_floor)
         atmos.tint =            max(0.0,tint)
-        atmos.grav_surf =       max(1.0e-4, gravity)
-        atmos.zenith_degrees =  max(min(zenith_degrees,89.5), 0.5)
+        atmos.grav_surf =       max(1.0e-7, gravity)
+        atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.instellation =    max(instellation, 0.0)
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
@@ -1547,9 +1547,6 @@ module atmosphere
             itp = Interpolator(log.(atmos.pl), atmos.tmpl)  
             atmos.tmp[:] .= itp.(log.(atmos.p[:]))
         end
-
-        # Limit domain
-        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
 
         return nothing
     end 
