@@ -38,6 +38,7 @@ module solver_nlsol
     - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
     - `method::Int=2`                   numerical method (1: Brute-Force, 2: Newton-Raphson, 3: Gauss-Newton, 4: Levenberg-Marquardt)
+    - `linesearch::Bool=true`           use a simple linesearch algorithm to determine the best step size
     - `modplot::Int=0`                  iteration frequency at which to make plots
     - `stabilise_mlt::Bool=true`        stabilise convection by introducing it gradually
     - `step_rtol::Float64=1.0e-2`       step size: relative change in residuals [dimensionless]
@@ -49,7 +50,8 @@ module solver_nlsol
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
-                            fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=2,
+                            fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
+                            method::Int=2, linesearch::Bool=true,
                             modplot::Int=1, stabilise_mlt::Bool=true,
                             step_rtol::Float64=1.0e-2, step_atol::Float64=1.0e-6, step_fact::Float64=8e4,
                             conv_atol::Float64=1.0e-2
@@ -149,13 +151,6 @@ module solver_nlsol
                 # Stabilise?
                 atmos.flux_c *= convect_sf
 
-                # Unmask where flux is small 
-                # for i in 1:atmos.nlev_c 
-                #     if atmos.flux_c[i]*atmos.flux_c[i+1] < 1.0e-3
-                #         atmos.mask_c[i] = 0
-                #     end 
-                # end 
-
                 # Add to total flux
                 atmos.flux_tot += atmos.flux_c
             end
@@ -224,7 +219,7 @@ module solver_nlsol
         end  # end fev
 
         # Calculate the jacobian and residuals at x using a central-difference method
-        function calc_jac_res_cendiff!(x::Array, jacob::Array, resid::Array)
+        function _calc_jac_res_cendiff!(x::Array, jacob::Array, resid::Array)
 
             # Evalulate residuals at x
             _fev!(x, resid)
@@ -253,7 +248,7 @@ module solver_nlsol
         end # end jr_cd
 
         # Calculate the jacobian and residuals at x using a forward-difference method
-        function calc_jac_res_fordiff!(x::Array, jacob::Array, resid::Array)
+        function _calc_jac_res_fordiff!(x::Array, jacob::Array, resid::Array)
 
             # Evalulate residuals at x
             _fev!(x, resid)
@@ -278,7 +273,7 @@ module solver_nlsol
         end # end jr_fd
 
         # Cost function 
-        function cost(_r::Array)
+        function _cost(_r::Array)
             return norm(_r)
         end 
 
@@ -347,7 +342,7 @@ module solver_nlsol
         r_old_2nm::Float64 =    0.02    # Previous ^
 
 
-        # Work variables
+        # Solver variables
         b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
         x_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Current best solution (i)
         x_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Previous best solution (i-1)
@@ -356,8 +351,14 @@ module solver_nlsol
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)               # Test for rejection residuals
         dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
-        c_cur::Float64 = Inf    # current cost 
-        c_old::Float64 = Inf    # old cost
+        c_cur::Float64 = Inf        # current cost (i)
+        c_old::Float64 = Inf        # old cost (i-1)
+
+        # Linesearch variables
+        ls_scale::Float64 = 1.0     # best scale factor for linesearch 
+        ls_bestc::Float64 = Inf     # best cost found using linesearch        
+        ls_lastc::Float64 = Inf     # last cost found using linesearch
+        ls_trysf::Array{Float64,1} = [0.1, 0.3, 0.8, 1.0]
 
         # Final setup
         x_cur[:] .= x_ini[:]
@@ -404,7 +405,7 @@ module solver_nlsol
             #     Sc,R       = stabilise convection, reduced this step
             #     Cd, Fd     = finite differencing type 
             #     Nr, Gn, Lm = stepping algorithm
-            #     P          = made plot
+            #     Ls         = linesearch active
             stepflags::String = ""
 
             # Check convective stabilisation
@@ -434,16 +435,16 @@ module solver_nlsol
             # Evaluate jacobian and residuals
             r_old[:] .= r_cur[:]
             if use_cendiff || (step == 1)
-                calc_jac_res_cendiff!(x_cur, b, r_cur) 
+                _calc_jac_res_cendiff!(x_cur, b, r_cur) 
                 stepflags *= "Cd"
             else
-                calc_jac_res_fordiff!(x_cur, b, r_cur) 
+                _calc_jac_res_fordiff!(x_cur, b, r_cur) 
                 stepflags *= "Fd"
             end 
 
             # Check convergence
             c_old = c_cur
-            c_cur = cost(r_cur)
+            c_cur = _cost(r_cur)
             if (c_cur < conv_atol) && !stabilise_mlt
                 code = 0
                 @printf("\n")
@@ -462,7 +463,7 @@ module solver_nlsol
             if method == 1
                 # Brute-Force step
                 stepflags *= "Bf"
-                error("Not yet implemented")
+                error("Brute-Force method is not yet implemented")
 
             elseif (method == 2) || (step <= 2)
                 # Newton-Raphson step 
@@ -495,23 +496,47 @@ module solver_nlsol
                     x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
                 end 
 
+                # Linesearch 
+                if linesearch 
+                    stepflags *= "Ls"
+                    ls_bestc = Inf 
+                    ls_lastc = Inf
+                    for sf in ls_trysf
+                        
+                        # set variables using this scale factor 
+                        x_cur[:] .= x_old[:] .+ (sf .* x_dif[:])
+
+                        # test step 
+                        _fev!(x_cur, r_tst)
+
+                        # improvement?
+                        ls_lastc = _cost(r_tst)
+                        if ls_lastc < ls_bestc  # improved upon last scale factor
+                            ls_scale = sf 
+                            ls_bestc = ls_lastc
+                        end   
+                    end 
+                    println("linesearch with sf=$ls_scale")
+                    x_dif[:] .*= ls_scale  # scale dx by best scale factor
+                end 
+
                 # Test new step 
-                x_cur[:] .= x_old[:] .+ x_dif[:]
-                _fev!(x_cur, r_tst)
+                # x_cur[:] .= x_old[:] .+ x_dif[:]
+                # _fev!(x_cur, r_tst)
 
                 # Limit step size in regions where residuals have changed a lot AND convection is occuring
                 # Otherwise, it's likely that the solver will skip-over the solution when it gets close, meaning that 
                 # instead of converging on the value it will forever bounce around it chaotically.
-                for i in 1:arr_len 
-                    if (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
-                        # If not stabilising, reduce step by 10x 
-                        if (!stabilise_mlt) || (i>atmos.nlev_c)
-                            x_dif[i] *= 0.1
-                        end
-                        # Limit step to ±5 K
-                        x_dif[i] = clamp(x_dif[i], -5, 5)
-                    end 
-                end 
+                # for i in 1:arr_len 
+                #     if (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
+                #         # If not stabilising, reduce step by 10x 
+                #         if (!stabilise_mlt) || (i>atmos.nlev_c)
+                #             x_dif[i] *= 0.1
+                #         end
+                #         # Limit step to ±5 K
+                #         x_dif[i] = clamp(x_dif[i], -5, 5)
+                #     end 
+                # end 
             end 
 
             # Take the step 
@@ -531,7 +556,6 @@ module solver_nlsol
             # Plot
             if modplot > 0
                 if mod(step, modplot) == 0
-                    stepflags *= "P"
                     plotting.plot_pt(atmos,     path_prf, incl_magma=(surf_state==2))
                     plotting.plot_fluxes(atmos, path_flx, incl_int=(surf_state==3))
                 end 
