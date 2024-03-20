@@ -70,7 +70,7 @@ function main()
                             tmp_magma=3000.0,
                             tmp_floor=5.0,
                             tint=0.0,
-                            thermo_functions=true,
+                            thermo_functions=false,
                     )
     atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
