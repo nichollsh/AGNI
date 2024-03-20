@@ -324,7 +324,8 @@ module solver_nlsol
         # Solver loop
         # ---------------------------------------------------------- 
         # Execution variables
-        modprint::Int =     1       # Print frequency
+        modprint::Int =         1       # Print frequency
+        x_dif_clip::Float64 =   300.0   # Maximum allowed step size
         
         # Tracking variables
         step::Int =         0       # Step number
@@ -353,12 +354,13 @@ module solver_nlsol
         dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
         c_cur::Float64 = Inf        # current cost (i)
         c_old::Float64 = Inf        # old cost (i-1)
+        x_dif_clip_step::Float64 = Inf # maximum step size (IN THIS STEP)
 
-        # Linesearch variables
-        ls_scale::Float64 = 1.0     # best scale factor for linesearch 
-        ls_bestc::Float64 = Inf     # best cost found using linesearch        
-        ls_lastc::Float64 = Inf     # last cost found using linesearch
-        ls_trysf::Array{Float64,1} = [0.1, 0.3, 0.8, 1.0]
+        # Linesearch parameters
+        ls_scale::Float64       = 1.0     # best scale factor for linesearch 
+        ls_test_cost::Float64   = Inf 
+        ls_best_cost::Float64   = Inf 
+        ls_best_scale::Float64  = 1.0 
 
         # Final setup
         x_cur[:] .= x_ini[:]
@@ -459,13 +461,14 @@ module solver_nlsol
             end 
 
             # Model step 
+            x_dif_clip_step = x_dif_clip
             x_old[:] = x_cur[:]
             if method == 1
                 # Brute-Force step
                 stepflags *= "Bf"
                 error("Brute-Force method is not yet implemented")
 
-            elseif (method == 2) || (step <= 2)
+            elseif (method == 2)
                 # Newton-Raphson step 
                 x_dif = -b\r_cur
                 stepflags *= "Nr"
@@ -492,52 +495,54 @@ module solver_nlsol
             # If not using brute force, limit step size
             if method != 1
                 # Limit step size according to inverse temperature (impacts high temperatures)
-                for i in 1:atmos.nlev_c 
-                    x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
-                end 
+                # for i in 1:atmos.nlev_c 
+                #     x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
+                # end 
 
                 # Linesearch 
-                if linesearch 
-                    stepflags *= "Ls"
-                    ls_bestc = Inf 
-                    ls_lastc = Inf
-                    for sf in ls_trysf
-                        
-                        # set variables using this scale factor 
-                        x_cur[:] .= x_old[:] .+ (sf .* x_dif[:])
+                if linesearch && (step > 2)
 
-                        # test step 
+                    # Reset
+                    stepflags *= "Ls"
+                    ls_best_cost = Inf
+                    ls_best_scale = 1.0
+
+                    for ls_scale in [0.3, 0.5, 0.8, 1.0] 
+                        # try this scale factor 
+                        x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
                         _fev!(x_cur, r_tst)
 
-                        # improvement?
-                        ls_lastc = _cost(r_tst)
-                        if ls_lastc < ls_bestc  # improved upon last scale factor
-                            ls_scale = sf 
-                            ls_bestc = ls_lastc
-                        end   
+                        # test improvement
+                        ls_test_cost = _cost(r_tst)
+                        if ls_test_cost < ls_best_cost 
+                            ls_best_scale = ls_scale 
+                            ls_best_cost = ls_test_cost 
+                        end 
                     end 
-                    println("linesearch with sf=$ls_scale")
-                    x_dif[:] .*= ls_scale  # scale dx by best scale factor
-                end 
+
+                    # apply best linesearch scale 
+                    x_dif[:] .*= ls_best_scale
+
+                end # end linesearch 
 
                 # Test new step 
-                # x_cur[:] .= x_old[:] .+ x_dif[:]
-                # _fev!(x_cur, r_tst)
+                x_cur[:] .= x_old[:] .+ x_dif[:]
+                _fev!(x_cur, r_tst)
 
-                # Limit step size in regions where residuals have changed a lot AND convection is occuring
-                # Otherwise, it's likely that the solver will skip-over the solution when it gets close, meaning that 
-                # instead of converging on the value it will forever bounce around it chaotically.
+                # If convection stabilisation is disabled, check if this step would make the residuals worse.
+                # If so, limit the maximum step size to a small value, maintaining the same descent direction.
                 # for i in 1:arr_len 
-                #     if (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
-                #         # If not stabilising, reduce step by 10x 
-                #         if (!stabilise_mlt) || (i>atmos.nlev_c)
-                #             x_dif[i] *= 0.1
-                #         end
-                #         # Limit step to ±5 K
-                #         x_dif[i] = clamp(x_dif[i], -5, 5)
+                #     if !stabilise_mlt && (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
+                #         x_dif_clip_step = 1.0e-2
+                #         break
                 #     end 
                 # end 
             end 
+
+            # Limit step size globally
+            if maximum(abs.(x_dif[:])) > x_dif_clip_step
+                x_dif[:] .*= x_dif_clip_step ./ maximum(abs.(x_dif[:]))
+            end
 
             # Take the step 
             x_cur[:] .= x_old[:] .+ x_dif[:]
