@@ -103,7 +103,6 @@ module solver_nlsol
             for i in 1:atmos.nlev_c
                 atmos.tmp[i] = _x[i]
             end
-            clamp!(atmos.tmp, atmos.tmp_floor+1.0, atmos.tmp_ceiling-1.0)
 
             # Interpolate temperature to cell-edge values (not incl. bottommost value)
             atmosphere.set_tmpl_from_tmp!(atmos)
@@ -194,7 +193,6 @@ module solver_nlsol
                     f = resid[i]
                     resid[i] = f * g
                     if atmos.tmp[i] < Tsat
-                        println("Condensing at level $i")
                         atmos.mask_p[i] = atmos.mask_decay 
                         prate[i]        = -1.0 * f / ( phys.lookup_safe("l_vap",condensate) * (atmos.zl[i] - atmos.zl[i+1])) * 86.4 # g cm-3 day-1
                         atmos.re[i]     = 1.0e-5  # 10 micron droplets
@@ -546,6 +544,7 @@ module solver_nlsol
 
             # Take the step 
             x_cur[:] .= x_old[:] .+ x_dif[:]
+            clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
             _fev!(x_cur, r_cur)
 
             # Model statistics 

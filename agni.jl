@@ -26,7 +26,7 @@ import solver_nlsol
 
 function main()
     # Configuration options
-    tstar::Float64         = 3000.0    # Surface temperature [kelvin]
+    tstar::Float64         = 1000.0    # Surface temperature [kelvin]
     instellation::Float64  = 2000.0
     albedo_b::Float64      = 0.1
     asf_sf::Float64        = 3.0/8.0
@@ -90,7 +90,7 @@ function main()
     # Call solver(s)
     dry_convect = true
     condensate  = ""
-    surf_state  = 0
+    surf_state  = 3
 
     # solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
     #                             modplot=100, modprop=5, verbose=true, 
