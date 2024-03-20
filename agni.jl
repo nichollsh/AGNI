@@ -101,7 +101,7 @@ function main()
 
     solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
                                 dry_convect=dry_convect, condensate=condensate,
-                                max_steps=2000, conv_atol=1.0e-1, method=0,
+                                max_steps=2000, conv_atol=1.0e-1, method=2,
                                 stabilise_mlt=true)
 
     # Calculate LW and SW fluxes (once)

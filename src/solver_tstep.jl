@@ -8,9 +8,6 @@ end
 
 module solver_tstep
 
-    # Include libraries
-    include("../socrates/julia/src/SOCRATES.jl")
-
     using Printf
     using Statistics
     using Revise

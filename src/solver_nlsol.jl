@@ -37,7 +37,7 @@ module solver_nlsol
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
-    - `method::Int=0`                   numerical method (0: Newton-Raphson, 1: Gauss-Newton, 2: Levenberg-Marquardt)
+    - `method::Int=2`                   numerical method (1: Brute-Force, 2: Newton-Raphson, 3: Gauss-Newton, 4: Levenberg-Marquardt)
     - `modplot::Int=0`                  iteration frequency at which to make plots
     - `stabilise_mlt::Bool=true`        stabilise convection by introducing it gradually
     - `step_rtol::Float64=1.0e-2`       step size: relative change in residuals [dimensionless]
@@ -49,7 +49,7 @@ module solver_nlsol
                             surf_state::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
-                            fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=0,
+                            fdw::Float64=1.0e-4, use_cendiff::Bool=false, method::Int=2,
                             modplot::Int=1, stabilise_mlt::Bool=true,
                             step_rtol::Float64=1.0e-2, step_atol::Float64=1.0e-6, step_fact::Float64=8e4,
                             conv_atol::Float64=1.0e-2
@@ -286,11 +286,13 @@ module solver_nlsol
         # ----------------------------------------------------------
         # Setup initial guess
         # ---------------------------------------------------------- 
-        if method == 0
-            println("Begin Newton-Raphson iterations") 
-        elseif method == 1
-            println("Begin Gauss-Newton iterations") 
+        if method == 1
+            println("Begin Brute-Force iterations")
         elseif method == 2
+            println("Begin Newton-Raphson iterations") 
+        elseif method == 3
+            println("Begin Gauss-Newton iterations") 
+        elseif method == 4
             println("Begin Levenberg-Marquardt iterations") 
         else 
             error("Invalid method choice ($method)")
@@ -354,7 +356,8 @@ module solver_nlsol
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)               # Test for rejection residuals
         dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
-        c_cur::Float64 = 0.0    # current cost 
+        c_cur::Float64 = Inf    # current cost 
+        c_old::Float64 = Inf    # old cost
 
         # Final setup
         x_cur[:] .= x_ini[:]
@@ -398,9 +401,10 @@ module solver_nlsol
             end
 
             # Reset flags 
+            #     Sc,R       = stabilise convection, reduced this step
             #     Cd, Fd     = finite differencing type 
             #     Nr, Gn, Lm = stepping algorithm
-            #     Sc,R       = stabilise convection, reduced this step
+            #     P          = made plot
             stepflags::String = ""
 
             # Check convective stabilisation
@@ -409,15 +413,17 @@ module solver_nlsol
                 stepflags *= "Sc"
                 
                 # Check if sf needs to be increased
-                if c_cur < 100.0*conv_atol
+                if c_cur < max(100.0*conv_atol, 10.0)
                     if convect_sf < 1.0 
-                        # increase sf - reduce stabilisation
+                        # increase sf - reduce stabilisation by 10x
                         stepflags *= "r"
                         convect_sf = min(1.0, convect_sf*10.0)
                         println("convect_sf = $convect_sf")
-                    else 
-                        # already at 1 - stop stabilising entirely
-                        stabilise_mlt = false
+                        
+                        # done stabilising 
+                        if convect_sf > 0.99
+                            stabilise_mlt = false 
+                        end
                     end 
                 end
             else
@@ -436,6 +442,7 @@ module solver_nlsol
             end 
 
             # Check convergence
+            c_old = c_cur
             c_cur = cost(r_cur)
             if (c_cur < conv_atol) && !stabilise_mlt
                 code = 0
@@ -452,17 +459,22 @@ module solver_nlsol
 
             # Model step 
             x_old[:] = x_cur[:]
-            if (method == 0) || (step <= 2)
+            if method == 1
+                # Brute-Force step
+                stepflags *= "Bf"
+                error("Not yet implemented")
+
+            elseif (method == 2) || (step <= 2)
                 # Newton-Raphson step 
                 x_dif = -b\r_cur
                 stepflags *= "Nr"
 
-            elseif method == 1
+            elseif method == 3
                 # Gauss-Newton step 
                 x_dif = -(b'*b) \ (b'*r_cur) 
                 stepflags *= "Gn"
 
-            elseif method == 2
+            elseif method == 4
                 # Levenberg-Marquardt step
                 #    Calculate damping parameter ("delayed gratification")
                 if r_cur_2nm < r_old_2nm
@@ -476,30 +488,34 @@ module solver_nlsol
                 stepflags *= "Lm"
             end
 
-            # Limit step size according to inverse temperature (impacts high temperatures)
-            for i in 1:atmos.nlev_c 
-                x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
-                if atmos.mask_c[i]>0
-                    x_dif[i] *= 0.1
-                end
-            end 
+            # If not using brute force, limit step size
+            if method != 1
+                # Limit step size according to inverse temperature (impacts high temperatures)
+                for i in 1:atmos.nlev_c 
+                    x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
+                end 
 
-            # Test new step 
-            x_cur[:] .= x_old[:] .+ x_dif[:]
-            _fev!(x_cur, r_tst)
+                # Test new step 
+                x_cur[:] .= x_old[:] .+ x_dif[:]
+                _fev!(x_cur, r_tst)
 
-            # Limit step size in regions where residuals have changed a lot and convection is occuring
-            # Otherwise, it's likely that the solver will skip-over the solution when it gets close, meaning that 
-            # instead of converging on the value it will forever bounce around it chaotically.
-            for i in 1:arr_len 
-                if (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
-                    x_dif[i] = clamp(x_dif[i], -5, 5)  # limit change to ±5 K
+                # Limit step size in regions where residuals have changed a lot AND convection is occuring
+                # Otherwise, it's likely that the solver will skip-over the solution when it gets close, meaning that 
+                # instead of converging on the value it will forever bounce around it chaotically.
+                for i in 1:arr_len 
+                    if (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
+                        # If not stabilising, reduce step by 10x 
+                        if (!stabilise_mlt) || (i>atmos.nlev_c)
+                            x_dif[i] *= 0.1
+                        end
+                        # Limit step to ±5 K
+                        x_dif[i] = clamp(x_dif[i], -5, 5)
+                    end 
                 end 
             end 
-            x_cur[:] .= x_old[:] .+ x_dif[:]
 
             # Take the step 
-            x_cur = x_old + x_dif
+            x_cur[:] .= x_old[:] .+ x_dif[:]
             _fev!(x_cur, r_cur)
 
             # Model statistics 
@@ -515,6 +531,7 @@ module solver_nlsol
             # Plot
             if modplot > 0
                 if mod(step, modplot) == 0
+                    stepflags *= "P"
                     plotting.plot_pt(atmos,     path_prf, incl_magma=(surf_state==2))
                     plotting.plot_fluxes(atmos, path_flx, incl_int=(surf_state==3))
                 end 
