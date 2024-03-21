@@ -26,15 +26,15 @@ import solver_nlsol
 
 function main()
     # Configuration options
-    tstar::Float64         = 1000.0    # Surface temperature [kelvin]
-    instellation::Float64  = 2000.0
+    tstar::Float64         = 2800.0    # Surface temperature [kelvin]
+    instellation::Float64  = 1200.0
     albedo_b::Float64      = 0.1
     asf_sf::Float64        = 3.0/8.0
     radius::Float64        = 6.37e6    # metres
     zenith::Float64        = 48.19
     gravity::Float64       = 9.81      # m s-2
-    nlev_centre::Int       = 30  
-    p_surf::Float64        = 280.0    # bar
+    nlev_centre::Int       = 100  
+    p_surf::Float64        = 300.0    # bar
     p_top::Float64         = 1e-5      # bar 
     mf_dict                = Dict([
                                 ("H2O" , 1.0),
@@ -80,8 +80,8 @@ function main()
     # setpt.isothermal!(atmos, tstar*0.7)
     # setpt.prevent_surfsupersat!(atmos)
     setpt.dry_adiabat!(atmos)
-    # setpt.condensing!(atmos, "H2O")
-    setpt.stratosphere!(atmos, 800.0)
+    setpt.condensing!(atmos, "H2O")
+    # setpt.stratosphere!(atmos, 800.0)
 
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
@@ -99,10 +99,10 @@ function main()
     #                             max_steps=400, min_steps=100, use_mlt=true)
 
 
-    solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
-                                dry_convect=dry_convect, condensate=condensate,
-                                max_steps=2000, conv_atol=1.0e-1, method=2,
-                                stabilise_mlt=true)
+    # solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+    #                             dry_convect=dry_convect, condensate=condensate,
+    #                             max_steps=2000, conv_atol=1.0e-1, method=2,
+    #                             stabilise_mlt=true)
 
     # Calculate LW and SW fluxes (once)
     atmosphere.radtrans!(atmos, true, calc_cf=true)

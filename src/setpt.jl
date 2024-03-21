@@ -248,41 +248,25 @@ module setpt
             error("Atmosphere is not setup or allocated")
         end 
 
+        # gas is present?
+        if !(gas in atmos.gases)
+            return nothing
+        end
+
+        # gas has thermodynamics setup?
         if phys.lookup_safe("L_vap",gas) < 1e-20
             return nothing
         end
-        
-        i_gas = findfirst(==(gas), atmos.gases)
 
-        # Check if each level is condensing. If it is, place on phase curve
-        for i in 1:atmos.nlev_c
+        # apply condensation curve 
+        atmosphere.apply_vlcc!(atmos, gas)
 
-            x = atmos.layer_x[i,i_gas]
-            if x < 1.0e-10 
-                continue
-            end
+        # apply cloud 
+        atmosphere.water_cloud!(atmos)
 
-            # Cell centre
-            Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
-            if atmos.tmp[i] < Tsat
-                atmos.tmp[i] = Tsat
-                atmos.re[i]   = 1.0e-5  # 10 micron droplets
-                atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
-                atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
-            else 
-                atmos.re[i]   = 0.0
-                atmos.lwm[i]  = 0.0
-                atmos.clfr[i] = 0.0
-            end
-                
-            # Cell edge
-            Tsat = phys.calc_Tdew(gas,atmos.pl[i] * x )
-            if atmos.tmpl[i] < Tsat
-                atmos.tmpl[i] = Tsat
-            end
-        end
-
+        # calculate properties 
         atmosphere.calc_layer_props!(atmos)
+
         return nothing
     end
 
