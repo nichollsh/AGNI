@@ -99,10 +99,10 @@ function main()
     #                             max_steps=400, min_steps=100, use_mlt=true)
 
 
-    # solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
-    #                             dry_convect=dry_convect, condensate=condensate,
-    #                             max_steps=2000, conv_atol=1.0e-1, method=2,
-    #                             stabilise_mlt=true)
+    solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+                                dry_convect=dry_convect, condensate=condensate,
+                                max_steps=2000, conv_atol=1.0e-1, method=1,
+                                stabilise_mlt=true)
 
     # Calculate LW and SW fluxes (once)
     atmosphere.radtrans!(atmos, true, calc_cf=true)
@@ -126,7 +126,7 @@ function main()
     plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
     plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(surf_state==2))
     plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"))
-    plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"), planck_tmp=atmos.tstar)
+    plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"))
     plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.png"))
 
     # Deallocate atmosphere
