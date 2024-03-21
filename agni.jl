@@ -27,14 +27,14 @@ import solver_nlsol
 function main()
     # Configuration options
     tstar::Float64         = 2800.0    # Surface temperature [kelvin]
-    instellation::Float64  = 9000.0
+    instellation::Float64  = 2000.0
     albedo_b::Float64      = 0.1
     asf_sf::Float64        = 3.0/8.0
     radius::Float64        = 6.37e6    # metres
     zenith::Float64        = 48.19
     gravity::Float64       = 9.81      # m s-2
     nlev_centre::Int       = 100  
-    p_surf::Float64        = 300.0    # bar
+    p_surf::Float64        = 10.0    # bar
     p_top::Float64         = 1e-5      # bar 
     mf_dict                = Dict([
                                 ("H2O" , 1.0),
@@ -62,8 +62,8 @@ function main()
                             nlev_centre, p_surf, p_top,
                             mf_dict=mf_dict,
                             flag_gcontinuum=true,
-                            flag_rayleigh=false,
-                            flag_cloud=true,
+                            flag_rayleigh=true,
+                            flag_cloud=false,
                             overlap_method=4,
                             skin_d=0.01,
                             skin_k=2.0,
