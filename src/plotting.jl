@@ -313,7 +313,7 @@ module plotting
     """
     Plot emission spectrum at the TOA
     """
-    function plot_emission(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, planck_tmp::Float64=0.0)
+    function plot_emission(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_surf::Bool=true)
 
         # Check that we have data 
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -335,10 +335,11 @@ module plotting
         end
 
         # Get planck function values 
-        nsamps = 300
-        xp = 10 .^ range( log10(xe[1]), stop=log10(xe[end]), length=nsamps)
-        yp = zeros(Float64, nsamps)
-        if planck_tmp > 1.0 
+        if incl_surf
+            planck_tmp::Float64 = atmos.tstar
+            nsamps::Int = 300
+            xp = 10 .^ range( log10(xe[1]), stop=log10(xe[end]), length=nsamps)
+            yp = zeros(Float64, nsamps)
             for i in 1:nsamps 
                 lambda = xp[i] * 1.0e-9 # metres
 
@@ -356,7 +357,7 @@ module plotting
         # Make plot
         plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
 
-        if planck_tmp > 1.0
+        if incl_surf
             plot!(plt, xp, yp, label="Surface",  color="brown3") # surface planck function
         end
         plot!(plt, xe, ye, label="Outgoing spectrum", color="black")  # emission spectrum

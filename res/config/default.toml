@@ -40,7 +40,7 @@ title = "Default"
     dry_convection  = "mlt"
     condensates     = []
     surf_state      = 0
-    solvers         = ["brute","nlsol"]
+    solvers         = ["nlsol"]
     stabilise       = true
 
 [plots]

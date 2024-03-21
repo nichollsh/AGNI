@@ -28,8 +28,8 @@ module atmosphere
     import phys
     import spectrum
 
-    AGNI_VERSION     = "0.1"
-    SOCRATES_VERSION = "2306"
+    AGNI_VERSION     = "0.2"
+    SOCRATES_VERSION = "2311"
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
@@ -696,9 +696,6 @@ module atmosphere
 
         # Insert stellar spectrum 
         if !spfile_has_star
-            # println("Python: inserting stellar spectrum")
-            # runfile = joinpath([atmos.ROOT_DIR, "src", "insert_stellar.py"])
-            # run(`python $runfile $(stellar_spectrum) $(atmos.spectral_file) $(spectral_file_run)`)
             wl, fl = spectrum.load_from_file(atmos.star_file)
             spectrum.write_to_socrates_format(wl, fl, socstar)
             spectrum.insert_stellar_spectrum(atmos.spectral_file, socstar, spectral_file_run)
@@ -712,7 +709,6 @@ module atmosphere
 
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
-            println("Python: inserting rayleigh scattering")
             co2_x = get_x(atmos, "CO2", -1) 
             n2_x  = get_x(atmos, "N2" , -1)
             h2o_x = get_x(atmos, "H2O", -1)
