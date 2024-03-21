@@ -31,14 +31,14 @@ albedo          = 0.18
 zenith          = 48.19
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
-nlev_centre     = 60  
+nlev_centre     = 30  
 p_surf          = 270.0    # bar
 p_top           = 1e-5      # bar 
 mf_dict         = Dict([
                         ("H2O" , 1.0),
                         ])
 
-spfile_name   = "res/spectral_files/Oak/Oak.sf"
+spfile_name   = "res/spectral_files/Frostflow/256/Frostflow.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir    = "out/"
 
@@ -57,6 +57,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=4,
                          tmp_floor=2.0,
                          thermo_functions=false,
+                         tint=0.0
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
@@ -73,13 +74,11 @@ end
 println("Running model...")
 
 # Call solver(s)
-dry_convect = true
-surf_state  = 0
-
 import solver_nlsol
-solver_nlsol.solve_energy!(atmos, surf_state=surf_state,
-                            dry_convect=dry_convect,
-                            max_steps=100, method=2)
+solver_nlsol.solve_energy!(atmos, surf_state=3, 
+                                dry_convect=true, condensate="",
+                                max_steps=2000, conv_atol=1.0e-2, method=1,
+                                stabilise_mlt=true)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))

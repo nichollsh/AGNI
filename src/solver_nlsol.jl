@@ -1,4 +1,4 @@
-# Contains code for obtaining energy balance (CVODE method)
+# Contains code for obtaining energy balance (nonlinear method)
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
@@ -37,7 +37,7 @@ module solver_nlsol
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
-    - `method::Int=2`                   numerical method (1: Brute-Force, 2: Newton-Raphson, 3: Gauss-Newton, 4: Levenberg-Marquardt)
+    - `method::Int=1`                   numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `linesearch::Bool=true`           use a simple linesearch algorithm to determine the best step size
     - `modplot::Int=0`                  iteration frequency at which to make plots
     - `stabilise_mlt::Bool=true`        stabilise convection by introducing it gradually
@@ -51,7 +51,7 @@ module solver_nlsol
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
-                            method::Int=2, linesearch::Bool=true,
+                            method::Int=1, linesearch::Bool=true,
                             modplot::Int=1, stabilise_mlt::Bool=true,
                             step_rtol::Float64=1.0e-2, step_atol::Float64=1.0e-6, step_fact::Float64=8e4,
                             conv_atol::Float64=1.0e-2
@@ -280,12 +280,10 @@ module solver_nlsol
         # Setup initial guess
         # ---------------------------------------------------------- 
         if method == 1
-            println("Begin Brute-Force iterations")
-        elseif method == 2
             println("Begin Newton-Raphson iterations") 
-        elseif method == 3
+        elseif method == 2
             println("Begin Gauss-Newton iterations") 
-        elseif method == 4
+        elseif method == 3
             println("Begin Levenberg-Marquardt iterations") 
         else 
             error("Invalid method choice ($method)")
@@ -461,22 +459,17 @@ module solver_nlsol
             # Model step 
             x_dif_clip_step = x_dif_clip
             x_old[:] = x_cur[:]
-            if method == 1
-                # Brute-Force step
-                stepflags *= "Bf"
-                error("Brute-Force method is not yet implemented")
-
-            elseif (method == 2)
+            if (method == 1)
                 # Newton-Raphson step 
                 x_dif = -b\r_cur
                 stepflags *= "Nr"
 
-            elseif method == 3
+            elseif method == 2
                 # Gauss-Newton step 
                 x_dif = -(b'*b) \ (b'*r_cur) 
                 stepflags *= "Gn"
 
-            elseif method == 4
+            elseif method == 3
                 # Levenberg-Marquardt step
                 #    Calculate damping parameter ("delayed gratification")
                 if r_cur_2nm < r_old_2nm
@@ -490,52 +483,49 @@ module solver_nlsol
                 stepflags *= "Lm"
             end
 
-            # If not using brute force, limit step size
-            if method != 1
-                # Limit step size according to inverse temperature (impacts high temperatures)
-                # for i in 1:atmos.nlev_c 
-                #     x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
-                # end 
+            # Limit step size according to inverse temperature (impacts high temperatures)
+            # for i in 1:atmos.nlev_c 
+            #     x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
+            # end 
 
-                # Linesearch 
-                if linesearch && (step > 2)
+            # Linesearch 
+            if linesearch && (step > 2)
 
-                    # Reset
-                    stepflags *= "Ls"
-                    ls_best_cost = Inf
-                    ls_best_scale = 1.0
+                # Reset
+                stepflags *= "Ls"
+                ls_best_cost = Inf
+                ls_best_scale = 1.0
 
-                    for ls_scale in [0.3, 0.5, 0.8, 1.0] 
-                        # try this scale factor 
-                        x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
-                        _fev!(x_cur, r_tst)
+                for ls_scale in [0.3, 0.5, 0.8, 1.0] 
+                    # try this scale factor 
+                    x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
+                    _fev!(x_cur, r_tst)
 
-                        # test improvement
-                        ls_test_cost = _cost(r_tst)
-                        if ls_test_cost < ls_best_cost 
-                            ls_best_scale = ls_scale 
-                            ls_best_cost = ls_test_cost 
-                        end 
+                    # test improvement
+                    ls_test_cost = _cost(r_tst)
+                    if ls_test_cost < ls_best_cost 
+                        ls_best_scale = ls_scale 
+                        ls_best_cost = ls_test_cost 
                     end 
+                end 
 
-                    # apply best linesearch scale 
-                    x_dif[:] .*= ls_best_scale
+                # apply best linesearch scale 
+                x_dif[:] .*= ls_best_scale
 
-                end # end linesearch 
+            end # end linesearch 
 
-                # Test new step 
-                x_cur[:] .= x_old[:] .+ x_dif[:]
-                _fev!(x_cur, r_tst)
+            # Test new step 
+            x_cur[:] .= x_old[:] .+ x_dif[:]
+            _fev!(x_cur, r_tst)
 
-                # If convection stabilisation is disabled, check if this step would make the residuals worse.
-                # If so, limit the maximum step size to a small value, maintaining the same descent direction.
-                # for i in 1:arr_len 
-                #     if !stabilise_mlt && (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
-                #         x_dif_clip_step = 1.0e-2
-                #         break
-                #     end 
-                # end 
-            end 
+            # If convection stabilisation is disabled, check if this step would make the residuals worse.
+            # If so, limit the maximum step size to a small value, maintaining the same descent direction.
+            # for i in 1:arr_len 
+            #     if !stabilise_mlt && (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
+            #         x_dif_clip_step = 1.0e-2
+            #         break
+            #     end 
+            # end 
 
             # Limit step size globally
             if maximum(abs.(x_dif[:])) > x_dif_clip_step
