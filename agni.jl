@@ -4,15 +4,14 @@
 # AGNI executable file for standalone execution
 # -------------
 
-tbegin = time()
-println("Begin AGNI")
-
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
 ENV["GKSwstype"]="nul"
 
 # Include libraries
 using Revise
+using LoggingExtras
+using Printf
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
@@ -25,6 +24,9 @@ import solver_tstep
 import solver_nlsol 
 
 function main()
+
+    tbegin = time()
+
     # Configuration options
     tstar::Float64         = 2800.0    # Surface temperature [kelvin]
     instellation::Float64  = 2000.0
@@ -51,8 +53,32 @@ function main()
     rm(output_dir,force=true,recursive=true)
     mkdir(output_dir)
 
+    # Setup global logger
+    logger_file = FormatLogger(joinpath(output_dir,"agni.log"); append=true) do io, args
+        @printf(io, "[%-5s] %s",args.level, args.message)
+    end;
+    logger_term = FormatLogger() do io, args
+        color::Int = 39
+        if args.level == LoggingExtras.Info
+            color = 32
+        elseif args.level == LoggingExtras.Warn
+            color = 33
+        elseif args.level == LoggingExtras.Debug
+            color = 36
+        end 
+
+        # Set color, set bold, print level, unset bold, unset color, message
+        @printf(io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s",color, args.level, args.message)
+    end;
+    logger_both = TeeLogger(logger_file, logger_term);
+    global_logger(logger_both)
+    disable_logging(Logging.Debug) # disable debug, info only
+
+    # Hello
+    @info "Hello\n"
+
     # Setup atmosphere
-    println("Setting up")
+    @info "Setting up\n"
     atmos = atmosphere.Atmos_t()
     atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                             spfile_name,
@@ -75,7 +101,7 @@ function main()
     atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
 
     # Set PT profile 
-    println("Setting initial T(p)")
+    @info "Setting initial T(p)\n"
     # setpt.fromcsv!(atmos,"pt.csv")
     # setpt.isothermal!(atmos, tstar*0.7)
     # setpt.prevent_surfsupersat!(atmos)
@@ -85,7 +111,7 @@ function main()
 
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
-    println("Running model...")
+    @info "Running model...\n"
 
     # Call solver(s)
     dry_convect = true
@@ -112,7 +138,7 @@ function main()
     # println("MLT: calculating fluxes")
     # atmosphere.mlt!(atmos)
 
-    println("Total RT evalulations: $(atmos.num_rt_eval)")
+    @info "Total RT evalulations: $(atmos.num_rt_eval)\n"
 
     # Write arrays
     atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
@@ -120,7 +146,7 @@ function main()
     atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
     # Save plots
-    println("Making plots")
+    @info "Making plots\n"
     # plotting.anim_solver(atmos)
     plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
     plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
@@ -130,17 +156,16 @@ function main()
     plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.png"))
 
     # Deallocate atmosphere
-    println("Deallocating arrays")
+    @info "Deallocating arrays\n"
     atmosphere.deallocate!(atmos)
+
+    # Finish up
+    runtime = round(time() - tbegin, digits=2)
+    @info "Runtime: $runtime seconds\n"
+    @info "Goodbye\n"
 
     return nothing 
 end 
 
 # Call main function 
 main()
-
-# Finish up
-runtime = round(time() - tbegin, digits=2)
-println("Runtime: $runtime seconds")
-println("Goodbye")
-exit(0)
