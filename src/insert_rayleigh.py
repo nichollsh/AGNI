@@ -202,8 +202,6 @@ def rayleigh_coeff_adder(species_list = ['co2'], mixing_ratio_list = [1.], spect
 # 4. H2O mixing ratio
 if __name__ == "__main__":
 
-    print("Python: Inserting Rayleigh scattering")
-
     args = sys.argv
 
     if len(args) > 5:

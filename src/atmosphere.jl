@@ -23,6 +23,7 @@ module atmosphere
     using LinearAlgebra
     using Statistics
     using Dates
+    using Logging
     
     import moving_average
     import phys
@@ -610,7 +611,7 @@ module atmosphere
     """
     function adapt_mesh!(atmos::atmosphere.Atmos_t, focus::Array; density::Int=1, percentile::Float64=20.0)
 
-        println("Mesh refinement")
+        @debug "Mesh refinement"
 
         # Tolerance for where focus is increased 
         atol::Float64 = quantile(focus, percentile*0.01)
@@ -620,7 +621,7 @@ module atmosphere
         for i in 1:atmos.nlev_l-1 
             push!(x_upsampled, atmos.pl[i])  # add original value
             if focus[i] > atol   # add new value(s)
-                println("Upsampling at p=$(atmos.p[i])")
+                @debug "Upsampling at p=$(atmos.p[i])"
                 for j in 1:density  
                     dxdj = (atmos.pl[i+1]-atmos.pl[i])/density * 0.9
                     push!(x_upsampled, atmos.pl[i] + dxdj*j)
@@ -709,6 +710,7 @@ module atmosphere
 
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
+            @info "Python: Inserting rayleigh scattering \n"
             co2_x = get_x(atmos, "CO2", -1) 
             n2_x  = get_x(atmos, "N2" , -1)
             h2o_x = get_x(atmos, "H2O", -1)
@@ -1335,7 +1337,7 @@ module atmosphere
                 # Check if this layer is condensing (this shouldn't ever be
                 # true, because the condensation curve dT/dp is too shallow)
                 if atmos.mask_p[i] > 0
-                    println("    WARNING: Somehow unstable to dry convection in a condensing region!")
+                    @warn "Somehow unstable to dry convection in a condensing region!"
                 end 
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt

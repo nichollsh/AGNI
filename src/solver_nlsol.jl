@@ -9,6 +9,7 @@ end
 module solver_nlsol
 
     using Printf
+    using LoggingExtras
     using Statistics
     using Revise
     using LinearAlgebra
@@ -280,24 +281,24 @@ module solver_nlsol
         # Setup initial guess
         # ---------------------------------------------------------- 
         if method == 1
-            println("Begin Newton-Raphson iterations") 
+            @info "Begin Newton-Raphson iterations\n"
         elseif method == 2
-            println("Begin Gauss-Newton iterations") 
+            @info "Begin Gauss-Newton iterations\n"
         elseif method == 3
-            println("Begin Levenberg-Marquardt iterations") 
+            @info "Begin Levenberg-Marquardt iterations\n"
         else 
             error("Invalid method choice ($method)")
         end
 
-        @printf("    surf   = %d\n", surf_state)
+        @info @sprintf("    surf   = %d\n", surf_state)
         if (surf_state == 1)
-            @printf("    tstar  = %.2f K\n", atmos.tstar)
+            @info @sprintf("    tstar  = %.2f K\n", atmos.tstar)
         elseif (surf_state == 2)
-            @printf("    skin_d = %.2f m\n",         atmos.skin_d)
-            @printf("    skin_k = %.2f W K-1 m-1\n", atmos.skin_k)
+            @info @sprintf("    skin_d = %.2f m\n",         atmos.skin_d)
+            @info @sprintf("    skin_k = %.2f W K-1 m-1\n", atmos.skin_k)
         elseif (surf_state == 3)
-            @printf("    tint   = %.2f K\n",     atmos.tint)
-            @printf("    Fint   = %.2f W m-2\n", atmos.flux_int)
+            @info @sprintf("    tint   = %.2f K\n",     atmos.tint)
+            @info @sprintf("    Fint   = %.2f W m-2\n", atmos.flux_int)
         end 
         
 
@@ -372,7 +373,8 @@ module solver_nlsol
             convect_sf = 1.0
         end
 
-        @printf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags\n")
+        @info @sprintf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags\n")
+        info_str::String = ""
         while true 
 
             # Update properties (cp, rho, etc.)
@@ -395,8 +397,9 @@ module solver_nlsol
                 code = 1 
                 break 
             end 
+            info_str = ""
             if mod(step,modprint) == 0 
-                @printf("    %4d  ", step)
+                info_str *= @sprintf("    %4d  ", step)
             end
 
             # Reset flags 
@@ -417,7 +420,7 @@ module solver_nlsol
                         # increase sf - reduce stabilisation by 10x
                         stepflags *= "r"
                         convect_sf = min(1.0, convect_sf*10.0)
-                        println("convect_sf = $convect_sf")
+                        @debug "convect_sf = $convect_sf"
                         
                         # done stabilising 
                         if convect_sf > 0.99
@@ -445,14 +448,12 @@ module solver_nlsol
             c_cur = _cost(r_cur)
             if (c_cur < conv_atol) && !stabilise_mlt
                 code = 0
-                @printf("\n")
                 break
             end
 
             # Check if jacobian is singular 
             if abs(det(b)) < 1.0e-90
                 code = 2
-                @printf("\n")
                 break
             end 
 
@@ -557,7 +558,8 @@ module solver_nlsol
                 
             # Inform user
             if mod(step,modprint) == 0 
-                @printf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-9s\n", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags)
+                info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-9s\n", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags)
+                @info info_str
             end
 
         end # end solver loop
@@ -571,18 +573,17 @@ module solver_nlsol
         atmos.is_solved = true
         atmos.is_converged = false 
         if code == 0
-            println("    success")
+            @info "    success\n"
             atmos.is_converged = true
         elseif code == 1
-            println("    failure (maximum iterations)")
+            @warn "    failure (maximum iterations)\n"
         elseif code == 2
-            println("    failure (singular jacobian)")
+            @warn "    failure (singular jacobian)\n"
         elseif code == 3
-            println("    failure (maximum time)")
+            @warn "    failure (maximum time)\n"
         else 
-            println("    failure (unhandled)")
+            @warn "    failure (unhandled)\n"
         end
-        println(" ")
 
         _fev!(x_cur, zeros(Float64, arr_len))
         atmosphere.calc_hrates!(atmos)
@@ -592,17 +593,17 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
         loss_pct = loss/maximum(atmos.flux_tot)*100.0
-        @printf("    summary \n")
-        @printf("    outgoing LW flux   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
+        @info "    summary\n"
+        @info @sprintf("    outgoing LW flux   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
         if (surf_state == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tstar)
-        @printf("    conduct. skin flux = %+.2e W m-2 \n", F_skin)
+            @info @sprintf("    conduct. skin flux = %+.2e W m-2 \n", F_skin)
         end
-        @printf("    total flux at TOA  = %+.2e W m-2     \n", atmos.flux_tot[1])
-        @printf("    total flux at BOA  = %+.2e W m-2     \n", atmos.flux_tot[end])
-        @printf("    column max. loss   = %+.2e W m-2  (%+.2e %%) \n", loss, loss_pct)
-        @printf("    final cost value   = %+.2e W m-2     \n", c_cur)
-        @printf("\n")
+        @info @sprintf("    total flux at TOA  = %+.2e W m-2     \n", atmos.flux_tot[1])
+        @info @sprintf("    total flux at BOA  = %+.2e W m-2     \n", atmos.flux_tot[end])
+        @info @sprintf("    column max. loss   = %+.2e W m-2  (%+.2e %%) \n", loss, loss_pct)
+        @info @sprintf("    final cost value   = %+.2e W m-2     \n", c_cur)
+        @info "\n"
 
         return atmos.is_converged
     end # end solve_energy 

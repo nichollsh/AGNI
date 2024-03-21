@@ -11,6 +11,7 @@ end
 module spectrum 
 
     using Revise
+    using LoggingExtras
     using Printf
     using BinnedStatistics
     using DelimitedFiles
@@ -63,7 +64,7 @@ module spectrum
             error("Stellar wavelength and flux arrays have different lengths")
         end 
         if len_wl < 500
-            println("WARNING: Loaded stellar spectrum is very short!")
+            @warn "Loaded stellar spectrum is very short!"
         end
         if minimum(wl) < 1.0e-45
             error("Minimum wavelength is too small")
@@ -154,7 +155,7 @@ module spectrum
         end
 
         # Run executable
-        println("Inserting stellar spectrum")
+        @info "Inserting stellar spectrum\n"
         run(pipeline(`bash $execpath`, stdout=devnull))
 
         # Delete executable 

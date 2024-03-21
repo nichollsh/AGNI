@@ -504,7 +504,7 @@ module plotting
 
         # Create animation
         if nframes < 1
-            println("WARNING: Cannot animate solver because no output frames were found")
+            @warn "Cannot animate solver because no output frames were found"
         else 
             fps = max(nframes/runtime, 5)
             run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/zzframe_*.png" -pix_fmt yuv420p -y $out/anim_tmp.mp4`)
