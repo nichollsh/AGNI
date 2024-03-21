@@ -261,7 +261,7 @@ module plotting
         # SW component
         if atmos.is_out_sw
             plot!(plt, _symlog.(-1.0.*atmos.flux_d_sw), arr_P, label="", lw=w, lc=col_r, ls=:dot)
-            plot!(plt, _symlog.(      atmos.flux_u_lw), arr_P, label="", lw=w, lc=col_r, ls=:dot)
+            plot!(plt, _symlog.(      atmos.flux_u_sw), arr_P, label="", lw=w, lc=col_r, ls=:dot)
         end 
 
         # Net radiative fluxes
