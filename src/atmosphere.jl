@@ -102,49 +102,49 @@ module atmosphere
         tmp_magma::Float64      # Mantle temperature [K]
 
         # Mole fractions (= VMR)
-        gases::Array{String,1}            # List of gas names 
-        input_x::Dict           # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
-        layer_x::Array{Float64,2}          # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
+        gases::Array{String,1}              # List of gas names 
+        input_x::Dict                       # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
+        layer_x::Array{Float64,2}           # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
 
         # Layers' average properties
-        thermo_funct::Bool      # use temperature-dependent evaluation
-        layer_density::Array{Float64,1}    # density [kg m-3]
-        layer_mmw::Array{Float64,1}        # mean molecular weight [kg mol-1]
-        layer_cp::Array{Float64,1}         # heat capacity at const-p [J K-1 kg-1]
-        layer_grav::Array{Float64,1}       # gravity [m s-2]
-        layer_mass::Array{Float64,1}       # mass per unit area [kg m-2]
+        thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
+        layer_density::Array{Float64,1}     # density [kg m-3]
+        layer_mmw::Array{Float64,1}         # mean molecular weight [kg mol-1]
+        layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
+        layer_grav::Array{Float64,1}        # gravity [m s-2]
+        layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
 
         # Calculated bolometric radiative fluxes (W m-2)
-        flux_int::Float64 # Interior flux  [W m-2] for surf_state=3
+        flux_int::Float64               # Interior flux  [W m-2] for surf_state=3
 
-        flux_d_lw::Array{Float64,1}  # down component, lw 
-        flux_u_lw::Array{Float64,1}  # up component, lw
-        flux_n_lw::Array{Float64,1}  # net upward, lw
+        flux_d_lw::Array{Float64,1}     # down component, lw 
+        flux_u_lw::Array{Float64,1}     # up component, lw
+        flux_n_lw::Array{Float64,1}     # net upward, lw
 
-        flux_d_sw::Array{Float64,1}  # down component, sw 
-        flux_u_sw::Array{Float64,1}  # up component, sw
-        flux_n_sw::Array{Float64,1}  # net upward, sw
+        flux_d_sw::Array{Float64,1}     # down component, sw 
+        flux_u_sw::Array{Float64,1}     # up component, sw
+        flux_n_sw::Array{Float64,1}     # net upward, sw
 
-        flux_d::Array{Float64,1}    # down component, lw+sw 
-        flux_u::Array{Float64,1}    # up component, lw+sw 
-        flux_n::Array{Float64,1}    # net upward, lw+sw 
+        flux_d::Array{Float64,1}        # down component, lw+sw 
+        flux_u::Array{Float64,1}        # up component, lw+sw 
+        flux_n::Array{Float64,1}        # net upward, lw+sw 
 
         # Calculated per-band radiative fluxes (W m-2)
-        band_d_lw::Array{Float64,2}  # down component, lw 
-        band_u_lw::Array{Float64,2}  # up component, lw
-        band_n_lw::Array{Float64,2}  # net upward, lw
+        band_d_lw::Array{Float64,2}     # down component, lw 
+        band_u_lw::Array{Float64,2}     # up component, lw
+        band_n_lw::Array{Float64,2}     # net upward, lw
 
-        band_d_sw::Array{Float64,2}  # down component, sw 
-        band_u_sw::Array{Float64,2}  # up component, sw
-        band_n_sw::Array{Float64,2}  # net upward, sw
+        band_d_sw::Array{Float64,2}     # down component, sw 
+        band_u_sw::Array{Float64,2}     # up component, sw
+        band_n_sw::Array{Float64,2}     # net upward, sw
 
         # Contribution function (to outgoing flux) per-band
         contfunc_norm::Array{Float64,2}    # LW+SW, and normalised by maximum value at each wavelength
 
         # Sensible heating
-        C_d::Float64        # Turbulent exchange coefficient [dimensionless]
-        U::Float64          # Wind speed [m s-1]
-        flux_sens::Float64  # Turbulent flux
+        C_d::Float64            # Turbulent exchange coefficient [dimensionless]
+        U::Float64              # Wind speed [m s-1]
+        flux_sens::Float64      # Turbulent flux
 
         # Convection 
         mask_c::Array{Int,1}       # Layers which are (or were recently) convective (value is set to >0)
@@ -153,10 +153,15 @@ module atmosphere
         Kzz::Array{Float64,1}      # Eddy diffusion coefficient from MLT
 
         # Cloud and condensation
-        mask_p::Array{Int,1}       # Layers which are (or were recently) condensing liquid
-        re::Array{Float64,1}       # Effective radius of the droplets [m] (drizzle forms above 20 microns)
-        lwm::Array{Float64,1}      # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
-        clfr::Array{Float64,1}     # Water cloud fraction - how much of the current cell turns into cloud? 0 : clear sky cell ; 1 : the cloud takes over the entire area of the cell (just leave at 1 for 1D runs)
+        mask_p::Array{Int,1}                # Layers which are (or were recently) condensing liquid
+        #    These arrays give the cloud properties within layers containing cloud
+        cloud_arr_r::Array{Float64,1}       # Effective radius of the droplets [m]. 
+        cloud_arr_l::Array{Float64,1}       # Liquid water mass fraction [kg/kg]. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
+        cloud_arr_f::Array{Float64,1}       # Water cloud fraction. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
+        #    These floats give the default values that the above arrays are filled with upon cloud formation
+        cloud_val_r::Float64 
+        cloud_val_l::Float64 
+        cloud_val_f::Float64 
 
         # Total energy flux
         flux_tot::Array{Float64,1}     # Total upward-directed flux at cell edges
@@ -338,10 +343,15 @@ module atmosphere
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
 
-        # Initialise cloud properties
-        atmos.re         = zeros(Float64, atmos.nlev_c) 
-        atmos.lwm        = zeros(Float64, atmos.nlev_c)
-        atmos.clfr       = zeros(Float64, atmos.nlev_c) 
+        # Initialise cloud arrays 
+        atmos.cloud_arr_r   = zeros(Float64, atmos.nlev_c) 
+        atmos.cloud_arr_l   = zeros(Float64, atmos.nlev_c)
+        atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c) 
+
+        # Hardcoded cloud properties 
+        atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
+        atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
+        atmos.cloud_val_f   = 1.0     # The cloud takes over the entire cell
 
         # Read mole fractions
         if isnothing(mf_dict) && isnothing(mf_path)
@@ -771,7 +781,7 @@ module atmosphere
 
         # modules_gen/dimensioms_fixed_pcf.f90
         npd_cloud_component        =  4 #   Number of components of clouds.
-        npd_cloud_type             =  4 #   Number of permitted types of clouds.
+        npd_cloud_type             =  1 #   Number of permitted types of clouds.
         npd_overlap_coeff          = 18 #   Number of overlap coefficients for cloud
         npd_source_coeff           =  2 #   Number of coefficients for two-stream sources
         npd_region                 =  3 # Number of regions in a layer
@@ -991,7 +1001,6 @@ module atmosphere
             atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11
         else
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
-            atmos.cld.n_condensed = 0
         end
 
         SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
@@ -1102,7 +1111,7 @@ module atmosphere
         #####################################
 
         # Cl_run_cdf +R flag
-        atmos.control.l_rescale = true
+        atmos.control.l_rescale = false
         if atmos.control.l_rescale
             atmos.control.l_henyey_greenstein_pf = true
         end
@@ -1146,9 +1155,9 @@ module atmosphere
         ###################################################
 
         if atmos.control.l_cloud
-            atmos.cld.w_cloud[1,:]               .= atmos.clfr[:]
-            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.lwm[:]
-            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.re[:]
+            atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]   
+            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]  
+            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]  
         end
 
         ###################################################
@@ -1467,7 +1476,6 @@ module atmosphere
     function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
         changed = falses(atmos.nlev_c)
-
         i_gas = findfirst(==(gas), atmos.gases)
 
         # Check if each level is condensing. If it is, place on phase curve
@@ -1483,18 +1491,49 @@ module atmosphere
             if atmos.tmp[i] < Tsat
                 atmos.tmp[i] = Tsat
                 changed[i] = true 
-                
-                atmos.re[i]   = 1.0e-5  # 10 micron droplets
-                atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
-                atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
-            else 
-                atmos.re[i]   = 0.0
-                atmos.lwm[i]  = 0.0
-                atmos.clfr[i] = 0.0
             end
         end
         
+        set_tmpl_from_tmp!(atmos)
         return changed
+    end
+
+    # Set cloud properties within condensing regions
+    function water_cloud!(atmos::atmosphere.Atmos_t)
+
+        # Reset 
+        fill!(atmos.cloud_arr_r, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        fill!(atmos.cloud_arr_f, 0.0)
+
+        # Get index of water 
+        if "H2O" in atmos.gases
+            i_gas::Int = findfirst(==("H2O"), atmos.gases)
+        else 
+            return nothing
+        end
+
+        # Check if each level is condensing. If it is, place on phase curve
+        x::Float64      = 0.0  # vmr of water vapour
+        Tsat::Float64   = 0.0  # dew point temperature of water vapour
+        for i in 1:atmos.nlev_c
+
+            x = atmos.layer_x[i,i_gas]
+            if x < 1.0e-10 
+                continue
+            end
+
+            # Cell centre only
+            # Check if temperature is below condensation curve
+            Tsat = phys.calc_Tdew("H2O",atmos.p[i] * x ) + 1.0e-10
+            if atmos.tmp[i] <= Tsat
+                atmos.cloud_arr_r[i] = atmos.cloud_val_r
+                atmos.cloud_arr_l[i] = atmos.cloud_val_l
+                atmos.cloud_arr_f[i] = atmos.cloud_val_f
+            end
+        end
+        
+        return nothing
     end
 
     # Smooth temperature at cell-centres 
