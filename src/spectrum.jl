@@ -53,10 +53,10 @@ module spectrum
     """
     function write_to_socrates_format(wl::Array, fl::Array, star_file::String, nbins_max::Int=99900)
 
-        len_wl = length(wl)
-        len_fl = length(fl)
-        socrates_nbins_max = Int(1e5 - 3)  # do not change this
-        tgt_bins = min(nbins_max, len_wl, socrates_nbins_max)
+        len_wl::Int = length(wl)
+        len_fl::Int = length(fl)
+        socrates_nbins_max::Int = Int(1e5 - 3)  # do not change this
+        tgt_bins::Int = min(nbins_max, len_wl, socrates_nbins_max)
 
         # Validate
         if len_wl != len_fl
@@ -94,6 +94,7 @@ module spectrum
         ofl = ofl .* 1.0e6   # [erg s-1 cm-2 nm-1] -> [W m-3]
 
         # Write file
+        len_new::Int = length(owl)
         open(star_file, "w") do f
 
             # Header
@@ -103,7 +104,7 @@ module spectrum
             write(f, "*BEGIN_DATA\n")
             
             # Body
-            for i in 1:len_wl
+            for i in 1:len_new
                 @printf(f, "      %1.7e      %1.7e\n", owl[i],ofl[i])
             end
 

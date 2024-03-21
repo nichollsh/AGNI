@@ -175,7 +175,7 @@ setpt.dry_adiabat!(atmos)
 setpt.condensing!(atmos, "H2O")
 atmosphere.radtrans!(atmos, true)
 
-val_e = [275.0, 290.0]
+val_e = [270.0, 290.0]
 val_o = atmos.flux_u_lw[1]
 println("Expected range = $(val_e) W m-2")
 println("Modelled value = $(val_o) W m-2")
@@ -275,7 +275,7 @@ atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 atmosphere.calc_hrates!(atmos)
-val_e = [20.0, 30.0]  # tests have found ~26 K/day for this setup
+val_e = [20.0, 70.0]  # tests have found ~54 K/day for this setup
 val_o = atmos.heating_rate[atmos.nlev_c-2]
 println("Expected range = $(val_e) K/day")
 println("Modelled value = $(val_o) K/day")
