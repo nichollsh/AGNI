@@ -61,7 +61,7 @@ module atmosphere
         all_channels::Bool              # Use all bands?
         spectral_file::String           # Path to spectral file
         star_file::String               # Path to star spectrum
-        albedo_b::Float64               # Enforced bond albedo (DO NOT USE ALONGSIDE CLOUD RADIATION EFFECTS)
+        albedo_b::Float64               # Enforced bond albedo 
         albedo_s::Float64               # Surface albedo
         zenith_degrees::Float64         # Solar zenith angle [deg]
         toa_heating::Float64            # Derived downward shortwave radiation flux at topmost level [W m-2]
@@ -155,9 +155,9 @@ module atmosphere
         # Cloud and condensation
         mask_p::Array{Int,1}                # Layers which are (or were recently) condensing liquid
         #    These arrays give the cloud properties within layers containing cloud
-        cloud_arr_r::Array{Float64,1}       # Effective radius of the droplets [m]. 
-        cloud_arr_l::Array{Float64,1}       # Liquid water mass fraction [kg/kg]. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
-        cloud_arr_f::Array{Float64,1}       # Water cloud fraction. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
+        cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
+        cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
+        cloud_arr_f::Array{Float64,1}       # Total cloud area fraction in layers. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
         #    These floats give the default values that the above arrays are filled with upon cloud formation
         cloud_val_r::Float64 
         cloud_val_l::Float64 
@@ -351,7 +351,7 @@ module atmosphere
         # Hardcoded cloud properties 
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
-        atmos.cloud_val_f   = 1.0     # The cloud takes over the entire cell
+        atmos.cloud_val_f   = 0.8     # 80% of the cell "area" is cloud
 
         # Read mole fractions
         if isnothing(mf_dict) && isnothing(mf_path)
@@ -1011,7 +1011,7 @@ module atmosphere
             atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
             atmos.cld.n_cloud_type      = 1
             atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
-            atmos.cld.i_condensed_param[1] = 5
+            atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
         else
             atmos.cld.n_condensed = 0
         end
@@ -1180,8 +1180,6 @@ module atmosphere
         atmos.atm.t[1, :] .= atmos.tmp[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
-
-        # calc_layer_props!(atmos)
 
         if lw
             atmos.bound.t_ground[1] = atmos.tstar

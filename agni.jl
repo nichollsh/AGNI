@@ -27,7 +27,7 @@ import solver_nlsol
 function main()
     # Configuration options
     tstar::Float64         = 2800.0    # Surface temperature [kelvin]
-    instellation::Float64  = 1200.0
+    instellation::Float64  = 9000.0
     albedo_b::Float64      = 0.1
     asf_sf::Float64        = 3.0/8.0
     radius::Float64        = 6.37e6    # metres
@@ -43,7 +43,7 @@ function main()
                                 # ("N2" ,  0.05)
                             ])
 
-    spfile_name   = "res/spectral_files/Frostflow/16/Frostflow.sf"
+    spfile_name   = "res/spectral_files/Frostflow/48/Frostflow.sf"
     star_file     = "res/stellar_spectra/sun.txt"
     output_dir    = "out/"
 
@@ -63,7 +63,7 @@ function main()
                             mf_dict=mf_dict,
                             flag_gcontinuum=true,
                             flag_rayleigh=false,
-                            flag_cloud=false,
+                            flag_cloud=true,
                             overlap_method=4,
                             skin_d=0.01,
                             skin_k=2.0,
