@@ -7,8 +7,8 @@
 !+ Program to generate a CDL-file of surface fields.
 !
 ! Method:
-!	A set of coordinates and albedos are read and written in
-!	the appropriate format.
+!   A set of coordinates and albedos are read and written in
+!   the appropriate format.
 !
 !- ---------------------------------------------------------------------
       PROGRAM gen_surf_cdl

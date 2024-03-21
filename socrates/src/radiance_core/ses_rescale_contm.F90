@@ -4,12 +4,13 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Perform path-length scaling for the different continuum absorbers.
-!
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiation Service
+! Perform path-length scaling for the different continuum absorbers.
 !
 !- ---------------------------------------------------------------------
+MODULE ses_rescale_contm_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SES_RESCALE_CONTM_MOD'
+CONTAINS
 SUBROUTINE ses_rescale_contm(nd_profile, nd_layer                       &
      , i_continuum, n_profile, n_layer                                  &
      , p, t, gas_mix_ratio, amount_continuum                            &
@@ -75,7 +76,7 @@ SUBROUTINE ses_rescale_contm(nd_profile, nd_layer                       &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SES_RESCALE_CONTM'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   k_m_air=k_boltzmann*mol_weight_air
   IF (i_continuum  ==  ip_cont_h2o ) THEN
@@ -107,5 +108,6 @@ SUBROUTINE ses_rescale_contm(nd_profile, nd_layer                       &
     END DO
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 END SUBROUTINE ses_rescale_contm
+END MODULE ses_rescale_contm_mod

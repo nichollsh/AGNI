@@ -7,9 +7,9 @@
 !+ Subroutine to calculate scattering properties using ADT.
 !
 ! Method:
-!	The standard formulae for the extinction and scattering
-!	cross-sections, integrated across a modified-gamma
-!	distribution, given by ADT are implemented.
+!   The standard formulae for the extinction and scattering
+!   cross-sections, integrated across a modified-gamma
+!   distribution, given by ADT are implemented.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE adt_integral(alpha_mg, size, n_relative

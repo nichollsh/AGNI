@@ -14,6 +14,10 @@
 !   each case (cloudy and clear) a suitable solver is called.
 !
 !- ---------------------------------------------------------------------
+MODULE mcica_column_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MCICA_COLUMN_MOD'
+CONTAINS
 SUBROUTINE mcica_column(ierr                                            &
   , control, cld, bound                                                 &
 !                   Atmospheric properties
@@ -66,6 +70,10 @@ SUBROUTINE mcica_column(ierr                                            &
 
   USE set_n_source_coeff_mod, ONLY: set_n_source_coeff
   USE calc_actinic_flux_mod, ONLY: calc_actinic_flux
+  USE column_solver_mod, ONLY: column_solver
+  USE ir_source_mod, ONLY: ir_source
+  USE two_coeff_fast_lw_mod, ONLY: two_coeff_fast_lw
+  USE two_coeff_mod, ONLY: two_coeff
 
   IMPLICIT NONE
 
@@ -246,7 +254,7 @@ SUBROUTINE mcica_column(ierr                                            &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'MCICA_COLUMN'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the number of source coefficients for the approximation
   n_source_coeff=set_n_source_coeff(isolir, l_ir_source_quad)
@@ -255,7 +263,6 @@ SUBROUTINE mcica_column(ierr                                            &
 ! source terms for the clear sky
   IF ( (i_scatter_method == ip_scatter_full) .OR.                       &
        (i_scatter_method == ip_scatter_approx) ) THEN
-! DEPENDS ON: two_coeff
     CALL two_coeff(ierr, control                                        &
     , n_profile, 1, n_cloud_top-1                                       &
     , i_2stream                                                         &
@@ -279,7 +286,6 @@ SUBROUTINE mcica_column(ierr                                            &
     )
   ELSE IF ( (i_scatter_method == ip_no_scatter_abs) .OR.                &
             (i_scatter_method == ip_no_scatter_ext) ) THEN
-!   DEPENDS ON: two_coeff_fast_lw
     CALL two_coeff_fast_lw(n_profile, 1, n_cloud_top-1                  &
       , l_ir_source_quad, ss_prop%tau_clr                               &
       , trans, source_coeff                                             &
@@ -316,7 +322,6 @@ SUBROUTINE mcica_column(ierr                                            &
 ! for cloud points.
   IF (l_clear) THEN
     IF (isolir == ip_infra_red) THEN
-! DEPENDS ON: ir_source
       CALL ir_source(n_profile, 1, n_layer                              &
       , source_coeff, diff_planck                                       &
       , l_ir_source_quad, diff_planck_2                                 &
@@ -324,7 +329,6 @@ SUBROUTINE mcica_column(ierr                                            &
       , nd_profile, nd_layer, nd_source_coeff)
     END IF
 
-! DEPENDS ON: column_solver
     CALL column_solver(ierr, control, bound, sph%common, sph%clear      &
     , n_profile, n_layer                                                &
     , i_scatter_method, i_solver                                        &
@@ -616,6 +620,7 @@ SUBROUTINE mcica_column(ierr                                            &
     DEALLOCATE(tau_abs)
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE mcica_column
+END MODULE mcica_column_mod

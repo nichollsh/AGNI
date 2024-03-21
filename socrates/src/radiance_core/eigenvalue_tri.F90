@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to find the eigenvalues of a symmetric tridiagonal matrix.
+! Subroutine to find the eigenvalues of a symmetric tridiagonal matrix.
 !
 ! Purpose:
 !   To caulate the eigenvalues of a symmetric tridiagonal matrix.
@@ -15,10 +15,11 @@
 !   pseudo-code and description given in "Numerical Analysis" by
 !   R. L. Burden and D. J. Faires (PWS-Kent 1989).
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE eigenvalue_tri_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'EIGENVALUE_TRI_MOD'
+CONTAINS
 SUBROUTINE eigenvalue_tri(n_matrix, n_in, d, e                          &
      , tol, n_max_iteration                                             &
      , nd_matrix)
@@ -113,7 +114,7 @@ SUBROUTINE eigenvalue_tri(n_matrix, n_in, d, e                          &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'EIGENVALUE_TRI'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The algorithm proceeds iteratively. The matrix supplied, A, is
 ! decomposed as A=QR where Q is orthogonal and R is upper
@@ -272,6 +273,7 @@ SUBROUTINE eigenvalue_tri(n_matrix, n_in, d, e                          &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE eigenvalue_tri
+END MODULE eigenvalue_tri_mod

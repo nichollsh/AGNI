@@ -4,16 +4,17 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate monochromatic fluxes using IPA.
+! Subroutine to calculate monochromatic fluxes using IPA.
 !
 ! Method:
 !   In this subroutine a long vector for two-stream flux calculations
 !   is set up using the information on the types of cloud present.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE calc_flux_ipa_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_FLUX_IPA_MOD'
+CONTAINS
 SUBROUTINE calc_flux_ipa(ierr                                           &
     , control, bound                                                    &
 !                 Atmospheric Properties
@@ -60,6 +61,8 @@ SUBROUTINE calc_flux_ipa(ierr                                           &
                      ip_surf_alb_dir
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE copy_clr_full_mod, ONLY: copy_clr_full
+  USE two_stream_mod, ONLY: two_stream
 
   IMPLICIT NONE
 
@@ -275,7 +278,7 @@ SUBROUTINE calc_flux_ipa(ierr                                           &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CALC_FLUX_IPA'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Zero the output arrays ready for incrementing.
   DO i=1, 2*n_layer+2
@@ -443,7 +446,6 @@ SUBROUTINE calc_flux_ipa(ierr                                           &
 
 
 !   N.B. The clear-sky option cannot be used here.
-! DEPENDS ON: two_stream
     CALL two_stream(ierr                                                &
       , control, bound                                                  &
 !                   Atmospheric properties
@@ -510,7 +512,6 @@ SUBROUTINE calc_flux_ipa(ierr                                           &
     ALLOCATE(omega_clr_f(nd_profile, nd_layer))
     ALLOCATE(phase_fnc_clr_f(nd_profile, nd_layer, 1))
 
-! DEPENDS ON: copy_clr_full
     CALL copy_clr_full(n_profile, n_layer, n_cloud_top, control, 1      &
       , ss_prop%tau_clr, ss_prop%tau_clr_dir                            &
       , ss_prop%omega_clr, ss_prop%phase_fnc_clr                        &
@@ -521,7 +522,6 @@ SUBROUTINE calc_flux_ipa(ierr                                           &
       , nd_profile, nd_layer, nd_layer_clr, id_ct, 1                    &
       )
 
-! DEPENDS ON: two_stream
     CALL two_stream(ierr                                                &
       , control, bound                                                  &
 !                   Atmospheric properties
@@ -562,6 +562,7 @@ SUBROUTINE calc_flux_ipa(ierr                                           &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_flux_ipa
+END MODULE calc_flux_ipa_mod

@@ -1,16 +1,15 @@
 #
-# Pathnames for Linux on an Intel x86_64 platform. 
-# Tested with Ubuntu.
-# 
-
-FORTCOMP        = gfortran -O3 -fPIC -c
-LINK            = gfortran -O3 -fPIC
+# Pathnames for compilers and global options for naming files
+#
+FORTCOMP        = ifort -O -c
+LINK            = ifort -O
 LIBLINK         = ar rvu
-INCCDF_PATH     = /usr/include/
-LIBCDF_PATH     = /usr/lib/
+INCCDF_PATH     = /data/users/frhg/netcdf-fortran-4.4.4/build/ifort17/include
+LIBCDF_PATH     = /data/users/frhg/netcdf-fortran-4.4.4/build/ifort17/lib
 LIBCDF_NAME     = netcdff
-OMPARG          = -fopenmp 
+OMPARG          = -qopenmp
 
 LIBSUFFIX       = a
 
 .SUFFIXES: $(SUFFIXES) .f90
+

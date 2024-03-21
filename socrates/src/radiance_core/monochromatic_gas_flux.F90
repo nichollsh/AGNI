@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate fluxes including only gaseous absorption.
+! Subroutine to calculate fluxes including only gaseous absorption.
 !
 ! Method:
 !   Transmission coefficients for each layer are calculated
@@ -12,10 +12,11 @@
 !   upward or downward through the column using these
 !   coefficients and source terms.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE monochromatic_gas_flux_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MONOCHROMATIC_GAS_FLUX_MOD'
+CONTAINS
 SUBROUTINE monochromatic_gas_flux(n_profile, n_layer                    &
     , tau_gas                                                           &
     , isolir, sec_0, flux_inc_direct, flux_inc_down                     &
@@ -111,7 +112,7 @@ SUBROUTINE monochromatic_gas_flux(n_profile, n_layer                    &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='MONOCHROMATIC_GAS_FLUX'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerances used in avoiding ill-conditioning, testing
 ! on any variable.
@@ -191,6 +192,7 @@ SUBROUTINE monochromatic_gas_flux(n_profile, n_layer                    &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE monochromatic_gas_flux
+END MODULE monochromatic_gas_flux_mod

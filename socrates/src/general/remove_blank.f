@@ -25,10 +25,10 @@
 !
 !
 !     Dummy arguments:
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    in_string*(*)
 !           Input string
-      CHARACTER	!, Intent(OUT)
+      CHARACTER !, Intent(OUT)
      &    out_string*(*)
 !           Output string
       INTEGER, Intent(OUT) ::

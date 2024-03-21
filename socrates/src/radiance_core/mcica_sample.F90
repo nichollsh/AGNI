@@ -13,6 +13,10 @@
 !   meaned making use of the fraction of cloudy sub-columns.
 !
 !- ---------------------------------------------------------------------
+MODULE mcica_sample_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MCICA_SAMPLE_MOD'
+CONTAINS
 SUBROUTINE mcica_sample(ierr                                            &
     , control, dimen, atm, cld, bound                                   &
 !                 Atmospheric Propertries
@@ -98,6 +102,8 @@ SUBROUTINE mcica_sample(ierr                                            &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
+  USE circumsolar_fraction_mod, ONLY: circumsolar_fraction
+  USE monochromatic_radiance_mod, ONLY: monochromatic_radiance
 
   IMPLICIT NONE
 
@@ -400,6 +406,12 @@ SUBROUTINE mcica_sample(ierr                                            &
   INTEGER :: index_subcol
 !       Index of current sub-grid cloud column
 
+  INTEGER, PARAMETER ::                                                 &
+      n_k_term_inner_dummy = 1                                          &
+!       Number of monochromatic calculations in inner loop (dummy here)
+    , nd_k_term_inner_dummy = 1
+!       Maximum number of k-terms in inner loops (dummy here)
+
   REAL (RealK) ::                                                       &
       i_direct_subcol(nd_radiance_profile, 0: nd_layer)                 &
 !       Partial solar irradiances
@@ -436,7 +448,7 @@ SUBROUTINE mcica_sample(ierr                                            &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='MCICA_SAMPLE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO m=cld%first_subcol_k(i_band,iex), cld%first_subcol_k(i_band,iex+1)-1
 
@@ -689,7 +701,6 @@ SUBROUTINE mcica_sample(ierr                                            &
               IF (control%i_direct_tau == ip_direct_csr_scaling ) THEN
 ! Calculate forward scattering fraction of direct flux within 
 ! the instrument FOV 
-! DEPENDS ON: circumsolar_fraction
                  CALL circumsolar_fraction(n_cloud_profile(i)           &
                   , i_cloud_profile(:, i), control%half_angle           &
                   , ss_prop%phase_fnc(:, i, 1, k)                       &
@@ -725,7 +736,6 @@ SUBROUTINE mcica_sample(ierr                                            &
     END SELECT
 
 
-! DEPENDS ON: monochromatic_radiance
     CALL monochromatic_radiance(ierr                                    &
       , control, atm, cld, bound                                        &
 !             atmospheric properties
@@ -744,7 +754,7 @@ SUBROUTINE mcica_sample(ierr                                            &
 !             options for solver
       , i_solver                                                        &
 !             gaseous propreties
-      , k_gas_abs                                                       &
+      , n_k_term_inner_dummy, k_gas_abs                                 &
 !             options for equivalent extinction
       , l_scale_solar, adjust_solar_ke                                  &
 !             spectral region
@@ -793,7 +803,7 @@ SUBROUTINE mcica_sample(ierr                                            &
       , nd_cloud_type, nd_region, nd_overlap_coeff                      &
       , nd_max_order, nd_sph_coeff                                      &
       , nd_brdf_basis_fnc, nd_brdf_trunc, nd_viewing_level              &
-      , nd_direction, nd_source_coeff                                   &
+      , nd_direction, nd_source_coeff, nd_k_term_inner_dummy            &
       )
 
     IF (m == cld%first_subcol_k(i_band,iex)) THEN
@@ -919,6 +929,7 @@ SUBROUTINE mcica_sample(ierr                                            &
     END DO
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE mcica_sample
+END MODULE mcica_sample_mod

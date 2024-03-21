@@ -7,9 +7,9 @@
 !+ Subroutine to find points just with a band.
 !
 ! Method:
-!	A spectrum of wavelengths is passed to the routine. The indices
-!	of points of the spectrum just within a given band are found
-!	by taking the end-points of the spectrum and moving in.
+!   A spectrum of wavelengths is passed to the routine. The indices
+!   of points of the spectrum just within a given band are found
+!   by taking the end-points of the spectrum and moving in.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE inner_bracket(ierr

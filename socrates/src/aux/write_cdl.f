@@ -45,7 +45,7 @@
 !
       INCLUDE 'cdl_struc.finc'
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    filename*(*)
 !           Name of the output file
 !

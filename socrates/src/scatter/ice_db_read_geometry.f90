@@ -24,6 +24,7 @@ SUBROUTINE ice_db_read_geometry &
   USE error_pcf
   USE def_db_crystal_geometry
   USE db_type_ucf
+  USE spline_fit_mod, ONLY: spline_fit
 !
 !
   IMPLICIT NONE

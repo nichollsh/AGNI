@@ -7,8 +7,8 @@
 !+ Program to find the height of a pressure level.
 !
 ! Method:
-!	A CDL-file of heights is read and the user supplies
-!	a pressure level. The height of this level is interpolated.
+!   A CDL-file of heights is read and the user supplies
+!   a pressure level. The height of this level is interpolated.
 !
 !- ---------------------------------------------------------------------
       PROGRAM phgt

@@ -4,16 +4,17 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate monochromatic radiances using IPA.
+! Subroutine to calculate monochromatic radiances using IPA.
 !
 ! Method:
 !   In this subroutine a long vector for radiance calculations
 !   is set up using the information on the types of cloud present.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE calc_radiance_ipa_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_RADIANCE_IPA_MOD'
+CONTAINS
 SUBROUTINE calc_radiance_ipa(                                           &
 !                 Atmospheric Properties
       n_profile, n_layer, n_cloud_top                                   &
@@ -66,6 +67,7 @@ SUBROUTINE calc_radiance_ipa(                                           &
                      ip_sph_reduced_iter, ip_sph_mode_rad
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE sph_solver_mod, ONLY: sph_solver
 
   IMPLICIT NONE
 
@@ -359,7 +361,7 @@ SUBROUTINE calc_radiance_ipa(                                           &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CALC_RADIANCE_IPA'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Zero the output arrays ready for incrementing.
   IF (i_sph_mode == ip_sph_mode_flux) THEN
@@ -614,7 +616,6 @@ SUBROUTINE calc_radiance_ipa(                                           &
     n_long=ll
 
 
-! DEPENDS ON: sph_solver
     CALL sph_solver(                                                    &
 !                   Atmospheric sizes
         n_long, n_layer                                                 &
@@ -717,6 +718,7 @@ SUBROUTINE calc_radiance_ipa(                                           &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_radiance_ipa
+END MODULE calc_radiance_ipa_mod

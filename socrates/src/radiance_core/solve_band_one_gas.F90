@@ -11,6 +11,10 @@
 !   and the results are summed.
 !
 !- ---------------------------------------------------------------------
+MODULE solve_band_one_gas_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLVE_BAND_ONE_GAS_MOD'
+CONTAINS
 SUBROUTINE solve_band_one_gas(ierr                                      &
     , control, dimen, spectrum, atm, cld, bound, radout, i_band         &
 !                 Atmospheric Column
@@ -90,6 +94,9 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
                      ip_surf_alb_diff, ip_spherical_harmonic
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE augment_radiance_mod, ONLY: augment_radiance
+  USE augment_tiled_radiance_mod, ONLY: augment_tiled_radiance
+  USE monochromatic_radiance_mod, ONLY: monochromatic_radiance
 
   IMPLICIT NONE
 
@@ -388,22 +395,23 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
 
 
 ! Local variables.
-  INTEGER                                                               &
-      l
-!       Loop variable
-  INTEGER                                                               &
+  INTEGER ::                                                            &
+      i, l
+!       Loop variables
+  INTEGER ::                                                            &
       i_abs                                                             &
 !       Local indexing number of gas considered (=1 here)
-    , i_abs_pointer(nd_abs)                                             &
-!       Pointer array for monochromatic ESFTs
     , iex                                                               &
 !       Index of ESFT term
     , iex_minor(nd_abs)
 !       Index of ESFT term for minor gas (dummy here)
+  INTEGER, PARAMETER ::                                                 &
+      n_k_term_inner_dummy = 1                                          &
+!       Number of monochromatic calculations in inner loop (dummy here)
+    , nd_k_term_inner_dummy = 1
+!       Maximum number of k-terms in inner loops (dummy here)
   REAL (RealK) ::                                                       &
-      k_esft(nd_profile, nd_layer, nd_abs)                              &
-!       Current ESFT exponents for each absorber
-    , k_gas_abs(nd_profile, nd_layer)                                   &
+      k_gas_abs(nd_profile, nd_layer)                                   &
 !       Gaseous absorptive extinction
     , d_planck_flux_surface(nd_profile)                                 &
 !       Ground source function
@@ -461,16 +469,11 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOLVE_BAND_ONE_GAS'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The ESFT terms for the first gas in the band alone are used.
   i_abs=index_abs(1)
-  i_abs_pointer(1)=i_abs
   DO iex=1, n_abs_esft(i_abs)
-
-!   Set the ESFT coefficient.
-    k_esft(1:n_profile, 1:n_layer, i_abs)=                              &
-      k_abs_layer(1:n_profile, 1:n_layer, iex, i_abs)
 
 !   Set the appropriate boundary terms for the total
 !   upward and downward fluxes.
@@ -521,15 +524,14 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
 
     END IF
 
-! DEPENDS ON: gas_optical_properties
-    CALL gas_optical_properties(n_profile, n_layer                      &
-      , 1, i_abs_pointer, k_esft                                        &
-      , k_gas_abs                                                       &
-      , nd_profile, nd_layer, nd_abs                                    &
-      )
+!   Set the absorption for this absorber and k-term.
+    DO i=1, n_layer
+      DO l=1, n_profile
+        k_gas_abs(l, i) = k_abs_layer(l, i, iex, i_abs)
+      END DO
+    END DO
 
 
-! DEPENDS ON: monochromatic_radiance
     CALL monochromatic_radiance(ierr                                    &
       , control, atm, cld, bound                                        &
 !                 Atmospheric properties
@@ -547,7 +549,7 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
 !                 Options for solver
       , i_solver                                                        &
 !                 Gaseous propreties
-      , k_gas_abs                                                       &
+      , n_k_term_inner_dummy, k_gas_abs                                 &
 !                 Options for equivalent extinction
       , .FALSE., dummy_ke                                               &
 !                 Spectral region
@@ -597,7 +599,7 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
       , nd_cloud_type, nd_region, nd_overlap_coeff                      &
       , nd_max_order, nd_sph_coeff                                      &
       , nd_brdf_basis_fnc, nd_brdf_trunc, nd_viewing_level              &
-      , nd_direction, nd_source_coeff                                   &
+      , nd_direction, nd_source_coeff, nd_k_term_inner_dummy            &
       )
 
 
@@ -613,7 +615,6 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
       weight_blue_incr = &
         spectrum%solar%weight_blue(i_band)*w_abs_esft(iex, i_abs)
 
-! DEPENDS ON: augment_radiance
     CALL augment_radiance(control, spectrum, atm, bound, radout         &
       , i_band, iex, iex_minor                                          &
       , n_profile, n_layer, n_viewing_level, n_direction                &
@@ -648,7 +649,6 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
           END DO          
         END IF
       END IF
-! DEPENDS ON: augment_tiled_radiance
       CALL augment_tiled_radiance(control, spectrum, radout             &
         , i_band, iex, iex_minor                                        &
         , n_point_tile, n_tile, list_tile                               &
@@ -669,6 +669,7 @@ SUBROUTINE solve_band_one_gas(ierr                                      &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solve_band_one_gas
+END MODULE solve_band_one_gas_mod

@@ -7,7 +7,7 @@
 !+ Program to construct a weighted average of two CDL-files.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       PROGRAM wadd

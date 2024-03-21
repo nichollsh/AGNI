@@ -4,9 +4,13 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate transmission and reflection coefficients.
+! Subroutine to calculate transmission and reflection coefficients.
 !
 !- ---------------------------------------------------------------------
+MODULE trans_source_coeff_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TRANS_SOURCE_COEFF_MOD'
+CONTAINS
 SUBROUTINE trans_source_coeff(control, n_profile                        &
      , i_layer_first, i_layer_last                                      &
      , tau_dir, tau, sum, diff, lambda, sec_0, path_div                 &
@@ -133,7 +137,7 @@ SUBROUTINE trans_source_coeff(control, n_profile                        &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='TRANS_SOURCE_COEFF'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerances used in avoiding ill-conditioning, testing
 ! on any variable.
@@ -259,6 +263,7 @@ SUBROUTINE trans_source_coeff(control, n_profile                        &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE trans_source_coeff
+END MODULE trans_source_coeff_mod

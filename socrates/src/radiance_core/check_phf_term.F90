@@ -4,17 +4,18 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to check the number of terms in the phase function.
+! Subroutine to check the number of terms in the phase function.
 !
 ! Purpose:
 !   This subroutine checks the prescription of the phase function
 !   against the specified options to ensure that information is
 !   present to define all required moments.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE check_phf_term_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CHECK_PHF_TERM_MOD'
+CONTAINS
 SUBROUTINE check_phf_term(ierr                                          &
     , l_aerosol, n_aerosol, i_aerosol_parametrization                   &
     , n_aerosol_phf_term                                                &
@@ -129,7 +130,7 @@ SUBROUTINE check_phf_term(ierr                                          &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'CHECK_PHF_TERM'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Determine the order of terms for which information in the
 ! phase function will be required.
@@ -243,6 +244,7 @@ SUBROUTINE check_phf_term(ierr                                          &
     CALL ereport(RoutineName, ierr, cmessage)
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE check_phf_term
+END MODULE check_phf_term_mod

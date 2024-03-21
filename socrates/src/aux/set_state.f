@@ -7,11 +7,11 @@
 !+ Subroutine to set mapping between height and pressure.
 !
 ! Method:
-!	A reference profile is passed to the subroutine to define
-!	the atmospheric state. This is checked to see that it
-!	contains both pressure and height data. If not an error
-!	is deemed to have occurrred. If it does, the reference 
-!	state is set.
+!   A reference profile is passed to the subroutine to define
+!   the atmospheric state. This is checked to see that it
+!   contains both pressure and height data. If not an error
+!   is deemed to have occurrred. If it does, the reference 
+!   state is set.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE set_state(ierr

@@ -23,6 +23,7 @@ Subroutine particle_size_90 &
   USE measure_particle_pcf
   USE distribution_pcf
   USE def_std_io_icf
+  USE spline_fit_mod, ONLY: spline_fit
 !
 !
   IMPLICIT NONE
@@ -72,7 +73,7 @@ Subroutine particle_size_90 &
 !       size distribution
 !
 ! Subroutines called:
-  EXTERNAL open_file_in, spline_fit
+  EXTERNAL open_file_in
 !
 ! Functions called:
   REAL  (RealK) :: gamma_fnc
@@ -223,7 +224,7 @@ Subroutine particle_size_90 &
         DO
           READ(iu_input, '(A)', IOSTAT=ios) line
           IF (line(1:4) == '*END') EXIT
-	  BACKSPACE(iu_input)
+          BACKSPACE(iu_input)
 !         Read the dimension into a temporary variable and decide
 !         whether it is sufficiently distinct from the previous
 !         value not to cause problems with interpolation.
@@ -300,7 +301,7 @@ Subroutine particle_size_90 &
 !         is not clear, as shapes are not specified. An undefined
 !         shape is assumed at the moment. Whether this should be 
 !         made more explicit is for future thought.
-	  SizeDist%i_shape_particle = ip_shape_db_undefined
+          SizeDist%i_shape_particle = ip_shape_db_undefined
         ENDIF
 !
       ENDIF

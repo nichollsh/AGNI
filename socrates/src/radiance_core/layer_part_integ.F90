@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set the particular integral for one layer
+! Subroutine to set the particular integral for one layer
 !
 ! Purpose:
 !   This routine calculates the particular integral in the
@@ -17,10 +17,11 @@
 !   the naive form of the particular integral to maintain
 !   numerical conditioning.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE layer_part_integ_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'LAYER_PART_INTEG_MOD'
+CONTAINS
 SUBROUTINE layer_part_integ(                                            &
 !                 Basic sizes
       n_profile, ls_trunc, ms, n_red_eigensystem                        &
@@ -160,7 +161,7 @@ SUBROUTINE layer_part_integ(                                            &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='LAYER_PART_INTEG'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   upm_c=0.0
 
@@ -388,6 +389,7 @@ SUBROUTINE layer_part_integ(                                            &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE layer_part_integ
+END MODULE layer_part_integ_mod

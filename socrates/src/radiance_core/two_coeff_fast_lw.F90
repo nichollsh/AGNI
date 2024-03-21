@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate coefficients in the two-stream equations.
+! Subroutine to calculate coefficients in the two-stream equations.
 !
 ! Method:
 !   The basic two-stream coefficients in the differential
@@ -15,10 +15,11 @@
 !   Coefficients for determining the solar or infra-red source
 !   terms are also calculated.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE two_coeff_fast_lw_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TWO_COEFF_FAST_LW_MOD'
+CONTAINS
 SUBROUTINE two_coeff_fast_lw(n_profile                                  &
     , i_layer_first, i_layer_last                                       &
     , l_ir_source_quad, tau                                             &
@@ -104,7 +105,7 @@ SUBROUTINE two_coeff_fast_lw(n_profile                                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='TWO_COEFF_FAST_LW'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerances used in avoiding ill-conditioning, testing
 ! on any variable.
@@ -153,6 +154,7 @@ SUBROUTINE two_coeff_fast_lw(n_profile                                  &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE two_coeff_fast_lw
+END MODULE two_coeff_fast_lw_mod

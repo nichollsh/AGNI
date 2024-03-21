@@ -16,6 +16,10 @@
 !   scattering factors are thus calculated.
 !
 !- ---------------------------------------------------------------------
+MODULE grey_opt_prop_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'GREY_OPT_PROP_MOD'
+CONTAINS
 SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
     , n_profile, n_layer, p, t, density                                 &
     , n_order_phase, l_solar_phf, n_direction, cos_sol_view             &
@@ -75,6 +79,12 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
+  USE circumsolar_fraction_mod, ONLY: circumsolar_fraction
+  USE opt_prop_aerosol_mod, ONLY: opt_prop_aerosol
+  USE opt_prop_ice_cloud_mod, ONLY: opt_prop_ice_cloud
+  USE opt_prop_inhom_corr_cairns_mod, ONLY: opt_prop_inhom_corr_cairns
+  USE opt_prop_ukca_aerosol_mod, ONLY: opt_prop_ukca_aerosol
+  USE opt_prop_water_cloud_mod, ONLY: opt_prop_water_cloud
 
   IMPLICIT NONE
 
@@ -429,7 +439,7 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='GREY_OPT_PROP'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! If using a separate solar phase function that must be initialized.
   IF (l_solar_phf) THEN
@@ -645,7 +655,6 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
   IF (control%l_aerosol) THEN
 !   Include the effects of aerosol.
 !   Above clouds.
-! DEPENDS ON: opt_prop_aerosol
     CALL opt_prop_aerosol(ierr                                          &
       , n_profile, 1, n_cloud_top-1                                     &
       , n_order_phase, control%l_rescale, control%n_order_forward       &
@@ -707,7 +716,6 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
   IF (control%l_aerosol_mode) THEN
 !   Include the effects of UKCA aerosols.
 !   Above clouds.
-! DEPENDS ON: opt_prop_ukca_aerosol
     CALL opt_prop_ukca_aerosol(                                         &
         n_profile, 1, n_cloud_top-1                                     &
       , n_order_phase, control%l_rescale, control%n_order_forward       &
@@ -856,7 +864,6 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
 !---------------------------------------------------------------------- 
         IF (control%i_direct_tau == ip_direct_csr_scaling ) THEN
 ! Above cloud top.
-! DEPENDS ON: circumsolar_fraction
           CALL circumsolar_fraction(n_index                             &
            , indx, control%half_angle                                   &
            , ss_prop%phase_fnc_clr(:, i, 1)                             &
@@ -959,7 +966,7 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
 
     END IF
 
-    IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+    IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
     RETURN
 
   END IF
@@ -1105,7 +1112,6 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
 
 !       Include scattering by water droplets.
 
-! DEPENDS ON: opt_prop_water_cloud
         CALL opt_prop_water_cloud(ierr                                  &
           , n_profile, n_layer, n_cloud_top                             &
           , n_cloud_profile, i_cloud_profile                            &
@@ -1137,7 +1143,6 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
 
 !       Include scattering by ice crystals.
 
-! DEPENDS ON: opt_prop_ice_cloud
         CALL opt_prop_ice_cloud(ierr                                    &
           , n_profile, n_layer, n_cloud_top                             &
           , n_cloud_profile, i_cloud_profile                            &
@@ -1169,7 +1174,6 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
 
 !     Apply cloud inhomogeneity correction
 
-! DEPENDS ON: opt_prop_inhom_corr_cairns
       IF (control%i_inhom == ip_cairns) THEN
         CALL opt_prop_inhom_corr_cairns(                                &
             n_layer, n_cloud_top                                        &
@@ -1534,6 +1538,7 @@ SUBROUTINE grey_opt_prop(ierr, control, radout, i_band                  &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE grey_opt_prop
+END MODULE grey_opt_prop_mod

@@ -4,17 +4,18 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to solve a set of banded matrix equations.
+! Subroutine to solve a set of banded matrix equations.
 !
 ! Method:
 !       A set of bands matrix equations is solved using the
 !       standard method of Gaussian elimination. Diagonals are
 !       numbered downward (i.e. upper diagonals first).
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE band_solver_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'BAND_SOLVER_MOD'
+CONTAINS
 SUBROUTINE band_solver(n_matrix, n_equation                             &
     , iu, il                                                            &
     , a, b                                                              &
@@ -82,7 +83,7 @@ SUBROUTINE band_solver(n_matrix, n_equation                             &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='BAND_SOLVER'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   iu1=iu+1
 ! Eliminative phase.
@@ -143,6 +144,7 @@ SUBROUTINE band_solver(n_matrix, n_equation                             &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE band_solver
+END MODULE band_solver_mod

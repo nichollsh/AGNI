@@ -37,6 +37,7 @@ PROGRAM Ice_Scatter
   USE def_sct_db
   USE def_db_crystal_geometry
   USE def_db_ss_mono
+  USE calc_gauss_weight_90_mod, ONLY: calc_gauss_weight_90
 !
 !
   IMPLICIT NONE
@@ -195,40 +196,40 @@ PROGRAM Ice_Scatter
 
      SUBROUTINE size_integral_90                  &
          (nd_integral, npd_panel, npd_refinement, &
-	  npd_point, npd_panel_point,             &
+          npd_point, npd_panel_point,             &
           p_panel_ratio, SizeDist,                &
-	  number_total, proj_area_total,          &
-	  volume_total, dm_average,               &
-		        ierr, DBGeom)
-     
+          number_total, proj_area_total,          &
+          volume_total, dm_average,               &
+          ierr, DBGeom)
+
           USE realtype_rd
-	  USE def_std_io_icf
-	  USE shape_particle_pcf
-	  USE def_size_dist
-	  USE prec_integral_tcf
-	  USE error_pcf
-	  USE rad_ccf, ONLY: pi
-	  USE def_db_crystal_geometry
+          USE def_std_io_icf
+          USE shape_particle_pcf
+          USE def_size_dist
+          USE prec_integral_tcf
+          USE error_pcf
+          USE rad_ccf, ONLY: pi
+          USE def_db_crystal_geometry
 
-	  INTEGER, Intent(IN) :: nd_integral
+          INTEGER, Intent(IN) :: nd_integral
           INTEGER, Intent(IN) :: npd_panel
-	  INTEGER, Intent(IN) :: npd_refinement
-	  INTEGER, Intent(IN) :: npd_point
-	  INTEGER, Intent(IN) :: npd_panel_point
-	  REAL  (RealK), Intent(IN) :: p_panel_ratio
-	  TYPE (STR_size_dist), Intent(IN) :: SizeDist
-	  REAL  (RealK), INTENT(OUT) :: number_total
-	  REAL  (RealK), INTENT(OUT) :: proj_area_total
-	  REAL  (RealK), INTENT(OUT) :: volume_total
+          INTEGER, Intent(IN) :: npd_refinement
+          INTEGER, Intent(IN) :: npd_point
+          INTEGER, Intent(IN) :: npd_panel_point
+          REAL  (RealK), Intent(IN) :: p_panel_ratio
+          TYPE (STR_size_dist), Intent(IN) :: SizeDist
+          REAL  (RealK), INTENT(OUT) :: number_total
+          REAL  (RealK), INTENT(OUT) :: proj_area_total
+          REAL  (RealK), INTENT(OUT) :: volume_total
           REAL  (RealK), INTENT(OUT) :: dm_average
-	  INTEGER, Intent(InOut) :: ierr      
-	  TYPE  (STR_db_cryst_geom), Intent(IN), Optional :: DBGeom
-	
-	END SUBROUTINE SIZE_INTEGRAL_90
-	
-      END INTERFACE
+          INTEGER, Intent(InOut) :: ierr      
+          TYPE  (STR_db_cryst_geom), Intent(IN), Optional :: DBGeom
 
-	   
+     END SUBROUTINE SIZE_INTEGRAL_90
+
+  END INTERFACE
+
+
 !
 !
 ! Set the flag for interactive operation

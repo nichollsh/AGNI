@@ -42,7 +42,7 @@
 !
 !     Declaration of variables:
 !
-      INTEGER	!,Intent(OUT)
+      INTEGER   !,Intent(OUT)
      &    ierr
 !            Error flag
       INCLUDE 'cdl_struc.finc'
@@ -67,7 +67,7 @@
 !           Type of angular integration
      &  , isolir
 !           Spectral region
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*(*)
 !           Name of input file
      &  , field_name*(*)

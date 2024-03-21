@@ -1058,7 +1058,7 @@ contains
        status = nf90_put_att(fileID,varID(31),"standard_name", "air_pressure_at_cloud_top")
        if (status .ne. nf90_NoERR) print*,trim(nf90_strerror(status))         
     endif
-    if (associated(cospOUT%isccp_fq)) then	    
+    if (associated(cospOUT%isccp_fq)) then
        status = nf90_def_var(fileID,"clisccp",nf90_float, (/dimID(1),dimID(5),dimID(7)/),varID(32))
        if (status .ne. nf90_NoERR) print*,trim(nf90_strerror(status))
        status = nf90_put_att(fileID,varID(32),"long_name","ISCCP joint-PDF of cloud top pressure and optical depth")
@@ -1090,7 +1090,7 @@ contains
        status = nf90_put_att(fileID,varID(34),"standard_name", "cloud_top_altitude")
        if (status .ne. nf90_NoERR) print*,trim(nf90_strerror(status))  
     endif
-    if (associated(cospOUT%misr_cldarea)) then	    
+    if (associated(cospOUT%misr_cldarea)) then
        status = nf90_def_var(fileID,"misr_cldarea",nf90_float, (/dimID(1)/),varID(35))
        if (status .ne. nf90_NoERR) print*,trim(nf90_strerror(status))
        status = nf90_put_att(fileID,varID(35),"long_name","MISR cloud cover")
@@ -1760,7 +1760,7 @@ contains
        status = nf90_put_var(fileID,varID(31),cospOUT%isccp_boxptop)
        if (status .ne. nf90_NoERR) print*,trim(nf90_strerror(status))
     endif
-    if (associated(cospOUT%isccp_fq)) then	    
+    if (associated(cospOUT%isccp_fq)) then
        status = nf90_put_var(fileID,varID(32),cospOUT%isccp_fq)
        if (status .ne. nf90_NoERR) print*,trim(nf90_strerror(status))
     endif
@@ -1773,7 +1773,7 @@ contains
        status = nf90_put_var(fileID,varID(34),cospOUT%misr_meanztop)
        if (status .ne. nf90_NoERR) print*,trim(nf90_strerror(status))
     endif
-    if (associated(cospOUT%misr_cldarea)) then	    
+    if (associated(cospOUT%misr_cldarea)) then
        status = nf90_put_var(fileID,varID(35),cospOUT%misr_cldarea)
        if (status .ne. nf90_NoERR) print*,trim(nf90_strerror(status))
     endif

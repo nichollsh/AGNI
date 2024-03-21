@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to solve the two-stream equations in a triple column.
+! Subroutine to solve the two-stream equations in a triple column.
 !
 ! Method:
 !   The atmospheric column is divided into three regions
@@ -13,10 +13,11 @@
 !   appropriate coupling of the fluxes at the boundaries
 !   of layers.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE triple_column_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TRIPLE_COLUMN_MOD'
+CONTAINS
 SUBROUTINE triple_column(ierr                                           &
      , control, bound                                                   &
 !                 Atmospheric properties
@@ -74,8 +75,15 @@ SUBROUTINE triple_column(ierr                                           &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
-
+  USE column_solver_mod, ONLY: column_solver
   USE set_n_source_coeff_mod, ONLY: set_n_source_coeff
+  USE ir_source_mod, ONLY: ir_source
+  USE solver_triple_app_scat_mod, ONLY: solver_triple_app_scat
+  USE solver_triple_mod, ONLY: solver_triple
+  USE solver_triple_hogan_mod, ONLY: solver_triple_hogan
+  USE triple_solar_source_mod, ONLY: triple_solar_source
+  USE two_coeff_region_mod, ONLY: two_coeff_region
+  USE two_coeff_region_fast_lw_mod, ONLY: two_coeff_region_fast_lw
 
   IMPLICIT NONE
 
@@ -247,7 +255,7 @@ SUBROUTINE triple_column(ierr                                           &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'TRIPLE_COLUMN'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the number of source coefficients for the approximation
   n_source_coeff=set_n_source_coeff(isolir, l_ir_source_quad)
@@ -255,7 +263,6 @@ SUBROUTINE triple_column(ierr                                           &
 
   IF ( (i_scatter_method == ip_scatter_full) .OR.                       &
        (i_scatter_method == ip_scatter_approx) ) THEN
-! DEPENDS ON: two_coeff_region
     CALL two_coeff_region(ierr, control                                 &
       , n_profile, n_layer, n_cloud_top                                 &
       , i_2stream, n_source_coeff                                       &
@@ -273,7 +280,6 @@ SUBROUTINE triple_column(ierr                                           &
       )
   ELSE IF ( (i_scatter_method == ip_no_scatter_abs) .OR.                &
             (i_scatter_method == ip_no_scatter_ext) ) THEN
-! DEPENDS ON: two_coeff_region_fast_lw
     CALL two_coeff_region_fast_lw(ierr                                  &
       , n_profile, n_layer, n_cloud_top                                 &
       , l_ir_source_quad, n_source_coeff                                &
@@ -297,7 +303,6 @@ SUBROUTINE triple_column(ierr                                           &
         n_top=n_cloud_top
       END IF
 
-! DEPENDS ON: ir_source
       CALL ir_source(n_profile, n_top, n_layer                          &
         , source_coeff(1, 1, 1, k), diff_planck                         &
         , l_ir_source_quad, diff_planck_2                               &
@@ -351,7 +356,6 @@ SUBROUTINE triple_column(ierr                                           &
 
   IF (isolir == ip_solar) THEN
 
-! DEPENDS ON: triple_solar_source
     CALL triple_solar_source(control, bound                             &
       , n_profile, n_layer, n_cloud_top                                 &
       , n_region, flux_inc_direct                                       &
@@ -408,7 +412,6 @@ SUBROUTINE triple_column(ierr                                           &
 
   CASE (ip_solver_triple)
 
-! DEPENDS ON: solver_triple
     CALL solver_triple(n_profile, n_layer, n_cloud_top                  &
       , trans(1, 1, ip_region_clear)                                    &
       , reflect(1, 1, ip_region_clear)                                  &
@@ -451,7 +454,6 @@ SUBROUTINE triple_column(ierr                                           &
 
   CASE (ip_solver_triple_hogan)
 
-! DEPENDS ON: solver_triple_hogan
     CALL solver_triple_hogan(n_profile, n_layer, n_cloud_top            &
       , trans(1, 1, ip_region_clear)                                    &
       , reflect(1, 1, ip_region_clear)                                  &
@@ -494,7 +496,6 @@ SUBROUTINE triple_column(ierr                                           &
 
   CASE (ip_solver_triple_app_scat)
 
-! DEPENDS ON: solver_triple_app_scat
     CALL solver_triple_app_scat(n_profile, n_layer, n_cloud_top         &
       , trans(1, 1, ip_region_clear)                                    &
       , reflect(1, 1, ip_region_clear)                                  &
@@ -547,7 +548,6 @@ SUBROUTINE triple_column(ierr                                           &
 
   IF (l_clear) THEN
 
-! DEPENDS ON: column_solver
     CALL column_solver(ierr, control, bound, sph%common, sph%clear      &
       , n_profile, n_layer                                              &
       , i_scatter_method, i_solver_clear                                &
@@ -567,6 +567,7 @@ SUBROUTINE triple_column(ierr                                           &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE triple_column
+END MODULE triple_column_mod

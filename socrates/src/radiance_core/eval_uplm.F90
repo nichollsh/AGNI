@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate spherical harmonics excluding expoential.
+! Subroutine to calculate spherical harmonics excluding expoential.
 !
 ! Purpose:
 !   Spherical harmonics, Upsilon_lm, are calculated for given directions
@@ -13,10 +13,11 @@
 ! Method:
 !   Y_mm is known so upward recurrence on l is used.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE eval_uplm_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'EVAL_UPLM_MOD'
+CONTAINS
 SUBROUTINE eval_uplm(ms, n_max_order, n_direction, x                    &
      , up_lm                                                            &
      , nd_direction                                                     &
@@ -76,7 +77,7 @@ SUBROUTINE eval_uplm(ms, n_max_order, n_direction, x                    &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='EVAL_UPLM'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Start the recurrence for Y_mm.
   product=1.0e+00_RealK
@@ -122,6 +123,7 @@ SUBROUTINE eval_uplm(ms, n_max_order, n_direction, x                    &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE eval_uplm
+END MODULE eval_uplm_mod

@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate basis functions for the diffuse albedo.
+! Subroutine to calculate basis functions for the diffuse albedo.
 !
 ! Purpose:
 !   This routine takes the BRDF supplied and calculates a diffuse
@@ -16,10 +16,11 @@
 !   so direct calculation is used. See calc_brdf.f for a note on
 !   the symmetries of the BRDF and storage.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE diff_albedo_basis_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'DIFF_ALBEDO_BASIS_MOD'
+CONTAINS
 SUBROUTINE diff_albedo_basis(n_brdf_basis_fnc                           &
     , ls_brdf_trunc, f_brdf                                             &
     , uplm_zero                                                         &
@@ -90,7 +91,7 @@ SUBROUTINE diff_albedo_basis(n_brdf_basis_fnc                           &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='DIFF_ALBEDO_BASIS'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO j=1, n_brdf_basis_fnc
     diffuse_alb_basis(j)=0.0e+00_RealK
@@ -117,6 +118,7 @@ SUBROUTINE diff_albedo_basis(n_brdf_basis_fnc                           &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE diff_albedo_basis
+END MODULE diff_albedo_basis_mod

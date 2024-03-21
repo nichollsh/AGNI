@@ -7,7 +7,7 @@
 !+ Subroutine to read a file of averaged scattering data.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE read_averaged_scatter(ierr, file_in
@@ -40,7 +40,7 @@
       INTEGER, Intent(INOUT) ::
      &    ierr
 !           Error flag
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_in*80
 !           Name of file to read
       INTEGER, Intent(OUT) ::

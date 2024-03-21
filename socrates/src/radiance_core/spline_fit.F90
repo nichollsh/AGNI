@@ -4,16 +4,16 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set coefficients for a spline fit.
+! Subroutine to set coefficients for a spline fit.
 !
 ! Method:
 !   The second derivatives of the cubic spline are found by solving
 !   a matrix equation using natural boundary conditions.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE spline_fit_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE spline_fit(n_data, x, y, y2)
 
   USE realtype_rd, ONLY: RealK
@@ -69,3 +69,4 @@ SUBROUTINE spline_fit(n_data, x, y, y2)
   END DO
 
 END SUBROUTINE spline_fit
+END MODULE spline_fit_mod

@@ -40,7 +40,7 @@
      &  , dimension_size(nd_cdl_dimen)
 !           SIzes of the CDL-dimensions
 !
-      INTEGER	!,Intent(OUT)
+      INTEGER   !,Intent(OUT)
      &    calc_cdl_stride
 !            Calculated stride
 !

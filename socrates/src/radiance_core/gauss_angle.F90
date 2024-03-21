@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate fluxes using gaussian quadrature.
+! Subroutine to calculate fluxes using gaussian quadrature.
 !
 ! Method:
 !   Fluxes are calculated by using gaussian quadrature for
@@ -16,10 +16,11 @@
 !   factors for the two-stream approximations are determined
 !   from the gaussian points.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE gauss_angle_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'GAUSS_ANGLE_MOD'
+CONTAINS
 SUBROUTINE gauss_angle(n_profile, n_layer                               &
      , n_order_gauss                                                    &
      , tau                                                              &
@@ -35,6 +36,7 @@ SUBROUTINE gauss_angle(n_profile, n_layer                               &
   USE gaussian_weight_pcf, ONLY : gauss_weight, gauss_point
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE monochromatic_ir_radiance_mod, ONLY: monochromatic_ir_radiance
 
   IMPLICIT NONE
 
@@ -99,7 +101,7 @@ SUBROUTINE gauss_angle(n_profile, n_layer                               &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='GAUSS_ANGLE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the source function.
   DO l=1, n_profile
@@ -124,7 +126,6 @@ SUBROUTINE gauss_angle(n_profile, n_layer                               &
       /(gauss_point(k, n_order_gauss)+1.0e+00_RealK)
 
 !   Calculate the radiance at this angle.
-! DEPENDS ON: monochromatic_ir_radiance
     CALL monochromatic_ir_radiance(n_profile, n_layer                   &
       , tau                                                             &
       , radiance_inc                                                    &
@@ -147,6 +148,7 @@ SUBROUTINE gauss_angle(n_profile, n_layer                               &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE gauss_angle
+END MODULE gauss_angle_mod

@@ -30,7 +30,7 @@
       INTEGER, Intent(IN) ::
      &    iunit
 !           Unit number
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    request*(*)
 !           Request prompting for file
 !

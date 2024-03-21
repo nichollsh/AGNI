@@ -202,7 +202,7 @@ PROGRAM icedb2bin
                  ice_sct%d_angle) > 1.0E-02*ice_sct%d_angle) THEN
         WRITE(*,*) n_angle, ABS(ice_sct%phf_angle(n_angle) - &
                                 ice_sct%phf_angle(n_angle-1) - &
-			      ice_sct%d_angle)
+                                ice_sct%d_angle)
           ice_sct%l_uniform=.FALSE.
         ENDIF
       ENDIF

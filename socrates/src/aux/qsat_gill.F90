@@ -7,7 +7,7 @@
 !+ Subroutine to calculate specific humidities from Gill's formula.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE qsat_gill(sat_spec_hum, t, p, n_profile)

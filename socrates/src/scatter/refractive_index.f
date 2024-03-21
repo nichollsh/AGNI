@@ -7,8 +7,8 @@
 !+ Subroutine to return the complex refractive index.
 !
 ! Method:
-!	The real and imaginary parts of the refractive index are
-!	represented as cubic splines.
+!   The real and imaginary parts of the refractive index are
+!   represented as cubic splines.
 !
 !- ---------------------------------------------------------------------
       FUNCTION refractive_index(ierr, nd_refract
@@ -20,6 +20,7 @@
       USE realtype_rd
       USE def_std_io_icf
       USE error_pcf
+      USE spline_evaluate_mod, ONLY: spline_evaluate
 !
 !
       IMPLICIT NONE
@@ -61,11 +62,6 @@
 !           Interpolated real part
      &  , im_refract_index
 !           Interpolated imaginary part
-!
-!     Subroutines called:
-      EXTERNAL
-     &    spline_evaluate
-!
 !
 !
       CALL spline_evaluate(ierr, n_refract, wavelength, re_refract

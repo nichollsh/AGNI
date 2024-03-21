@@ -7,6 +7,10 @@
 ! Subroutine to calculate fluxes in a column ignoring scattering.
 !
 !- ---------------------------------------------------------------------
+MODULE solver_no_scat_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLVER_NO_SCAT_MOD'
+CONTAINS
 SUBROUTINE solver_no_scat(n_profile, n_layer                            &
     , trans, s_down, s_up                                               &
     , diffuse_albedo, flux_inc_down, d_planck_flux_surface              &
@@ -65,7 +69,7 @@ SUBROUTINE solver_no_scat(n_profile, n_layer                            &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOLVER_NO_SCAT'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Downward fluxes.
   DO l=1, n_profile
@@ -89,6 +93,7 @@ SUBROUTINE solver_no_scat(n_profile, n_layer                            &
     END DO
   END DO
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solver_no_scat
+END MODULE solver_no_scat_mod

@@ -51,7 +51,7 @@
 !
 !     Declaration of variables:
 !
-      INTEGER	!,Intent(OUT)
+      INTEGER   !,Intent(OUT)
      &    ierr
 !            Error flag
 !
@@ -70,7 +70,7 @@
      &  , nd_viewing_level
 !           Allowed size for levels where radiances are required
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*(*)
 !           Name of input file
 !

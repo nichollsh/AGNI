@@ -5,6 +5,8 @@
 ! *****************************COPYRIGHT*******************************
 !
       SUBROUTINE seaalbedo(zenith, wavelength, albedo)
+      USE realtype_rd, ONLY: RealK
+      USE spline_evaluate_mod, ONLY: spline_evaluate
       IMPLICIT NONE
       
       ! Arguments with intent(in)
@@ -20,11 +22,13 @@
       REAL*8 wavelength
       REAL*8 albedo
 
-      REAL n_pure_water, n_sea_water
+      REAL(RealK) n_pure_water
+      REAL n_sea_water
       REAL salinity, temperature, psi
       REAL vent10, vent41feet, ww, pi
       PARAMETER (pi=3.1415926)
-      REAL rfresnel, rfres_plat, rmousse, rmorel
+      REAL(RealK) rmorel
+      REAL rfresnel, rfres_plat, rmousse
       PARAMETER (salinity=35.0)
       PARAMETER (temperature=20.0) 
       PARAMETER (vent10=7.0)
@@ -44,9 +48,9 @@ C     prevent going out of range
       wavelength = wavelength * 1.e6
  
 C-donne l'indice de refraction de l'eau pure a la l.o. wavelength a 25oC
-      CALL m_pure_water(SNGL(wavelength), n_pure_water)
+      CALL m_pure_water(REAL(wavelength,RealK), n_pure_water)
 C-donne l'indice de refraction de l'eau de mer. 
-      CALL m_sea_water(n_pure_water, salinity, 
+      CALL m_sea_water(SNGL(n_pure_water), salinity, 
      &                 temperature, n_sea_water)
 C-donne le vent aux bonnes altitudes
       CALL vent_z(vent10, 10.0, 12.464, vent41feet)
@@ -56,12 +60,12 @@ C-cacule la reflection de Fresnel
       IF (rfresnel.GT.1.0) rfresnel = rfres_plat
       rfresnel=MAX(0.02, rfresnel)
 C-calcule la surface des whitecaps et leur albedo
-      CALL mousse(SNGL(wavelength), vent10, ww, rmousse)
+      CALL mousse(wavelength, vent10, ww, rmousse)
 C-calcule l'albedo de ce qui remonte 
-      CALL morel(SNGL(wavelength), rmorel)
+      CALL morel(wavelength, rmorel)
 C-somme les contributions
       albedo = (1.0d0-DBLE(ww))*
-     &		(DBLE(rfresnel+rmorel))+DBLE(ww)*DBLE(rmousse)
+     &      (DBLE(rfresnel+rmorel))+DBLE(ww)*DBLE(rmousse)
       albedo = MIN(albedo, 1.0d0)
       
       RETURN
@@ -79,12 +83,15 @@ C=================================================================
       END
 C---------------------------------------------------------
       SUBROUTINE morel(wv,rmorel)
+      USE realtype_rd, ONLY: RealK
+      USE spline_evaluate_mod, ONLY: spline_evaluate
+      USE spline_fit_mod, ONLY: spline_fit
       IMPLICIT NONE
       INTEGER ierr
       INTEGER wvmax
       PARAMETER (wvmax=15)
-      REAL wvi(wvmax), rmoreli(wvmax), rmoreli2(wvmax)
-      REAL wv, rmorel 
+      REAL(RealK) wvi(wvmax), rmoreli(wvmax), rmoreli2(wvmax)
+      REAL(RealK) wv, rmorel 
       DATA wvi/0.2, 0.3, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65,
      .         0.7, 0.8, 0.9, 1.0,  2.0,  3.0, 4.0/
       DATA rmoreli/0.10, 0.10, 0.10, 0.0898, 0.0424, 0.0137, 
@@ -98,6 +105,9 @@ C---------------------------------------------------------
       END
 c----------------------------------------------------------
       SUBROUTINE m_pure_water(wv,m)
+      USE realtype_rd, ONLY: RealK
+      USE spline_evaluate_mod, ONLY: spline_evaluate
+      USE spline_fit_mod, ONLY: spline_fit
       IMPLICIT NONE
 C----------------------------------------------------------
 C--REFERENCE = Jerlov, Marine Optics, 1976
@@ -111,8 +121,8 @@ c-------Jerlov
 c      PARAMETER (wvmax=10) 
 c-------Hale and Querry 1973
       PARAMETER (wvmax=65)
-      REAL mi(wvmax), wvi(wvmax)
-      REAL y2(wvmax)
+      REAL(RealK) mi(wvmax), wvi(wvmax)
+      REAL(RealK) y2(wvmax)
 c-------Jerlov
 c      DATA mi/1.3773, 1.3569, 1.3480, 1.3433, 1.3403, 
 c     .        1.3371, 1.3330, 1.3289, 1.3247, 1.3210/
@@ -139,7 +149,7 @@ c-------Hale and Querry 1973
      .         3.050, 3.100, 3.150, 3.200, 3.250, 3.300, 3.350, 
      .         3.400, 3.450, 3.500, 3.600, 3.700, 3.800, 3.900,
      .         4.000, 4.100/
-      REAL m, wv
+      REAL(RealK) m, wv
 
       CALL spline_fit(wvmax, wvi, mi, y2)
       CALL spline_evaluate(ierr, wvmax, wvi, mi, y2, wv, m)
@@ -148,6 +158,9 @@ c-------Hale and Querry 1973
 C-----------------------------------------------------------------
 
       SUBROUTINE mousse(wavelength,vent10,ww,reflectance)
+      USE realtype_rd, ONLY: RealK
+      USE spline_evaluate_mod, ONLY: spline_evaluate
+      USE spline_fit_mod, ONLY: spline_fit
       IMPLICIT NONE
 C----------------------------------------------------
 C--REFERENCE : Koepke 1984
@@ -163,8 +176,8 @@ C----------------------------------------------------
       REAL vent10, ww 
       INTEGER nwvmax
       PARAMETER (nwvmax=37)
-      REAL wv(1:nwvmax), whitlock(1:nwvmax)
-      REAL whitlock2(1:nwvmax)
+      REAL(RealK) wv(1:nwvmax), whitlock(1:nwvmax)
+      REAL(RealK) whitlock2(1:nwvmax)
       DATA wv/0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
      .        1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,
      .        1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 
@@ -177,9 +190,10 @@ C----------------------------------------------------
      .              0.08, 0.06, 0.01, 0.00, 0.00, 0.00, 0.00, 
      .              0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00,
      .              0.00, 0.00/
-      REAL xx, sp, f_ef_p, f_ef_s, wavelength 
+      REAL(RealK) wavelength, reflec
+      REAL xx, sp, f_ef_p, f_ef_s
       PARAMETER (xx=0.5, f_ef_p=0.4, f_ef_s=0.18)
-      REAL wp, ws, f_ef, reflec, reflectance
+      REAL wp, ws, f_ef, reflectance
 
       CALL spline_fit(nwvmax, wv, whitlock, whitlock2)
       sp=0.

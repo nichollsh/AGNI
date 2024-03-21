@@ -7,8 +7,8 @@
 !+ Subroutine to read a SAMSON file.
 !
 ! Method:
-!	The input file is opened and the standard reading routine
-!	is called. This is a restricted version for conversion of
+!   The input file is opened and the standard reading routine
+!   is called. This is a restricted version for conversion of
 !       formats. Only fields on pressure levels can be read.
 !
 !- ---------------------------------------------------------------------
@@ -40,7 +40,7 @@
 !           Size allocated for profiles
      &  , nd_layer
 !           Size allocated for layers
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*(*)
 !           Name of input file
 !

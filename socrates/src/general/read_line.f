@@ -7,7 +7,7 @@
 !+ Subroutine to read a line giving the gases in a band.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE read_line(ierr, i, prompt, max_size
@@ -26,7 +26,7 @@
 !
 !
 !     Dummy arguments
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    prompt*(*)
 !           Prompt to user
       INTEGER, Intent(IN) ::

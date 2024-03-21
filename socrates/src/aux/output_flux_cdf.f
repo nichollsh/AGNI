@@ -87,7 +87,7 @@
 !           Longitudes
 !
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    base_name*(*)
 !           Base name of input file
      &  , name_vert_coord*(*)
@@ -139,7 +139,7 @@
      &  , point
 !           Point addressed in CDL-array
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*80
 !           Name of input file
 !

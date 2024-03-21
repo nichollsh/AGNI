@@ -7,8 +7,8 @@
 !+ Program to increment a CDL-field.
 !
 ! Method:
-!	An increment is added to a CDL-field within a range of
-!	pressures.
+!   An increment is added to a CDL-field within a range of
+!   pressures.
 !
 !- ---------------------------------------------------------------------
       PROGRAM inc_field

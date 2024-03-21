@@ -7,12 +7,12 @@
 !+ Program to calculate heating rates from net fluxes.
 !
 ! Method:
-!	From the net fluxes, the net flow of energy into a layer is
-!	determined. From the pressures the mass within the layer
-!	can be found. The heating rates are now calculated assuming
-!	that the specific heat may be taken as that of dry air.
-!	The heating rates are allocated pressurea at the mid-points
-!	of layers.
+!   From the net fluxes, the net flow of energy into a layer is
+!   determined. From the pressures the mass within the layer
+!   can be found. The heating rates are now calculated assuming
+!   that the specific heat may be taken as that of dry air.
+!   The heating rates are allocated pressurea at the mid-points
+!   of layers.
 !
 !- ---------------------------------------------------------------------
       PROGRAM nettohr

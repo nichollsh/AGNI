@@ -7,8 +7,8 @@
 !+ Program to convert from dewpoints to q.
 !
 ! Method:
-!	The dewpoints are read in and an approprite routine
-!	is called to determine the saturated mixing ratio.
+!   The dewpoints are read in and an approprite routine
+!   is called to determine the saturated mixing ratio.
 !
 !- ---------------------------------------------------------------------
       PROGRAM dewtoq

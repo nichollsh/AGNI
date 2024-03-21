@@ -40,13 +40,13 @@
 !
 !     Dummy arguments:
 !
-      INTEGER	!,Intent(OUT)
+      INTEGER   !,Intent(OUT)
      &    ierr
 !            Error flag
 !
       INCLUDE 'cdl_struc.finc'
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*(*)
 !           Name of input file
      &  , var_find*(*)

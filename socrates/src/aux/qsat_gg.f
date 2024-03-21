@@ -7,7 +7,7 @@
 !+ Subroutine to find saturated mixing ratio of water.
 !
 ! Method:
-!	The standard Goff-Gratsch formula is implemented.
+!   The standard Goff-Gratsch formula is implemented.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE qsat_gg(qs, t, p)

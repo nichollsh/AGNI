@@ -13,6 +13,9 @@
 !   is actually zero.
 !
 !------------------------------------------------------------------------------
+MODULE legendre_weight_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE legendre_weight(x, n, lpy, wt)
 
   USE realtype_rd, ONLY: RealK
@@ -56,3 +59,4 @@ SUBROUTINE legendre_weight(x, n, lpy, wt)
   wt=2.0_RealK/MAX((REAL(n, RealK)*d_lpy*lpy_m2),TINY(d_lpy))
 
 END SUBROUTINE legendre_weight
+END MODULE legendre_weight_mod

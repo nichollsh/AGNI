@@ -12,6 +12,10 @@
 !   are then used in a full calculation involving the major gas.
 !
 !- ---------------------------------------------------------------------
+MODULE solve_band_k_eqv_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLVE_BAND_K_EQV_MOD'
+CONTAINS
 SUBROUTINE solve_band_k_eqv(ierr                                        &
     , control, dimen, spectrum, atm, cld, bound, radout                 &
 !                   Atmospheric properties
@@ -103,6 +107,12 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
   USE vectlib_mod, ONLY: exp_v
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE augment_radiance_mod, ONLY: augment_radiance
+  USE augment_tiled_radiance_mod, ONLY: augment_tiled_radiance
+  USE mcica_sample_mod, ONLY: mcica_sample
+  USE monochromatic_gas_flux_mod, ONLY: monochromatic_gas_flux
+  USE monochromatic_radiance_mod, ONLY: monochromatic_radiance
+  USE scale_absorb_mod, ONLY: scale_absorb
 
   IMPLICIT NONE
 
@@ -461,17 +471,10 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
 
 
 ! Local variables.
-  INTEGER                                                               &
-      i                                                                 &
-!       Loop variable
-    , j                                                                 &
-!       Loop variable
-    , k                                                                 &
-!       Loop variable
-    , l
-!       Loop variable
-  INTEGER                                                               &
-      i_gas                                                             &
+  INTEGER ::                                                            &
+      i, j, k, l                                                        &
+!       Loop variables
+    , i_gas                                                             &
 !       Index of main gas
     , i_gas_band                                                        &
 !       Index of active gas
@@ -481,6 +484,11 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
 !       Index of ESFT term for minor gas (dummy here)
     , i_scatter_method
 !       Method of treating scattering
+  INTEGER, PARAMETER ::                                                 &
+      n_k_term_inner_dummy = 1                                          &
+!       Number of monochromatic calculations in inner loop (dummy here)
+    , nd_k_term_inner_dummy = 1
+!       Maximum number of k-terms in inner loops (dummy here)
   REAL (RealK) ::                                                       &
       d_planck_flux_surface(nd_profile)                                 &
 !       Difference in Planckian fluxes between the surface
@@ -580,7 +588,7 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOLVE_BAND_K_EQV'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   i_gas=index_absorb(1, i_band)
 
@@ -629,7 +637,6 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
 
 !       Rescale the amount of gas for this absorber if required.
         IF (i_scale_esft(i_band, i_gas_band) == ip_scale_term) THEN
-! DEPENDS ON: scale_absorb
           CALL scale_absorb(ierr, n_profile, n_layer                    &
             , gas_mix_ratio(1, 1, i_gas_band), p, t                     &
             , i_top                                                     &
@@ -840,7 +847,6 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
 !       Calculate the fluxes with just this gas. flux_term is
 !       passed to both the direct and total fluxes as we do
 !       not calculate any direct flux here.
-! DEPENDS ON: monochromatic_gas_flux
         CALL monochromatic_gas_flux(n_profile, n_layer                  &
           , tau_gas                                                     &
           , isolir, zen_0, flux_inc_direct, flux_inc_down               &
@@ -1050,7 +1056,6 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
 
     IF (i_cloud == ip_cloud_mcica) THEN
 
-! DEPENDS ON: mcica_sample
       CALL mcica_sample(ierr                                            &
         , control, dimen, atm, cld, bound                               &
 !                   Atmospheric properties
@@ -1123,7 +1128,6 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
 
     ELSE
 
-! DEPENDS ON: monochromatic_radiance
       CALL monochromatic_radiance(ierr                                  &
         , control, atm, cld, bound                                      &
 !                   Atmospheric properties
@@ -1142,7 +1146,7 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
 !                   Options for solver
         , i_solver                                                      &
 !                   Gaseous propreties
-        , k_gas_abs                                                     &
+        , n_k_term_inner_dummy, k_gas_abs                               &
 !                   Options for equivalent extinction
         , .TRUE., adjust_solar_ke                                       &
 !                   Spectral region
@@ -1192,7 +1196,7 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
         , nd_cloud_type, nd_region, nd_overlap_coeff                    &
         , nd_max_order, nd_sph_coeff                                    &
         , nd_brdf_basis_fnc, nd_brdf_trunc, nd_viewing_level            &
-        , nd_direction, nd_source_coeff                                 &
+        , nd_direction, nd_source_coeff, nd_k_term_inner_dummy          &
         )
 
     END IF
@@ -1204,7 +1208,6 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
     IF (control%l_blue_flux_surf) &
       weight_blue_incr = spectrum%solar%weight_blue(i_band)*esft_weight
 
-! DEPENDS ON: augment_radiance
     CALL augment_radiance(control, spectrum, atm, bound, radout         &
       , i_band, iex, iex_minor                                          &
       , n_profile, n_layer, n_viewing_level, n_direction                &
@@ -1239,7 +1242,6 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
           END DO
         END IF
       END IF
-! DEPENDS ON: augment_tiled_radiance
       CALL augment_tiled_radiance(control, spectrum, radout             &
         , i_band, iex, iex_minor                                        &
         , n_point_tile, n_tile, list_tile                               &
@@ -1260,6 +1262,7 @@ SUBROUTINE solve_band_k_eqv(ierr                                        &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solve_band_k_eqv
+END MODULE solve_band_k_eqv_mod

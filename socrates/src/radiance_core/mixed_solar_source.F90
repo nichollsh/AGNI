@@ -12,6 +12,10 @@
 !   source terms in each layer.
 !
 !- ---------------------------------------------------------------------
+MODULE mixed_solar_source_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MIXED_SOLAR_SOURCE_MOD'
+CONTAINS
 SUBROUTINE mixed_solar_source(control, bound                            &
     , n_profile, n_layer, n_cloud_top                                   &
     , flux_inc_direct                                                   &
@@ -148,7 +152,7 @@ SUBROUTINE mixed_solar_source(control, bound                            &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='MIXED_SOLAR_SOURCE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The clear and cloudy direct fluxes are calculated separately
 ! and added together to form the total direct flux.
@@ -389,6 +393,7 @@ SUBROUTINE mixed_solar_source(control, bound                            &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE mixed_solar_source
+END MODULE mixed_solar_source_mod

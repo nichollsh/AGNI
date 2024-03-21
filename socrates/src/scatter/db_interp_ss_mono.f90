@@ -19,6 +19,7 @@ SUBROUTINE db_interp_ss_mono &
   USE def_std_io_icf
   USE error_pcf
   USE def_db_ss_mono
+  USE spline_evaluate_mod, ONLY: spline_evaluate
 !
 !
   IMPLICIT NONE

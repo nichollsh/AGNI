@@ -4,17 +4,17 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set observational optical properties of aerosols.
+! Subroutine to set observational optical properties of aerosols.
 !
 ! Method:
 !   Splined fits to the given data at the corresponding pressure
 !   levels are carried out. Optical properties at the required
 !   pressure levels are calculated from the splined fits.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE prsc_opt_prop_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE prsc_opt_prop(ierr                                           &
     , n_profile, i_first_layer, i_last_layer                            &
     , l_rescale, n_order_forward                                        &
@@ -33,6 +33,7 @@ SUBROUTINE prsc_opt_prop(ierr                                           &
     )
 
   USE realtype_rd, ONLY: RealK
+  USE prsc_gather_spline_mod, ONLY: prsc_gather_spline
 
   IMPLICIT NONE
 
@@ -166,7 +167,6 @@ SUBROUTINE prsc_opt_prop(ierr                                           &
 
 ! Absorption:
 ! Put this into the total extinction for now.
-! DEPENDS ON: prsc_gather_spline
   CALL prsc_gather_spline(ierr                                          &
     , n_profile, i_first_layer, i_last_layer, p                         &
     , n_opt_level_prsc, prsc_pressure, prsc_absorption                  &
@@ -413,3 +413,4 @@ SUBROUTINE prsc_opt_prop(ierr                                           &
   END IF
 
 END SUBROUTINE prsc_opt_prop
+END MODULE prsc_opt_prop_mod

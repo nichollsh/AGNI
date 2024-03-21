@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set level weights for calculating radiances.
+! Subroutine to set level weights for calculating radiances.
 !
 ! Purpose:
 !   This routine yields the weights to be applied to the
@@ -15,10 +15,11 @@
 !   within the current layer and weights are calculated for each
 !   unknown.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE set_level_weights_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SET_LEVEL_WEIGHTS_MOD'
+CONTAINS
 SUBROUTINE set_level_weights(i                                          &
 !                 Basic sizes
     , n_profile, ls_trunc, ms, n_red_eigensystem                        &
@@ -179,7 +180,7 @@ SUBROUTINE set_level_weights(i                                          &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SET_LEVEL_WEIGHTS'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO WHILE (l_assign)
 
@@ -299,6 +300,7 @@ SUBROUTINE set_level_weights(i                                          &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE set_level_weights
+END MODULE set_level_weights_mod

@@ -11,6 +11,10 @@
 !   averaged.
 !
 !- ---------------------------------------------------------------------
+MODULE two_coeff_cloud_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TWO_COEFF_CLOUD_MOD'
+CONTAINS
 SUBROUTINE two_coeff_cloud(ierr, control                                &
      , n_profile, i_layer_first, i_layer_last                           &
      , i_2stream, n_source_coeff                                        &
@@ -31,6 +35,7 @@ SUBROUTINE two_coeff_cloud(ierr, control                                &
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
   USE def_control, ONLY: StrCtrl 
+  USE two_coeff_mod, ONLY: two_coeff
 
   IMPLICIT NONE
 
@@ -163,7 +168,7 @@ SUBROUTINE two_coeff_cloud(ierr, control                                &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='TWO_COEFF_CLOUD'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Initialize the full arrays.
   DO i=i_layer_first, i_layer_last
@@ -254,7 +259,6 @@ SUBROUTINE two_coeff_cloud(ierr, control                                &
         END IF
 
 
-! DEPENDS ON: two_coeff
         CALL two_coeff(ierr, control                                    &
           , n_list, i, i                                                &
           , i_2stream                                                   &
@@ -303,6 +307,7 @@ SUBROUTINE two_coeff_cloud(ierr, control                                &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE two_coeff_cloud
+END MODULE two_coeff_cloud_mod

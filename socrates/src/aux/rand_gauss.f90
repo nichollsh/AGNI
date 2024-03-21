@@ -46,8 +46,8 @@ RESULT (gauss)
         call random_seed
         call random_number(harvest)
         v1=2.0*harvest-1.0
-	call random_seed
-	call random_number(harvest)
+        call random_seed
+        call random_number(harvest)
         v2=2.0*harvest-1.0
         rsq=v1**2+v2**2
         IF ( (rsq > 0) .AND. (rsq < 1) ) EXIT

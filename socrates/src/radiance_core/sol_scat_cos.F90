@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate solar scattering angles.
+! Subroutine to calculate solar scattering angles.
 !
 ! Purpose:
 !   This routine returns the cosines of the angles of scattering
@@ -16,10 +16,11 @@
 !   be calculated, so ND_PROFILE can be used for all horizontal
 !   dimensions.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE sol_scat_cos_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOL_SCAT_COS_MOD'
+CONTAINS
 SUBROUTINE sol_scat_cos(n_profile, n_direction                          &
     , mu_0, direction, cos_sol_view                                     &
     , nd_profile, nd_direction)
@@ -71,7 +72,7 @@ SUBROUTINE sol_scat_cos(n_profile, n_direction                          &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOL_SCAT_COS'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO id=1, n_direction
     DO l=1, n_profile
@@ -83,6 +84,7 @@ SUBROUTINE sol_scat_cos(n_profile, n_direction                          &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE sol_scat_cos
+END MODULE sol_scat_cos_mod

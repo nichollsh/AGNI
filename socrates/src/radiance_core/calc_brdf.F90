@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate the arrays of BRDF terms.
+! Subroutine to calculate the arrays of BRDF terms.
 !
 ! Purpose:
 !   This routine is called to calculate a set of arrays related to
@@ -29,10 +29,11 @@
 !   such a scheme has not been selected because of its extra
 !   complexity.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE calc_brdf_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_BRDF_MOD'
+CONTAINS
 SUBROUTINE calc_brdf(isolir, ms_min, ms_max                             &
     , ia_sph_mm                                                         &
     , uplm_sol, uplm_zero                                               &
@@ -50,6 +51,7 @@ SUBROUTINE calc_brdf(isolir, ms_min, ms_max                             &
   USE rad_ccf, ONLY: pi
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE eval_uplm_mod, ONLY: eval_uplm
 
   IMPLICIT NONE
 
@@ -157,7 +159,7 @@ SUBROUTINE calc_brdf(isolir, ms_min, ms_max                             &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CALC_BRDF'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   IF (isolir == ip_solar) THEN
 
@@ -192,7 +194,6 @@ SUBROUTINE calc_brdf(isolir, ms_min, ms_max                             &
 !     Calculate spherical harmonics in the viewing directions
 !     at this azimuthal order.
       DO id=1, n_direction
-! DEPENDS ON: eval_uplm
         CALL eval_uplm(ms, ls_brdf_trunc                                &
           , n_profile, direction(1, id, 1), up_lm(1, 1, id)             &
           , nd_profile)
@@ -257,7 +258,6 @@ SUBROUTINE calc_brdf(isolir, ms_min, ms_max                             &
 !     Calculate spherical harmonics in the viewing directions
 !     at this azimuthal order.
       DO id=1, n_direction
-! DEPENDS ON: eval_uplm
         CALL eval_uplm(ms, ls_brdf_trunc                                &
           , n_profile, direction(1, id, 1), up_lm(1, 1, id)             &
           , nd_profile)
@@ -287,6 +287,7 @@ SUBROUTINE calc_brdf(isolir, ms_min, ms_max                             &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_brdf
+END MODULE calc_brdf_mod

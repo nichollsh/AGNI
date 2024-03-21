@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate spherical Clebsch-Gordan coefficients.
+! Subroutine to calculate spherical Clebsch-Gordan coefficients.
 !
 ! Purpose:
 !   The routine yields the Clebsch-Gordan coefficients between the
@@ -17,10 +17,11 @@
 !   As this routine is called only once speed is not too critical
 !   so direct calculation is used. Only values for m>0 are required.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE calc_cg_coeff_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_CG_COEFF_MOD'
+CONTAINS
 SUBROUTINE calc_cg_coeff(ls_max_order                                   &
     , ia_sph_mm, ms_min, ms_trunc                                       &
     , cg_coeff                                                          &
@@ -70,7 +71,7 @@ SUBROUTINE calc_cg_coeff(ls_max_order                                   &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CALC_CG_COEFF'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO ls=0, ls_max_order
     inv=1.0e+00_RealK/REAL((2*ls+1)*(2*ls+3), RealK)
@@ -81,6 +82,7 @@ SUBROUTINE calc_cg_coeff(ls_max_order                                   &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_cg_coeff
+END MODULE calc_cg_coeff_mod

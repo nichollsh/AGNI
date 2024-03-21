@@ -8,8 +8,8 @@
 !
 !
 ! Method:
-!	An input file with embedded directives is read. This file
-!	is processed to generate a number of profiles.
+!   An input file with embedded directives is read. This file
+!   is processed to generate a number of profiles.
 !
 !- ---------------------------------------------------------------------
       PROGRAM raw_input

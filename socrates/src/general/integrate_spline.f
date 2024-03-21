@@ -7,11 +7,11 @@
 !+ Subroutine to evaluate the integral of a cubic spline.
 !
 ! Method:
-!	The range of integration is checked against the range of the
-!	spline. If the range of integration lies within the range of 
-!	the spline the integral is evaluated noting that between each
-!	pair of knots the spline is a cubic which can be integrated
-!	directly.
+!   The range of integration is checked against the range of the
+!   spline. If the range of integration lies within the range of 
+!   the spline the integral is evaluated noting that between each
+!   pair of knots the spline is a cubic which can be integrated
+!   directly.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE integrate_spline(ierr, x1, x2

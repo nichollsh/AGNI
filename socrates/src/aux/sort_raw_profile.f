@@ -7,10 +7,10 @@
 !+ Subroutine to sort the elements of a profile in increasing pressure.
 !
 ! Method:
-!	The profile is searched to find the pressure or height on
-!	which to sort. A shell sorting algorithm is called to find
-!	the correct order. Using the key thus defined the columns
-!	os the profile are re-ordered.
+!   The profile is searched to find the pressure or height on
+!   which to sort. A shell sorting algorithm is called to find
+!   the correct order. Using the key thus defined the columns
+!   os the profile are re-ordered.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE sort_raw_profile(ierr
@@ -26,6 +26,7 @@
       USE input_head_pcf
       USE def_std_io_icf
       USE error_pcf
+      USE shell_sort_mod, ONLY: shell_sort
 !
 !
       IMPLICIT NONE
@@ -68,11 +69,6 @@
 !           Sorting key
      &  , x(npd_layer+1)
 !           Temporary variable
-!
-!     Subroutines called:
-      EXTERNAL
-     &    shell_sort
-!
 !
 !
 !     Proceed through the profile to find the pressure or the height.

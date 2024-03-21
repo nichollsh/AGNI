@@ -7,8 +7,8 @@
 !+ Function to calculate the extinction of an SRA profile.
 !
 ! Method:
-!	A representation is given and the extinction is calculated
-!	appropriately.
+!   A representation is given and the extinction is calculated
+!   appropriately.
 !
 !- ---------------------------------------------------------------------
       FUNCTION extinction_profile(z

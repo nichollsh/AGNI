@@ -45,7 +45,7 @@
 !
 !     Declaration of variables:
 !
-      INTEGER	!,Intent(OUT)
+      INTEGER   !,Intent(OUT)
      &    ierr
 !            Error flag
 !
@@ -89,7 +89,7 @@
 !           Viewing levels
 !
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    base_name*(*)
 !           Base name of input file
       INTEGER, Intent(IN) ::
@@ -115,7 +115,7 @@
      &  , point
 !           Point in CDL data-array
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*80
 !           Name of input file
 !

@@ -7,8 +7,8 @@
 !+ Program to generate a CDL-file of a 2-D field.
 !
 ! Method:
-!	The horizontal coordinates and values of the field
-!	are read and passed to teh output routines.
+!   The horizontal coordinates and values of the field
+!   are read and passed to teh output routines.
 !
 !- ---------------------------------------------------------------------
       PROGRAM gen_horiz_cdl

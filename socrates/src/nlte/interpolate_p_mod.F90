@@ -43,15 +43,17 @@ SUBROUTINE interpolate_p(n, p, a, x, y, y2, pp, aa, i_mode, l_splined)
 ! Subroutine to interpolate to the value of a field at a point.
 !
 ! Method:
-!	The field to be evaluated is passed to the routine, together
-!	with its second derivatives if a splined fit is used. Its
-!	value at the pressure supplied is evaluated according to the
-!	type of interpolation prescribed. The result is returned.
+!   The field to be evaluated is passed to the routine, together
+!   with its second derivatives if a splined fit is used. Its
+!   value at the pressure supplied is evaluated according to the
+!   type of interpolation prescribed. The result is returned.
 
 ! Modules to set types of variables:
   USE realtype_rd, ONLY: RealK
   USE rad_pcf, ONLY: i_normal, i_err_fatal, i_err_range
   USE ereport_mod, ONLY: ereport
+  USE spline_evaluate_mod, ONLY: spline_evaluate
+  USE spline_fit_mod, ONLY: spline_fit
 
   IMPLICIT NONE
 
@@ -89,9 +91,6 @@ SUBROUTINE interpolate_p(n, p, a, x, y, y2, pp, aa, i_mode, l_splined)
   CHARACTER (LEN = 80)          :: cmessage
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'INTERPOLATE_P'
 
-! Subroutines called:
-! DEPENDS ON: spline_fit
-! DEPENDS ON: spline_evaluate
 
 ! Perform the initial spline fit on the first call.
   IF (.NOT. l_splined) THEN

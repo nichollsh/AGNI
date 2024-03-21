@@ -7,6 +7,10 @@
 ! Subroutine to calculate fluxes in a homogeneous column directly.
 !
 !- ---------------------------------------------------------------------
+MODULE solver_homogen_direct_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLVER_HOMOGEN_DIRECT_MOD'
+CONTAINS
 SUBROUTINE solver_homogen_direct(n_profile, n_layer                     &
     , trans, reflect                                                    &
     , s_down, s_up                                                      &
@@ -84,7 +88,7 @@ SUBROUTINE solver_homogen_direct(n_profile, n_layer                     &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOLVER_HOMOGEN_DIRECT'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Eliminating loop:
   DO i=n_layer+1, 1, -1
@@ -127,6 +131,7 @@ SUBROUTINE solver_homogen_direct(n_profile, n_layer                     &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solver_homogen_direct
+END MODULE solver_homogen_direct_mod

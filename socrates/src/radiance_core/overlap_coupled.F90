@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to find energy transfer coefficients for coupled overlap.
+! Subroutine to find energy transfer coefficients for coupled overlap.
 !
 ! Method:
 !   Energy transfer coefficients for upward and downward radiation
@@ -21,10 +21,11 @@
 !   cases the originating region changes most frequently with the
 !   index.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE overlap_coupled_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'OVERLAP_COUPLED_MOD'
+CONTAINS
 SUBROUTINE overlap_coupled(n_profile, n_layer, n_cloud_top              &
     , w_cloud, w_free, n_region, type_region, frac_region, p            &
     , i_cloud                                                           &
@@ -145,7 +146,7 @@ SUBROUTINE overlap_coupled(n_profile, n_layer, n_cloud_top              &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='OVERLAP_COUPLED'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   tol_cloud=1.0e+02_RealK*EPSILON(tol_cloud)
 
@@ -447,6 +448,7 @@ SUBROUTINE overlap_coupled(n_profile, n_layer, n_cloud_top              &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE overlap_coupled
+END MODULE overlap_coupled_mod

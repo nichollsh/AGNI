@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to apply a path-length scaling to the continuum.
+! Subroutine to apply a path-length scaling to the continuum.
 !
 ! Method:
 !   The scaling function is calculated. This is multpiled by a
@@ -12,6 +12,10 @@
 !   density.
 !
 !- ---------------------------------------------------------------------
+MODULE rescale_continuum_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'RESCALE_CONTINUUM_MOD'
+CONTAINS
 SUBROUTINE rescale_continuum(control, n_profile, n_layer, i_continuum   &
      , p, t, density, water_frac                                        &
      , amount_continuum                                                 &
@@ -98,7 +102,7 @@ SUBROUTINE rescale_continuum(control, n_profile, n_layer, i_continuum   &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='RESCALE_CONTINUUM'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO i=1, n_layer
     DO l=1, n_profile
@@ -175,6 +179,7 @@ SUBROUTINE rescale_continuum(control, n_profile, n_layer, i_continuum   &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE rescale_continuum
+END MODULE rescale_continuum_mod

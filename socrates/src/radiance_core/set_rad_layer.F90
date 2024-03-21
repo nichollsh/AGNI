@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set the layers in which radiances are required.
+! Subroutine to set the layers in which radiances are required.
 !
 ! Purpose:
 !   This determines the layers of the atmosphere where the analytic
@@ -14,10 +14,11 @@
 ! Method:
 !   Straightforward.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE set_rad_layer_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SET_RAD_LAYER_MOD'
+CONTAINS
 SUBROUTINE set_rad_layer(ierr                                           &
     , n_layer, n_viewing_level, viewing_level                           &
     , i_rad_layer, frac_rad_layer                                       &
@@ -76,7 +77,7 @@ SUBROUTINE set_rad_layer(ierr                                           &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'SET_RAD_LAYER'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerance for detecting boundaries.
   tol_bdy=1.6e+01_RealK*EPSILON(tol_bdy)
@@ -112,6 +113,7 @@ SUBROUTINE set_rad_layer(ierr                                           &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE set_rad_layer
+END MODULE set_rad_layer_mod

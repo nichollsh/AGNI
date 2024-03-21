@@ -4,15 +4,16 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to rescale optical depth and albedo.
+! Subroutine to rescale optical depth and albedo.
 !
 ! Method:
 !   The standard rescaling formulae are applied.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE rescale_tau_omega_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'RESCALE_TAU_OMEGA_MOD'
+CONTAINS
 SUBROUTINE rescale_tau_omega(n_profile                                  &
     , i_layer_first, i_layer_last                                       &
     , tau, omega, forward_scatter                                       &
@@ -67,7 +68,7 @@ SUBROUTINE rescale_tau_omega(n_profile                                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='RESCALE_TAU_OMEGA'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO i=i_layer_first, i_layer_last
     DO l=1, n_profile
@@ -79,6 +80,7 @@ SUBROUTINE rescale_tau_omega(n_profile                                  &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE rescale_tau_omega
+END MODULE rescale_tau_omega_mod

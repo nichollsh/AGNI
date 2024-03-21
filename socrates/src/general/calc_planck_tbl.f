@@ -7,13 +7,13 @@
 !+ Subroutine to calculate the Planck function table.
 !
 ! Method:
-!	A table in the temperature to the Planck function 
-!	integrated across a spectral band is required. This is obtained
-!	by explicit integration using Simpson's Rule.
+!   A table in the temperature to the Planck function 
+!   integrated across a spectral band is required. This is obtained
+!   by explicit integration using Simpson's Rule.
 !
-!	This routine does basically the same as 'calc_planck_tbl' below.
-!       However, but we have to integrate the product of the Planckian
-!       and the filter function.
+!   This routine does basically the same as 'calc_planck_tbl' below.
+!   However, but we have to integrate the product of the Planckian
+!   and the filter function.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE CALC_PLANCK_FILT_TBL(IERR
@@ -109,9 +109,9 @@
 !+ Subroutine to calculate the Planck function table.
 !
 ! Method:
-!	A table in the temperature to the Planck function 
-!	integrated across a spectral band is required. This is obtained
-!	by explicit numerical integration using Simpson's Rule.
+!   A table in the temperature to the Planck function 
+!   integrated across a spectral band is required. This is obtained
+!   by explicit numerical integration using Simpson's Rule.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE CALC_PLANCK_TBL(IERR

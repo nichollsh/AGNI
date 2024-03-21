@@ -7,8 +7,8 @@
 !+ Subroutine to form composite array of pressures.
 !
 ! Method:
-!	Pressures in the background array are used as levels,
-!	except in the region where the merged data are to be taken.
+!   Pressures in the background array are used as levels,
+!   except in the region where the merged data are to be taken.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE merge_pressure(ierr

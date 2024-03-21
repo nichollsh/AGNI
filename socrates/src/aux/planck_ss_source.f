@@ -146,7 +146,7 @@
      &  , planck_radiance_bottom
 !           Planckian radiance at the bottom of a layer
 !
-      REAL  (RealK) ::	
+      REAL  (RealK) ::
      &    planck_cumul
 !           Function to calculate the cumulative 
 !           radiant Planck function

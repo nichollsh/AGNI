@@ -28,7 +28,7 @@ use rad_pcf, only: i_normal, i_err_fatal, ip_cloud_off, &
   ip_drop_pade_2, ip_ice_pade_2_phf, ip_ice_fu_phf, ip_ice_baran
 use ereport_mod, only: ereport
 use errormessagelength_mod, only: errormessagelength
-
+use set_cloud_geometry_mod, only: set_cloud_geometry
 use opt_prop_pade_2_mod, only: opt_prop_pade_2
 use opt_prop_fu_phf_mod, only: opt_prop_fu_phf
 use opt_prop_baran_mod, only: opt_prop_baran

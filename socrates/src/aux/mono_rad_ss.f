@@ -53,6 +53,18 @@
       USE def_std_io_icf
       USE rad_pcf
       USE rad_ccf, ONLY: pi
+      USE calc_brdf_mod, ONLY: calc_brdf
+      USE calc_cg_coeff_mod, ONLY: calc_cg_coeff
+      USE calc_uplm_sol_mod, ONLY: calc_uplm_sol
+      USE calc_uplm_zero_mod, ONLY: calc_uplm_zero
+      USE gauss_angle_mod, ONLY: gauss_angle
+      USE rescale_phase_fnc_mod, ONLY: rescale_phase_fnc
+      USE rescale_tau_omega_mod, ONLY: rescale_tau_omega
+      USE set_rad_layer_mod, ONLY: set_rad_layer
+      USE set_truncation_mod, ONLY: set_truncation
+      USE sol_scat_cos_mod, ONLY: sol_scat_cos
+      USE sph_solver_mod, ONLY: sph_solver
+      USE two_stream_mod, ONLY: two_stream
 !
 !
       IMPLICIT NONE
@@ -392,11 +404,7 @@
 !
 !
 !     Subroutines called:
-      EXTERNAL
-     &    rescale_phase_fnc, rescale_tau_omega
-     &  , planck_ss_source, two_stream, set_truncation, calc_cg_coeff
-     &  , calc_uplm_zero, calc_uplm_sol, calc_brdf, set_rad_layer
-     &  , gauss_angle, sph_solver
+      EXTERNAL planck_ss_source
 !
 !
 !

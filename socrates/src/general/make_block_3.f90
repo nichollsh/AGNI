@@ -7,9 +7,9 @@
 !+ Subroutine to make spectral blocks of type 3.
 !
 ! Method:
-!	A solar spectrum is read if necessary. The monochromatic
-!	Rayleigh scattering coefficients are calculated and 
-!	weighted with the solar spectrum (in make_block_3_1).
+!   A solar spectrum is read if necessary. The monochromatic
+!   Rayleigh scattering coefficients are calculated and 
+!   weighted with the solar spectrum (in make_block_3_1).
 !
 !- ---------------------------------------------------------------------
 SUBROUTINE make_block_3(Sp, Sol, ierr)

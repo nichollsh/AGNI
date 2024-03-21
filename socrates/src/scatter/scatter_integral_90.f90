@@ -189,12 +189,12 @@ Subroutine scatter_integral_90 &
               (dimen, i_measure, i_shape, ierr, DBGeom) RESULT(proj_area)
 
         USE realtype_rd
-	USE def_db_crystal_geometry
+        USE def_db_crystal_geometry
 
-	INTEGER, Intent(IN) :: i_shape
-	INTEGER, Intent(IN) :: i_measure
-	REAL  (RealK), Intent(IN) :: dimen
-	TYPE  (STR_db_cryst_geom), Intent(IN), Optional :: DBGeom
+        INTEGER, Intent(IN) :: i_shape
+        INTEGER, Intent(IN) :: i_measure
+        REAL  (RealK), Intent(IN) :: dimen
+        TYPE  (STR_db_cryst_geom), Intent(IN), Optional :: DBGeom
         REAL  (RealK) :: proj_area
         INTEGER, Intent(InOut) :: ierr
 

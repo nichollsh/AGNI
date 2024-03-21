@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to build up the matrix for radiances.
+! Subroutine to build up the matrix for radiances.
 !
 ! Purpose:
 !   This routine assembles the stepped matrix to solve the equation
@@ -45,10 +45,11 @@
 !   3n_e-1 sub-diagonals. The mapping is:
 !     (IE, IV) --> (IE, IV-2*N_RED_EIGENSYSTEM*(I-1))
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE build_sph_matrix_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'BUILD_SPH_MATRIX_MOD'
+CONTAINS
 SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
 !                 Basic sizes
     , n_profile, n_layer, ls_trunc, ms, n_red_eigensystem               &
@@ -87,6 +88,12 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
   USE rad_ccf, ONLY: pi
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE calc_surf_rad_mod, ONLY: calc_surf_rad
+  USE calc_top_rad_mod, ONLY: calc_top_rad
+  USE eig_sys_mod, ONLY: eig_sys
+  USE layer_part_integ_mod, ONLY: layer_part_integ
+  USE set_dirn_weights_mod, ONLY: set_dirn_weights
+  USE set_level_weights_mod, ONLY: set_level_weights
 
   IMPLICIT NONE
 
@@ -363,7 +370,7 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='BUILD_SPH_MATRIX'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Initialize the matrix.
   DO ie=1, 2*n_layer*n_red_eigensystem
@@ -405,7 +412,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
   END DO
 
 ! Calculate the eigenvalues and eigenvectors for this layer.
-! DEPENDS ON: eig_sys
   CALL eig_sys(n_profile, ls_trunc, ms, n_red_eigensystem               &
     , cg_coeff, ssrt(1, 0)                                              &
     , mu(1, 1, i_below), eig_vec(1, 1, 1, i_below)                      &
@@ -420,7 +426,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
   END DO
 
 ! Find the particular integral in this layer.
-! DEPENDS ON: layer_part_integ
   CALL layer_part_integ(                                                &
       n_profile, ls_trunc, ms, n_red_eigensystem                        &
     , cg_coeff, mu(1, 1, i_below)                                       &
@@ -511,7 +516,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
     l_assign=(i_assign_level <= n_viewing_level)
     IF (l_assign) l_assign=(i_rad_layer(i_assign_level) == 1)
 
-! DEPENDS ON: set_level_weights
     CALL set_level_weights(1, n_profile, ls_trunc                       &
       , ms, n_red_eigensystem                                           &
       , cg_coeff, mu(1, 1, i_below), eig_vec(1, 1, 1, i_below)          &
@@ -529,7 +533,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
   ELSE IF (i_sph_algorithm == ip_sph_reduced_iter) THEN
 !   Here the weights couple directly to radiances in
 !   particular directions.
-! DEPENDS ON: set_dirn_weights
     CALL set_dirn_weights(n_profile                                     &
       , ms, ls_trunc, up_lm                                             &
       , n_direction, mu_v, azim_factor                                  &
@@ -583,7 +586,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
 
 !   Calculate the eigenvalues and eigenvectors for the current
 !   layer which is that below the interface.
-! DEPENDS ON: eig_sys
     CALL eig_sys(n_profile, ls_trunc, ms, n_red_eigensystem             &
       , cg_coeff, ssrt(1, 0)                                            &
       , mu(1, 1, i_below), eig_vec(1, 1, 1, i_below)                    &
@@ -599,7 +601,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
     END DO
 
 !   Find the particular integral in this layer.
-! DEPENDS ON: layer_part_integ
     CALL layer_part_integ(                                              &
         n_profile, ls_trunc, ms, n_red_eigensystem                      &
       , cg_coeff, mu(1, 1, i_below)                                     &
@@ -667,7 +668,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
 !     from all layers, so the final index must be allow for
 !     contributions from all layers.
 
-! DEPENDS ON: set_level_weights
       CALL set_level_weights(i, n_profile, ls_trunc                     &
         , ms, n_red_eigensystem                                         &
         , cg_coeff, mu(1, 1, i_below), eig_vec(1, 1, 1, i_below)        &
@@ -685,7 +685,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
     ELSE IF (i_sph_algorithm == ip_sph_reduced_iter) THEN
 !     Here the weights couple directly to radiances in
 !     particular directions.
-! DEPENDS ON: set_dirn_weights
       CALL set_dirn_weights(n_profile                                   &
         , ms, ls_trunc, up_lm                                           &
         , n_direction, mu_v, azim_factor                                &
@@ -912,7 +911,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
 !   Calculate the contribution of radiation reflected from the
 !   surface.
 
-! DEPENDS ON: calc_surf_rad
     CALL calc_surf_rad(n_profile, n_layer, tau                          &
       , ms, ls_trunc, euler_factor                                      &
       , isolir, i_direct(1, n_layer), mu_0, d_planck_flux_surface       &
@@ -932,7 +930,6 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
 !   Isotropic incident fluxes are permitted (and required in the
 !   differential formulation of the IR).
     IF (ms == 0) THEN
-! DEPENDS ON: calc_top_rad
       CALL calc_top_rad(n_profile, tau                                  &
         , n_viewing_level, i_rad_layer, frac_rad_layer                  &
         , n_direction, mu_v                                             &
@@ -944,6 +941,7 @@ SUBROUTINE build_sph_matrix(i_sph_algorithm, euler_factor               &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE build_sph_matrix
+END MODULE build_sph_matrix_mod

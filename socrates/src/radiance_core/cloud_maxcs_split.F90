@@ -4,16 +4,17 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to split cloud into maximally overlapped C/S.
+! Subroutine to split cloud into maximally overlapped C/S.
 !
 ! Method:
 !   Convective cloud is left-justified in the grid-box while
 !   stratiform cloud is right-justified.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE cloud_maxcs_split_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CLOUD_MAXCS_SPLIT_MOD'
+CONTAINS
 SUBROUTINE cloud_maxcs_split(ierr, n_profile, n_layer, n_cloud_top      &
     , w_cloud, frac_cloud                                               &
     , n_cloud_type                                                      &
@@ -29,6 +30,7 @@ SUBROUTINE cloud_maxcs_split(ierr, n_profile, n_layer, n_cloud_top      &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
+  USE shell_sort_mod, ONLY: shell_sort
 
   IMPLICIT NONE
 
@@ -134,7 +136,7 @@ SUBROUTINE cloud_maxcs_split(ierr, n_profile, n_layer, n_cloud_top      &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'CLOUD_MAXCS_SPLIT'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerance used for clouds.
   tol_cloud=1.0e+04_RealK*EPSILON(tol_cloud)
@@ -192,9 +194,7 @@ SUBROUTINE cloud_maxcs_split(ierr, n_profile, n_layer, n_cloud_top      &
     END DO
 
 !   Find the key ranking these edges in increasing order.
-! DEPENDS ON: shell_sort
     CALL shell_sort(n_cld_layer, key_cnv, cnv_right)
-! DEPENDS ON: shell_sort
     CALL shell_sort(n_cld_layer, key_st, strat_left)
 
 
@@ -330,6 +330,7 @@ SUBROUTINE cloud_maxcs_split(ierr, n_profile, n_layer, n_cloud_top      &
     CALL ereport(RoutineName, ierr, cmessage)
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE cloud_maxcs_split
+END MODULE cloud_maxcs_split_mod

@@ -4,15 +4,16 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to perform a shell sort.
+! Subroutine to perform a shell sort.
 !
 ! Method:
 !   The standard shell sorting algorithm is implemented.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE shell_sort_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SHELL_SORT_MOD'
+CONTAINS
 SUBROUTINE shell_sort(n, pointer, key)
 
 
@@ -52,11 +53,11 @@ SUBROUTINE shell_sort(n, pointer, key)
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SHELL_SORT'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   IF (n == 1) THEN
     pointer(1)=1
-    IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+    IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
     RETURN
   END IF
 
@@ -75,6 +76,7 @@ SUBROUTINE shell_sort(n, pointer, key)
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE shell_sort
+END MODULE shell_sort_mod

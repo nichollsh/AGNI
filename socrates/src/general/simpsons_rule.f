@@ -7,37 +7,37 @@
 !+ Subroutine to make spectral blocks of type 2.
 !
 ! Method:
-!	Perform integration using Simpsons Rule.
+!   Perform integration using Simpsons Rule.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE SIMPSONS_RULE(N,DELTA,INPUT_ARRAY,RESULT)
-       
-       
+
+
       IMPLICIT NONE
-       
-      INTEGER, INTENT(IN) ::     
+
+      INTEGER, INTENT(IN) ::
      &     N
 !             Number of data points
 
       REAL(KIND=KIND(1.0D0)) , INTENT(IN) ::
      &     DELTA
-!             Size of Interval     
+!             Size of Interval
      &  ,  INPUT_ARRAY(0:N)
 !             Array being summed over
-     
+
       REAL(KIND=KIND(1.0D0)) , INTENT(OUT) ::
-     &     Result              
+     &     Result
 !             The final sum of all array entries
 
 !
 ! Local Variables
-!       
+!
       INTEGER
      &   I
 !            Looping variable
-   
+
       REAL (KIND=KIND(1.0D0)) ::
-     &    SUM      
+     &    SUM
 !            The sum of the array entries
 
 
@@ -46,14 +46,13 @@
          IF ((I.EQ.0).OR.(I.EQ.N)) THEN
             SUM=SUM+INPUT_ARRAY(I)
          ELSE IF (MOD(I,2).EQ.0) THEN
-            SUM=SUM+2.0*INPUT_ARRAY(I)  
+            SUM=SUM+2.0*INPUT_ARRAY(I)
          ELSE IF (MOD(I,2).EQ.1) THEN
-            SUM=SUM+4.0*INPUT_ARRAY(I)   
+            SUM=SUM+4.0*INPUT_ARRAY(I)
          ENDIF
       ENDDO
-      
+
       RESULT=SUM*DELTA/3.0
-      
+
       RETURN
       END
-      	  

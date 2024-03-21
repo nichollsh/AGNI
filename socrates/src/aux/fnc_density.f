@@ -7,7 +7,7 @@
 !+ Function to calculate the atmospheric density.
 !
 ! Method:
-!	The atmospheric density is calculated from T and q.
+!   The atmospheric density is calculated from T and q.
 !
 !- ---------------------------------------------------------------------
       FUNCTION fnc_density(p, t, q)

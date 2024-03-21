@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to solve for triple overlaps with approximate scattering.
+! Subroutine to solve for triple overlaps with approximate scattering.
 !
 ! Method:
 !   The flux is propagated downwards, ignoring reflection terms.
@@ -13,10 +13,11 @@
 !   fluxes are calculated using the newly available approximate
 !   downward fluxes in the reflected terms.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE solver_triple_app_scat_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLVER_TRIPLE_APP_SCAT_MOD'
+CONTAINS
 SUBROUTINE solver_triple_app_scat(n_profile, n_layer, n_cloud_top       &
      , t, r, s_down, s_up                                               &
      , t_strat, r_strat, s_down_strat, s_up_strat                       &
@@ -169,7 +170,7 @@ SUBROUTINE solver_triple_app_scat(n_profile, n_layer, n_cloud_top       &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOLVER_TRIPLE_APP_SCAT'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The arrays flux_down and flux_up will eventually contain the total
 ! fluxes, but initially they are used for the clear fluxes.
@@ -319,6 +320,7 @@ SUBROUTINE solver_triple_app_scat(n_profile, n_layer, n_cloud_top       &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solver_triple_app_scat
+END MODULE solver_triple_app_scat_mod

@@ -7,9 +7,9 @@
 !+ Subroutine to make spectral blocks of type 6.
 !
 ! Method:
-!	Calculate the thermal coefficients for the LW spectral files.
-!       This routine basically just determines whether a filter function
-!       is required or not.
+!   Calculate the thermal coefficients for the LW spectral files.
+!   This routine basically just determines whether a filter function
+!   is required or not.
 !
 !- ---------------------------------------------------------------------
 SUBROUTINE make_block_6(Spectrum, ierr)

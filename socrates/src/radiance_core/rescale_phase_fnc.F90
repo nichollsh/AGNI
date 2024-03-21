@@ -4,15 +4,16 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to rescale the phase function.
+! Subroutine to rescale the phase function.
 !
 ! Method:
 !   The standard rescaling of the phase function is used.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE rescale_phase_fnc_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'RESCALE_PHASE_FNC_MOD'
+CONTAINS
 SUBROUTINE rescale_phase_fnc(n_profile                                  &
     , i_layer_first, i_layer_last, n_direction, cos_sol_view            &
     , n_order_phase, phase_fnc, forward_scatter, forward_solar          &
@@ -114,7 +115,7 @@ SUBROUTINE rescale_phase_fnc(n_profile                                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='RESCALE_PHASE_FNC'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO k=1, n_order_phase
     DO i=i_layer_first, i_layer_last
@@ -167,6 +168,7 @@ SUBROUTINE rescale_phase_fnc(n_profile                                  &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE rescale_phase_fnc
+END MODULE rescale_phase_fnc_mod

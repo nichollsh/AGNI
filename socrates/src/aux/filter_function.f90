@@ -19,6 +19,7 @@ SUBROUTINE filter_function(ierr, n_band, wave_length_short, wave_length_long,  &
   USE realtype_rd, ONLY: RealK
   USE error_pcf, ONLY: i_normal, i_err_fatal, i_err_range
   USE def_inst_flt, ONLY: StrFiltResp
+  USE spline_fit_mod, ONLY: spline_fit
 
   IMPLICIT NONE
 

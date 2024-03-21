@@ -282,7 +282,7 @@
      &      , npd_thermal_coeff, npd_thermal_coeff
      &      , w, v, wrk
      &    )
-          IF (ierr /= i_normal) RETURN	
+          IF (ierr /= i_normal) RETURN
   !
   !       Zero very small terms of the diagonal matrix.
           wmax=0.0_RealK

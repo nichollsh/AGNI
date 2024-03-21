@@ -29,6 +29,7 @@
       USE dimensions_cdl_ucf
       USE dimensions_field_ucf
       USE dimensions_spec_ucf
+      USE shell_sort_mod, ONLY: shell_sort
 !
 !
       IMPLICIT NONE
@@ -68,7 +69,7 @@
 !           Latitude of data
 !
       EXTERNAL
-     &    get_free_unit, open_file_in, shell_sort
+     &    get_free_unit, open_file_in
      &  , output_opt_profile_cdl
       data ierr/i_normal/
 !

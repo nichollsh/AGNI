@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set weights for the C.F. at the surface
+! Subroutine to set weights for the C.F. at the surface
 !
 ! Purpose:
 !   The contribution to the radiance of radiation reflected from the
@@ -22,10 +22,11 @@
 !   surface. Given these constraints the algorithm is essentially
 !   straightforward.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE calc_surf_rad_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_SURF_RAD_MOD'
+CONTAINS
 SUBROUTINE calc_surf_rad(n_profile, n_layer, tau                        &
     , ms, ls_trunc, euler_factor                                        &
     , isolir, i_direct_surf, mu_0, d_planck_flux_surface                &
@@ -242,7 +243,7 @@ SUBROUTINE calc_surf_rad(n_profile, n_layer, tau                        &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CALC_SURF_RAD'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! For each direction and observing level we calculate the
 ! contribution of the particular integral to the radiance
@@ -439,6 +440,7 @@ SUBROUTINE calc_surf_rad(n_profile, n_layer, tau                        &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_surf_rad
+END MODULE calc_surf_rad_mod

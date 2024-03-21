@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to account for the optical properties of UKCA aerosols.
+! Subroutine to account for the optical properties of UKCA aerosols.
 !
 ! Method:
 !   UKCA aerosols are only provided in a Henyey-Greenstein
@@ -16,10 +16,11 @@
 !   The routine is based on opt_prop_aerosol.F90 where only
 !   the Henyey-Greenstein case is retained.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE opt_prop_ukca_aerosol_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'OPT_PROP_UKCA_AEROSOL_MOD'
+CONTAINS
 SUBROUTINE opt_prop_ukca_aerosol(                                       &
       n_profile, first_layer, last_layer                                &
     , n_order_phase, l_rescale, n_order_forward                         &
@@ -122,7 +123,7 @@ SUBROUTINE opt_prop_ukca_aerosol(                                       &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='OPT_PROP_UKCA_AEROSOL'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO j=1, n_ukca_mode
 
@@ -202,6 +203,7 @@ SUBROUTINE opt_prop_ukca_aerosol(                                       &
   END DO ! j
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE opt_prop_ukca_aerosol
+END MODULE opt_prop_ukca_aerosol_mod

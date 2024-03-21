@@ -16,6 +16,10 @@
 !   shadowing, as documented in Shonk & Hogan, 2007, J. Climate.
 !
 !- ---------------------------------------------------------------------
+MODULE solver_mix_direct_hogan_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLVER_MIX_DIRECT_HOGAN_MOD'
+CONTAINS
 SUBROUTINE solver_mix_direct_hogan(n_profile, n_layer, n_cloud_top      &
      , t, r, s_down, s_up                                               &
      , t_cloud, r_cloud, s_down_cloud, s_up_cloud                       &
@@ -150,7 +154,7 @@ SUBROUTINE solver_mix_direct_hogan(n_profile, n_layer, n_cloud_top      &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOLVER_MIX_DIRECT_HOGAN'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Upward elimination through the cloudy layers.
   DO i=n_layer+1, 1, -1
@@ -313,6 +317,7 @@ SUBROUTINE solver_mix_direct_hogan(n_profile, n_layer, n_cloud_top      &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solver_mix_direct_hogan
+END MODULE solver_mix_direct_hogan_mod

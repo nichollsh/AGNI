@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to increment radiances for radiation from the top.
+! Subroutine to increment radiances for radiation from the top.
 !
 ! Purpose:
 !   The contribution to the solution of radiances transmitted from
@@ -16,10 +16,11 @@
 ! Method:
 !   Straightforward.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE calc_top_rad_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_TOP_RAD_MOD'
+CONTAINS
 SUBROUTINE calc_top_rad(n_profile, tau                                  &
     , n_viewing_level, i_rad_layer, frac_rad_layer                      &
     , n_direction, mu_v                                                 &
@@ -109,7 +110,7 @@ SUBROUTINE calc_top_rad(n_profile, tau                                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CALC_TOP_RAD'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Calculate the cumulative optical depth from the
 ! top of the atmosphere to each viewing level.
@@ -150,6 +151,7 @@ SUBROUTINE calc_top_rad(n_profile, tau                                  &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_top_rad
+END MODULE calc_top_rad_mod

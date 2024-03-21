@@ -7,9 +7,9 @@
 !+ Program to calculate the solar flux at the top of the atmosphere.
 !
 ! Method:
-!	A solar constant and a day of the year are supplied. The
-!	solar flux at the top of the atmosphere is calculated 
-!	accordingly using the same algorithm as in the Unified Model.
+!   A solar constant and a day of the year are supplied. The
+!   solar flux at the top of the atmosphere is calculated 
+!   accordingly using the same algorithm as in the Unified Model.
 !
 !- ---------------------------------------------------------------------
       PROGRAM solar_inc

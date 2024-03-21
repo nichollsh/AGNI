@@ -9,6 +9,10 @@
 !
 !-----------------------------------------------------------------------
 
+MODULE inter_t_lookup_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'INTER_T_LOOKUP_MOD'
+CONTAINS
 SUBROUTINE inter_t_lookup(nd_profile, nd_layer, nd_t_lookup_cont &
      , n_profile, n_layer, t, t_lookup_cont &
      , wt_ct, jt_ct)
@@ -65,7 +69,7 @@ SUBROUTINE inter_t_lookup(nd_profile, nd_layer, nd_t_lookup_cont &
 
   CHARACTER(LEN=*), PARAMETER :: RoutineName='INTER_T_LOOKUP'
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 
   DO i=1, n_layer
@@ -85,5 +89,6 @@ SUBROUTINE inter_t_lookup(nd_profile, nd_layer, nd_t_lookup_cont &
     END DO
   END DO
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 END SUBROUTINE inter_t_lookup
+END MODULE inter_t_lookup_mod

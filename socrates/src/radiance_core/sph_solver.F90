@@ -4,16 +4,17 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to solve for radiances in harmonics.
+! Subroutine to solve for radiances in harmonics.
 !
 ! Method:
 !   After setting the basic properties for the radiance solver
 !   a matrix is built and solved.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE sph_solver_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SPH_SOLVER_MOD'
+CONTAINS
 SUBROUTINE sph_solver(                                                  &
 !                 Atmospheric sizes
       n_profile, n_layer                                                &
@@ -60,6 +61,13 @@ SUBROUTINE sph_solver(                                                  &
                      ip_trunc_adaptive
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE build_sph_matrix_mod, ONLY: build_sph_matrix
+  USE cg_kappa_ms_mod, ONLY: cg_kappa_ms
+  USE eval_uplm_mod, ONLY: eval_uplm
+  USE hemi_sph_integ_mod, ONLY: hemi_sph_integ
+  USE increment_rad_cf_mod, ONLY: increment_rad_cf
+  USE single_scat_sol_mod, ONLY: single_scat_sol
+  USE sph_matrix_solver_mod, ONLY: sph_matrix_solver
 
   IMPLICIT NONE
 
@@ -279,7 +287,7 @@ SUBROUTINE sph_solver(                                                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SPH_SOLVER'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Calculate the direct radiances which are independent of the
 ! azimuthal order.
@@ -369,7 +377,6 @@ SUBROUTINE sph_solver(                                                  &
 !     order, but deemed that too much storage would be required
 !     for all azmuthal orders to be held at once.
       DO id=1, n_direction
-! DEPENDS ON: eval_uplm
         CALL eval_uplm(ms, ls_trunc_calc                                &
           , n_profile, direction(1, id, 1), up_lm(1, 1, id)             &
           , nd_profile)
@@ -379,7 +386,6 @@ SUBROUTINE sph_solver(                                                  &
 !   Calculate integrals of products of spherical harmonics for
 !   use in Marshak's boundary conditions. These arrays are
 !   recalculated each time to save storage.
-! DEPENDS ON: hemi_sph_integ
     CALL hemi_sph_integ(ls_trunc_calc, ms, uplm_zero(ia_sph_mm(ms))     &
       , kappa                                                           &
       , nd_max_order                                                    &
@@ -389,7 +395,6 @@ SUBROUTINE sph_solver(                                                  &
 !   order of calculation: it must also be even.
     ls_brdf_trunc_calc                                                  &
       =MIN(ls_brdf_trunc, ls_trunc_calc-MOD(ls_trunc_calc, 2))
-! DEPENDS ON: cg_kappa_ms
     CALL cg_kappa_ms(ms, ls_trunc_calc, ls_brdf_trunc_calc              &
       , cg_coeff, kappa                                                 &
       , cgk                                                             &
@@ -417,7 +422,6 @@ SUBROUTINE sph_solver(                                                  &
 
     n_red_eigensystem=(ls_trunc_calc+1-ms)/2
 
-! DEPENDS ON: build_sph_matrix
     CALL build_sph_matrix(i_sph_algorithm, euler_factor                 &
 !                   Basic sizes
       , n_profile, n_layer, ls_trunc_calc                               &
@@ -456,7 +460,6 @@ SUBROUTINE sph_solver(                                                  &
 
     n_equation=2*n_layer*n_red_eigensystem
 
-! DEPENDS ON: sph_matrix_solver
     CALL sph_matrix_solver(n_profile, n_layer, n_red_eigensystem        &
       , a, b                                                            &
       , upm                                                             &
@@ -465,7 +468,6 @@ SUBROUTINE sph_solver(                                                  &
 
 !   Increment the radiances with the contributions from
 !   the complementary function.
-! DEPENDS ON: increment_rad_cf
     CALL increment_rad_cf(n_profile                                     &
       , n_direction, azim_factor                                        &
       , n_viewing_level, i_rad_layer                                    &
@@ -504,7 +506,6 @@ SUBROUTINE sph_solver(                                                  &
        (isolir == ip_solar) ) THEN
 !   Add in the singly scattered solar beam using the
 !   potentially higher order of truncation.
-! DEPENDS ON: single_scat_sol
     CALL single_scat_sol(n_profile, n_layer                             &
       , n_direction, direction                                          &
       , n_viewing_level, i_rad_layer, frac_rad_layer                    &
@@ -517,6 +518,7 @@ SUBROUTINE sph_solver(                                                  &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE sph_solver
+END MODULE sph_solver_mod

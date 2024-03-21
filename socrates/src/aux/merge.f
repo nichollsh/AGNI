@@ -7,9 +7,9 @@
 !+ Program to merge a CDL-field on to a background.
 !
 ! Method:
-!	Two CDL-files are read, one giving the background field
-!	and the other the field to be merged. Options for merging
-!	are obtained and the merged field is written out.
+!   Two CDL-files are read, one giving the background field
+!   and the other the field to be merged. Options for merging
+!   are obtained and the merged field is written out.
 !
 !- ---------------------------------------------------------------------
       PROGRAM merge

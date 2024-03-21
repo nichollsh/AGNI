@@ -45,7 +45,7 @@
      &    ierr
 !           Error flag
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    filename*(*)
 !           Name of input file
 !

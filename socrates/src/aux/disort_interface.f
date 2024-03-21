@@ -44,6 +44,7 @@
       USE def_std_io_icf
       USE rad_pcf
       USE rad_ccf, ONLY: pi
+      USE set_rad_layer_mod, ONLY: set_rad_layer
 !
 !
       IMPLICIT NONE

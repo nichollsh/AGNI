@@ -7,19 +7,19 @@
 !+ Subroutine to calculate the matrices for a fit to the Plack function.
 !
 ! Method:
-!	A polynomial fit in the temperature to the Planck function 
-!	integrated across a spectral band is required. This is obtained
-!	from a least-squares fit. Minimization of the error in the fit
-!	leads to a set of linear equations. This routine determines the
-!	matrix and source term in these equations as A and B.
+!   A polynomial fit in the temperature to the Planck function 
+!   integrated across a spectral band is required. This is obtained
+!   from a least-squares fit. Minimization of the error in the fit
+!   leads to a set of linear equations. This routine determines the
+!   matrix and source term in these equations as A and B.
 !
-!	This routine does basically the same as 'calc_thermal_coeff' below.
-!       However, because now we have to integrate the product of the Planckian
-!       and the filter function the least square forcing terms have to be 
-!       evaluated numerically. 
-!       The least squares forcing terms are evaluated by integrating the
-!       product of the Planckian and the filter function over wavelength and
-!       temperature. Integration is done by using Simpson's rule.
+!   This routine does basically the same as 'calc_thermal_coeff' below.
+!   However, because now we have to integrate the product of the Planckian
+!   and the filter function the least square forcing terms have to be 
+!   evaluated numerically. 
+!   The least squares forcing terms are evaluated by integrating the
+!   product of the Planckian and the filter function over wavelength and
+!   temperature. Integration is done by using Simpson's rule.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE CALC_THERMAL_COEFF_NUM(IERR
@@ -165,11 +165,11 @@
 !+ Subroutine to calculate the matrices for a fit to the Plack function.
 !
 ! Method:
-!	A polynomial fit in the temperature to the Planck function 
-!	integrated across a spectral band is required. This is obtained
-!	from a least-squares fit. Minimization of the error in the fit
-!	leads to a set of linear equations. This routine determines the
-!	matrix and source term in these equations as A and B.
+!   A polynomial fit in the temperature to the Planck function 
+!   integrated across a spectral band is required. This is obtained
+!   from a least-squares fit. Minimization of the error in the fit
+!   leads to a set of linear equations. This routine determines the
+!   matrix and source term in these equations as A and B.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE CALC_THERMAL_COEFF(IERR

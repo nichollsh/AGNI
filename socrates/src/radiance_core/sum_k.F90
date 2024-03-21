@@ -11,6 +11,10 @@
 !   need to have the same weights, otherwise an error is raised.
 !
 !------------------------------------------------------------------------------
+MODULE sum_k_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SUM_K_MOD'
+CONTAINS
 SUBROUTINE sum_k(ierr, n_profile, n_layer                                      &
      , n_abs_esft, k_abs_layer, w_abs_esft                                     &
      , n_add_esft, k_add_layer, w_add_esft                                     &
@@ -77,7 +81,7 @@ SUBROUTINE sum_k(ierr, n_profile, n_layer                                      &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'SUM_K'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   l_weights_match = .FALSE.
   IF (n_abs_esft == n_add_esft) THEN
@@ -96,6 +100,7 @@ SUBROUTINE sum_k(ierr, n_profile, n_layer                                      &
     CALL ereport(RoutineName, ierr, cmessage)
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE sum_k
+END MODULE sum_k_mod

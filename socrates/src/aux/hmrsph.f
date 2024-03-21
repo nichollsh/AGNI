@@ -7,7 +7,7 @@
 !+ Program to convert from humidity mixing ratios to specific humidity.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       PROGRAM hmrsph

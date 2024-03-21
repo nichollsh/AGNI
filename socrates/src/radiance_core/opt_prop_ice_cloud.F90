@@ -15,6 +15,10 @@
 !   properties.
 !
 !- ---------------------------------------------------------------------
+MODULE opt_prop_ice_cloud_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'OPT_PROP_ICE_CLOUD_MOD'
+CONTAINS
 SUBROUTINE opt_prop_ice_cloud(ierr                                      &
     , n_profile, n_layer, n_cloud_top                                   &
     , n_cloud_profile, i_cloud_profile                                  &
@@ -56,6 +60,7 @@ SUBROUTINE opt_prop_ice_cloud(ierr                                      &
   USE opt_prop_pade_2_mod, ONLY: opt_prop_pade_2
   USE opt_prop_fu_phf_mod, ONLY: opt_prop_fu_phf
   USE opt_prop_baran_mod, ONLY: opt_prop_baran
+  USE prsc_opt_prop_mod, ONLY: prsc_opt_prop
 
   IMPLICIT NONE
 
@@ -217,7 +222,7 @@ SUBROUTINE opt_prop_ice_cloud(ierr                                      &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'OPT_PROP_ICE_CLOUD'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 
   IF ( (n_order_phase == 1) .AND.                                       &
@@ -904,7 +909,6 @@ SUBROUTINE opt_prop_ice_cloud(ierr                                      &
     END DO
 
   ELSE IF (i_parametrization_ice == ip_ice_unparametrized) THEN
-! DEPENDS ON: prsc_opt_prop
     CALL prsc_opt_prop(ierr                                             &
       , n_profile, n_cloud_top, n_layer                                 &
       , l_rescale, n_order_forward                                      &
@@ -943,6 +947,7 @@ SUBROUTINE opt_prop_ice_cloud(ierr                                      &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE opt_prop_ice_cloud
+END MODULE opt_prop_ice_cloud_mod

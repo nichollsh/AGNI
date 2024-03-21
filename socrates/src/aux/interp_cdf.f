@@ -7,11 +7,11 @@
 !+ Program to interpolate a netCDF-field on to a new grid.
 !
 ! Method:
-!	Two netCDF files are read, one specifying the data and the
-!	other the new grid. A method of interpolation is also 
-!	supplied and the program used this method to interpolate
-!	the data to the final grid.
-!	
+!   Two netCDF files are read, one specifying the data and the
+!   other the new grid. A method of interpolation is also 
+!   supplied and the program used this method to interpolate
+!   the data to the final grid.
+!   
 !
 !- ---------------------------------------------------------------------
       PROGRAM interp_cdf

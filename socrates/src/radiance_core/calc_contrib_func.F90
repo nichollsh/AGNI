@@ -11,6 +11,10 @@
 !   pressure.
 !
 !------------------------------------------------------------------------------
+MODULE calc_contrib_func_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_CONTRIB_FUNC_MOD'
+CONTAINS
 SUBROUTINE calc_contrib_func(n_profile, n_layer, n_cloud_top                   &
       , plev, planck_flux_band, ss_prop, contrib_funci_part                    &
       , contrib_funcf_part, nd_profile, nd_layer)
@@ -60,7 +64,7 @@ SUBROUTINE calc_contrib_func(n_profile, n_layer, n_cloud_top                   &
   REAL(KIND=jprb)               :: zhook_handle
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'CALC_CONTRIB_FUNC'
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Initialise optical depth at top-of-atmosphere
   tau_clr_sum(1:n_profile, 0) = 0.0_RealK
@@ -97,6 +101,7 @@ SUBROUTINE calc_contrib_func(n_profile, n_layer, n_cloud_top                   &
     END DO
   END DO
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_contrib_func
+END MODULE calc_contrib_func_mod

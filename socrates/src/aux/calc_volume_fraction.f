@@ -7,8 +7,8 @@
 !+ Program to calculate volume fractions for SRA profiles.
 !
 ! Method:
-!	The volume fractions are calculated from extinctions
-!	at 550 nm.
+!   The volume fractions are calculated from extinctions
+!   at 550 nm.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE calc_volume_fraction(n_component

@@ -7,14 +7,14 @@
 !+ Subroutine to make spectral blocks of type 11.
 !
 ! Method:
-!	Scattering data are given in a parametrized form where the 
-!	extinctions are proportion to the mass loading. For this,
-!	a file of scattering properties is supplied. In the case of
-!	dry aerosols, only one set of properties for each band is 
-!	required. In the case of moist aerosols this file must
-!	contain a number of blocks, each giving the single scattering
-!	properties in each band at a particular value of the humidity.
-!	A look-up table is constructed from these values.
+!   Scattering data are given in a parametrized form where the 
+!   extinctions are proportion to the mass loading. For this,
+!   a file of scattering properties is supplied. In the case of
+!   dry aerosols, only one set of properties for each band is 
+!   required. In the case of moist aerosols this file must
+!   contain a number of blocks, each giving the single scattering
+!   properties in each band at a particular value of the humidity.
+!   A look-up table is constructed from these values.
 !
 !- ---------------------------------------------------------------------
 SUBROUTINE make_block_11(Spectrum, ierr)
