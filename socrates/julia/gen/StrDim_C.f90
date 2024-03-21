@@ -128,6 +128,8 @@ contains
             val = dimen%nd_point_tile
         else if (field == 'nd_tile') then
             val = dimen%nd_tile
+        else if (field == 'nd_k_term_inner') then
+            val = dimen%nd_k_term_inner
         else
             field_OK = .FALSE.
         end if
@@ -221,6 +223,8 @@ contains
             dimen%nd_point_tile = val
         else if (field == 'nd_tile') then
             dimen%nd_tile = val
+        else if (field == 'nd_k_term_inner') then
+            dimen%nd_k_term_inner = val
         else
             field_OK = .FALSE.
         end if
