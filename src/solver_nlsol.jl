@@ -290,15 +290,15 @@ module solver_nlsol
             error("Invalid method choice ($method)")
         end
 
-        @info @sprintf("    surf   = %d\n", surf_state)
+        @info @sprintf("    surf     = %d\n", surf_state)
         if (surf_state == 1)
-            @info @sprintf("    tmp_surf  = %.2f K\n", atmos.tmp_surf)
+            @info @sprintf("    tmp_surf = %.2f K\n", atmos.tmp_surf)
         elseif (surf_state == 2)
-            @info @sprintf("    skin_d = %.2f m\n",         atmos.skin_d)
-            @info @sprintf("    skin_k = %.2f W K-1 m-1\n", atmos.skin_k)
+            @info @sprintf("    skin_d   = %.2f m\n",         atmos.skin_d)
+            @info @sprintf("    skin_k   = %.2f W K-1 m-1\n", atmos.skin_k)
         elseif (surf_state == 3)
-            @info @sprintf("    tmp_int   = %.2f K\n",     atmos.tmp_int)
-            @info @sprintf("    Fint   = %.2f W m-2\n", atmos.flux_int)
+            @info @sprintf("    tmp_int  = %.2f K\n",     atmos.tmp_int)
+            @info @sprintf("    Fint     = %.2f W m-2\n", atmos.flux_int)
         end 
         
 
@@ -379,8 +379,8 @@ module solver_nlsol
 
             # Update properties (cp, rho, etc.)
             if !all(isfinite, x_cur)
-                display(x_cur)
-                error("Solution array contains NaNs and/or Infs")
+                @error "Solution array contains NaNs and/or Infs \n"
+                break
             end 
             _set_tmps!(x_cur)
             atmosphere.calc_layer_props!(atmos)
@@ -576,13 +576,13 @@ module solver_nlsol
             @info "    success\n"
             atmos.is_converged = true
         elseif code == 1
-            @warn "    failure (maximum iterations)\n"
+            @error "    failure (maximum iterations)\n"
         elseif code == 2
-            @warn "    failure (singular jacobian)\n"
+            @error "    failure (singular jacobian)\n"
         elseif code == 3
-            @warn "    failure (maximum time)\n"
+            @error "    failure (maximum time)\n"
         else 
-            @warn "    failure (unhandled)\n"
+            @error "    failure (unhandled)\n"
         end
         @info "\n"
 

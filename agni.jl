@@ -35,24 +35,41 @@ function setup_logging(outpath::String, silent::Bool)
         return nothing
     end 
 
+    # Formatting
+    color::Int = 39
+    level::String = "UNSET"
+
     # Setup file logger
     logger_file = FormatLogger(outpath; append=true) do io, args
-        @printf(io, "[%-5s] %s",args.level, args.message)
+        if args.level == LoggingExtras.Info
+            level = "INFO"
+        elseif args.level == LoggingExtras.Warn
+            level = "WARN"
+        elseif args.level == LoggingExtras.Debug
+            level = "DEBUG"
+        elseif args.level == LoggingExtras.Error 
+            level = "ERROR"
+        end 
+        @printf(io, "[ %-5s ] %s", level, args.message)
     end;
 
     # Setup terminal logger 
     logger_term = FormatLogger() do io, args
-        color::Int = 39
         if args.level == LoggingExtras.Info
             color = 32
+            level = "INFO"
         elseif args.level == LoggingExtras.Warn
             color = 33
+            level = "WARN"
         elseif args.level == LoggingExtras.Debug
             color = 36
+            level = "DEBUG"
+        elseif args.level == LoggingExtras.Error 
+            color = 31
+            level = "ERROR"
         end 
-
         # Set color, set bold, print level, unset bold, unset color, message
-        @printf(io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s",color, args.level, args.message)
+        @printf(io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s",color, level, args.message)
     end;
 
     # Combine and set 
