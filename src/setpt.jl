@@ -149,8 +149,8 @@ module setpt
     # Set atmosphere to have an isothermal stratosphere
     function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp::Float64)
 
-        # Keep stratosphere below tstar value
-        strat_tmp = min(strat_tmp, atmos.tstar)
+        # Keep stratosphere below tmp_surf value
+        strat_tmp = min(strat_tmp, atmos.tmp_surf)
 
         # Loop upwards from bottom of model
         strat = false
@@ -177,15 +177,15 @@ module setpt
     # Set atmosphere to have a log-linear T(p) profile
     function loglinear!(atmos::atmosphere.Atmos_t, top_tmp::Float64)
 
-        # Keep top_tmp below tstar value
-        top_tmp = min(top_tmp, atmos.tstar)
+        # Keep top_tmp below tmp_surf value
+        top_tmp = min(top_tmp, atmos.tmp_surf)
 
         # Set surface and near-surface
-        atmos.tmpl[end] = atmos.tstar
-        atmos.tmpl[end-1] = atmos.tstar 
+        atmos.tmpl[end] = atmos.tmp_surf
+        atmos.tmpl[end-1] = atmos.tmp_surf 
 
         # Loop upwards from bottom of model, assuming temperatures are log-spaced
-        dtdi = (top_tmp - atmos.tstar)/(atmos.nlev_l-1)
+        dtdi = (top_tmp - atmos.tmp_surf)/(atmos.nlev_l-1)
         for i in range(atmos.nlev_l-2,1,step=-1)
             atmos.tmpl[i] = atmos.tmpl[i+1] + dtdi
         end
@@ -241,7 +241,7 @@ module setpt
     end
 
 
-    # Set atmosphere to phase curve of gas when it enters the condensible region (does not modify tstar)
+    # Set atmosphere to phase curve of gas when it enters the condensible region (does not modify tmp_surf)
     function condensing!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 

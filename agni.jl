@@ -119,7 +119,7 @@ function main()
 
     # Read REQUIRED configuration options from dict 
     #    planet stuff 
-    t_star::Float64        = cfg["planet"]["t_star"]
+    tmp_surf::Float64      = cfg["planet"]["tmp_surf"]
     instellation::Float64  = cfg["planet"]["instellation"]
     albedo_b::Float64      = cfg["planet"]["albedo_b"]
     albedo_s::Float64      = cfg["planet"]["albedo_s"]
@@ -140,9 +140,10 @@ function main()
     overlap::Int           = cfg["execution" ]["overlap_method"]
     thermo_funcs::Bool     = cfg["execution" ]["thermo_funcs"]
     dry_type::String       = cfg["execution" ]["dry_convection"]
+    incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
     surf_state::Int        = cfg["execution" ]["surf_state"]
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
-    initial_cmd::Array     = cfg["execution" ]["initial_state"]
+    initial_req::Array     = cfg["execution" ]["initial_state"]
     stabilise::Bool        = cfg["execution" ]["stabilise"]
     conv_atol::Float64     = cfg["execution" ]["converge_atol"]
     max_steps::Int         = cfg["execution" ]["max_steps"]
@@ -167,21 +168,21 @@ function main()
     end 
     #     sensible heat at the surface 
     turb_coeff::Float64 = 0.0; wind_speed::Float64 = 0.0
-    if cfg["execution"]["sensible_heat"]
+    if incl_sens
         turb_coeff = cfg["planet"]["turb_coeff"]
         wind_speed = cfg["planet"]["wind_speed"]
     end 
     #     conductive skin case 
-    skin_k::Float64=0.0; skin_d::Float64=0.0; t_magma::Float64=0.0
+    skin_k::Float64=0.0; skin_d::Float64=0.0; tmp_magma::Float64=0.0
     if surf_state == 2
-        skin_k  = cfg["planet"]["skin_k"]
-        skin_d  = cfg["planet"]["skin_d"]
-        t_magma = cfg["planet"]["t_magma"]
+        skin_k      = cfg["planet"]["skin_k"]
+        skin_d      = cfg["planet"]["skin_d"]
+        tmp_magma   = cfg["planet"]["tmp_magma"]
     end 
     #     interior temperature case 
-    t_int::Float64 = 0.0
+    tmp_int::Float64 = 0.0
     if surf_state == 3
-        t_int = cfg["planet"]["t_int"]
+        tmp_int = cfg["planet"]["tmp_int"]
     end 
 
 
@@ -191,30 +192,68 @@ function main()
     atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                             spfile_name,
                             instellation, asf_sf, albedo_b, zenith,
-                            t_star, 
+                            tmp_surf, 
                             gravity, radius,
                             nlev_centre, p_surf, p_top,
                             mf_dict=mf_dict, mf_path=mf_path,
                             flag_gcontinuum=flag_cnt, flag_rayleigh=flag_ray,
                             flag_cloud=flag_cld, flag_aerosol=flag_aer,
                             overlap_method=overlap,
-                            skin_d=skin_d, skin_k=skin_k, tmp_magma=t_magma,
+                            skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                             tmp_floor=5.0,
-                            tint=t_int, albedo_s=albedo_s,
+                            tmp_int=tmp_int, albedo_s=albedo_s,
                             thermo_functions=thermo_funcs,
                             C_d=turb_coeff, U=wind_speed
                     )
     atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true,spfile_has_star=isempty(star_file))
 
-    # Set PT profile 
+    # Set PT profile by looping over requests
+    # Each request may be a command, or an argument following a command
     @info "Setting initial T(p)\n"
-    # setpt.fromcsv!(atmos,"pt.csv")
-    # setpt.isothermal!(atmos, t_star*0.7)
-    # setpt.prevent_surfsupersat!(atmos)
-    setpt.dry_adiabat!(atmos)
-    setpt.condensing!(atmos, "H2O")
-    # setpt.stratosphere!(atmos, 800.0)
+    num_req::Int = length(initial_req)      # Number of requests
+    idx_req::Int = 1                        # Index of current request
+    str_req::String = "_unset"              # String of current request
+    while idx_req <= num_req
+        # get command 
+        str_req = strip(lowercase(initial_req[idx_req]))
 
+        # handle requests  
+        if str_req == "dry"
+            # dry adiabat from surface
+            setpt.dry_adiabat!(atmos)
+
+        elseif str_req == "str"
+            # isothermal stratosphere 
+            idx_req += 1
+            setpt.stratosphere!(atmos, parse(Float64, initial_req[idx_req]))
+            
+        elseif str_req == "iso"
+            # isothermal profile 
+            idx_req += 1
+            setpt.isothermal!(atmos, parse(Float64, initial_req[idx_req]))
+        
+        elseif str_req == "csv"
+            # set from csv file 
+            idx_req += 1
+            setpt.fromcsv!(atmos,initial_req[idx_req])
+
+        elseif str_req == "sat"
+            # check surface supersaturation
+            setpt.prevent_surfsupersat!(atmos)
+        
+        elseif str_req == "con"
+            # condensing a volatile 
+            setpt.condensing!(atmos, initial_req[idx_req])
+
+        else 
+            error("Invalid initial state '$str_req'")
+        end 
+        
+        # iterate
+        idx_req += 1
+    end 
+
+    # Write initial state
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
     # Solver variables 
@@ -223,6 +262,7 @@ function main()
     modplot::Int      = 0
     condensate  = ""
 
+    # Plotting at runtime
     if plt_run 
         modplot = 1
     end
@@ -230,12 +270,15 @@ function main()
     # Loop over requested solvers 
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
     method::Int = 0
+    if length(solvers_cmd) == 0
+        solvers_cmd = [""]
+    end 
     for sol in solvers_cmd 
 
-        sol = lowercase(sol)
+        sol = strip(lowercase(sol))
 
         # No solve - just calc fluxes at the end
-        if sol == ""
+        if isempty(sol)
             @info "Solver = none\n"
             atmosphere.radtrans!(atmos, true, calc_cf=true)
             atmosphere.radtrans!(atmos, false)
@@ -247,7 +290,7 @@ function main()
         elseif sol == "timestep"
             @info "Solver = $sol\n"
             solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
-                                modplot=modplot, modprop=5, verbose=true, 
+                                modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
                                 dry_convect=dry_convect, condensate=condensate,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
@@ -257,7 +300,7 @@ function main()
             @info "Solver = $sol\n"
             method = findfirst(==(sol), method_map)
             solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
-                                dry_convect=dry_convect, condensate=condensate,
+                                dry_convect=dry_convect, condensate=condensate, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
         else 

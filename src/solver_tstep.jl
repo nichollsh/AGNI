@@ -435,7 +435,7 @@ module solver_tstep
                 # Conductive skin
                 atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
                 atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
-                atmos.tstar = atmos.tmpl[end]
+                atmos.tmp_surf = atmos.tmpl[end]
 
             end 
 
@@ -585,7 +585,7 @@ module solver_tstep
         @info @sprintf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
         @info @sprintf("    tot_BOA   = %.2e W m-2         \n", F_BOA_tot)
         if (surf_state == 2)
-            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tstar)
+            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
             @info @sprintf("    cond_skin = %.2e W m-2         \n", F_skin)
         end
         @info @sprintf("\n")
