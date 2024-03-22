@@ -6,7 +6,7 @@
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
-ENV["GKSwstype"] = "100"
+ENV["GKSwstype"]="nul"
 
 println("Begin runaway demo")
 
@@ -34,7 +34,7 @@ p_surf          = 300.0     # bar
 p_top           = 1e-8      # bar 
 mole_fractions  = Dict([("H2O", 1.0)])
 
-spectral_file = "res/spectral_files/Oak/Oak"
+spectral_file = "res/spectral_files/Oak/Oak.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 output_dir = "out/"
 
@@ -68,7 +68,7 @@ for i in 1:run_len
     # Set PT profile 
     atmos.p_boa = p_boa
     atmosphere.generate_pgrid!(atmos)
-    atmos.tstar =       tsurf_arr[i]
+    atmos.tmp_surf =       tsurf_arr[i]
     atmos.tmpl[end] =   tsurf_arr[i]
 
     setpt.prevent_surfsupersat!(atmos)
@@ -115,3 +115,4 @@ savefig(plt, "out/runaway_olr.pdf")
 atmosphere.deallocate!(atmos)
 
 println("Goodbye")
+exit(0)

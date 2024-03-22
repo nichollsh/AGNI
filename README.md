@@ -1,9 +1,9 @@
 # AGNI
 Radiative-convective solver designed for integration into a coupled atmosphere-interior code.   
 
-AGNI relies on SOCRATES (2306) for calculating radiances. It makes use of the Julia interface to SOCRATES as written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption / CIA.        
+AGNI relies on SOCRATES (2311) for calculating radiances. It makes use of the Julia interface to SOCRATES as written by Stuart Daines. The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption.        
 
-Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki/An-overview) on GitHub for information about the model. 
+Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for information about the model. 
     
 ## Repository structure 
 * `README.md`       - This file
@@ -43,7 +43,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki/An-overview) on G
 - `$ cd julia`
 - `$ julia`
 - `julia> ]`
--  `(@v1.9) pkg> add OffsetArrays Revise PCHIPInterpolation Plots NCDatasets DataStructures Glob ArgParse NLsolve LineSearches`
+-  `(@v1.9) pkg> add OffsetArrays Revise PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse BinnedStatistics LoggingExtras`
 -  `(@v1.9) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`
@@ -55,7 +55,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki/An-overview) on G
 You should end up in the root directory of the repository.    
 
 ## Running the code
-For the command line interface, run `$ ./agni_cli.jl` (pass `--help` for help).     
-To debug the program, run `$ ./agni.jl` in the root directory of the repository.       
-To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.     
+To run the program, execute `./agni.jl [cfg_path]`. If `[cfg_path]` is not provided, then the default configuration file will be used.       
+To demo the steam runaway greenhouse effect, execute `./demo_steamrun.jl`.     
+To run the unit tests execute `./demo_steamrun.jl`.     
 

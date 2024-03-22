@@ -1,24 +1,32 @@
 # Socrates files
-.spfile_runtime
-.spfile_runtime_k
-.star_file
-.star_temp
 *.mod
 *.o
 radiation_code.lock
+socrates/bin/*
+socrates/set_rad_env
+socrates/sbin/Cgen_null
+socrates/sbin/Cinc_field
+socrates/sbin/Cscale_field
 
 # Spectral data 
 *.par 
 *.xsc
 *.bin
+res/spectral_files/*/4096
+res/spectral_files/Reach/
+res/spectral_files/Dayspring
 
 # Output files 
 out/*
+.spfile_runtime
+.spfile_runtime_k
+.star_file
+.star_temp
+.socstar
 
 # Misc files
 .DS_Store
 .vscode 
 __pycache__
 debug/
-
-
+nogit_*

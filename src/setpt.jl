@@ -111,8 +111,8 @@ module setpt
         if !atmos.is_param
             error("Atmosphere parameters not set")
         end 
-        atmos.tmpl[1:end-1] .= set_tmp 
-        atmos.tmp[:] .= set_tmp
+        atmos.tmpl[:] .= set_tmp 
+        atmos.tmp[:]  .= set_tmp
 
         atmosphere.calc_layer_props!(atmos)
         return nothing
@@ -149,8 +149,8 @@ module setpt
     # Set atmosphere to have an isothermal stratosphere
     function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp::Float64)
 
-        # Keep stratosphere below tstar value
-        strat_tmp = min(strat_tmp, atmos.tstar)
+        # Keep stratosphere below tmp_surf value
+        strat_tmp = min(strat_tmp, atmos.tmp_surf)
 
         # Loop upwards from bottom of model
         strat = false
@@ -173,6 +173,30 @@ module setpt
         atmosphere.calc_layer_props!(atmos)
         return nothing
     end
+
+    # Set atmosphere to have a log-linear T(p) profile
+    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp::Float64)
+
+        # Keep top_tmp below tmp_surf value
+        top_tmp = min(top_tmp, atmos.tmp_surf)
+
+        # Set surface and near-surface
+        atmos.tmpl[end] = atmos.tmp_surf
+        atmos.tmpl[end-1] = atmos.tmp_surf 
+
+        # Loop upwards from bottom of model, assuming temperatures are log-spaced
+        dtdi = (top_tmp - atmos.tmp_surf)/(atmos.nlev_l-1)
+        for i in range(atmos.nlev_l-2,1,step=-1)
+            atmos.tmpl[i] = atmos.tmpl[i+1] + dtdi
+        end
+
+        # Set cell-centres 
+        atmos.tmp[1:end] .= 0.5 .* (atmos.tmpl[1:end-1] + atmos.tmpl[2:end])
+
+        atmosphere.calc_layer_props!(atmos)
+        return nothing
+    end
+
 
     # Ensure that the surface isn't supersaturated
     function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)
@@ -208,7 +232,7 @@ module setpt
                 end
 
                 # Generate new pressure grid 
-                atmosphere.generate_pgrid!(atmos, switch=atmos.res_switching)
+                atmosphere.generate_pgrid!(atmos)
             end
         end 
 
@@ -217,48 +241,32 @@ module setpt
     end
 
 
-    # Set atmosphere to phase curve of gas when it enters the condensible region (does not modify tstar)
+    # Set atmosphere to phase curve of gas when it enters the condensible region (does not modify tmp_surf)
     function condensing!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup or allocated")
         end 
 
+        # gas is present?
+        if !(gas in atmos.gases)
+            return nothing
+        end
+
+        # gas has thermodynamics setup?
         if phys.lookup_safe("L_vap",gas) < 1e-20
             return nothing
         end
-        
-        i_gas = findfirst(==(gas), atmos.gases)
 
-        # Check if each level is condensing. If it is, place on phase curve
-        for i in 1:atmos.nlev_c
+        # apply condensation curve 
+        atmosphere.apply_vlcc!(atmos, gas)
 
-            x = atmos.layer_x[i,i_gas]
-            if x < 1.0e-10 
-                continue
-            end
+        # apply cloud 
+        atmosphere.water_cloud!(atmos)
 
-            # Cell centre
-            Tsat = phys.calc_Tdew(gas,atmos.p[i] * x )
-            if atmos.tmp[i] < Tsat
-                atmos.tmp[i] = Tsat
-                atmos.re[i]   = 1.0e-5  # 10 micron droplets
-                atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
-                atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
-            else 
-                atmos.re[i]   = 0.0
-                atmos.lwm[i]  = 0.0
-                atmos.clfr[i] = 0.0
-            end
-                
-            # Cell edge
-            Tsat = phys.calc_Tdew(gas,atmos.pl[i] * x )
-            if atmos.tmpl[i] < Tsat
-                atmos.tmpl[i] = Tsat
-            end
-        end
-
+        # calculate properties 
         atmosphere.calc_layer_props!(atmos)
+
         return nothing
     end
 

@@ -21,13 +21,16 @@ module atmosphere
     using DelimitedFiles
     using PCHIPInterpolation
     using LinearAlgebra
+    using Statistics
     using Dates
+    using Logging
     
     import moving_average
     import phys
+    import spectrum
 
-    AGNI_VERSION     = "0.1"
-    SOCRATES_VERSION = "2306"
+    AGNI_VERSION     = "0.2"
+    SOCRATES_VERSION = "2311"
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
@@ -55,23 +58,25 @@ module atmosphere
         radout::SOCRATES.StrOut
 
         # Radiation parameters
+        num_rt_eval::Int                # Total number of RT evaluations
         all_channels::Bool              # Use all bands?
         spectral_file::String           # Path to spectral file
         star_file::String               # Path to star spectrum
-        albedo_b::Float64               # Enforced bond albedo (DO NOT USE ALONGSIDE CLOUD RADIATION EFFECTS)
+        albedo_b::Float64               # Enforced bond albedo 
         albedo_s::Float64               # Surface albedo
         zenith_degrees::Float64         # Solar zenith angle [deg]
         toa_heating::Float64            # Derived downward shortwave radiation flux at topmost level [W m-2]
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (cronin+14)
-        tstar::Float64                  # Surface brightness temperature [K]
+        tmp_surf::Float64                  # Surface brightness temperature [K]
+        tmp_int::Float64                   # Internal temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
 
         # Band edges 
         nbands::Int
-        bands_min::Array    # Lower wavelength [m]
-        bands_max::Array    # Upper wavelength [m]
+        bands_min::Array{Float64,1}    # Lower wavelength [m]
+        bands_max::Array{Float64,1}    # Upper wavelength [m]
 
         # Pressure-temperature grid (with i=1 at the top of the model)
         nlev_c::Int         # Cell centre (count)
@@ -80,15 +85,14 @@ module atmosphere
         p_boa::Float64      # Pressure at bottom [Pa]
         p_toa::Float64      # Pressure at top [Pa]
         rp::Float64         # planet radius [m]
-        res_switching::Bool # resolution switching at high pressures
 
-        tmp::Array          # cc temperature [K]
-        tmpl::Array         # ce temperature
-        p::Array            # cc pressure 
-        pl::Array           # ce pressure
-        z::Array            # cc height 
-        zl::Array           # ce height 
-        time::Array         # time [days]
+        tmp::Array{Float64,1}          # cc temperature [K]
+        tmpl::Array{Float64,1}         # ce temperature
+        p::Array{Float64,1}            # cc pressure 
+        pl::Array{Float64,1}           # ce pressure
+        z::Array{Float64,1}            # cc height 
+        zl::Array{Float64,1}           # ce height 
+        time::Array{Float64,1}         # time [days]
 
         tmp_floor::Float64      # Temperature floor to prevent numerics [K]
         tmp_ceiling::Float64    # Temperature ceiling to prevent numerics [K]
@@ -99,65 +103,72 @@ module atmosphere
         tmp_magma::Float64      # Mantle temperature [K]
 
         # Mole fractions (= VMR)
-        gases::Array            # List of gas names 
-        input_x::Dict           # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
-        layer_x::Array          # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
+        gases::Array{String,1}              # List of gas names 
+        input_x::Dict                       # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
+        layer_x::Array{Float64,2}           # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
 
         # Layers' average properties
-        thermo_funct::Bool      # use temperature-dependent evaluation
-        layer_density::Array    # density [kg m-3]
-        layer_mmw::Array        # mean molecular weight [kg mol-1]
-        layer_cp::Array         # heat capacity at const-p [J K-1 kg-1]
-        layer_grav::Array       # gravity [m s-2]
-        layer_mass::Array       # mass per unit area [kg m-2]
+        thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
+        layer_density::Array{Float64,1}     # density [kg m-3]
+        layer_mmw::Array{Float64,1}         # mean molecular weight [kg mol-1]
+        layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
+        layer_grav::Array{Float64,1}        # gravity [m s-2]
+        layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
 
         # Calculated bolometric radiative fluxes (W m-2)
-        flux_d_lw::Array  # down component, lw 
-        flux_u_lw::Array  # up component, lw
-        flux_n_lw::Array  # net upward, lw
+        flux_int::Float64               # Interior flux  [W m-2] for surf_state=3
 
-        flux_d_sw::Array  # down component, sw 
-        flux_u_sw::Array  # up component, sw
-        flux_n_sw::Array  # net upward, sw
+        flux_d_lw::Array{Float64,1}     # down component, lw 
+        flux_u_lw::Array{Float64,1}     # up component, lw
+        flux_n_lw::Array{Float64,1}     # net upward, lw
 
-        flux_d::Array    # down component, lw+sw 
-        flux_u::Array    # up component, lw+sw 
-        flux_n::Array    # net upward, lw+sw 
+        flux_d_sw::Array{Float64,1}     # down component, sw 
+        flux_u_sw::Array{Float64,1}     # up component, sw
+        flux_n_sw::Array{Float64,1}     # net upward, sw
+
+        flux_d::Array{Float64,1}        # down component, lw+sw 
+        flux_u::Array{Float64,1}        # up component, lw+sw 
+        flux_n::Array{Float64,1}        # net upward, lw+sw 
 
         # Calculated per-band radiative fluxes (W m-2)
-        band_d_lw::Array  # down component, lw 
-        band_u_lw::Array  # up component, lw
-        band_n_lw::Array  # net upward, lw
+        band_d_lw::Array{Float64,2}     # down component, lw 
+        band_u_lw::Array{Float64,2}     # up component, lw
+        band_n_lw::Array{Float64,2}     # net upward, lw
 
-        band_d_sw::Array  # down component, sw 
-        band_u_sw::Array  # up component, sw
-        band_n_sw::Array  # net upward, sw
+        band_d_sw::Array{Float64,2}     # down component, sw 
+        band_u_sw::Array{Float64,2}     # up component, sw
+        band_n_sw::Array{Float64,2}     # net upward, sw
 
         # Contribution function (to outgoing flux) per-band
-        contfunc_norm::Array    # LW+SW, and normalised by maximum value at each wavelength
+        contfunc_norm::Array{Float64,2}    # LW+SW, and normalised by maximum value at each wavelength
 
         # Sensible heating
-        C_d::Float64        # Turbulent exchange coefficient [dimensionless]
-        U::Float64          # Wind speed [m s-1]
-        flux_sens::Float64  # Turbulent flux
+        C_d::Float64            # Turbulent exchange coefficient [dimensionless]
+        U::Float64              # Wind speed [m s-1]
+        flux_sens::Float64      # Turbulent flux
 
         # Convection 
-        mask_c::Array       # Layers which are (or were recently) convective (value is set to >0)
-        mask_decay::Int     # How long is 'recent'
-        flux_c::Array       # Dry convective fluxes from MLT
-        Kzz::Array          # Eddy diffusion coefficient from MLT
+        mask_c::Array{Int,1}       # Layers which are (or were recently) convective (value is set to >0)
+        mask_decay::Int            # How long is 'recent'
+        flux_c::Array{Float64,1}   # Dry convective fluxes from MLT
+        Kzz::Array{Float64,1}      # Eddy diffusion coefficient from MLT
 
         # Cloud and condensation
-        mask_p::Array       # Layers which are (or were recently) condensing liquid
-        re::Array           # Effective radius of the droplets [m] (drizzle forms above 20 microns)
-        lwm::Array          # Liquid water mass fraction [kg/kg] - how much liquid vs. gas is there upon cloud formation? 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
-        clfr::Array         # Water cloud fraction - how much of the current cell turns into cloud? 0 : clear sky cell ; 1 : the cloud takes over the entire area of the cell (just leave at 1 for 1D runs)
+        mask_p::Array{Int,1}                # Layers which are (or were recently) condensing liquid
+        #    These arrays give the cloud properties within layers containing cloud
+        cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
+        cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
+        cloud_arr_f::Array{Float64,1}       # Total cloud area fraction in layers. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
+        #    These floats give the default values that the above arrays are filled with upon cloud formation
+        cloud_val_r::Float64 
+        cloud_val_l::Float64 
+        cloud_val_f::Float64 
 
         # Total energy flux
-        flux_tot::Array     # Total upward-directed flux at cell edges
+        flux_tot::Array{Float64,1}     # Total upward-directed flux at cell edges
 
         # Heating rate 
-        heating_rate::Array # radiative heating rate [K/day]
+        heating_rate::Array{Float64,1} # radiative heating rate [K/day]
 
         Atmos_t() = new()
     end
@@ -195,7 +206,7 @@ module atmosphere
     - `s0_fact::Float64`                scale factor applied to instellation to account for planetary rotation (i.e. S_0^*/S_0 in Cronin+14)
     - `albedo_b::Float64`               bond albedo scale factor applied to instellation in order to imitate shortwave reflection 
     - `zenith_degrees::Float64`         angle of radiation from the star, relative to the zenith [degrees].
-    - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
+    - `tmp_surf::Float64`               effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
     - `radius::Float64`                 planet radius at the surface [m].
     - `nlev_centre::Int`                number of model levels.
@@ -210,21 +221,21 @@ module atmosphere
     - `tmp_magma::Float64=3000.0`       mantle temperature [K].
     - `skin_d::Float64=0.05`            skin thickness [m].
     - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
-    - `all_channels::Bool=true`         use all channels available for RT?
     - `overlap_method::Int=4`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
+    - `tmp_int::Float64=0.0`               planet's interior brightness temperature BC [K]
+    - `all_channels::Bool=true`         use all channels available for RT?
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
     - `flag_continuum::Bool=false`      include continuum absorption?
     - `flag_aerosol::Bool=false`        include aersols?
     - `flag_cloud::Bool=false`          include clouds?
-    - `res_switching::Bool=false`       use resolution switching at high pressures?
     - `thermo_functions::Bool=true`     use temperature-dependent thermodynamic properties
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
                     spfile::String, 
                     instellation::Float64, s0_fact::Float64, albedo_b::Float64, zenith_degrees::Float64,
-                    tstar::Float64,
+                    tmp_surf::Float64,
                     gravity::Float64, radius::Float64,
                     nlev_centre::Int, p_surf::Float64, p_top::Float64;
                     mf_dict=                    nothing,
@@ -237,19 +248,21 @@ module atmosphere
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
                     overlap_method::Int =       4,
+                    tmp_int::Float64 =             0.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
-                    res_switching::Bool =       false,
                     thermo_functions::Bool =    true
                     )
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
             mkdir(OUT_DIR)
         end
+
+        atmos.num_rt_eval = 0
 
         atmos.dimen =       SOCRATES.StrDim()
         atmos.control =     SOCRATES.StrCtrl()
@@ -263,30 +276,32 @@ module atmosphere
         # Set the parameters (and make sure that they're reasonable)
         atmos.ROOT_DIR =        abspath(ROOT_DIR)
         atmos.OUT_DIR =         abspath(OUT_DIR)
-
         atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
         atmos.overlap_method =  Int(overlap_method)
        
-        if res_switching && (p_surf < 5.0)
-            println("WARNING: Resolution switching is enabled, but surface pressure is quite low")
-        end 
-        atmos.res_switching = res_switching
         atmos.thermo_funct  = thermo_functions
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
-        atmos.tmp_ceiling =     5000.0
+        atmos.tmp_ceiling =     2.0e4
 
-        atmos.nlev_c         =  max(nlev_centre,45)
+        if nlev_centre < 25 
+            @warn "Adjusted number of levels to 25"
+            nlev_centre = 25
+        end 
+        atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
-        atmos.tstar =           max(tstar, atmos.tmp_floor)
-        atmos.grav_surf =       max(1.0e-4, gravity)
-        atmos.zenith_degrees =  max(min(zenith_degrees,89.5), 0.5)
+        atmos.tmp_surf =        max(tmp_surf, atmos.tmp_floor)
+        atmos.tmp_int =         tmp_int
+        atmos.grav_surf =       max(1.0e-7, gravity)
+        atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.instellation =    max(instellation, 0.0)
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
         atmos.s0_fact =         max(s0_fact,0.0)
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) * s0_fact * cosd(atmos.zenith_degrees)
+
+        atmos.flux_int =        phys.sigma * (atmos.tmp_int)^4.0           
         
         atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
@@ -318,19 +333,30 @@ module atmosphere
         # atmos.control.l_contrib_func_band = false
 
         # Initialise temperature grid to be isothermal
-        atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tstar
-        atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tstar
+        atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tmp_surf
+        atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tmp_surf
 
         # Initialise pressure grid with current p_toa and p_boa
-        generate_pgrid!(atmos, switch=atmos.res_switching)
+        generate_pgrid!(atmos)
         atmos.z          = zeros(Float64, atmos.nlev_c)
         atmos.zl         = zeros(Float64, atmos.nlev_l)
         atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
 
-        # Initialise cloud properties
-        atmos.re         = zeros(Float64, atmos.nlev_c) 
-        atmos.lwm        = zeros(Float64, atmos.nlev_c)
-        atmos.clfr       = zeros(Float64, atmos.nlev_c) 
+        # Initialise thermodynamics 
+        atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
+        atmos.layer_density = zeros(Float64, atmos.nlev_c)
+        atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
+        atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
+
+        # Initialise cloud arrays 
+        atmos.cloud_arr_r   = zeros(Float64, atmos.nlev_c) 
+        atmos.cloud_arr_l   = zeros(Float64, atmos.nlev_c)
+        atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c) 
+
+        # Hardcoded cloud properties 
+        atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
+        atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
+        atmos.cloud_val_f   = 0.8     # 80% of the cell "area" is cloud
 
         # Read mole fractions
         if isnothing(mf_dict) && isnothing(mf_path)
@@ -479,10 +505,10 @@ module atmosphere
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
 
         # mmw, cp, rho
-        atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
-        atmos.layer_density = zeros(Float64, atmos.nlev_c)
-        atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
-        atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
+        fill!(atmos.layer_mmw    ,0.0)
+        fill!(atmos.layer_density,0.0)
+        fill!(atmos.layer_cp     ,0.0)
+        fill!(atmos.layer_mass   ,0.0)
         for i in 1:atmos.atm.n_layer
 
             # for each gas
@@ -492,11 +518,12 @@ module atmosphere
                 atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
 
                 # set cp
-                t = -1.0
                 if atmos.thermo_funct 
-                    t = atmos.tmp[i]
+                    atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
+                else 
+                    atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas)
                 end
-                atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=t)
+                
             end
 
             # density (assumes ideal gas)
@@ -506,9 +533,12 @@ module atmosphere
 
         # geometrical height and gravity
         # dz = -dp / (rho * g)
-        atmos.z[:] .= 0.0
-        atmos.zl[:] .= 0.0
-        atmos.layer_grav[:] .= 0.0
+        fill!(atmos.z         , 0.0)
+        fill!(atmos.zl        , 0.0)
+        fill!(atmos.layer_grav, 0.0)
+        g1::Float64 = 0.0
+        g2::Float64 = 0.0
+        dzc::Float64= 0.0
         for i in range(atmos.nlev_c, 1, step=-1)
 
             # Technically, g and z should be integrated as coupled equations,
@@ -525,7 +555,7 @@ module atmosphere
             dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * 0.5 * (atmos.p[i] + atmos.pl[i] )) * (atmos.p[i]- atmos.pl[i]) 
             atmos.zl[i] = atmos.z[i] + dzl
 
-            atmos.layer_grav[i] = 0.5 * (g1 + g2)
+            atmos.layer_grav[i] = sqrt(g1 * g2)
 
             if (dzl < 1e-20) || (dzc < 1e-20)
                 error("Height integration resulted in dz <= 0")
@@ -544,57 +574,73 @@ module atmosphere
     """
     **Generate pressure grid.**
 
-    Equally log-spaced between p_boa and p_boa in the nominal configuration.
+    Equally log-spaced between p_boa and p_boa. The bottom-most cell is set with 
+    a bespoke of p_boa*(1-boundary_scale), which ensures that it is sufficiently thin
+    to avoid numerical instabilities. 
     
-    If switching is enabled, the grid resolution will change at 10% of the 
-    surface pressure, with at least switch_f percent of the levels being placed 
-    at pressures greater than this value. This enhances the resolution near the 
-    surface, which may help with model stability.
-
     Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    - `switch::Float64`         switch resolution at 0.1*p_surf level
-    - `switch_f::Int`           lower region level proportion minimum [%].
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `boundary_scale::Float64=1.0e-3`  scale factor for the thickness of the bottom-most cell.
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t; switch::Bool=false, switch_f::Int=25)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-3)
 
-        # Try canonical distribution
-        atmos.pl = 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa), length=atmos.nlev_l)
+        boundary_scale = max(min(boundary_scale, 1.0-1.0e-8), 1.0e-8)
 
-        # Check if resolution switch is required
-        if switch 
-
-            # Upper and lower part counts
-            switch_p  = 0.10 * atmos.p_boa
-            switch_lo = ceil(Int, float(switch_f) / 100 * atmos.nlev_l)
-            switch_up = atmos.nlev_l - switch_lo
-
-            # Check requirement
-            count_lo = 0
-            for i in 1:atmos.nlev_l 
-                if atmos.pl[i] > switch_p 
-                    count_lo += 1
-                end
-            end
-
-            # Upper and lower parts
-            if count_lo < switch_lo 
-                pl_up = 10 .^ range( log10(atmos.p_toa), stop=log10(switch_p),    length=switch_up + 1)
-                pl_lo = 10 .^ range( log10(switch_p),    stop=log10(atmos.p_boa), length=switch_lo)
-                pl_lo[1] = sqrt(pl_up[end-1]*pl_lo[2])
-                atmos.pl = vcat(pl_up[1:end-1], pl_lo[1:end])
-            end
-        end
-    
-        # Set bottom and top layers to be quite small  (to avoid giving the extrapolation too much control)
-        # atmos.pl[end-1] = max(atmos.pl[end-1], atmos.pl[end] * 0.999)
-        # atmos.pl[2]     = min(atmos.pl[2]    , atmos.pl[1]   / 0.999)
+        # Logarithmically-spaced levels
+        atmos.pl           = zeros(Float64, atmos.nlev_l)
+        atmos.pl[end]      = atmos.p_boa 
+        atmos.pl[1:end-1] .= 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa*(1.0-boundary_scale)), length=atmos.nlev_l-1)
 
         # Set pressure cell-centre array using geometric mean
-        atmos.p =    zeros(Float64, atmos.nlev_c)
+        atmos.p = zeros(Float64, atmos.nlev_c)
+        atmos.p[1:end] .= sqrt.(atmos.pl[1:end-1].*atmos.pl[2:end])
+
+        return nothing
+    end
+
+    """
+    **Adapt pressure grid based on the input focus array.**
+
+    Increases the number of points in regions where the focus values are 
+    relatively large, at the cost of decreased points elsewhere in the grid. By
+    default this function will maintain the total number of grid points.
+
+    This will modify the pressure grid inside the atmos struct.
+    
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `focus::Array`            values used to determine where to focus the grid; strictly positive-valued (length=atmos.nlev_c)
+    - `density::Int`            how much to increase the point-density (length=atmos.nlev_c)
+    - `percentile::Float64`     percentile threshold for where density should be increased
+    """
+    function adapt_mesh!(atmos::atmosphere.Atmos_t, focus::Array; density::Int=1, percentile::Float64=20.0)
+
+        @debug "Mesh refinement"
+
+        # Tolerance for where focus is increased 
+        atol::Float64 = quantile(focus, percentile*0.01)
+
+        # Upsample pressure array where necessary
+        x_upsampled = [atmos.pl[end]]
+        for i in 1:atmos.nlev_l-1 
+            push!(x_upsampled, atmos.pl[i])  # add original value
+            if focus[i] > atol   # add new value(s)
+                @debug "Upsampling at p=$(atmos.p[i])"
+                for j in 1:density  
+                    dxdj = (atmos.pl[i+1]-atmos.pl[i])/density * 0.9
+                    push!(x_upsampled, atmos.pl[i] + dxdj*j)
+                end
+            end
+        end 
+        sort!(x_upsampled)
+
+        # Set cell-edges
+        atmos.pl[:] = x_upsampled[round.(Int, range(1, length(x_upsampled), length=atmos.nlev_l))]
+
+        # Set cell-centres 
         for i in 1:atmos.nlev_c
             atmos.p[i] = sqrt(atmos.pl[i]*atmos.pl[i+1])
-        end
+        end 
 
         return nothing
     end
@@ -650,20 +696,25 @@ module atmosphere
 
         # Spectral file to be loaded
         spectral_file_run  = joinpath([atmos.OUT_DIR, ".spfile_runtime"])  
+        socstar = joinpath([atmos.OUT_DIR, ".socstar"])  
+
 
         # Insert stellar spectrum 
         if !spfile_has_star
-            println("Python: inserting stellar spectrum")
-            runfile = joinpath([atmos.ROOT_DIR, "src", "insert_stellar.py"])
-            run(`python $runfile $(stellar_spectrum) $(atmos.spectral_file) $(spectral_file_run)`)
+            wl, fl = spectrum.load_from_file(atmos.star_file)
+            spectrum.write_to_socrates_format(wl, fl, socstar)
+            spectrum.insert_stellar_spectrum(atmos.spectral_file, socstar, spectral_file_run)
+            
         elseif atmos.spectral_file != spectral_file_run
             cp(atmos.spectral_file,      spectral_file_run,      force=true)
             cp(atmos.spectral_file*"_k", spectral_file_run*"_k", force=true)
+        else 
+            error("Invalid spectral file / star file combination")
         end
 
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
-            println("Python: inserting rayleigh scattering")
+            @info "Python: Inserting rayleigh scattering \n"
             co2_x = get_x(atmos, "CO2", -1) 
             n2_x  = get_x(atmos, "N2" , -1)
             h2o_x = get_x(atmos, "H2O", -1)
@@ -732,7 +783,7 @@ module atmosphere
 
         # modules_gen/dimensioms_fixed_pcf.f90
         npd_cloud_component        =  4 #   Number of components of clouds.
-        npd_cloud_type             =  4 #   Number of permitted types of clouds.
+        npd_cloud_type             =  1 #   Number of permitted types of clouds.
         npd_overlap_coeff          = 18 #   Number of overlap coefficients for cloud
         npd_source_coeff           =  2 #   Number of coefficients for two-stream sources
         npd_region                 =  3 # Number of regions in a layer
@@ -952,7 +1003,6 @@ module atmosphere
             atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11
         else
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
-            atmos.cld.n_condensed = 0
         end
 
         SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
@@ -963,7 +1013,7 @@ module atmosphere
             atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
             atmos.cld.n_cloud_type      = 1
             atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
-            atmos.cld.i_condensed_param[1] = 5
+            atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
         else
             atmos.cld.n_condensed = 0
         end
@@ -997,8 +1047,8 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
-        atmos.mask_p =            zeros(Float64, atmos.nlev_c)
-        atmos.mask_c =            zeros(Float64, atmos.nlev_c)
+        atmos.mask_p =            zeros(Int, atmos.nlev_c)
+        atmos.mask_c =            zeros(Int, atmos.nlev_c)
         atmos.flux_c =            zeros(Float64, atmos.nlev_l)
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
 
@@ -1012,13 +1062,15 @@ module atmosphere
         return nothing
     end  # end of allocate
 
-    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf=false)
+    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
         if !atmos.is_alloc
             error("atmosphere arrays have not been allocated")
         end
         if !atmos.is_param
             error("atmosphere parameters have not been set")
         end
+
+        atmos.num_rt_eval += 1
 
         # Longwave or shortwave calculation?
         if lw
@@ -1061,7 +1113,7 @@ module atmosphere
         #####################################
 
         # Cl_run_cdf +R flag
-        atmos.control.l_rescale = true
+        atmos.control.l_rescale = false
         if atmos.control.l_rescale
             atmos.control.l_henyey_greenstein_pf = true
         end
@@ -1105,9 +1157,9 @@ module atmosphere
         ###################################################
 
         if atmos.control.l_cloud
-            atmos.cld.w_cloud[1,:]               .= atmos.clfr[:]
-            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.lwm[:]
-            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.re[:]
+            atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]   
+            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]  
+            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]  
         end
 
         ###################################################
@@ -1131,10 +1183,8 @@ module atmosphere
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
-        # calc_layer_props!(atmos)
-
         if lw
-            atmos.bound.t_ground[1] = atmos.tstar
+            atmos.bound.t_ground[1] = atmos.tmp_surf
         end
 
         if lw
@@ -1159,6 +1209,7 @@ module atmosphere
                                 atmos.bound, atmos.radout)
 
         # Store new fluxes in atmos struct
+        idx::Int = 1
         if lw 
             # LW case
             fill!(atmos.flux_u_lw, 0.0)
@@ -1229,7 +1280,7 @@ module atmosphere
     function sensible!(atmos::atmosphere.Atmos_t)
         # TKE scheme for this 1D case
         # transports energy from the surface to the bottom node
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tstar-atmos.tmp[end])
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmp_surf-atmos.tmp[end])
         return nothing
     end
 
@@ -1256,16 +1307,16 @@ module atmosphere
     function mlt!(atmos; pmin::Float64=0.0, mltype::Int=1)
 
         # Reset arrays
-        atmos.flux_c[:] .= 0.0
-        atmos.Kzz[:] .= 0.0
+        fill!(atmos.flux_c, 0.0)
+        fill!(atmos.Kzz,    0.0)
 
         # Work variables 
-        H = 0.0; l = 0.0; w = 0.0
-        m1 = 0.0; m2 = 0.0; mt = 0.0
-        grav = 0.0; mu = 0.0; c_p = 0.0; rho = 0.0
-        grad_ad = 0.0; grad_pr = 0.0
+        H::Float64 = 0.0; l::Float64 = 0.0; w::Float64 = 0.0
+        m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
+        grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
+        grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0; grad_df::Float64 = 0.0
 
-        # Loop from bottom upwards
+        # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1 , step=-1, stop=3) 
 
             # Optionally skip low pressures 
@@ -1290,11 +1341,14 @@ module atmosphere
                 # Check if this layer is condensing (this shouldn't ever be
                 # true, because the condensation curve dT/dp is too shallow)
                 if atmos.mask_p[i] > 0
-                    println("    WARNING: Somehow unstable to dry convection in a condensing region!")
+                    @warn "Somehow unstable to dry convection in a condensing region!"
                 end 
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
+                if i < atmos.nlev_c-1
+                    atmos.mask_c[i+1] = atmos.mask_decay
+                end
                 atmos.mask_c[i]   = atmos.mask_decay
                 atmos.mask_c[i-1] = atmos.mask_decay
                 
@@ -1324,6 +1378,7 @@ module atmosphere
             
             end
         end
+
         return nothing
     end # end of mlt
 
@@ -1421,7 +1476,6 @@ module atmosphere
     function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
         changed = falses(atmos.nlev_c)
-
         i_gas = findfirst(==(gas), atmos.gases)
 
         # Check if each level is condensing. If it is, place on phase curve
@@ -1437,18 +1491,49 @@ module atmosphere
             if atmos.tmp[i] < Tsat
                 atmos.tmp[i] = Tsat
                 changed[i] = true 
-                
-                atmos.re[i]   = 1.0e-5  # 10 micron droplets
-                atmos.lwm[i]  = 0.8     # 80% of the saturated vapor turns into cloud
-                atmos.clfr[i] = 1.0     # The cloud takes over the entire cell
-            else 
-                atmos.re[i]   = 0.0
-                atmos.lwm[i]  = 0.0
-                atmos.clfr[i] = 0.0
             end
         end
         
+        set_tmpl_from_tmp!(atmos)
         return changed
+    end
+
+    # Set cloud properties within condensing regions
+    function water_cloud!(atmos::atmosphere.Atmos_t)
+
+        # Reset 
+        fill!(atmos.cloud_arr_r, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        fill!(atmos.cloud_arr_f, 0.0)
+
+        # Get index of water 
+        if "H2O" in atmos.gases
+            i_gas::Int = findfirst(==("H2O"), atmos.gases)
+        else 
+            return nothing
+        end
+
+        # Check if each level is condensing. If it is, place on phase curve
+        x::Float64      = 0.0  # vmr of water vapour
+        Tsat::Float64   = 0.0  # dew point temperature of water vapour
+        for i in 1:atmos.nlev_c
+
+            x = atmos.layer_x[i,i_gas]
+            if x < 1.0e-10 
+                continue
+            end
+
+            # Cell centre only
+            # Check if temperature is below condensation curve
+            Tsat = phys.calc_Tdew("H2O",atmos.p[i] * x ) + 1.0e-10
+            if atmos.tmp[i] <= Tsat
+                atmos.cloud_arr_r[i] = atmos.cloud_val_r
+                atmos.cloud_arr_l[i] = atmos.cloud_val_l
+                atmos.cloud_arr_f[i] = atmos.cloud_val_f
+            end
+        end
+        
+        return nothing
     end
 
     # Smooth temperature at cell-centres 
@@ -1478,7 +1563,7 @@ module atmosphere
     """
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t; limit_change::Bool=false, back_interp::Bool=false)
 
-        top_old_e = atmos.tmpl[1]
+        top_old_e::Float64 = atmos.tmpl[1]
 
         # Interpolate temperature to bulk cell-edge values (log-linear)
         itp = Interpolator(log.(atmos.p), atmos.tmp)
@@ -1501,9 +1586,6 @@ module atmosphere
             itp = Interpolator(log.(atmos.pl), atmos.tmpl)  
             atmos.tmp[:] .= itp.(log.(atmos.p[:]))
         end
-
-        # Limit domain
-        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
 
         return nothing
     end 
@@ -1622,7 +1704,8 @@ module atmosphere
         # ----------------------
         # Scalar quantities  
         #    Create variables
-        var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # BOA LW BC
+        var_tmp_surf =  defVar(ds, "tmp_surf",         Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
+        var_tmp_int =      defVar(ds, "tmp_int",          Float64, (), attrib = OrderedDict("units" => "K"))      # Internal temperature [K]
         var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
         var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
         var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
@@ -1646,7 +1729,8 @@ module atmosphere
         var_starfile =  defVar(ds, "starfile"      ,String, ())     # Path to star file when read
 
         #     Store data
-        var_tstar[1] =      atmos.tstar 
+        var_tmp_surf[1] =   atmos.tmp_surf 
+        var_tmp_int[1] =       atmos.tmp_int 
         var_inst[1] =       atmos.instellation
         var_s0fact[1] =     atmos.s0_fact
         var_albbond[1] =    atmos.albedo_b

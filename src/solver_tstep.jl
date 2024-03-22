@@ -8,10 +8,8 @@ end
 
 module solver_tstep
 
-    # Include libraries
-    include("../socrates/julia/src/SOCRATES.jl")
-
     using Printf
+    using LoggingExtras
     using Statistics
     using Revise
 
@@ -36,7 +34,7 @@ module solver_tstep
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
-    - `update_tstar::Bool=false`        update tstar BC to be equal to tmpl[end]
+    - `use_physical_dt::Bool=false`     use a single time-step across the entire column (for physical time-evolution)
     - `dry_convect::Bool=true`          enable dry convection
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
@@ -46,40 +44,45 @@ module solver_tstep
     - `modplot::Int=0`                  plot frequency (0 => no plots)
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `adams::Bool=true`                use Adams-Bashforth integrator
-    - `rtol::Bool=1.0e-4`               relative tolerence
-    - `atol::Bool=1.0e-2`               absolute tolerence
     - `dt_max::Float64=500.0            maximum time-step outside of the accelerated phase
     - `max_steps::Int=1000`             maximum number of solver steps
     - `min_steps::Int=300`              minimum number of solver steps
-    - `drel_dt_conv::Float64=1.0`       convergence: maximum rate of relative change in temperature (dtmp/tmp/dt) [day-1]
-    - `drel_F_conv::Float64=0.1`        convergence: maximum relative change in F_TOA_rad for convergence [%]
-    - `F_losspct_conv::Float64=1.0`     convergence: maximum relative local radiative flux loss [%]
+    - `max_runtime::Float64=400.0`      maximum runtime in wall-clock seconds
+    - `step_rtol::Float64=1.0e-4`       step size: relative change in per-level temperature [dimensionless]
+    - `step_atol::Float64=1.0e-2`       step size: absolute change in per-level temperature [K]
+    - `conv_rtol::Float64=1.0e-4`       convergence: relative tolerance on per-level flux loss [dimensionless]
+    - `conv_atol::Float64=1.0e-1`       convergence: absolute tolerance on per-level flux loss [W m-2]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int=1, update_tstar::Bool=false,
+                            surf_state::Int=1, use_physical_dt::Bool=false,
                             dry_convect::Bool=true, condensate::String="", use_mlt::Bool=true,
                             sens_heat::Bool=false, modprop::Int=1,
                             verbose::Bool=true, modplot::Int=0,
-                            accel::Bool=true, adams::Bool=true,
-                            dt_max::Float64=500.0, max_steps::Int=1000, min_steps::Int=300,
-                            rtol::Float64=1.0e-4, atol::Float64=1.0e-2,
-                            drel_dt_conv::Float64=1.0, drel_F_conv::Float64=0.1, F_losspct_conv::Float64=1.0
+                            accel::Bool=true, adams::Bool=true, dt_max::Float64=500.0, 
+                            max_steps::Int=1000, min_steps::Int=100, max_runtime::Float64=400.0,
+                            step_rtol::Float64=1.0e-4, step_atol::Float64=1.0e-2,
+                            conv_rtol::Float64=1.0e-4, conv_atol::Float64=1.0e-1
                             )
 
-        println("TSSolver: begin accelerated timestepping")
+        if use_physical_dt
+            @info "Begin physical timestepping"
+        else 
+            @info "Begin accelerated timestepping"
+        end 
+
+        # Start timer 
+        wct_start::Float64 = time()
 
         # Run parameters
-        dtmp_accel   = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
-        smooth_stp   = 150    # Number of steps for which to apply smoothing
-        smooth       = true   # Currently smoothing?
-        wait_con     = 50     # Introduce convection after this many steps, if ^^ is not already true
+        dtmp_accel::Float64 = 15.0   # Change in temperature below which to stop model acceleration (needs to be turned off at small dtmp)
+        smooth_stp::Int     = 120    # Number of steps for which to apply smoothing
+        do_smooth::Bool     = true   # Is smoothing allowed at ever?
+        wait_con::Int       = 30     # Introduce convection after this many steps, if ^^ is not already true
+        modprint::Int       = 50     # Frequency to print when verbose==false
+        len_hist::Int       = 10     # Number of previous states to store
+        H_large::Float64    = 1.0e5  # A characteristic large heating rate [K/day]
 
-        modprint     = 50     # Frequency to print when verbose==false
-        len_hist     = 10     # Number of previous states to store
-        H_large      = 1.0e5  # A characteristic large heating rate [K/day]
-
-        do_condense  = false  # Allow condensation ever? (overwritten according to condensate)
-        is_condense  = false  # Is condensation currently enabled?
+        do_condense::Bool   = false  # Allow condensation ever? (overwritten according to condensate)
 
         if condensate != "" 
             if condensate in atmos.gases
@@ -95,7 +98,7 @@ module solver_tstep
 
         # Validate inputs
         wait_con  = max(wait_con, 1)
-        min_steps = max(min_steps,wait_con+100)
+        min_steps = max(min_steps,wait_con+50)
         min_steps = max(min_steps,smooth_stp+50)
         max_steps = max(min_steps+50, max_steps)
         len_hist  = max(min(len_hist, max_steps-1), 5)
@@ -105,23 +108,11 @@ module solver_tstep
             error("The value of len_hist is too small ($len_hist < 4)")
         end
 
-        if verbose
-            @printf("    convergence criteria       \n")
-            @printf("    step count  > %d           \n", min_steps)
-            @printf("    dtmp/tmp/dt < %.3f K day-1 \n", drel_dt_conv)
-            @printf("    dF/F (TOA)  < %.3f %%      \n", drel_F_conv)
-            @printf("    F_loc loss  < %.3f %%      \n", F_losspct_conv)
-            @printf(" \n")
-        end
-        
         # Tracking
         adj_changed::Int   = 0           # Number of convectively adjusted levels
         F_loss::Float64    = 1.0e99      # Total flux loss (TOA vs BOA-1)
-        F_losspct::Float64 = 1.0e99      # Maximum local relative radiative flux loss [%]
         H_stat::Float64    = 1.0e99      # Heating rate statistic
         F_TOA_rad::Float64 = 1.0e99      # Net upward TOA radiative flux
-        F_TOA_pre::Float64 = 1.0e99      # Previous ^
-        F_TOA_rel::Float64 = 1.0e99      # Relative change in ^
         F_BOA_rad::Float64 = 0.0         # Net upward BOA radiative flux
         F_OLR_rad::Float64 = 0.0         # Longwave upward TOA radiative flux
         F_TOA_tot::Float64 = 0.0         # Total TOA flux
@@ -129,28 +120,39 @@ module solver_tstep
         dtmp_comp::Float64 = Inf         # Temperature change comparison
         drel_dt::Float64   = Inf         # Rate of relative temperature change
         drel_dt_prev::Float64 = Inf      # Previous ^
-        start_con          = false       # Convection has been started at any point
+        start_con::Bool       = false       # Convection has been started at any point
 
         oscil       = falses(atmos.nlev_c)          # layers which are oscillating
         dt          = ones(Float64,  atmos.nlev_c)  # time-step [days]
         dtmp        = zeros(Float64, atmos.nlev_c)  # temperature step [K]
 
+        # Convergence 
+        F_cri_worst::Float64 = Inf
+        F_tol_worst::Float64 = 1.0
+        F_rto_worst::Float64 = Inf
+        F_rto::Float64       = F_rto_worst
+        F_cri::Float64       = F_cri_worst
+        F_tol::Float64       = F_tol_worst
+
         # Variables
-        step      = 0          # Current step number
-        success   = false       # Convergence criteria met
-        flag_prev = false       # Previous iteration is meeting convergence
-        flag_this = false       # Current iteration is meeting convergence
-        plt_magma = false       # Include tmp_magma in plots
-        stopaccel = false       # stop accelerated period this iter
-        rtol_step = rtol        # rtol used this step
-        step_stopaccel = 99999  # step at which accelerated period was stopped
+        is_condense::Bool   = false       # Is condensation currently enabled?
+        is_smooth::Bool     = true        # Currently smoothing?
+        step::Int           = 0           # Current step number
+        success::Bool       = false       # Convergence criteria met
+        flag_prev::Bool     = false       # Previous iteration is meeting convergence
+        flag_this::Bool     = false       # Current iteration is meeting convergence
+        stopaccel::Bool     = false       # stop accelerated period this iter
+        this_rtol::Float64  = step_rtol   # rtol used this step
+        step_stopaccel::Int = 99999       # step at which accelerated period was stopped
+
+        info_str::String = ""
 
         if !accel 
             step_stopaccel = 1
         end
 
-        plt_magma = (surf_state == 2)
-        smooth_width = 1
+        plt_magma::Bool = (surf_state == 2)
+        smooth_width::Int = 5
 
         # Store previous n atmosphere states
         hist_tmp  = zeros(Float64, (len_hist, atmos.nlev_c))   # temperature (cc)
@@ -166,6 +168,7 @@ module solver_tstep
         # Main loop
         while (!success) && (step < max_steps)
             step += 1
+            info_str = ""
 
             # ----------------------------------------------------------
             # Check that solver is happy 
@@ -177,6 +180,10 @@ module solver_tstep
                 error("Temperature array contains negative values")
             end
 
+            # Check time 
+            if time()-wct_start > max_runtime 
+                break
+            end 
 
             # ----------------------------------------------------------
             # Prepare for new iteration
@@ -186,7 +193,7 @@ module solver_tstep
             atmos.mask_p[:] .-= 1.0
 
             if mod(step,modprint) == 0
-                @printf("    step %d ", step)
+                info_str *= @sprintf("    step %d ", step)
             end
 
             # End of the initial fast period
@@ -199,16 +206,16 @@ module solver_tstep
             if accel
                 # Fast phase
                 if mod(step,modprint) == 0
-                    @printf("(accel) ")
+                    info_str *= @sprintf("(accel) ")
                 end
                 dtmp_clip    = 50.0
                 dryadj_steps = 4
                 is_condense  = do_condense
                 dt_min_step  = 1.0e-1
                 dt_max_step  = 120.0
-                rtol_step    = rtol
-                smooth       = true 
-                smooth_width = floor(Int, max(0.20*atmos.nlev_c,2 )) # 20% of levels
+                this_rtol    = step_rtol
+                is_smooth    = do_smooth 
+                smooth_width = max(5, floor(Int, 0.2*atmos.nlev_c)) # 20% of levels, and >=5
 
             else
                 # Slow phase
@@ -217,10 +224,10 @@ module solver_tstep
                 is_condense  = do_condense
                 dt_min_step  = 5.0e-5
                 dt_max_step  = max(dt_max, 1.0e-2)
-                rtol_step    = rtol
+                this_rtol    = step_rtol
                 
-                if smooth && (step >= smooth_stp)
-                    smooth = false
+                if is_smooth && (step >= smooth_stp)
+                    is_smooth = false
                     clamp!(dt, dt_min_step, 1.0)
                 end
 
@@ -235,31 +242,21 @@ module solver_tstep
                     step_stopaccel = step
                 end
 
-                # Solver is struggling
-                if (step > max_steps * 0.9)
-                    dt_max_step *= 0.5
-                    dtmp_clip *= 0.8
-
-                # Not struggling
-                else
-                    if smooth
-                        smooth_width = floor(Int, max(0.08*atmos.nlev_c,2 )) # 10% of levels
-                        dt_max_step *= 10.0
-                        rtol_step *= 12.0
-                    else 
-                        smooth_width = 0
-                    end
+                if is_smooth
+                    smooth_width = max(5, floor(Int, 0.08*atmos.nlev_c)) # 8% of levels, and >= 5
+                    dt_max_step *= 10.0
+                    this_rtol *= 12.0
                 end
             end
 
             # Introduce convection and condensation schemes
             if !start_con && (step >= wait_con) && (dry_convect || do_condense)
                 start_con = true 
-                @printf("(intro convect/condense) ")
+                info_str *= @sprintf("(intro convect/condense) ")
             end
 
-            if (mod(step,modprint) == 0) && smooth
-                @printf("(smooth) ")
+            if (mod(step,modprint) == 0) && is_smooth
+                info_str *= @sprintf("(smooth) ")
             end
 
             # ----------------------------------------------------------
@@ -267,13 +264,14 @@ module solver_tstep
             # ---------------------------------------------------------- 
             if (modprop > 0) && ( (mod(step, modprop) == 0) || (step < 10))
                 if mod(step,modprint) == 0
-                    @printf("(props) ")
+                    info_str *= @sprintf("(props) ")
                 end
                 atmosphere.calc_layer_props!(atmos)
             end 
 
             if mod(step,modprint) == 0
-                @printf("\n")
+                info_str *= "\n"
+                @info info_str
             end
 
             # ----------------------------------------------------------
@@ -321,7 +319,7 @@ module solver_tstep
                         dt[i] *= 0.4
                     else
                         # Set timestep
-                        if (abs(atmos.tmp[i] - hist_tmp[end,i]) < (rtol_step*abs(hist_tmp[end,i]) + atol) ) 
+                        if (abs(atmos.tmp[i] - hist_tmp[end,i]) < (this_rtol*abs(hist_tmp[end,i]) + step_atol) ) 
                             dt[i] *= 1.03
                         else
                             dt[i] /= 1.02
@@ -330,11 +328,17 @@ module solver_tstep
                 end
             end 
 
+            # Enforce time-stepping limits 
             dt[end] = min(dt[end], dt_max_step*0.95)
             clamp!(dt, dt_min_step, dt_max_step)
 
+            # Enforce a constant dt across column 
+            if use_physical_dt
+                fill!(dt, minimum(dt))
+            end 
+
             if verbose && (mod(step,modprint) == 0)
-                @printf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
+                @info @sprintf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
             end
 
             # ----------------------------------------------------------
@@ -402,8 +406,7 @@ module solver_tstep
             # ----------------------------------------------------------
             # (Optionally) Smooth temperature profile for stability
             # ---------------------------------------------------------- 
-
-            if smooth && (smooth_width > 2)
+            if is_smooth
                 atmosphere.smooth_centres!(atmos, smooth_width)
             end
 
@@ -423,9 +426,7 @@ module solver_tstep
 
             elseif (surf_state == 0)
                 # Extrapolate (log-linear)
-                grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
-                grad_dp = log(atmos.p[end]/atmos.p[end-1])
-                atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
+                atmos.tmpl[end] = atmos.tmp[end] +   (atmos.tmp[end]-atmos.tmp[end-1])/(log(atmos.p[end]/atmos.p[end-1]))   * log(atmos.pl[end]/atmos.p[end])
 
             # elseif (surf_state==1) 
             #   do nothing in this case
@@ -434,14 +435,9 @@ module solver_tstep
                 # Conductive skin
                 atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
                 atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
-                atmos.tstar = atmos.tmpl[end]
+                atmos.tmp_surf = atmos.tmpl[end]
 
             end 
-
-            # Update tstar?
-            if update_tstar 
-                atmos.tstar = tmpl[end]
-            end
 
             # Temperature domain
             clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
@@ -462,39 +458,43 @@ module solver_tstep
             if step > 3
                 dtmp_comp = -1
                 for i in 1:atmos.nlev_c 
-                    tmp_comp_1 = 0.5 * ( atmos.tmp[i]      + hist_tmp[end  ,i] )
-                    tmp_comp_2 = 0.5 * ( hist_tmp[end-1,i] + hist_tmp[end-2,i] )
+                    tmp_comp_1::Float64 = 0.5 * ( atmos.tmp[i]      + hist_tmp[end  ,i] )
+                    tmp_comp_2::Float64 = 0.5 * ( hist_tmp[end-1,i] + hist_tmp[end-2,i] )
                     dtmp_comp = max(dtmp_comp, abs(tmp_comp_1 - tmp_comp_2))
                 end 
             end 
 
             # Calculate the (change in) flux balance
-            F_TOA_pre = F_TOA_rad 
             F_TOA_rad = atmos.flux_n[1]
-            F_TOA_rel = abs((F_TOA_rad-F_TOA_pre)/F_TOA_pre)*100.0
             F_BOA_rad = atmos.flux_n[end-1]
             F_OLR_rad = atmos.flux_u_lw[1]
 
             F_TOA_tot = atmos.flux_tot[1]
             F_BOA_tot = atmos.flux_tot[end-1]
-            F_loss    = abs( F_TOA_tot-F_BOA_tot )
-
-            F_losspct = 0.0
+            F_loss    = abs( F_TOA_tot-F_BOA_tot )  # flux lost across whole column
+            F_rto_worst = 0.0
             for i in 1:atmos.nlev_c
                 # skip convective layers if adjustment is being used
                 # skip condensing layers always
-                skipcheck = false
-                for j in -3:3  # neighbours
+                skipcheck::Bool = false
+                for j in -2:3  # neighbours
                     if (j+i <= atmos.nlev_c) && (j+i >= 1)  # don't go out of range
                         skipcheck = skipcheck || ( (atmos.mask_c[i+j] > 0) && !use_mlt)|| (atmos.mask_p[i+j] > 0)
                     end
                 end
+
                 # if this layer (and its neighbours) are valid for this criterion, check flux loss
                 if !skipcheck
-                    F_losspct = max(F_losspct, abs( (atmos.flux_n[i]-atmos.flux_n[i+1])/atmos.flux_n[i]))
+                    F_tol = abs(atmos.flux_tot[i+1]) * conv_rtol + conv_atol  # required loss for convergence
+                    F_cri = abs(atmos.flux_tot[i] - atmos.flux_tot[i+1])
+                    F_rto = F_cri/F_tol 
+                    if F_rto > F_rto_worst
+                        F_rto_worst = F_rto
+                        F_cri_worst = F_cri
+                        F_tol_worst = F_tol
+                    end 
                 end 
             end 
-            F_losspct *= 100.0
             
             # Calculate the 'typical' heating rate magnitude
             H_stat    = quantile(abs.(atmos.heating_rate[:]), 0.95)
@@ -503,21 +503,21 @@ module solver_tstep
             # Print debug info (some are disabled depending on the convection scheme)
             # -------------------------------------- 
             if verbose && (mod(step,modprint) == 0)
-                @printf("    dtmp_comp   = %+.3f K      \n", dtmp_comp)
-                @printf("    dtmp/tmp/dt = %+.3f day-1  \n", drel_dt)
-                @printf("    drel_F_TOA  = %+.4f %%     \n", F_TOA_rel)
-                @printf("    F_locloss   = %+.4f %%     \n", F_losspct)
+                @info @sprintf("    dtmp_comp   = %+.3f K      \n", dtmp_comp)
+                @info @sprintf("    dtmp/tmp/dt = %+.3f day-1  \n", drel_dt)
+                @info @sprintf("    F_cri_worst = %+.2e W m-2  \n", F_cri_worst)
+                @info @sprintf("    F_tol_worst = %+.2e W m-2  \n", F_tol_worst)
 
-                @printf("    F_rad^TOA   = %+.2e W m-2  \n", F_TOA_rad)
-                @printf("    F_rad^BOA   = %+.2e W m-2  \n", F_BOA_rad)
-                @printf("    F_rad^OLR   = %+.2e W m-2  \n", F_OLR_rad)
-                @printf("    F_tot^loss  = %+.2f W m-2  \n", F_loss)
-                @printf("    HR_typical  = %+.4f K day-1\n", H_stat)
+                @info @sprintf("    F_rad^TOA   = %+.2e W m-2  \n", F_TOA_rad)
+                @info @sprintf("    F_rad^BOA   = %+.2e W m-2  \n", F_BOA_rad)
+                @info @sprintf("    F_rad^OLR   = %+.2e W m-2  \n", F_OLR_rad)
+                @info @sprintf("    F_tot^loss  = %+.2f W m-2  \n", F_loss)
+                @info @sprintf("    HR_typical  = %+.4f K day-1\n", H_stat)
 
                 if ( (dryadj_steps > 0) && !use_mlt) || is_condense
-                    @printf("    count_adj   = %d layers   \n", adj_changed)
+                    @info @sprintf("    count_adj   = %d layers   \n", adj_changed)
                 end
-                @printf("\n")
+                @info @sprintf("\n")
             end
 
             # --------------------------------------
@@ -538,22 +538,18 @@ module solver_tstep
             if (modplot > 0) && (mod(step,modplot) == 0)
                 plotting.plot_solver(atmos, @sprintf("%s/solver.png", atmos.OUT_DIR), hist_tmpl=hist_tmpl, incl_magma=plt_magma, step=step)
                 cp(@sprintf("%s/solver.png", atmos.OUT_DIR), @sprintf("%s/zzframe_%04d.png", atmos.OUT_DIR, step), force=true)
-
-                plotting.plot_fluxes(atmos, @sprintf("%s/fluxes.png", atmos.OUT_DIR))
-                cp(@sprintf("%s/fluxes.png", atmos.OUT_DIR), @sprintf("%s/zyframe_%04d.png", atmos.OUT_DIR, step), force=true)
             end 
 
             # --------------------------------------
             # Convergence check
             # -------------------------------------- 
             # Requires that:
-            # - minimal rate (dT/dt) of temperature change for two iters
-            # - minimal change to net radiative flux at TOA for two iters
-            # - minimal flux loss between neighbouring layers
-            # - solver is not being accelerated in any sense
+            # - flux loss is within the rtol,atol tolerances for two consecutive steps
+            # - if enabled, convection/condensation are active
+            # - solver is not being accelerated or smoothed
             flag_prev = flag_this
-            flag_this = (drel_dt < drel_dt_conv) && ( F_TOA_rel < drel_F_conv) && (F_losspct < F_losspct_conv) 
-            success   = flag_this && flag_prev && !smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!dry_convect && !do_condense))
+            flag_this = (F_rto_worst <= 1.0)
+            success   = flag_this && flag_prev && !is_smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!dry_convect && !do_condense))
             
             # --------------------------------------
             # Sleep in order to capture keyboard interrupt
@@ -563,44 +559,43 @@ module solver_tstep
 
         end # end main loop
 
-        # Calculate final fluxes for CF and emission spectrum 
-        atmosphere.radtrans!(atmos, false)
-        atmosphere.radtrans!(atmos, true, calc_cf=true)
-
         # Print information about the final state
         atmos.is_solved = true
         if !success
-            @printf("    stopping atmosphere iterations before convergence \n")
+            @warn @sprintf("    stopping atmosphere iterations before convergence \n")
             atmos.is_converged = false
         else
-            @printf("    convergence criteria met (%d iterations) \n", step)
+            @info @sprintf("    convergence criteria met (%d iterations) \n", step)
             atmos.is_converged = true
         end
-        @printf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
-        @printf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
-        @printf("    dF/F (TOA)  = %.4f %%     \n", F_TOA_rel)
-        @printf("    local loss  = %.2f %%     \n", F_losspct)
-        @printf("\n")
+        @info @sprintf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
+        @info @sprintf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
+        @info @sprintf("    F_cri_worst = %+.2e W m-2  \n", F_cri_worst)
+        @info @sprintf("    F_tol_worst = %+.2e W m-2  \n", F_tol_worst)
+        if use_physical_dt
+            @info @sprintf("    total_time  = %+.2e years  \n", atmos.time[1]/365.25)
+        else 
+            @info @sprintf("    max_time    = %+.2e years  \n", maximum(atmos.time)/365.25)
+        end 
+        @info @sprintf("\n")
 
-        @printf("    endpoint fluxes \n")
-        @printf("    rad_OLR   = %.2e W m-2         \n", F_OLR_rad)
-        @printf("    rad_TOA   = %.2e W m-2         \n", F_TOA_rad)
-        @printf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
-        @printf("    tot_BOA   = %.2e W m-2         \n", F_BOA_tot)
+        @info @sprintf("    endpoint fluxes \n")
+        @info @sprintf("    rad_OLR   = %.2e W m-2         \n", F_OLR_rad)
+        @info @sprintf("    rad_TOA   = %.2e W m-2         \n", F_TOA_rad)
+        @info @sprintf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
+        @info @sprintf("    tot_BOA   = %.2e W m-2         \n", F_BOA_tot)
         if (surf_state == 2)
-            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tstar)
-            @printf("    cond_skin = %.2e W m-2         \n", F_skin)
+            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
+            @info @sprintf("    cond_skin = %.2e W m-2         \n", F_skin)
         end
-        @printf("\n")
+        @info @sprintf("\n")
     
         # Warn user if there's a sign difference in TOA vs BOA fluxes
         # because this shouldn't be the case
         if F_TOA_tot*F_BOA_tot < 0
-            @printf("WARNING: TOA and BOA total fluxes have different signs\n")
+            @warn @sprintf("TOA and BOA total fluxes have different signs\n")
         end
 
-        rm(joinpath(atmos.OUT_DIR,"fluxes.png"), force=true)
-        rm(joinpath(atmos.OUT_DIR,"solver.png"), force=true)
         return nothing
 
     end # end solve_time
