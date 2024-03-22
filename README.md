@@ -13,11 +13,8 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 * `res/`            - Resources
 * `src/`            - AGNI source code
 * `socrates/`       - Directory containing SOCRATES and associated files (subject to the license therein)
-* `agni.jl`         - AGNI executable for debugging
-* `agni_cli.jl`     - AGNI executable with command-line interface
+* `agni.jl`         - AGNI executable
 * `demo_steamrun.jl`- Script to demonstrate the pure-steam runaway greenhouse effect
-* `demo_earth.jl`   - Script to demonstrate solving for Earth's temperature structure
-* `demo_hotdry.jl`  - Script to demonstrate solving for a hot and dry post-runaway steam atmosphere
 * `demo_tests.jl`   - Script containing quick tests for verifying that the basics of the model are functioning
 
 
