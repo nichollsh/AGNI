@@ -8,13 +8,13 @@
 ROOT_DIR = dirname(abspath(@__FILE__))
 ENV["GKSwstype"]="nul"
 
-println("Begin runaway demo")
-
 using Revise
 using Printf
 using Plots
 using DelimitedFiles
+using LoggingExtras
 
+@info "Begin runaway demo"
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
@@ -79,7 +79,7 @@ for i in 1:run_len
     atmosphere.radtrans!(atmos, true)
 
     olr = atmos.flux_u_lw[1]
-    @printf("Tsurf = %4.1f K  ,  OLR = %5.1f W m-2 \n",atmos.tmpl[end],olr)
+    @info @sprintf("Tsurf = %4.1f K  ,  OLR = %5.1f W m-2 ",atmos.tmpl[end],olr)
     olr_arr[i] = olr 
 
     if plot_frames 
@@ -91,7 +91,8 @@ for i in 1:run_len
 end
 
 # Make plot of OLR vs T_surf
-plt = plot(framestyle=:box, size=(500,400))
+@info "Making plot"
+plt = plot(framestyle=:box, size=(500,400), dpi=300)
 
 lw=2.5
 
@@ -110,9 +111,10 @@ xlabel!(plt, "Surface temperature [K]")
 ylabel!(plt, "OLR [W m-2]")
 
 savefig(plt, "out/runaway_olr.pdf")
+savefig(plt, "out/runaway_olr.png")
 
 # Deallocate atmosphere
 atmosphere.deallocate!(atmos)
 
-println("Goodbye")
+@info "Goodbye"
 exit(0)

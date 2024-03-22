@@ -4,8 +4,6 @@
 # This file runs a series of tests, to make sure that the model is behaving properly.
 # -------------
 
-println("Begin tests")
-
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
@@ -13,6 +11,10 @@ ENV["GKSwstype"]="nul"
 
 # Include libraries
 using Revise
+using LoggingExtras
+
+@info "Begin tests"
+
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
@@ -42,8 +44,8 @@ passing = true
 # -------------
 # Test mixing ratios
 # -------------
-println(" ")
-println("Testing composition")
+@info " "
+@info "Testing composition"
 
 tmp_surf           = 200.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00  # Instellation flux [W m-2]
@@ -78,12 +80,12 @@ for k in keys(val_e)
     val_o[k] = atmosphere.get_x(atmos, k, 25)
     global sp_pass = sp_pass && ( abs(val_o[k]-val_e[k]) < 1.0e-6 )
 end
-println("Expected values = $(val_e)")
-println("Modelled values = $(val_o)")
+@info "Expected values = $(val_e)"
+@info "Modelled values = $(val_o)"
 if sp_pass
-    println("Pass")
+    @info "Pass"
 else
-    println("Fail")
+    @warn "Fail"
     passing = false
 end
 atmosphere.deallocate!(atmos)
@@ -95,8 +97,8 @@ atmosphere.deallocate!(atmos)
 # -------------
 # Test instellation
 # -------------
-println(" ")
-println("Testing instellation")
+@info " "
+@info "Testing instellation"
 
 tmp_surf           = 200.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00     # Instellation flux [W m-2]
@@ -127,12 +129,12 @@ atmosphere.radtrans!(atmos, false)
 
 val_e = toa_heating * cosd(theta)
 val_o = atmos.flux_d_sw[1]
-println("Expected value = $(val_e) W m-2")
-println("Modelled value = $(val_o) W m-2")
+@info "Expected value = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
 if abs(val_e-val_o) < 2
-    println("Pass")
+    @info "Pass"
 else
-    println("Fail")
+    @warn "Fail"
     passing = false
 end
 atmosphere.deallocate!(atmos)
@@ -143,8 +145,8 @@ atmosphere.deallocate!(atmos)
 # -------------
 # Test greenhouse effect
 # -------------
-println(" ")
-println("Testing greenhouse effect")
+@info " "
+@info "Testing greenhouse effect"
 
 tmp_surf           = 1300.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00    # Instellation flux [W m-2]
@@ -177,12 +179,12 @@ atmosphere.radtrans!(atmos, true)
 
 val_e = [270.0, 290.0]
 val_o = atmos.flux_u_lw[1]
-println("Expected range = $(val_e) W m-2")
-println("Modelled value = $(val_o) W m-2")
+@info "Expected range = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
 if ( val_o > val_e[1]) && (val_o < val_e[2]) 
-    println("Pass")
+    @info "Pass"
 else
-    println("Fail")
+    @warn "Fail"
     passing = false
 end
 atmosphere.deallocate!(atmos)
@@ -192,8 +194,8 @@ atmosphere.deallocate!(atmos)
 # -------------
 # Test Rayleigh scattering
 # -------------
-println(" ")
-println("Testing Rayleigh scattering")
+@info " "
+@info "Testing Rayleigh scattering"
 
 tmp_surf           = 400.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00    # Instellation flux [W m-2]
@@ -225,12 +227,12 @@ atmosphere.radtrans!(atmos, false)
 
 val_e = [1.0e-4, 1e9]
 val_o = atmos.flux_u_sw[20]
-println("Expected range = $(val_e) W m-2")
-println("Modelled value = $(val_o) W m-2")
+@info "Expected range = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
 if ( val_o > val_e[1]) && (val_o < val_e[2]) 
-    println("Pass")
+    @info "Pass"
 else
-    println("Fail")
+    @warn "Fail"
     passing = false
 end
 atmosphere.deallocate!(atmos)
@@ -241,8 +243,8 @@ atmosphere.deallocate!(atmos)
 # -------------
 # Test heating rate calculation
 # -------------
-println(" ")
-println("Testing heating rates")
+@info " "
+@info "Testing heating rates"
 
 tmp_surf           = 2500.0    # Surface temperature [kelvin]
 toa_heating     = 1000.0    # Instellation flux [W m-2]
@@ -277,12 +279,12 @@ atmos.flux_tot += atmos.flux_n
 atmosphere.calc_hrates!(atmos)
 val_e = [20.0, 70.0]  # tests have found ~54 K/day for this setup
 val_o = atmos.heating_rate[atmos.nlev_c-2]
-println("Expected range = $(val_e) K/day")
-println("Modelled value = $(val_o) K/day")
+@info "Expected range = $(val_e) K/day"
+@info "Modelled value = $(val_o) K/day"
 if ( val_o > val_e[1]) && (val_o < val_e[2]) 
-    println("Pass")
+    @info "Pass"
 else
-    println("Fail")
+    @warn "Fail"
     passing = false
 end
 atmosphere.deallocate!(atmos)
@@ -291,12 +293,12 @@ atmosphere.deallocate!(atmos)
 # -------------
 # Inform at end
 # -------------
-println(" ")
+@info " "
 if passing
-    println("SUCCESS - all tests passed")
+    @info "All tests passed"
     exit(0)
 else 
-    println("WARNING - some tests failed")
+    @warn "Some tests failed"
     exit(1)
 end
 
