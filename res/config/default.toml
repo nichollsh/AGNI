@@ -2,13 +2,13 @@
 title = "Default"
 
 [planet]
-    t_star          = 3000.0    # Surface temperature [kelvin]
+    t_star          = 2800.0    # Surface temperature [kelvin]
     instellation    = 2000.0
     albedo_b        = 0.1
     s0_fact         = 0.375
     albedo_s        = 0.0
     radius          = 6.37e6    # metres
-    zenith          = 48.19
+    zenith_angle    = 48.19
     gravity         = 9.81      # m s-2
     p_surf          = 280.0     # bar
     p_top           = 1e-5      # bar 
@@ -34,14 +34,17 @@ title = "Default"
     continua        = true
     rayleigh        = false
     cloud           = false
+    aerosol         = false 
     overlap_method  = 4
-    thermo_funcs    = true     
-    tmp_floor       = 5.0
+    thermo_funcs    = false     
+    sensible_heat   = false 
     dry_convection  = "mlt"
     condensates     = []
     surf_state      = 0
-    solvers         = ["nlsol"]
+    solvers         = ["newton"]
+    initial_state   = ["dry", "condense", "H2O"]
     stabilise       = true
+    converge_atol   = 1.0e-1
 
 [plots]
     at_runtime      = true
@@ -51,4 +54,5 @@ title = "Default"
     emission        = true 
     albedo          = true 
     mixing_ratios   = true 
+    animate         = false 
 
