@@ -55,7 +55,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 You should end up in the root directory of the repository.    
 
 ## Running the code
-For the command line interface, run `$ ./agni_cli.jl` (pass `--help` for help).     
-To debug the program, run `$ ./agni.jl` in the root directory of the repository.       
-To demo the steam runaway greenhouse effect, run `$ ./demo_steamrun.jl`.     
+To run the program, execute `./agni.jl [cfg_path]`. If `[cfg_path]` is not provided, then the default configuration file will be used.       
+To demo the steam runaway greenhouse effect, execute `./demo_steamrun.jl`.     
+To run the unit tests execute `./demo_steamrun.jl`.     
 
