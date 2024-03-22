@@ -584,6 +584,7 @@ module solver_nlsol
         else 
             @warn "    failure (unhandled)\n"
         end
+        @info "\n"
 
         _fev!(x_cur, zeros(Float64, arr_len))
         atmosphere.calc_hrates!(atmos)
