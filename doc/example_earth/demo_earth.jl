@@ -30,7 +30,7 @@ instellation    = 1361.0    # Daytime instellation flux [W m-2]
 radius          = 6.37e6    # metres
 gravity         = 9.81      # m s-2
 theta           = 20.0
-nlev_centre     = 100  
+nlev_centre     = 50  
 p_surf          = 1.0       # bar
 p_top           = 1e-7      # bar 
 mf_path         = "doc/example_earth/equ.csv"
@@ -50,22 +50,27 @@ println("Setting up")
 atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
-                         toa_heating, 3.0/8.0, 0.12, theta,
+                         instellation, 3.0/8.0, 0.12, theta,
                          tstar,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_path=mf_path,
                          flag_gcontinuum=true,
-                         flag_rayleigh=false,  # the RFM profile does not include scattering
+                         flag_rayleigh=true, 
                          overlap_method=4
                  )
 atmosphere.allocate!(atmos;stellar_spectrum=star_file)
 
 # Call solver 
 println("Starting solver")
-solver_tstep.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true,
-                           dry_convect=true, condensate="H2O", sens_heat=true, 
-                           dt_max=2.0, max_steps=300)
+# solver_tstep.solve_energy!(atmos, surf_state=1, modplot=1, verbose=true,
+#                            dry_convect=true, sens_heat=true, 
+#                            dt_max=2.0, max_steps=300)
+
+import solver_nlsol
+solver_nlsol.solve_energy!(atmos, surf_state=1, sens_heat=false,
+                            dry_convect=true,
+                            max_steps=300, atol=1.0e-2)
 
 # Write arrays
 atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
@@ -81,3 +86,4 @@ println("Deallocating arrays")
 atmosphere.deallocate!(atmos)
 
 println("Goodbye")
+exit(0)

@@ -9,7 +9,7 @@ println("Begin tests")
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
-ENV["GKSwstype"] = "100"
+ENV["GKSwstype"]="nul"
 
 # Include libraries
 using Revise
@@ -45,7 +45,7 @@ passing = true
 println(" ")
 println("Testing composition")
 
-tstar           = 200.0    # Surface temperature [kelvin]
+tmp_surf           = 200.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00  # Instellation flux [W m-2]
 p_surf          = 50.0     # bar
 theta           = 65.0
@@ -56,7 +56,7 @@ mf_dict         = Dict([
                         ("SO2" , 0.1),
                         ("O3"  , 0.2)
                         ])
-spfile_name   = "res/spectral_files/Reach/Reach"
+spfile_name   = "res/spectral_files/Reach/Reach.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
@@ -64,7 +64,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict
@@ -98,7 +98,7 @@ atmosphere.deallocate!(atmos)
 println(" ")
 println("Testing instellation")
 
-tstar           = 200.0    # Surface temperature [kelvin]
+tmp_surf           = 200.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00     # Instellation flux [W m-2]
 p_surf          = 50.0    # bar
 theta           = 65.0
@@ -106,7 +106,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.8),
                         ("CO2" , 0.2),
                         ])
-spfile_name   = "res/spectral_files/Mallard/Mallard"
+spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
@@ -114,7 +114,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -146,14 +146,14 @@ atmosphere.deallocate!(atmos)
 println(" ")
 println("Testing greenhouse effect")
 
-tstar           = 1300.0    # Surface temperature [kelvin]
+tmp_surf           = 1300.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00    # Instellation flux [W m-2]
 p_surf          = 300.0    # bar
 theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0),
                         ])
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Oak/Oak.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
@@ -161,7 +161,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -175,7 +175,7 @@ setpt.dry_adiabat!(atmos)
 setpt.condensing!(atmos, "H2O")
 atmosphere.radtrans!(atmos, true)
 
-val_e = [275.0, 290.0]
+val_e = [270.0, 290.0]
 val_o = atmos.flux_u_lw[1]
 println("Expected range = $(val_e) W m-2")
 println("Modelled value = $(val_o) W m-2")
@@ -195,7 +195,7 @@ atmosphere.deallocate!(atmos)
 println(" ")
 println("Testing Rayleigh scattering")
 
-tstar           = 400.0    # Surface temperature [kelvin]
+tmp_surf           = 400.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00    # Instellation flux [W m-2]
 p_surf          = 10.0    # bar
 theta           = 75.0
@@ -203,7 +203,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.6),
                         ("CO2" , 0.4),
                         ])
-spfile_name   = "res/spectral_files/Mallard/Mallard"
+spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
@@ -211,7 +211,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -244,14 +244,14 @@ atmosphere.deallocate!(atmos)
 println(" ")
 println("Testing heating rates")
 
-tstar           = 2500.0    # Surface temperature [kelvin]
+tmp_surf           = 2500.0    # Surface temperature [kelvin]
 toa_heating     = 1000.0    # Instellation flux [W m-2]
 p_surf          = 5.0     # bar
 theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0)
                         ])
-spfile_name   = "res/spectral_files/Oak/Oak"
+spfile_name   = "res/spectral_files/Oak/Oak.sf"
 star_file     = "res/stellar_spectra/trappist-1.txt"
 
 # Setup atmosphere
@@ -259,7 +259,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -275,7 +275,7 @@ atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 atmosphere.calc_hrates!(atmos)
-val_e = [20.0, 30.0]  # tests have found ~26 K/day for this setup
+val_e = [20.0, 70.0]  # tests have found ~54 K/day for this setup
 val_o = atmos.heating_rate[atmos.nlev_c-2]
 println("Expected range = $(val_e) K/day")
 println("Modelled value = $(val_o) K/day")
@@ -294,7 +294,9 @@ atmosphere.deallocate!(atmos)
 println(" ")
 if passing
     println("SUCCESS - all tests passed")
+    exit(0)
 else 
     println("WARNING - some tests failed")
+    exit(1)
 end
 

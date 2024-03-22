@@ -4,15 +4,15 @@
 # AGNI executable file for standalone execution
 # -------------
 
-tbegin = time()
-println("Begin AGNI")
-
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
-ENV["GKSwstype"] = "100"
+ENV["GKSwstype"]="nul"
 
 # Include libraries
 using Revise
+using LoggingExtras
+using Printf
+using TOML
 
 # Include local jl files
 include("socrates/julia/src/SOCRATES.jl")
@@ -21,115 +21,329 @@ import atmosphere
 import setpt
 import plotting 
 import phys
+import solver_tstep
+import solver_nlsol 
 
+# Setup terminal + file logging 
+function setup_logging(outpath::String, silent::Bool)
+    # Remove old file 
+    rm(outpath, force=true)
 
-# Configuration options
-tstar           = 2490.0    # Surface temperature [kelvin]
-instellation    = 1361.0
-albedo_b        = 0.18
-radius          = 6.37e6    # metres
-zenith          = 48.19
-gravity         = 9.81      # m s-2
-nlev_centre     = 50  
-p_surf          = 270.0    # bar
-p_top           = 1e-5      # bar 
-mf_dict         = Dict([
-                        ("H2O" , 1.0),
-                        # ("CO2" , 0.1),
-                        # ("H2" , 1.0),
-                        # ("CO" , 90.58514),
-                        # ("N2" , 1.41003)
-                        ])
+    # If silent 
+    if silent 
+        global_logger(MinLevelLogger(current_logger(), Logging.Error))
+        return nothing
+    end 
 
-spfile_name   = "res/spectral_files/Oak/Oak"
-star_file     = "res/stellar_spectra/sun.txt"
-output_dir    = "out/"
+    # Setup file logger
+    logger_file = FormatLogger(outpath; append=true) do io, args
+        @printf(io, "[%-5s] %s",args.level, args.message)
+    end;
 
-# Setup atmosphere
-println("Setting up")
-atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
-                         spfile_name,
-                         instellation, 3.0/8.0, albedo_b, zenith,
-                         tstar,
-                         gravity, radius,
-                         nlev_centre, p_surf, p_top,
-                         mf_dict=mf_dict,
-                         flag_gcontinuum=true,
-                         flag_rayleigh=true,
-                         flag_cloud=false,
-                         overlap_method=4,
-                         skin_d=0.01,
-                         skin_k=2.0,
-                         tmp_magma=2500.0,
-                         tmp_floor=2.0,
-                         thermo_functions=true,
-                 )
-atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true)
+    # Setup terminal logger 
+    logger_term = FormatLogger() do io, args
+        color::Int = 39
+        if args.level == LoggingExtras.Info
+            color = 32
+        elseif args.level == LoggingExtras.Warn
+            color = 33
+        elseif args.level == LoggingExtras.Debug
+            color = 36
+        end 
 
-# Set PT profile 
-println("Setting initial T(p)")
-# setpt.fromcsv!(atmos,"pt.csv")
-# setpt.isothermal!(atmos, tstar-300.0)
-# setpt.prevent_surfsupersat!(atmos)
-# setpt.dry_adiabat!(atmos)
-# setpt.condensing!(atmos, "H2O")
-# setpt.stratosphere!(atmos, 500.0)
+        # Set color, set bold, print level, unset bold, unset color, message
+        @printf(io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s",color, args.level, args.message)
+    end;
 
-# Create output directory
-rm(output_dir,force=true,recursive=true)
-if !isdir(output_dir) && !isfile(output_dir)
-    mkdir(output_dir)
+    # Combine and set 
+    logger_both = TeeLogger(logger_file, logger_term);
+    global_logger(logger_both)
+    disable_logging(Logging.Debug) # disable debug; info only
+
+    return nothing 
 end 
 
-atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
+# Open and validate config file 
+function open_config(cfg_path::String)::Dict
 
-println("Running model...")
+    # open file 
+    cfg_dict = TOML.parsefile(cfg_path)
 
-# Calculate LW and SW fluxes (once)
-atmosphere.radtrans!(atmos, true, calc_cf=true)
-atmosphere.radtrans!(atmos, false)
+    # check headers 
+    headers = ["plots", "planet", "files", "execution", "title"]
+    for h in headers 
+        if !haskey(cfg_dict, h)
+            error("Key $h is missing from configuration file at '$cfg_path'")
+        end 
+    end 
 
-# Calculate convective fluxes (once)
-# println("MLT: calculating fluxes")
-# atmosphere.mlt!(atmos)
+    # check that output dir is named  
+    if !haskey(cfg_dict["files"], "output_dir") || (cfg_dict["files"]["output_dir"] == "")
+        error("Output directory is missing from configuration file at '$cfg_path'")
+    end 
+    out_path = abspath(cfg_dict["files"]["output_dir"])
+    
+    # check if this is a dangerous path
+    if ispath(joinpath(out_path, ".git")) || (joinpath(out_path) == pwd())
+        error("Output directory is unsafe")
+    end 
+
+    # looks good
+    return cfg_dict 
+end 
+
+# Main function!
+function main()
+
+    # Record start time 
+    tbegin = time()
+
+    # Open and validate config file 
+    cfg_path::String = joinpath(ROOT_DIR, "res/config/default.toml")
+    if length(ARGS)>0
+        cfg_path = ARGS[1]
+    end
+    if !ispath(cfg_path)
+        error("Cannot find configuration file at '$cfg_path'")
+    end 
+    cfg = open_config(cfg_path)
+
+    # Output folder 
+    output_dir = abspath(cfg["files"]["output_dir"])
+    rm(output_dir,force=true,recursive=true)
+    mkdir(output_dir)
+
+    # Copy configuration file 
+    cp(cfg_path, joinpath(output_dir, "agni.cfg"))
+
+    # Logging 
+    silent::Bool = cfg["execution"]["silent"]
+    setup_logging(joinpath(output_dir, "agni.log"), silent)
+
+    # Hello
+    @info "Hello\n"
+    @info "Using configuration '$(cfg["title"])'\n"
+
+    # Read REQUIRED configuration options from dict 
+    #    planet stuff 
+    tmp_surf::Float64      = cfg["planet"]["tmp_surf"]
+    instellation::Float64  = cfg["planet"]["instellation"]
+    albedo_b::Float64      = cfg["planet"]["albedo_b"]
+    albedo_s::Float64      = cfg["planet"]["albedo_s"]
+    asf_sf::Float64        = cfg["planet"]["s0_fact"]
+    radius::Float64        = cfg["planet"]["radius"]
+    zenith::Float64        = cfg["planet"]["zenith_angle"]
+    gravity::Float64       = cfg["planet"]["gravity"]
+    p_surf::Float64        = cfg["planet"]["p_surf"]
+    p_top::Float64         = cfg["planet"]["p_top"]
+    #    solver stuff 
+    spfile_name::String    = cfg["files" ]["input_sf"]
+    star_file::String      = cfg["files" ]["input_star"]
+    nlev_centre::Int       = cfg["execution"]["num_levels"]
+    flag_cnt::Bool         = cfg["execution" ]["continua"]
+    flag_ray::Bool         = cfg["execution" ]["rayleigh"]
+    flag_cld::Bool         = cfg["execution" ]["cloud"]
+    flag_aer::Bool         = cfg["execution" ]["aerosol"]
+    overlap::Int           = cfg["execution" ]["overlap_method"]
+    thermo_funcs::Bool     = cfg["execution" ]["thermo_funcs"]
+    dry_type::String       = cfg["execution" ]["dry_convection"]
+    incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
+    surf_state::Int        = cfg["execution" ]["surf_state"]
+    solvers_cmd::Array     = cfg["execution" ]["solvers"]
+    initial_req::Array     = cfg["execution" ]["initial_state"]
+    stabilise::Bool        = cfg["execution" ]["stabilise"]
+    conv_atol::Float64     = cfg["execution" ]["converge_atol"]
+    max_steps::Int         = cfg["execution" ]["max_steps"]
+    #    plotting stuff 
+    plt_run::Bool          = cfg["plots"     ]["at_runtime"]
+    plt_tmp::Bool          = cfg["plots"     ]["temperature"]
+    plt_flx::Bool          = cfg["plots"     ]["fluxes"]
+    plt_cff::Bool          = cfg["plots"     ]["contribution"]
+    plt_ems::Bool          = cfg["plots"     ]["emission"]
+    plt_alb::Bool          = cfg["plots"     ]["albedo"]
+    plt_vmr::Bool          = cfg["plots"     ]["mixing_ratios"]
+    plt_ani::Bool          = cfg["plots"     ]["animate"]
+
+    # Read OPTIONAL configuration options from dict
+    #     mixing ratios can be set either way
+    if haskey(cfg["planet"],"vmr")
+        mf_dict::Dict = cfg["planet"]["vmr"]
+        mf_path = nothing
+    else 
+        mf_dict = nothing
+        mf_path = cfg["files"]["input_vmr"]
+    end 
+    #     sensible heat at the surface 
+    turb_coeff::Float64 = 0.0; wind_speed::Float64 = 0.0
+    if incl_sens
+        turb_coeff = cfg["planet"]["turb_coeff"]
+        wind_speed = cfg["planet"]["wind_speed"]
+    end 
+    #     conductive skin case 
+    skin_k::Float64=0.0; skin_d::Float64=0.0; tmp_magma::Float64=0.0
+    if surf_state == 2
+        skin_k      = cfg["planet"]["skin_k"]
+        skin_d      = cfg["planet"]["skin_d"]
+        tmp_magma   = cfg["planet"]["tmp_magma"]
+    end 
+    #     interior temperature case 
+    tmp_int::Float64 = 0.0
+    if surf_state == 3
+        tmp_int = cfg["planet"]["tmp_int"]
+    end 
 
 
-# Call solver(s)
-dry_convect = true
-condensate  = ""
-surf_state  = 0
+    # Setup atmosphere
+    @info "Setting up\n"
+    atmos = atmosphere.Atmos_t()
+    atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+                            spfile_name,
+                            instellation, asf_sf, albedo_b, zenith,
+                            tmp_surf, 
+                            gravity, radius,
+                            nlev_centre, p_surf, p_top,
+                            mf_dict=mf_dict, mf_path=mf_path,
+                            flag_gcontinuum=flag_cnt, flag_rayleigh=flag_ray,
+                            flag_cloud=flag_cld, flag_aerosol=flag_aer,
+                            overlap_method=overlap,
+                            skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
+                            tmp_floor=5.0,
+                            tmp_int=tmp_int, albedo_s=albedo_s,
+                            thermo_functions=thermo_funcs,
+                            C_d=turb_coeff, U=wind_speed
+                    )
+    atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true,spfile_has_star=isempty(star_file))
 
-# import solver_tstep
-# solver_tstep.solve_energy!(atmos, surf_state=surf_state, modplot=10, modprop=5, verbose=true, 
-#                             dry_convect=dry_convect, condensate=condensate,
-#                             accel=true, rtol=1.0e-4, atol=1.0e-2,
-#                             max_steps=400, min_steps=200, use_mlt=true,
-#                             dt_max=150.0, F_losspct_conv=1.0)
+    # Set PT profile by looping over requests
+    # Each request may be a command, or an argument following a command
+    @info "Setting initial T(p)\n"
+    num_req::Int = length(initial_req)      # Number of requests
+    idx_req::Int = 1                        # Index of current request
+    str_req::String = "_unset"              # String of current request
+    while idx_req <= num_req
+        # get command 
+        str_req = strip(lowercase(initial_req[idx_req]))
 
-# import solver_nlsol
-# solver_nlsol.solve_energy!(atmos, surf_state=surf_state,
-#                             dry_convect=dry_convect, condensate=condensate,
-#                             max_steps=100, atol=10.0)
+        # handle requests  
+        if str_req == "dry"
+            # dry adiabat from surface
+            setpt.dry_adiabat!(atmos)
 
-# Write arrays
-atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
-atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
-atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
+        elseif str_req == "str"
+            # isothermal stratosphere 
+            idx_req += 1
+            setpt.stratosphere!(atmos, parse(Float64, initial_req[idx_req]))
+            
+        elseif str_req == "iso"
+            # isothermal profile 
+            idx_req += 1
+            setpt.isothermal!(atmos, parse(Float64, initial_req[idx_req]))
+        
+        elseif str_req == "csv"
+            # set from csv file 
+            idx_req += 1
+            setpt.fromcsv!(atmos,initial_req[idx_req])
 
-# Save plots
-println("Making plots")
-plotting.anim_solver(atmos)
-plotting.plot_x(atmos,      joinpath(atmos.OUT_DIR,"mf.pdf"))
-plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.pdf"))
-plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.pdf"), incl_magma=(surf_state==2))
-plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.pdf"))
-plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.pdf"), planck_tmp=atmos.tstar)
+        elseif str_req == "sat"
+            # check surface supersaturation
+            setpt.prevent_surfsupersat!(atmos)
+        
+        elseif str_req == "con"
+            # condensing a volatile 
+            setpt.condensing!(atmos, initial_req[idx_req])
 
-# Deallocate atmosphere
-println("Deallocating arrays")
-atmosphere.deallocate!(atmos)
+        else 
+            error("Invalid initial state '$str_req'")
+        end 
+        
+        # iterate
+        idx_req += 1
+    end 
 
-runtime = round(time() - tbegin, digits=2)
-println("Runtime: $runtime seconds")
-println("Goodbye")
+    # Write initial state
+    atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
+
+    # Solver variables 
+    dry_convect::Bool = !isempty(dry_type)
+    use_mlt::Bool     = (dry_type == "mlt")
+    modplot::Int      = 0
+    condensate  = ""
+
+    # Plotting at runtime
+    if plt_run 
+        modplot = 1
+    end
+
+    # Loop over requested solvers 
+    method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
+    method::Int = 0
+    if length(solvers_cmd) == 0
+        solvers_cmd = [""]
+    end 
+    for sol in solvers_cmd 
+
+        sol = strip(lowercase(sol))
+
+        # No solve - just calc fluxes at the end
+        if isempty(sol)
+            @info "Solver = none\n"
+            atmosphere.radtrans!(atmos, true, calc_cf=true)
+            atmosphere.radtrans!(atmos, false)
+            if use_mlt 
+                atmosphere.mlt!(atmos)
+            end 
+        
+        # Timestepping
+        elseif sol == "timestep"
+            @info "Solver = $sol\n"
+            solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
+                                modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
+                                dry_convect=dry_convect, condensate=condensate,
+                                accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
+                                max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
+        
+        # Nonlinear methods
+        elseif (sol in method_map) 
+            @info "Solver = $sol\n"
+            method = findfirst(==(sol), method_map)
+            solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+                                dry_convect=dry_convect, condensate=condensate, sens_heat=incl_sens,
+                                max_steps=max_steps, conv_atol=conv_atol, method=1,
+                                stabilise_mlt=stabilise,modplot=modplot)
+        else 
+            error("Invalid solver requested '$sol'")
+        end 
+
+    end 
+
+    @info "Total RT evalulations: $(atmos.num_rt_eval)\n"
+
+    # Write arrays
+    atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
+    atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
+    atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
+
+    # Save plots
+    @info "Making plots\n"
+    plt_ani && plotting.anim_solver(atmos)
+    plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
+    plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
+    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(surf_state==2))
+    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"))
+    plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"))
+    plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.png"))
+
+    # Deallocate atmosphere
+    @info "Deallocating arrays\n"
+    atmosphere.deallocate!(atmos)
+
+    # Finish up
+    runtime = round(time() - tbegin, digits=2)
+    @info "Runtime: $runtime seconds\n"
+    @info "Goodbye\n"
+
+    return nothing 
+end 
+
+# Call main function 
+main()
