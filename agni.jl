@@ -25,12 +25,18 @@ import solver_tstep
 import solver_nlsol 
 
 # Setup terminal + file logging 
-function setup_logging(outpath::String)
+function setup_logging(outpath::String, silent::Bool)
     # Remove old file 
     rm(outpath, force=true)
 
-    # Setup global logger
-     logger_file = FormatLogger(outpath; append=true) do io, args
+    # If silent 
+    if silent 
+        global_logger(MinLevelLogger(current_logger(), Logging.Error))
+        return nothing
+    end 
+
+    # Setup file logger
+    logger_file = FormatLogger(outpath; append=true) do io, args
         @printf(io, "[%-5s] %s",args.level, args.message)
     end;
 
@@ -111,7 +117,8 @@ function main()
     cp(cfg_path, joinpath(output_dir, "agni.cfg"))
 
     # Logging 
-    setup_logging(joinpath(output_dir, "agni.log"))
+    silent::Bool = cfg["execution"]["silent"]
+    setup_logging(joinpath(output_dir, "agni.log"), silent)
 
     # Hello
     @info "Hello\n"
