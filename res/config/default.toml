@@ -2,7 +2,7 @@
 title = "Default"
 
 [planet]
-    t_star          = 2800.0    # Surface temperature [kelvin]
+    tmp_surf        = 2800.0    # Surface temperature [kelvin]
     instellation    = 2000.0
     albedo_b        = 0.1
     s0_fact         = 0.375
@@ -15,15 +15,14 @@ title = "Default"
     vmr             = { H2O = 1.0 }
     skin_d          = 0.01
     skin_k          = 2.0
-    t_magma         = 3000.0
-    t_int           = 0.0
+    tmp_magma       = 3000.0
+    tmp_int         = 0.0
     turb_coeff      = 0.001
     wind_speed      = 2.0
 
 [files]
     input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"
     input_star      = "res/stellar_spectra/sun.txt"
-    input_pt        = ""
     input_vmr       = ""
     output_dir      = "out/"
 
@@ -40,9 +39,9 @@ title = "Default"
     sensible_heat   = false 
     dry_convection  = "mlt"
     condensates     = []
-    surf_state      = 0
-    solvers         = ["newton"]
-    initial_state   = ["dry", "condense", "H2O"]
+    surf_state      = 2
+    solvers         = []
+    initial_state   = ["dry", "str", "800"]
     stabilise       = true
     converge_atol   = 1.0e-1
 
