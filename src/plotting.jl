@@ -50,7 +50,7 @@ module plotting
         if incl_magma
             scatter!(plt, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
         end
-        scatter!(plt, [atmos.tmp_surf], [atmos.pl[end]*1e-5], color="brown3", label=L"T_*")
+        scatter!(plt, [atmos.tmp_surf], [atmos.pl[end]*1e-5], color="brown3", label=L"T_s")
         plot!(plt, arr_T, arr_P, lc="black", lw=2, label=L"T(p)")
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
@@ -138,7 +138,7 @@ module plotting
         if incl_magma
             scatter!(plt1, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
         end
-        scatter!(plt1, [atmos.tmp_surf],     [atmos.pl[end]*1e-5], color="brown3",         label=L"T_*") 
+        scatter!(plt1, [atmos.tmp_surf],     [atmos.pl[end]*1e-5], color="brown3",         label=L"T_s") 
 
         # Plot temperature profiles 
         plot!(plt1, arr_T, arr_P, lc="black", lw=lw, label=L"T_n")
