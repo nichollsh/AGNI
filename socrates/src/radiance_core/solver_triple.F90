@@ -13,6 +13,10 @@
 !   out to determine the upward and downward fluxes.
 !
 !- ---------------------------------------------------------------------
+MODULE solver_triple_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLVER_TRIPLE_MOD'
+CONTAINS
 SUBROUTINE solver_triple(n_profile, n_layer, n_cloud_top                &
      , t, r, s_down, s_up                                               &
      , t_strat, r_strat, s_down_strat, s_up_strat                       &
@@ -211,7 +215,7 @@ SUBROUTINE solver_triple(n_profile, n_layer, n_cloud_top                &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOLVER_TRIPLE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! This routine is specific to cases of three regions and it is
 ! assumed that 1 represents clear skies, 2 represents startiform
@@ -503,6 +507,7 @@ SUBROUTINE solver_triple(n_profile, n_layer, n_cloud_top                &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solver_triple
+END MODULE solver_triple_mod

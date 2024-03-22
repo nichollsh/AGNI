@@ -538,7 +538,7 @@ contains
           do j=1,npoints ! 
              if (sunlit(j).eq.1 .or. isccp_top_height .eq. 3) then 
                 fq_isccp(j,ilev,ilev2)= 0._wp
-	     else 
+             else 
                 fq_isccp(j,ilev,ilev2)= output_missing_value
              end if
           enddo

@@ -7,6 +7,10 @@
 ! Subroutine to calculate the basic coefficients for the solar beam.
 !
 !- ---------------------------------------------------------------------
+MODULE solar_coefficient_basic_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLAR_COEFFICIENT_BASIC_MOD'
+CONTAINS
 SUBROUTINE solar_coefficient_basic(control                              &
     , n_profile, i_layer_first, i_layer_last                            &
     , omega, asymmetry, sec_0, path_div                                 &
@@ -113,7 +117,7 @@ SUBROUTINE solar_coefficient_basic(control                              &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'SOLAR_COEFFICIENT_BASIC'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerances used in avoiding ill-conditioning, testing
 ! on any variable.
@@ -215,6 +219,7 @@ SUBROUTINE solar_coefficient_basic(control                              &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solar_coefficient_basic
+END MODULE solar_coefficient_basic_mod

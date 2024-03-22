@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate the singly scattered solar radiance.
+! Subroutine to calculate the singly scattered solar radiance.
 !
 ! Purpose:
 !   This subroutine is used to increment the radiances in the
@@ -20,10 +20,11 @@
 !   beam gives the contribution of that layer to the increment
 !   to the radiance.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE single_scat_sol_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SINGLE_SCAT_SOL_MOD'
+CONTAINS
 SUBROUTINE single_scat_sol(n_profile, n_layer                           &
     , n_direction, direction                                            &
     , n_viewing_level, i_rad_layer, frac_rad_layer                      &
@@ -164,7 +165,7 @@ SUBROUTINE single_scat_sol(n_profile, n_layer                           &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SINGLE_SCAT_SOL'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerances used in avoiding ill-conditioning, testing
 ! on any variable.
@@ -335,6 +336,7 @@ SUBROUTINE single_scat_sol(n_profile, n_layer                           &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE single_scat_sol
+END MODULE single_scat_sol_mod

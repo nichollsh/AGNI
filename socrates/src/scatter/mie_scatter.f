@@ -7,9 +7,9 @@
 !+ Subroutine to calculate mie scattering cross-sections and asymmetry.
 !
 ! Method:
-!	This routine is closely based on that given in "Absorption 
-!	and Scattering of Light by Small Particles" by C. F. Bohren 
-!	and Huffman. It uses downward recurrence.
+!   This routine is closely based on that given in "Absorption 
+!   and Scattering of Light by Small Particles" by C. F. Bohren 
+!   and Huffman. It uses downward recurrence.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE mie_scatter(ierr, x, n_relative
@@ -95,7 +95,7 @@
      &    n_term
 !           Number of terms computed
      &  , n_down
-!           Start of downward recurrence	
+!           Start of downward recurrence
      &  , n_y
 !           Integral part of y
      &  , i_term

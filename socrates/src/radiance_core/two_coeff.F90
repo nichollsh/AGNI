@@ -13,6 +13,10 @@
 !   determining the solar or infra-red source terms are calculated.
 !
 !- ---------------------------------------------------------------------
+MODULE two_coeff_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TWO_COEFF_MOD'
+CONTAINS
 SUBROUTINE two_coeff(ierr, control                                      &
      , n_profile, i_layer_first, i_layer_last                           &
      , i_2stream                                                        &
@@ -32,6 +36,9 @@ SUBROUTINE two_coeff(ierr, control                                      &
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
   USE def_control, ONLY: StrCtrl
+  USE solar_coefficient_basic_mod, ONLY: solar_coefficient_basic
+  USE trans_source_coeff_mod, ONLY: trans_source_coeff
+  USE two_coeff_basic_mod, ONLY: two_coeff_basic
 
   IMPLICIT NONE
 
@@ -133,12 +140,11 @@ SUBROUTINE two_coeff(ierr, control                                      &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='TWO_COEFF'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Calculate the basic two-stream coefficients. (The single
 ! scattering albedo has already been perturbed away from 1 in
 ! SINGLE_SCATTERING.)
-! DEPENDS ON: two_coeff_basic
   CALL two_coeff_basic(ierr                                             &
     , n_profile, i_layer_first, i_layer_last                            &
     , i_2stream                                                         &
@@ -160,7 +166,6 @@ SUBROUTINE two_coeff(ierr, control                                      &
   IF (isolir == ip_solar) THEN
 !   LAMBDA may be perturbed by this routine to avoid
 !   ill-conditioning for the singular zenith angle.
-! DEPENDS ON: solar_coefficient_basic
     CALL solar_coefficient_basic(control                                &
       , n_profile, i_layer_first, i_layer_last                          &
       , omega, asymmetry, sec_0, path_div                               &
@@ -172,7 +177,6 @@ SUBROUTINE two_coeff(ierr, control                                      &
 
 
 ! Determine the transmission and reflection coefficients.
-! DEPENDS ON: trans_source_coeff
   CALL trans_source_coeff(control                                       &
     , n_profile, i_layer_first, i_layer_last                            &
     , tau_dir, tau, sum, diff, lambda, sec_0, path_div                  &
@@ -184,6 +188,7 @@ SUBROUTINE two_coeff(ierr, control                                      &
     )
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE two_coeff
+END MODULE two_coeff_mod

@@ -7,7 +7,7 @@
 !+ Subroutine to calculate the saturated mixing ratio for ice.
 !
 ! Method:
-!	The standard Goff-Gratsch formula is implemented.
+!   The standard Goff-Gratsch formula is implemented.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE qsat_gg_ice(qs, t, p)

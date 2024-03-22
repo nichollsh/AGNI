@@ -22,6 +22,7 @@ FUNCTION proj_area_particle &
   USE def_db_crystal_geometry
   USE error_pcf
   USE rad_ccf, ONLY: pi
+  USE spline_evaluate_mod, ONLY: spline_evaluate
 !
 !
   IMPLICIT NONE

@@ -10,6 +10,10 @@
 !   Interpolation of gas and continuum absorption coefficients.
 !
 !-----------------------------------------------------------------------
+MODULE inter_k_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'INTER_K_MOD'
+CONTAINS
 SUBROUTINE inter_k(n_profile, n_layer, n_band_absorb                    &
   , mix_gas_band, n_mix_gas, index_mix_gas                              &
   , i_band_esft, i_band                                                 &
@@ -168,7 +172,7 @@ SUBROUTINE inter_k(n_profile, n_layer, n_band_absorb                    &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='INTER_K'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 
   IF (l_continuum .AND. ( n_continuum  /=  0 ) ) THEN
@@ -298,5 +302,6 @@ SUBROUTINE inter_k(n_profile, n_layer, n_band_absorb                    &
 
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 END SUBROUTINE inter_k
+END MODULE inter_k_mod

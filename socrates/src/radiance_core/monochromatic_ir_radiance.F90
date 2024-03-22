@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate the infra-red radiance ignoring scattering.
+! Subroutine to calculate the infra-red radiance ignoring scattering.
 !
 ! Method:
 !   Using the secant of the ray transmission coefficients for
@@ -12,10 +12,11 @@
 !   The upward and downward radiances are integrated along
 !   their paths.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE monochromatic_ir_radiance_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MONOCHROMATIC_IR_RADIANCE_MOD'
+CONTAINS
 SUBROUTINE monochromatic_ir_radiance(n_profile, n_layer                 &
      , tau                                                              &
      , rad_inc_down                                                     &
@@ -92,7 +93,7 @@ SUBROUTINE monochromatic_ir_radiance(n_profile, n_layer                 &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='MONOCHROMATIC_IR_RADIANCE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerances used in avoiding ill-conditioning, testing
 ! on any variable.
@@ -138,6 +139,7 @@ SUBROUTINE monochromatic_ir_radiance(n_profile, n_layer                 &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE monochromatic_ir_radiance
+END MODULE monochromatic_ir_radiance_mod

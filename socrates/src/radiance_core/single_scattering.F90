@@ -4,17 +4,18 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to find the optical depth and single scattering albedo.
+! Subroutine to find the optical depth and single scattering albedo.
 !
 ! Method:
 !   Depending on the treatment of scattering, the optical and
 !   and single scattering albedo are determined from the
 !   extinctions supplied.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE single_scattering_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SINGLE_SCATTERING_MOD'
+CONTAINS
 SUBROUTINE single_scattering(i_scatter_method_band                      &
     , n_profile, i_first_layer, i_last_layer                            &
     , d_mass                                                            &
@@ -104,7 +105,7 @@ SUBROUTINE single_scattering(i_scatter_method_band                      &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SINGLE_SCATTERING'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerances used in avoiding ill-conditioning, testing
 ! on any variable.
@@ -163,6 +164,7 @@ SUBROUTINE single_scattering(i_scatter_method_band                      &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE single_scattering
+END MODULE single_scattering_mod

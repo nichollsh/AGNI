@@ -7,13 +7,13 @@
 !+ Subroutine to remove weakly absorbing comntinua from bands.
 !
 ! Method:
-!       A tolerance for negelecting continuum absorption is obtained.
-!       A typical amount of each continuum in a column is given: for
-!	the self-broadened continuum this must be multiplied by a
-!	broadening density. For each band a test is made to see 
-!	whether this amount of continuum absorber gives a transmission 
-!	close to 1 as defined by the tolerance. If so, the continuum is
-!	removed from this spectral band.
+!   A tolerance for negelecting continuum absorption is obtained.
+!   A typical amount of each continuum in a column is given: for
+!   the self-broadened continuum this must be multiplied by a
+!   broadening density. For each band a test is made to see 
+!   whether this amount of continuum absorber gives a transmission 
+!   close to 1 as defined by the tolerance. If so, the continuum is
+!   removed from this spectral band.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE REMOVE_WEAK_CONT(IERR, N_BAND

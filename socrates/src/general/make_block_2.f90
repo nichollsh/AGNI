@@ -7,16 +7,16 @@
 !+ Subroutine to make spectral blocks of type 2.
 !
 ! Method:
-!	A solar spectrum, giving the irradiance against wavelength,
-!	is read in. The total flux in the spectrum is determined,
-!	using a Rayleigh-Jeans distribution for the far infra-red.
-!	The fraction of this flux in each band is calculated. The
-!	band will probably not cover the whole spectrum. If 
-!	simulating observations this is as required, since the
-!	spectral cut-offs of the observing instruments must be 
-!	matched. In atmospheric models the whole flux should be
-!	calculated and there is therefore an option to enhance
-!	the fluxes in the outside bands to include the full flux.
+!   A solar spectrum, giving the irradiance against wavelength,
+!   is read in. The total flux in the spectrum is determined,
+!   using a Rayleigh-Jeans distribution for the far infra-red.
+!   The fraction of this flux in each band is calculated. The
+!   band will probably not cover the whole spectrum. If 
+!   simulating observations this is as required, since the
+!   spectral cut-offs of the observing instruments must be 
+!   matched. In atmospheric models the whole flux should be
+!   calculated and there is therefore an option to enhance
+!   the fluxes in the outside bands to include the full flux.
 !
 !- ---------------------------------------------------------------------
 SUBROUTINE make_block_2(Spectrum, SolarSpec, ierr)

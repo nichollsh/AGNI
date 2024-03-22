@@ -7,7 +7,7 @@
 !+ Function to calculate the Rayleigh scattering coefficient at S.T.P.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
 FUNCTION rayleigh_scatter_h2he(lambda, wavelength_refract_index_H2,            &

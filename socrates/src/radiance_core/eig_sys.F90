@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set up and solve the eigensystem.
+! Subroutine to set up and solve the eigensystem.
 !
 ! Purpose:
 !   For a given value of the azimuthal quantum number, MS, this
@@ -17,10 +17,11 @@
 !   eigenvalues are then found by calling the QR-algorithm and the
 !   eigenvectors are obtained from a recurrence relation.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE eig_sys_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'EIG_SYS_MOD'
+CONTAINS
 SUBROUTINE eig_sys(n_profile, ls_trunc, ms, n_red_eigensystem           &
     , cg_coeff, sqs                                                     &
     , mu, eig_vec                                                       &
@@ -31,6 +32,7 @@ SUBROUTINE eig_sys(n_profile, ls_trunc, ms, n_red_eigensystem           &
   USE realtype_rd, ONLY: RealK
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE eigenvalue_tri_mod, ONLY: eigenvalue_tri
 
   IMPLICIT NONE
 
@@ -102,7 +104,7 @@ SUBROUTINE eig_sys(n_profile, ls_trunc, ms, n_red_eigensystem           &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='EIG_SYS'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerance for convergence of the algorithm from the
 ! precision of the machine.
@@ -144,7 +146,6 @@ SUBROUTINE eig_sys(n_profile, ls_trunc, ms, n_red_eigensystem           &
 !   as the order of truncation rises. A small allowance is made
 !   for extra iterations.
     n_max_qr_iteration=ls_trunc+25
-! DEPENDS ON: eigenvalue_tri
     CALL eigenvalue_tri(n_profile, n_red_eigensystem                    &
       , mu, e, tol, n_max_qr_iteration                                  &
       , nd_profile                                                      &
@@ -223,6 +224,7 @@ SUBROUTINE eig_sys(n_profile, ls_trunc, ms, n_red_eigensystem           &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE eig_sys
+END MODULE eig_sys_mod

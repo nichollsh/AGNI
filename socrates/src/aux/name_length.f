@@ -7,7 +7,7 @@
 !+ Function to determine the length of non-blank substring.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       FUNCTION name_length(name)
@@ -27,7 +27,7 @@
 !           Length of name
 !
 !     Dummy argument.
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    name*(*)
 !           Name to be striped
 !

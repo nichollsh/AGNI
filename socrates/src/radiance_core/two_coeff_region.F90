@@ -4,16 +4,16 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate two-stream coefficients in the regions.
+! Subroutine to calculate two-stream coefficients in the regions.
 !
 ! Method:
-!   The coeffients for each region are determined and
-!   averaged.
-!
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
+!   The coeffients for each region are determined and averaged.
 !
 !- ---------------------------------------------------------------------
+MODULE two_coeff_region_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TWO_COEFF_REGION_MOD'
+CONTAINS
 SUBROUTINE two_coeff_region(ierr, control                               &
      , n_profile, n_layer, n_cloud_top                                  &
      , i_2stream, n_source_coeff                                        &
@@ -38,6 +38,7 @@ SUBROUTINE two_coeff_region(ierr, control                               &
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
   USE def_control, ONLY: StrCtrl
+  USE two_coeff_mod, ONLY: two_coeff
 
   IMPLICIT NONE
 
@@ -197,13 +198,12 @@ SUBROUTINE two_coeff_region(ierr, control                               &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='TWO_COEFF_REGION'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Determine the optical properties of the clear-sky regions of
 ! the layers.
 
 
-! DEPENDS ON: two_coeff
   CALL two_coeff(ierr, control                                          &
     , n_profile, 1, n_cloud_top-1                                       &
     , i_2stream                                                         &
@@ -216,7 +216,6 @@ SUBROUTINE two_coeff_region(ierr, control                               &
     , source_coeff(1, 1, 1, ip_region_clear)                            &
     , nd_profile, 1, nd_layer_clr, 1, nd_layer, nd_source_coeff         &
     )
-! DEPENDS ON: two_coeff
   CALL two_coeff(ierr, control                                          &
     , n_profile, n_cloud_top, n_layer                                   &
     , i_2stream                                                         &
@@ -325,7 +324,6 @@ SUBROUTINE two_coeff_region(ierr, control                               &
         END IF
 
 
-! DEPENDS ON: two_coeff
         CALL two_coeff(ierr, control                                    &
           , n_list, i, i                                                &
           , i_2stream                                                   &
@@ -441,6 +439,7 @@ SUBROUTINE two_coeff_region(ierr, control                               &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE two_coeff_region
+END MODULE two_coeff_region_mod

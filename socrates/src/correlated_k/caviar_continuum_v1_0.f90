@@ -42,6 +42,8 @@ CONTAINS
     USE hitran_cnst,     ONLY: avogadro_number, c2
     USE ckd_extern_data   ! c_self_h2o_260, c_self_h2o_296,
                           ! and c_foreign_h2o_296 are set in here
+    USE spline_evaluate_mod, ONLY: spline_evaluate
+    USE spline_fit_mod, ONLY: spline_fit
 
     IMPLICIT NONE
 
@@ -219,6 +221,8 @@ CONTAINS
     USE gas_list_pcf,    ONLY: ip_h2o, ip_air, molar_weight
     USE hitran_cnst,     ONLY: avogadro_number, c2
     USE ckd_extern_data
+    USE spline_evaluate_mod, ONLY: spline_evaluate
+    USE spline_fit_mod, ONLY: spline_fit
 
     IMPLICIT NONE
 

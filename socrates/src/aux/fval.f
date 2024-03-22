@@ -7,9 +7,9 @@
 !+ Program to evaluate the value of a CDL-field at a given pressure.
 !
 ! Method:
-!	The field is read in and the value at the selected pressure
-!	is calculated by interpolation according to the selected
-!	scheme.
+!   The field is read in and the value at the selected pressure
+!   is calculated by interpolation according to the selected
+!   scheme.
 !
 !- ---------------------------------------------------------------------
       PROGRAM fval

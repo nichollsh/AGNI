@@ -4,16 +4,16 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate two-stream coefficients in cloudy regions.
+! Subroutine to calculate two-stream coefficients in cloudy regions.
 !
 ! Method:
-!   The coefficients for each region are determined and
-!   averaged.
-!
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
+!   The coefficients for each region are determined and averaged.
 !
 !- ---------------------------------------------------------------------
+MODULE two_coeff_region_fast_lw_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TWO_COEFF_REGION_FAST_LW_MOD'
+CONTAINS
 SUBROUTINE two_coeff_region_fast_lw(ierr                                &
     , n_profile, n_layer, n_cloud_top                                   &
     , l_ir_source_quad, n_source_coeff                                  &
@@ -33,6 +33,7 @@ SUBROUTINE two_coeff_region_fast_lw(ierr                                &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
+  USE two_coeff_fast_lw_mod, ONLY: two_coeff_fast_lw
 
   IMPLICIT NONE
 
@@ -143,7 +144,7 @@ SUBROUTINE two_coeff_region_fast_lw(ierr                                &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'TWO_COEFF_REGION_FAST_LW'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! This routine should not be used outside the IR.
   IF (isolir /= ip_infra_red) THEN
@@ -155,14 +156,12 @@ SUBROUTINE two_coeff_region_fast_lw(ierr                                &
 ! Determine the optical properties of the clear-sky regions of
 ! the layers.
 
-! DEPENDS ON: two_coeff_fast_lw
   CALL two_coeff_fast_lw(n_profile, 1, n_cloud_top-1                    &
     , l_ir_source_quad, tau_clr                                         &
     , trans(1, 1, ip_region_clear)                                      &
     , source_coeff(1, 1, 1, ip_region_clear)                            &
     , nd_profile, nd_layer, 1, nd_layer_clr, nd_source_coeff            &
     )
-! DEPENDS ON: two_coeff_fast_lw
   CALL two_coeff_fast_lw(n_profile, n_cloud_top, n_layer                &
     , l_ir_source_quad, tau_clr                                         &
     , trans(1, 1, ip_region_clear)                                      &
@@ -235,7 +234,6 @@ SUBROUTINE two_coeff_region_fast_lw(ierr                                &
           tau_gathered(l, i)=tau(l_list(l), i, k)
         END DO
 
-! DEPENDS ON: two_coeff_fast_lw
         CALL two_coeff_fast_lw(n_list, i, i                             &
           , l_ir_source_quad, tau_gathered                              &
           , trans_temp                                                  &
@@ -296,6 +294,7 @@ SUBROUTINE two_coeff_region_fast_lw(ierr                                &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE two_coeff_region_fast_lw
+END MODULE two_coeff_region_fast_lw_mod

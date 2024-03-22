@@ -7,9 +7,9 @@
 !+ Subroutine to split a profile into CDL-files.
 !
 ! Method:
-!	For each field in a profile is examined. Appropriate pressure
-!	coordinates are derived and the field is written to a file
-!	with a suitable suffix.
+!   For each field in a profile is examined. Appropriate pressure
+!   coordinates are derived and the field is written to a file
+!   with a suitable suffix.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE write_profile(ierr
@@ -55,7 +55,7 @@
 !           Length of profile name
      &  , n_level_ref
 !           Number of levels in reference atm.
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    name_profile*80
 !           Name of profile
       LOGICAL, Intent(IN) ::

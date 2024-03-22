@@ -24,7 +24,7 @@
 !
 !
 !     Dummy variables
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    request*(*)
 !           Prompt to user
       INTEGER, Intent(IN) ::

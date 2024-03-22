@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to gather data for spline fitting.
+! Subroutine to gather data for spline fitting.
 !
 ! Method:
 ! Splined fits to the given data at the corresponding pressure
@@ -13,10 +13,10 @@
 ! This routine is not intended to run in vector mode,
 ! and has therefore not been optimized for such use.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE prsc_gather_spline_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE prsc_gather_spline(ierr                                      &
     , n_profile, i_first_layer, i_last_layer, p_eval                    &
     , n_opt_level_prsc, prsc_pressure, prsc_opt_property                &
@@ -27,6 +27,8 @@ SUBROUTINE prsc_gather_spline(ierr                                      &
 
   USE realtype_rd, ONLY: RealK
   USE rad_pcf, ONLY: i_err_range, i_normal
+  USE spline_evaluate_mod, ONLY: spline_evaluate
+  USE spline_fit_mod, ONLY: spline_fit
 
   IMPLICIT NONE
 
@@ -105,12 +107,10 @@ SUBROUTINE prsc_gather_spline(ierr                                      &
     END DO
 
 !   Calculate second derivatives for fitting.
-! DEPENDS ON: spline_fit
     CALL spline_fit(n_opt_level_prsc, prsc_pressure_g                   &
       , prsc_opt_property_g, d2)
 
     DO i=i_first_layer, i_last_layer
-! DEPENDS ON: spline_evaluate
       CALL spline_evaluate(ierr, n_opt_level_prsc                       &
         , prsc_pressure_g, prsc_opt_property_g                          &
         , d2, p_eval(l, i)                                              &
@@ -132,3 +132,4 @@ SUBROUTINE prsc_gather_spline(ierr                                      &
   END DO
 
 END SUBROUTINE prsc_gather_spline
+END MODULE prsc_gather_spline_mod

@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calcaulate IR source function for differential flux.
+! Subroutine to calcaulate IR source function for differential flux.
 !
 ! Method:
 !   The linear contribution to the source function is proportional
@@ -13,10 +13,11 @@
 !   A correction may also be made for a quadratic variation in the
 !   temperature across the layer.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE ir_source_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'IR_SOURCE_MOD'
+CONTAINS
 SUBROUTINE ir_source(n_profile, i_layer_first, i_layer_last             &
      , source_coeff, del_planck, l_ir_source_quad, diff_planck_2        &
      , s_down, s_up                                                     &
@@ -85,7 +86,7 @@ SUBROUTINE ir_source(n_profile, i_layer_first, i_layer_last             &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='IR_SOURCE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Multiply the source coefficients by the Planckian differences
 ! to the order required.
@@ -118,6 +119,7 @@ SUBROUTINE ir_source(n_profile, i_layer_first, i_layer_last             &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE ir_source
+END MODULE ir_source_mod

@@ -7,8 +7,8 @@
 !+ Subroutine to make spectral blocks of type 19.
 !
 ! Method:
-!	Initialy, a transparent grey fit is set for each gas.
-!	A file is opened and an ESFT fit is read from the file.
+!   Initialy, a transparent grey fit is set for each gas.
+!   A file is opened and an ESFT fit is read from the file.
 !
 !- ---------------------------------------------------------------------
 SUBROUTINE make_block_19(Spectrum, ierr)

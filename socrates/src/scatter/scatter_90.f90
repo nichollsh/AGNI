@@ -37,6 +37,8 @@ PROGRAM scatter_90
   USE rad_pcf
   USE rad_ccf, ONLY: pi
   USE file_type_pcf
+  USE calc_gauss_weight_90_mod, ONLY: calc_gauss_weight_90
+  USE spline_fit_mod, ONLY: spline_fit
 !
 !
   IMPLICIT NONE
@@ -217,10 +219,10 @@ PROGRAM scatter_90
 !
 ! Subroutines called:
   EXTERNAL &
-    get_free_unit, open_file_in, spline_fit, &
+    get_free_unit, open_file_in, &
     particle_size_90, size_integral_90, grow_particles, &
     mie_scatter, scatter_integral_90, adt_integral, &
-    calc_gauss_weight_90, decompose_phf_90
+    decompose_phf_90
 !
 ! Functions called:
   COMPLEX  (RealK) :: refractive_index

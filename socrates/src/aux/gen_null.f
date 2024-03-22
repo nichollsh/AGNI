@@ -7,8 +7,8 @@
 !+ Program to generate a null CDL-file.
 !
 ! Method:
-!	Pressure levels are read in and a CDL-file with
-!	a null field at these levels is written.
+!   Pressure levels are read in and a CDL-file with
+!   a null field at these levels is written.
 !
 !- ---------------------------------------------------------------------
       PROGRAM gen_null
@@ -24,6 +24,7 @@
       USE rad_pcf
       USE def_data_in_icf
       USE input_head_pcf
+      USE shell_sort_mod, ONLY: shell_sort
 !
 !
       IMPLICIT NONE
@@ -82,8 +83,7 @@
 !
       data ierr/i_normal/
 !     Subroutines called:
-      EXTERNAL
-     &    shell_sort, output_vert_cdl
+      EXTERNAL  output_vert_cdl
 !
 !
 !

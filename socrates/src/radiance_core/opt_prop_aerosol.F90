@@ -15,6 +15,10 @@
 !   properties. Aerosol properties may depend on the humidity.
 !
 !- ---------------------------------------------------------------------
+MODULE opt_prop_aerosol_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'OPT_PROP_AEROSOL_MOD'
+CONTAINS
 SUBROUTINE opt_prop_aerosol(ierr                                        &
     , n_profile, first_layer, last_layer                                &
     , n_order_phase, l_rescale, n_order_forward                         &
@@ -50,6 +54,7 @@ SUBROUTINE opt_prop_aerosol(ierr                                        &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
+  USE prsc_opt_prop_mod, ONLY: prsc_opt_prop
 
   IMPLICIT NONE
 
@@ -263,7 +268,7 @@ SUBROUTINE opt_prop_aerosol(ierr                                        &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'OPT_PROP_AEROSOL'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO j_mr=1, n_aerosol_mr
 
@@ -709,7 +714,6 @@ SUBROUTINE opt_prop_aerosol(ierr                                        &
 
     ELSE IF (i_aerosol_parametrization(j) ==                            &
              ip_aerosol_unparametrized) THEN
-! DEPENDS ON: prsc_opt_prop
        CALL prsc_opt_prop(ierr                                          &
          , n_profile, first_layer, last_layer                           &
          , l_rescale, n_order_forward                                   &
@@ -791,6 +795,7 @@ SUBROUTINE opt_prop_aerosol(ierr                                        &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE opt_prop_aerosol
+END MODULE opt_prop_aerosol_mod

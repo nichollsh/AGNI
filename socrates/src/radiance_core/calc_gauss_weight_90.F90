@@ -21,12 +21,16 @@
 !   can then be isolated by false position.
 !
 !------------------------------------------------------------------------------
+MODULE calc_gauss_weight_90_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE calc_gauss_weight_90(ierr, n, root, weight)
 
   USE realtype_rd, ONLY: RealK
   USE rad_pcf, ONLY: i_err_fatal
   USE errormessagelength_mod, ONLY: errormessagelength
   USE ereport_mod, ONLY: ereport
+  USE legendre_weight_mod, ONLY: legendre_weight
 
   IMPLICIT NONE
 
@@ -101,7 +105,6 @@ SUBROUTINE calc_gauss_weight_90(ierr, n, root, weight)
     DO i = 1, order
 
       xl = bracket(i)
-! DEPENDS ON: legendre_weight
       CALL legendre_weight(xl, order, yl, wt)
       xh = bracket(i+1)
       CALL legendre_weight(xh, order, yh, wt)
@@ -164,3 +167,4 @@ SUBROUTINE calc_gauss_weight_90(ierr, n, root, weight)
   ENDIF
 
 END SUBROUTINE calc_gauss_weight_90
+END MODULE calc_gauss_weight_90_mod

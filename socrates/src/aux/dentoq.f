@@ -7,8 +7,8 @@
 !+ Program to convert from densities of water vapour to q.
 !
 ! Method:
-!	The densities and temperature are read in and q is 
-!	calculated using a standard formula.
+!   The densities and temperature are read in and q is 
+!   calculated using a standard formula.
 !
 !- ---------------------------------------------------------------------
       PROGRAM dentoq

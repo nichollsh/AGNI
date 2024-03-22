@@ -7,7 +7,7 @@
 !+ Function to perform trapezoidal integration.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       function trapezoid(n_points, x, y)

@@ -13,6 +13,10 @@
 !   incremented.
 !
 !- ---------------------------------------------------------------------
+MODULE augment_radiance_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'AUGMENT_RADIANCE_MOD'
+CONTAINS
 SUBROUTINE augment_radiance(control, sp, atm, bound, radout             &
     , i_band, iex, iex_minor                                            &
     , n_profile, n_layer, n_viewing_level, n_direction                  &
@@ -193,7 +197,7 @@ SUBROUTINE augment_radiance(control, sp, atm, bound, radout             &
 
   CHARACTER(LEN=*), PARAMETER :: RoutineName='AUGMENT_RADIANCE'
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   IF (control%l_map_sub_bands) THEN
     ! Increment the fluxes with sub-bands mapping to channels
@@ -940,6 +944,7 @@ SUBROUTINE augment_radiance(control, sp, atm, bound, radout             &
 
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE augment_radiance
+END MODULE augment_radiance_mod

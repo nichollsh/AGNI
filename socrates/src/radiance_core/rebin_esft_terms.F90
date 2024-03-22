@@ -4,10 +4,13 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to rebin ESFT terms using the random overlap method with
-!  resorting and rebinning.
+! Subroutine to rebin ESFT terms using the random overlap method with
+! resorting and rebinning.
 !
 !- ---------------------------------------------------------------------
+MODULE rebin_esft_terms_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE rebin_esft_terms(i_band_esft_mix, n_esft_red                 &
     , i_profile, i_layer                                                &
     , w_esft_target, glim_target                                        &
@@ -112,3 +115,4 @@ SUBROUTINE rebin_esft_terms(i_band_esft_mix, n_esft_red                 &
     1:n_esft_red)/w_esft_target(1:n_esft_red)
   
 END SUBROUTINE rebin_esft_terms
+END MODULE rebin_esft_terms_mod

@@ -32,7 +32,7 @@
      &    ierr
 !           Error Flag
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    in_string*(*)
 !           Input string
      &  , type*(*)

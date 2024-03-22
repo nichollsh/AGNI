@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to solve for the monochromatic radiances.
+! Subroutine to solve for the monochromatic radiances.
 !
 ! Method:
 !   The final single scattering properties are calculated
@@ -12,10 +12,11 @@
 !   calculate the radiances depending on the treatment of
 !   cloudiness.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE monochromatic_radiance_sph_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MONOCHROMATIC_RADIANCE_SPH_MOD'
+CONTAINS
 SUBROUTINE monochromatic_radiance_sph(ierr                              &
 !                 Atmospheric Propertries
     , control, n_profile, n_layer                                       &
@@ -77,6 +78,10 @@ SUBROUTINE monochromatic_radiance_sph(ierr                              &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
+  USE calc_radiance_ipa_mod, ONLY: calc_radiance_ipa
+  USE copy_clr_full_mod, ONLY: copy_clr_full
+  USE copy_clr_sol_mod, ONLY: copy_clr_sol
+  USE sph_solver_mod, ONLY: sph_solver
 
   IMPLICIT NONE
 
@@ -328,7 +333,7 @@ SUBROUTINE monochromatic_radiance_sph(ierr                              &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'MONOCHROMATIC_RADIANCE_SPH'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Split the method of solution according to the cloud scheme.
   IF (i_cloud == ip_cloud_clear) THEN
@@ -354,7 +359,6 @@ SUBROUTINE monochromatic_radiance_sph(ierr                              &
     ALLOCATE(phase_fnc_solar_clr_f(nd_radiance_profile                  &
       , nd_layer, nd_direction))
 
-! DEPENDS ON: copy_clr_full
     CALL copy_clr_full(n_profile, n_layer, n_cloud_top                  &
       , control, n_order_phase                                          &
       , ss_prop%tau_clr, ss_prop%tau_clr_dir                            &
@@ -367,7 +371,6 @@ SUBROUTINE monochromatic_radiance_sph(ierr                              &
       )
     IF ( (i_sph_algorithm == ip_sph_reduced_iter).AND.                  &
          (isolir == ip_solar) ) THEN
-! DEPENDS ON: copy_clr_sol
       CALL copy_clr_sol(n_profile, n_layer, n_cloud_top                 &
         , n_direction, l_rescale                                        &
         , ss_prop%forward_scatter_clr                                   &
@@ -380,7 +383,6 @@ SUBROUTINE monochromatic_radiance_sph(ierr                              &
         )
     END IF
 
-! DEPENDS ON: sph_solver
     CALL sph_solver(                                                    &
 !                   Atmospheric sizes
         n_profile, n_layer                                              &
@@ -467,7 +469,6 @@ SUBROUTINE monochromatic_radiance_sph(ierr                              &
     END IF
 
 
-! DEPENDS ON: calc_radiance_ipa
     CALL calc_radiance_ipa(                                             &
 !                 Atmospheric Properties
         n_profile, n_layer, n_cloud_top                                 &
@@ -516,6 +517,7 @@ SUBROUTINE monochromatic_radiance_sph(ierr                              &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE monochromatic_radiance_sph
+END MODULE monochromatic_radiance_sph_mod

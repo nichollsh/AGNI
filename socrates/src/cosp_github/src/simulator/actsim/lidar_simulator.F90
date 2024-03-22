@@ -568,14 +568,14 @@ contains
        epsilon50 = 0.2559_wp,      & !
        zeta50    = -9.4776e-07_wp    ! 
        
-	! Inputs
+    ! Inputs
     integer,intent(in) :: &
        Npoints,  & ! Number of gridpoints
        Ncolumns, & ! Number of subcolumns
        Nlevels,  & ! Number of vertical levels
        Ncat,     & ! Number of cloud layer types
        Nphase      ! Number of cloud layer phase types
-	               ! [ice,liquid,undefined,false ice,false liquid,Percent of ice]
+                   ! [ice,liquid,undefined,false ice,false liquid,Percent of ice]
     real(wp),intent(in) :: &
        S_att,    & !
        S_cld,    & !
@@ -589,7 +589,7 @@ contains
        tmp,      & ! Temperature   
        pplay       ! Pressure
 
-	! Outputs
+    ! Outputs
     real(wp),intent(out),dimension(Npoints,Ntemp,5) :: &
        lidarcldtemp  ! 3D Temperature 1=tot,2=ice,3=liq,4=undef,5=ice/ice+liq
     real(wp),intent(out),dimension(Npoints,Nlevels,Nphase) :: &
@@ -624,7 +624,7 @@ contains
        cldlayphase ! subgrided low mid high phase cloud fraction
              
     ! ####################################################################################
-	! 1) Initialize    
+    ! 1) Initialize    
     ! ####################################################################################
     lidarcld              = 0._wp
     nsub                  = 0._wp
@@ -1270,7 +1270,7 @@ contains
        S_att_opaq = 0.06_wp, & ! Fully Attenuated threshold (Guzman et al. 2017, JGR-Atmospheres)
        eta = 0.6_wp            ! Multiple-scattering factor (Vaillant de Guelis et al. 2017a, AMT)
 
-	! Inputs
+    ! Inputs
     integer,intent(in) :: &
        Npoints,  & ! Number of gridpoints
        Ncolumns, & ! Number of subcolumns
@@ -1289,7 +1289,7 @@ contains
     real(wp),intent(in),dimension(Npoints) :: &
        surfelev    ! Surface Elevation (SE)
 
-	! Outputs
+    ! Outputs
     real(wp),intent(out),dimension(Npoints,Nlevels,Ntype+1) :: &
        lidarcldtype   ! 3D OPAQ product fraction (opaque clouds, thin clouds, z_opaque, opacity)
     real(wp),intent(out),dimension(Npoints,Ntype) :: &
@@ -1322,7 +1322,7 @@ contains
        srokopaq    !
 
     ! ####################################################################################
-	! 1) Initialize    
+    ! 1) Initialize    
     ! ####################################################################################
     cldtype(:,:)          = 0._wp
     cldtypetemp(:,:)      = 0._wp
@@ -1390,93 +1390,93 @@ contains
        enddo
     enddo   
 
-! OPAQ variables
-     do ic = 1, Ncolumns
-        do ip = 1, Npoints
+    ! OPAQ variables
+    do ic = 1, Ncolumns
+       do ip = 1, Npoints
 
-     ! Declaring non-opaque cloudy profiles as thin cloud profiles
-	   if ( cldlay(ip,ic,4).gt. 0. .and. cldlay(ip,ic,1) .eq. 0. ) then
-	      cldlay(ip,ic,2)  =  1._wp
- 	   endif
+          ! Declaring non-opaque cloudy profiles as thin cloud profiles
+          if ( cldlay(ip,ic,4).gt. 0. .and. cldlay(ip,ic,1) .eq. 0. ) then
+             cldlay(ip,ic,2)  =  1._wp
+          endif
 
-     ! Filling in 3D and 2D variables
+          ! Filling in 3D and 2D variables
 
-     ! Opaque cloud profiles
-	   if ( cldlay(ip,ic,1) .eq. 1. ) then
-	      zopac = 0._wp
-	      z_top = 0._wp
-	      do k=1,Nlevels-1
-     ! Declaring z_opaque altitude and opaque cloud fraction for 3D and 2D variables
-     ! From SFC-2-TOA ( actually from vgrid_z(SFC+1) = vgrid_z(Nlevels-1) )
-	         if ( cldy(ip,ic,Nlevels-k) .eq. 1. .and. zopac .eq. 0. ) then
-		    lidarcldtype(ip,Nlevels-k + 1,3) = lidarcldtype(ip,Nlevels-k + 1,3) + 1._wp
-		    cldlay(ip,ic,3)                  = vgrid_z(Nlevels-k+1)      ! z_opaque altitude
-		    nsublay(ip,ic,3)                 = 1._wp
-		    zopac = Nlevels-k+1                        ! z_opaque vertical index on vgrid_z
-		 endif
-	         if ( cldy(ip,ic,Nlevels-k) .eq. 1. ) then
-		    lidarcldtype(ip,Nlevels-k ,1)    = lidarcldtype(ip,Nlevels-k ,1) + 1._wp
-		    z_top = Nlevels-k    ! top cloud layer vertical index on vgrid_z
-                 endif
-	      enddo
-     ! Summing opaque cloud mean temperatures and altitudes
-     ! as defined in Vaillant de Guelis et al. 2017a, AMT
-              if (zopac .ne. 0) then 
-                 cldtypetemp(ip,1) = cldtypetemp(ip,1) + ( tmp(ip,zopac) + tmp(ip,z_top) )/2.
-                 cldtypetemp(ip,3) = cldtypetemp(ip,3) + tmp(ip,zopac)                 ! z_opaque
-                 cldtypemeanz(ip,1) = cldtypemeanz(ip,1) + ( vgrid_z(zopac) + vgrid_z(z_top) )/2.
-                 cldtypemeanzse(ip,1) = cldtypemeanzse(ip,1) + (( vgrid_z(zopac) + vgrid_z(z_top) )/2.) - surfelev(ip)
-                 cldtypemeanzse(ip,3) = cldtypemeanzse(ip,3) + ( vgrid_z(zopac) - surfelev(ip) )
-              else
-                 cldlay(ip,ic,1) = 0
-              endif
-	   endif
+          ! Opaque cloud profiles
+          if ( cldlay(ip,ic,1) .eq. 1. ) then
+             zopac = 0._wp
+             z_top = 0._wp
+             do k=1,Nlevels-1
+                ! Declaring z_opaque altitude and opaque cloud fraction for 3D and 2D variables
+                ! From SFC-2-TOA ( actually from vgrid_z(SFC+1) = vgrid_z(Nlevels-1) )
+                if ( cldy(ip,ic,Nlevels-k) .eq. 1. .and. zopac .eq. 0. ) then
+                   lidarcldtype(ip,Nlevels-k + 1,3) = lidarcldtype(ip,Nlevels-k + 1,3) + 1._wp
+                   cldlay(ip,ic,3)                  = vgrid_z(Nlevels-k+1)      ! z_opaque altitude
+                   nsublay(ip,ic,3)                 = 1._wp
+                   zopac = Nlevels-k+1                        ! z_opaque vertical index on vgrid_z
+                endif
+                if ( cldy(ip,ic,Nlevels-k) .eq. 1. ) then
+                   lidarcldtype(ip,Nlevels-k ,1)    = lidarcldtype(ip,Nlevels-k ,1) + 1._wp
+                   z_top = Nlevels-k    ! top cloud layer vertical index on vgrid_z
+                endif
+             enddo
+             ! Summing opaque cloud mean temperatures and altitudes
+             ! as defined in Vaillant de Guelis et al. 2017a, AMT
+             if (zopac .ne. 0) then 
+                cldtypetemp(ip,1) = cldtypetemp(ip,1) + ( tmp(ip,zopac) + tmp(ip,z_top) )/2.
+                cldtypetemp(ip,3) = cldtypetemp(ip,3) + tmp(ip,zopac)                 ! z_opaque
+                cldtypemeanz(ip,1) = cldtypemeanz(ip,1) + ( vgrid_z(zopac) + vgrid_z(z_top) )/2.
+                cldtypemeanzse(ip,1) = cldtypemeanzse(ip,1) + (( vgrid_z(zopac) + vgrid_z(z_top) )/2.) - surfelev(ip)
+                cldtypemeanzse(ip,3) = cldtypemeanzse(ip,3) + ( vgrid_z(zopac) - surfelev(ip) )
+             else
+                cldlay(ip,ic,1) = 0
+             endif
+          endif
 
-     ! Thin cloud profiles
-	   if ( cldlay(ip,ic,2) .eq. 1. ) then
-	      topcloud = 0._wp
-	      z_top = 0._wp
-	      z_base = 0._wp
-	      do k=1,Nlevels
-     ! Declaring thin cloud fraction for 3D variable
-     ! From TOA-2-SFC
-                 if ( cldy(ip,ic,k) .eq. 1. .and. topcloud .eq. 1. ) then
-                    lidarcldtype(ip,k,2) = lidarcldtype(ip,k,2) + 1._wp
-		    z_base = k ! bottom cloud layer
-                 endif
-	         if ( cldy(ip,ic,k) .eq. 1. .and. topcloud .eq. 0. ) then
-                    lidarcldtype(ip,k,2) = lidarcldtype(ip,k,2) + 1._wp
-		    z_top = k  ! top cloud layer
-		    z_base = k ! bottom cloud layer
-                    topcloud = 1._wp
-		 endif
-	      enddo
-     ! Computing mean emissivity using layers below the bottom cloud layer to the surface
-     	      srmean = 0._wp
-	      srcount = 0._wp
-	      cloudemis = 0._wp
-     	      do k=z_base+1,Nlevels
-	         if (  (x(ip,ic,k) .gt. S_att_opaq) .and. (x(ip,ic,k) .lt. 1.0) .and. (x(ip,ic,k) .ne. undef)  ) then
-		    srmean = srmean + x(ip,ic,k)
-		    srcount = srcount + 1.
-                 endif
-	      enddo
-	      ! If clear sky layers exist below bottom cloud layer
-	      if ( srcount .gt. 0. ) then
-	      	 trans2 = srmean/srcount              ! thin cloud transmittance**2
-	      	 tau_app = -(log(trans2))/2.          ! apparent cloud optical depth
-	      	 tau_vis = tau_app/eta                ! cloud visible optical depth (multiple scat.)
-	      	 tau_ir = tau_vis/2.                  ! approx. relation between visible and IR ODs
-	      	 cloudemis = 1. - exp(-tau_ir)        ! no diffusion in IR considered : emis = 1-T
-		 count_emis(ip) = count_emis(ip) + 1.
-	      endif
-     ! Summing thin cloud mean temperatures and altitudes
-     ! as defined in Vaillant de Guelis et al. 2017a, AMT
-              cldtypetemp(ip,2) = cldtypetemp(ip,2) + ( tmp(ip,z_base) + tmp(ip,z_top) )/2.
-              cldtypemeanz(ip,2) = cldtypemeanz(ip,2) + ( vgrid_z(z_base) + vgrid_z(z_top) )/2.
-              cldtypemeanzse(ip,2) = cldtypemeanzse(ip,2) + (( vgrid_z(z_base) + vgrid_z(z_top) )/2.) - surfelev(ip)
-              cldthinemis(ip) = cldthinemis(ip) + cloudemis
-           endif
+          ! Thin cloud profiles
+          if ( cldlay(ip,ic,2) .eq. 1. ) then
+             topcloud = 0._wp
+             z_top = 0._wp
+             z_base = 0._wp
+             do k=1,Nlevels
+                ! Declaring thin cloud fraction for 3D variable
+                ! From TOA-2-SFC
+                if ( cldy(ip,ic,k) .eq. 1. .and. topcloud .eq. 1. ) then
+                   lidarcldtype(ip,k,2) = lidarcldtype(ip,k,2) + 1._wp
+                   z_base = k ! bottom cloud layer
+                endif
+                if ( cldy(ip,ic,k) .eq. 1. .and. topcloud .eq. 0. ) then
+                   lidarcldtype(ip,k,2) = lidarcldtype(ip,k,2) + 1._wp
+                   z_top = k  ! top cloud layer
+                   z_base = k ! bottom cloud layer
+                   topcloud = 1._wp
+                endif
+             enddo
+             ! Computing mean emissivity using layers below the bottom cloud layer to the surface
+             srmean = 0._wp
+             srcount = 0._wp
+             cloudemis = 0._wp
+             do k=z_base+1,Nlevels
+                if (  (x(ip,ic,k) .gt. S_att_opaq) .and. (x(ip,ic,k) .lt. 1.0) .and. (x(ip,ic,k) .ne. undef)  ) then
+                   srmean = srmean + x(ip,ic,k)
+                   srcount = srcount + 1.
+                endif
+             enddo
+             ! If clear sky layers exist below bottom cloud layer
+             if ( srcount .gt. 0. ) then
+                trans2 = srmean/srcount              ! thin cloud transmittance**2
+                tau_app = -(log(trans2))/2.          ! apparent cloud optical depth
+                tau_vis = tau_app/eta                ! cloud visible optical depth (multiple scat.)
+                tau_ir = tau_vis/2.                  ! approx. relation between visible and IR ODs
+                cloudemis = 1. - exp(-tau_ir)        ! no diffusion in IR considered : emis = 1-T
+                count_emis(ip) = count_emis(ip) + 1.
+             endif
+             ! Summing thin cloud mean temperatures and altitudes
+             ! as defined in Vaillant de Guelis et al. 2017a, AMT
+             cldtypetemp(ip,2) = cldtypetemp(ip,2) + ( tmp(ip,z_base) + tmp(ip,z_top) )/2.
+             cldtypemeanz(ip,2) = cldtypemeanz(ip,2) + ( vgrid_z(z_base) + vgrid_z(z_top) )/2.
+             cldtypemeanzse(ip,2) = cldtypemeanzse(ip,2) + (( vgrid_z(z_base) + vgrid_z(z_top) )/2.) - surfelev(ip)
+             cldthinemis(ip) = cldthinemis(ip) + cloudemis
+          endif
 
        enddo
     enddo   
@@ -1499,13 +1499,13 @@ contains
     ! 3D opacity fraction (=4) !Summing z_opaque fraction from TOA(k=1) to SFC(k=Nlevels)
        lidarcldtype(:,1,4) = lidarcldtype(:,1,3) !top layer equal to 3D z_opaque fraction
     do ip = 1, Npoints
-     	do k = 2, Nlevels
-            if ( (lidarcldtype(ip,k,3) .ne. undef) .and. (lidarcldtype(ip,k-1,4) .ne. undef) ) then
-	        lidarcldtype(ip,k,4) = lidarcldtype(ip,k,3) + lidarcldtype(ip,k-1,4)
-	    else
-	        lidarcldtype(ip,k,4) = undef
-	    endif
-	enddo
+       do k = 2, Nlevels
+          if ( (lidarcldtype(ip,k,3) .ne. undef) .and. (lidarcldtype(ip,k-1,4) .ne. undef) ) then
+             lidarcldtype(ip,k,4) = lidarcldtype(ip,k,3) + lidarcldtype(ip,k-1,4)
+          else
+             lidarcldtype(ip,k,4) = undef
+          endif
+       enddo
     enddo
 
     ! Layered cloud types (opaque, thin and z_opaque 2D variables)

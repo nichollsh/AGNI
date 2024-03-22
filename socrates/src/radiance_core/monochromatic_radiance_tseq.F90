@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to solve for the monochromatic radiances.
+! Subroutine to solve for the monochromatic radiances.
 !
 ! Method:
 !   The final single scattering properties are calculated
@@ -13,6 +13,10 @@
 !   cloudiness.
 !
 !- ---------------------------------------------------------------------
+MODULE monochromatic_radiance_tseq_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MONOCHROMATIC_RADIANCE_TSEQ_MOD'
+CONTAINS
 SUBROUTINE monochromatic_radiance_tseq(ierr                             &
     , control, cld, bound                                               &
 !                 Atmospheric Propertries
@@ -69,6 +73,12 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
   USE calc_actinic_flux_mod, ONLY: calc_actinic_flux
+  USE calc_flux_ipa_mod, ONLY: calc_flux_ipa
+  USE copy_clr_full_mod, ONLY: copy_clr_full
+  USE mcica_column_mod, ONLY: mcica_column
+  USE mix_column_mod, ONLY: mix_column
+  USE triple_column_mod, ONLY: triple_column
+  USE two_stream_mod, ONLY: two_stream
 
   IMPLICIT NONE
 
@@ -278,7 +288,7 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='MONOCHROMATIC_RADIANCE_TSEQ'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Choose an appropriate routine to calculate the fluxes as
 ! determined by the cloud scheme selected.
@@ -290,7 +300,6 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
     ALLOCATE(omega_clr_f(nd_profile, nd_layer))
     ALLOCATE(phase_fnc_clr_f(nd_profile, nd_layer, 1))
 
-! DEPENDS ON: copy_clr_full
     CALL copy_clr_full(n_profile, n_layer, n_cloud_top                  &
       , control, 1                                                      &
       , ss_prop%tau_clr, ss_prop%tau_clr_dir, ss_prop%omega_clr         &
@@ -303,7 +312,6 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
       )
 
 !   A two-stream scheme with no clouds.
-! DEPENDS ON: two_stream
     CALL two_stream(ierr                                                &
       , control, bound                                                  &
 !                 Atmospheric properties
@@ -398,7 +406,6 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
   ELSE IF (i_cloud == ip_cloud_mcica) THEN
 
 
-! DEPENDS ON: mcica_column
     CALL mcica_column(ierr                                              &
       , control, cld, bound                                             &
 !                 Atmospheric properties
@@ -445,7 +452,6 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
 !   Clouds are treated using the coupled overlaps originally
 !   introduced by Geleyn and Hollingsworth.
 
-! DEPENDS ON: mix_column
     CALL mix_column(ierr                                                &
       , control, bound                                                  &
 !                 Atmospheric properties
@@ -494,7 +500,6 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
 !   Clouds are treated using a decomposition of the column
 !   into clear-sky, stratiform and convective regions.
 
-! DEPENDS ON: triple_column
     CALL triple_column(ierr                                             &
       , control, bound                                                  &
 !                 Atmospheric properties
@@ -548,7 +553,6 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
       nd_profile_column=MAX(nd_profile_column, n_column_slv(l))
     END DO
 
-! DEPENDS ON: calc_flux_ipa
     CALL calc_flux_ipa(ierr                                             &
       , control, bound                                                  &
 !                 Atmospheric properties
@@ -587,6 +591,7 @@ SUBROUTINE monochromatic_radiance_tseq(ierr                             &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE monochromatic_radiance_tseq
+END MODULE monochromatic_radiance_tseq_mod

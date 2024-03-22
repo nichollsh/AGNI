@@ -4,16 +4,17 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to scale amounts of absorbers.
+! Subroutine to scale amounts of absorbers.
 !
 ! Method:
 !   The mixing ratio is multiplied by a factor determined
 !   by the type of scaling selected.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE scale_absorb_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SCALE_ABSORB_MOD'
+CONTAINS
 SUBROUTINE scale_absorb(ierr, n_profile, n_layer                        &
     , gas_mix_ratio, p, t, i_top                                        &
     , gas_frac_rescaled, k_esft_layer                                   &
@@ -117,7 +118,7 @@ SUBROUTINE scale_absorb(ierr, n_profile, n_layer                        &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'SCALE_ABSORB'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the offset to the pressure for the Doppler correction.
   IF (l_doppler) THEN
@@ -177,7 +178,7 @@ SUBROUTINE scale_absorb(ierr, n_profile, n_layer                        &
 
   ELSE IF (i_fnc == ip_scale_fnc_null) THEN
 
-    IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+    IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
     RETURN
 
   ELSE IF (i_fnc == ip_scale_power_quad) THEN
@@ -307,6 +308,7 @@ SUBROUTINE scale_absorb(ierr, n_profile, n_layer                        &
     END DO
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE scale_absorb
+END MODULE scale_absorb_mod

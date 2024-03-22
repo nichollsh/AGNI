@@ -13,6 +13,10 @@
 !   can be called to initialize fluxes.
 !
 !- ---------------------------------------------------------------------
+MODULE augment_tiled_radiance_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'AUGMENT_TILED_RADIANCE_MOD'
+CONTAINS
 SUBROUTINE augment_tiled_radiance(control, spectrum, radout             &
     , i_band, iex, iex_minor                                            &
     , n_point_tile, n_tile, list_tile                                   &
@@ -125,7 +129,7 @@ SUBROUTINE augment_tiled_radiance(control, spectrum, radout             &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'AUGMENT_TILED_RADIANCE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   IF (control%l_map_sub_bands) THEN
     ! Increment the fluxes with sub-bands mapping to channels
@@ -168,7 +172,7 @@ SUBROUTINE augment_tiled_radiance(control, spectrum, radout             &
     CALL augment_channel_tile()
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 
 CONTAINS
@@ -351,3 +355,4 @@ SUBROUTINE augment_channel_tile()
 END SUBROUTINE augment_channel_tile
 
 END SUBROUTINE augment_tiled_radiance
+END MODULE augment_tiled_radiance_mod

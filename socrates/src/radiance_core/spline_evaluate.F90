@@ -4,12 +4,12 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to evaluate a cubic spline.
-!
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
+! Subroutine to evaluate a cubic spline.
 !
 !- ---------------------------------------------------------------------
+MODULE spline_evaluate_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE spline_evaluate(ierr, n_data, x, y, y2, x_point, y_point)
 
   USE realtype_rd, ONLY: RealK
@@ -86,3 +86,4 @@ SUBROUTINE spline_evaluate(ierr, n_data, x, y, y2, x_point, y_point)
   END IF
 
 END SUBROUTINE spline_evaluate
+END MODULE spline_evaluate_mod

@@ -39,12 +39,45 @@ subroutine runes(n_profile, n_layer, diag, &
   profile_list, n_layer_stride, n_level_stride, &
   n_cloud_layer, n_aer_mode, n_aer_layer, n_tile, n_subcol_gen, &
   p_layer, t_layer, t_level, mass, density, &
-  h2o, o3, &
+  h2o, co2, o3, n2o, co, ch4, o2, no, so2, no2, nh3, hno3, n2, &
+  cfc11, cfc12, cfc113, hcfc22, hfc125, hfc134a, cfc114, tio, vo, h2, &
+  he, ocs, na, k, feh, crh, li, rb, cs, ph3, c2h2, hcn, h2s, ar, o, n, no3, &
+  n2o5, hono, ho2no2, h2o2, c2h6, ch3, h2co, ho2, &
+  hdo, hcl, hf, cosso, tosso, yosos, &
   p_layer_1d, t_layer_1d, t_level_1d, mass_1d, density_1d, &
-  h2o_1d, o3_1d, &
-  co2_mix_ratio, n2o_mix_ratio, ch4_mix_ratio, &
-  o2_mix_ratio, so2_mix_ratio, cfc11_mix_ratio, cfc12_mix_ratio, &
-  cfc113_mix_ratio, hcfc22_mix_ratio, hfc134a_mix_ratio, &
+  h2o_1d, co2_1d, o3_1d, n2o_1d, co_1d, ch4_1d, o2_1d, no_1d, so2_1d, no2_1d, &
+  nh3_1d, hno3_1d, n2_1d, cfc11_1d, cfc12_1d, cfc113_1d, hcfc22_1d, hfc125_1d, &
+  hfc134a_1d, cfc114_1d, tio_1d, vo_1d, h2_1d, he_1d, ocs_1d, na_1d, k_1d, &
+  feh_1d, crh_1d, li_1d, rb_1d, cs_1d, ph3_1d, c2h2_1d, hcn_1d, h2s_1d, ar_1d, &
+  o_1d, n_1d, no3_1d, n2o5_1d, hono_1d, ho2no2_1d, h2o2_1d, c2h6_1d, ch3_1d, &
+  h2co_1d, ho2_1d, hdo_1d, hcl_1d, hf_1d, cosso_1d, tosso_1d, yosos_1d, &
+  h2o_mix_ratio, co2_mix_ratio, o3_mix_ratio, n2o_mix_ratio, co_mix_ratio, &
+  ch4_mix_ratio, o2_mix_ratio, no_mix_ratio, so2_mix_ratio, no2_mix_ratio, &
+  nh3_mix_ratio, hno3_mix_ratio, n2_mix_ratio, cfc11_mix_ratio, &
+  cfc12_mix_ratio, cfc113_mix_ratio, hcfc22_mix_ratio, hfc125_mix_ratio, &
+  hfc134a_mix_ratio, cfc114_mix_ratio, tio_mix_ratio, vo_mix_ratio, &
+  h2_mix_ratio, he_mix_ratio, ocs_mix_ratio, na_mix_ratio, k_mix_ratio, &
+  feh_mix_ratio, crh_mix_ratio, li_mix_ratio, rb_mix_ratio, cs_mix_ratio, &
+  ph3_mix_ratio, c2h2_mix_ratio, hcn_mix_ratio, h2s_mix_ratio, ar_mix_ratio, &
+  o_mix_ratio, n_mix_ratio, no3_mix_ratio, n2o5_mix_ratio, hono_mix_ratio, &
+  ho2no2_mix_ratio, h2o2_mix_ratio, c2h6_mix_ratio, ch3_mix_ratio, &
+  h2co_mix_ratio, ho2_mix_ratio, hdo_mix_ratio, hcl_mix_ratio, hf_mix_ratio, &
+  cosso_mix_ratio, tosso_mix_ratio, yosos_mix_ratio, &
+  l_h2o_well_mixed, l_co2_well_mixed, l_o3_well_mixed, l_n2o_well_mixed, &
+  l_co_well_mixed, l_ch4_well_mixed, l_o2_well_mixed, l_no_well_mixed, &
+  l_so2_well_mixed, l_no2_well_mixed, l_nh3_well_mixed, l_hno3_well_mixed, &
+  l_n2_well_mixed, l_cfc11_well_mixed, l_cfc12_well_mixed, &
+  l_cfc113_well_mixed, l_hcfc22_well_mixed, l_hfc125_well_mixed, &
+  l_hfc134a_well_mixed, l_cfc114_well_mixed, l_tio_well_mixed, &
+  l_vo_well_mixed, l_h2_well_mixed, l_he_well_mixed, l_ocs_well_mixed, &
+  l_na_well_mixed, l_k_well_mixed, l_feh_well_mixed, l_crh_well_mixed, &
+  l_li_well_mixed, l_rb_well_mixed, l_cs_well_mixed, l_ph3_well_mixed, &
+  l_c2h2_well_mixed, l_hcn_well_mixed, l_h2s_well_mixed, l_ar_well_mixed, &
+  l_o_well_mixed, l_n_well_mixed, l_no3_well_mixed, l_n2o5_well_mixed, &
+  l_hono_well_mixed, l_ho2no2_well_mixed, l_h2o2_well_mixed, &
+  l_c2h6_well_mixed, l_ch3_well_mixed, l_h2co_well_mixed, l_ho2_well_mixed, &
+  l_hdo_well_mixed, l_hcl_well_mixed, l_hf_well_mixed, l_cosso_well_mixed, &
+  l_tosso_well_mixed, l_yosos_well_mixed, &
   l_flux_ground, t_ground, flux_ground, flux_ground_1d, &
   cos_zenith_angle, solar_irrad, l_orog, orog_corr, &
   l_grey_albedo, grey_albedo, albedo_diff, albedo_dir, &
@@ -191,15 +224,198 @@ real(RealExt), intent(in), optional :: density_1d(:)
 real(RealExt), intent(in), optional :: h2o(:, :)
 real(RealExt), intent(in), optional :: h2o_1d(:)
 !   Mass mixing ratio of water vapour
+real(RealExt), intent(in), optional :: co2(:, :)
+real(RealExt), intent(in), optional :: co2_1d(:)
+!   Mass mixing ratio of carbon dioxide
 real(RealExt), intent(in), optional :: o3(:, :)
 real(RealExt), intent(in), optional :: o3_1d(:)
 !   Mass mixing ratio of ozone
+real(RealExt), intent(in), optional :: n2o(:, :)
+real(RealExt), intent(in), optional :: n2o_1d(:)
+!   Mass mixing ratio of dinitrogen oxide
+real(RealExt), intent(in), optional :: co(:, :)
+real(RealExt), intent(in), optional :: co_1d(:)
+!   Mass mixing ratio of carbon monoxide
+real(RealExt), intent(in), optional :: ch4(:, :)
+real(RealExt), intent(in), optional :: ch4_1d(:)
+!   Mass mixing ratio of methane
+real(RealExt), intent(in), optional :: o2(:, :)
+real(RealExt), intent(in), optional :: o2_1d(:)
+!   Mass mixing ratio of oxygen
+real(RealExt), intent(in), optional :: no(:, :)
+real(RealExt), intent(in), optional :: no_1d(:)
+!   Mass mixing ratio of nitrogen monoxide
+real(RealExt), intent(in), optional :: so2(:, :)
+real(RealExt), intent(in), optional :: so2_1d(:)
+!   Mass mixing ratio of sulphur dioxide
+real(RealExt), intent(in), optional :: no2(:, :)
+real(RealExt), intent(in), optional :: no2_1d(:)
+!   Mass mixing ratio of nitrogen dioxide
+real(RealExt), intent(in), optional :: nh3(:, :)
+real(RealExt), intent(in), optional :: nh3_1d(:)
+!   Mass mixing ratio of ammonia
+real(RealExt), intent(in), optional :: hno3(:, :)
+real(RealExt), intent(in), optional :: hno3_1d(:)
+!   Mass mixing ratio of nitric acid
+real(RealExt), intent(in), optional :: n2(:, :)
+real(RealExt), intent(in), optional :: n2_1d(:)
+!   Mass mixing ratio of nitrogen
+real(RealExt), intent(in), optional :: cfc11(:, :)
+real(RealExt), intent(in), optional :: cfc11_1d(:)
+!   Mass mixing ratio of CFC11 (CFCl3)
+real(RealExt), intent(in), optional :: cfc12(:, :)
+real(RealExt), intent(in), optional :: cfc12_1d(:)
+!   Mass mixing ratio of CFC12 (CF2Cl2)
+real(RealExt), intent(in), optional :: cfc113(:, :)
+real(RealExt), intent(in), optional :: cfc113_1d(:)
+!   Mass mixing ratio of CFC113 (CF2ClCFCl2)
+real(RealExt), intent(in), optional :: hcfc22(:, :)
+real(RealExt), intent(in), optional :: hcfc22_1d(:)
+!   Mass mixing ratio of HCFC22 (CHF2Cl)
+real(RealExt), intent(in), optional :: hfc125(:, :)
+real(RealExt), intent(in), optional :: hfc125_1d(:)
+!   Mass mixing ratio of HFC125 (C2HF5)
+real(RealExt), intent(in), optional :: hfc134a(:, :)
+real(RealExt), intent(in), optional :: hfc134a_1d(:)
+!   Mass mixing ratio of HFC134A (CF4CFH2)
+real(RealExt), intent(in), optional :: cfc114(:, :)
+real(RealExt), intent(in), optional :: cfc114_1d(:)
+!   Mass mixing ratio of CFC114 (C2Cl2F4)
+real(RealExt), intent(in), optional :: tio(:, :)
+real(RealExt), intent(in), optional :: tio_1d(:)
+!   Mass mixing ratio of titanium oxide
+real(RealExt), intent(in), optional :: vo(:, :)
+real(RealExt), intent(in), optional :: vo_1d(:)
+!   Mass mixing ratio of vanadium oxide
+real(RealExt), intent(in), optional :: h2(:, :)
+real(RealExt), intent(in), optional :: h2_1d(:)
+!   Mass mixing ratio of hydrogen
+real(RealExt), intent(in), optional :: he(:, :)
+real(RealExt), intent(in), optional :: he_1d(:)
+!   Mass mixing ratio of helium
+real(RealExt), intent(in), optional :: ocs(:, :)
+real(RealExt), intent(in), optional :: ocs_1d(:)
+!   Mass mixing ratio of carbonyl sulphide
+real(RealExt), intent(in), optional :: na(:, :)
+real(RealExt), intent(in), optional :: na_1d(:)
+!   Mass mixing ratio of sodium
+real(RealExt), intent(in), optional :: k(:, :)
+real(RealExt), intent(in), optional :: k_1d(:)
+!   Mass mixing ratio of potassium
+real(RealExt), intent(in), optional :: feh(:, :)
+real(RealExt), intent(in), optional :: feh_1d(:)
+!   Mass mixing ratio of iron hydride
+real(RealExt), intent(in), optional :: crh(:, :)
+real(RealExt), intent(in), optional :: crh_1d(:)
+!   Mass mixing ratio of chromium hydride
+real(RealExt), intent(in), optional :: li(:, :)
+real(RealExt), intent(in), optional :: li_1d(:)
+!   Mass mixing ratio of lithium
+real(RealExt), intent(in), optional :: rb(:, :)
+real(RealExt), intent(in), optional :: rb_1d(:)
+!   Mass mixing ratio of rubidium
+real(RealExt), intent(in), optional :: cs(:, :)
+real(RealExt), intent(in), optional :: cs_1d(:)
+!   Mass mixing ratio of cesium
+real(RealExt), intent(in), optional :: ph3(:, :)
+real(RealExt), intent(in), optional :: ph3_1d(:)
+!   Mass mixing ratio of phosphine
+real(RealExt), intent(in), optional :: c2h2(:, :)
+real(RealExt), intent(in), optional :: c2h2_1d(:)
+!   Mass mixing ratio of acetylene
+real(RealExt), intent(in), optional :: hcn(:, :)
+real(RealExt), intent(in), optional :: hcn_1d(:)
+!   Mass mixing ratio of hydrogen cyanide
+real(RealExt), intent(in), optional :: h2s(:, :)
+real(RealExt), intent(in), optional :: h2s_1d(:)
+!   Mass mixing ratio of hydrogen sulphide
+real(RealExt), intent(in), optional :: ar(:, :)
+real(RealExt), intent(in), optional :: ar_1d(:)
+!   Mass mixing ratio of argon
+real(RealExt), intent(in), optional :: o(:, :)
+real(RealExt), intent(in), optional :: o_1d(:)
+!   Mass mixing ratio of atomic oxygen
+real(RealExt), intent(in), optional :: n(:, :)
+real(RealExt), intent(in), optional :: n_1d(:)
+!   Mass mixing ratio of atomic nitrogen
+real(RealExt), intent(in), optional :: no3(:, :)
+real(RealExt), intent(in), optional :: no3_1d(:)
+!   Mass mixing ratio of nitrate radical
+real(RealExt), intent(in), optional :: n2o5(:, :)
+real(RealExt), intent(in), optional :: n2o5_1d(:)
+!   Mass mixing ratio of dinitrogen pentoxide
+real(RealExt), intent(in), optional :: hono(:, :)
+real(RealExt), intent(in), optional :: hono_1d(:)
+!   Mass mixing ratio of nitrous acid
+real(RealExt), intent(in), optional :: ho2no2(:, :)
+real(RealExt), intent(in), optional :: ho2no2_1d(:)
+!   Mass mixing ratio of peroxynitric acid
+real(RealExt), intent(in), optional :: h2o2(:, :)
+real(RealExt), intent(in), optional :: h2o2_1d(:)
+!   Mass mixing ratio of hydrogen peroxide
+real(RealExt), intent(in), optional :: c2h6(:, :)
+real(RealExt), intent(in), optional :: c2h6_1d(:)
+!   Mass mixing ratio of ethane
+real(RealExt), intent(in), optional :: ch3(:, :)
+real(RealExt), intent(in), optional :: ch3_1d(:)
+!   Mass mixing ratio of methyl radical
+real(RealExt), intent(in), optional :: h2co(:, :)
+real(RealExt), intent(in), optional :: h2co_1d(:)
+!   Mass mixing ratio of formaldehyde
+real(RealExt), intent(in), optional :: ho2(:, :)
+real(RealExt), intent(in), optional :: ho2_1d(:)
+!   Mass mixing ratio of hydroperoxy radical
+real(RealExt), intent(in), optional :: hdo(:, :)
+real(RealExt), intent(in), optional :: hdo_1d(:)
+!   Mass mixing ratio of semiheavy water
+real(RealExt), intent(in), optional :: hcl(:, :)
+real(RealExt), intent(in), optional :: hcl_1d(:)
+!   Mass mixing ratio of hydrogen chloride
+real(RealExt), intent(in), optional :: hf(:, :)
+real(RealExt), intent(in), optional :: hf_1d(:)
+!   Mass mixing ratio of hydrogen fluoride
+real(RealExt), intent(in), optional :: cosso(:, :)
+real(RealExt), intent(in), optional :: cosso_1d(:)
+!   Mass mixing ratio of cis-OSSO
+real(RealExt), intent(in), optional :: tosso(:, :)
+real(RealExt), intent(in), optional :: tosso_1d(:)
+!   Mass mixing ratio of trans-OSSO
+real(RealExt), intent(in), optional :: yosos(:, :)
+real(RealExt), intent(in), optional :: yosos_1d(:)
+!   Mass mixing ratio of OSO-S
 
 real(RealExt), intent(in), optional :: &
-  co2_mix_ratio, n2o_mix_ratio, ch4_mix_ratio, &
-  o2_mix_ratio, so2_mix_ratio, cfc11_mix_ratio, cfc12_mix_ratio, &
-  cfc113_mix_ratio, hcfc22_mix_ratio, hfc134a_mix_ratio
-!   Trace gas mass mixing ratios
+  h2o_mix_ratio, co2_mix_ratio, o3_mix_ratio, n2o_mix_ratio, co_mix_ratio, &
+  ch4_mix_ratio, o2_mix_ratio, no_mix_ratio, so2_mix_ratio, no2_mix_ratio, &
+  nh3_mix_ratio, hno3_mix_ratio, n2_mix_ratio, cfc11_mix_ratio, &
+  cfc12_mix_ratio, cfc113_mix_ratio, hcfc22_mix_ratio, hfc125_mix_ratio, &
+  hfc134a_mix_ratio, cfc114_mix_ratio, tio_mix_ratio, vo_mix_ratio, &
+  h2_mix_ratio, he_mix_ratio, ocs_mix_ratio, na_mix_ratio, k_mix_ratio, &
+  feh_mix_ratio, crh_mix_ratio, li_mix_ratio, rb_mix_ratio, cs_mix_ratio, &
+  ph3_mix_ratio, c2h2_mix_ratio, hcn_mix_ratio, h2s_mix_ratio, ar_mix_ratio, &
+  o_mix_ratio, n_mix_ratio, no3_mix_ratio, n2o5_mix_ratio, hono_mix_ratio, &
+  ho2no2_mix_ratio, h2o2_mix_ratio, c2h6_mix_ratio, ch3_mix_ratio, &
+  h2co_mix_ratio, ho2_mix_ratio, hdo_mix_ratio, hcl_mix_ratio, hf_mix_ratio, &
+  cosso_mix_ratio, tosso_mix_ratio, yosos_mix_ratio
+!   Well mixed mass mixing ratios
+
+logical, intent(in), optional :: &
+  l_h2o_well_mixed, l_co2_well_mixed, l_o3_well_mixed, l_n2o_well_mixed, &
+  l_co_well_mixed, l_ch4_well_mixed, l_o2_well_mixed, l_no_well_mixed, &
+  l_so2_well_mixed, l_no2_well_mixed, l_nh3_well_mixed, l_hno3_well_mixed, &
+  l_n2_well_mixed, l_cfc11_well_mixed, l_cfc12_well_mixed, &
+  l_cfc113_well_mixed, l_hcfc22_well_mixed, l_hfc125_well_mixed, &
+  l_hfc134a_well_mixed, l_cfc114_well_mixed, l_tio_well_mixed, &
+  l_vo_well_mixed, l_h2_well_mixed, l_he_well_mixed, l_ocs_well_mixed, &
+  l_na_well_mixed, l_k_well_mixed, l_feh_well_mixed, l_crh_well_mixed, &
+  l_li_well_mixed, l_rb_well_mixed, l_cs_well_mixed, l_ph3_well_mixed, &
+  l_c2h2_well_mixed, l_hcn_well_mixed, l_h2s_well_mixed, l_ar_well_mixed, &
+  l_o_well_mixed, l_n_well_mixed, l_no3_well_mixed, l_n2o5_well_mixed, &
+  l_hono_well_mixed, l_ho2no2_well_mixed, l_h2o2_well_mixed, &
+  l_c2h6_well_mixed, l_ch3_well_mixed, l_h2co_well_mixed, l_ho2_well_mixed, &
+  l_hdo_well_mixed, l_hcl_well_mixed, l_hf_well_mixed, l_cosso_well_mixed, &
+  l_tosso_well_mixed, l_yosos_well_mixed
+!   Flag to use the well mixed ratios
 
 logical, intent(in), optional :: l_flux_ground
 !   Set effective surface emission over whole grid-box
@@ -505,37 +721,239 @@ call set_dimen(dimen, control, n_profile, n_layer, &
   n_subcol_gen  = n_subcol_gen )
 
 call set_atm(atm, dimen, spec, n_profile, n_layer, &
-  profile_list      = profile_list, &
-  n_layer_stride    = n_layer_stride, &
-  n_level_stride    = n_level_stride, &
-  p_layer           = p_layer, &
-  t_layer           = t_layer, &
-  mass              = mass, &
-  density           = density, &
-  t_level           = t_level, &
-  h2o               = h2o, &
-  o3                = o3, &
-  p_layer_1d        = p_layer_1d, &
-  t_layer_1d        = t_layer_1d, &
-  mass_1d           = mass_1d, &
-  density_1d        = density_1d, &
-  t_level_1d        = t_level_1d, &
-  h2o_1d            = h2o_1d, &
-  o3_1d             = o3_1d, &
-  co2_mix_ratio     = co2_mix_ratio, &
-  n2o_mix_ratio     = n2o_mix_ratio, &
-  ch4_mix_ratio     = ch4_mix_ratio, &
-  o2_mix_ratio      = o2_mix_ratio, &
-  so2_mix_ratio     = so2_mix_ratio, &
-  cfc11_mix_ratio   = cfc11_mix_ratio, &
-  cfc12_mix_ratio   = cfc12_mix_ratio, &
-  cfc113_mix_ratio  = cfc113_mix_ratio, &
-  hcfc22_mix_ratio  = hcfc22_mix_ratio, &
-  hfc134a_mix_ratio = hfc134a_mix_ratio, &
-  l_invert          = l_invert, &
-  l_profile_last    = l_profile_last, &
-  l_debug           = l_debug, &
-  i_profile_debug   = i_profile_debug )
+  profile_list         = profile_list, &
+  n_layer_stride       = n_layer_stride, &
+  n_level_stride       = n_level_stride, &
+  p_layer              = p_layer, &
+  t_layer              = t_layer, &
+  mass                 = mass, &
+  density              = density, &
+  t_level              = t_level, &
+  p_layer_1d           = p_layer_1d, &
+  t_layer_1d           = t_layer_1d, &
+  mass_1d              = mass_1d, &
+  density_1d           = density_1d, &
+  t_level_1d           = t_level_1d, &
+  h2o                  = h2o, &
+  co2                  = co2, &
+  o3                   = o3, &
+  n2o                  = n2o, &
+  co                   = co, &
+  ch4                  = ch4, &
+  o2                   = o2, &
+  no                   = no, &
+  so2                  = so2, &
+  no2                  = no2, &
+  nh3                  = nh3, &
+  hno3                 = hno3, &
+  n2                   = n2, &
+  cfc11                = cfc11, &
+  cfc12                = cfc12, &
+  cfc113               = cfc113, &
+  hcfc22               = hcfc22, &
+  hfc125               = hfc125, &
+  hfc134a              = hfc134a, &
+  cfc114               = cfc114, &
+  tio                  = tio, &
+  vo                   = vo, &
+  h2                   = h2, &
+  he                   = he, &
+  ocs                  = ocs, &
+  na                   = na, &
+  k                    = k, &
+  feh                  = feh, &
+  crh                  = crh, &
+  li                   = li, &
+  rb                   = rb, &
+  cs                   = cs, &
+  ph3                  = ph3, &
+  c2h2                 = c2h2, &
+  hcn                  = hcn, &
+  h2s                  = h2s, &
+  ar                   = ar, &
+  o                    = o, &
+  n                    = n, &
+  no3                  = no3, &
+  n2o5                 = n2o5, &
+  hono                 = hono, &
+  ho2no2               = ho2no2, &
+  h2o2                 = h2o2, &
+  c2h6                 = c2h6, &
+  ch3                  = ch3, &
+  h2co                 = h2co, &
+  ho2                  = ho2, &
+  hdo                  = hdo, &
+  hcl                  = hcl, &
+  hf                   = hf, &
+  cosso                = cosso, &
+  tosso                = tosso, &
+  yosos                = yosos, &
+  h2o_1d               = h2o_1d, &
+  co2_1d               = co2_1d, &
+  o3_1d                = o3_1d, &
+  n2o_1d               = n2o_1d, &
+  co_1d                = co_1d, &
+  ch4_1d               = ch4_1d, &
+  o2_1d                = o2_1d, &
+  no_1d                = no_1d, &
+  so2_1d               = so2_1d, &
+  no2_1d               = no2_1d, &
+  nh3_1d               = nh3_1d, &
+  hno3_1d              = hno3_1d, &
+  n2_1d                = n2_1d, &
+  cfc11_1d             = cfc11_1d, &
+  cfc12_1d             = cfc12_1d, &
+  cfc113_1d            = cfc113_1d, &
+  hcfc22_1d            = hcfc22_1d, &
+  hfc125_1d            = hfc125_1d, &
+  hfc134a_1d           = hfc134a_1d, &
+  cfc114_1d            = cfc114_1d, &
+  tio_1d               = tio_1d, &
+  vo_1d                = vo_1d, &
+  h2_1d                = h2_1d, &
+  he_1d                = he_1d, &
+  ocs_1d               = ocs_1d, &
+  na_1d                = na_1d, &
+  k_1d                 = k_1d, &
+  feh_1d               = feh_1d, &
+  crh_1d               = crh_1d, &
+  li_1d                = li_1d, &
+  rb_1d                = rb_1d, &
+  cs_1d                = cs_1d, &
+  ph3_1d               = ph3_1d, &
+  c2h2_1d              = c2h2_1d, &
+  hcn_1d               = hcn_1d, &
+  h2s_1d               = h2s_1d, &
+  ar_1d                = ar_1d, &
+  o_1d                 = o_1d, &
+  n_1d                 = n_1d, &
+  no3_1d               = no3_1d, &
+  n2o5_1d              = n2o5_1d, &
+  hono_1d              = hono_1d, &
+  ho2no2_1d            = ho2no2_1d, &
+  h2o2_1d              = h2o2_1d, &
+  c2h6_1d              = c2h6_1d, &
+  ch3_1d               = ch3_1d, &
+  h2co_1d              = h2co_1d, &
+  ho2_1d               = ho2_1d, &
+  hdo_1d               = hdo_1d, &
+  hcl_1d               = hcl_1d, &
+  hf_1d                = hf_1d, &
+  cosso_1d             = cosso_1d, &
+  tosso_1d             = tosso_1d, &
+  yosos_1d             = yosos_1d, &
+  h2o_mix_ratio        = h2o_mix_ratio, &
+  co2_mix_ratio        = co2_mix_ratio, &
+  o3_mix_ratio         = o3_mix_ratio, &
+  n2o_mix_ratio        = n2o_mix_ratio, &
+  co_mix_ratio         = co_mix_ratio, &
+  ch4_mix_ratio        = ch4_mix_ratio, &
+  o2_mix_ratio         = o2_mix_ratio, &
+  no_mix_ratio         = no_mix_ratio, &
+  so2_mix_ratio        = so2_mix_ratio, &
+  no2_mix_ratio        = no2_mix_ratio, &
+  nh3_mix_ratio        = nh3_mix_ratio, &
+  hno3_mix_ratio       = hno3_mix_ratio, &
+  n2_mix_ratio         = n2_mix_ratio, &
+  cfc11_mix_ratio      = cfc11_mix_ratio, &
+  cfc12_mix_ratio      = cfc12_mix_ratio, &
+  cfc113_mix_ratio     = cfc113_mix_ratio, &
+  hcfc22_mix_ratio     = hcfc22_mix_ratio, &
+  hfc125_mix_ratio     = hfc125_mix_ratio, &
+  hfc134a_mix_ratio    = hfc134a_mix_ratio, &
+  cfc114_mix_ratio     = cfc114_mix_ratio, &
+  tio_mix_ratio        = tio_mix_ratio, &
+  vo_mix_ratio         = vo_mix_ratio, &
+  h2_mix_ratio         = h2_mix_ratio, &
+  he_mix_ratio         = he_mix_ratio, &
+  ocs_mix_ratio        = ocs_mix_ratio, &
+  na_mix_ratio         = na_mix_ratio, &
+  k_mix_ratio          = k_mix_ratio, &
+  feh_mix_ratio        = feh_mix_ratio, &
+  crh_mix_ratio        = crh_mix_ratio, &
+  li_mix_ratio         = li_mix_ratio, &
+  rb_mix_ratio         = rb_mix_ratio, &
+  cs_mix_ratio         = cs_mix_ratio, &
+  ph3_mix_ratio        = ph3_mix_ratio, &
+  c2h2_mix_ratio       = c2h2_mix_ratio, &
+  hcn_mix_ratio        = hcn_mix_ratio, &
+  h2s_mix_ratio        = h2s_mix_ratio, &
+  ar_mix_ratio         = ar_mix_ratio, &
+  o_mix_ratio          = o_mix_ratio, &
+  n_mix_ratio          = n_mix_ratio, &
+  no3_mix_ratio        = no3_mix_ratio, &
+  n2o5_mix_ratio       = n2o5_mix_ratio, &
+  hono_mix_ratio       = hono_mix_ratio, &
+  ho2no2_mix_ratio     = ho2no2_mix_ratio, &
+  h2o2_mix_ratio       = h2o2_mix_ratio, &
+  c2h6_mix_ratio       = c2h6_mix_ratio, &
+  ch3_mix_ratio        = ch3_mix_ratio, &
+  h2co_mix_ratio       = h2co_mix_ratio, &
+  ho2_mix_ratio        = ho2_mix_ratio, &
+  hdo_mix_ratio        = hdo_mix_ratio, &
+  hcl_mix_ratio        = hcl_mix_ratio, &
+  hf_mix_ratio         = hf_mix_ratio, &
+  cosso_mix_ratio      = cosso_mix_ratio, &
+  tosso_mix_ratio      = tosso_mix_ratio, &
+  yosos_mix_ratio      = yosos_mix_ratio, &
+  l_h2o_well_mixed     = l_h2o_well_mixed, &
+  l_co2_well_mixed     = l_co2_well_mixed, &
+  l_o3_well_mixed      = l_o3_well_mixed, &
+  l_n2o_well_mixed     = l_n2o_well_mixed, &
+  l_co_well_mixed      = l_co_well_mixed, &
+  l_ch4_well_mixed     = l_ch4_well_mixed, &
+  l_o2_well_mixed      = l_o2_well_mixed, &
+  l_no_well_mixed      = l_no_well_mixed, &
+  l_so2_well_mixed     = l_so2_well_mixed, &
+  l_no2_well_mixed     = l_no2_well_mixed, &
+  l_nh3_well_mixed     = l_nh3_well_mixed, &
+  l_hno3_well_mixed    = l_hno3_well_mixed, &
+  l_n2_well_mixed      = l_n2_well_mixed, &
+  l_cfc11_well_mixed   = l_cfc11_well_mixed, &
+  l_cfc12_well_mixed   = l_cfc12_well_mixed, &
+  l_cfc113_well_mixed  = l_cfc113_well_mixed, &
+  l_hcfc22_well_mixed  = l_hcfc22_well_mixed, &
+  l_hfc125_well_mixed  = l_hfc125_well_mixed, &
+  l_hfc134a_well_mixed = l_hfc134a_well_mixed, &
+  l_cfc114_well_mixed  = l_cfc114_well_mixed, &
+  l_tio_well_mixed     = l_tio_well_mixed, &
+  l_vo_well_mixed      = l_vo_well_mixed, &
+  l_h2_well_mixed      = l_h2_well_mixed, &
+  l_he_well_mixed      = l_he_well_mixed, &
+  l_ocs_well_mixed     = l_ocs_well_mixed, &
+  l_na_well_mixed      = l_na_well_mixed, &
+  l_k_well_mixed       = l_k_well_mixed, &
+  l_feh_well_mixed     = l_feh_well_mixed, &
+  l_crh_well_mixed     = l_crh_well_mixed, &
+  l_li_well_mixed      = l_li_well_mixed, &
+  l_rb_well_mixed      = l_rb_well_mixed, &
+  l_cs_well_mixed      = l_cs_well_mixed, &
+  l_ph3_well_mixed     = l_ph3_well_mixed, &
+  l_c2h2_well_mixed    = l_c2h2_well_mixed, &
+  l_hcn_well_mixed     = l_hcn_well_mixed, &
+  l_h2s_well_mixed     = l_h2s_well_mixed, &
+  l_ar_well_mixed      = l_ar_well_mixed, &
+  l_o_well_mixed       = l_o_well_mixed, &
+  l_n_well_mixed       = l_n_well_mixed, &
+  l_no3_well_mixed     = l_no3_well_mixed, &
+  l_n2o5_well_mixed    = l_n2o5_well_mixed, &
+  l_hono_well_mixed    = l_hono_well_mixed, &
+  l_ho2no2_well_mixed  = l_ho2no2_well_mixed, &
+  l_h2o2_well_mixed    = l_h2o2_well_mixed, &
+  l_c2h6_well_mixed    = l_c2h6_well_mixed, &
+  l_ch3_well_mixed     = l_ch3_well_mixed, &
+  l_h2co_well_mixed    = l_h2co_well_mixed, &
+  l_ho2_well_mixed     = l_ho2_well_mixed, &
+  l_hdo_well_mixed     = l_hdo_well_mixed, &
+  l_hcl_well_mixed     = l_hcl_well_mixed, &
+  l_hf_well_mixed      = l_hf_well_mixed, &
+  l_cosso_well_mixed   = l_cosso_well_mixed, &
+  l_tosso_well_mixed   = l_tosso_well_mixed, &
+  l_yosos_well_mixed   = l_yosos_well_mixed, &
+  l_invert             = l_invert, &
+  l_profile_last       = l_profile_last, &
+  l_debug              = l_debug, &
+  i_profile_debug      = i_profile_debug )
 
 call set_bound(bound, control, dimen, spec, n_profile, &
   profile_list        = profile_list, &

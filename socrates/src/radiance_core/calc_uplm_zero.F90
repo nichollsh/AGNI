@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate Upsilon_l^m(0) or its derivative.
+! Subroutine to calculate Upsilon_l^m(0) or its derivative.
 !
 ! Purpose:
 !   This routine is called to determine the value of a spherical
@@ -15,10 +15,11 @@
 !   As this routine is called only once speed is not too critical
 !   so direct calculation is used.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE calc_uplm_zero_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_UPLM_ZERO_MOD'
+CONTAINS
 SUBROUTINE calc_uplm_zero(ms_min, ms_max, ia_sph_mm                     &
     , ls_local_trunc, uplm_zero                                         &
     , nd_max_order, nd_sph_coeff)
@@ -70,7 +71,7 @@ SUBROUTINE calc_uplm_zero(ms_min, ms_max, ia_sph_mm                     &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CALC_UPLM_ZERO'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO ms=ms_min, ms_max
 
@@ -110,6 +111,7 @@ SUBROUTINE calc_uplm_zero(ms_min, ms_max, ia_sph_mm                     &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_uplm_zero
+END MODULE calc_uplm_zero_mod

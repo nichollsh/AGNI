@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to increment radiances at a given azimuthal order.
+! Subroutine to increment radiances at a given azimuthal order.
 !
 ! Method:
 !   The weights of the terms in the complementary function
@@ -14,10 +14,11 @@
 !   factor representing the azimuthal dependence to complete the
 !   calculation of the radiance.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE increment_rad_cf_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'INCREMENT_RAD_CF_MOD'
+CONTAINS
 SUBROUTINE increment_rad_cf(n_profile                                   &
     , n_direction, azim_factor                                          &
     , n_viewing_level, i_rad_layer                                      &
@@ -183,7 +184,7 @@ SUBROUTINE increment_rad_cf(n_profile                                   &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='INCREMENT_RAD_CF'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   IF (i_sph_algorithm == ip_sph_direct) THEN
 
@@ -309,6 +310,7 @@ SUBROUTINE increment_rad_cf(n_profile                                   &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE increment_rad_cf
+END MODULE increment_rad_cf_mod

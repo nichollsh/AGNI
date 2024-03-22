@@ -7,13 +7,13 @@
 !+ Program to set aerosol mixing ratios for SRA profiles.
 !
 ! Method:
-!	The pressure, temperatures and specific humidity are read
-!	in as CDL-files. These quantities enable the height at
-!	each pressure level to be calculated: the SRA profiles are
-!	specified in terms of heights. For the profile selected
-!	the extinction at 550 nm for each component is calculated
-!	and the volume fraction is set to be consistent with the
-!	extinction.
+!   The pressure, temperatures and specific humidity are read
+!   in as CDL-files. These quantities enable the height at
+!   each pressure level to be calculated: the SRA profiles are
+!   specified in terms of heights. For the profile selected
+!   the extinction at 550 nm for each component is calculated
+!   and the volume fraction is set to be consistent with the
+!   extinction.
 !
 !- ---------------------------------------------------------------------
       PROGRAM sra_aerosol_profile

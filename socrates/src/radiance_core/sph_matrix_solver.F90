@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to solve a set of stepped block equations.
+! Subroutine to solve a set of stepped block equations.
 !
 ! Method:
 !   A set of linear equations of the stepped block form
@@ -14,10 +14,11 @@
 !   when choosing pivots and this helps to reduce the
 !   band-width of the system.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE sph_matrix_solver_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SPH_MATRIX_SOLVER_MOD'
+CONTAINS
 SUBROUTINE sph_matrix_solver(n_matrix, n_step, n_block                  &
     , a, b                                                              &
     , x                                                                 &
@@ -108,7 +109,7 @@ SUBROUTINE sph_matrix_solver(n_matrix, n_step, n_block                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SPH_MATRIX_SOLVER'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Eliminative phase:
   i_step=1
@@ -272,6 +273,7 @@ SUBROUTINE sph_matrix_solver(n_matrix, n_step, n_block                  &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE sph_matrix_solver
+END MODULE sph_matrix_solver_mod

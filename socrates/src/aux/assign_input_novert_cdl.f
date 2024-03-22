@@ -39,7 +39,7 @@
 !
 !     Declaration of variables:
 !
-      INTEGER	!,Intent(OUT)
+      INTEGER   !,Intent(OUT)
      &    ierr
 !            Error flag
 !
@@ -54,7 +54,7 @@
      &  , nd_longitude
 !           Allowed size for longitudes
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*(*)
 !           Name of input file
      &  , field_name*(*)

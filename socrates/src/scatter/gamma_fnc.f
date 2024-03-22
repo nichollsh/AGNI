@@ -7,18 +7,17 @@
 !+ Function to calculate the gamma-function.
 !
 ! Method:
-!	The gamma function for the fractional part of the argument is
-!	evaluated using Weierstrass's formula. The integral part is
-!	handled by recurrence. A correction is applied to Weierstrass's
-!	formula to reduce the influence of the truncation: this is
-!	derived by imposing the condition that Gamma(1)=1. The 
-!	coefficient in this truncation could be precalculated, but it
-!	depends on N_LIMIT and is therefore calculated here so that
-!	N_LIMIT may be changed easily and consistently. With 
-!	N_LIMIT=10,000, the error should be less than one part in 10^7.
-!	This routine is intended only for positive arguments and is
-!	not especially efficient. 
-!	
+!   The gamma function for the fractional part of the argument is
+!   evaluated using Weierstrass's formula. The integral part is
+!   handled by recurrence. A correction is applied to Weierstrass's
+!   formula to reduce the influence of the truncation: this is
+!   derived by imposing the condition that Gamma(1)=1. The
+!   coefficient in this truncation could be precalculated, but it
+!   depends on N_LIMIT and is therefore calculated here so that
+!   N_LIMIT may be changed easily and consistently. With
+!   N_LIMIT=10,000, the error should be less than one part in 10^7.
+!   This routine is intended only for positive arguments and is
+!   not especially efficient.
 !
 !- ---------------------------------------------------------------------
       function gamma_fnc(ierr, z)

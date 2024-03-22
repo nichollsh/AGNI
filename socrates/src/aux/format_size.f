@@ -7,9 +7,9 @@
 !+ Program to format a distribution of particle sizes.
 !
 ! Method:
-!	Directives are inserted into a file of raw data conrtaining
-!	size spectra. This program reads the file and formats
-!	the output for the scattering program.
+!   Directives are inserted into a file of raw data conrtaining
+!   size spectra. This program reads the file and formats
+!   the output for the scattering program.
 !
 !- ---------------------------------------------------------------------
       PROGRAM format_size

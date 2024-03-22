@@ -41,7 +41,7 @@
 !
 !     Declaration of variables:
 !
-      INTEGER	!,Intent(OUT)
+      INTEGER   !,Intent(OUT)
      &    ierr
 !            Error flag
 !
@@ -65,12 +65,12 @@
 !           Expected number of vertical levels
      &  , i_start
 !           Starting point in array
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*(*)
 !           Name of input file
      &  , field_name*(*)
 !           Name of input field.
-      CHARACTER	!, Intent(INOUT)
+      CHARACTER !, Intent(INOUT)
      &    name_vert_coord*(*)
 !           Name of vertical coordinate
       LOGICAL, Intent(IN) ::

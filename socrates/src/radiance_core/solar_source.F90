@@ -7,6 +7,10 @@
 ! Subroutine to calculate the solar flux and source terms.
 !
 !- ---------------------------------------------------------------------
+MODULE solar_source_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SOLAR_SOURCE_MOD'
+CONTAINS
 SUBROUTINE solar_source(control, bound, n_profile, n_layer              &
      , flux_inc_direct                                                  &
      , trans_0_dir, trans_0, source_coeff                               &
@@ -96,7 +100,7 @@ SUBROUTINE solar_source(control, bound, n_profile, n_layer              &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SOLAR_SOURCE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO l=1, n_profile
     flux_direct(l, 0)=flux_inc_direct(l)
@@ -200,6 +204,7 @@ SUBROUTINE solar_source(control, bound, n_profile, n_layer              &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE solar_source
+END MODULE solar_source_mod

@@ -7,12 +7,12 @@
 !+ Program to integrate mixing ratios vertically through the atmosphere.
 !
 ! Method:
-!	A CDL-file is read in. Its contents are assumed to be mixing
-!	ratios on pressure levels. These pressure levels give the
-!	masses in the layers so defined. The mean mixing ratio in the
-!	layer is taken as the average of the values at the boundaries.
-!	This enables us to calculate the amount of the quantity
-!	integrating downwards. The results are written to a CDL-file.
+!   A CDL-file is read in. Its contents are assumed to be mixing
+!   ratios on pressure levels. These pressure levels give the
+!   masses in the layers so defined. The mean mixing ratio in the
+!   layer is taken as the average of the values at the boundaries.
+!   This enables us to calculate the amount of the quantity
+!   integrating downwards. The results are written to a CDL-file.
 !
 !- ---------------------------------------------------------------------
       PROGRAM vert_int

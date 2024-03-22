@@ -12,6 +12,9 @@
 !   the Delta-Eddington scaling      
 !
 !----------------------------------------------------------------------
+MODULE rescale_tau_csr_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE rescale_tau_csr(n_profile                                    &
     , i_layer_first, i_layer_last                                       &
     , forward_scatter                                                   &
@@ -69,3 +72,4 @@ SUBROUTINE rescale_tau_csr(n_profile                                    &
   END DO
 ! 
 END SUBROUTINE rescale_tau_csr     
+END MODULE rescale_tau_csr_mod

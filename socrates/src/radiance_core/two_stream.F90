@@ -14,6 +14,10 @@
 !   and solved to give the fluxes.
 !
 !- ---------------------------------------------------------------------
+MODULE two_stream_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TWO_STREAM_MOD'
+CONTAINS
 SUBROUTINE two_stream(ierr                                              &
     , control, bound                                                    &
 !                 Atmospheric Properties
@@ -52,6 +56,10 @@ SUBROUTINE two_stream(ierr                                              &
                      ip_scatter_approx, ip_scatter_full
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE column_solver_mod, ONLY: column_solver
+  USE ir_source_mod, ONLY: ir_source
+  USE two_coeff_fast_lw_mod, ONLY: two_coeff_fast_lw
+  USE two_coeff_mod, ONLY: two_coeff
 
   IMPLICIT NONE
 
@@ -152,12 +160,11 @@ SUBROUTINE two_stream(ierr                                              &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'TWO_STREAM'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Calculate the two-stream coefficients.
   IF ( (i_scatter_method == ip_scatter_full) .OR.                       &
        (i_scatter_method == ip_scatter_approx) ) THEN
-! DEPENDS ON: two_coeff
     CALL two_coeff(ierr, control                                        &
       , n_profile, 1, n_layer                                           &
       , i_2stream                                                       &
@@ -169,7 +176,6 @@ SUBROUTINE two_stream(ierr                                              &
       )
   ELSE IF ( (i_scatter_method == ip_no_scatter_abs) .OR.                &
             (i_scatter_method == ip_no_scatter_ext) ) THEN
-! DEPENDS ON: two_coeff_fast_lw
     CALL two_coeff_fast_lw(n_profile, 1, n_layer                        &
       , l_ir_source_quad, tau                                           &
       , trans, source_coeff                                             &
@@ -179,7 +185,6 @@ SUBROUTINE two_stream(ierr                                              &
 
 ! Calculate the appropriate source terms.
   IF (isolir == ip_infra_red) THEN
-! DEPENDS ON: ir_source
     CALL ir_source(n_profile, 1, n_layer                                &
       , source_coeff, diff_planck                                       &
       , l_ir_source_quad, diff_planck_2                                 &
@@ -188,7 +193,6 @@ SUBROUTINE two_stream(ierr                                              &
       )
   END IF
 
-! DEPENDS ON: column_solver
   CALL column_solver(ierr, control, bound, sph%common, sph%allsky       &
     , n_profile, n_layer                                                &
     , i_scatter_method, i_solver                                        &
@@ -202,6 +206,7 @@ SUBROUTINE two_stream(ierr                                              &
     , nd_profile, nd_layer, nd_source_coeff)
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE two_stream
+END MODULE two_stream_mod

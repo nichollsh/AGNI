@@ -144,36 +144,35 @@ Subroutine size_integral_90 &
 
      FUNCTION proj_area_particle &
               (dimen, i_measure, i_shape, ierr, DBGeom) RESULT(proj_area)
-	      
-	USE realtype_rd
-	USE def_db_crystal_geometry
+
+        USE realtype_rd
+        USE def_db_crystal_geometry
 
         INTEGER, Intent(IN) :: i_shape
-	INTEGER, Intent(IN) :: i_measure
-	REAL  (RealK), Intent(IN) :: dimen
+        INTEGER, Intent(IN) :: i_measure
+        REAL  (RealK), Intent(IN) :: dimen
         TYPE  (STR_db_cryst_geom), Intent(IN), Optional :: DBGeom
         REAL  (RealK) :: proj_area
         INTEGER, Intent(InOut) :: ierr
-		    
+
      END FUNCTION proj_area_particle
 
      FUNCTION volume_particle &
               (dimen, i_measure, i_shape, ierr, DBGeom) RESULT(volume)
-     
+
         USE realtype_rd
         USE def_db_crystal_geometry
-       
-	
-	INTEGER, Intent(IN) :: i_shape
+
+        INTEGER, Intent(IN) :: i_shape
         INTEGER, Intent(IN) :: i_measure
-	REAL  (RealK), Intent(IN) :: dimen
-	INTEGER, Intent(InOut) :: ierr
-	TYPE  (STR_db_cryst_geom), Intent(IN), Optional :: DBGeom
+        REAL  (RealK), Intent(IN) :: dimen
+        INTEGER, Intent(InOut) :: ierr
+        TYPE  (STR_db_cryst_geom), Intent(IN), Optional :: DBGeom
         REAL  (RealK) :: volume
-	
+
      END FUNCTION volume_particle
   END INTERFACE
-  
+
 !  
 ! - End Of Header
 !

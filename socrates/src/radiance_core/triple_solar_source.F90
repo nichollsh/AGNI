@@ -4,17 +4,18 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set the solar solar terms in a triple column.
+! Subroutine to set the solar solar terms in a triple column.
 !
 ! Method:
 !   The direct beam is calculated by propagating down through
 !   the column. These direct fluxes are used to define the
 !   source terms in each layer.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE triple_solar_source_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TRIPLE_SOLAR_SOURCE_MOD'
+CONTAINS
 SUBROUTINE triple_solar_source(control, bound                           &
      , n_profile, n_layer, n_cloud_top                                  &
      , n_region, flux_inc_direct                                        &
@@ -150,7 +151,7 @@ SUBROUTINE triple_solar_source(control, bound                           &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='TRIPLE_SOLAR_SOURCE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The clear and cloudy direct fluxes are calculated separately
 ! and added together to form the total direct flux.
@@ -405,6 +406,7 @@ SUBROUTINE triple_solar_source(control, bound                           &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE triple_solar_source
+END MODULE triple_solar_source_mod

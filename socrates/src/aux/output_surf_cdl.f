@@ -36,7 +36,7 @@
 !
 !     Declaration of variables:
 !
-      INTEGER	!,Intent(OUT)
+      INTEGER   !,Intent(OUT)
      &    ierr
 !            Error flag
 !
@@ -53,7 +53,7 @@
      &  , nd_brdf_basis_fnc
 !           Allowed size for basis functions
 !
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    file_name*(*)
 !           Name of the file to be written
 !
@@ -75,7 +75,7 @@
 !           Longitudes
 !
 !     The field:
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    field_name*(*)
 !           Name of the field to be written
      &  , field_type*(*)

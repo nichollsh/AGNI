@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate the product of CG and KAPPA.
+! Subroutine to calculate the product of CG and KAPPA.
 !
 ! Purpose:
 !   This routine calculates a sum of products of hemispheric
@@ -20,10 +20,11 @@
 !   consecutive values, so we map into the actual array as
 !       (l', l) --> ( (l'-m+2)/2, (l-m+1) )
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE cg_kappa_ms_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CG_KAPPA_MS_MOD'
+CONTAINS
 SUBROUTINE cg_kappa_ms(ms, ls_trunc, ls_brdf_trunc                      &
     , cg_coeff, kappa                                                   &
     , cgk                                                               &
@@ -79,7 +80,7 @@ SUBROUTINE cg_kappa_ms(ms, ls_trunc, ls_brdf_trunc                      &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CG_KAPPA_MS'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Consider first the case where l+m is even. In this case the
 ! documented formula is applied directly, with the omission
@@ -113,6 +114,7 @@ SUBROUTINE cg_kappa_ms(ms, ls_trunc, ls_brdf_trunc                      &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE cg_kappa_ms
+END MODULE cg_kappa_ms_mod

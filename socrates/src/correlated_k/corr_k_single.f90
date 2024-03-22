@@ -214,7 +214,7 @@ SUBROUTINE corr_k_single &
   REAL  (RealK), Intent(OUT), Dimension(:), Target :: k_opt_self
 !   Optimal self-broadened continuum absorption coefficient
   REAL  (RealK), Intent(OUT), Dimension(:), Target :: k_opt_frn
-!   Optimal self-broadened continuum absorption coefficient
+!   Optimal foreign-broadened continuum absorption coefficient
 !
 ! The scaling function:
   INTEGER, Intent(IN) :: i_type_residual
@@ -439,6 +439,8 @@ SUBROUTINE corr_k_single &
 !   Error norm for fitting
   REAL  (RealK) :: rms_residual
 !   R.m.s. residual error in transmission
+  REAL  (RealK) :: grid_offset
+!   Offset of externally supplied wavenumber grid
 
   LOGICAL :: l_debug = .FALSE.
 !  LOGICAL :: l_debug = .TRUE.
@@ -765,7 +767,8 @@ SUBROUTINE corr_k_single &
 ! Check that band limits agree with wavenumber grid in file. Note that the
 ! use of a tolerance of 1e-9 due to use of the format e16.9 for wavelengths
 ! in the spectral file
-  DO ib=1,n_band
+  DO ibb=1, n_selected_band
+    ib=list_band(ibb)
     IF (abs(band_min(ib)-(nint((band_min(ib)-nu_band_adjust)/nu_inc)*nu_inc + &
       nu_band_adjust)) >= 1.0E-09_RealK*band_min(ib) .OR. &
       abs(band_max(ib)-(nint((band_max(ib)-nu_band_adjust)/nu_inc)*nu_inc + &
@@ -775,6 +778,21 @@ SUBROUTINE corr_k_single &
 !     of increments
       band_min(ib) = ANINT(1.0_RealK/(nu_inc*wavelength_long(ib)))*nu_inc
       band_max(ib) = ANINT(1.0_RealK/(nu_inc*wavelength_short(ib)))*nu_inc
+
+      IF (l_lbl_exist) THEN
+        ! Ensure externally supplied grid aligns with band increments
+        grid_offset = MINVAL(nu_wgt_all - band_min(ib), &
+          mask=(nu_wgt_all - band_min(ib) >= 1.0E-09_RealK))
+        IF (grid_offset > nu_inc + 1.0E-09_RealK) THEN
+          WRITE(cmessage,'(a,i0)') &
+            'The line-by-line file does not contain sufficient data'//&
+            ' for band ', ib
+          ierr = i_err_fatal
+          CALL ereport(RoutineName, ierr, cmessage)
+        END IF
+        band_min(ib) = band_min(ib) + grid_offset - nu_inc/2.0_RealK
+        band_max(ib) = band_max(ib) + grid_offset - nu_inc/2.0_RealK
+      END IF
 
       WRITE(*,'(a,i3,a,2f16.3,a)') 'Band ', ib, ' limits adjusted to:', &
         band_min(ib), band_max(ib), ' m-1'
@@ -1938,6 +1956,7 @@ CONTAINS
 !
 !
   SUBROUTINE apply_response_int
+    USE spline_evaluate_mod, ONLY: spline_evaluate
 !
 !
     IMPLICIT NONE 

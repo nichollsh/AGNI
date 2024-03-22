@@ -7,8 +7,8 @@
 !+ Subroutine to bracket a point in an array of wavelengths.
 !
 ! Method:
-!	An array of points is searched to find those bracketing
-!	a given wavelength.
+!   An array of points is searched to find those bracketing
+!   a given wavelength.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE point_bracket(lambda

@@ -13,6 +13,9 @@
 !   efficiency.
 !
 !- ---------------------------------------------------------------------
+MODULE quicksort_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE quicksort(n_elem, a_array, b_array)
 
   USE realtype_rd, ONLY: RealK
@@ -188,3 +191,4 @@ SUBROUTINE quicksort(n_elem, a_array, b_array)
   END IF
 
 END SUBROUTINE quicksort
+END MODULE quicksort_mod

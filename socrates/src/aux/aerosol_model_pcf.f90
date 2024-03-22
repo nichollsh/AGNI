@@ -54,15 +54,15 @@ MODULE aerosol_model_pcf
     Dimension(NPD_aerosol_component, NPD_aerosol_model) :: &
     fraction_component = RESHAPE( (/ &
     0.61_RealK, 0.17_RealK, 0.0_RealK, 0.22_RealK, 0.0_RealK, 0.0_RealK, &
-      (0.0_RealK, im=1,NPD_aerosol_component-6) &
+      (0.0_RealK, im=1,NPD_aerosol_component-6), &
     0.29_RealK, 0.70_RealK, 0.0_RealK, 0.01_RealK, 0.0_RealK, 0.0_RealK, &
-      (0.0_RealK, im=1,NPD_aerosol_component-6) &
+      (0.0_RealK, im=1,NPD_aerosol_component-6), &
     0.05_RealK, 0.0_RealK, 0.95_RealK, 0.0_RealK, 0.0_RealK, 0.0_RealK, &
-      (0.0_RealK, im=1,NPD_aerosol_component-6) &
+      (0.0_RealK, im=1,NPD_aerosol_component-6), &
     0.0_RealK, 0.0_RealK, 0.0_RealK, 0.0_RealK, 0.0_RealK, 1.0_RealK, &
-      (0.0_RealK, im=1,NPD_aerosol_component-6) &
+      (0.0_RealK, im=1,NPD_aerosol_component-6), &
     0.0_RealK, 0.0_RealK, 0.0_RealK, 0.0_RealK, 1.0_RealK, 0.0_RealK, &
-      (0.0_RealK, im=1,NPD_aerosol_component-6) &
+      (0.0_RealK, im=1,NPD_aerosol_component-6), &
     0.0_RealK, 0.0_RealK, 0.0_RealK, 0.0_RealK, 0.0_RealK, 1.0_RealK, &
       (0.0_RealK, im=1,NPD_aerosol_component-6) /), &
     (/ NPD_aerosol_component, NPD_aerosol_model /) )

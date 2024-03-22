@@ -21,6 +21,7 @@ FUNCTION number_particle_90 &
   USE error_pcf
   USE rad_ccf, ONLY: pi
   USE max_size_acf
+  USE spline_evaluate_mod, ONLY: spline_evaluate
 !
 !
   IMPLICIT NONE
@@ -66,10 +67,6 @@ FUNCTION number_particle_90 &
   REAL  (RealK), Allocatable, Dimension(:) :: zeros
 !   Dummy array of zeros to make splining routine behave like a 
 !   linear fit.
-!
-! Subroutines called:
-  EXTERNAL spline_evaluate
-!
 !
 !
 ! A cutoff is placed at a prescribed limit.

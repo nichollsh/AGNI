@@ -7,7 +7,7 @@
 !+ Function to determine whether a line is blank.
 !
 ! Method:
-!	Straightforward
+!   Straightforward
 !
 !- ---------------------------------------------------------------------
       function non_blank(line)
@@ -18,7 +18,7 @@
 !
 !
 !     Dummy arguments
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    line*(*)
 !           Input line
 !

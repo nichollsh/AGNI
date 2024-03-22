@@ -7,6 +7,10 @@
 ! Subroutine to set the pentadiagonal matrix for the fluxes.
 !
 !- ---------------------------------------------------------------------
+MODULE set_matrix_pentadiagonal_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SET_MATRIX_PENTADIAGONAL_MOD'
+CONTAINS
 SUBROUTINE set_matrix_pentadiagonal(n_profile, n_layer                  &
      , trans, reflect                                                   &
      , s_down, s_up                                                     &
@@ -74,7 +78,7 @@ SUBROUTINE set_matrix_pentadiagonal(n_profile, n_layer                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SET_MATRIX_PENTADIAGONAL'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The top boundary condition:
   DO l=1, n_profile
@@ -117,6 +121,7 @@ SUBROUTINE set_matrix_pentadiagonal(n_profile, n_layer                  &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE set_matrix_pentadiagonal
+END MODULE set_matrix_pentadiagonal_mod

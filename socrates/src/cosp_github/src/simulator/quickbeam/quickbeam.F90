@@ -297,7 +297,7 @@ contains
                zlev_half(:,nlevels:1:-1),Ze_tot_non(:,:,nlevels:1:-1),llm,vgrid_zl(llm:1:-1),&
                vgrid_zu(llm:1:-1),Ze_noni(:,:,llm:1:-1),log_units=.true.)
           ! Compute the zstep distance between two atmopsheric layers
-	  zstep = vgrid_zl(1)-vgrid_zl(2)
+          zstep = vgrid_zl(1)-vgrid_zl(2)
           ! Now call routine to generate diagnostics.
           call cloudsat_precipOccurence(Npoints, Ncolumns, llm, N_HYDRO, Ze_toti, Ze_noni, &
                land, surfelev, t2m, fracPrecipIce, cloudsat_precip_cover, cloudsat_pia, zstep)
@@ -373,7 +373,7 @@ contains
     real(wp),dimension(Npoints,nCloudsatPrecipClass),intent(out) :: &
          cloudsat_precip_cover ! Model precip rate in by CloudSat precip flag
     real(wp),dimension(Npoints),intent(out) :: &
-         cloudsat_pia          ! Cloudsat path integrated attenuation			        
+         cloudsat_pia          ! Cloudsat path integrated attenuation
 
     ! Local variables 
     integer,dimension(Npoints,Ncolumns) :: &
@@ -464,11 +464,11 @@ contains
           
           ! ################################################################################
           ! 2) Land points.
-	  !    *NOTE* For land points we go up a layer higher, so cloudsat_preclvl_index(i)-1
-	  !                  
+          !    *NOTE* For land points we go up a layer higher, so cloudsat_preclvl_index(i)-1
+          !                  
           ! ################################################################################
           if (land(i) .eq. 1) then             
-	     ! 2a) Compute the PIA in all profiles containing hydrometeors
+             ! 2a) Compute the PIA in all profiles containing hydrometeors
              if ( (Ze_non_out(i,pr,cloudsat_preclvl_index(i)-1).gt.-100) .and. &
                   (Ze_out(i,pr,cloudsat_preclvl_index(i)-1).gt.-100) ) then
                 if ( (Ze_non_out(i,pr,cloudsat_preclvl_index(i)-1).lt.100) .and. &

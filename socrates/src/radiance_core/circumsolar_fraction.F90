@@ -15,6 +15,9 @@
 !  and omega. This is consistent with the treatment of Delta-scaling.
 !
 !----------------------------------------------------------------------
+MODULE circumsolar_fraction_mod
+IMPLICIT NONE
+CONTAINS
 SUBROUTINE circumsolar_fraction(n_profile                               &
     , indx, half_angle                                                  &
     , asymmetry_factor                                                  &
@@ -83,3 +86,4 @@ SUBROUTINE circumsolar_fraction(n_profile                               &
   END DO
 ! 
 END SUBROUTINE circumsolar_fraction
+END MODULE circumsolar_fraction_mod

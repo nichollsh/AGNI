@@ -15,6 +15,10 @@
 !   and an appropriate solver is called.
 !
 !- ---------------------------------------------------------------------
+MODULE mix_column_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MIX_COLUMN_MOD'
+CONTAINS
 SUBROUTINE mix_column(ierr                                              &
      , control, bound                                                   &
 !                 Atmospheric properties
@@ -68,8 +72,15 @@ SUBROUTINE mix_column(ierr                                              &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
-
+  USE column_solver_mod, ONLY: column_solver
   USE set_n_source_coeff_mod, ONLY: set_n_source_coeff
+  USE ir_source_mod, ONLY: ir_source
+  USE mix_app_scat_mod, ONLY: mix_app_scat
+  USE mixed_solar_source_mod, ONLY: mixed_solar_source
+  USE solver_mix_direct_mod, ONLY: solver_mix_direct
+  USE solver_mix_direct_hogan_mod, ONLY: solver_mix_direct_hogan
+  USE two_coeff_mod, ONLY: two_coeff
+  USE two_coeff_cloud_mod, ONLY: two_coeff_cloud
 
   IMPLICIT NONE
 
@@ -279,7 +290,7 @@ SUBROUTINE mix_column(ierr                                              &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'MIX_COLUMN'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the pointers to the various types of transition.
   i_ovp_dn_ff=3*k_clr-2
@@ -297,7 +308,6 @@ SUBROUTINE mix_column(ierr                                              &
 ! Set the number of source coefficients for the approximation
   n_source_coeff=set_n_source_coeff(isolir, l_ir_source_quad)
 
-! DEPENDS ON: two_coeff
   CALL two_coeff(ierr, control                                          &
     , n_profile, 1, n_cloud_top-1                                       &
     , i_2stream                                                         &
@@ -327,7 +337,6 @@ SUBROUTINE mix_column(ierr                                              &
 
   IF (isolir == ip_infra_red) THEN
 
-! DEPENDS ON: ir_source
     CALL ir_source(n_profile, 1, n_layer                                &
       , source_coeff_free, diff_planck                                  &
       , l_ir_source_quad, diff_planck_2                                 &
@@ -365,7 +374,6 @@ SUBROUTINE mix_column(ierr                                              &
 ! dimension of arrays of optical properties.
 
 
-! DEPENDS ON: two_coeff_cloud
   CALL two_coeff_cloud(ierr, control                                    &
     , n_profile, n_cloud_top, n_layer                                   &
     , i_2stream, n_source_coeff                                         &
@@ -405,7 +413,6 @@ SUBROUTINE mix_column(ierr                                              &
 
   IF (isolir == ip_solar) THEN
 
-! DEPENDS ON: mixed_solar_source
     CALL mixed_solar_source(control, bound                              &
       , n_profile, n_layer, n_cloud_top                                 &
       , flux_inc_direct                                                 &
@@ -432,7 +439,6 @@ SUBROUTINE mix_column(ierr                                              &
 
   CASE (ip_solver_mix_app_scat)
 
-! DEPENDS ON: mix_app_scat
     CALL mix_app_scat(n_profile, n_layer, n_cloud_top                   &
       , trans_free, reflect_free, s_down_free, s_up_free                &
       , trans_cloud, reflect_cloud                                      &
@@ -476,7 +482,6 @@ SUBROUTINE mix_column(ierr                                              &
     END IF
 
     IF (i_solver == ip_solver_mix_direct) THEN
-! DEPENDS ON: solver_mix_direct
       CALL solver_mix_direct(n_profile, n_layer, n_cloud_top            &
       , trans_free, reflect_free, s_down_free, s_up_free                &
       , trans_cloud, reflect_cloud                                      &
@@ -497,7 +502,6 @@ SUBROUTINE mix_column(ierr                                              &
       )
 
     ELSE IF (i_solver == ip_solver_mix_direct_hogan) THEN
-! DEPENDS ON: solver_mix_direct_hogan
       CALL solver_mix_direct_hogan(n_profile, n_layer, n_cloud_top      &
       , trans_free, reflect_free, s_down_free, s_up_free                &
       , trans_cloud, reflect_cloud                                      &
@@ -531,7 +535,6 @@ SUBROUTINE mix_column(ierr                                              &
 
   IF (l_clear) THEN
 
-! DEPENDS ON: column_solver
     CALL column_solver(ierr, control, bound, sph%common, sph%clear      &
       , n_profile, n_layer                                              &
       , i_scatter_method, i_solver_clear                                &
@@ -548,6 +551,7 @@ SUBROUTINE mix_column(ierr                                              &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE mix_column
+END MODULE mix_column_mod

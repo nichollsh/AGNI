@@ -23,6 +23,7 @@ Subroutine get_refract_index &
   USE def_std_io_icf
   USE error_pcf
   USE realtype_rd
+  USE spline_fit_mod, ONLY: spline_fit
 !
   IMPLICIT NONE
 !

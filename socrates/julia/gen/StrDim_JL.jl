@@ -66,6 +66,7 @@
             :nd_region,
             :nd_point_tile,
             :nd_tile,
+            :nd_k_term_inner,
         ]
 
         return names
@@ -117,6 +118,7 @@
             :nd_region,
             :nd_point_tile,
             :nd_tile,
+            :nd_k_term_inner,
         )
             val = Ref{Cint}()
             field_ok = ccall(
@@ -175,6 +177,7 @@
             :nd_region,
             :nd_point_tile,
             :nd_tile,
+            :nd_k_term_inner,
         )
                     
             field_ok = ccall(

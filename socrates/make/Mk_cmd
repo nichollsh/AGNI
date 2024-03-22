@@ -1,15 +1,15 @@
 #
-# Pathnames for Linux on an Intel x86_64 platform. 
-# Tested with Ubuntu.
-# 
+# Pathnames for MacOS on an Apple Silicon ARM platform.
+# Tested with Ventura.
+#
 
 FORTCOMP        = gfortran -O3 -fPIC -c
 LINK            = gfortran -O3 -fPIC
 LIBLINK         = ar rvu
-INCCDF_PATH     = /usr/include/
-LIBCDF_PATH     = /usr/lib/
+INCCDF_PATH     = /opt/homebrew/Cellar/netcdf-fortran/4.6.1/include
+LIBCDF_PATH     = /opt/homebrew/Cellar/netcdf-fortran/4.6.1/lib
 LIBCDF_NAME     = netcdff
-OMPARG          = -fopenmp 
+OMPARG          = -fopenmp
 
 LIBSUFFIX       = a
 

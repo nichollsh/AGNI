@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set arrays describing the spherical truncation.
+! Subroutine to set arrays describing the spherical truncation.
 !
 ! Purpose:
 !   This routine sets an arrays of pointers to control the allocation
@@ -13,10 +13,11 @@
 ! Method:
 !   Straightforward.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE set_truncation_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SET_TRUNCATION_MOD'
+CONTAINS
 SUBROUTINE set_truncation(ierr                                          &
     , i_truncation, ls_global_trunc                                     &
     , ls_max_order, ls_local_trunc                                      &
@@ -80,7 +81,7 @@ SUBROUTINE set_truncation(ierr                                          &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'SET_TRUNCATION'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Carry out a preliminary check that the truncation is appropriate.
   IF ( (i_truncation == ip_trunc_azim_sym).AND.                         &
@@ -187,6 +188,7 @@ SUBROUTINE set_truncation(ierr                                          &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE set_truncation
+END MODULE set_truncation_mod

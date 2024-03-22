@@ -13,6 +13,10 @@
 !
 !-----------------------------------------------------------------------
 
+MODULE inter_pt_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'INTER_PT_MOD'
+CONTAINS
 SUBROUTINE inter_pt(nd_profile, nd_layer                                &
      , n_profile, n_layer, gas_mix_ratio                                &
      , p, t, fac00, fac01, fac10, fac11                                 &
@@ -229,7 +233,7 @@ REAL, PARAMETER ::       &
    5.36000e+00, 5.56000e+00, 5.76000e+00, 5.96000e+00, 6.16000e+00,     &
    6.36000e+00, 6.56000e+00, 6.76000e+00, 6.96000e+00/
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO i=1, n_layer
     DO l=1, n_profile
@@ -309,5 +313,6 @@ REAL, PARAMETER ::       &
     END DO
   END DO
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 END SUBROUTINE inter_pt
+END MODULE inter_pt_mod

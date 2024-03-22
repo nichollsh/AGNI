@@ -4,13 +4,17 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate basic coefficients in two-stream equations.
+! Subroutine to calculate basic coefficients in two-stream equations.
 !
 ! Method:
 !   Depending on the two-stream equations employed, the
 !   appropriate coefficients for the fluxes are calculated.
 !
 !- ---------------------------------------------------------------------
+MODULE two_coeff_basic_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'TWO_COEFF_BASIC_MOD'
+CONTAINS
 SUBROUTINE two_coeff_basic(ierr                                         &
      , n_profile, i_layer_first, i_layer_last                           &
      , i_2stream                                                        &
@@ -90,7 +94,7 @@ SUBROUTINE two_coeff_basic(ierr                                         &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'TWO_COEFF_BASIC'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   IF (i_2stream == ip_eddington) THEN
     DO i=i_layer_first, i_layer_last
@@ -201,6 +205,7 @@ SUBROUTINE two_coeff_basic(ierr                                         &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE two_coeff_basic
+END MODULE two_coeff_basic_mod

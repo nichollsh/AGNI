@@ -7,7 +7,7 @@
 !+ Subroutine to read a blank-delimited substring from a string.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE read_word(ierr
@@ -39,7 +39,7 @@
       INTEGER, Intent(INOUT) ::
      &    i_begin
 !           Beginning of word
-      CHARACTER	!, Intent(OUT)
+      CHARACTER !, Intent(OUT)
      &    word*16
 !           Word read (right justified in field)
       INTEGER, Intent(OUT) ::

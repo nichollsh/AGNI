@@ -7,9 +7,9 @@
 !+ Program to form a CDL-file of mid-points of layers.
 !
 ! Method:
-!	A CDL-file is read in, giving the boundaries of layers.
-!	A CDL-file with levels at the mid-points of these layers 
-!	is written out with a zero field.
+!   A CDL-file is read in, giving the boundaries of layers.
+!   A CDL-file with levels at the mid-points of these layers 
+!   is written out with a zero field.
 !
 !- ---------------------------------------------------------------------
       PROGRAM mid_point

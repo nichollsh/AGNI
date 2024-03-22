@@ -7,6 +7,10 @@
 ! Convert differential IR radiances or fluxes to actual ones.
 !
 !------------------------------------------------------------------------------
+MODULE adjust_ir_radiance_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'ADJUST_IR_RADIANCE_MOD'
+CONTAINS
 SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
     planck, i_band, l_clear)
 
@@ -61,7 +65,7 @@ SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='ADJUST_IR_RADIANCE'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   IF (control%l_map_sub_bands) THEN
     ! Adjust the fluxes with sub-bands mapping to channels
@@ -162,7 +166,7 @@ SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
 
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 
 CONTAINS
@@ -233,3 +237,4 @@ SUBROUTINE adjust_ir_channel()
 END SUBROUTINE adjust_ir_channel
 
 END SUBROUTINE adjust_ir_radiance
+END MODULE adjust_ir_radiance_mod

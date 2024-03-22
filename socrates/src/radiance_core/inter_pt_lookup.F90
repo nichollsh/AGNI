@@ -9,6 +9,10 @@
 !
 !-----------------------------------------------------------------------
 
+MODULE inter_pt_lookup_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'INTER_PT_LOOKUP_MOD'
+CONTAINS
 SUBROUTINE inter_pt_lookup(nd_profile, nd_layer, nd_pre, nd_tmp         &
      , nd_gas_frac, nd_species, nd_species_sb                           &
      , n_profile, n_layer, n_gas_frac, n_absorb                         &
@@ -131,7 +135,7 @@ SUBROUTINE inter_pt_lookup(nd_profile, nd_layer, nd_pre, nd_tmp         &
      , j_sb
 !       Gas loop index in arrays with self-broadened
 
-  REAL, PARAMETER :: eps = EPSILON(1.0_RealK)
+  REAL (RealK), PARAMETER :: eps = EPSILON(1.0_RealK)
 
   INTEGER(KIND=jpim), PARAMETER :: zhook_in  = 0
   INTEGER(KIND=jpim), PARAMETER :: zhook_out = 1
@@ -139,7 +143,7 @@ SUBROUTINE inter_pt_lookup(nd_profile, nd_layer, nd_pre, nd_tmp         &
 
   CHARACTER(LEN=*), PARAMETER :: RoutineName='INTER_PT_LOOKUP'
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   p_lookup_min = p_lookup(1)      + MAX(ABS(p_lookup(1)     )*eps, eps)
   p_lookup_max = p_lookup(nd_pre) - MAX(ABS(p_lookup(nd_pre))*eps, eps)
@@ -262,6 +266,7 @@ SUBROUTINE inter_pt_lookup(nd_profile, nd_layer, nd_pre, nd_tmp         &
     END DO
   END IF
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE inter_pt_lookup
+END MODULE inter_pt_lookup_mod

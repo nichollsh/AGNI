@@ -27,11 +27,11 @@
      &  , i_sph_algorithm, n_order_phase_solar
      &  , n_direction, direction
      &  , n_viewing_level, viewing_level, i_sph_mode
-!			Derived dimensions
+!           Derived dimensions
      &  , nd_sph_coeff
      &  , nd_2sg_profile, nd_flux_profile
      &  , nd_radiance_profile, nd_j_profile, nd_viewing_level
-!			Sizes of arrays
+!           Sizes of arrays
      &  , nd_latitude, nd_longitude
      &  , nd_profile, nd_layer, nd_direction, nd_max_order
      &  , nd_cdl_dimen, nd_cdl_dimen_size, nd_cdl_data, nd_cdl_var
@@ -80,7 +80,7 @@
 !
 !
 !     Input files:
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    base_name*80
 !           Base name of input files
       INTEGER, Intent(IN) ::

@@ -7,10 +7,10 @@
 !+ Program to scale a CDL-field.
 !
 ! Method:
-!	A CDL-field is read in. A scaling factor and a range of
-!	pressures are obtained. Within the range of pressures the
-!	field is multiplied by the scaling factor and written out
-!	with a new title.
+!   A CDL-field is read in. A scaling factor and a range of
+!   pressures are obtained. Within the range of pressures the
+!   field is multiplied by the scaling factor and written out
+!   with a new title.
 !
 !- ---------------------------------------------------------------------
       PROGRAM scale_field

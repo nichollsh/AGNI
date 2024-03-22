@@ -4,8 +4,8 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT****************************************
 !
-!  Subroutine to correct optical scattering properties for cloud
-!  inhomogeneities with ip_cairns.
+! Subroutine to correct optical scattering properties for cloud
+! inhomogeneities with ip_cairns.
 !
 ! Method:
 !   Straight forward. Applying Eq. (11) from Cairns et al., Journal of
@@ -15,6 +15,10 @@
 !   single condensed component of the cloud.
 !
 !- -----------------------------------------------------------------------------
+MODULE opt_prop_inhom_corr_cairns_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'OPT_PROP_INHOM_CORR_CAIRNS_MOD'
+CONTAINS
 SUBROUTINE opt_prop_inhom_corr_cairns(                                         &
       n_layer, n_cloud_top, n_cloud_profile, i_cloud_profile                   &
     , l_rescale, n_order_forward                                               &
@@ -97,7 +101,7 @@ SUBROUTINE opt_prop_inhom_corr_cairns(                                         &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'OPT_PROP_INHOM_CORR_CAIRNS'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Apply inhomogeneity corrections to optical scattering parameters
 
@@ -134,6 +138,7 @@ SUBROUTINE opt_prop_inhom_corr_cairns(                                         &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE opt_prop_inhom_corr_cairns
+END MODULE opt_prop_inhom_corr_cairns_mod

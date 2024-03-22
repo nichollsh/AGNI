@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to solve for fluxes treating scattering approximately.
+! Subroutine to solve for fluxes treating scattering approximately.
 !
 ! Method:
 !   The routine is applicable in the infra-red. downward
@@ -13,10 +13,11 @@
 !   calculated using the previously calculated downward fluxes
 !   in the reflected terms.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE mix_app_scat_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'MIX_APP_SCAT_MOD'
+CONTAINS
 SUBROUTINE mix_app_scat(n_profile, n_layer, n_cloud_top                 &
      , t_free, r_free, s_down_free, s_up_free                           &
      , t_cloud, r_cloud, s_down_cloud, s_up_cloud                       &
@@ -129,7 +130,7 @@ SUBROUTINE mix_app_scat(n_profile, n_layer, n_cloud_top                 &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='MIX_APP_SCAT'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The arrays flux_down and flux_up will eventually contain the total
 ! fluxes, but initially they are used for the clear fluxes.
@@ -244,6 +245,7 @@ SUBROUTINE mix_app_scat(n_profile, n_layer, n_cloud_top                 &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE mix_app_scat
+END MODULE mix_app_scat_mod

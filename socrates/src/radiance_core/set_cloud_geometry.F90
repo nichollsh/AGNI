@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set geometry of clouds.
+! Subroutine to set geometry of clouds.
 !
 ! Method:
 !   For use in multi-column mode arrays are set for each layer
@@ -12,10 +12,11 @@
 !   cloudy fractions. The topmost cloudy layers are also
 !   detected.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE set_cloud_geometry_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SET_CLOUD_GEOMETRY_MOD'
+CONTAINS
 SUBROUTINE set_cloud_geometry(n_profile, n_layer                        &
     , l_global_cloud_top, w_cloud                                       &
     , n_cloud_top, n_cloud_profile, i_cloud_profile                     &
@@ -77,7 +78,7 @@ SUBROUTINE set_cloud_geometry(n_profile, n_layer                        &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SET_CLOUD_GEOMETRY'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO i=id_ct, n_layer
     n_cloud_profile(i)=0
@@ -100,6 +101,7 @@ SUBROUTINE set_cloud_geometry(n_profile, n_layer                        &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE set_cloud_geometry
+END MODULE set_cloud_geometry_mod

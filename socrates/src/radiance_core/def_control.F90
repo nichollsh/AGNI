@@ -181,7 +181,7 @@ TYPE StrCtrl
 !   Flag for absorption by trans-OSSO
   LOGICAL :: l_yosos                                              = .FALSE.
 !   Flag for absorption by OSO-S
-  LOGICAL :: l_h2s	                                          = .FALSE.
+  LOGICAL :: l_h2s                                                = .FALSE.
 !   Flag for absorption by Hydrogen sulphide
   LOGICAL :: l_cocs                                               = .FALSE.
 !   Flag for absorption by Carbonyl sulphide
@@ -281,7 +281,7 @@ TYPE StrCtrl
   REAL (RealK) :: euler_factor                                    = rmdi
 !   Factor applied to the last term of an alternating series
   REAL (RealK) :: half_angle                                      = rmdi
-!   Half angle of FOV used for CSR fraction calculation 
+!   Half angle of FOV used for CSR fraction calculation
 
 ! Miscallaneous options
   LOGICAL :: l_tile                                               = .FALSE.

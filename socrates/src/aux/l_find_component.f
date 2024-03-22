@@ -7,7 +7,7 @@
 !+ Function to find whether an aerosol component is in a spectral file.
 !
 ! Method:
-!	Straightforward.
+!   Straightforward.
 !
 !- ---------------------------------------------------------------------
       FUNCTION l_find_component(n_aerosol, type_aerosol, i_component)

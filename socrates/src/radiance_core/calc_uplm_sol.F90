@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate Upsilon_l^m(0) for the solar direction.
+! Subroutine to calculate Upsilon_l^m(0) for the solar direction.
 !
 ! Purpose:
 !   This routine is called to determine the values of spherical
@@ -14,10 +14,11 @@
 !   As this routine is called only once speed is not too critical
 !   so direct calculation is used.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE calc_uplm_sol_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'CALC_UPLM_SOL_MOD'
+CONTAINS
 SUBROUTINE calc_uplm_sol(n_profile, ms_min, ms_max, ia_sph_mm           &
     , ls_local_trunc, zen_0, uplm_sol                                   &
     , nd_profile, nd_max_order, nd_sph_coeff)
@@ -85,7 +86,7 @@ SUBROUTINE calc_uplm_sol(n_profile, ms_min, ms_max, ia_sph_mm           &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='CALC_UPLM_SOL'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Note here that ZEN_0 holds the cosine of the zenith angle, so
 ! the cosine of the solar direction is actually -ZEN_0.
@@ -141,6 +142,7 @@ SUBROUTINE calc_uplm_sol(n_profile, ms_min, ms_max, ia_sph_mm           &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE calc_uplm_sol
+END MODULE calc_uplm_sol_mod

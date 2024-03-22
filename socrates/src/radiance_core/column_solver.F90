@@ -14,6 +14,10 @@
 !   with MCICA).
 !
 !- ---------------------------------------------------------------------
+MODULE column_solver_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'COLUMN_SOLVER_MOD'
+CONTAINS
 SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
     , n_profile, n_layer                                                &
     , i_scatter_method, i_solver_clear                                  &
@@ -40,8 +44,12 @@ SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
   USE parkind1, ONLY: jprb, jpim
   USE ereport_mod, ONLY: ereport
   USE errormessagelength_mod, ONLY: errormessagelength
-
+  USE band_solver_mod, ONLY: band_solver
   USE spherical_solar_source_mod, ONLY: spherical_solar_source
+  USE set_matrix_pentadiagonal_mod, ONLY: set_matrix_pentadiagonal
+  USE solar_source_mod, ONLY: solar_source
+  USE solver_homogen_direct_mod, ONLY: solver_homogen_direct
+  USE solver_no_scat_mod, ONLY: solver_no_scat
 
   IMPLICIT NONE
 
@@ -146,7 +154,7 @@ SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'COLUMN_SOLVER'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The source functions only need to be recalculated in the visible.
   IF (isolir == ip_solar) THEN
@@ -162,7 +170,6 @@ SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
           *sph_comp%flux_direct(l, n_layer+1)
       END DO
     ELSE
-      ! DEPENDS ON: solar_source
       CALL solar_source(control, bound, n_profile, n_layer,             &
         flux_inc_direct, trans_0_dir, trans_0, source_coeff,            &
         l_scale_solar, adjust_solar_ke,                                 &
@@ -186,7 +193,6 @@ SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
        (i_scatter_method == ip_no_scatter_ext) ) THEN
 
 !   Solve for the fluxes ignoring scattering
-! DEPENDS ON: solver_no_scat
     CALL solver_no_scat(n_profile, n_layer                              &
       , trans, s_down, s_up                                             &
       , albedo_surface_diff, flux_inc_down, d_planck_flux_surface       &
@@ -196,7 +202,6 @@ SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
   ELSE IF (i_solver_clear == ip_solver_pentadiagonal) THEN
 
 !   Calculate the elements of the matrix equations.
-! DEPENDS ON: set_matrix_pentadiagonal
     CALL set_matrix_pentadiagonal(n_profile, n_layer                    &
       , trans, reflect                                                  &
       , s_down, s_up                                                    &
@@ -208,7 +213,6 @@ SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
       )
     n_equation=2*n_layer+2
 
-! DEPENDS ON: band_solver
     CALL band_solver(n_profile, n_equation                              &
       , 2, 2                                                            &
       , a5, b                                                           &
@@ -220,7 +224,6 @@ SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
   ELSE IF (i_solver_clear == ip_solver_homogen_direct) THEN
 
 !   Solve for the fluxes in the column directly.
-! DEPENDS ON: solver_homogen_direct
     CALL solver_homogen_direct(n_profile, n_layer                       &
       , trans, reflect                                                  &
       , s_down, s_up                                                    &
@@ -240,6 +243,7 @@ SUBROUTINE column_solver(ierr, control, bound, sph_common, sph_comp     &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE column_solver
+END MODULE column_solver_mod

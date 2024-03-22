@@ -7,8 +7,8 @@
 !+ Function to check for the existence of the locking file.
 !
 ! Method:
-!	The inquire statement is used. an argument must be given
-!	to the function, otherwise it will not be called.
+!   The inquire statement is used. an argument must be given
+!   to the function, otherwise it will not be called.
 !
 !- ---------------------------------------------------------------------
       FUNCTION lock_code(l_apply)

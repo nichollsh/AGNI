@@ -4,15 +4,16 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to find single scattering properties of all regions.
+! Subroutine to find single scattering properties of all regions.
 !
 ! Method:
 !   Straightforward.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE single_scattering_all_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SINGLE_SCATTERING_ALL_MOD'
+CONTAINS
 SUBROUTINE single_scattering_all(i_scatter_method_band                  &
 !                 Atmospheric Properties
     , n_profile, n_layer, d_mass                                        &
@@ -29,6 +30,7 @@ SUBROUTINE single_scattering_all(i_scatter_method_band                  &
   USE def_ss_prop, ONLY: STR_ss_prop
   USE yomhook, ONLY: lhook, dr_hook
   USE parkind1, ONLY: jprb, jpim
+  USE single_scattering_mod, ONLY: single_scattering
 
   IMPLICIT NONE
 
@@ -90,14 +92,13 @@ SUBROUTINE single_scattering_all(i_scatter_method_band                  &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='SINGLE_SCATTERING_ALL'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Clear-sky properties:
 
 ! In the following call K_GAS_ABS can be used as if it had the
 ! smaller dimension ND_LAYER_CLR as long as the last dimension
 ! is over atmospheric layers.
-! DEPENDS ON: single_scattering
   CALL single_scattering(i_scatter_method_band                          &
     , n_profile, 1, n_cloud_top-1                                       &
     , d_mass                                                            &
@@ -130,6 +131,7 @@ SUBROUTINE single_scattering_all(i_scatter_method_band                  &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE single_scattering_all
+END MODULE single_scattering_all_mod

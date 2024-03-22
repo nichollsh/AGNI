@@ -7,8 +7,8 @@
 !+ Subroutine to read a single profile of raw data.
 !
 ! Method:
-!	The header is read to determine the contents. These are
-!	read and converted to S. I. units.
+!   The header is read to determine the contents. These are
+!   read and converted to S. I. units.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE read_raw_profile(ierr

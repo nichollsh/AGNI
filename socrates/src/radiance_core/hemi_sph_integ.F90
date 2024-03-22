@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to calculate hemispheric spherical integrals.
+! Subroutine to calculate hemispheric spherical integrals.
 !
 ! Purpose:
 !   This routine calculates hemispheric integrals of products
@@ -23,11 +23,11 @@
 !   The integrals are evaluated from the values of spherical
 !   harmonics and their derivatives at a polar angle of pi/2.
 !
-!
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE hemi_sph_integ_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'HEMI_SPH_INTEG_MOD'
+CONTAINS
 SUBROUTINE hemi_sph_integ(ls_trunc, ms, uplm_zero                       &
     , kappa                                                             &
     , nd_max_order                                                      &
@@ -77,7 +77,7 @@ SUBROUTINE hemi_sph_integ(ls_trunc, ms, uplm_zero                       &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='HEMI_SPH_INTEG'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! The outer loop is over l' where l'+m is odd. Indexing is done
 ! using the reduced indices l'+1-m and l+1-m.
@@ -91,6 +91,7 @@ SUBROUTINE hemi_sph_integ(ls_trunc, ms, uplm_zero                       &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE hemi_sph_integ
+END MODULE hemi_sph_integ_mod

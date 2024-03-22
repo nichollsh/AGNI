@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set clear-sky solar phase function.
+! Subroutine to set clear-sky solar phase function.
 !
 ! Method:
 !   The arrays of clear-sky forward scattering and the solar
@@ -13,10 +13,11 @@
 !   are combined to give unified arrays of clear-sky
 !   optical properties.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE copy_clr_sol_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'COPY_CLR_SOL_MOD'
+CONTAINS
 SUBROUTINE copy_clr_sol(n_profile, n_layer, n_cloud_top                 &
     , n_direction, l_rescale                                            &
     , forward_scatter_clr, phase_fnc_solar_clr                          &
@@ -98,7 +99,7 @@ SUBROUTINE copy_clr_sol(n_profile, n_layer, n_cloud_top                 &
   CHARACTER(LEN=*), PARAMETER :: RoutineName='COPY_CLR_SOL'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Above cloud top.
   DO i=1, n_cloud_top-1
@@ -129,6 +130,7 @@ SUBROUTINE copy_clr_sol(n_profile, n_layer, n_cloud_top                 &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE copy_clr_sol
+END MODULE copy_clr_sol_mod

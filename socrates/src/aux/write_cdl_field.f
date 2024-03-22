@@ -39,7 +39,7 @@
       REAL  (RealK), Intent(IN) ::
      &    data_fl(n_data)
 !           Values of floating-point data
-      CHARACTER	!, Intent(IN)
+      CHARACTER !, Intent(IN)
      &    name_data*(*)
 !           Name of the data variable
      &  , type_data*(*)

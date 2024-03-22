@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to aggregate clouds into regions.
+! Subroutine to aggregate clouds into regions.
 !
 ! Method:
 !       The clouds in a layer are combined in groups to form regions
@@ -12,10 +12,11 @@
 !       equation of transfer. The extents of these regions are also
 !       determined.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE aggregate_cloud_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'AGGREGATE_CLOUD_MOD'
+CONTAINS
 SUBROUTINE aggregate_cloud(ierr                                         &
      , n_profile, n_layer, n_cloud_top                                  &
      , i_cloud, i_cloud_representation, n_cloud_type                    &
@@ -101,7 +102,7 @@ SUBROUTINE aggregate_cloud(ierr                                         &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'AGGREGATE_CLOUD'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   IF ( (i_cloud == ip_cloud_triple).OR.                                 &
        (i_cloud == ip_cloud_part_corr_cnv) ) THEN
@@ -161,6 +162,7 @@ SUBROUTINE aggregate_cloud(ierr                                         &
   END IF
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE aggregate_cloud
+END MODULE aggregate_cloud_mod

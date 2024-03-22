@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-!  Subroutine to set weights for the C.F. along a direction.
+! Subroutine to set weights for the C.F. along a direction.
 !
 ! Purpose:
 !   The complementary function for the radiation involves unknown
@@ -14,10 +14,11 @@
 ! Method:
 !   Straightforward.
 !
-! Code Owner: Please refer to the UM file CodeOwners.txt
-! This file belongs in section: Radiance Core
-!
 !- ---------------------------------------------------------------------
+MODULE set_dirn_weights_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SET_DIRN_WEIGHTS_MOD'
+CONTAINS
 SUBROUTINE set_dirn_weights(n_profile                                   &
     , ms, ls_trunc, up_lm                                               &
     , n_direction, mu_v, azim_factor                                    &
@@ -219,7 +220,7 @@ SUBROUTINE set_dirn_weights(n_profile                                   &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'SET_DIRN_WEIGHTS'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
 ! Set the tolerances used in avoiding ill-conditioning, testing
 ! on any variable.
@@ -625,6 +626,7 @@ SUBROUTINE set_dirn_weights(n_profile                                   &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE set_dirn_weights
+END MODULE set_dirn_weights_mod

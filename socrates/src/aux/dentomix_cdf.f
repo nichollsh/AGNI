@@ -7,9 +7,9 @@
 !+ Program to convert densities to mass fractions.
 !
 ! Method:
-!	Fields are read in as netCDF files.
-!	The density of air is calculated from T and q whence
-!	the mixing ratio is calculated.
+!   Fields are read in as netCDF files.
+!   The density of air is calculated from T and q whence
+!   the mixing ratio is calculated.
 !
 !- ---------------------------------------------------------------------
       PROGRAM dentomix_cdf

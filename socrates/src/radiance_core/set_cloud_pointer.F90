@@ -12,6 +12,10 @@
 !   it is determined to which type of cloud they contribute.
 !
 !- ---------------------------------------------------------------------
+MODULE set_cloud_pointer_mod
+IMPLICIT NONE
+CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName = 'SET_CLOUD_POINTER_MOD'
+CONTAINS
 SUBROUTINE set_cloud_pointer(ierr                                       &
      , n_condensed, type_condensed, i_cloud_representation              &
      , l_drop, l_ice                                                    &
@@ -84,7 +88,7 @@ SUBROUTINE set_cloud_pointer(ierr                                       &
   CHARACTER (LEN=*), PARAMETER  :: RoutineName = 'SET_CLOUD_POINTER'
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_in,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 
   DO k=1, n_condensed
 
@@ -172,6 +176,7 @@ SUBROUTINE set_cloud_pointer(ierr                                       &
   END DO
 
 
-  IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
+  IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 
 END SUBROUTINE set_cloud_pointer
+END MODULE set_cloud_pointer_mod

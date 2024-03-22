@@ -286,11 +286,11 @@ CONTAINS
 ! Subroutine to remove weakly absorbing gases from bands.
 !
 ! Method:
-!	A tolerance for negelecting gaseous absorption is obtained.
-!	A typical amount of each gas in a column is given. For each
-!	band a test is made to see whether this amount of absorber
-!	gives a transmission close to 1 as defined by the tolerance.
-!	If so, the gas is removed from this spectral band.
+!   A tolerance for negelecting gaseous absorption is obtained.
+!   A typical amount of each gas in a column is given. For each
+!   band a test is made to see whether this amount of absorber
+!   gives a transmission close to 1 as defined by the tolerance.
+!   If so, the gas is removed from this spectral band.
 !
 !- ---------------------------------------------------------------------
   SUBROUTINE remove_weak

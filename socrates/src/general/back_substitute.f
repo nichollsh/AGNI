@@ -7,7 +7,7 @@
 !+ Subroutine to perfrom back-substitution in SVD.
 !
 ! Method:
-!	Straightforward back-substitution.
+!   Straightforward back-substitution.
 !
 !- ---------------------------------------------------------------------
       SUBROUTINE back_substitute(u, w, v
