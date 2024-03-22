@@ -68,7 +68,7 @@ for i in 1:run_len
     # Set PT profile 
     atmos.p_boa = p_boa
     atmosphere.generate_pgrid!(atmos)
-    atmos.tstar =       tsurf_arr[i]
+    atmos.tmp_surf =       tsurf_arr[i]
     atmos.tmpl[end] =   tsurf_arr[i]
 
     setpt.prevent_surfsupersat!(atmos)

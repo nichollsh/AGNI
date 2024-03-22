@@ -30,7 +30,7 @@ module solver_nlsol
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: Tint
+    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: tmp_int
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
@@ -118,7 +118,7 @@ module solver_nlsol
                 atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
                 if (surf_state >= 2)  # states 2 and 3
-                    atmos.tstar = _x[end]  # Surface brightness temperature
+                    atmos.tmp_surf = _x[end]  # Surface brightness temperature
                 end
             end 
             
@@ -163,14 +163,14 @@ module solver_nlsol
 
             # Calculate residuals subject to the boundary condition
             if (surf_state == 0) || (surf_state == 1)
-                # Conserve fluxes with constant tstar
+                # Conserve fluxes with constant tmp_surf
                 resid[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1] 
             elseif (surf_state == 2)
                 # Conductive boundary layer
                 resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
                 resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
             elseif (surf_state == 3)
-                # Fluxes equal to sigma*Tint^4
+                # Fluxes equal to sigma*tmp_int^4
                 resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_int
             end
 
@@ -292,12 +292,12 @@ module solver_nlsol
 
         @info @sprintf("    surf   = %d\n", surf_state)
         if (surf_state == 1)
-            @info @sprintf("    tstar  = %.2f K\n", atmos.tstar)
+            @info @sprintf("    tmp_surf  = %.2f K\n", atmos.tmp_surf)
         elseif (surf_state == 2)
             @info @sprintf("    skin_d = %.2f m\n",         atmos.skin_d)
             @info @sprintf("    skin_k = %.2f W K-1 m-1\n", atmos.skin_k)
         elseif (surf_state == 3)
-            @info @sprintf("    tint   = %.2f K\n",     atmos.tint)
+            @info @sprintf("    tmp_int   = %.2f K\n",     atmos.tmp_int)
             @info @sprintf("    Fint   = %.2f W m-2\n", atmos.flux_int)
         end 
         
@@ -597,7 +597,7 @@ module solver_nlsol
         @info "    summary\n"
         @info @sprintf("    outgoing LW flux   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
         if (surf_state == 2)
-            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tstar)
+            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
             @info @sprintf("    conduct. skin flux = %+.2e W m-2 \n", F_skin)
         end
         @info @sprintf("    total flux at TOA  = %+.2e W m-2     \n", atmos.flux_tot[1])

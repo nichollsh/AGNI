@@ -30,7 +30,7 @@ module solver_optim
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: Tint
+    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: tmp_int
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
@@ -74,7 +74,7 @@ module solver_optim
                 atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
                 if (surf_state >= 2) # Surface brightness temperature
-                    atmos.tstar = _x[end]
+                    atmos.tmp_surf = _x[end]
                 end
             end 
             
@@ -115,14 +115,14 @@ module solver_optim
 
             # Calculate residuals subject to the boundary condition
             if (surf_state == 0) || (surf_state == 1)
-                # Conserve fluxes with constant tstar
+                # Conserve fluxes with constant tmp_surf
                 resid[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1] 
             elseif (surf_state == 2)
                 # Conductive boundary layer
                 resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
                 resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
             elseif (surf_state == 3)
-                # Fluxes equal to sigma*Tint^4
+                # Fluxes equal to sigma*tmp_int^4
                 resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_int
             end
 
@@ -151,12 +151,12 @@ module solver_optim
 
         @printf("    surf   = %d\n", surf_state)
         if (surf_state == 1)
-            @printf("    tstar  = %.2f K\n", atmos.tstar)
+            @printf("    tmp_surf  = %.2f K\n", atmos.tmp_surf)
         elseif (surf_state == 2)
             @printf("    skin_d = %.2f m\n",         atmos.skin_d)
             @printf("    skin_k = %.2f W K-1 m-1\n", atmos.skin_k)
         elseif (surf_state == 3)
-            @printf("    tint   = %.2f K\n",     atmos.tint)
+            @printf("    tmp_int   = %.2f K\n",     atmos.tmp_int)
             @printf("    Fint   = %.2f W m-2\n", atmos.flux_int)
         end 
         
@@ -221,7 +221,7 @@ module solver_optim
         @printf("    endpoint fluxes \n")
         @printf("    rad_OLR   = %+.2e W m-2     \n", atmos.flux_u_lw[1])
         if (surf_state == 2)
-            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tstar)
+            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
             @printf("    cond_skin = %+.2e W m-2 \n", F_skin)
         end
         @printf("    tot_TOA   = %+.2e W m-2     \n", atmos.flux_tot[1])

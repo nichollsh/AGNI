@@ -68,8 +68,8 @@ module atmosphere
         toa_heating::Float64            # Derived downward shortwave radiation flux at topmost level [W m-2]
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (cronin+14)
-        tstar::Float64                  # Surface brightness temperature [K]
-        tint::Float64                   # Internal temperature of the planet [K]
+        tmp_surf::Float64                  # Surface brightness temperature [K]
+        tmp_int::Float64                   # Internal temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
 
@@ -206,7 +206,7 @@ module atmosphere
     - `s0_fact::Float64`                scale factor applied to instellation to account for planetary rotation (i.e. S_0^*/S_0 in Cronin+14)
     - `albedo_b::Float64`               bond albedo scale factor applied to instellation in order to imitate shortwave reflection 
     - `zenith_degrees::Float64`         angle of radiation from the star, relative to the zenith [degrees].
-    - `tstar::Float64`                  effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
+    - `tmp_surf::Float64`               effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
     - `radius::Float64`                 planet radius at the surface [m].
     - `nlev_centre::Int`                number of model levels.
@@ -222,7 +222,7 @@ module atmosphere
     - `skin_d::Float64=0.05`            skin thickness [m].
     - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
     - `overlap_method::Int=4`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
-    - `tint::Float64=0.0`               planet's interior brightness temperature BC [K]
+    - `tmp_int::Float64=0.0`               planet's interior brightness temperature BC [K]
     - `all_channels::Bool=true`         use all channels available for RT?
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
@@ -235,7 +235,7 @@ module atmosphere
                     ROOT_DIR::String, OUT_DIR::String, 
                     spfile::String, 
                     instellation::Float64, s0_fact::Float64, albedo_b::Float64, zenith_degrees::Float64,
-                    tstar::Float64,
+                    tmp_surf::Float64,
                     gravity::Float64, radius::Float64,
                     nlev_centre::Int, p_surf::Float64, p_top::Float64;
                     mf_dict=                    nothing,
@@ -248,7 +248,7 @@ module atmosphere
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
                     overlap_method::Int =       4,
-                    tint::Float64 =             0.0,
+                    tmp_int::Float64 =             0.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -285,10 +285,14 @@ module atmosphere
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     2.0e4
 
-        atmos.nlev_c         =  max(nlev_centre,25)
+        if nlev_centre < 25 
+            @warn "Adjusted number of levels to 25"
+            nlev_centre = 25
+        end 
+        atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
-        atmos.tstar =           max(tstar, atmos.tmp_floor)
-        atmos.tint =            max(0.0,tint)
+        atmos.tmp_surf =        max(tmp_surf, atmos.tmp_floor)
+        atmos.tmp_int =         tmp_int
         atmos.grav_surf =       max(1.0e-7, gravity)
         atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
@@ -297,7 +301,7 @@ module atmosphere
         atmos.s0_fact =         max(s0_fact,0.0)
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) * s0_fact * cosd(atmos.zenith_degrees)
 
-        atmos.flux_int =        phys.sigma * (atmos.tint)^4            
+        atmos.flux_int =        phys.sigma * (atmos.tmp_int)^4.0           
         
         atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
@@ -329,8 +333,8 @@ module atmosphere
         # atmos.control.l_contrib_func_band = false
 
         # Initialise temperature grid to be isothermal
-        atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tstar
-        atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tstar
+        atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tmp_surf
+        atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tmp_surf
 
         # Initialise pressure grid with current p_toa and p_boa
         generate_pgrid!(atmos)
@@ -1180,7 +1184,7 @@ module atmosphere
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
         if lw
-            atmos.bound.t_ground[1] = atmos.tstar
+            atmos.bound.t_ground[1] = atmos.tmp_surf
         end
 
         if lw
@@ -1276,7 +1280,7 @@ module atmosphere
     function sensible!(atmos::atmosphere.Atmos_t)
         # TKE scheme for this 1D case
         # transports energy from the surface to the bottom node
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tstar-atmos.tmp[end])
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmp_surf-atmos.tmp[end])
         return nothing
     end
 
@@ -1700,8 +1704,8 @@ module atmosphere
         # ----------------------
         # Scalar quantities  
         #    Create variables
-        var_tstar =     defVar(ds, "tstar",         Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
-        var_tint =      defVar(ds, "tint",          Float64, (), attrib = OrderedDict("units" => "K"))      # Internal temperature [K]
+        var_tmp_surf =  defVar(ds, "tmp_surf",         Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
+        var_tmp_int =      defVar(ds, "tmp_int",          Float64, (), attrib = OrderedDict("units" => "K"))      # Internal temperature [K]
         var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
         var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
         var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
@@ -1725,8 +1729,8 @@ module atmosphere
         var_starfile =  defVar(ds, "starfile"      ,String, ())     # Path to star file when read
 
         #     Store data
-        var_tstar[1] =      atmos.tstar 
-        var_tint[1] =       atmos.tint 
+        var_tmp_surf[1] =   atmos.tmp_surf 
+        var_tmp_int[1] =       atmos.tmp_int 
         var_inst[1] =       atmos.instellation
         var_s0fact[1] =     atmos.s0_fact
         var_albbond[1] =    atmos.albedo_b

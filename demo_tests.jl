@@ -45,7 +45,7 @@ passing = true
 println(" ")
 println("Testing composition")
 
-tstar           = 200.0    # Surface temperature [kelvin]
+tmp_surf           = 200.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00  # Instellation flux [W m-2]
 p_surf          = 50.0     # bar
 theta           = 65.0
@@ -64,7 +64,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict
@@ -98,7 +98,7 @@ atmosphere.deallocate!(atmos)
 println(" ")
 println("Testing instellation")
 
-tstar           = 200.0    # Surface temperature [kelvin]
+tmp_surf           = 200.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00     # Instellation flux [W m-2]
 p_surf          = 50.0    # bar
 theta           = 65.0
@@ -114,7 +114,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -146,7 +146,7 @@ atmosphere.deallocate!(atmos)
 println(" ")
 println("Testing greenhouse effect")
 
-tstar           = 1300.0    # Surface temperature [kelvin]
+tmp_surf           = 1300.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00    # Instellation flux [W m-2]
 p_surf          = 300.0    # bar
 theta           = 45.0
@@ -161,7 +161,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -195,7 +195,7 @@ atmosphere.deallocate!(atmos)
 println(" ")
 println("Testing Rayleigh scattering")
 
-tstar           = 400.0    # Surface temperature [kelvin]
+tmp_surf           = 400.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00    # Instellation flux [W m-2]
 p_surf          = 10.0    # bar
 theta           = 75.0
@@ -211,7 +211,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
@@ -244,7 +244,7 @@ atmosphere.deallocate!(atmos)
 println(" ")
 println("Testing heating rates")
 
-tstar           = 2500.0    # Surface temperature [kelvin]
+tmp_surf           = 2500.0    # Surface temperature [kelvin]
 toa_heating     = 1000.0    # Instellation flux [W m-2]
 p_surf          = 5.0     # bar
 theta           = 45.0
@@ -259,7 +259,7 @@ atmos = atmosphere.Atmos_t()
 atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
-                         tstar,
+                         tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict,
