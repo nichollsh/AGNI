@@ -25,7 +25,7 @@ title = "Hot and dry"                    # Name for this configuration file
     silent          = false                     # Disable all printing?
     max_steps       = 200                       # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
-    num_levels      = 45                        # Number of model levels.
+    num_levels      = 40                        # Number of model levels.
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
@@ -37,9 +37,9 @@ title = "Hot and dry"                    # Name for this configuration file
     condensates     = []                        # List of volatiles which are allowed to condense.
     surf_state      = 3                         # Surface boundary condition (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
-    initial_state   = ["dry", "str", "800"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    initial_state   = ["iso","1000"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     stabilise       = false                     # Use various methods to help stabilise the model?
-    converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
+    converge_atol   = 1.0e-2                    # Convergence criterion on absolute flux divergence [W m-2].
 
 [plots]
     at_runtime      = true                      # Make some plots at runtime?
