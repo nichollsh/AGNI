@@ -77,6 +77,8 @@ module plotting
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(500,400), guidefontsize=9)
 
         # Plot mole fractions for each gas
+        xmin::Float64 = 0.1
+        this_min::Float64 = 0.0
         for (i_gas,gas) in enumerate(atmos.gases)  
             if haskey(phys.lookup_color, gas)
                 c = phys.lookup_color[gas]
@@ -84,9 +86,13 @@ module plotting
                 c = "#"*bytes2hex(rand(UInt8, 3))
             end 
             plot!(atmos.layer_x[1:end,i_gas], arr_P, label=phys.lookup_pretty[gas], lw=4, linealpha=0.7, color=c)
+            this_min = minimum(atmos.layer_x[1:end,i_gas])
+            if this_min > 1.0e-90
+                xmin = min(xmin, this_min)
+            end
         end
 
-        xlims  = (max(minimum(atmos.layer_x), 1.0e-20)*0.5, 1.2)
+        xlims  = (max(xmin, 1.0e-20)*0.5, 1.2)
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=0, step=1))
 
         # Set figure properties
@@ -218,7 +224,7 @@ module plotting
     """
     Plot the fluxes at each pressure level
     """
-    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_int::Bool=false)
+    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_int::Bool=false, incl_mlt::Bool=true)
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]*0.95, arr_P[end]*2.0)
@@ -272,7 +278,7 @@ module plotting
         end 
 
         # Convective flux (MLT)
-        if any(x->x!=0.0, atmos.flux_c)
+        if incl_mlt
             plot!(plt, _symlog.(atmos.flux_c), arr_P, label="CONVECT", lw=w*1.2, lc=col_c, ls=:solid)
         end 
 
@@ -362,7 +368,7 @@ module plotting
         end
         plot!(plt, xe, ye, label="Outgoing spectrum", color="black")  # emission spectrum
 
-        xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 50000.0))
+        xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 70000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         ylims  = (max(1.0e-10,minimum(ye)) / 2, max(maximum(ye),maximum(yp)) * 2)

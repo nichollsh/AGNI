@@ -215,7 +215,7 @@ module atmosphere
     - `mf_dict=nothing`                 dictionary of mole fractions in the format (key,value)=(gas,mf).
     - `mf_path=nothing`                 path to file containing mole fractions at each level.
     - `albedo_s::Float64=0.0`           surface albedo.
-    - `tmp_floor::Float64=50.0`         temperature floor [K].
+    - `tmp_floor::Float64=5.0`         temperature floor [K].
     - `C_d::Float64=0.001`              turbulent heat exchange coefficient [dimensionless].
     - `U::Float64=10.0`                 surface wind speed [m s-1].
     - `tmp_magma::Float64=3000.0`       mantle temperature [K].
