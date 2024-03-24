@@ -170,6 +170,7 @@ function main()
     initial_req::Array     = cfg["execution" ]["initial_state"]
     stabilise::Bool        = cfg["execution" ]["stabilise"]
     conv_atol::Float64     = cfg["execution" ]["converge_atol"]
+    conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
     max_steps::Int         = cfg["execution" ]["max_steps"]
     #    plotting stuff 
     plt_run::Bool          = cfg["plots"     ]["at_runtime"]
@@ -184,7 +185,7 @@ function main()
     # Read OPTIONAL configuration options from dict
     #     mixing ratios can be set either way
     if haskey(cfg["planet"],"vmr")
-        mf_dict::Dict = cfg["planet"]["vmr"]
+        mf_dict = cfg["planet"]["vmr"]
         mf_path = nothing
     else 
         mf_dict = nothing
@@ -286,11 +287,6 @@ function main()
     modplot::Int      = 0
     condensate  = ""
 
-    # Plotting at runtime
-    if plt_run 
-        modplot = 1
-    end
-
     # Loop over requested solvers 
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
     method::Int = 0
@@ -313,19 +309,27 @@ function main()
         # Timestepping
         elseif sol == "timestep"
             @info "Solver = $sol\n"
+            # Plotting at runtime
+            if plt_run 
+                modplot = 10
+            end
             solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
                                 dry_convect=dry_convect, condensate=condensate,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
+                                conv_atol=conv_atol, conv_rtol=conv_rtol,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
         
         # Nonlinear methods
         elseif (sol in method_map) 
             @info "Solver = $sol\n"
+            if plt_run 
+                modplot = 1
+            end
             method = findfirst(==(sol), method_map)
             solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
                                 dry_convect=dry_convect, condensate=condensate, sens_heat=incl_sens,
-                                max_steps=max_steps, conv_atol=conv_atol, method=1,
+                                max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
         else 
             error("Invalid solver requested '$sol'")
@@ -346,7 +350,7 @@ function main()
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
     plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(surf_state==2))
-    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"))
+    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"), incl_mlt=use_mlt)
     plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"))
     plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.png"))
 
