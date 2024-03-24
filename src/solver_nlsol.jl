@@ -42,10 +42,8 @@ module solver_nlsol
     - `linesearch::Bool=true`           use a simple linesearch algorithm to determine the best step size
     - `modplot::Int=0`                  iteration frequency at which to make plots
     - `stabilise_mlt::Bool=true`        stabilise convection by introducing it gradually
-    - `step_rtol::Float64=1.0e-2`       step size: relative change in residuals [dimensionless]
-    - `step_atol::Float64=1.0e-1`       step size: absolute change in residuals [W m-2]
-    - `step_fact::Float64=8.0e4`        step size: scale factor for maximum per-level temperature step [K^2]
-    - `conv_atol::Float64=1.0e-2`       convergence: absolute tolerance on per-level flux deviation [W m-2]
+    - `conv_atol::Float64=1.0e-5`       convergence: absolute tolerance on per-level flux deviation [W m-2]
+    - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             surf_state::Int=1, condensate::String="",
@@ -54,8 +52,7 @@ module solver_nlsol
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
                             method::Int=1, linesearch::Bool=true,
                             modplot::Int=1, stabilise_mlt::Bool=true,
-                            step_rtol::Float64=1.0e-2, step_atol::Float64=1.0e-6, step_fact::Float64=8e4,
-                            conv_atol::Float64=1.0e-2
+                            conv_atol::Float64=1.0e-5, conv_rtol::Float64=1.0e-3
                             )
 
         # Validate condensation case
@@ -332,6 +329,7 @@ module solver_nlsol
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
         r_max::Float64 =        9.0     # Maximum residual (sign agnostic)
+        f_max::Float64 =        0.0     # Maximim flux (sign agnostic)
         x_med::Float64 =        0.0     # Median solution
         x_max::Float64 =        0.0     # Maximum solution (sign agnostic)
         iworst::Int =           0       # Level which is furthest from convergence
@@ -415,7 +413,7 @@ module solver_nlsol
                 stepflags *= "Sc"
                 
                 # Check if sf needs to be increased
-                if c_cur < max(100.0*conv_atol, 10.0)
+                if c_cur < max(100.0*conv_rtol, 10.0)
                     if convect_sf < 1.0 
                         # increase sf - reduce stabilisation by 10x
                         stepflags *= "r"
@@ -446,13 +444,13 @@ module solver_nlsol
             # Check convergence
             c_old = c_cur
             c_cur = _cost(r_cur)
-            if (c_cur < conv_atol) && !stabilise_mlt
+            if (c_cur < conv_atol + conv_rtol * f_max) && !stabilise_mlt
                 code = 0
                 break
             end
 
             # Check if jacobian is singular 
-            if abs(det(b)) < 1.0e-90
+            if abs(det(b)) < floatmin()*10.0
                 code = 2
                 break
             end 
@@ -542,6 +540,7 @@ module solver_nlsol
             r_med   = median(r_cur)
             iworst  = argmax(abs.(r_cur))
             r_max   = r_cur[iworst]
+            f_max   = maximum(abs.(atmos.flux_tot))
             x_med   = median(x_cur)
             x_max   = x_cur[argmax(abs.(x_cur))]
             dxmax   = maximum(abs.(x_dif))
