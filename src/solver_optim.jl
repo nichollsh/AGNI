@@ -30,7 +30,7 @@ module solver_optim
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: tmp_int
+    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: tmp_eff
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
@@ -122,8 +122,8 @@ module solver_optim
                 resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
                 resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
             elseif (surf_state == 3)
-                # Fluxes equal to sigma*tmp_int^4
-                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_int
+                # Fluxes equal to sigma*tmp_eff^4
+                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
             end
 
             # Check that residuals are real numbers
@@ -156,8 +156,8 @@ module solver_optim
             @printf("    skin_d = %.2f m\n",         atmos.skin_d)
             @printf("    skin_k = %.2f W K-1 m-1\n", atmos.skin_k)
         elseif (surf_state == 3)
-            @printf("    tmp_int   = %.2f K\n",     atmos.tmp_int)
-            @printf("    Fint   = %.2f W m-2\n", atmos.flux_int)
+            @printf("    tmp_eff   = %.2f K\n",     atmos.tmp_eff)
+            @printf("    Fint   = %.2f W m-2\n", atmos.flux_eff)
         end 
         
 
