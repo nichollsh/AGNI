@@ -205,9 +205,9 @@ function main()
         tmp_magma   = cfg["planet"]["tmp_magma"]
     end 
     #     interior temperature case 
-    tmp_int::Float64 = 0.0
+    tmp_eff::Float64 = 0.0
     if surf_state == 3
-        tmp_int = cfg["planet"]["tmp_int"]
+        tmp_eff = cfg["planet"]["tmp_eff"]
     end 
 
 
@@ -226,7 +226,7 @@ function main()
                             overlap_method=overlap,
                             skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                             tmp_floor=5.0,
-                            tmp_int=tmp_int, albedo_s=albedo_s,
+                            tmp_eff=tmp_eff, albedo_s=albedo_s,
                             thermo_functions=thermo_funcs,
                             C_d=turb_coeff, U=wind_speed
                     )

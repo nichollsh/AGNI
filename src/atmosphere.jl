@@ -69,7 +69,7 @@ module atmosphere
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (cronin+14)
         tmp_surf::Float64                  # Surface brightness temperature [K]
-        tmp_int::Float64                   # Internal temperature of the planet [K]
+        tmp_eff::Float64                   # Internal temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
 
@@ -116,7 +116,7 @@ module atmosphere
         layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
 
         # Calculated bolometric radiative fluxes (W m-2)
-        flux_int::Float64               # Interior flux  [W m-2] for surf_state=3
+        flux_eff::Float64               # Interior flux  [W m-2] for surf_state=3
 
         flux_d_lw::Array{Float64,1}     # down component, lw 
         flux_u_lw::Array{Float64,1}     # up component, lw
@@ -222,7 +222,7 @@ module atmosphere
     - `skin_d::Float64=0.05`            skin thickness [m].
     - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
     - `overlap_method::Int=4`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
-    - `tmp_int::Float64=0.0`               planet's interior brightness temperature BC [K]
+    - `tmp_eff::Float64=0.0`               planet's interior brightness temperature BC [K]
     - `all_channels::Bool=true`         use all channels available for RT?
     - `flag_rayleigh::Bool=false`       include rayleigh scattering?
     - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
@@ -248,7 +248,7 @@ module atmosphere
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
                     overlap_method::Int =       4,
-                    tmp_int::Float64 =             0.0,
+                    tmp_eff::Float64 =             0.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -292,7 +292,7 @@ module atmosphere
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.tmp_surf =        max(tmp_surf, atmos.tmp_floor)
-        atmos.tmp_int =         tmp_int
+        atmos.tmp_eff =         tmp_eff
         atmos.grav_surf =       max(1.0e-7, gravity)
         atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
@@ -301,7 +301,7 @@ module atmosphere
         atmos.s0_fact =         max(s0_fact,0.0)
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) * s0_fact * cosd(atmos.zenith_degrees)
 
-        atmos.flux_int =        phys.sigma * (atmos.tmp_int)^4.0           
+        atmos.flux_eff =        phys.sigma * (atmos.tmp_eff)^4.0           
         
         atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
@@ -1734,7 +1734,7 @@ module atmosphere
         # Scalar quantities  
         #    Create variables
         var_tmp_surf =  defVar(ds, "tmp_surf",         Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
-        var_tmp_int =      defVar(ds, "tmp_int",          Float64, (), attrib = OrderedDict("units" => "K"))      # Internal temperature [K]
+        var_tmp_eff =      defVar(ds, "tmp_eff",          Float64, (), attrib = OrderedDict("units" => "K"))      # Internal temperature [K]
         var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
         var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
         var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
@@ -1759,7 +1759,7 @@ module atmosphere
 
         #     Store data
         var_tmp_surf[1] =   atmos.tmp_surf 
-        var_tmp_int[1] =       atmos.tmp_int 
+        var_tmp_eff[1] =       atmos.tmp_eff 
         var_inst[1] =       atmos.instellation
         var_s0fact[1] =     atmos.s0_fact
         var_albbond[1] =    atmos.albedo_b

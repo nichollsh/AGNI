@@ -7,7 +7,7 @@
 [Info ] Solver = newton
 [Info ] Begin Newton-Raphson iterations
 [Info ]     surf   = 3
-[Info ]     tmp_int   = 0.00 K
+[Info ]     tmp_eff   = 0.00 K
 [Info ]     Fint   = 0.00 W m-2
 [Info ]     step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags
 [Info ]        1  +2.52e+02  4.328e+04  2.298e+04  +8.00e+02  +3.04e+03  3.000e+02  CdNr     

@@ -224,7 +224,7 @@ module plotting
     """
     Plot the fluxes at each pressure level
     """
-    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_int::Bool=false, incl_mlt::Bool=true)
+    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_eff::Bool=false, incl_mlt::Bool=true)
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]*0.95, arr_P[end]*2.0)
@@ -254,8 +254,8 @@ module plotting
         plot!(plt, [0.0, 0.0], [arr_P[1], arr_P[end]], lw=0.4, lc="black", label="")
 
         # Interior flux
-        if incl_int
-            plot!(plt, [_symlog(atmos.flux_int)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="INT")
+        if incl_eff
+            plot!(plt, [_symlog(atmos.flux_eff)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="INT")
         end
 
         # LW component
