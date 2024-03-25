@@ -30,7 +30,7 @@ module solver_nlsol
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: tmp_int
+    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: tmp_eff
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
@@ -169,8 +169,8 @@ module solver_nlsol
                 resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
                 resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
             elseif (surf_state == 3)
-                # Fluxes equal to sigma*tmp_int^4
-                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_int
+                # Fluxes equal to sigma*tmp_eff^4
+                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
             end
 
             # +Condensation
@@ -296,8 +296,8 @@ module solver_nlsol
             @info @sprintf("    skin_d   = %.2f m",         atmos.skin_d)
             @info @sprintf("    skin_k   = %.2f W K-1 m-1", atmos.skin_k)
         elseif (surf_state == 3)
-            @info @sprintf("    tmp_int  = %.2f K",     atmos.tmp_int)
-            @info @sprintf("    Fint     = %.2f W m-2", atmos.flux_int)
+            @info @sprintf("    tmp_eff  = %.2f K",     atmos.tmp_eff)
+            @info @sprintf("    Fint     = %.2f W m-2", atmos.flux_eff)
         end 
         
 
@@ -553,7 +553,7 @@ module solver_nlsol
             if modplot > 0
                 if mod(step, modplot) == 0
                     plotting.plot_pt(atmos,     path_prf, incl_magma=(surf_state==2))
-                    plotting.plot_fluxes(atmos, path_flx, incl_int=(surf_state==3))
+                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(surf_state==3))
                 end 
             end 
                 
