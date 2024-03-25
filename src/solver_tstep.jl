@@ -270,7 +270,7 @@ module solver_tstep
             end 
 
             if mod(step,modprint) == 0
-                info_str *= "\n"
+                info_str *= ""
                 @info info_str
             end
 
@@ -338,7 +338,7 @@ module solver_tstep
             end 
 
             if verbose && (mod(step,modprint) == 0)
-                @info @sprintf("    dt_max,med  = %.5f, %.5f days \n", maximum(dt), median(dt))
+                @info @sprintf("    dt_max,med  = %.5f, %.5f days ", maximum(dt), median(dt))
             end
 
             # ----------------------------------------------------------
@@ -503,21 +503,21 @@ module solver_tstep
             # Print debug info (some are disabled depending on the convection scheme)
             # -------------------------------------- 
             if verbose && (mod(step,modprint) == 0)
-                @info @sprintf("    dtmp_comp   = %+.3f K      \n", dtmp_comp)
-                @info @sprintf("    dtmp/tmp/dt = %+.3f day-1  \n", drel_dt)
-                @info @sprintf("    F_cri_worst = %+.2e W m-2  \n", F_cri_worst)
-                @info @sprintf("    F_tol_worst = %+.2e W m-2  \n", F_tol_worst)
+                @info @sprintf("    dtmp_comp   = %+.3f K      ", dtmp_comp)
+                @info @sprintf("    dtmp/tmp/dt = %+.3f day-1  ", drel_dt)
+                @info @sprintf("    F_cri_worst = %+.2e W m-2  ", F_cri_worst)
+                @info @sprintf("    F_tol_worst = %+.2e W m-2  ", F_tol_worst)
 
-                @info @sprintf("    F_rad^TOA   = %+.2e W m-2  \n", F_TOA_rad)
-                @info @sprintf("    F_rad^BOA   = %+.2e W m-2  \n", F_BOA_rad)
-                @info @sprintf("    F_rad^OLR   = %+.2e W m-2  \n", F_OLR_rad)
-                @info @sprintf("    F_tot^loss  = %+.2f W m-2  \n", F_loss)
-                @info @sprintf("    HR_typical  = %+.4f K day-1\n", H_stat)
+                @info @sprintf("    F_rad^TOA   = %+.2e W m-2  ", F_TOA_rad)
+                @info @sprintf("    F_rad^BOA   = %+.2e W m-2  ", F_BOA_rad)
+                @info @sprintf("    F_rad^OLR   = %+.2e W m-2  ", F_OLR_rad)
+                @info @sprintf("    F_tot^loss  = %+.2f W m-2  ", F_loss)
+                @info @sprintf("    HR_typical  = %+.4f K day-1", H_stat)
 
                 if ( (dryadj_steps > 0) && !use_mlt) || is_condense
-                    @info @sprintf("    count_adj   = %d layers   \n", adj_changed)
+                    @info @sprintf("    count_adj   = %d layers   ", adj_changed)
                 end
-                @info @sprintf("\n")
+                @info @sprintf(" ")
             end
 
             # --------------------------------------
@@ -562,38 +562,38 @@ module solver_tstep
         # Print information about the final state
         atmos.is_solved = true
         if !success
-            @warn @sprintf("    stopping atmosphere iterations before convergence \n")
+            @warn @sprintf("    stopping atmosphere iterations before convergence ")
             atmos.is_converged = false
         else
-            @info @sprintf("    convergence criteria met (%d iterations) \n", step)
+            @info @sprintf("    convergence criteria met (%d iterations) ", step)
             atmos.is_converged = true
         end
-        @info @sprintf("    dtmp_comp   = %.3f K      \n", dtmp_comp)
-        @info @sprintf("    dtmp/tmp/dt = %.3f day-1  \n", drel_dt)
-        @info @sprintf("    F_cri_worst = %+.2e W m-2  \n", F_cri_worst)
-        @info @sprintf("    F_tol_worst = %+.2e W m-2  \n", F_tol_worst)
+        @info @sprintf("    dtmp_comp   = %.3f K      ", dtmp_comp)
+        @info @sprintf("    dtmp/tmp/dt = %.3f day-1  ", drel_dt)
+        @info @sprintf("    F_cri_worst = %+.2e W m-2  ", F_cri_worst)
+        @info @sprintf("    F_tol_worst = %+.2e W m-2  ", F_tol_worst)
         if use_physical_dt
-            @info @sprintf("    total_time  = %+.2e years  \n", atmos.time[1]/365.25)
+            @info @sprintf("    total_time  = %+.2e years  ", atmos.time[1]/365.25)
         else 
-            @info @sprintf("    max_time    = %+.2e years  \n", maximum(atmos.time)/365.25)
+            @info @sprintf("    max_time    = %+.2e years  ", maximum(atmos.time)/365.25)
         end 
-        @info @sprintf("\n")
+        @info " "
 
-        @info @sprintf("    endpoint fluxes \n")
-        @info @sprintf("    rad_OLR   = %.2e W m-2         \n", F_OLR_rad)
-        @info @sprintf("    rad_TOA   = %.2e W m-2         \n", F_TOA_rad)
-        @info @sprintf("    rad_BOA   = %.2e W m-2         \n", F_BOA_rad)
-        @info @sprintf("    tot_BOA   = %.2e W m-2         \n", F_BOA_tot)
+        @info @sprintf("    endpoint fluxes ")
+        @info @sprintf("    rad_OLR   = %.2e W m-2         ", F_OLR_rad)
+        @info @sprintf("    rad_TOA   = %.2e W m-2         ", F_TOA_rad)
+        @info @sprintf("    rad_BOA   = %.2e W m-2         ", F_BOA_rad)
+        @info @sprintf("    tot_BOA   = %.2e W m-2         ", F_BOA_tot)
         if (surf_state == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
-            @info @sprintf("    cond_skin = %.2e W m-2         \n", F_skin)
+            @info @sprintf("    cond_skin = %.2e W m-2         ", F_skin)
         end
-        @info @sprintf("\n")
+        @info " "
     
         # Warn user if there's a sign difference in TOA vs BOA fluxes
         # because this shouldn't be the case
         if F_TOA_tot*F_BOA_tot < 0
-            @warn @sprintf("TOA and BOA total fluxes have different signs\n")
+            @warn @sprintf("TOA and BOA total fluxes have different signs")
         end
 
         return nothing

@@ -40,7 +40,7 @@ title = "Default"                       # Name for this configuration file
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     dry_convection  = "mlt"                     # Convection type (mlt = use mixing length theory, adj = use convective adjustment).
     condensates     = []                        # List of volatiles which are allowed to condense.
-    surf_state      = 2                         # Surface boundary condition (see wiki).
+    surf_state      = 0                         # Surface boundary condition (see wiki).
     solvers         = []                        # Ordered list of solvers to apply (see wiki).
     initial_state   = ["dry", "str", "800"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     stabilise       = true                      # Use various methods to help stabilise the model?

@@ -376,14 +376,19 @@ module atmosphere
         # we do not yet know which order the gases should be indexed in.
 
         atmos.input_x = Dict()  # dict of arrays 
-        
+
         # Dict input case
         if mf_source == 0
+            @info "Composition set by dict"
             for (key, value) in mf_dict  # store as arrays
                 gas_valid = strip(key, ' ')
-                if key in SOCRATES.input_head_pcf.header_gas
+                # If gas supported by socrates, store it 
+                if gas_valid in SOCRATES.input_head_pcf.header_gas
                     atmos.input_x[gas_valid] = ones(Float64, atmos.nlev_c) * value
-                end
+                    @info("    added gas $gas_valid")
+                else
+                    @warn "    gas $gas_valid is not supported" 
+                end 
             end
         end
 
@@ -393,6 +398,7 @@ module atmosphere
             if !isfile(mf_path)
                 error("Could not read file '$mf_path'")
             end
+            @info "Composition set by file"
 
             # get header
             mf_head = readlines(abspath(mf_path))[1]
@@ -405,7 +411,10 @@ module atmosphere
                 gas_valid = strip(h, ' ')
                 if gas_valid in SOCRATES.input_head_pcf.header_gas
                     atmos.input_x[gas_valid] = zeros(Float64, atmos.nlev_c)
-                end 
+                    @info("    added gas $gas_valid")
+                else
+                    @warn "    gas $gas_valid is not supported" 
+                end
             end 
 
             # get body
@@ -714,7 +723,7 @@ module atmosphere
 
         # Insert rayleigh scattering (optionally)
         if atmos.control.l_rayleigh
-            @info "Python: Inserting rayleigh scattering \n"
+            @info "Python: Inserting rayleigh scattering"
             co2_x = get_x(atmos, "CO2", -1) 
             n2_x  = get_x(atmos, "N2" , -1)
             h2o_x = get_x(atmos, "H2O", -1)
@@ -923,12 +932,32 @@ module atmosphere
         atmos.gases = Array{String}(undef, atmos.spectrum.Gas.n_absorb)
         atmos.layer_x = zeros(Float64, (atmos.nlev_c,length(atmos.gases)))
 
+        #    check if all requested gases are in the spectral file 
+        is_in_spectral_file::Bool = false
+        for v_gas in keys(atmos.input_x)
+            is_in_spectral_file = false
+            for i_gas in 1:atmos.spectrum.Gas.n_absorb
+                ti = atmos.spectrum.Gas.type_absorb[i_gas]
+                s_gas = SOCRATES.input_head_pcf.header_gas[ti]
+
+                # is included?
+                if s_gas == v_gas 
+                    is_in_spectral_file = true 
+                end 
+            end 
+            if !is_in_spectral_file 
+                @warn @sprintf("Gas %s is not present in the spectral file", v_gas)
+            end 
+        end
+
+        #    loop over gases in the spectral file 
         for i_gas in 1:atmos.spectrum.Gas.n_absorb
             ti = atmos.spectrum.Gas.type_absorb[i_gas]
             gas = SOCRATES.input_head_pcf.header_gas[ti]
 
             atmos.gases[i_gas] = gas
 
+            #    is this gas included in the input VMRs?
             if gas in keys(atmos.input_x)
                 atmos.layer_x[:,i_gas] .= atmos.input_x[gas]
             else
