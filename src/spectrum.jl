@@ -155,7 +155,7 @@ module spectrum
         end
 
         # Run executable
-        @info "Inserting stellar spectrum\n"
+        @info "Inserting stellar spectrum"
         run(pipeline(`bash $execpath`, stdout=devnull))
 
         # Delete executable 

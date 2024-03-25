@@ -50,7 +50,7 @@ function setup_logging(outpath::String, silent::Bool)
         elseif args.level == LoggingExtras.Error 
             level = "ERROR"
         end 
-        @printf(io, "[ %-5s ] %s", level, args.message)
+        @printf(io, "[ %-5s ] %s \n", level, args.message)
     end;
 
     # Setup terminal logger 
@@ -59,17 +59,17 @@ function setup_logging(outpath::String, silent::Bool)
             color = 32
             level = "INFO"
         elseif args.level == LoggingExtras.Warn
-            color = 33
+            color = 93
             level = "WARN"
         elseif args.level == LoggingExtras.Debug
-            color = 36
+            color = 96
             level = "DEBUG"
         elseif args.level == LoggingExtras.Error 
-            color = 31
+            color = 91
             level = "ERROR"
         end 
         # Set color, set bold, print level, unset bold, unset color, message
-        @printf(io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s",color, level, args.message)
+        @printf(io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",color, level, args.message)
     end;
 
     # Combine and set 
@@ -138,8 +138,8 @@ function main()
     setup_logging(joinpath(output_dir, "agni.log"), silent)
 
     # Hello
-    @info "Hello\n"
-    @info "Using configuration '$(cfg["title"])'\n"
+    @info "Hello"
+    @info "Using configuration '$(cfg["title"])'"
 
     # Read REQUIRED configuration options from dict 
     #    planet stuff 
@@ -212,7 +212,7 @@ function main()
 
 
     # Setup atmosphere
-    @info "Setting up\n"
+    @info "Setting up"
     atmos = atmosphere.Atmos_t()
     atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                             spfile_name,
@@ -234,7 +234,7 @@ function main()
 
     # Set PT profile by looping over requests
     # Each request may be a command, or an argument following a command
-    @info "Setting initial T(p)\n"
+    @info "Setting initial T(p)"
     num_req::Int = length(initial_req)      # Number of requests
     idx_req::Int = 1                        # Index of current request
     str_req::String = "_unset"              # String of current request
@@ -299,7 +299,7 @@ function main()
 
         # No solve - just calc fluxes at the end
         if isempty(sol)
-            @info "Solver = none\n"
+            @info "Solver = none"
             atmosphere.radtrans!(atmos, true, calc_cf=true)
             atmosphere.radtrans!(atmos, false)
             if use_mlt 
@@ -308,7 +308,7 @@ function main()
         
         # Timestepping
         elseif sol == "timestep"
-            @info "Solver = $sol\n"
+            @info "Solver = $sol"
             # Plotting at runtime
             if plt_run 
                 modplot = 10
@@ -322,7 +322,7 @@ function main()
         
         # Nonlinear methods
         elseif (sol in method_map) 
-            @info "Solver = $sol\n"
+            @info "Solver = $sol"
             if plt_run 
                 modplot = 1
             end
@@ -337,7 +337,7 @@ function main()
 
     end 
 
-    @info "Total RT evalulations: $(atmos.num_rt_eval)\n"
+    @info "Total RT evalulations: $(atmos.num_rt_eval)"
 
     # Write arrays
     atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
@@ -345,7 +345,7 @@ function main()
     atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
     # Save plots
-    @info "Making plots\n"
+    @info "Making plots"
     plt_ani && plotting.anim_solver(atmos)
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
@@ -355,13 +355,13 @@ function main()
     plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.png"))
 
     # Deallocate atmosphere
-    @info "Deallocating arrays\n"
+    @info "Deallocating arrays"
     atmosphere.deallocate!(atmos)
 
     # Finish up
     runtime = round(time() - tbegin, digits=2)
-    @info "Runtime: $runtime seconds\n"
-    @info "Goodbye\n"
+    @info "Runtime: $runtime seconds"
+    @info "Goodbye"
 
     return nothing 
 end 
