@@ -1,7 +1,7 @@
 # AGNI
 Radiative-convective solver designed for integration into a coupled atmosphere-interior code.   
 
-AGNI relies on SOCRATES (2311) for calculating radiances. It makes use of the Julia interface to SOCRATES as written by Stuart Daines. The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption.        
+AGNI relies on SOCRATES (2311) for calculating radiances. The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption. Mixing length theory is used to parametrise convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile.      
 
 Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for information about the model. 
     
@@ -29,8 +29,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 
 ## Supported platforms
 * MacOS (ARM and x86-64)
-* Ubuntu (x86-64)
-
+* GNU/Linux (x86-64)
 
 ## Installation instructions
 - `$ cd socrates`
