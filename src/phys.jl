@@ -55,7 +55,7 @@ module phys
         ("CFC114", "CFC114"   ), 
         ("TiO",    "TiO"      ), 
         ("VO",     "VO"       ), 
-        ("H2",     "H2"       ), 
+        ("H2",     "H₂"       ), 
         ("He",     "He"       ), 
         ("OCS",    "OCS"      ), 
         ("Na",     "Na"       ), 

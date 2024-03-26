@@ -290,8 +290,11 @@ function main()
     # Loop over requested solvers 
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
     method::Int = 0
-    if length(solvers_cmd) == 0
+    if length(solvers_cmd) == 0  # is empty 
         solvers_cmd = [""]
+    end 
+    if !isempty(solvers_cmd[end])  # append "no solve" case to end, for calculating cff
+        push!(solvers_cmd, "")
     end 
     for sol in solvers_cmd 
 
@@ -300,11 +303,17 @@ function main()
         # No solve - just calc fluxes at the end
         if isempty(sol)
             @info "Solver = none"
+            fill!(atmos.flux_tot, 0.0)
             atmosphere.radtrans!(atmos, true, calc_cf=true)
             atmosphere.radtrans!(atmos, false)
             if use_mlt 
                 atmosphere.mlt!(atmos)
             end 
+            if incl_sens 
+                atmosphere.sensible!(atmos)
+            end 
+            atmos.flux_tot = atmos.flux_c + atmos.flux_n
+            atmos.flux_tot[end] += atmos.flux_sens
         
         # Timestepping
         elseif sol == "timestep"
@@ -334,6 +343,7 @@ function main()
         else 
             error("Invalid solver requested '$sol'")
         end 
+        @info " "
 
     end 
 
@@ -360,7 +370,7 @@ function main()
 
     # Finish up
     runtime = round(time() - tbegin, digits=2)
-    @info "Runtime: $runtime seconds"
+    @info "Model runtime: $runtime seconds"
     @info "Goodbye"
 
     return nothing 
