@@ -228,7 +228,6 @@ module solver_optim
         @printf("    tot_BOA   = %+.2e W m-2     \n", atmos.flux_tot[end])
         @printf("    loss      = %+.2e W m-2     \n", loss)
         @printf("    loss      = %+.2e %%        \n", loss_pct)
-        @printf("\n")
 
         return atmos.is_converged
     end # end solve_energy 

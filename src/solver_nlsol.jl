@@ -490,7 +490,7 @@ module solver_nlsol
             # end 
 
             # Linesearch 
-            if linesearch && (step > 2)
+            if linesearch && (step > 1)
 
                 # Reset
                 stepflags *= "Ls"
@@ -585,7 +585,6 @@ module solver_nlsol
         else 
             @error "    failure (unhandled)"
         end
-        @info ""
 
         _fev!(x_cur, zeros(Float64, arr_len))
         atmosphere.calc_hrates!(atmos)
@@ -595,7 +594,6 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
         loss_pct = loss/maximum(atmos.flux_tot)*100.0
-        @info "    summary"
         @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
         if (surf_state == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
@@ -605,7 +603,7 @@ module solver_nlsol
         @info @sprintf("    total flux at BOA  = %+.2e W m-2     ", atmos.flux_tot[end])
         @info @sprintf("    column max. loss   = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
         @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
-        @info ""
+       
 
         return atmos.is_converged
     end # end solve_energy 
