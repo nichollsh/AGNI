@@ -18,11 +18,9 @@ res/spectral_files/Dayspring
 
 # Output files 
 out/*
-.spfile_runtime
-.spfile_runtime_k
-.star_file
-.star_temp
-.socstar
+runtime.sf
+runtime.sf_k 
+socstar.dat
 
 # Misc files
 .DS_Store
