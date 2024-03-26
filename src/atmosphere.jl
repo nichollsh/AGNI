@@ -704,8 +704,8 @@ module atmosphere
         end
 
         # Spectral file to be loaded
-        spectral_file_run  = joinpath([atmos.OUT_DIR, ".spfile_runtime"])  
-        socstar = joinpath([atmos.OUT_DIR, ".socstar"])  
+        spectral_file_run  = joinpath([atmos.OUT_DIR, "runtime.sf"])  
+        socstar = joinpath([atmos.OUT_DIR, "socstar.dat"])  
 
 
         # Insert stellar spectrum 
