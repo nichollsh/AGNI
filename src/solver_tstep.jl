@@ -577,7 +577,6 @@ module solver_tstep
         else 
             @info @sprintf("    max_time    = %+.2e years  ", maximum(atmos.time)/365.25)
         end 
-        @info " "
 
         @info @sprintf("    endpoint fluxes ")
         @info @sprintf("    rad_OLR   = %.2e W m-2         ", F_OLR_rad)
@@ -588,7 +587,6 @@ module solver_tstep
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
             @info @sprintf("    cond_skin = %.2e W m-2         ", F_skin)
         end
-        @info " "
     
         # Warn user if there's a sign difference in TOA vs BOA fluxes
         # because this shouldn't be the case

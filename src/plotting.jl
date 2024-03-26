@@ -64,7 +64,7 @@ module plotting
     end
 
     """
-    Plot the composition of the atmosphere at each cell-centre location.
+    Plot the VMRs of the atmosphere at each cell-centre location.
     """
     function plot_x(atmos::atmosphere.Atmos_t, fname; dpi::Int=250)
         
@@ -85,7 +85,7 @@ module plotting
             else 
                 c = "#"*bytes2hex(rand(UInt8, 3))
             end 
-            plot!(atmos.layer_x[1:end,i_gas], arr_P, label=phys.lookup_pretty[gas], lw=4, linealpha=0.7, color=c)
+            plot!(atmos.layer_x[1:end,i_gas], arr_P, label=phys.lookup_pretty[gas], lw=2.5, linealpha=0.7, color=c)
             this_min = minimum(atmos.layer_x[1:end,i_gas])
             if this_min > 1.0e-90
                 xmin = min(xmin, this_min)
@@ -375,7 +375,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         xlabel!(plt, "Wavelength [nm]")
-        ylabel!(plt, "Spectral flux density [erg s-1 cm-2 nm-1]")
+        ylabel!(plt, "Spectral flux density [erg s⁻¹ cm⁻² nm⁻¹]")
         yaxis!(plt, yscale=:log10, ylims=ylims, yticks=yticks)
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
@@ -479,6 +479,10 @@ module plotting
         plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
 
         plot!(plt, x, y, label="", color="black")
+
+        xlims  = ( max(1.0e-10,minimum(x)), min(maximum(x), 70000.0))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
         xlabel!(plt, "Wavelength [nm]")
         ylabel!(plt, "Spectral albedo")
