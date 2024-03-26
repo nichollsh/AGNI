@@ -29,8 +29,9 @@ module atmosphere
     import phys
     import spectrum
 
-    AGNI_VERSION     = "0.2"
-    SOCRATES_VERSION = "2311"
+    # Code version
+    AGNI_VERSION     = Symbol("0.2")
+    SOCRATES_VERSION = Symbol("2311")
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
@@ -178,7 +179,7 @@ module atmosphere
         SOCRATES.deallocate_atm(     atmos.atm)
 
         SOCRATES.deallocate_cld(     atmos.cld)
-        SOCRATES.deallocate_cld_prsc(atmos.cld)
+        # SOCRATES.deallocate_cld_prsc(atmos.cld)
 
         SOCRATES.deallocate_aer(     atmos.aer)
         SOCRATES.deallocate_aer_prsc(atmos.aer)
@@ -828,6 +829,7 @@ module atmosphere
         atmos.dimen.nd_aerosol_mode           = 1
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
+        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
@@ -1034,7 +1036,6 @@ module atmosphere
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
 
-        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
 
         if atmos.control.l_cloud
@@ -1133,7 +1134,7 @@ module atmosphere
         if lw
             atmos.control.i_2stream = 12 # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
         else
-            atmos.control.i_2stream = 16 # Practical improved fl ux method (original form of 1980)
+            atmos.control.i_2stream = 16 # Practical improved flux method (original form of 1980)
         end
 
         #####################################
@@ -1190,6 +1191,8 @@ module atmosphere
             atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]  
             atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]  
         end
+
+        display(atmos.cld.w_cloud)
 
         ###################################################
         # Treatment of scattering
@@ -1704,8 +1707,8 @@ module atmosphere
         ds.attrib["date"]               = Dates.format(now(), "yyyy-u-dd HH:MM:SS")
         ds.attrib["hostname"]           = gethostname()
         ds.attrib["username"]           = ENV["USER"]
-        ds.attrib["AGNI_version"]       = AGNI_VERSION
-        ds.attrib["SOCRATES_version"]   = SOCRATES_VERSION 
+        ds.attrib["AGNI_version"]       = String(AGNI_VERSION)
+        ds.attrib["SOCRATES_version"]   = String(SOCRATES_VERSION )
 
         plat = "Generic"
         if Sys.isapple()

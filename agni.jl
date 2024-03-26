@@ -154,9 +154,9 @@ function main()
     p_surf::Float64        = cfg["planet"]["p_surf"]
     p_top::Float64         = cfg["planet"]["p_top"]
     #    solver stuff 
-    spfile_name::String    = cfg["files" ]["input_sf"]
-    star_file::String      = cfg["files" ]["input_star"]
-    nlev_centre::Int       = cfg["execution"]["num_levels"]
+    spfile_name::String    = cfg["files"     ]["input_sf"]
+    star_file::String      = cfg["files"     ]["input_star"]
+    nlev_centre::Int       = cfg["execution" ]["num_levels"]
     flag_cnt::Bool         = cfg["execution" ]["continua"]
     flag_ray::Bool         = cfg["execution" ]["rayleigh"]
     flag_cld::Bool         = cfg["execution" ]["cloud"]
@@ -245,29 +245,36 @@ function main()
         # handle requests  
         if str_req == "dry"
             # dry adiabat from surface
+            @info "    dry adiabat"
             setpt.dry_adiabat!(atmos)
 
         elseif str_req == "str"
             # isothermal stratosphere 
             idx_req += 1
+            @info "    stratosphere"
             setpt.stratosphere!(atmos, parse(Float64, initial_req[idx_req]))
             
         elseif str_req == "iso"
             # isothermal profile 
             idx_req += 1
+            @info "    isothermal"
             setpt.isothermal!(atmos, parse(Float64, initial_req[idx_req]))
         
         elseif str_req == "csv"
             # set from csv file 
             idx_req += 1
+            @info "    csv"
             setpt.fromcsv!(atmos,initial_req[idx_req])
 
         elseif str_req == "sat"
             # check surface supersaturation
+            @info "    check surface supersaturation"
             setpt.prevent_surfsupersat!(atmos)
         
         elseif str_req == "con"
             # condensing a volatile 
+            idx_req += 1
+            @info "    condensing"
             setpt.condensing!(atmos, initial_req[idx_req])
 
         else 
@@ -293,7 +300,7 @@ function main()
     if length(solvers_cmd) == 0  # is empty 
         solvers_cmd = [""]
     end 
-    if !isempty(solvers_cmd[end])  # append "no solve" case to end, for calculating cff
+    if !isempty(solvers_cmd[end])  # append "no solve" case to end
         push!(solvers_cmd, "")
     end 
     for sol in solvers_cmd 
