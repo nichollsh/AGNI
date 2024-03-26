@@ -1192,7 +1192,7 @@ module atmosphere
             atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]  
         end
 
-        display(atmos.cld.w_cloud)
+        # display(atmos.cld.w_cloud)
 
         ###################################################
         # Treatment of scattering

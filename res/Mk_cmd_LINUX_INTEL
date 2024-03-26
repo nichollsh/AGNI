@@ -3,8 +3,8 @@
 # Tested with Ubuntu.
 # 
 
-FORTCOMP        = gfortran -O3 -fPIC -c
-LINK            = gfortran -O3 -fPIC
+FORTCOMP        = gfortran -O3 -fPIC -fopenmp -c
+LINK            = gfortran -O3 -fPIC -fopenmp 
 LIBLINK         = ar rvu
 INCCDF_PATH     = /usr/include/
 LIBCDF_PATH     = /usr/lib/

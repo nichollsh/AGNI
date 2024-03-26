@@ -494,9 +494,6 @@
 
       ! Parameters Used: zerodegc, delta_t,repsilon,one_minus_epsilon
       ! t_high, t_low
-!$OMP  PARALLEL DO SCHEDULE(STATIC) DEFAULT(NONE)                       &
-!$OMP& SHARED(qs, t, p, es, npnts)                                      &  
-!$OMP& PRIVATE(fsubw, tt, atable, itable, i)    
       DO I=1,NPNTS
 !      COMPUTE THE FACTOR THAT CONVERTS FROM SAT VAPOUR PRESSURE IN A
 !      PURE WATER SYSTEM TO SAT VAPOUR PRESSURE IN AIR, FSUBW.
@@ -535,7 +532,6 @@
      &          ( MAX(P(I),QS(I)) - ONE_MINUS_EPSILON*QS(I) )
 !
       END DO ! Npnts_do_1
-!$OMP END PARALLEL DO
 !
       IF (lhook) CALL dr_hook(RoutineName,zhook_out,zhook_handle)
       RETURN

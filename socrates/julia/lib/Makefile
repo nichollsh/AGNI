@@ -5,7 +5,7 @@ LDFLAGS = -ldl
 SHLIBFLAGS = -shared
 FC=gfortran
 # FFLAGS= -g
-FFLAGS = -O2 -Wall -fPIC
+FFLAGS = -O3 -Wall -fopenmp -fPIC
 
 # SOCRATES library code must be built with -fPIC (eg edit Mk_cmd to add this option)
 # library location RAD_BIN is set by set_rad_env script in the top-level socrates working folder

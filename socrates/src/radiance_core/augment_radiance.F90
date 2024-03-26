@@ -338,611 +338,649 @@ SUBROUTINE augment_radiance(control, sp, atm, bound, radout             &
 
   END IF
 
-  IF (l_initial) THEN
-    ! Initialise diagnostic fields that aren't in channels.
-    IF ( (control%i_angular_integration == ip_two_stream).OR. &
-         (control%i_angular_integration == ip_ir_gauss).OR. &
-       ( (control%i_angular_integration == ip_spherical_harmonic).AND. &
-          (control%i_sph_mode == ip_sph_mode_flux) ) ) THEN
+  
+  !=============================================================================================
+  ! HII commented region for OMP
+  ! Having l_initial switch to trigger doesn't work when shared between cores. Instead,
+  ! initialise as 0 all variables that all bands have to add (in def_out.F90).
+  ! Then have !$OMP atomic directive when updating these variables, to ensure that there are no
+  ! race conditions
+  !=============================================================================================
+  
+  ! IF (l_initial) THEN
+  !   ! Initialise diagnostic fields that aren't in channels.
+  !   IF ( (control%i_angular_integration == ip_two_stream).OR. &
+  !        (control%i_angular_integration == ip_ir_gauss).OR. &
+  !      ( (control%i_angular_integration == ip_spherical_harmonic).AND. &
+  !         (control%i_sph_mode == ip_sph_mode_flux) ) ) THEN
 
-      IF (control%isolir == ip_solar) THEN
-        IF (control%l_spherical_solar) THEN
-          IF (control%l_blue_flux_surf) THEN
-            DO l=1, n_profile
-              radout%flux_direct_blue_surf(l) &
-                = weight_blue_incr*sph%allsky%flux_direct(l, n_layer+1)
-            END DO
-          END IF
-        ELSE
-          IF (control%l_blue_flux_surf) THEN
-            DO l=1, n_profile
-              radout%flux_direct_blue_surf(l) &
-                = weight_blue_incr*flux_direct_incr(l, n_layer)
-            END DO
-          END IF
-        END IF
-        IF (control%l_blue_flux_surf) THEN
-          DO l=1, n_profile
-            radout%flux_up_blue_surf(l) &
-              = weight_blue_incr*flux_total_incr(l, 2*n_layer+1)
-            radout%flux_down_blue_surf(l) &
-              = weight_blue_incr*flux_total_incr(l, 2*n_layer+2)
-          END DO
-        END IF
-      END IF
+  !     IF (control%isolir == ip_solar) THEN
+  !       IF (control%l_spherical_solar) THEN
+  !         IF (control%l_blue_flux_surf) THEN
+  !           DO l=1, n_profile
+  !             radout%flux_direct_blue_surf(l) &
+  !               = weight_blue_incr*sph%allsky%flux_direct(l, n_layer+1)
+  !           END DO
+  !         END IF
+  !       ELSE
+  !         IF (control%l_blue_flux_surf) THEN
+  !           DO l=1, n_profile
+  !             radout%flux_direct_blue_surf(l) &
+  !               = weight_blue_incr*flux_direct_incr(l, n_layer)
+  !           END DO
+  !         END IF
+  !       END IF
+  !       IF (control%l_blue_flux_surf) THEN
+  !         DO l=1, n_profile
+  !           radout%flux_up_blue_surf(l) &
+  !             = weight_blue_incr*flux_total_incr(l, 2*n_layer+1)
+  !           radout%flux_down_blue_surf(l) &
+  !             = weight_blue_incr*flux_total_incr(l, 2*n_layer+2)
+  !         END DO
+  !       END IF
+  !     END IF
 
-    ELSE IF ( (control%i_angular_integration == ip_spherical_harmonic).AND. &
-              (control%i_sph_mode == ip_sph_mode_rad) ) THEN
+  !   ELSE IF ( (control%i_angular_integration == ip_spherical_harmonic).AND. &
+  !             (control%i_sph_mode == ip_sph_mode_rad) ) THEN
 
-      IF (control%isolir == ip_solar) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            i_direct(l, i)=weight_incr*i_direct_incr(l, i)
-          END DO
-        END DO
-      END IF
+  !     IF (control%isolir == ip_solar) THEN
+  !       DO i=0, n_layer
+  !         DO l=1, n_profile
+  !           i_direct(l, i)=weight_incr*i_direct_incr(l, i)
+  !         END DO
+  !       END DO
+  !     END IF
 
-    END IF
-    l_initial = .FALSE.
-  ELSE
-    IF ( (control%i_angular_integration == ip_two_stream).OR. &
-         (control%i_angular_integration == ip_ir_gauss).OR. &
-       ( (control%i_angular_integration == ip_spherical_harmonic).AND. &
-         (control%i_sph_mode == ip_sph_mode_flux) ) ) THEN
+  !   END IF
+  !   l_initial = .FALSE.
+  !ELSE
+  IF ( (control%i_angular_integration == ip_two_stream).OR. &
+  (control%i_angular_integration == ip_ir_gauss).OR. &
+( (control%i_angular_integration == ip_spherical_harmonic).AND. &
+  (control%i_sph_mode == ip_sph_mode_flux) ) ) THEN
 
-      IF (control%isolir == ip_solar) THEN
-        IF (control%l_spherical_solar) THEN
-          IF (control%l_blue_flux_surf) THEN
-            DO l=1, n_profile
-              radout%flux_direct_blue_surf(l) &
-                = radout%flux_direct_blue_surf(l) &
-                + weight_blue_incr*sph%allsky%flux_direct(l, n_layer+1)
-            END DO
-          END IF
-        ELSE
-          IF (control%l_blue_flux_surf) THEN
-            DO l=1, n_profile
-              radout%flux_direct_blue_surf(l) &
-                = radout%flux_direct_blue_surf(l) &
-                + weight_blue_incr*flux_direct_incr(l, n_layer)
-            END DO
-          END IF
-        END IF
-        IF (control%l_blue_flux_surf) THEN
-          DO l=1, n_profile
-            radout%flux_up_blue_surf(l) &
-              = radout%flux_up_blue_surf(l) &
-              + weight_blue_incr*flux_total_incr(l, 2*n_layer+1)
-            radout%flux_down_blue_surf(l) &
-              = radout%flux_down_blue_surf(l) &
-              + weight_blue_incr*flux_total_incr(l, 2*n_layer+2)
-          END DO
-        END IF
-      END IF
+IF (control%isolir == ip_solar) THEN
+ IF (control%l_spherical_solar) THEN
+   IF (control%l_blue_flux_surf) THEN
+      DO l=1, n_profile
+!$OMP atomic                
+       radout%flux_direct_blue_surf(l) &
+         = radout%flux_direct_blue_surf(l) &
+         + weight_blue_incr*sph%allsky%flux_direct(l, n_layer+1)
+     END DO
+   END IF
+ ELSE
+   IF (control%l_blue_flux_surf) THEN
+      DO l=1, n_profile
+!$OMP atomic
+       radout%flux_direct_blue_surf(l) &
+         = radout%flux_direct_blue_surf(l) &
+         + weight_blue_incr*flux_direct_incr(l, n_layer)
+     END DO
+   END IF
+ END IF
+ IF (control%l_blue_flux_surf) THEN
+    DO l=1, n_profile
+!$OMP atomic              
+     radout%flux_up_blue_surf(l) &
+       = radout%flux_up_blue_surf(l) &
+       + weight_blue_incr*flux_total_incr(l, 2*n_layer+1)
+!$OMP atomic            
+     radout%flux_down_blue_surf(l) &
+       = radout%flux_down_blue_surf(l) &
+       + weight_blue_incr*flux_total_incr(l, 2*n_layer+2)
+   END DO
+ END IF
+END IF
 
-    ELSE IF ( (control%i_angular_integration == ip_spherical_harmonic).AND. &
-              (control%i_sph_mode == ip_sph_mode_rad) ) THEN
+ELSE IF ( (control%i_angular_integration == ip_spherical_harmonic).AND. &
+       (control%i_sph_mode == ip_sph_mode_rad) ) THEN
 
-      IF (control%isolir == ip_solar) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            i_direct(l, i)=i_direct(l, i) &
-              +weight_incr*i_direct_incr(l, i)
-          END DO
-        END DO
-      END IF
+IF (control%isolir == ip_solar) THEN
+ DO i=0, n_layer
+    DO l=1, n_profile
+!$OMP atomic              
+     i_direct(l, i)=i_direct(l, i) &
+       +weight_incr*i_direct_incr(l, i)
+   END DO
+ END DO
+END IF
 
-    END IF
-  END IF
+END IF
+!  END IF
 
+!=============================================================================================
+! HII commented region for OMP optimization (see above)
+!=============================================================================================
+!   IF (l_initial_band(i_band)) THEN
+! !   Initialise the band-by-band fluxes
+!     IF (control%l_flux_direct_band) THEN
+!       DO i=0, n_layer
+!         DO l=1, n_profile
+!           radout%flux_direct_band(l, i, i_band) &
+!             = weight_incr*flux_direct_incr(l, i)
+!         END DO
+!       END DO
+!     END IF
+!     IF (control%l_flux_direct_div_band .AND. &
+!         control%l_spherical_solar) THEN
+!       DO i=1, n_layer
+!         DO l=1, n_profile
+!           radout%flux_direct_div_band(l, i, i_band) &
+!             = weight_incr*sph%allsky%flux_direct_div(l, i)
+!         END DO
+!       END DO
+!     END IF
+!     IF (control%l_flux_direct_sph_band .AND. &
+!         control%l_spherical_solar) THEN
+!       DO i=0, n_layer+1
+!         DO l=1, n_profile
+!           radout%flux_direct_sph_band(l, i, i_band) &
+!             = weight_incr*sph%allsky%flux_direct(l, i)
+!         END DO
+!       END DO
+!     END IF
+!     IF (control%l_flux_down_band) THEN
+!       DO i=0, n_layer
+!         DO l=1, n_profile
+!           radout%flux_down_band(l, i, i_band) &
+!             = weight_incr*flux_total_incr(l, 2*i+2)
+!         END DO
+!       END DO
+!     END IF
+!     IF (control%l_flux_up_band) THEN
+!       DO i=0, n_layer
+!         DO l=1, n_profile
+!           radout%flux_up_band(l, i, i_band) &
+!             = weight_incr*flux_total_incr(l, 2*i+1)
+!         END DO
+!       END DO
+!     END IF
+!     IF (control%l_flux_div_band .AND. .NOT.control%l_map_sub_bands) THEN
+!       IF (control%isolir == ip_solar .AND. control%l_spherical_solar) THEN
+!         DO i=1, n_layer
+!           DO l=1, n_profile
+!             radout%flux_div_band(l, i, i_band) &
+!               = weight_incr * &
+!               ( flux_total_incr(l, 2*i+1) - flux_total_incr(l, 2*i-1) &
+!               + flux_total_incr(l, 2*i)   - flux_total_incr(l, 2*i+2) &
+!               + sph%allsky%flux_direct_div(l, i) )
+!           END DO
+!         END DO
+!       ELSE
+!         DO i=1, n_layer
+!           DO l=1, n_profile
+!             radout%flux_div_band(l, i, i_band) &
+!               = weight_incr * &
+!               ( flux_total_incr(l, 2*i+1) - flux_total_incr(l, 2*i-1) &
+!               + flux_total_incr(l, 2*i)   - flux_total_incr(l, 2*i+2) )
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%isolir == ip_solar .AND. control%l_orog .AND. &
+!         .NOT. control%l_spherical_solar) THEN
+!         DO l=1, n_profile
+!           radout%flux_div_band(l, n_layer, i_band) &
+!             = radout%flux_div_band(l, n_layer, i_band) &
+!             + weight_incr*flux_direct_incr(l, n_layer) &
+!             * (bound%orog_corr(l) - 1.0_RealK)/bound%orog_corr(l)
+!         END DO
+!       END IF
+!       DO i_path=1, sp%photol%n_pathway
+!         DO i=1, n_layer
+!           DO l=1, n_profile
+!             radout%flux_div_band(l, i, i_band) &
+!               = radout%flux_div_band(l, i, i_band) &
+!               - photolysis_div_incr(l, i, i_path)
+!           END DO
+!         END DO
+!       END DO
+!     END IF
+!     IF (control%l_actinic_flux_band) THEN
+!       DO i=1, n_layer
+!         DO l=1, n_profile
+!           radout%actinic_flux_band(l, i, i_band) &
+!             = weight_incr*actinic_flux_incr(l, i)
+!         END DO
+!       END DO
+!     END IF
 
-  IF (l_initial_band(i_band)) THEN
+!     IF (l_clear) THEN
 
-!   Initialise the band-by-band fluxes
-    IF (control%l_flux_direct_band) THEN
-      DO i=0, n_layer
-        DO l=1, n_profile
-          radout%flux_direct_band(l, i, i_band) &
-            = weight_incr*flux_direct_incr(l, i)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_direct_div_band .AND. &
-        control%l_spherical_solar) THEN
-      DO i=1, n_layer
-        DO l=1, n_profile
-          radout%flux_direct_div_band(l, i, i_band) &
-            = weight_incr*sph%allsky%flux_direct_div(l, i)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_direct_sph_band .AND. &
-        control%l_spherical_solar) THEN
-      DO i=0, n_layer+1
-        DO l=1, n_profile
-          radout%flux_direct_sph_band(l, i, i_band) &
-            = weight_incr*sph%allsky%flux_direct(l, i)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_down_band) THEN
-      DO i=0, n_layer
-        DO l=1, n_profile
-          radout%flux_down_band(l, i, i_band) &
-            = weight_incr*flux_total_incr(l, 2*i+2)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_up_band) THEN
-      DO i=0, n_layer
-        DO l=1, n_profile
-          radout%flux_up_band(l, i, i_band) &
-            = weight_incr*flux_total_incr(l, 2*i+1)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_div_band .AND. .NOT.control%l_map_sub_bands) THEN
-      IF (control%isolir == ip_solar .AND. control%l_spherical_solar) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_div_band(l, i, i_band) &
-              = weight_incr * &
-              ( flux_total_incr(l, 2*i+1) - flux_total_incr(l, 2*i-1) &
-              + flux_total_incr(l, 2*i)   - flux_total_incr(l, 2*i+2) &
-              + sph%allsky%flux_direct_div(l, i) )
-          END DO
-        END DO
-      ELSE
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_div_band(l, i, i_band) &
-              = weight_incr * &
-              ( flux_total_incr(l, 2*i+1) - flux_total_incr(l, 2*i-1) &
-              + flux_total_incr(l, 2*i)   - flux_total_incr(l, 2*i+2) )
-          END DO
-        END DO
-      END IF
-      IF (control%isolir == ip_solar .AND. control%l_orog .AND. &
-        .NOT. control%l_spherical_solar) THEN
-        DO l=1, n_profile
-          radout%flux_div_band(l, n_layer, i_band) &
-            = radout%flux_div_band(l, n_layer, i_band) &
-            + weight_incr*flux_direct_incr(l, n_layer) &
-            * (bound%orog_corr(l) - 1.0_RealK)/bound%orog_corr(l)
-        END DO
-      END IF
-      DO i_path=1, sp%photol%n_pathway
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_div_band(l, i, i_band) &
-              = radout%flux_div_band(l, i, i_band) &
-              - photolysis_div_incr(l, i, i_path)
-          END DO
-        END DO
-      END DO
-    END IF
-    IF (control%l_actinic_flux_band) THEN
-      DO i=1, n_layer
-        DO l=1, n_profile
-          radout%actinic_flux_band(l, i, i_band) &
-            = weight_incr*actinic_flux_incr(l, i)
-        END DO
-      END DO
-    END IF
+!       IF (control%l_flux_direct_clear_band .OR. &
+!            (.NOT.control%l_spherical_solar .AND. &
+!              ( control%l_cloud_extinction .OR. &
+!                control%l_ls_cloud_extinction .OR. &
+!                control%l_cnv_cloud_extinction ) ) ) THEN
+!         DO i=0, n_layer
+!           DO l=1, n_profile
+!             radout%flux_direct_clear_band(l, i, i_band) &
+!               = weight_incr*flux_direct_incr_clear(l, i)
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_flux_direct_clear_div_band .AND. &
+!           control%l_spherical_solar) THEN
+!         DO i=1, n_layer
+!           DO l=1, n_profile
+!             radout%flux_direct_clear_div_band(l, i, i_band) &
+!               = weight_incr*sph%clear%flux_direct_div(l, i)
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_spherical_solar .AND. &
+!            (control%l_flux_direct_clear_sph_band .OR. &
+!             control%l_cloud_extinction .OR. &
+!             control%l_ls_cloud_extinction .OR. &
+!             control%l_cnv_cloud_extinction)) THEN
+!         DO i=0, n_layer+1
+!           DO l=1, n_profile
+!             radout%flux_direct_clear_sph_band(l, i, i_band) &
+!               = weight_incr*sph%clear%flux_direct(l, i)
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_flux_down_clear_band) THEN
+!         DO i=0, n_layer
+!           DO l=1, n_profile
+!             radout%flux_down_clear_band(l, i, i_band) &
+!               = weight_incr*flux_total_incr_clear(l, 2*i+2)
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_flux_up_clear_band .OR. &
+!           control%l_cloud_absorptivity .OR. &
+!           control%l_ls_cloud_absorptivity .OR. &
+!           control%l_cnv_cloud_absorptivity) THEN
+!         DO i=0, n_layer
+!           DO l=1, n_profile
+!             radout%flux_up_clear_band(l, i, i_band) &
+!               = weight_incr*flux_total_incr_clear(l, 2*i+1)
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_flux_div_clear_band .AND. .NOT.control%l_map_sub_bands) THEN
+!         IF (control%isolir == ip_solar .AND. control%l_spherical_solar) THEN
+!           DO i=1, n_layer
+!             DO l=1, n_profile
+!               radout%flux_div_clear_band(l, i, i_band) &
+!                 = weight_incr * &
+!                 ( flux_total_incr_clear(l, 2*i+1) &
+!                 - flux_total_incr_clear(l, 2*i-1) &
+!                 + flux_total_incr_clear(l, 2*i) &
+!                 - flux_total_incr_clear(l, 2*i+2) &
+!                 + sph%clear%flux_direct_div(l, i) )
+!             END DO
+!           END DO
+!         ELSE
+!           DO i=1, n_layer
+!             DO l=1, n_profile
+!               radout%flux_div_clear_band(l, i, i_band) &
+!                 = weight_incr * &
+!                 ( flux_total_incr_clear(l, 2*i+1) &
+!                 - flux_total_incr_clear(l, 2*i-1) &
+!                 + flux_total_incr_clear(l, 2*i) &
+!                 - flux_total_incr_clear(l, 2*i+2) )
+!             END DO
+!           END DO
+!         END IF
+!         IF (control%isolir == ip_solar .AND. control%l_orog .AND. &
+!           .NOT. control%l_spherical_solar) THEN
+!           DO l=1, n_profile
+!             radout%flux_div_clear_band(l, n_layer, i_band) &
+!               = radout%flux_div_clear_band(l, n_layer, i_band) &
+!               + weight_incr*flux_direct_incr_clear(l, n_layer) &
+!               * (bound%orog_corr(l) - 1.0_RealK)/bound%orog_corr(l)
+!           END DO
+!         END IF
+!         DO i_path=1, sp%photol%n_pathway
+!           DO i=1, n_layer
+!             DO l=1, n_profile
+!               radout%flux_div_clear_band(l, i, i_band) &
+!                 = radout%flux_div_clear_band(l, i, i_band) &
+!                 - photolysis_div_incr(l, i, i_path)
+!             END DO
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_actinic_flux_clear_band) THEN
+!         DO i=1, n_layer
+!           DO l=1, n_profile
+!             radout%actinic_flux_clear_band(l, i, i_band) &
+!               = weight_incr*actinic_flux_incr_clear(l, i)
+!           END DO
+!         END DO
+!       END IF
 
-    IF (l_clear) THEN
+!     ELSE ! .NOT. l_clear_band
 
-      IF (control%l_flux_direct_clear_band .OR. &
-           (.NOT.control%l_spherical_solar .AND. &
-             ( control%l_cloud_extinction .OR. &
-               control%l_ls_cloud_extinction .OR. &
-               control%l_cnv_cloud_extinction ) ) ) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_direct_clear_band(l, i, i_band) &
-              = weight_incr*flux_direct_incr_clear(l, i)
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_direct_clear_div_band .AND. &
-          control%l_spherical_solar) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_direct_clear_div_band(l, i, i_band) &
-              = weight_incr*sph%clear%flux_direct_div(l, i)
-          END DO
-        END DO
-      END IF
-      IF (control%l_spherical_solar .AND. &
-           (control%l_flux_direct_clear_sph_band .OR. &
-            control%l_cloud_extinction .OR. &
-            control%l_ls_cloud_extinction .OR. &
-            control%l_cnv_cloud_extinction)) THEN
-        DO i=0, n_layer+1
-          DO l=1, n_profile
-            radout%flux_direct_clear_sph_band(l, i, i_band) &
-              = weight_incr*sph%clear%flux_direct(l, i)
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_down_clear_band) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_down_clear_band(l, i, i_band) &
-              = weight_incr*flux_total_incr_clear(l, 2*i+2)
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_up_clear_band .OR. &
-          control%l_cloud_absorptivity .OR. &
-          control%l_ls_cloud_absorptivity .OR. &
-          control%l_cnv_cloud_absorptivity) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_up_clear_band(l, i, i_band) &
-              = weight_incr*flux_total_incr_clear(l, 2*i+1)
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_div_clear_band .AND. .NOT.control%l_map_sub_bands) THEN
-        IF (control%isolir == ip_solar .AND. control%l_spherical_solar) THEN
-          DO i=1, n_layer
-            DO l=1, n_profile
-              radout%flux_div_clear_band(l, i, i_band) &
-                = weight_incr * &
-                ( flux_total_incr_clear(l, 2*i+1) &
-                - flux_total_incr_clear(l, 2*i-1) &
-                + flux_total_incr_clear(l, 2*i) &
-                - flux_total_incr_clear(l, 2*i+2) &
-                + sph%clear%flux_direct_div(l, i) )
-            END DO
-          END DO
-        ELSE
-          DO i=1, n_layer
-            DO l=1, n_profile
-              radout%flux_div_clear_band(l, i, i_band) &
-                = weight_incr * &
-                ( flux_total_incr_clear(l, 2*i+1) &
-                - flux_total_incr_clear(l, 2*i-1) &
-                + flux_total_incr_clear(l, 2*i) &
-                - flux_total_incr_clear(l, 2*i+2) )
-            END DO
-          END DO
-        END IF
-        IF (control%isolir == ip_solar .AND. control%l_orog .AND. &
-          .NOT. control%l_spherical_solar) THEN
-          DO l=1, n_profile
-            radout%flux_div_clear_band(l, n_layer, i_band) &
-              = radout%flux_div_clear_band(l, n_layer, i_band) &
-              + weight_incr*flux_direct_incr_clear(l, n_layer) &
-              * (bound%orog_corr(l) - 1.0_RealK)/bound%orog_corr(l)
-          END DO
-        END IF
-        DO i_path=1, sp%photol%n_pathway
-          DO i=1, n_layer
-            DO l=1, n_profile
-              radout%flux_div_clear_band(l, i, i_band) &
-                = radout%flux_div_clear_band(l, i, i_band) &
-                - photolysis_div_incr(l, i, i_path)
-            END DO
-          END DO
-        END DO
-      END IF
-      IF (control%l_actinic_flux_clear_band) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%actinic_flux_clear_band(l, i, i_band) &
-              = weight_incr*actinic_flux_incr_clear(l, i)
-          END DO
-        END DO
-      END IF
+!       IF (control%l_flux_direct_clear_band .OR. &
+!            (.NOT.control%l_spherical_solar .AND. &
+!              ( control%l_cloud_extinction .OR. &
+!                control%l_ls_cloud_extinction .OR. &
+!                control%l_cnv_cloud_extinction ) ) ) THEN
+!         DO i=0, n_layer
+!           DO l=1, n_profile
+!             radout%flux_direct_clear_band(l, i, i_band) = 0.0_RealK
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_flux_direct_clear_div_band .AND. &
+!           control%l_spherical_solar) THEN
+!         DO i=1, n_layer
+!           DO l=1, n_profile
+!             radout%flux_direct_clear_div_band(l, i, i_band) = 0.0_RealK
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_spherical_solar .AND. &
+!            (control%l_flux_direct_clear_sph_band .OR. &
+!             control%l_cloud_extinction .OR. &
+!             control%l_ls_cloud_extinction .OR. &
+!             control%l_cnv_cloud_extinction)) THEN
+!         DO i=0, n_layer+1
+!           DO l=1, n_profile
+!             radout%flux_direct_clear_sph_band(l, i, i_band) = 0.0_RealK
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_flux_down_clear_band) THEN
+!         DO i=0, n_layer
+!           DO l=1, n_profile
+!             radout%flux_down_clear_band(l, i, i_band) = 0.0_RealK
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_flux_up_clear_band .OR. &
+!           control%l_cloud_absorptivity .OR. &
+!           control%l_ls_cloud_absorptivity .OR. &
+!           control%l_cnv_cloud_absorptivity) THEN
+!         DO i=0, n_layer
+!           DO l=1, n_profile
+!             radout%flux_up_clear_band(l, i, i_band) = 0.0_RealK
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_flux_div_clear_band) THEN
+!         DO i=1, n_layer
+!           DO l=1, n_profile
+!             radout%flux_div_clear_band(l, i, i_band) = 0.0_RealK
+!           END DO
+!         END DO
+!       END IF
+!       IF (control%l_actinic_flux_clear_band) THEN
+!         DO i=1, n_layer
+!           DO l=1, n_profile
+!             radout%actinic_flux_clear_band(l, i, i_band) = 0.0_RealK
+!           END DO
+!         END DO
+!       END IF      
 
-    ELSE ! .NOT. l_clear_band
+!     END IF
 
-      IF (control%l_flux_direct_clear_band .OR. &
-           (.NOT.control%l_spherical_solar .AND. &
-             ( control%l_cloud_extinction .OR. &
-               control%l_ls_cloud_extinction .OR. &
-               control%l_cnv_cloud_extinction ) ) ) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_direct_clear_band(l, i, i_band) = 0.0_RealK
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_direct_clear_div_band .AND. &
-          control%l_spherical_solar) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_direct_clear_div_band(l, i, i_band) = 0.0_RealK
-          END DO
-        END DO
-      END IF
-      IF (control%l_spherical_solar .AND. &
-           (control%l_flux_direct_clear_sph_band .OR. &
-            control%l_cloud_extinction .OR. &
-            control%l_ls_cloud_extinction .OR. &
-            control%l_cnv_cloud_extinction)) THEN
-        DO i=0, n_layer+1
-          DO l=1, n_profile
-            radout%flux_direct_clear_sph_band(l, i, i_band) = 0.0_RealK
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_down_clear_band) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_down_clear_band(l, i, i_band) = 0.0_RealK
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_up_clear_band .OR. &
-          control%l_cloud_absorptivity .OR. &
-          control%l_ls_cloud_absorptivity .OR. &
-          control%l_cnv_cloud_absorptivity) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_up_clear_band(l, i, i_band) = 0.0_RealK
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_div_clear_band) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_div_clear_band(l, i, i_band) = 0.0_RealK
-          END DO
-        END DO
-      END IF
-      IF (control%l_actinic_flux_clear_band) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%actinic_flux_clear_band(l, i, i_band) = 0.0_RealK
-          END DO
-        END DO
-      END IF      
+!     IF (control%l_contrib_func_band) THEN
+!       DO i=1, n_layer
+!         DO l=1, n_profile
+!           radout%contrib_funci_band(l, i, i_band) &
+!             = weight_incr*contrib_funci_incr(l, i)
+!           radout%contrib_funcf_band(l, i, i_band) &
+!             = weight_incr*contrib_funcf_incr(l, i)
+!         END DO
+!       END DO
+!     END IF
 
-    END IF
-
-    IF (control%l_contrib_func_band) THEN
-      DO i=1, n_layer
-        DO l=1, n_profile
-          radout%contrib_funci_band(l, i, i_band) &
-            = weight_incr*contrib_funci_incr(l, i)
-          radout%contrib_funcf_band(l, i, i_band) &
-            = weight_incr*contrib_funcf_incr(l, i)
-        END DO
-      END DO
-    END IF
-
-    l_initial_band(i_band) = .FALSE.
-
-  ELSE
+!     l_initial_band(i_band) = .FALSE.
+!
+!  ELSE
 
 !   Increment the band-by-band fluxes
-    IF (control%l_flux_direct_band) THEN
-      DO i=0, n_layer
-        DO l=1, n_profile
-          radout%flux_direct_band(l, i, i_band) &
-            = radout%flux_direct_band(l, i, i_band) &
-            + weight_incr*flux_direct_incr(l, i)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_direct_div_band .AND. &
-        control%l_spherical_solar) THEN
-      DO i=1, n_layer
-        DO l=1, n_profile
-          radout%flux_direct_div_band(l, i, i_band) &
-            = radout%flux_direct_div_band(l, i, i_band) &
-            + weight_incr*sph%allsky%flux_direct_div(l, i)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_direct_sph_band .AND. &
-        control%l_spherical_solar) THEN
-      DO i=0, n_layer+1
-        DO l=1, n_profile
-          radout%flux_direct_sph_band(l, i, i_band) &
-            = radout%flux_direct_sph_band(l, i, i_band) &
-            + weight_incr*sph%allsky%flux_direct(l, i)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_down_band) THEN
-      DO i=0, n_layer
-        DO l=1, n_profile
-          radout%flux_down_band(l, i, i_band) &
-            = radout%flux_down_band(l, i, i_band) &
-            + weight_incr*flux_total_incr(l, 2*i+2)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_up_band) THEN
-      DO i=0, n_layer
-        DO l=1, n_profile
-          radout%flux_up_band(l, i, i_band) &
-            = radout%flux_up_band(l, i, i_band) &
-            + weight_incr*flux_total_incr(l, 2*i+1)
-        END DO
-      END DO
-    END IF
-    IF (control%l_flux_div_band .AND. .NOT.control%l_map_sub_bands) THEN
-      IF (control%isolir == ip_solar .AND. control%l_spherical_solar) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_div_band(l, i, i_band) &
-              = radout%flux_div_band(l, i, i_band) + weight_incr * &
-              ( flux_total_incr(l, 2*i+1) - flux_total_incr(l, 2*i-1) &
-              + flux_total_incr(l, 2*i)   - flux_total_incr(l, 2*i+2) &
-              + sph%allsky%flux_direct_div(l, i) )
-          END DO
-        END DO
-      ELSE
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_div_band(l, i, i_band) &
-              = radout%flux_div_band(l, i, i_band) + weight_incr * &
-              ( flux_total_incr(l, 2*i+1) - flux_total_incr(l, 2*i-1) &
-              + flux_total_incr(l, 2*i)   - flux_total_incr(l, 2*i+2) )
-          END DO
-        END DO
-      END IF
-      IF (control%isolir == ip_solar .AND. control%l_orog .AND. &
-        .NOT. control%l_spherical_solar) THEN
-        DO l=1, n_profile
-          radout%flux_div_band(l, n_layer, i_band) &
-            = radout%flux_div_band(l, n_layer, i_band) &
-            + weight_incr*flux_direct_incr(l, n_layer) &
-            * (bound%orog_corr(l) - 1.0_RealK)/bound%orog_corr(l)
-        END DO
-      END IF
-      DO i_path=1, sp%photol%n_pathway
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_div_band(l, i, i_band) &
-              = radout%flux_div_band(l, i, i_band) &
-              - photolysis_div_incr(l, i, i_path)
-          END DO
-        END DO
-      END DO
-    END IF
-    IF (control%l_actinic_flux_band) THEN
-      DO i=1, n_layer
-        DO l=1, n_profile
-          radout%actinic_flux_band(l, i, i_band) &
-            = radout%actinic_flux_band(l, i, i_band) &
-            + weight_incr*actinic_flux_incr(l, i)
-        END DO
-      END DO
-    END IF
+IF (control%l_flux_direct_band) THEN
+DO i=0, n_layer
+  DO l=1, n_profile
+!$OMP atomic            
+   radout%flux_direct_band(l, i, i_band) &
+     = radout%flux_direct_band(l, i, i_band) &
+     + weight_incr*flux_direct_incr(l, i)
+ END DO
+END DO
+END IF
+IF (control%l_flux_direct_div_band .AND. &
+ control%l_spherical_solar) THEN
+DO i=1, n_layer
+  DO l=1, n_profile
+!$OMP atomic                        
+   radout%flux_direct_div_band(l, i, i_band) &
+     = radout%flux_direct_div_band(l, i, i_band) &
+     + weight_incr*sph%allsky%flux_direct_div(l, i)
+ END DO
+END DO
+END IF
+IF (control%l_flux_direct_sph_band .AND. &
+ control%l_spherical_solar) THEN
+DO i=0, n_layer+1
+  DO l=1, n_profile
+!$OMP atomic                        
+   radout%flux_direct_sph_band(l, i, i_band) &
+     = radout%flux_direct_sph_band(l, i, i_band) &
+     + weight_incr*sph%allsky%flux_direct(l, i)
+ END DO
+END DO
+END IF
+IF (control%l_flux_down_band) THEN
+DO i=0, n_layer
+  DO l=1, n_profile
+!$OMP atomic                        
+   radout%flux_down_band(l, i, i_band) &
+     = radout%flux_down_band(l, i, i_band) &
+     + weight_incr*flux_total_incr(l, 2*i+2)
+ END DO
+END DO
+END IF
+IF (control%l_flux_up_band) THEN
+DO i=0, n_layer
+  DO l=1, n_profile
+!$OMP atomic                        
+   radout%flux_up_band(l, i, i_band) &
+     = radout%flux_up_band(l, i, i_band) &
+     + weight_incr*flux_total_incr(l, 2*i+1)
+ END DO
+END DO
+END IF
+IF (control%l_flux_div_band .AND. .NOT.control%l_map_sub_bands) THEN
+IF (control%isolir == ip_solar .AND. control%l_spherical_solar) THEN
+ DO i=1, n_layer
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_div_band(l, i, i_band) &
+       = radout%flux_div_band(l, i, i_band) + weight_incr * &
+       ( flux_total_incr(l, 2*i+1) - flux_total_incr(l, 2*i-1) &
+       + flux_total_incr(l, 2*i)   - flux_total_incr(l, 2*i+2) &
+       + sph%allsky%flux_direct_div(l, i) )
+   END DO
+ END DO
+ELSE
+ DO i=1, n_layer
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_div_band(l, i, i_band) &
+       = radout%flux_div_band(l, i, i_band) + weight_incr * &
+       ( flux_total_incr(l, 2*i+1) - flux_total_incr(l, 2*i-1) &
+       + flux_total_incr(l, 2*i)   - flux_total_incr(l, 2*i+2) )
+   END DO
+ END DO
+END IF
+IF (control%isolir == ip_solar .AND. control%l_orog .AND. &
+ .NOT. control%l_spherical_solar) THEN
+  DO l=1, n_profile
+!$OMP atomic                        
+   radout%flux_div_band(l, n_layer, i_band) &
+     = radout%flux_div_band(l, n_layer, i_band) &
+     + weight_incr*flux_direct_incr(l, n_layer) &
+     * (bound%orog_corr(l) - 1.0_RealK)/bound%orog_corr(l)
+ END DO
+END IF
+DO i_path=1, sp%photol%n_pathway
+ DO i=1, n_layer
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_div_band(l, i, i_band) &
+       = radout%flux_div_band(l, i, i_band) &
+       - photolysis_div_incr(l, i, i_path)
+   END DO
+ END DO
+END DO
+END IF
+IF (control%l_actinic_flux_band) THEN
+DO i=1, n_layer
+  DO l=1, n_profile
+!$OMP atomic                        
+   radout%actinic_flux_band(l, i, i_band) &
+     = radout%actinic_flux_band(l, i, i_band) &
+     + weight_incr*actinic_flux_incr(l, i)
+ END DO
+END DO
+END IF
 
-    IF (l_clear) THEN
-      IF (control%l_flux_direct_clear_band .OR. &
-           (.NOT.control%l_spherical_solar .AND. &
-             ( control%l_cloud_extinction .OR. &
-               control%l_ls_cloud_extinction .OR. &
-               control%l_cnv_cloud_extinction ) ) ) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_direct_clear_band(l, i, i_band) &
-              = radout%flux_direct_clear_band(l, i, i_band) &
-              + weight_incr*flux_direct_incr_clear(l, i)
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_direct_clear_div_band .AND. &
-          control%l_spherical_solar) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%flux_direct_clear_div_band(l, i, i_band) &
-              = radout%flux_direct_clear_div_band(l, i, i_band) &
-              + weight_incr*sph%clear%flux_direct_div(l, i)
-          END DO
-        END DO
-      END IF
-      IF (control%l_spherical_solar .AND. &
-           (control%l_flux_direct_clear_sph_band .OR. &
-            control%l_cloud_extinction .OR. &
-            control%l_ls_cloud_extinction .OR. &
-            control%l_cnv_cloud_extinction)) THEN
-        DO i=0, n_layer+1
-          DO l=1, n_profile
-            radout%flux_direct_clear_sph_band(l, i, i_band) &
-              = radout%flux_direct_clear_sph_band(l, i, i_band) &
-              + weight_incr*sph%clear%flux_direct(l, i)
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_down_clear_band) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_down_clear_band(l, i, i_band) &
-              = radout%flux_down_clear_band(l, i, i_band) &
-              + weight_incr*flux_total_incr_clear(l, 2*i+2)
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_up_clear_band .OR. &
-          control%l_cloud_absorptivity .OR. &
-          control%l_ls_cloud_absorptivity .OR. &
-          control%l_cnv_cloud_absorptivity) THEN
-        DO i=0, n_layer
-          DO l=1, n_profile
-            radout%flux_up_clear_band(l, i, i_band) &
-              = radout%flux_up_clear_band(l, i, i_band) &
-              + weight_incr*flux_total_incr_clear(l, 2*i+1)
-          END DO
-        END DO
-      END IF
-      IF (control%l_flux_div_clear_band .AND. .NOT.control%l_map_sub_bands) THEN
-        IF (control%isolir == ip_solar .AND. control%l_spherical_solar) THEN
-          DO i=1, n_layer
-            DO l=1, n_profile
-              radout%flux_div_clear_band(l, i, i_band) &
-                = radout%flux_div_clear_band(l, i, i_band) + weight_incr * &
-                ( flux_total_incr_clear(l, 2*i+1) &
-                - flux_total_incr_clear(l, 2*i-1) &
-                + flux_total_incr_clear(l, 2*i) &
-                - flux_total_incr_clear(l, 2*i+2) &
-                + sph%clear%flux_direct_div(l, i) )
-            END DO
-          END DO
-        ELSE
-          DO i=1, n_layer
-            DO l=1, n_profile
-              radout%flux_div_clear_band(l, i, i_band) &
-                = radout%flux_div_clear_band(l, i, i_band) + weight_incr * &
-                ( flux_total_incr_clear(l, 2*i+1) &
-                - flux_total_incr_clear(l, 2*i-1) &
-                + flux_total_incr_clear(l, 2*i) &
-                - flux_total_incr_clear(l, 2*i+2) )
-            END DO
-          END DO
-        END IF
-        IF (control%isolir == ip_solar .AND. control%l_orog .AND. &
-          .NOT. control%l_spherical_solar) THEN
-          DO l=1, n_profile
-            radout%flux_div_clear_band(l, n_layer, i_band) &
-              = radout%flux_div_clear_band(l, n_layer, i_band) &
-              + weight_incr*flux_direct_incr_clear(l, n_layer) &
-              * (bound%orog_corr(l) - 1.0_RealK)/bound%orog_corr(l)
-          END DO
-        END IF
-        DO i_path=1, sp%photol%n_pathway
-          DO i=1, n_layer
-            DO l=1, n_profile
-              radout%flux_div_clear_band(l, i, i_band) &
-                = radout%flux_div_clear_band(l, i, i_band) &
-                - photolysis_div_incr(l, i, i_path)
-            END DO
-          END DO
-        END DO
-      END IF
-      IF (control%l_actinic_flux_clear_band) THEN
-        DO i=1, n_layer
-          DO l=1, n_profile
-            radout%actinic_flux_clear_band(l, i, i_band) &
-              = radout%actinic_flux_clear_band(l, i, i_band) &
-              + weight_incr*actinic_flux_incr_clear(l, i)
-          END DO
-        END DO
-      END IF
-    END IF
+IF (l_clear) THEN
+IF (control%l_flux_direct_clear_band .OR. &
+    (.NOT.control%l_spherical_solar .AND. &
+      ( control%l_cloud_extinction .OR. &
+        control%l_ls_cloud_extinction .OR. &
+        control%l_cnv_cloud_extinction ) ) ) THEN
+ DO i=0, n_layer
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_direct_clear_band(l, i, i_band) &
+       = radout%flux_direct_clear_band(l, i, i_band) &
+       + weight_incr*flux_direct_incr_clear(l, i)
+   END DO
+ END DO
+END IF
+IF (control%l_flux_direct_clear_div_band .AND. &
+   control%l_spherical_solar) THEN
+ DO i=1, n_layer
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_direct_clear_div_band(l, i, i_band) &
+       = radout%flux_direct_clear_div_band(l, i, i_band) &
+       + weight_incr*sph%clear%flux_direct_div(l, i)
+   END DO
+ END DO
+END IF
+IF (control%l_spherical_solar .AND. &
+    (control%l_flux_direct_clear_sph_band .OR. &
+     control%l_cloud_extinction .OR. &
+     control%l_ls_cloud_extinction .OR. &
+     control%l_cnv_cloud_extinction)) THEN
+ DO i=0, n_layer+1
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_direct_clear_sph_band(l, i, i_band) &
+       = radout%flux_direct_clear_sph_band(l, i, i_band) &
+       + weight_incr*sph%clear%flux_direct(l, i)
+   END DO
+ END DO
+END IF
+IF (control%l_flux_down_clear_band) THEN
+ DO i=0, n_layer
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_down_clear_band(l, i, i_band) &
+       = radout%flux_down_clear_band(l, i, i_band) &
+       + weight_incr*flux_total_incr_clear(l, 2*i+2)
+   END DO
+ END DO
+END IF
+IF (control%l_flux_up_clear_band .OR. &
+   control%l_cloud_absorptivity .OR. &
+   control%l_ls_cloud_absorptivity .OR. &
+   control%l_cnv_cloud_absorptivity) THEN
+ DO i=0, n_layer
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_up_clear_band(l, i, i_band) &
+       = radout%flux_up_clear_band(l, i, i_band) &
+       + weight_incr*flux_total_incr_clear(l, 2*i+1)
+   END DO
+ END DO
+END IF
+IF (control%l_flux_div_clear_band .AND. .NOT.control%l_map_sub_bands) THEN
+ IF (control%isolir == ip_solar .AND. control%l_spherical_solar) THEN
+   DO i=1, n_layer
+      DO l=1, n_profile
+!$OMP atomic                            
+       radout%flux_div_clear_band(l, i, i_band) &
+         = radout%flux_div_clear_band(l, i, i_band) + weight_incr * &
+         ( flux_total_incr_clear(l, 2*i+1) &
+         - flux_total_incr_clear(l, 2*i-1) &
+         + flux_total_incr_clear(l, 2*i) &
+         - flux_total_incr_clear(l, 2*i+2) &
+         + sph%clear%flux_direct_div(l, i) )
+     END DO
+   END DO
+ ELSE
+   DO i=1, n_layer
+      DO l=1, n_profile
+!$OMP atomic                            
+       radout%flux_div_clear_band(l, i, i_band) &
+         = radout%flux_div_clear_band(l, i, i_band) + weight_incr * &
+         ( flux_total_incr_clear(l, 2*i+1) &
+         - flux_total_incr_clear(l, 2*i-1) &
+         + flux_total_incr_clear(l, 2*i) &
+         - flux_total_incr_clear(l, 2*i+2) )
+     END DO
+   END DO
+ END IF
+ IF (control%isolir == ip_solar .AND. control%l_orog .AND. &
+   .NOT. control%l_spherical_solar) THEN
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%flux_div_clear_band(l, n_layer, i_band) &
+       = radout%flux_div_clear_band(l, n_layer, i_band) &
+       + weight_incr*flux_direct_incr_clear(l, n_layer) &
+       * (bound%orog_corr(l) - 1.0_RealK)/bound%orog_corr(l)
+   END DO
+ END IF
+ DO i_path=1, sp%photol%n_pathway
+   DO i=1, n_layer
+      DO l=1, n_profile
+!$OMP atomic                            
+       radout%flux_div_clear_band(l, i, i_band) &
+         = radout%flux_div_clear_band(l, i, i_band) &
+         - photolysis_div_incr(l, i, i_path)
+     END DO
+   END DO
+ END DO
+END IF
+IF (control%l_actinic_flux_clear_band) THEN
+ DO i=1, n_layer
+    DO l=1, n_profile
+!$OMP atomic                          
+     radout%actinic_flux_clear_band(l, i, i_band) &
+       = radout%actinic_flux_clear_band(l, i, i_band) &
+       + weight_incr*actinic_flux_incr_clear(l, i)
+   END DO
+ END DO
+END IF
+END IF
 
-    IF (control%l_contrib_func_band) THEN
-      DO i=1, n_layer
-        DO l=1, n_profile
-          radout%contrib_funci_band(l, i, i_band) &
-            = radout%contrib_funci_band(l, i, i_band) &
-            + weight_incr*contrib_funci_incr(l, i)
-          radout%contrib_funcf_band(l, i, i_band) &
-            = radout%contrib_funcf_band(l, i, i_band) &
-            + weight_incr*contrib_funcf_incr(l, i)
-        END DO
-      END DO
-    END IF
+IF (control%l_contrib_func_band) THEN
+DO i=1, n_layer
+  DO l=1, n_profile
+!$OMP atomic                        
+   radout%contrib_funci_band(l, i, i_band) &
+     = radout%contrib_funci_band(l, i, i_band) &
+     + weight_incr*contrib_funci_incr(l, i)
+!$OMP atomic                      
+   radout%contrib_funcf_band(l, i, i_band) &
+     = radout%contrib_funcf_band(l, i, i_band) &
+     + weight_incr*contrib_funcf_incr(l, i)
+ END DO
+END DO
+END IF
 
-  END IF
+!END IF
+
 
   IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_out,zhook_handle)
 

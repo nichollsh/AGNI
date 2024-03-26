@@ -101,7 +101,8 @@ SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
 
     IF (control%l_flux_up_band) THEN
       DO i=0, atm%n_layer
-        DO l=1, atm%n_profile
+         DO l=1, atm%n_profile
+!$OMP atomic            
           radout%flux_up_band(l, i, i_band) = &
             radout%flux_up_band(l, i, i_band) &
             + planck%flux(l, i)*control%weight_band(i_band)
@@ -110,7 +111,8 @@ SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
     END IF
     IF (control%l_flux_down_band) THEN
       DO i=0, atm%n_layer
-        DO l=1, atm%n_profile
+         DO l=1, atm%n_profile
+!$OMP atomic            
           radout%flux_down_band(l, i, i_band) = &
             radout%flux_down_band(l, i, i_band) &
             + planck%flux(l, i)*control%weight_band(i_band)
@@ -120,7 +122,8 @@ SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
     IF (l_clear) THEN
       IF (control%l_flux_up_clear_band) THEN
         DO i=0, atm%n_layer
-          DO l=1, atm%n_profile
+           DO l=1, atm%n_profile
+!$OMP atomic              
             radout%flux_up_clear_band(l, i, i_band) = &
               radout%flux_up_clear_band(l, i, i_band) &
               + planck%flux(l, i)*control%weight_band(i_band)
@@ -129,7 +132,8 @@ SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
       END IF
       IF (control%l_flux_down_clear_band) THEN
         DO i=0, atm%n_layer
-          DO l=1, atm%n_profile
+           DO l=1, atm%n_profile
+!$OMP atomic              
             radout%flux_down_clear_band(l, i, i_band) = &
               radout%flux_down_clear_band(l, i, i_band) &
               + planck%flux(l, i)*control%weight_band(i_band)
@@ -146,7 +150,8 @@ SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
     IF (control%i_sph_mode == ip_sph_mode_flux) THEN
       IF (control%l_flux_up_band) THEN
         DO i=0, atm%n_layer
-          DO l=1, atm%n_profile
+           DO l=1, atm%n_profile
+!$OMP atomic              
             radout%flux_up_band(l, i, i_band) = &
               radout%flux_up_band(l, i, i_band) &
               + pi*planck%radiance(l, i+1)*control%weight_band(i_band)
@@ -155,7 +160,8 @@ SUBROUTINE adjust_ir_radiance(control, spectrum, atm, radout, &
       END IF
       IF (control%l_flux_down_band) THEN
         DO i=0, atm%n_layer
-          DO l=1, atm%n_profile
+           DO l=1, atm%n_profile
+!$OMP atomic              
             radout%flux_down_band(l, i, i_band) = &
               radout%flux_down_band(l, i, i_band) &
               + pi*planck%radiance(l, i+1)*control%weight_band(i_band)
@@ -182,10 +188,12 @@ SUBROUTINE adjust_ir_channel()
        (control%i_angular_integration == ip_ir_gauss) ) THEN
 
     DO i=0, atm%n_layer
-      DO l=1, atm%n_profile
+       DO l=1, atm%n_profile
+!$OMP atomic          
         radout%flux_up(l, i, i_channel) = &
           radout%flux_up(l, i, i_channel) &
           + planck%flux(l, i)*weight_channel_incr
+!$OMP atomic        
         radout%flux_down(l, i, i_channel) = &
           radout%flux_down(l, i, i_channel) &
           + planck%flux(l, i)*weight_channel_incr
@@ -193,10 +201,12 @@ SUBROUTINE adjust_ir_channel()
     END DO
     IF (l_clear) THEN
       DO i=0, atm%n_layer
-        DO l=1, atm%n_profile
+         DO l=1, atm%n_profile
+!$OMP atomic            
           radout%flux_up_clear(l, i, i_channel) = &
             radout%flux_up_clear(l, i, i_channel) &
             + planck%flux(l, i)*weight_channel_incr
+!$OMP atomic          
           radout%flux_down_clear(l, i, i_channel) = &
             radout%flux_down_clear(l, i, i_channel) &
             + planck%flux(l, i)*weight_channel_incr
@@ -211,10 +221,12 @@ SUBROUTINE adjust_ir_channel()
 !   be set appropriately above.
     IF (control%i_sph_mode == ip_sph_mode_flux) THEN
       DO i=0, atm%n_layer
-        DO l=1, atm%n_profile
+         DO l=1, atm%n_profile
+!$OMP atomic            
           radout%flux_up(l, i, i_channel) = &
             radout%flux_up(l, i, i_channel) &
             + pi*planck%radiance(l, i+1)*weight_channel_incr
+!$OMP atomic          
           radout%flux_down(l, i, i_channel) = &
             radout%flux_down(l, i, i_channel) &
             + pi*planck%radiance(l, i+1)*weight_channel_incr
@@ -223,7 +235,8 @@ SUBROUTINE adjust_ir_channel()
     ELSE IF (control%i_sph_mode == ip_sph_mode_rad) THEN
       DO id=1, atm%n_direction
         DO i=1, atm%n_viewing_level
-          DO l=1, atm%n_profile
+           DO l=1, atm%n_profile
+!$OMP atomic
             radout%radiance(l, i, id, i_channel) = &
               radout%radiance(l, i, id, i_channel) &
               + planck%radiance(l, i)*weight_channel_incr

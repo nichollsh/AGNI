@@ -480,6 +480,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
   ELSE IF (control%i_angular_integration == ip_spherical_harmonic) THEN
 
 !   Set limits on ranges of harmonics and set pointers to arrays.
+! DEPENDS ON: set_truncation
     CALL set_truncation(ierr                                                   &
       , control%i_truncation, control%ls_global_trunc                          &
       , ls_max_order, ls_local_trunc                                           &
@@ -496,12 +497,14 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 !   Calculate the solar scattering angles if treating the
 !   solar beam separately.
     IF (l_solar_phf) THEN
+! DEPENDS ON: sol_scat_cos
       CALL sol_scat_cos(atm%n_profile, atm%n_direction                         &
         , bound%zen_0, atm%direction, cos_sol_view                             &
         , dimen%nd_profile, dimen%nd_direction)
     END IF
 
 !   Calculate Clebsch-Gordan coefficients once and for all.
+! DEPENDS ON: calc_cg_coeff
     CALL calc_cg_coeff(ls_max_order                                            &
       , ia_sph_mm, control%ms_min, ms_trunc                                    &
       , cg_coeff                                                               &
@@ -509,12 +512,14 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 
 !   Calculate spherical harmonics at polar angles of pi/2 for
 !   use in Marshak's boundary conditions.
+! DEPENDS ON: calc_uplm_zero
     CALL calc_uplm_zero(control%ms_min, control%ms_max, ia_sph_mm              &
       , ls_local_trunc, uplm_zero                                              &
       , dimen%nd_max_order, dimen%nd_sph_coeff)
 
     IF (control%isolir == ip_solar) THEN
 !     Calculate the spherical harmonics of the solar direction.
+! DEPENDS ON: calc_uplm_sol
       CALL calc_uplm_sol(atm%n_profile, control%ms_min, control%ms_max         &
         , ia_sph_mm                                                            &
         , ls_local_trunc, bound%zen_0, uplm_sol                                &
@@ -523,6 +528,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 
     IF (control%i_sph_algorithm == ip_sph_reduced_iter) THEN
 !     Calcuate some arrays of terms for the BRDF.
+! DEPENDS ON: calc_brdf
       CALL calc_brdf(control%isolir, control%ms_min, control%ms_max            &
         , ia_sph_mm, uplm_sol, uplm_zero                                       &
         , bound%n_brdf_basis_fnc, control%ls_brdf_trunc, bound%f_brdf          &
@@ -545,6 +551,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
          spectrum%gas%i_overlap(i_band) == ip_overlap_k_eqv_scl)
     END DO
     IF ( (control%isolir == ip_infra_red).AND.l_diff_alb ) THEN
+! DEPENDS ON: diff_albedo_basis
       CALL diff_albedo_basis(bound%n_brdf_basis_fnc                            &
         , control%ls_brdf_trunc, bound%f_brdf                                  &
         , uplm_zero(ia_sph_mm(0))                                              &
@@ -554,6 +561,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
     END IF
 
 !   Determine which layers will be required to give radiances.
+! DEPENDS ON: set_rad_layer
     CALL set_rad_layer(ierr                                                    &
       , atm%n_layer, atm%n_viewing_level, atm%viewing_level                    &
       , i_rad_layer, frac_rad_layer                                            &
@@ -607,6 +615,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
   IF (control%l_cloud) THEN
 
 !   Set pointers to the types of cloud.
+! DEPENDS ON: set_cloud_pointer
     CALL set_cloud_pointer(ierr                                                &
       , cld%n_condensed, cld%type_condensed, control%i_cloud_representation    &
       , control%l_drop, control%l_ice                                          &
@@ -616,6 +625,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 
 
 !   Set the geometry of the clouds.
+! DEPENDS ON: set_cloud_geometry
     CALL set_cloud_geometry(atm%n_profile, atm%n_layer                         &
       , control%l_global_cloud_top, cld%w_cloud                                &
       , n_cloud_top, n_cloud_profile, i_cloud_profile                          &
@@ -632,6 +642,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
       type_region(1)=ip_region_clear
       type_region(2)=ip_region_strat
       type_region(3)=ip_region_conv
+! DEPENDS ON: aggregate_cloud
       CALL aggregate_cloud(ierr                                                &
         , atm%n_profile, atm%n_layer, n_cloud_top                              &
         , control%i_cloud, control%i_cloud_representation                      &
@@ -662,6 +673,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
          (control%i_cloud == ip_cloud_part_corr).OR.                           &
          (control%i_cloud == ip_cloud_part_corr_cnv) ) THEN
 
+! DEPENDS ON: overlap_coupled
       CALL overlap_coupled(atm%n_profile, atm%n_layer, n_cloud_top             &
         , cld%w_cloud, w_free, n_region, type_region, frac_region, atm%p       &
         , control%i_cloud                                                      &
@@ -673,6 +685,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 
     ELSE IF (control%i_cloud == ip_cloud_column_max) THEN
 
+! DEPENDS ON: cloud_maxcs_split
         CALL cloud_maxcs_split(ierr, atm%n_profile, atm%n_layer                &
           , n_cloud_top, cld%w_cloud, cld%frac_cloud                           &
           , cld%n_cloud_type                                                   &
@@ -694,6 +707,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 ! Calculate temperature and pressure interpolation factor for ESFT
   IF ( ANY(spectrum%gas%i_scale_fnc(                                           &
     control%first_band : control%last_band, 1) == ip_scale_ses2) ) THEN
+! DEPENDS ON: inter_pt
     CALL inter_pt(dimen%nd_profile, dimen%nd_layer                             &
       , atm%n_profile, atm%n_layer, atm%gas_mix_ratio(1,1,i_pointer_water)     &
       , atm%p, atm%t, fac00, fac01, fac10, fac11                               &
@@ -701,6 +715,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
       , facc00, facc01, jp, jph2oc, jt, jtt, jto2c, jtswo3)
   ELSE IF ( ANY(spectrum%gas%i_scale_fnc(                                      &
     control%first_band : control%last_band, :) == ip_scale_lookup) ) THEN
+! DEPENDS ON: inter_pt_lookup
     CALL inter_pt_lookup(dimen%nd_profile, dimen%nd_layer, spectrum%dim%nd_pre &
       , spectrum%dim%nd_tmp, spectrum%dim%nd_gas_frac, spectrum%dim%nd_species &
       , spectrum%dim%nd_species_sb, atm%n_profile, atm%n_layer                 &
@@ -715,6 +730,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 ! Calculate temperature interpolation factor for continuum ESFT terms
   IF (ANY(spectrum%contgen%i_band_k_cont(                                      &
             control%first_band : control%last_band, :) > 0)) THEN
+! DEPENDS ON: inter_t_lookup
     CALL inter_t_lookup(dimen%nd_profile, dimen%nd_layer &
         , spectrum%dim%nd_t_lookup_cont, atm%n_profile, atm%n_layer, atm%t     &
         , spectrum%contgen%t_lookup_cont                                       &
@@ -729,6 +745,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 ! things, but we had to wait for certain other calculations to be
 ! made.
   IF (control%i_angular_integration == ip_spherical_harmonic) THEN
+! DEPENDS ON: check_phf_term
     CALL check_phf_term(ierr                                                   &
       , control%l_aerosol, spectrum%aerosol%n_aerosol                          &
       , spectrum%aerosol%i_aerosol_parm                                        &
@@ -803,7 +820,19 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
   l_initial_channel(:)=.TRUE.
   l_initial_channel_tile(:)=.TRUE.
 
-! Solve the equation of transfer in each band and increment the fluxes.
+  i_direct = 0.0_realk
+  ! Solve the equation of transfer in each band and increment the fluxes.
+  
+!$OMP PARALLEL DO                                                            &
+!$OMP PRIVATE(i_band, l_clear_band, i_gas_overlap, n_continuum, i_continuum, &
+!$OMP         k_continuum_mono, ierr, ss_prop, cloud_extinction_band, cloud_absorptivity_band, &
+!$OMP         ls_cloud_extinction_band, ls_cloud_absorptivity_band, cnv_cloud_extinction_band, &
+!$OMP         cnv_cloud_absorptivity_band, k_esft_layer, k_mix_gas_layer, k_contm_layer, &
+!$OMP         k, l, j, solar_irrad_band_ses, i_gas_band, i_gas_band_sb, i, jp1, jt1, jtt1, &
+!$OMP         jgf0, jgf1, sph, solar_irrad_band, k_esft_cont_layer, n_gas, l_gas_band, &
+!$OMP         n_cont, l_cont_band, cmessage, l_abs_band, n_abs, i_cont_band, nd_abs, w_abs_esft, &
+!$OMP         index_abs, n_abs_esft, l_cont_added, i_scatter_method_term, gas_frac_rescaled, &
+!$OMP         k_abs_layer, i_gas_band_1, i_gas_band_2, k_cont_layer, i_abs, major_abs, planck, j_cont,ll)
   DO i_band=control%first_band, control%last_band
 
 !   Determine whether clear-sky fluxes are required for this band
@@ -811,9 +840,9 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 
 !   Determine the gas overlap method for the band
     IF (control%i_gas_overlap_band(i_band) == ip_overlap_hybrid) THEN
-      i_gas_overlap = spectrum%gas%i_overlap(i_band)
+       i_gas_overlap = spectrum%gas%i_overlap(i_band)
     ELSE
-      i_gas_overlap = control%i_gas_overlap_band(i_band)
+       i_gas_overlap = control%i_gas_overlap_band(i_band)
     END IF
 
 !   Rescale amounts of continua.
@@ -824,6 +853,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
         i_continuum=spectrum%cont%index_continuum(i_band, i)
         IF (spectrum%cont%i_scale_fnc_cont(i_band, i) == ip_scale_ses2) THEN
           k_continuum_mono(i)=0.0
+! DEPENDS ON: ses_rescale_contm
           CALL ses_rescale_contm(dimen%nd_profile, dimen%nd_layer              &
             , i_continuum, atm%n_profile, atm%n_layer                          &
             , atm%p, atm%t, atm%gas_mix_ratio(1,1,i_pointer_water)             &
@@ -832,6 +862,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
         ELSE
           l_grey_cont = .TRUE.
           k_continuum_mono(i) = spectrum%cont%k_cont(i_band, i)
+! DEPENDS ON: rescale_continuum
           CALL rescale_continuum(control, atm%n_profile, atm%n_layer           &
             , i_continuum, atm%p, atm%t                                        &
             , atm%density, atm%gas_mix_ratio(1, 1, i_pointer_water)            &
@@ -850,7 +881,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
     CALL allocate_ss_prop(ss_prop, dimen)
 
 !   Calculate the grey extinction within the band.
-
+! DEPENDS ON: grey_opt_prop
     CALL grey_opt_prop(ierr, control, radout, i_band                           &
       , atm%n_profile, atm%n_layer, atm%p, atm%t, atm%density                  &
       , n_order_phase, l_solar_phf, atm%n_direction, cos_sol_view              &
@@ -923,6 +954,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 !       Rescale clear-sky phase function:
 
 !       The section above clouds.
+! DEPENDS ON: rescale_phase_fnc
         CALL rescale_phase_fnc(atm%n_profile, 1, n_cloud_top-1                 &
           , atm%n_direction, cos_sol_view                                      &
           , n_order_phase                                                      &
@@ -975,6 +1007,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
     IF (i_gas_overlap == ip_overlap_mix_ses2) THEN
 
 !     Interpolate absorption coefficients onto model grid
+! DEPENDS ON: inter_k
       CALL inter_k(atm%n_profile, atm%n_layer, spectrum%gas%n_band_absorb      &
         , spectrum%gas%mix_gas_band, spectrum%gas%n_mix_gas(i_band)            &
         , spectrum%gas%index_mix_gas                                           &
@@ -1220,7 +1253,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
           cmessage =                                                           &
             '*** Error: The selected gaseous overlap method is invalid.'
           ierr=i_err_fatal
-          GO TO 9999
+          CALL ereport(RoutineName, ierr, cmessage)
         END IF
 
       ELSE
@@ -1262,7 +1295,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
     IF (i_gas_overlap == ip_overlap_single .AND. n_abs > 1) THEN
       cmessage = '*** Error: The selected gaseous overlap method is invalid.'
       ierr=i_err_fatal
-      GO TO 9999
+      CALL ereport(RoutineName, ierr, cmessage)
     END IF
 
 !   Allocate absorber arrays
@@ -1299,6 +1332,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 !       Perform the rescaling of the amount of gas for this band.
         IF (spectrum%gas%i_scale_k(i_band, i_gas_band)                         &
             == ip_scale_band) THEN
+! DEPENDS ON: scale_absorb
           CALL scale_absorb(ierr, atm%n_profile, atm%n_layer                   &
             , atm%gas_mix_ratio(1, 1, i_gas_band), atm%p, atm%t                &
             , i_top                                                            &
@@ -1400,6 +1434,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
                   END DO
                 END DO
               END DO
+! DEPENDS ON: sum_k
               CALL sum_k(ierr, atm%n_profile, atm%n_layer, n_abs_esft(j)       &
                 , k_abs_layer(1, 1, 1, j), w_abs_esft(1, j)                    &
                 , spectrum%contgen%i_band_k_cont(i_band, i_cont_band)          &
@@ -1471,6 +1506,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 
 !     There is no gaseous absorption. Solve for the radiances directly.
 
+! DEPENDS ON: solve_band_without_gas
       CALL solve_band_without_gas(ierr                                         &
         , control, dimen, spectrum, atm, cld, bound, radout, i_band            &
 !                 Atmospheric properties
@@ -1542,6 +1578,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
       SELECT CASE (i_gas_overlap)
 
       CASE (ip_overlap_single)
+! DEPENDS ON: solve_band_one_gas
         CALL solve_band_one_gas(ierr                                           &
           , control, dimen, spectrum, atm, cld, bound, radout, i_band          &
 !                 Atmospheric properties
@@ -1610,6 +1647,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
           )
 
       CASE (ip_overlap_random, ip_overlap_exact_major)
+! DEPENDS ON: solve_band_random_overlap
         CALL solve_band_random_overlap(ierr                                    &
           , control, dimen, spectrum, atm, cld, bound, radout, i_band          &
 !                 Atmospheric properties
@@ -1684,6 +1722,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
       CASE (ip_overlap_random_resort_rebin)
 !       Set maximum number of ESFT terms needed
         nd_esft_max = MAX(control%n_esft_red, nd_k_term)
+! DEPENDS ON: solve_band_random_overlap_resort_rebin
         CALL solve_band_random_overlap_resort_rebin(ierr                       &
           , control, dimen, spectrum, atm, cld, bound, radout, i_band          &
 !                 Atmospheric properties
@@ -1753,6 +1792,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
           )
 
       CASE (ip_overlap_k_eqv_scl)
+         ! DEPENDS ON: solve_band_k_eqv_scl
         CALL solve_band_k_eqv_scl(ierr                                         &
           , control, dimen, spectrum, atm, cld, bound, radout                  &
 !                 Atmospheric properties
@@ -1825,6 +1865,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
           )
 
       CASE (ip_overlap_k_eqv, ip_overlap_k_eqv_mod)
+! DEPENDS ON: solve_band_k_eqv
         CALL solve_band_k_eqv(ierr                                             &
           , control, dimen, spectrum, atm, cld, bound, radout                  &
 !                 Atmospheric properties
@@ -1905,6 +1946,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
           )
 
       CASE (ip_overlap_mix_ses2)
+! DEPENDS ON: solve_band_ses
         CALL solve_band_ses(ierr                                               &
           , control, dimen, spectrum, atm, cld, bound, radout                  &
 !                 Atmospheric properties
@@ -1987,7 +2029,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
           'has not been specified, even though gaseous ' //                    &
           'absorption is to be included.'
         ierr=i_err_fatal
-        GO TO 9999
+        CALL ereport(RoutineName, ierr, cmessage)
       END SELECT
 
     END IF
@@ -2178,6 +2220,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
 !   This is done inside the loop over bands to allow for division of the
 !   output fluxes between separate diagnostic bands.
     IF (control%isolir == ip_infra_red) THEN
+! DEPENDS ON: adjust_ir_radiance
       CALL adjust_ir_radiance(control, spectrum, atm, radout, &
         planck, i_band, l_clear_band)
     END IF
@@ -2188,8 +2231,7 @@ SUBROUTINE radiance_calc(control, dimen, spectrum, atm, cld, aer, bound, radout)
   END DO ! i_band
 
   CALL deallocate_sph(sph)
-  
-  9999 CONTINUE
+
   IF (ierr /= i_normal) THEN
     CALL ereport(RoutineName, ierr, cmessage)
   END IF
