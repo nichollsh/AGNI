@@ -15,7 +15,6 @@ using Printf
 using TOML
 
 # Include local jl files
-include("socrates/julia/src/SOCRATES.jl")
 push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
 import setpt
@@ -165,7 +164,7 @@ function main()
     thermo_funcs::Bool     = cfg["execution" ]["thermo_funcs"]
     dry_type::String       = cfg["execution" ]["dry_convection"]
     incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
-    surf_state::Int        = cfg["execution" ]["surf_state"]
+    sol_type::Int          = cfg["execution" ]["solution_type"]
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
     initial_req::Array     = cfg["execution" ]["initial_state"]
     stabilise::Bool        = cfg["execution" ]["stabilise"]
@@ -199,16 +198,21 @@ function main()
     end 
     #     conductive skin case 
     skin_k::Float64=0.0; skin_d::Float64=0.0; tmp_magma::Float64=0.0
-    if surf_state == 2
+    if sol_type == 2
         skin_k      = cfg["planet"]["skin_k"]
         skin_d      = cfg["planet"]["skin_d"]
         tmp_magma   = cfg["planet"]["tmp_magma"]
     end 
-    #     interior temperature case 
+    #     effective temperature case 
     tmp_eff::Float64 = 0.0
-    if surf_state == 3
+    if sol_type == 3
         tmp_eff = cfg["planet"]["tmp_eff"]
     end 
+    #     target OLR case 
+    target_olr::Float64 = 0.0
+    if sol_type == 4
+        target_olr = cfg["planet"]["target_olr"]
+    end    
 
 
     # Setup atmosphere
@@ -225,7 +229,7 @@ function main()
                             flag_cloud=flag_cld, flag_aerosol=flag_aer,
                             overlap_method=overlap,
                             skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
-                            tmp_floor=5.0,
+                            tmp_floor=5.0, target_olr=target_olr,
                             tmp_eff=tmp_eff, albedo_s=albedo_s,
                             thermo_functions=thermo_funcs,
                             C_d=turb_coeff, U=wind_speed
@@ -322,7 +326,7 @@ function main()
             if plt_run 
                 modplot = 10
             end
-            solver_tstep.solve_energy!(atmos, surf_state=surf_state, use_physical_dt=false,
+            solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
                                 dry_convect=dry_convect, condensate=condensate,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
@@ -336,7 +340,7 @@ function main()
                 modplot = 1
             end
             method = findfirst(==(sol), method_map)
-            solver_nlsol.solve_energy!(atmos, surf_state=surf_state, 
+            solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
                                 dry_convect=dry_convect, condensate=condensate, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
@@ -359,7 +363,7 @@ function main()
     plt_ani && plotting.anim_solver(atmos)
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
-    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(surf_state==2))
+    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(sol_type==2))
     plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"), incl_mlt=use_mlt)
     plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"))
     plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.png"))

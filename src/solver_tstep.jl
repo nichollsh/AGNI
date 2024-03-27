@@ -33,7 +33,7 @@ module solver_tstep
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
+    - `sol_type::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
     - `use_physical_dt::Bool=false`     use a single time-step across the entire column (for physical time-evolution)
     - `dry_convect::Bool=true`          enable dry convection
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
@@ -54,7 +54,7 @@ module solver_tstep
     - `conv_atol::Float64=1.0e-1`       convergence: absolute tolerance on per-level flux loss [W m-2]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int=1, use_physical_dt::Bool=false,
+                            sol_type::Int=1, use_physical_dt::Bool=false,
                             dry_convect::Bool=true, condensate::String="", use_mlt::Bool=true,
                             sens_heat::Bool=false, modprop::Int=1,
                             verbose::Bool=true, modplot::Int=0,
@@ -151,7 +151,7 @@ module solver_tstep
             step_stopaccel = 1
         end
 
-        plt_magma::Bool = (surf_state == 2)
+        plt_magma::Bool = (sol_type == 2)
         smooth_width::Int = 5
 
         # Store previous n atmosphere states
@@ -420,18 +420,18 @@ module solver_tstep
             atmosphere.set_tmpl_from_tmp!(atmos, limit_change=true)
 
             # Set bottom edge temperature 
-            if (surf_state < 0) || (surf_state > 2)
+            if (sol_type < 0) || (sol_type > 2)
                 # Error cases
-                error("Invalid surface state ($surf_state)")
+                error("Invalid surface state ($sol_type)")
 
-            elseif (surf_state == 0)
+            elseif (sol_type == 0)
                 # Extrapolate (log-linear)
                 atmos.tmpl[end] = atmos.tmp[end] +   (atmos.tmp[end]-atmos.tmp[end-1])/(log(atmos.p[end]/atmos.p[end-1]))   * log(atmos.pl[end]/atmos.p[end])
 
-            # elseif (surf_state==1) 
+            # elseif (sol_type==1) 
             #   do nothing in this case
                 
-            elseif (surf_state == 2) && (step > 15)
+            elseif (sol_type == 2) && (step > 15)
                 # Conductive skin
                 atmos.tmpl[end] = atmos.tmp_magma - atmos.flux_tot[1] * atmos.skin_d / atmos.skin_k
                 atmos.tmpl[end] = max(atmos.tmp_floor, atmos.tmpl[end])
@@ -583,7 +583,7 @@ module solver_tstep
         @info @sprintf("    rad_TOA   = %.2e W m-2         ", F_TOA_rad)
         @info @sprintf("    rad_BOA   = %.2e W m-2         ", F_BOA_rad)
         @info @sprintf("    tot_BOA   = %.2e W m-2         ", F_BOA_tot)
-        if (surf_state == 2)
+        if (sol_type == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
             @info @sprintf("    cond_skin = %.2e W m-2         ", F_skin)
         end

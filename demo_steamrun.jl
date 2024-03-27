@@ -96,13 +96,13 @@ plt = plot(framestyle=:box, size=(500,400), dpi=300)
 
 lw=2.5
 
-litdata = readdlm("res/runaway_litdata/Goldblatt13_data.txt", ',', Float64; header=false, skipstart=2)
+litdata = readdlm("res/literature_data/runaway/Goldblatt13_data.txt", ',', Float64; header=false, skipstart=2)
 plot!(plt, litdata[:,1] , litdata[:,2], label="Goldblatt+13", lw=lw)
 
-litdata = readdlm("res/runaway_litdata/Hamano15_data.txt", ',', Float64; header=false, skipstart=2)
+litdata = readdlm("res/literature_data/runaway/Hamano15_data.txt", ',', Float64; header=false, skipstart=2)
 plot!(plt, litdata[:,1] , litdata[:,2], label="Hamano+15", lw=lw)
 
-litdata = readdlm("res/runaway_litdata/Kopparapu13_data.txt", ',', Float64; header=false, skipstart=2)
+litdata = readdlm("res/literature_data/runaway/Kopparapu13_data.txt", ',', Float64; header=false, skipstart=2)
 plot!(plt, litdata[:,1] , litdata[:,2], label="Kopparapu+13", lw=lw)
 
 plot!(tsurf_arr,olr_arr,label="AGNI", lw=lw)
