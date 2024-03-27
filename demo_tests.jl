@@ -39,6 +39,29 @@ end
 passing = true
 
 
+# -------------
+# Test shomate
+# -------------
+@info " "
+@info "Testing heat capacity functions"
+c_expt::Array{Float64, 1} = [35.22, 41.27 , 51.20 , 55.74 , 59.40 ]     # Expected values of cp [J mol-1 K-1]
+t_test::Array{Float64, 1} = [500.0, 1000.0, 2000.0, 3000.0, 5000.0]     # Tested values of temperature 
+cp_pass = true 
+for i in 1:5
+    c_this = phys.shomate_cp("H2O", t_test[i]) * 18.0153 * 1.0e-3 # get value and convert units 
+    if abs(c_expt[i]-c_this)/c_expt[i] > 0.01  # error must be <1%
+        @warn "At tmp=$(t_test[i]) K \nModelled value = $c_this J K-1 mol-1 \nExpected value = $(c_expt[i]) J K-1 mol-1"
+        global cp_pass = false 
+    end 
+end 
+if cp_pass
+    @info "Pass"
+else
+    @warn "Fail"
+    passing = false
+end
+
+
 
 
 # -------------
@@ -71,17 +94,17 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict
                  )
-atmosphere.allocate!(atmos;stellar_spectrum=star_file)
+atmosphere.allocate!(atmos;spfile_has_star=true)
 
-val_e = mf_dict
-val_o = Dict()
+dct_e::Dict{String, Float64} = mf_dict
+dct_o::Dict{String, Float64} = Dict()
 sp_pass = true
-for k in keys(val_e)
-    val_o[k] = atmosphere.get_x(atmos, k, 25)
-    global sp_pass = sp_pass && ( abs(val_o[k]-val_e[k]) < 1.0e-6 )
+for k in keys(dct_e)
+    dct_o[k] = atmosphere.get_x(atmos, k, 25)
+    global sp_pass = sp_pass && ( abs(dct_o[k]-dct_e[k]) < 1.0e-6 )
 end
-@info "Expected values = $(val_e)"
-@info "Modelled values = $(val_o)"
+@info "Expected values = $(dct_e)"
+@info "Modelled values = $(dct_o)"
 if sp_pass
     @info "Pass"
 else
