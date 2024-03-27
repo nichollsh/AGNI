@@ -163,6 +163,7 @@ function main()
     overlap::Int           = cfg["execution" ]["overlap_method"]
     thermo_funcs::Bool     = cfg["execution" ]["thermo_funcs"]
     dry_type::String       = cfg["execution" ]["dry_convection"]
+    condensates::Array     = cfg["execution" ]["condensates"]
     incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
     sol_type::Int          = cfg["execution" ]["solution_type"]
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
@@ -289,7 +290,6 @@ function main()
     dry_convect::Bool = !isempty(dry_type)
     use_mlt::Bool     = (dry_type == "mlt")
     modplot::Int      = 0
-    condensate  = ""
 
     # Loop over requested solvers 
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
@@ -328,7 +328,7 @@ function main()
             end
             solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
-                                dry_convect=dry_convect, condensate=condensate,
+                                dry_convect=dry_convect, condensates=condensates,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
@@ -341,7 +341,7 @@ function main()
             end
             method = findfirst(==(sol), method_map)
             solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
-                                dry_convect=dry_convect, condensate=condensate, sens_heat=incl_sens,
+                                dry_convect=dry_convect, condensates=condensates, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
         else 

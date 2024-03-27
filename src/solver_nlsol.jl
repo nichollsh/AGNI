@@ -31,7 +31,7 @@ module solver_nlsol
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
-    - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
+    - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `max_steps::Int=2000`             maximum number of solver steps
@@ -46,7 +46,7 @@ module solver_nlsol
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1, condensate::String="",
+                            sol_type::Int=1, condensates::Array=[],
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
@@ -57,15 +57,15 @@ module solver_nlsol
 
         # Validate condensation case
         do_condense::Bool  = false 
-        i_gas::Int         = -1
-        if condensate != "" 
-            if condensate in atmos.gases
-                do_condense = true 
-                i_gas = findfirst(==(condensate), atmos.gases)
-            else 
-                @error "Invalid condensate '$condensate'"
-                return false
-            end 
+        if length(condensates) == 0
+            for c in condensates
+                if c in atmos.gases
+                    do_condense = true 
+                else 
+                    @error "Invalid condensate '$c'"
+                    return false
+                end 
+            end
         end 
 
         # Validate sol_type
@@ -88,7 +88,6 @@ module solver_nlsol
         end
 
         # Work arrays 
-        prate::Array{Float64,1} = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
         rf::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference
         rb::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference
         x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
@@ -160,10 +159,50 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
+            # Divergence (so far)
+            atmos.flux_div[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])./(atmos.zl[1:end-1] .- atmos.zl[2:end])
+
+            # +Condensation
+            if do_condense
+
+                a::Float64 = max(maximum(abs.(atmos.flux_div)), 10.0)
+                pp::Float64 = 0.0
+                i_gas::Int = -1
+
+                for i in 1:atmos.nlev_c
+                    for c in condensates
+                        # Get partial pressure 
+                        i_gas = findfirst(==(c), atmos.gases)
+                        pp = atmos.layer_x[i,i_gas] * atmos.p[i]
+                        if pp < 1.0e-10 
+                            continue
+                        end
+
+                        # Reset water cloud 
+                        atmos.re[i]    = 0.0
+                        atmos.lwm[i]   = 0.0
+                        atmos.clfr[i]  = 0.0
+
+                        # Layer is condensing if T < T_dew
+                        Tsat = phys.calc_Tdew(c, pp)
+                        if atmos.tmp[i] < Tsat
+                            flux_div[i] += (a/atmos.tmp[i] - a/Tsat )
+                            println("Condensing $c at $i")
+                            atmos.mask_p[i] = atmos.mask_decay 
+                            if c == "H2O"
+                                atmos.re[i]   = atmos.cloud_val_r
+                                atmos.lwm[i]  = atmos.cloud_val_l
+                                atmos.clfr[i] = atmos.cloud_val_f
+                            end 
+                        end 
+                    end # end condensate
+                end # end levels 
+            end # end condensing
+
             # Calculate residuals subject to the boundary condition
             if (sol_type == 0) || (sol_type == 1)
-                # Conserve fluxes with constant tmp_surf
-                resid[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1] 
+                # Zero divergence with constant tmp_surf
+                resid[1:end] .= atmos.flux_div[1:end]
             elseif (sol_type == 2)
                 # Conductive boundary layer
                 resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
@@ -177,40 +216,6 @@ module solver_nlsol
                 # Set residuals using new flux_eff 
                 resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
             end
-
-            # +Condensation
-            if do_condense
-
-                a = 1.0
-                g = 1.0
-                f = 0.0
-
-                for i in 1:atmos.nlev_c
-
-                    pp = atmos.layer_x[i,i_gas] * atmos.p[i]
-                    if pp < 1.0e-10 
-                        continue
-                    end
-
-                    # Layer is condensing if T < T_dew
-                    Tsat = phys.calc_Tdew(condensate, pp )
-                    g = 1.0 - exp(a * (Tsat - atmos.tmp[i]))
-                    f = resid[i]
-                    resid[i] = f * g
-                    if atmos.tmp[i] < Tsat
-                        atmos.mask_p[i] = atmos.mask_decay 
-                        prate[i]        = -1.0 * f / ( phys.lookup_safe("l_vap",condensate) * (atmos.zl[i] - atmos.zl[i+1])) * 86.4 # g cm-3 day-1
-                        atmos.re[i]     = 1.0e-5  # 10 micron droplets
-                        atmos.lwm[i]    = 0.8     # 80% of the saturated vapor turns into cloud
-                        atmos.clfr[i]   = 1.0     # The cloud takes over the entire cell
-                    else 
-                        prate[i] = 0.0
-                        atmos.re[i]    = 0.0
-                        atmos.lwm[i]   = 0.0
-                        atmos.clfr[i]  = 0.0
-                    end
-                end
-            end 
 
             # Check that residuals are real numbers
             if !all(isfinite, resid)
@@ -338,7 +343,7 @@ module solver_nlsol
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
         r_max::Float64 =        9.0     # Maximum residual (sign agnostic)
-        f_max::Float64 =        0.0     # Maximim flux (sign agnostic)
+        c_max::Float64 =        0.0     # Maximum cost (sign agnostic)
         x_med::Float64 =        0.0     # Median solution
         x_max::Float64 =        0.0     # Maximum solution (sign agnostic)
         iworst::Int =           0       # Level which is furthest from convergence
@@ -453,7 +458,7 @@ module solver_nlsol
             # Check convergence
             c_old = c_cur
             c_cur = _cost(r_cur)
-            if (c_cur < conv_atol + conv_rtol * f_max) && !stabilise_mlt
+            if (c_cur < conv_atol + conv_rtol * c_max) && !stabilise_mlt
                 code = 0
                 break
             end
@@ -549,12 +554,16 @@ module solver_nlsol
             r_med   = median(r_cur)
             iworst  = argmax(abs.(r_cur))
             r_max   = r_cur[iworst]
-            f_max   = maximum(abs.(atmos.flux_tot))
             x_med   = median(x_cur)
             x_max   = x_cur[argmax(abs.(x_cur))]
             dxmax   = maximum(abs.(x_dif))
             r_old_2nm   = r_cur_2nm
             r_cur_2nm   = norm(r_cur)
+            if (sol_type==0) || (sol_type===1)
+                c_max = maximum(abs.(atmos.flux_div))
+            else 
+                c_max = maximum(abs.(atmos.flux_tot))
+            end 
 
             # Plot
             if modplot > 0

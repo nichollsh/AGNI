@@ -35,8 +35,8 @@ module atmosphere
     
     # Solution types
     SOL_TYPES::Array{String, 1} = [
-        "fixsurf_ext",      # fixed tmp_surf, extrapolated tmpl[end]
-        "fixsurf_cst",      # fixed tmp_surf, constant tmpl[end]
+        "steadystate_ext",  # zero divergence at fixed tmp_surf, extrapolated tmpl[end]
+        "steadystate_cst",  # zero divergence at fixed tmp_surf, constant tmpl[end]
         "cond_skin",        # set tmp_surf such that conductive skin conserves energy flux
         "flux_eff",         # total flux at each level equal to flux_eff
         "target_olr",       # OLR is equal to target_olr
@@ -177,9 +177,10 @@ module atmosphere
 
         # Total energy flux
         flux_tot::Array{Float64,1}     # Total upward-directed flux at cell edges
+        flux_div::Array{Float64,1}     # Flux (negative) divergence at each level centre (positive => net inward, negative => net outward)
 
-        # Heating rate 
-        heating_rate::Array{Float64,1} # radiative heating rate [K/day]
+        # Heating rate felt at each level [K/day]
+        heating_rate::Array{Float64,1} 
 
         Atmos_t() = new()
     end
@@ -1096,7 +1097,7 @@ module atmosphere
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
-
+        atmos.flux_div =          zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
         # Mark as allocated
