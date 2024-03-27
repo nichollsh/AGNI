@@ -30,7 +30,7 @@ module solver_nlsol
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `surf_state::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: skin | 3: tmp_eff
+    - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
     - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          enable dry convection
     - `sens_heat::Bool=false`           include sensible heating 
@@ -46,7 +46,7 @@ module solver_nlsol
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            surf_state::Int=1, condensate::String="",
+                            sol_type::Int=1, condensate::String="",
                             dry_convect::Bool=true, sens_heat::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
@@ -68,9 +68,9 @@ module solver_nlsol
             end 
         end 
 
-        # Validate surf_state
-        if (surf_state < 0) || (surf_state > 3)
-            @error "Invalid surface state ($surf_state)"
+        # Validate sol_type
+        if (sol_type < 0) || (sol_type > 4)
+            @error "Invalid solution type ($sol_type)"
             return false
         end
 
@@ -83,7 +83,7 @@ module solver_nlsol
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c 
-        if (surf_state >= 2)  # states 2 and 3
+        if (sol_type >= 2)  # states 2,3,4
             arr_len += 1
         end
 
@@ -108,7 +108,7 @@ module solver_nlsol
             atmosphere.set_tmpl_from_tmp!(atmos)
 
             # Set bottom edge temperature 
-            if (surf_state != 1) 
+            if (sol_type != 1) 
                 # For state=1, tmpl[end] is held constant
 
                 # Extrapolate (log-linear)
@@ -116,7 +116,7 @@ module solver_nlsol
                 grad_dp = log(atmos.p[end]/atmos.p[end-1])
                 atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
-                if (surf_state >= 2)  # states 2 and 3
+                if (sol_type >= 2)  # states 2,3,4
                     atmos.tmp_surf = _x[end]  # Surface brightness temperature
                 end
             end 
@@ -161,15 +161,20 @@ module solver_nlsol
             end
 
             # Calculate residuals subject to the boundary condition
-            if (surf_state == 0) || (surf_state == 1)
+            if (sol_type == 0) || (sol_type == 1)
                 # Conserve fluxes with constant tmp_surf
                 resid[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1] 
-            elseif (surf_state == 2)
+            elseif (sol_type == 2)
                 # Conductive boundary layer
                 resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
                 resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
-            elseif (surf_state == 3)
+            elseif (sol_type == 3)
                 # Fluxes equal to sigma*tmp_eff^4
+                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
+            elseif (sol_type == 4)
+                # Set flux_eff to value required to reach target_olr
+                atmos.flux_eff = atmos.target_olr + atmos.flux_u_sw[1] - atmos.flux_d_lw[1] - atmos.flux_d_sw[1]
+                # Set residuals using new flux_eff 
                 resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
             end
 
@@ -289,21 +294,23 @@ module solver_nlsol
             error("Invalid method choice ($method)")
         end
 
-        @info @sprintf("    surf     = %d", surf_state)
-        if (surf_state == 1)
+        @info @sprintf("    surf     = %d", sol_type)
+        if (sol_type == 1)
             @info @sprintf("    tmp_surf = %.2f K", atmos.tmp_surf)
-        elseif (surf_state == 2)
+        elseif (sol_type == 2)
             @info @sprintf("    skin_d   = %.2f m",         atmos.skin_d)
             @info @sprintf("    skin_k   = %.2f W K-1 m-1", atmos.skin_k)
-        elseif (surf_state == 3)
+        elseif (sol_type == 3)
             @info @sprintf("    tmp_eff  = %.2f K",     atmos.tmp_eff)
-            @info @sprintf("    Fint     = %.2f W m-2", atmos.flux_eff)
+            @info @sprintf("    f_eff    = %.2f W m-2", atmos.flux_eff)
+        elseif (sol_type == 4)
+            @info @sprintf("    tgt_olr  = %.2f W m-2", atmos.target_olr)
         end 
         
 
         # Allocate initial guess for the x array, as well as a,b arrays
         # Array storage structure:
-        #   in the surf_state=2 case
+        #   in the sol_type=2 case
         #       1:end-1 => cell centre temperatures 
         #       end     => bottom cell edge temperature
         #   other cases 
@@ -312,7 +319,7 @@ module solver_nlsol
         for i in 1:atmos.nlev_c
             x_ini[i]    = clamp(atmos.tmp[i], atmos.tmp_floor , atmos.tmp_ceiling)
         end 
-        if (surf_state >= 2)
+        if (sol_type >= 2)
             x_ini[end] = atmos.tmp[atmos.nlev_c] + 1.0
         end
 
@@ -552,8 +559,8 @@ module solver_nlsol
             # Plot
             if modplot > 0
                 if mod(step, modplot) == 0
-                    plotting.plot_pt(atmos,     path_prf, incl_magma=(surf_state==2))
-                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(surf_state==3))
+                    plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2))
+                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3))
                 end 
             end 
                 
@@ -595,7 +602,7 @@ module solver_nlsol
         loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
         loss_pct = loss/maximum(atmos.flux_tot)*100.0
         @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
-        if (surf_state == 2)
+        if (sol_type == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
             @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", F_skin)
         end
