@@ -464,7 +464,7 @@ module plotting
     end 
 
     """
-    Plot spectral albedo (ratio of LW_UP to SW_DN)
+    Plot spectral albedo (ratio of SW_UP to SW_DN)
     """
     function plot_albedo(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
 

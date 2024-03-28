@@ -6,7 +6,7 @@
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
-ENV["GKSwstype"]="nul"
+ENV["GKSwstype"] = "100"
 
 # Include libraries
 using Revise
@@ -362,12 +362,12 @@ function main()
     # Save plots
     @info "Making plots"
     plt_ani && plotting.anim_solver(atmos)
-    plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
-    plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
-    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(sol_type==2))
-    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3))
-    plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"))
-    plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.png"))
+    plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
+    plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
+    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
+    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3))
+    plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"plot_emission.png"))
+    plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 
     # Deallocate atmosphere
     @info "Deallocating arrays"
