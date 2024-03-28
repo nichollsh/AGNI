@@ -482,7 +482,7 @@ module plotting
             x[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
             
             # y value - spectral albedo [dimensionless]
-            y[ba] = atmos.band_u_lw[1, ba]/atmos.band_d_sw[1, ba]
+            y[ba] = 100.0 * atmos.band_u_sw[1, ba]/atmos.band_d_sw[1, ba]
         end
 
         # Make plot
@@ -490,12 +490,12 @@ module plotting
 
         plot!(plt, x, y, label="", color="black")
 
-        xlims  = ( max(1.0e-10,minimum(x)), min(maximum(x), 70000.0))
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
-        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+        xlims  = (200.0, 1000.0)
+        xticks = range( xlims[1], xlims[2], step=100.0)
+        xaxis!(plt, xlims=xlims, xticks=xticks, minorgrid=true)
 
         xlabel!(plt, "Wavelength [nm]")
-        ylabel!(plt, "Spectral albedo")
+        ylabel!(plt, "Spectral albedo [%]")
 
         if !isempty(fname)
             savefig(plt, fname)
