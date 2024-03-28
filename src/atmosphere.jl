@@ -35,8 +35,8 @@ module atmosphere
     
     # Solution types
     SOL_TYPES::Array{String, 1} = [
-        "fixsurf_ext",      # fixed tmp_surf, extrapolated tmpl[end]
-        "fixsurf_cst",      # fixed tmp_surf, constant tmpl[end]
+        "steadystate_ext",  # zero divergence at fixed tmp_surf, extrapolated tmpl[end]
+        "steadystate_cst",  # zero divergence at fixed tmp_surf, constant tmpl[end]
         "cond_skin",        # set tmp_surf such that conductive skin conserves energy flux
         "flux_eff",         # total flux at each level equal to flux_eff
         "target_olr",       # OLR is equal to target_olr
@@ -122,7 +122,9 @@ module atmosphere
         layer_density::Array{Float64,1}     # density [kg m-3]
         layer_mmw::Array{Float64,1}         # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
+        layer_kc::Array{Float64,1}          # thermal conductivity at const-p [W m-1 K-1]
         layer_grav::Array{Float64,1}        # gravity [m s-2]
+        layer_thick::Array{Float64,1}       # geometrical thickness [m]
         layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
 
         # Calculated bolometric radiative fluxes (W m-2)
@@ -161,8 +163,11 @@ module atmosphere
         # Convection 
         mask_c::Array{Int,1}       # Layers which are (or were recently) convective (value is set to >0)
         mask_decay::Int            # How long is 'recent'
-        flux_c::Array{Float64,1}   # Dry convective fluxes from MLT
+        flux_cdry::Array{Float64,1}  # Dry convective fluxes from MLT
         Kzz::Array{Float64,1}      # Eddy diffusion coefficient from MLT
+
+        # Conduction 
+        flux_cdct::Array{Float64,1} # Conductive flux [W m-2]
 
         # Cloud and condensation
         mask_p::Array{Int,1}                # Layers which are (or were recently) condensing liquid
@@ -175,11 +180,15 @@ module atmosphere
         cloud_val_l::Float64 
         cloud_val_f::Float64 
 
-        # Total energy flux
-        flux_tot::Array{Float64,1}     # Total upward-directed flux at cell edges
+        # Cell-internal heating 
+        ediv_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-3] (e.g. from advection)
 
-        # Heating rate 
-        heating_rate::Array{Float64,1} # radiative heating rate [K/day]
+        # Total energy flux
+        flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2]
+        flux_tot::Array{Float64,1}      # Total upward-directed flux at cell edges [W m-2]
+
+        # Heating rate felt at each level [K/day]
+        heating_rate::Array{Float64,1} 
 
         Atmos_t() = new()
     end
@@ -360,7 +369,9 @@ module atmosphere
         atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
         atmos.layer_density = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
+        atmos.layer_kc      = zeros(Float64, atmos.nlev_c)
         atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
+        atmos.layer_thick   = zeros(Float64, atmos.nlev_c)
 
         # Initialise cloud arrays 
         atmos.cloud_arr_r   = zeros(Float64, atmos.nlev_c) 
@@ -527,10 +538,11 @@ module atmosphere
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
 
-        # mmw, cp, rho
+        # mmw, cp, rho, kc
         fill!(atmos.layer_mmw    ,0.0)
         fill!(atmos.layer_density,0.0)
         fill!(atmos.layer_cp     ,0.0)
+        fill!(atmos.layer_kc     ,0.0)
         fill!(atmos.layer_mass   ,0.0)
         for i in 1:atmos.atm.n_layer
 
@@ -540,11 +552,13 @@ module atmosphere
                 # set mmw
                 atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
 
-                # set cp
+                # set cp, kc
                 if atmos.thermo_funct 
                     atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
+                    atmos.layer_kc[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i])
                 else 
                     atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas)
+                    atmos.layer_kc[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("kc",gas)
                 end
                 
             end
@@ -556,9 +570,10 @@ module atmosphere
 
         # geometrical height and gravity
         # dz = -dp / (rho * g)
-        fill!(atmos.z         , 0.0)
-        fill!(atmos.zl        , 0.0)
-        fill!(atmos.layer_grav, 0.0)
+        fill!(atmos.z         ,  0.0)
+        fill!(atmos.zl        ,  0.0)
+        fill!(atmos.layer_grav,  0.0)
+        fill!(atmos.layer_thick, 0.0)
         g1::Float64 = 0.0
         g2::Float64 = 0.0
         dzc::Float64= 0.0
@@ -579,11 +594,16 @@ module atmosphere
             atmos.zl[i] = atmos.z[i] + dzl
 
             atmos.layer_grav[i] = sqrt(g1 * g2)
+            atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
 
             if (dzl < 1e-20) || (dzc < 1e-20)
-                error("Height integration resulted in dz <= 0")
+                error("Height integration resulted in dz <= 0 at level $i")
+            end
+            if (dzl > 1e8) || (dzc > 1e8)
+                error("Height integration blew up at level $i")
             end
         end 
+
 
         # Mass
         for i in 1:atmos.atm.n_layer
@@ -1092,11 +1112,13 @@ module atmosphere
 
         atmos.mask_p =            zeros(Int, atmos.nlev_c)
         atmos.mask_c =            zeros(Int, atmos.nlev_c)
-        atmos.flux_c =            zeros(Float64, atmos.nlev_l)
+        atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection 
+        atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction 
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
-
+        atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
+        atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
         # Mark as allocated
@@ -1218,9 +1240,6 @@ module atmosphere
         # Temperature
         ###################################################
 
-        clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
-        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
-
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.t[1, :] .= atmos.tmp[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
@@ -1327,6 +1346,21 @@ module atmosphere
         return nothing
     end
 
+    # Calculate conductive fluxes 
+    function conduct!(atmos::atmosphere.Atmos_t)
+        # top layer 
+        atmos.flux_cdct[1] = 0.0
+
+        # bulk layers
+        for i in 2:atmos.nlev_l-1  
+            atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) * (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
+        end 
+        
+        # bottom layer 
+        atmos.flux_cdct[end] = atmos.layer_kc[end] * (atmos.tmp[end]-atmos.tmp_surf)/atmos.z[end]
+        return nothing
+    end 
+
 
     """
     **Calculate dry convective fluxes using mixing length theory.**
@@ -1347,10 +1381,10 @@ module atmosphere
     - `pmin::Float64=0.0`               pressure below which convection is disabled.
     - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
     """
-    function mlt!(atmos; pmin::Float64=0.0, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=0.0, mltype::Int=1)
 
         # Reset arrays
-        fill!(atmos.flux_c, 0.0)
+        fill!(atmos.flux_cdry, 0.0)
         fill!(atmos.Kzz,    0.0)
 
         # Work variables 
@@ -1384,7 +1418,7 @@ module atmosphere
                 # Check if this layer is condensing (this shouldn't ever be
                 # true, because the condensation curve dT/dp is too shallow)
                 if atmos.mask_p[i] > 0
-                    @warn "Somehow unstable to dry convection in a condensing region!"
+                    @warn "Condensing region is unstable to dry convection"
                 end 
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
@@ -1413,8 +1447,8 @@ module atmosphere
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel oscillations)
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
-                # Convective flux
-                atmos.flux_c[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
+                # Dry convective flux
+                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
 
                 # Thermal eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
@@ -1683,7 +1717,7 @@ module atmosphere
         rm(fname, force=true)
 
         open(fname, "w") do f
-            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C           , tot      \n")
+            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C_DRY       , tot      \n")
             write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
             for i in 1:atmos.nlev_l
                 @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e, %+1.4e \n", 
@@ -1691,7 +1725,7 @@ module atmosphere
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
-                          atmos.flux_c[i],    atmos.flux_tot[i]
+                          atmos.flux_cdry[i], atmos.flux_tot[i]
                           )
             end
         end
@@ -1773,7 +1807,7 @@ module atmosphere
 
         #     Store data
         var_tmp_surf[1] =   atmos.tmp_surf 
-        var_tmp_eff[1] =       atmos.tmp_eff 
+        var_tmp_eff[1] =    atmos.tmp_eff 
         var_inst[1] =       atmos.instellation
         var_s0fact[1] =     atmos.s0_fact
         var_albbond[1] =    atmos.albedo_b
@@ -1837,9 +1871,11 @@ module atmosphere
         var_tmpl =      defVar(ds, "tmpl",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "K"))
         var_z =         defVar(ds, "z",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
         var_zl =        defVar(ds, "zl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
+        var_thick =     defVar(ds, "dz",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
         var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
+        var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "J K-1 kg-1"))
         var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
-        var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf AEOLUS because of how Julia stores arrays
+        var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf JANUS because of how Julia stores arrays
         var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c")) # ^^
         var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
@@ -1850,7 +1886,8 @@ module atmosphere
         var_fd =        defVar(ds, "fl_D",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fu =        defVar(ds, "fl_U",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fn =        defVar(ds, "fl_N",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fc =        defVar(ds, "fl_C",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fcd =       defVar(ds, "fl_C_DRY",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fcc =       defVar(ds, "fl_CNDCT",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ft =        defVar(ds, "fl_tot",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",     Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_kzz =       defVar(ds, "Kzz",       Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
@@ -1872,7 +1909,9 @@ module atmosphere
         var_z[:]    =   atmos.z
         var_zl[:]   =   atmos.zl
         var_mmw[:]  =   atmos.layer_mmw
+        var_cp[:]  =    atmos.layer_cp
         var_grav[:]  =  atmos.layer_grav
+        var_thick[:]  = atmos.layer_thick
 
         for i_gas in 1:ngases 
             for i_char in 1:nchars 
@@ -1901,7 +1940,8 @@ module atmosphere
         var_fu[:] =     atmos.flux_u
         var_fn[:] =     atmos.flux_n
 
-        var_fc[:] =     atmos.flux_c
+        var_fcd[:] =    atmos.flux_cdry
+        var_fcc[:] =    atmos.flux_cdct
 
         var_ft[:] =     atmos.flux_tot
         var_hr[:] =     atmos.heating_rate

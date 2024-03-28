@@ -31,9 +31,10 @@ module solver_nlsol
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
-    - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
-    - `dry_convect::Bool=true`          enable dry convection
+    - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
+    - `dry_convect::Bool=true`          include dry convection
     - `sens_heat::Bool=false`           include sensible heating 
+    - `conduct::Bool=true`              include conduction
     - `max_steps::Int=2000`             maximum number of solver steps
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
@@ -46,8 +47,9 @@ module solver_nlsol
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1, condensate::String="",
+                            sol_type::Int=1, condensates::Array=[],
                             dry_convect::Bool=true, sens_heat::Bool=false,
+                            conduct::Bool=true,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
                             method::Int=1, linesearch::Bool=true,
@@ -57,15 +59,15 @@ module solver_nlsol
 
         # Validate condensation case
         do_condense::Bool  = false 
-        i_gas::Int         = -1
-        if condensate != "" 
-            if condensate in atmos.gases
-                do_condense = true 
-                i_gas = findfirst(==(condensate), atmos.gases)
-            else 
-                @error "Invalid condensate '$condensate'"
-                return false
-            end 
+        if length(condensates) == 0
+            for c in condensates
+                if c in atmos.gases
+                    do_condense = true 
+                else 
+                    @error "Invalid condensate '$c'"
+                    return false
+                end 
+            end
         end 
 
         # Validate sol_type
@@ -88,7 +90,6 @@ module solver_nlsol
         end
 
         # Work arrays 
-        prate::Array{Float64,1} = zeros(Float64, atmos.nlev_c)  # condensation production rate [kg /m3 /s]
         rf::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference
         rb::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference
         x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
@@ -100,6 +101,7 @@ module solver_nlsol
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
             # Read new guess
+            clamp!(_x, atmos.tmp_floor+1.0, atmos.tmp_ceiling-1.0)
             for i in 1:atmos.nlev_c
                 atmos.tmp[i] = _x[i]
             end
@@ -127,15 +129,21 @@ module solver_nlsol
         # Objective function to solve for
         function _fev!(x::Array,resid::Array)
 
-            # Reset values
-            atmos.mask_c[:] .= 0
-            atmos.mask_p[:] .= 0
+            # Reset masks
+            fill!(atmos.mask_c, 0.0)
+            fill!(atmos.mask_p, 0.0)
            
             # Set temperatures 
             _set_tmps!(x)
 
+            # Calculate layer properties if they are temperature-dependent
+            if atmos.thermo_funct
+                atmosphere.calc_layer_props!(atmos)
+            end 
+
             # Reset fluxes
-            atmos.flux_tot[:] .= 0.0
+            fill!(atmos.flux_tot, 0.0)
+            fill!(atmos.flux_dif, 0.0)
 
             # +Radiation
             atmosphere.radtrans!(atmos, true)
@@ -148,69 +156,89 @@ module solver_nlsol
                 atmosphere.mlt!(atmos)
 
                 # Stabilise?
-                atmos.flux_c *= convect_sf
+                atmos.flux_cdry *= convect_sf
 
                 # Add to total flux
-                atmos.flux_tot += atmos.flux_c
+                atmos.flux_tot += atmos.flux_cdry
             end
 
-            # +Turbulence
+            # +Surface turbulence
             if sens_heat
                 atmosphere.sensible!(atmos)
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
-            # Calculate residuals subject to the boundary condition
+            # +Conduction 
+            if conduct
+                atmosphere.conduct!(atmos)
+                atmos.flux_tot += atmos.flux_cdct
+            end
+
+            # Flux loss across each level 
+            atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
+
+            # Additional energy input
+            atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
+
+            # +Condensation
+            if do_condense
+
+                a::Float64 = max(maximum(abs.(atmos.flux_tot)), 10.0)
+                pp::Float64 = 0.0
+                i_gas::Int = -1
+
+                # Reset water cloud 
+                fill!(atmos.re[i]  , 0.0)
+                fill!(atmos.lwm[i] , 0.0)
+                fill!(atmos.clfr[i], 0.0)
+                
+                for i in 1:atmos.nlev_c
+                    for c in condensates
+                        # Get partial pressure 
+                        i_gas = findfirst(==(c), atmos.gases)
+                        pp = atmos.layer_x[i,i_gas] * atmos.p[i]
+                        if pp < 1.0e-10 
+                            continue
+                        end
+
+                        Tsat = phys.calc_Tdew(c, pp)
+                        if atmos.tmp[i] < Tsat
+                            atmos.flux_dif[i] += (a/atmos.tmp[i] - a/Tsat )
+                            println("Condensing $c at $i")
+                            atmos.mask_p[i] = atmos.mask_decay 
+                            if c == "H2O"
+                                atmos.re[i]   = atmos.cloud_val_r
+                                atmos.lwm[i]  = atmos.cloud_val_l
+                                atmos.clfr[i] = atmos.cloud_val_f
+                            end 
+                        end 
+                    end # end condensate
+                end # end levels 
+            end # end condensing
+
+            # Calculate residuals subject to the solution type
             if (sol_type == 0) || (sol_type == 1)
-                # Conserve fluxes with constant tmp_surf
-                resid[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1] 
+                # Zero loss with constant tmp_surf
+                resid[1:end] .= atmos.flux_dif[1:end]
+
             elseif (sol_type == 2)
                 # Conductive boundary layer
-                resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
-                resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
+                resid[2:end] .= atmos.flux_dif[1:end]
+                resid[1] = atmos.flux_tot[end] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
+
             elseif (sol_type == 3)
-                # Fluxes equal to sigma*tmp_eff^4
-                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
+                # Zero loss
+                resid[2:end] .= atmos.flux_dif[1:end]
+                # Total flux at TOA is equal to sigma*tmp_eff^4
+                resid[1] = atmos.flux_tot[1] - atmos.flux_eff
+
             elseif (sol_type == 4)
                 # Set flux_eff to value required to reach target_olr
                 atmos.flux_eff = atmos.target_olr + atmos.flux_u_sw[1] - atmos.flux_d_lw[1] - atmos.flux_d_sw[1]
                 # Set residuals using new flux_eff 
                 resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
+
             end
-
-            # +Condensation
-            if do_condense
-
-                a = 1.0
-                g = 1.0
-                f = 0.0
-
-                for i in 1:atmos.nlev_c
-
-                    pp = atmos.layer_x[i,i_gas] * atmos.p[i]
-                    if pp < 1.0e-10 
-                        continue
-                    end
-
-                    # Layer is condensing if T < T_dew
-                    Tsat = phys.calc_Tdew(condensate, pp )
-                    g = 1.0 - exp(a * (Tsat - atmos.tmp[i]))
-                    f = resid[i]
-                    resid[i] = f * g
-                    if atmos.tmp[i] < Tsat
-                        atmos.mask_p[i] = atmos.mask_decay 
-                        prate[i]        = -1.0 * f / ( phys.lookup_safe("l_vap",condensate) * (atmos.zl[i] - atmos.zl[i+1])) * 86.4 # g cm-3 day-1
-                        atmos.re[i]     = 1.0e-5  # 10 micron droplets
-                        atmos.lwm[i]    = 0.8     # 80% of the saturated vapor turns into cloud
-                        atmos.clfr[i]   = 1.0     # The cloud takes over the entire cell
-                    else 
-                        prate[i] = 0.0
-                        atmos.re[i]    = 0.0
-                        atmos.lwm[i]   = 0.0
-                        atmos.clfr[i]  = 0.0
-                    end
-                end
-            end 
 
             # Check that residuals are real numbers
             if !all(isfinite, resid)
@@ -338,7 +366,7 @@ module solver_nlsol
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
         r_max::Float64 =        9.0     # Maximum residual (sign agnostic)
-        f_max::Float64 =        0.0     # Maximim flux (sign agnostic)
+        c_max::Float64 =        0.0     # Maximum cost (sign agnostic)
         x_med::Float64 =        0.0     # Median solution
         x_max::Float64 =        0.0     # Maximum solution (sign agnostic)
         iworst::Int =           0       # Level which is furthest from convergence
@@ -450,14 +478,6 @@ module solver_nlsol
                 stepflags *= "Fd"
             end 
 
-            # Check convergence
-            c_old = c_cur
-            c_cur = _cost(r_cur)
-            if (c_cur < conv_atol + conv_rtol * f_max) && !stabilise_mlt
-                code = 0
-                break
-            end
-
             # Check if jacobian is singular 
             if abs(det(b)) < floatmin()*10.0
                 code = 2
@@ -545,16 +565,20 @@ module solver_nlsol
             clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
             _fev!(x_cur, r_cur)
 
+            # Cost value
+            c_old = c_cur
+            c_cur = _cost(r_cur)
+
             # Model statistics 
             r_med   = median(r_cur)
             iworst  = argmax(abs.(r_cur))
             r_max   = r_cur[iworst]
-            f_max   = maximum(abs.(atmos.flux_tot))
             x_med   = median(x_cur)
             x_max   = x_cur[argmax(abs.(x_cur))]
             dxmax   = maximum(abs.(x_dif))
             r_old_2nm   = r_cur_2nm
             r_cur_2nm   = norm(r_cur)
+            c_max = maximum(abs.(atmos.flux_tot))
 
             # Plot
             if modplot > 0
@@ -568,6 +592,12 @@ module solver_nlsol
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-9s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags)
                 @info info_str
+            end
+
+            # Converged?
+            if (c_cur < conv_atol + conv_rtol * c_max) && !stabilise_mlt
+                code = 0
+                break
             end
 
         end # end solver loop
@@ -600,7 +630,7 @@ module solver_nlsol
         # Print info
         # ---------------------------------------------------------- 
         loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
-        loss_pct = loss/maximum(atmos.flux_tot)*100.0
+        loss_pct = 100.0*loss/maximum(atmos.flux_tot)
         @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
         if (sol_type == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)

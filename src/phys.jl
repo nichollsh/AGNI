@@ -155,7 +155,7 @@ module phys
         ("HF", 2.000689E-02 )
     ])
 
-    # Molecule heat capacity at constant pressure, J K-1 kg-1
+    # Molecule heat capacity at constant pressure and temperature, J K-1 kg-1
     const lookup_cp = Dict{String, Float64}([
         ("H2O", 1.847000E+03), 
         ("CO2", 8.200000E+02), 
@@ -167,6 +167,13 @@ module phys
         ("H2",  1.423000E+04), 
         ("He",  5.196000E+03),
         ("O3",  819.37)
+    ])
+
+    # Molecule thermal conductivity at constant pressure and temperature, J K-1 kg-1
+    const lookup_kc = Dict{String, Float64}([
+        ("H2O", 0.11967),   # at 1173 K   | all values in this dict sourced 
+        ("CO2", 0.07396),   # at 1050 K   | from the engineering toolbox website 
+        ("CH4", 0.17670),   # at 1000 K   | https://www.engineeringtoolbox.com
     ])
 
     # Critical point temperature, K
@@ -445,36 +452,38 @@ module phys
 
         prop = lowercase(prop)
 
-        table = nothing
-        funct = nothing
+        _table::Dict{String, Float64} = Dict()
+        _funct = nothing
 
         # Find table 
         if prop == "l_vap"
-            table = lookup_L_vap
+            _table = lookup_L_vap
             # funct = interp_Lv
         elseif prop == "p_trip"
-            table = lookup_P_trip
+            _table = lookup_P_trip
         elseif prop == "t_trip"
-            table = lookup_T_trip
+            _table = lookup_T_trip
         elseif prop == "t_crit"
-            table = lookup_T_crit
+            _table = lookup_T_crit
         elseif prop == "mmw"
-            table = lookup_mmw
+            _table = lookup_mmw
         elseif prop == "cp"
-            table = lookup_cp
-            funct = shomate_cp
+            _table = lookup_cp
+            _funct = shomate_cp
+        elseif prop == "kc"
+            _table = lookup_kc
         else 
             error("Invalid thermodynamic property '$prop'")
         end 
 
         # Try temperature-dependent cases 
-        if !isnothing(funct) && (tmp > 0.1)
-            return funct(gas,tmp)
+        if !isnothing(_funct) && (tmp > 0.1)
+            return _funct(gas,tmp)
 
         # Otherwise, try lookup tables
         else
-            if gas in keys(table)
-                return table[gas]
+            if gas in keys(_table)
+                return _table[gas]
             end
         end 
          

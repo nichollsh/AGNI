@@ -224,7 +224,9 @@ module plotting
     """
     Plot the fluxes at each pressure level
     """
-    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_eff::Bool=false, incl_mlt::Bool=true)
+    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, 
+                            incl_eff::Bool=false, incl_mlt::Bool=true, incl_cdct::Bool=true
+                        )
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]*0.95, arr_P[end]*2.0)
@@ -239,10 +241,13 @@ module plotting
         w = 2.0
         plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, guidefontsize=9)
 
-        col_r = "gray"
-        col_n = "black"
-        col_c = "cornflowerblue"
-        col_t = "orangered"
+        col_r = "#c0c0c0"
+        col_n = "#000000"
+        col_c = "#6495ed"
+        col_t = "#ff4400"
+        col_o = "#66CD00"
+
+        alpha = 0.7
 
         # Legend dummy plots
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dot,   lw=w, lc=col_r, label="SW")
@@ -253,33 +258,38 @@ module plotting
         # Zero line 
         plot!(plt, [0.0, 0.0], [arr_P[1], arr_P[end]], lw=0.4, lc="black", label="")
 
-        # Interior flux
+        # Effective flux
         if incl_eff
-            plot!(plt, [_symlog(atmos.flux_eff)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="INT")
+            plot!(plt, [_symlog(atmos.flux_eff)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="EFF")
         end
 
         # LW component
         if atmos.is_out_lw
-            plot!(plt, _symlog.(-1.0*atmos.flux_d_lw), arr_P, label="", lw=w, lc=col_r, ls=:dash)
-            plot!(plt, _symlog.(     atmos.flux_u_lw), arr_P, label="", lw=w, lc=col_r, ls=:dash)
+            plot!(plt, _symlog.(-1.0*atmos.flux_d_lw), arr_P, label="", lw=w, lc=col_r, ls=:dash, linealpha=alpha)
+            plot!(plt, _symlog.(     atmos.flux_u_lw), arr_P, label="", lw=w, lc=col_r, ls=:dash, linealpha=alpha)
         end
 
         # SW component
         if atmos.is_out_sw
-            plot!(plt, _symlog.(-1.0.*atmos.flux_d_sw), arr_P, label="", lw=w, lc=col_r, ls=:dot)
-            plot!(plt, _symlog.(      atmos.flux_u_sw), arr_P, label="", lw=w, lc=col_r, ls=:dot)
+            plot!(plt, _symlog.(-1.0.*atmos.flux_d_sw), arr_P, label="", lw=w, lc=col_r, ls=:dot, linealpha=alpha)
+            plot!(plt, _symlog.(      atmos.flux_u_sw), arr_P, label="", lw=w, lc=col_r, ls=:dot, linealpha=alpha)
         end 
 
         # Net radiative fluxes
         if atmos.is_out_lw && atmos.is_out_sw
-            plot!(plt, _symlog.(      atmos.flux_u), arr_P, label="", lw=w, lc=col_r, ls=:solid)
-            plot!(plt, _symlog.(-1.0.*atmos.flux_d), arr_P, label="", lw=w, lc=col_r, ls=:solid)
-            plot!(plt, _symlog.(      atmos.flux_n), arr_P, label="", lw=w, lc=col_n, ls=:solid)
+            plot!(plt, _symlog.(      atmos.flux_u), arr_P, label="", lw=w, lc=col_r, ls=:solid, linealpha=alpha)
+            plot!(plt, _symlog.(-1.0.*atmos.flux_d), arr_P, label="", lw=w, lc=col_r, ls=:solid, linealpha=alpha)
+            plot!(plt, _symlog.(      atmos.flux_n), arr_P, label="", lw=w, lc=col_n, ls=:solid, linealpha=alpha)
         end 
 
         # Convective flux (MLT)
         if incl_mlt
-            plot!(plt, _symlog.(atmos.flux_c), arr_P, label="CONVECT", lw=w*1.2, lc=col_c, ls=:solid)
+            plot!(plt, _symlog.(atmos.flux_cdry), arr_P, label="C_DRY", lw=w*1.2, lc=col_c, ls=:solid, linealpha=alpha)
+        end 
+
+        # Conduction 
+        if incl_cdct
+            plot!(plt, _symlog.(atmos.flux_cdct), arr_P, label="CNDCT", lw=w*1.2, lc=col_o, ls=:solid, linealpha=alpha)
         end 
 
         # Sensible heat
@@ -288,7 +298,7 @@ module plotting
         end
 
         # Total flux
-        plot!(plt, _symlog.(atmos.flux_tot), arr_P, label="TOTAL", lw=w, lc=col_t, ls=:solid, linealpha=0.7)
+        plot!(plt, _symlog.(atmos.flux_tot), arr_P, label="TOTAL", lw=w, lc=col_t, ls=:solid, linealpha=alpha)
 
         # Overplot convection and condensation mask
         for i in 1:atmos.nlev_c
@@ -454,7 +464,7 @@ module plotting
     end 
 
     """
-    Plot spectral albedo (ratio of LW_UP to SW_DN)
+    Plot spectral albedo (ratio of SW_UP to SW_DN)
     """
     function plot_albedo(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
 
@@ -472,7 +482,7 @@ module plotting
             x[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
             
             # y value - spectral albedo [dimensionless]
-            y[ba] = atmos.band_u_lw[1, ba]/atmos.band_d_sw[1, ba]
+            y[ba] = 100.0 * atmos.band_u_sw[1, ba]/atmos.band_d_sw[1, ba]
         end
 
         # Make plot
@@ -480,12 +490,12 @@ module plotting
 
         plot!(plt, x, y, label="", color="black")
 
-        xlims  = ( max(1.0e-10,minimum(x)), min(maximum(x), 70000.0))
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
-        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+        xlims  = (200.0, 1000.0)
+        xticks = range( xlims[1], xlims[2], step=100.0)
+        xaxis!(plt, xlims=xlims, xticks=xticks, minorgrid=true)
 
         xlabel!(plt, "Wavelength [nm]")
-        ylabel!(plt, "Spectral albedo")
+        ylabel!(plt, "Spectral albedo [%]")
 
         if !isempty(fname)
             savefig(plt, fname)

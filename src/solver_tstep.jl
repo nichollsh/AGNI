@@ -33,12 +33,13 @@ module solver_tstep
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `sol_type::Int=1`               bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
+    - `sol_type::Int=1`                 bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
     - `use_physical_dt::Bool=false`     use a single time-step across the entire column (for physical time-evolution)
     - `dry_convect::Bool=true`          enable dry convection
-    - `condensate::String=""`           condensate to model (if empty, no condensates are modelled)
+    - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
     - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=false`           include sensible heating 
+    - `conduct::Bool=true`              include conduction
     - `modprop::Int=1`                  frequency at which to update thermodynamic properties (0 => never)
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
@@ -55,8 +56,8 @@ module solver_tstep
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, use_physical_dt::Bool=false,
-                            dry_convect::Bool=true, condensate::String="", use_mlt::Bool=true,
-                            sens_heat::Bool=false, modprop::Int=1,
+                            dry_convect::Bool=true, condensates::Array=[], use_mlt::Bool=true,
+                            sens_heat::Bool=false, conduct::Bool=true, modprop::Int=1, 
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, adams::Bool=true, dt_max::Float64=500.0, 
                             max_steps::Int=1000, min_steps::Int=100, max_runtime::Float64=400.0,
@@ -84,12 +85,14 @@ module solver_tstep
 
         do_condense::Bool   = false  # Allow condensation ever? (overwritten according to condensate)
 
-        if condensate != "" 
-            if condensate in atmos.gases
-                do_condense = true 
-            else 
-                error("Invalid condensate ('$condensate')")
-            end 
+        if length(condensates) > 0 
+            for c in condensates
+                if condensate in atmos.gases
+                    do_condense = true 
+                else 
+                    error("Invalid condensate ('$c')")
+                end 
+            end
         end 
 
         if verbose
@@ -287,7 +290,7 @@ module solver_tstep
             # Dry convection (MLT)
             if use_mlt && dry_convect && start_con
                 atmosphere.mlt!(atmos)
-                atmos.flux_tot += atmos.flux_c
+                atmos.flux_tot += atmos.flux_cdry
             end
 
             # Turbulence
@@ -296,11 +299,16 @@ module solver_tstep
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
+            # Conduction
+            if conduct
+                atmosphere.conduct!(atmos)
+                atmos.flux_tot += atmos.flux_cdct
+            end
+
             # ----------------------------------------------------------
             # Calculate heating rates
             # ---------------------------------------------------------- 
             atmosphere.calc_hrates!(atmos)
-
 
             # ----------------------------------------------------------
             # Calculate step size for this step
@@ -391,16 +399,17 @@ module solver_tstep
             # Apply condensation
             if is_condense && start_con
 
-                lvl_condensing = atmosphere.apply_vlcc!(atmos, condensate)
-                
-                # check which levels were changed
-                for i in 1:atmos.nlev_c
-                    if lvl_condensing[i]
-                        adj_changed += 1
-                        atmos.mask_p[i]  = atmos.mask_decay
-                    end
-                end 
-
+                for c in condensates
+                    lvl_condensing = atmosphere.apply_vlcc!(atmos, c)
+                    
+                    # check which levels were changed
+                    for i in 1:atmos.nlev_c
+                        if lvl_condensing[i]
+                            adj_changed += 1
+                            atmos.mask_p[i]  = atmos.mask_decay
+                        end
+                    end 
+                end
             end
 
             # ----------------------------------------------------------
