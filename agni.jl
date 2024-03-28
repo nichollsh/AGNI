@@ -6,7 +6,7 @@
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(@__FILE__))
-ENV["GKSwstype"]="nul"
+ENV["GKSwstype"] = "100"
 
 # Include libraries
 using Revise
@@ -161,8 +161,9 @@ function main()
     flag_cld::Bool         = cfg["execution" ]["cloud"]
     flag_aer::Bool         = cfg["execution" ]["aerosol"]
     overlap::Int           = cfg["execution" ]["overlap_method"]
-    thermo_funcs::Bool     = cfg["execution" ]["thermo_funcs"]
+    thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
     dry_type::String       = cfg["execution" ]["dry_convection"]
+    condensates::Array     = cfg["execution" ]["condensates"]
     incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
     sol_type::Int          = cfg["execution" ]["solution_type"]
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
@@ -231,7 +232,7 @@ function main()
                             skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                             tmp_floor=5.0, target_olr=target_olr,
                             tmp_eff=tmp_eff, albedo_s=albedo_s,
-                            thermo_functions=thermo_funcs,
+                            thermo_functions=thermo_funct,
                             C_d=turb_coeff, U=wind_speed
                     )
     atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true,spfile_has_star=isempty(star_file))
@@ -289,7 +290,6 @@ function main()
     dry_convect::Bool = !isempty(dry_type)
     use_mlt::Bool     = (dry_type == "mlt")
     modplot::Int      = 0
-    condensate  = ""
 
     # Loop over requested solvers 
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
@@ -316,7 +316,8 @@ function main()
             if incl_sens 
                 atmosphere.sensible!(atmos)
             end 
-            atmos.flux_tot = atmos.flux_c + atmos.flux_n
+            atmosphere.conduct!(atmos)
+            atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct
             atmos.flux_tot[end] += atmos.flux_sens
         
         # Timestepping
@@ -328,7 +329,7 @@ function main()
             end
             solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
-                                dry_convect=dry_convect, condensate=condensate,
+                                dry_convect=dry_convect, condensates=condensates,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
@@ -341,7 +342,7 @@ function main()
             end
             method = findfirst(==(sol), method_map)
             solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
-                                dry_convect=dry_convect, condensate=condensate, sens_heat=incl_sens,
+                                dry_convect=dry_convect, condensates=condensates, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
         else 
@@ -361,12 +362,12 @@ function main()
     # Save plots
     @info "Making plots"
     plt_ani && plotting.anim_solver(atmos)
-    plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"mf.png"))
-    plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"cf.png"))
-    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"pt.png"), incl_magma=(sol_type==2))
-    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"fl.png"), incl_mlt=use_mlt)
-    plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"em.png"))
-    plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"al.png"))
+    plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
+    plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
+    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
+    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3))
+    plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"plot_emission.png"))
+    plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 
     # Deallocate atmosphere
     @info "Deallocating arrays"
