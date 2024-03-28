@@ -453,7 +453,7 @@ module phys
         prop = lowercase(prop)
 
         _table::Dict{String, Float64} = Dict()
-        _funct::Function = _dummy()=0.0
+        _funct = nothing
 
         # Find table 
         if prop == "l_vap"
