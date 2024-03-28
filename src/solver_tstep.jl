@@ -39,6 +39,7 @@ module solver_tstep
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
     - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=false`           include sensible heating 
+    - `conduct::Bool=true`              include conduction
     - `modprop::Int=1`                  frequency at which to update thermodynamic properties (0 => never)
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
@@ -56,7 +57,7 @@ module solver_tstep
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, use_physical_dt::Bool=false,
                             dry_convect::Bool=true, condensates::Array=[], use_mlt::Bool=true,
-                            sens_heat::Bool=false, modprop::Int=1,
+                            sens_heat::Bool=false, conduct::Bool=true, modprop::Int=1, 
                             verbose::Bool=true, modplot::Int=0,
                             accel::Bool=true, adams::Bool=true, dt_max::Float64=500.0, 
                             max_steps::Int=1000, min_steps::Int=100, max_runtime::Float64=400.0,
@@ -289,7 +290,7 @@ module solver_tstep
             # Dry convection (MLT)
             if use_mlt && dry_convect && start_con
                 atmosphere.mlt!(atmos)
-                atmos.flux_tot += atmos.flux_c
+                atmos.flux_tot += atmos.flux_cdry
             end
 
             # Turbulence
@@ -298,11 +299,16 @@ module solver_tstep
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
+            # Conduction
+            if conduct
+                atmosphere.conduct!(atmos)
+                atmos.flux_tot += atmos.flux_cdct
+            end
+
             # ----------------------------------------------------------
             # Calculate heating rates
             # ---------------------------------------------------------- 
             atmosphere.calc_hrates!(atmos)
-
 
             # ----------------------------------------------------------
             # Calculate step size for this step
