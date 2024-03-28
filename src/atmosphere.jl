@@ -1418,7 +1418,7 @@ module atmosphere
                 # Check if this layer is condensing (this shouldn't ever be
                 # true, because the condensation curve dT/dp is too shallow)
                 if atmos.mask_p[i] > 0
-                    @warn "Somehow unstable to dry convection in a condensing region!"
+                    @warn "Condensing region is unstable to dry convection"
                 end 
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
