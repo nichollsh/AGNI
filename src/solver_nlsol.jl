@@ -32,8 +32,9 @@ module solver_nlsol
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
-    - `dry_convect::Bool=true`          enable dry convection
+    - `dry_convect::Bool=true`          include dry convection
     - `sens_heat::Bool=false`           include sensible heating 
+    - `conduct::Bool=true`              include conduction
     - `max_steps::Int=2000`             maximum number of solver steps
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
@@ -48,6 +49,7 @@ module solver_nlsol
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, condensates::Array=[],
                             dry_convect::Bool=true, sens_heat::Bool=false,
+                            conduct::Bool=true,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
                             method::Int=1, linesearch::Bool=true,
@@ -154,10 +156,10 @@ module solver_nlsol
                 atmosphere.mlt!(atmos)
 
                 # Stabilise?
-                atmos.flux_c *= convect_sf
+                atmos.flux_cdry *= convect_sf
 
                 # Add to total flux
-                atmos.flux_tot += atmos.flux_c
+                atmos.flux_tot += atmos.flux_cdry
             end
 
             # +Surface turbulence
@@ -166,11 +168,17 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
+            # +Conduction 
+            if conduct
+                atmosphere.conduct!(atmos)
+                atmos.flux_tot += atmos.flux_cdct
+            end
+
             # Flux loss across each level 
             atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
 
-            # Additional energy 
-            # atmos.flux_dif[:] .+= atmos.ediv_add[:] .* ()
+            # Additional energy input
+            atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
 
             # +Condensation
             if do_condense
