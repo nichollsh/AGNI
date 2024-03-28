@@ -123,6 +123,7 @@ module atmosphere
         layer_mmw::Array{Float64,1}         # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
         layer_grav::Array{Float64,1}        # gravity [m s-2]
+        layer_thick::Array{Float64,1}       # geometrical thickness [m]
         layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
 
         # Calculated bolometric radiative fluxes (W m-2)
@@ -365,6 +366,7 @@ module atmosphere
         atmos.layer_density = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
+        atmos.layer_thick   = zeros(Float64, atmos.nlev_c)
 
         # Initialise cloud arrays 
         atmos.cloud_arr_r   = zeros(Float64, atmos.nlev_c) 
@@ -560,9 +562,10 @@ module atmosphere
 
         # geometrical height and gravity
         # dz = -dp / (rho * g)
-        fill!(atmos.z         , 0.0)
-        fill!(atmos.zl        , 0.0)
-        fill!(atmos.layer_grav, 0.0)
+        fill!(atmos.z         ,  0.0)
+        fill!(atmos.zl        ,  0.0)
+        fill!(atmos.layer_grav,  0.0)
+        fill!(atmos.layer_thick, 0.0)
         g1::Float64 = 0.0
         g2::Float64 = 0.0
         dzc::Float64= 0.0
@@ -1844,6 +1847,7 @@ module atmosphere
         var_tmpl =      defVar(ds, "tmpl",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "K"))
         var_z =         defVar(ds, "z",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
         var_zl =        defVar(ds, "zl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
+        var_thick =     defVar(ds, "dz",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
         var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
         var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "J K-1 kg-1"))
         var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
@@ -1880,8 +1884,9 @@ module atmosphere
         var_z[:]    =   atmos.z
         var_zl[:]   =   atmos.zl
         var_mmw[:]  =   atmos.layer_mmw
-        var_cp[:]  =   atmos.layer_cp
+        var_cp[:]  =    atmos.layer_cp
         var_grav[:]  =  atmos.layer_grav
+        var_thick[:]  = atmos.layer_thick
 
         for i_gas in 1:ngases 
             for i_char in 1:nchars 
