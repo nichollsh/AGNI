@@ -175,9 +175,12 @@ module atmosphere
         cloud_val_l::Float64 
         cloud_val_f::Float64 
 
+        # Cell-internal heating 
+        
+
         # Total energy flux
-        flux_tot::Array{Float64,1}     # Total upward-directed flux at cell edges
-        flux_div::Array{Float64,1}     # Flux (negative) divergence at each level centre (positive => net inward, negative => net outward)
+        flux_tot::Array{Float64,1}     # Total upward-directed flux at cell edges [W m-2]
+        ediv_tot::Array{Float64,1}     # Energy divergence at each level centre [W m-3] (positive => net inward, negative => net outward)
 
         # Heating rate felt at each level [K/day]
         heating_rate::Array{Float64,1} 
@@ -1097,7 +1100,7 @@ module atmosphere
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
-        atmos.flux_div =          zeros(Float64, atmos.nlev_c)
+        atmos.ediv_tot =          zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
         # Mark as allocated

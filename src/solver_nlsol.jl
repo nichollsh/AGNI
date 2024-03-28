@@ -126,15 +126,16 @@ module solver_nlsol
         # Objective function to solve for
         function _fev!(x::Array,resid::Array)
 
-            # Reset values
-            atmos.mask_c[:] .= 0
-            atmos.mask_p[:] .= 0
+            # Reset masks
+            fill!(atmos.mask_c, 0.0)
+            fill!(atmos.mask_p, 0.0)
            
             # Set temperatures 
             _set_tmps!(x)
 
             # Reset fluxes
-            atmos.flux_tot[:] .= 0.0
+            fill!(atmos.flux_tot, 0.0)
+            fill!(atmos.ediv_tot, 0.0)
 
             # +Radiation
             atmosphere.radtrans!(atmos, true)
@@ -153,19 +154,19 @@ module solver_nlsol
                 atmos.flux_tot += atmos.flux_c
             end
 
-            # +Turbulence
+            # +Surface turbulence
             if sens_heat
                 atmosphere.sensible!(atmos)
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
             # Divergence (so far)
-            atmos.flux_div[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])./(atmos.zl[1:end-1] .- atmos.zl[2:end])
+            atmos.ediv_tot[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])./(atmos.zl[1:end-1] .- atmos.zl[2:end])
 
             # +Condensation
             if do_condense
 
-                a::Float64 = max(maximum(abs.(atmos.flux_div)), 10.0)
+                a::Float64 = max(maximum(abs.(atmos.ediv_tot)), 10.0)
                 pp::Float64 = 0.0
                 i_gas::Int = -1
 
@@ -186,7 +187,7 @@ module solver_nlsol
                         # Layer is condensing if T < T_dew
                         Tsat = phys.calc_Tdew(c, pp)
                         if atmos.tmp[i] < Tsat
-                            flux_div[i] += (a/atmos.tmp[i] - a/Tsat )
+                            atmos.ediv_tot[i] += (a/atmos.tmp[i] - a/Tsat )
                             println("Condensing $c at $i")
                             atmos.mask_p[i] = atmos.mask_decay 
                             if c == "H2O"
@@ -202,7 +203,7 @@ module solver_nlsol
             # Calculate residuals subject to the boundary condition
             if (sol_type == 0) || (sol_type == 1)
                 # Zero divergence with constant tmp_surf
-                resid[1:end] .= atmos.flux_div[1:end]
+                resid[1:end] .= atmos.ediv_tot[1:end]
             elseif (sol_type == 2)
                 # Conductive boundary layer
                 resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
@@ -560,7 +561,7 @@ module solver_nlsol
             r_old_2nm   = r_cur_2nm
             r_cur_2nm   = norm(r_cur)
             if (sol_type==0) || (sol_type===1)
-                c_max = maximum(abs.(atmos.flux_div))
+                c_max = maximum(abs.(atmos.ediv_tot))
             else 
                 c_max = maximum(abs.(atmos.flux_tot))
             end 
