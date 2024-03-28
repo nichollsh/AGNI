@@ -176,11 +176,11 @@ module atmosphere
         cloud_val_f::Float64 
 
         # Cell-internal heating 
-        
+        ediv_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-3] (e.g. from advection)
 
         # Total energy flux
-        flux_tot::Array{Float64,1}     # Total upward-directed flux at cell edges [W m-2]
-        ediv_tot::Array{Float64,1}     # Energy divergence at each level centre [W m-3] (positive => net inward, negative => net outward)
+        flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2]
+        flux_tot::Array{Float64,1}      # Total upward-directed flux at cell edges [W m-2]
 
         # Heating rate felt at each level [K/day]
         heating_rate::Array{Float64,1} 
@@ -583,11 +583,16 @@ module atmosphere
             atmos.zl[i] = atmos.z[i] + dzl
 
             atmos.layer_grav[i] = sqrt(g1 * g2)
+            atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
 
             if (dzl < 1e-20) || (dzc < 1e-20)
-                error("Height integration resulted in dz <= 0")
+                error("Height integration resulted in dz <= 0 at level $i")
+            end
+            if (dzl > 1e8) || (dzc > 1e8)
+                error("Height integration blew up at level $i")
             end
         end 
+
 
         # Mass
         for i in 1:atmos.atm.n_layer
@@ -1100,7 +1105,8 @@ module atmosphere
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
-        atmos.ediv_tot =          zeros(Float64, atmos.nlev_c)
+        atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
+        atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
         # Mark as allocated
@@ -1221,9 +1227,6 @@ module atmosphere
         ####################################################
         # Temperature
         ###################################################
-
-        clamp!(atmos.tmp,  atmos.tmp_floor, atmos.tmp_ceiling)
-        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
 
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.t[1, :] .= atmos.tmp[:]
@@ -1777,7 +1780,7 @@ module atmosphere
 
         #     Store data
         var_tmp_surf[1] =   atmos.tmp_surf 
-        var_tmp_eff[1] =       atmos.tmp_eff 
+        var_tmp_eff[1] =    atmos.tmp_eff 
         var_inst[1] =       atmos.instellation
         var_s0fact[1] =     atmos.s0_fact
         var_albbond[1] =    atmos.albedo_b
@@ -1842,8 +1845,9 @@ module atmosphere
         var_z =         defVar(ds, "z",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
         var_zl =        defVar(ds, "zl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
         var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
+        var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "J K-1 kg-1"))
         var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
-        var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf AEOLUS because of how Julia stores arrays
+        var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf JANUS because of how Julia stores arrays
         var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c")) # ^^
         var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
@@ -1876,6 +1880,7 @@ module atmosphere
         var_z[:]    =   atmos.z
         var_zl[:]   =   atmos.zl
         var_mmw[:]  =   atmos.layer_mmw
+        var_cp[:]  =   atmos.layer_cp
         var_grav[:]  =  atmos.layer_grav
 
         for i_gas in 1:ngases 

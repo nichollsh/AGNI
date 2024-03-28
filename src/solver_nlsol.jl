@@ -99,6 +99,7 @@ module solver_nlsol
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
             # Read new guess
+            clamp!(_x, atmos.tmp_floor+1.0, atmos.tmp_ceiling-1.0)
             for i in 1:atmos.nlev_c
                 atmos.tmp[i] = _x[i]
             end
@@ -133,9 +134,14 @@ module solver_nlsol
             # Set temperatures 
             _set_tmps!(x)
 
+            # Calculate layer properties if they are temperature-dependent
+            if atmos.thermo_funct
+                atmosphere.calc_layer_props!(atmos)
+            end 
+
             # Reset fluxes
             fill!(atmos.flux_tot, 0.0)
-            fill!(atmos.ediv_tot, 0.0)
+            fill!(atmos.flux_dif, 0.0)
 
             # +Radiation
             atmosphere.radtrans!(atmos, true)
@@ -160,16 +166,24 @@ module solver_nlsol
                 atmos.flux_tot[end] += atmos.flux_sens
             end
 
-            # Divergence (so far)
-            atmos.ediv_tot[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])./(atmos.zl[1:end-1] .- atmos.zl[2:end])
+            # Flux loss across each level 
+            atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
+
+            # Additional energy 
+            # atmos.flux_dif[:] .+= atmos.ediv_add[:] .* ()
 
             # +Condensation
             if do_condense
 
-                a::Float64 = max(maximum(abs.(atmos.ediv_tot)), 10.0)
+                a::Float64 = max(maximum(abs.(atmos.flux_tot)), 10.0)
                 pp::Float64 = 0.0
                 i_gas::Int = -1
 
+                # Reset water cloud 
+                fill!(atmos.re[i]  , 0.0)
+                fill!(atmos.lwm[i] , 0.0)
+                fill!(atmos.clfr[i], 0.0)
+                
                 for i in 1:atmos.nlev_c
                     for c in condensates
                         # Get partial pressure 
@@ -179,15 +193,9 @@ module solver_nlsol
                             continue
                         end
 
-                        # Reset water cloud 
-                        atmos.re[i]    = 0.0
-                        atmos.lwm[i]   = 0.0
-                        atmos.clfr[i]  = 0.0
-
-                        # Layer is condensing if T < T_dew
                         Tsat = phys.calc_Tdew(c, pp)
                         if atmos.tmp[i] < Tsat
-                            atmos.ediv_tot[i] += (a/atmos.tmp[i] - a/Tsat )
+                            atmos.flux_dif[i] += (a/atmos.tmp[i] - a/Tsat )
                             println("Condensing $c at $i")
                             atmos.mask_p[i] = atmos.mask_decay 
                             if c == "H2O"
@@ -200,22 +208,28 @@ module solver_nlsol
                 end # end levels 
             end # end condensing
 
-            # Calculate residuals subject to the boundary condition
+            # Calculate residuals subject to the solution type
             if (sol_type == 0) || (sol_type == 1)
-                # Zero divergence with constant tmp_surf
-                resid[1:end] .= atmos.ediv_tot[1:end]
+                # Zero loss with constant tmp_surf
+                resid[1:end] .= atmos.flux_dif[1:end]
+
             elseif (sol_type == 2)
                 # Conductive boundary layer
-                resid[1:end-1] = atmos.flux_tot[2:end] - atmos.flux_tot[1:end-1] 
-                resid[end] = atmos.flux_tot[1] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
+                resid[2:end] .= atmos.flux_dif[1:end]
+                resid[1] = atmos.flux_tot[end] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
+
             elseif (sol_type == 3)
-                # Fluxes equal to sigma*tmp_eff^4
-                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
+                # Zero loss
+                resid[2:end] .= atmos.flux_dif[1:end]
+                # Total flux at TOA is equal to sigma*tmp_eff^4
+                resid[1] = atmos.flux_tot[1] - atmos.flux_eff
+
             elseif (sol_type == 4)
                 # Set flux_eff to value required to reach target_olr
                 atmos.flux_eff = atmos.target_olr + atmos.flux_u_sw[1] - atmos.flux_d_lw[1] - atmos.flux_d_sw[1]
                 # Set residuals using new flux_eff 
                 resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
+
             end
 
             # Check that residuals are real numbers
@@ -456,14 +470,6 @@ module solver_nlsol
                 stepflags *= "Fd"
             end 
 
-            # Check convergence
-            c_old = c_cur
-            c_cur = _cost(r_cur)
-            if (c_cur < conv_atol + conv_rtol * c_max) && !stabilise_mlt
-                code = 0
-                break
-            end
-
             # Check if jacobian is singular 
             if abs(det(b)) < floatmin()*10.0
                 code = 2
@@ -551,6 +557,10 @@ module solver_nlsol
             clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
             _fev!(x_cur, r_cur)
 
+            # Cost value
+            c_old = c_cur
+            c_cur = _cost(r_cur)
+
             # Model statistics 
             r_med   = median(r_cur)
             iworst  = argmax(abs.(r_cur))
@@ -560,11 +570,7 @@ module solver_nlsol
             dxmax   = maximum(abs.(x_dif))
             r_old_2nm   = r_cur_2nm
             r_cur_2nm   = norm(r_cur)
-            if (sol_type==0) || (sol_type===1)
-                c_max = maximum(abs.(atmos.ediv_tot))
-            else 
-                c_max = maximum(abs.(atmos.flux_tot))
-            end 
+            c_max = maximum(abs.(atmos.flux_tot))
 
             # Plot
             if modplot > 0
@@ -578,6 +584,12 @@ module solver_nlsol
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-9s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags)
                 @info info_str
+            end
+
+            # Converged?
+            if (c_cur < conv_atol + conv_rtol * c_max) && !stabilise_mlt
+                code = 0
+                break
             end
 
         end # end solver loop
@@ -610,7 +622,7 @@ module solver_nlsol
         # Print info
         # ---------------------------------------------------------- 
         loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
-        loss_pct = loss/maximum(atmos.flux_tot)*100.0
+        loss_pct = 100.0*loss/maximum(atmos.flux_tot)
         @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
         if (sol_type == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)

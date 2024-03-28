@@ -161,7 +161,7 @@ function main()
     flag_cld::Bool         = cfg["execution" ]["cloud"]
     flag_aer::Bool         = cfg["execution" ]["aerosol"]
     overlap::Int           = cfg["execution" ]["overlap_method"]
-    thermo_funcs::Bool     = cfg["execution" ]["thermo_funcs"]
+    thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
     dry_type::String       = cfg["execution" ]["dry_convection"]
     condensates::Array     = cfg["execution" ]["condensates"]
     incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
@@ -232,7 +232,7 @@ function main()
                             skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                             tmp_floor=5.0, target_olr=target_olr,
                             tmp_eff=tmp_eff, albedo_s=albedo_s,
-                            thermo_functions=thermo_funcs,
+                            thermo_functions=thermo_funct,
                             C_d=turb_coeff, U=wind_speed
                     )
     atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true,spfile_has_star=isempty(star_file))
