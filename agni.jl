@@ -126,7 +126,9 @@ function main()
 
     # Output folder 
     output_dir = abspath(cfg["files"]["output_dir"])
-    rm(output_dir,force=true,recursive=true)
+    if cfg["files"]["clean_output"]
+        rm(output_dir,force=true,recursive=true)
+    end 
     mkdir(output_dir)
 
     # Copy configuration file 
