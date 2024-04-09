@@ -126,10 +126,10 @@ function main()
 
     # Output folder 
     output_dir = abspath(cfg["files"]["output_dir"])
-    if cfg["files"]["clean_output"]
+    if cfg["files"]["clean_output"] || !(ispath(output_dir) && isdir(output_dir))
         rm(output_dir,force=true,recursive=true)
+        mkdir(output_dir)
     end 
-    mkdir(output_dir)
 
     # Copy configuration file 
     cp(cfg_path, joinpath(output_dir, "agni.cfg"))
