@@ -77,11 +77,11 @@ theta           = 65.0
 mf_dict         = Dict([
                         ("H2O" , 0.5),
                         ("CO2" , 0.1),
-                        ("He"  , 0.1),
-                        ("SO2" , 0.1),
-                        ("O3"  , 0.2)
+                        ("O2"  , 0.1),
+                        ("He" , 0.1),
+                        ("H2"  , 0.2)
                         ])
-spfile_name   = "res/spectral_files/Reach/Reach.sf"
+spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
 star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
