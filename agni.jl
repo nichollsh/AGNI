@@ -37,6 +37,7 @@ function setup_logging(outpath::String, silent::Bool)
     # Formatting
     color::Int = 39
     level::String = "UNSET"
+    term_io::IO = stdout
 
     # Setup file logger
     logger_file = FormatLogger(outpath; append=true) do io, args
@@ -65,10 +66,11 @@ function setup_logging(outpath::String, silent::Bool)
             level = "DEBUG"
         elseif args.level == LoggingExtras.Error 
             color = 91
+            term_io = stderr
             level = "ERROR"
         end 
         # Set color, set bold, print level, unset bold, unset color, message
-        @printf(io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",color, level, args.message)
+        @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",color, level, args.message)
     end;
 
     # Combine and set 
@@ -275,6 +277,7 @@ function main()
         
         elseif str_req == "con"
             # condensing a volatile 
+            idx_req += 1
             setpt.condensing!(atmos, initial_req[idx_req])
 
         else 
