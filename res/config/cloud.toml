@@ -36,9 +36,9 @@ title = "Hot and dry"                    # Name for this configuration file
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     dry_convection  = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
     condensates     = ["H2O"]                   # List of volatiles which are allowed to condense.
-    solution_type   = 1                         # Surface boundary condition (see wiki).
+    solution_type   = 1                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
-    initial_state   = ["iso","1500"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    initial_state   = ["iso","1500"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     stabilise       = false                     # Use various methods to help stabilise the model?
     converge_atol   = 1.0e-4                    # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-4                    # Convergence criterion on relative flux divergence [dimensionless].
