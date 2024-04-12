@@ -119,43 +119,57 @@ module spectrum
 
 
     """
-    **Insert a stellar spectrum into a SOCRATES spectral file.**
+    **Insert a stellar spectrum and Rayleigh coeffs into a SOCRATES spectral file.**
 
-    Will not overwrite the original file.
+    Will not overwrite the original file. 
 
     Arguments:
     - `orig_file::String`        Path to original spectral file.
     - `star_file::String`        Path to file containing stellar spectrum written with this module.
     - `outp_file::String`        Path to output spectral file.
+    - `insert_rscatter::Bool`    Calculate Rayleigh scattering coefficients?
     """
-    function insert_stellar_spectrum(orig_file::String, star_file::String, outp_file::String)
-        # k files
-        orig_filek::String = orig_file*"_k"
-        outp_filek::String = outp_file*"_k"
+    function insert_stellar_and_rscatter(orig_file::String, star_file::String, outp_file::String, insert_rscatter::Bool)
 
-        # Delete "new" files if they already exist
-        rm(outp_file , force=true)
-        rm(outp_filek, force=true)
-
-        # Copy original files to new location (retain old files)
-        cp(orig_file,  outp_file )
-        cp(orig_filek, outp_filek)
-
-        # prep_spec inputs
-        inputs = [outp_file,"a","6","n","T","100 4000","1000","2","n",star_file,"y","-1","EOF"]
+        # Inputs to prep_spec
+        prep_spec = abspath(dirname(abspath(@__FILE__))*"/../socrates/bin/prep_spec")
+        @debug "Using prep_spec at: "*prep_spec
+        star_inputs = ["6","n","T","100 4000","1000",   "2","n",star_file,"y"]
 
         # Write executable 
-        execpath::String = "/tmp/$(rand(Int,1)[1])_agni_insert_stellar.sh"
+        execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_insert_stellar.sh"
         rm(execpath, force=true)
         open(execpath, "w") do f
-            write(f, "socrates/bin/prep_spec <<EOF\n")
-            for inp in inputs 
+            
+            # exec prep_spec 
+            write(f, prep_spec*" <<EOF\n")
+
+            # paths
+            write(f, orig_file*" \n")
+            write(f, "n \n")
+            write(f, outp_file*" \n")
+
+            # write thermal source function + stellar spectrum
+            @info "Inserting stellar spectrum"
+            for inp in star_inputs 
                 write(f, inp*" \n")
             end 
+
+            # write rayleigh coefficients
+            if insert_rscatter
+                @info "Inserting Rayleigh coefficients" 
+                write(f, "3 \n")       #  block 3, please
+                write(f, "c \n")       #  custom composition
+                write(f, "a \n")       #  all gases
+            end 
+
+            # exit prep_spec 
+            write(f, "-1 \n")
+            write(f, "EOF \n")
         end
 
         # Run executable
-        @info "Inserting stellar spectrum"
+        @debug "Running prep_spec now"
         run(pipeline(`bash $execpath`, stdout=devnull))
 
         # Delete executable 

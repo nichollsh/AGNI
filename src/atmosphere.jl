@@ -694,15 +694,9 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
-    - `spfile_has_star::Bool=false`    does the spectral file already contain the stellar spectrum?
-    - `stellar_spectrum::String=""`    path to stellar spectrum csv file (used when `spfile_has_star==false`)
-    - `spfile_noremove::Bool=false`    should the runtime spectral file not be removed after use?
+    - `stellar_spectrum::String`       path to stellar spectrum csv file (will not modify spectral file if this is left blank)
     """
-    function allocate!(atmos::atmosphere.Atmos_t;
-                        spfile_has_star::Bool=false,
-                        stellar_spectrum::String="",
-                        spfile_noremove::Bool=false
-                        )
+    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String)
 
         if !atmos.is_param
             error("atmosphere parameters have not been set")
@@ -718,56 +712,44 @@ module atmosphere
 
         # Validate files
         if !isfile(atmos.spectral_file)
-            error("Spectral file '$(atmos.spectral_file)' does not exist")
-        end
-        if !spfile_has_star && (stellar_spectrum == "")
-            error("No stellar spectrum provided")
-        end
-        if spfile_has_star && (stellar_spectrum != "")
-            error("Stellar spectrum provided, but spectral file already contains this block")
-        end 
-        if !isfile(stellar_spectrum) && !spfile_has_star
-            error("Stellar spectrum file '$(stellar_spectrum)' does not exist")
+            error("Source spectral file '$(atmos.spectral_file)' does not exist")
         end
 
-        # Record location
-        if !spfile_has_star
+        spectral_file_run::String  = joinpath([atmos.OUT_DIR, "runtime.sf"])  
+        spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])  
+
+        # Setup spectral file 
+        if !isempty(stellar_spectrum)
+
+            if !isfile(stellar_spectrum)
+                error("Stellar spectrum file '$(stellar_spectrum)' does not exist")
+            end
+
+            # File to be loaded
+            rm(spectral_file_run , force=true)
+            rm(spectral_file_runk, force=true)
+
             atmos.star_file = abspath(stellar_spectrum)
-        else 
-            atmos.star_file = "IN_SPECTRAL_FILE"
-        end
 
-        # Spectral file to be loaded
-        spectral_file_run  = joinpath([atmos.OUT_DIR, "runtime.sf"])  
-        socstar = joinpath([atmos.OUT_DIR, "socstar.dat"])  
-
-
-        # Insert stellar spectrum 
-        if !spfile_has_star
+            # Write spectrum in required format 
+            socstar = joinpath([atmos.OUT_DIR, "socstar.dat"])  
             wl, fl = spectrum.load_from_file(atmos.star_file)
             spectrum.write_to_socrates_format(wl, fl, socstar)
-            spectrum.insert_stellar_spectrum(atmos.spectral_file, socstar, spectral_file_run)
-            
-        elseif atmos.spectral_file != spectral_file_run
-            cp(atmos.spectral_file,      spectral_file_run,      force=true)
-            cp(atmos.spectral_file*"_k", spectral_file_run*"_k", force=true)
+
+            # Insert stellar spectrum and rayleigh scattering, if required
+            spectrum.insert_stellar_and_rscatter(atmos.spectral_file, socstar, spectral_file_run, atmos.control.l_rayleigh)
+
         else 
-            error("Invalid spectral file / star file combination")
+            # Stellar spectrum was not provided, which is taken to mean that the spectral file includes it already 
+            atmos.star_file = "IN_SPECTRAL_FILE"
+            spectral_file_run  = atmos.spectral_file
+            spectral_file_runk = atmos.spectral_file*"_k"
+            @info "Using pre-existing spectral file without modifications"
         end
-
-        # Insert rayleigh scattering (optionally)
-        if atmos.control.l_rayleigh
-            @info "Python: Inserting rayleigh scattering"
-            co2_x = get_x(atmos, "CO2", -1) 
-            n2_x  = get_x(atmos, "N2" , -1)
-            h2o_x = get_x(atmos, "H2O", -1)
-            runfile = joinpath([atmos.ROOT_DIR, "src", "insert_rayleigh.py"])
-            run(`python $runfile $spectral_file_run $co2_x $n2_x $h2o_x`)
-        end
-
+     
         # Validate files
-        if occursin("NaN", readchomp(spectral_file_run*"_k"))
-            error("Spectral _k file contains NaN values")
+        if occursin("NaN", readchomp(spectral_file_runk))
+            error("Spectral_k file contains NaN values")
         end 
         if occursin("NaN", readchomp(spectral_file_run))
             error("Spectral file contains NaN values")
@@ -779,10 +761,6 @@ module atmosphere
                               spectral_file=atmos.control.spectral_file, 
                               l_all_gasses=true)
 
-        if !spfile_noremove                              
-            rm(spectral_file_run; force=true)
-            rm(spectral_file_run*"_k"; force=true)
-        end
 
         #########################################
         # diagnostics

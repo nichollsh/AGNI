@@ -134,7 +134,7 @@ function main()
     end 
 
     # Copy configuration file 
-    cp(cfg_path, joinpath(output_dir, "agni.cfg"))
+    cp(cfg_path, joinpath(output_dir, "agni.cfg"), force=true)
 
     # Logging 
     silent::Bool = cfg["execution"]["silent"]
@@ -239,7 +239,7 @@ function main()
                             thermo_functions=thermo_funct,
                             C_d=turb_coeff, U=wind_speed
                     )
-    atmosphere.allocate!(atmos;stellar_spectrum=star_file,spfile_noremove=true,spfile_has_star=isempty(star_file))
+    atmosphere.allocate!(atmos,star_file)
 
     # Set PT profile by looping over requests
     # Each request may be a command, or an argument following a command
@@ -360,12 +360,13 @@ function main()
     @info "Total RT evalulations: $(atmos.num_rt_eval)"
 
     # Write arrays
+    @info "Writing results"
     atmosphere.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
     atmosphere.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
     atmosphere.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
     # Save plots
-    @info "Making plots"
+    @info "Plotting results"
     plt_ani && plotting.anim_solver(atmos)
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
