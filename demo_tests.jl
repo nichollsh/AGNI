@@ -82,7 +82,6 @@ mf_dict         = Dict([
                         ("H2"  , 0.2)
                         ])
 spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
-star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -94,7 +93,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          nlev_centre, p_surf, p_top,
                          mf_dict=mf_dict
                  )
-atmosphere.allocate!(atmos;spfile_has_star=true)
+atmosphere.allocate!(atmos,"")
 
 dct_e::Dict{String, Float64} = mf_dict
 dct_o::Dict{String, Float64} = Dict()
@@ -132,7 +131,6 @@ mf_dict         = Dict([
                         ("CO2" , 0.2),
                         ])
 spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
-star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -147,7 +145,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=false,
                          overlap_method=2
                  )
-atmosphere.allocate!(atmos;stellar_spectrum=star_file)
+atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
 atmosphere.radtrans!(atmos, false)
 
 val_e = toa_heating * cosd(theta)
@@ -179,7 +177,6 @@ mf_dict         = Dict([
                         ("H2O" , 1.0),
                         ])
 spfile_name   = "res/spectral_files/Oak/Oak.sf"
-star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -194,7 +191,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=false,
                          overlap_method=4
                  )
-atmosphere.allocate!(atmos;stellar_spectrum=star_file)
+atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
 setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
 setpt.condensing!(atmos, "H2O")
@@ -229,7 +226,6 @@ mf_dict         = Dict([
                         ("CO2" , 0.4),
                         ])
 spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
-star_file     = "res/stellar_spectra/sun.txt"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -244,7 +240,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=true,
                          overlap_method=2
                  )
-atmosphere.allocate!(atmos;stellar_spectrum=star_file, spfile_noremove=true)
+atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
 atmosphere.radtrans!(atmos, true)
 atmosphere.radtrans!(atmos, false)
 
@@ -277,7 +273,6 @@ mf_dict         = Dict([
                         ("H2O" , 1.0)
                         ])
 spfile_name   = "res/spectral_files/Oak/Oak.sf"
-star_file     = "res/stellar_spectra/trappist-1.txt"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -293,7 +288,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=2,
                          thermo_functions=false
                  )
-atmosphere.allocate!(atmos;stellar_spectrum=star_file, spfile_noremove=true)
+atmosphere.allocate!(atmos,"res/stellar_spectra/trappist-1.txt")
 setpt.isothermal!(atmos, 300.0)
 atmos.flux_tot[:] .= 0.0
 atmosphere.radtrans!(atmos, true)

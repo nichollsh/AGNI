@@ -54,14 +54,14 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                         flag_gcontinuum=true,
                         thermo_functions=false
                         )
-atmosphere.allocate!(atmos, stellar_spectrum=star_file)
+atmosphere.allocate!(atmos, star_file)
 
 p_boa = atmos.p_boa
 
 plot_frames = false
 
-run_len = 100
-tsurf_arr = range(200,stop=2250,length=run_len)
+run_len = 200
+tsurf_arr = range(200,stop=2400,length=run_len)
 olr_arr = zeros(Float64, run_len)
 for i in 1:run_len
     
@@ -112,6 +112,12 @@ ylabel!(plt, "OLR [W m-2]")
 
 savefig(plt, "out/runaway_olr.pdf")
 savefig(plt, "out/runaway_olr.png")
+
+# Write data 
+@info "Writing data"
+open("out/OLR_vs_Tsurf.csv","w") do hdl 
+    writedlm(hdl, [tsurf_arr olr_arr], ", ")
+end 
 
 # Deallocate atmosphere
 atmosphere.deallocate!(atmos)

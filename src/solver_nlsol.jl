@@ -96,7 +96,7 @@ module solver_nlsol
         fd_s::Float64           = 0.0                      # Row perturbation amount
 
         # Convective flux scale factor 
-        convect_sf::Float64 = 1.0e-5
+        convect_sf::Float64 = 5.0e-5
 
         # Calculate the (remaining) temperatures  
         function _set_tmps!(_x::Array)
@@ -357,6 +357,7 @@ module solver_nlsol
         # Execution variables
         modprint::Int =         1       # Print frequency
         x_dif_clip::Float64 =   300.0   # Maximum allowed step size
+        convect_incr::Float64 = 6.0     # Factor to increase convect_sf when stabilising convection
         
         # Tracking variables
         step::Int =         0       # Step number
@@ -454,7 +455,7 @@ module solver_nlsol
                     if convect_sf < 1.0 
                         # increase sf - reduce stabilisation by 10x
                         stepflags *= "r"
-                        convect_sf = min(1.0, convect_sf*10.0)
+                        convect_sf = min(1.0, convect_sf*convect_incr)
                         @debug "convect_sf = $convect_sf"
                         
                         # done stabilising 
@@ -521,10 +522,10 @@ module solver_nlsol
 
                 # Reset
                 stepflags *= "Ls"
-                ls_best_cost = Inf
-                ls_best_scale = 1.0
+                ls_best_cost = c_old*10.0  # allow a cost increase of up to 10x
+                ls_best_scale = 0.1       # ^ this will require a step scale of 0.1
 
-                for ls_scale in [0.3, 0.5, 0.8, 1.0] 
+                for ls_scale in [0.3, 0.7, 1.0] # linesearch scales based on best cost reduction
                     # try this scale factor 
                     x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
                     _fev!(x_cur, r_tst)
