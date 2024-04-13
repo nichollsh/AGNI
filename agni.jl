@@ -321,8 +321,9 @@ function main()
             if incl_sens 
                 atmosphere.sensible!(atmos)
             end 
+            atmosphere.condense_relax!(atmos, condensates)
             atmosphere.conduct!(atmos)
-            atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct
+            atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct + atmos.flux_p
             atmos.flux_tot[end] += atmos.flux_sens
         
         # Timestepping
@@ -370,7 +371,7 @@ function main()
     plt_ani && plotting.anim_solver(atmos)
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
-    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
+    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2), condensates=condensates)
     plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3))
     plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"plot_emission.png"))
     plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
