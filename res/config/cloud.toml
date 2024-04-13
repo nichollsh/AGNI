@@ -1,18 +1,18 @@
 # AGNI configuration file 
-# This is designed to demonstrate a case similar to Figure1 of Selsis+23
-title = "Hot and dry"                    # Name for this configuration file
+# This is designed to test clouds
+title = "Cloud test"                    # Name for this configuration file
 
 [planet]
-    tmp_surf        = 1550.0            # Surface temperature [kelvin]
-    instellation    = 4000.0          # Stellar flux at planet's orbital distance [W m-2]
-    albedo_b        = 0.18              # Pseudo bond-albedo which removes downscales the stellar flux by 1-this_value
+    tmp_surf        = 1750.0            # Surface temperature [kelvin]
+    instellation    = 1000.0          # Stellar flux at planet's orbital distance [W m-2]
+    albedo_b        = 0.0              # Pseudo bond-albedo which removes downscales the stellar flux by 1-this_value
     s0_fact         = 0.375           # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
     zenith_angle    = 48.19             # Characteristic zenith angle for incoming stellar radiation [degrees]
     albedo_s        = 0.2               # Surface albedo
     radius          = 6.37e6            # Planet radius at the surface [m]
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
-    p_surf          = 50.0             # Total surface pressure [bar]
-    p_top           = 5e-6              # Total top-of-atmosphere pressure [bar]
+    p_surf          = 100.0             # Total surface pressure [bar]
+    p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
     tmp_eff         = 0.0               # Effective temperature
 
@@ -29,14 +29,14 @@ title = "Hot and dry"                    # Name for this configuration file
     num_levels      = 50                        # Number of model levels.
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
-    cloud           = true                     # Include water cloud radiative properties?
+    cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = false                     # Accounting temperature dependence of thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
-    dry_convection  = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
+    dry_convection  = ""                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
     condensates     = ["H2O"]                   # List of volatiles which are allowed to condense.
-    solution_type   = 1                         # Solution type (see wiki).
+    solution_type   = 0                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
     initial_state   = ["iso","1500"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     stabilise       = false                     # Use various methods to help stabilise the model?

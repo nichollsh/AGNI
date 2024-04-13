@@ -34,7 +34,7 @@ module plotting
     """
     Plot the temperature-pressure profile.
     """
-    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_magma::Bool=false)
+    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_magma::Bool=false, condensates::Array=[])
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -46,12 +46,29 @@ module plotting
         # Create plot
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400), guidefontsize=9)
 
-        # Plot temperature
+        # Plot condensation curves 
+        if length(condensates) > 0
+            sat_t = zeros(Float64, atmos.nlev_l)
+            for c in condensates
+                for i in 1:atmos.nlev_l
+                    sat_t[i] = phys.calc_Tdew(c, atmos.pl[i])
+                end 
+                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.lookup_color[c], ls=:dot, label="cc "*phys.lookup_pretty[c])
+            end 
+        end
+
+        # Plot tmp_magma 
         if incl_magma
             scatter!(plt, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
         end
+
+        # Plot tmp_surf 
         scatter!(plt, [atmos.tmp_surf], [atmos.pl[end]*1e-5], color="brown3", label=L"T_s")
+
+        # Plot profile 
         plot!(plt, arr_T, arr_P, lc="black", lw=2, label=L"T(p)")
+
+        # Decorate
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
