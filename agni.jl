@@ -111,7 +111,7 @@ function open_config(cfg_path::String)::Dict
 end 
 
 # Main function!
-function main()
+function main()::Bool
 
     # Record start time 
     tbegin = time()
@@ -281,7 +281,8 @@ function main()
             setpt.condensing!(atmos, initial_req[idx_req])
 
         else 
-            error("Invalid initial state '$str_req'")
+            @error "Invalid initial state '$str_req'"
+            return false
         end 
         
         # iterate
@@ -297,6 +298,8 @@ function main()
     modplot::Int      = 0
 
     # Loop over requested solvers 
+    return_success::Bool = true
+    solver_success::Bool = true
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
     method::Int = 0
     if length(solvers_cmd) == 0  # is empty 
@@ -325,6 +328,7 @@ function main()
             atmosphere.conduct!(atmos)
             atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct + atmos.flux_p
             atmos.flux_tot[end] += atmos.flux_sens
+            atmos.flux_dif[:] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1]
         
         # Timestepping
         elseif sol == "timestep"
@@ -333,12 +337,13 @@ function main()
             if plt_run 
                 modplot = 10
             end
-            solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
+            solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
                                 dry_convect=dry_convect, condensates=condensates,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
+            return_success = return_success && solver_success
         
         # Nonlinear methods
         elseif (sol in method_map) 
@@ -347,15 +352,17 @@ function main()
                 modplot = 1
             end
             method = findfirst(==(sol), method_map)
-            solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
+            solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
                                 dry_convect=dry_convect, condensates=condensates, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
+            return_success = return_success && solver_success
         else 
-            error("Invalid solver requested '$sol'")
+            @error "Invalid solver requested '$sol'"
+            return_success = false 
+            break
         end 
         @info " "
-
     end 
 
     @info "Total RT evalulations: $(atmos.num_rt_eval)"
@@ -385,8 +392,11 @@ function main()
     @info "Model runtime: $runtime seconds"
     @info "Goodbye"
 
-    return nothing 
+    return return_success 
 end 
 
 # Call main function 
-main()
+if main()
+    exit(0)
+end 
+exit(1)
