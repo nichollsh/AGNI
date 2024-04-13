@@ -150,6 +150,12 @@ module solver_nlsol
             atmosphere.radtrans!(atmos, false)
             atmos.flux_tot += atmos.flux_n
 
+            # +Condensation
+            if do_condense
+                atmosphere.condense_relax!(atmos, condensates)
+                atmos.flux_tot += atmos.flux_p
+            end
+
             # +Dry convection
             if dry_convect
                 # Calc flux
@@ -180,42 +186,6 @@ module solver_nlsol
             # Additional energy input
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
 
-            # +Condensation
-            if do_condense
-                a::Float64 = 1.0e3 #max(maximum(abs.(atmos.flux_dif)) * 0.9, 10000.0)
-                pp::Float64 = 0.0
-                i_gas::Int = -1
-
-                # Reset water cloud 
-                fill!(atmos.cloud_arr_r, 0.0)
-                fill!(atmos.cloud_arr_l, 0.0)
-                fill!(atmos.cloud_arr_f, 0.0)
-                
-                for i in 1:atmos.nlev_c
-                    for c in condensates
-                        # Get partial pressure 
-                        i_gas = findfirst(==(c), atmos.gases)
-                        pp = atmos.layer_x[i,i_gas] * atmos.p[i]
-                        if pp < 1.0e-10 
-                            continue
-                        end
-
-                        Tsat = phys.calc_Tdew(c, pp)
-                        if atmos.tmp[i] < Tsat
-                            atmos.flux_dif[i] = (a/atmos.tmp[i] - a/Tsat )
-                            # println("Condensing $c at $i")
-                            atmos.mask_p[i] = atmos.mask_decay 
-                            atmos.mask_c[i] = 0
-                            if c == "H2O"
-                                atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                                atmos.cloud_arr_l[i] = atmos.cloud_val_l
-                                atmos.cloud_arr_f[i] = atmos.cloud_val_f
-                            end 
-                        end 
-                    end # end condensate
-                end # end levels 
-            end # end condensing
-           
             # Calculate residuals subject to the solution type
             if (sol_type == 0) || (sol_type == 1)
                 # Zero loss with constant tmp_surf
@@ -390,6 +360,7 @@ module solver_nlsol
         x_dif_clip_step::Float64 = Inf # maximum step size (IN THIS STEP)
 
         # Linesearch parameters
+        ls_compassion::Float64  = 5.0     # factor by which cost is allowed to increase
         ls_scale::Float64       = 1.0     # best scale factor for linesearch 
         ls_test_cost::Float64   = Inf 
         ls_best_cost::Float64   = Inf 
@@ -522,10 +493,10 @@ module solver_nlsol
 
                 # Reset
                 stepflags *= "Ls"
-                ls_best_cost = c_old*2.0  # allow a cost increase 
-                ls_best_scale = 0.05     # ^ this will require a small step scale
+                ls_best_cost = c_old*ls_compassion  # allow a cost increase 
+                ls_best_scale = 0.1     # ^ this will require a small step scale
 
-                for ls_scale in [0.1, 0.4, 0.9] # linesearch scales based on best cost reduction
+                for ls_scale in [0.3, 0.5, 0.95] # linesearch scales based on best cost reduction
                     # try this scale factor 
                     x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
                     _fev!(x_cur, r_tst)

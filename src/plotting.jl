@@ -53,7 +53,7 @@ module plotting
                 for i in 1:atmos.nlev_l
                     sat_t[i] = phys.calc_Tdew(c, atmos.pl[i])
                 end 
-                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.lookup_color[c], ls=:dot, label="cc "*phys.lookup_pretty[c])
+                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.lookup_color[c], ls=:dot, label=phys.lookup_pretty[c])
             end 
         end
 
@@ -263,6 +263,7 @@ module plotting
         col_c = "#6495ed"
         col_t = "#ff4400"
         col_o = "#66CD00"
+        col_p = "#ecb000"
 
         alpha = 0.7
 
@@ -309,6 +310,9 @@ module plotting
             plot!(plt, _symlog.(atmos.flux_cdct), arr_P, label="CNDCT", lw=w*1.2, lc=col_o, ls=:solid, linealpha=alpha)
         end 
 
+        # Condensation 
+        plot!(plt, _symlog.(atmos.flux_p), arr_P, label="PHASE", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+
         # Sensible heat
         if atmos.flux_sens != 0.0
             scatter!(plt, [_symlog(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_r, label="SENS")
@@ -320,10 +324,10 @@ module plotting
         # Overplot convection and condensation mask
         for i in 1:atmos.nlev_c
             if atmos.mask_c[i] > 0
-                plot!(plt, [xlims[1],xlims[2]], [arr_P[i], arr_P[i]], opacity=0.2, linewidth=3.5, color="goldenrod2", label="")
+                scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_c, label="")
             end 
             if atmos.mask_p[i] > 0
-                plot!(plt, [xlims[1],xlims[2]], [arr_P[i], arr_P[i]], opacity=0.2, linewidth=3.5, color="dodgerblue", label="")
+                scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_p, label="")
             end 
         end
 
