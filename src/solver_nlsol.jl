@@ -34,7 +34,7 @@ module solver_nlsol
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
     - `dry_convect::Bool=true`          include dry convection
     - `sens_heat::Bool=false`           include sensible heating 
-    - `conduct::Bool=false`             include conduction
+    - `conduct::Bool=false`             include conductive heat transport within the atmosphere
     - `max_steps::Int=2000`             maximum number of solver steps
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
@@ -292,7 +292,7 @@ module solver_nlsol
             error("Invalid method choice ($method)")
         end
 
-        @info @sprintf("    surf     = %d", sol_type)
+            @info @sprintf("    sol_type = %d", sol_type)
         if (sol_type == 1)
             @info @sprintf("    tmp_surf = %.2f K", atmos.tmp_surf)
         elseif (sol_type == 2)
@@ -496,7 +496,7 @@ module solver_nlsol
                 ls_best_cost = c_old*ls_compassion  # allow a cost increase 
                 ls_best_scale = 0.1     # ^ this will require a small step scale
 
-                for ls_scale in [0.3, 0.5, 0.95] # linesearch scales based on best cost reduction
+                for ls_scale in [0.2, 0.5, 1.0] # linesearch scale is set based on the best cost reduction
                     # try this scale factor 
                     x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
                     _fev!(x_cur, r_tst)
@@ -556,7 +556,7 @@ module solver_nlsol
             if modplot > 0
                 if mod(step, modplot) == 0
                     plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates)
-                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3))
+                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct)
                 end 
             end 
                 
