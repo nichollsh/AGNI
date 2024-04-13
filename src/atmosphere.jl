@@ -170,6 +170,7 @@ module atmosphere
         flux_cdct::Array{Float64,1} # Conductive flux [W m-2]
 
         # Cloud and condensation
+        flux_p::Array{Float64, 1}           # Condensation flux [W m-2]
         mask_p::Array{Int,1}                # Layers which are (or were recently) condensing liquid
         #    These arrays give the cloud properties within layers containing cloud
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
@@ -1090,6 +1091,7 @@ module atmosphere
 
         atmos.mask_p =            zeros(Int, atmos.nlev_c)
         atmos.mask_c =            zeros(Int, atmos.nlev_c)
+        atmos.flux_p =            zeros(Float64, atmos.nlev_l)  # Phase change (latent heat)
         atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection 
         atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction 
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
@@ -1380,6 +1382,11 @@ module atmosphere
                 continue
             end
 
+            # Skip condensing regions
+            if atmos.mask_p[i] == atmos.mask_decay
+                continue
+            end 
+
             m1 = atmos.layer_mass[i-1]
             m2 = atmos.layer_mass[i]
             mt = m1+m2
@@ -1437,6 +1444,67 @@ module atmosphere
 
         return nothing
     end # end of mlt
+
+
+
+    """
+    **Analytical relaxation scheme for condensation fluxes.**
+
+    Description.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `condensates::Array`              list of condensates (strings)
+    """
+    function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array=[])
+        
+        # Work variables
+        a::Float64 = 2.0e5 #max(maximum(abs.(atmos.flux_dif)) * 0.9, 10000.0)
+        pp::Float64 = 0.0
+        i_gas::Int = -1
+        dif::Array = zeros(Float64, atmos.nlev_c)
+
+        # Reset clouds
+        fill!(atmos.cloud_arr_r, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        fill!(atmos.cloud_arr_f, 0.0)
+        
+        # Calculate flux (negative) divergence due to latent heat release
+        for i in 1:atmos.nlev_c
+            for c in condensates
+                # Get partial pressure 
+                i_gas = findfirst(==(c), atmos.gases)
+                pp = atmos.layer_x[i,i_gas] * atmos.p[i]
+                if pp < 1.0e-10 
+                    continue
+                end
+
+                Tsat = phys.calc_Tdew(c, pp)
+                if atmos.tmp[i] < Tsat
+                    dif[i] = (a/atmos.tmp[i] - a/Tsat )  # relaxation function
+                    # println("Condensing $c at $i")
+                    atmos.mask_p[i] = atmos.mask_decay 
+                    atmos.mask_c[i] = 0
+                    if c == "H2O"
+                        atmos.cloud_arr_r[i] = atmos.cloud_val_r
+                        atmos.cloud_arr_l[i] = atmos.cloud_val_l
+                        atmos.cloud_arr_f[i] = atmos.cloud_val_f
+                    end 
+                end 
+            end # end condensate
+        end # end levels 
+
+        # Convert divergence to cell-edge fluxes
+        # Assuming zero condensation at surface
+        fill!(atmos.flux_p, 0.0)
+        for i in range(start=atmos.nlev_l-1, stop=1, step=-1)
+            if atmos.mask_p[i] > 0
+                atmos.flux_p[i] = atmos.flux_p[i+1] - dif[i]
+            end 
+        end 
+
+        return nothing
+    end # end of condense_relax
 
     """
     **Calculate heating rates at cell-centres from the total flux.**
@@ -1696,15 +1764,15 @@ module atmosphere
         rm(fname, force=true)
 
         open(fname, "w") do f
-            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C_DRY       , tot      \n")
-            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
+            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , C_DRY       , PHASE       , tot      \n")
+            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
             for i in 1:atmos.nlev_l
-                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e, %+1.4e \n", 
+                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
                           atmos.pl[i], 
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
-                          atmos.flux_cdry[i], atmos.flux_tot[i]
+                          atmos.flux_cdry[i], atmos.flux_p[i],    atmos.flux_tot[i]
                           )
             end
         end
@@ -1867,6 +1935,7 @@ module atmosphere
         var_fn =        defVar(ds, "fl_N",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fcd =       defVar(ds, "fl_C_DRY",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fcc =       defVar(ds, "fl_CNDCT",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fph =       defVar(ds, "fl_PHASE",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ft =        defVar(ds, "fl_tot",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",     Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_kzz =       defVar(ds, "Kzz",       Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
@@ -1921,6 +1990,7 @@ module atmosphere
 
         var_fcd[:] =    atmos.flux_cdry
         var_fcc[:] =    atmos.flux_cdct
+        var_fph[:] =    atmos.flux_p
 
         var_ft[:] =     atmos.flux_tot
         var_hr[:] =     atmos.heating_rate
