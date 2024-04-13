@@ -545,8 +545,10 @@ module solver_tstep
             # Make plots 
             # -------------------------------------- 
             if (modplot > 0) && (mod(step,modplot) == 0)
-                plotting.plot_solver(atmos, @sprintf("%s/solver.png", atmos.OUT_DIR), hist_tmpl=hist_tmpl, incl_magma=plt_magma, step=step)
-                cp(@sprintf("%s/solver.png", atmos.OUT_DIR), @sprintf("%s/zzframe_%04d.png", atmos.OUT_DIR, step), force=true)
+                plotting.plot_pt(atmos,     @sprintf("%s/solver_prf.png", atmos.OUT_DIR), incl_magma=(sol_type==2))
+                plotting.plot_fluxes(atmos, @sprintf("%s/solver_flx.png", atmos.OUT_DIR), incl_eff=(sol_type==3))
+                plotting.plot_solver(atmos, @sprintf("%s/solver_mon.png", atmos.OUT_DIR), hist_tmpl=hist_tmpl, incl_magma=plt_magma, step=step)
+                cp(@sprintf("%s/solver_mon.png", atmos.OUT_DIR), @sprintf("%s/zzframe_%04d.png", atmos.OUT_DIR, step), force=true)
             end 
 
             # --------------------------------------
