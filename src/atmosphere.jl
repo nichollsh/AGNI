@@ -624,9 +624,9 @@ module atmosphere
     
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `boundary_scale::Float64=1.0e-3`  scale factor for the thickness of the bottom-most cell.
+    - `boundary_scale::Float64=1.0e-4`  scale factor for the thickness of the bottom-most cell.
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-3)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-4)
 
         boundary_scale = max(min(boundary_scale, 1.0-1.0e-8), 1.0e-8)
 
@@ -1375,15 +1375,15 @@ module atmosphere
         grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0; grad_df::Float64 = 0.0
 
         # Loop from bottom upwards (over cell-edges)
-        for i in range(start=atmos.nlev_l-1 , step=-1, stop=3) 
+        for i in range(start=atmos.nlev_l-1, step=-1, stop=3) 
 
             # Optionally skip low pressures 
-            if atmos.p[i] < pmin
+            if atmos.pl[i] < pmin
                 continue
             end
 
             # Skip condensing regions
-            if atmos.mask_p[i] == atmos.mask_decay
+            if (i <= atmos.nlev_c) && (atmos.mask_p[i] == atmos.mask_decay)
                 continue
             end 
 
@@ -1409,7 +1409,7 @@ module atmosphere
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
-                if i < atmos.nlev_c-1
+                if i <= atmos.nlev_c-1
                     atmos.mask_c[i+1] = atmos.mask_decay
                 end
                 atmos.mask_c[i]   = atmos.mask_decay
@@ -1450,25 +1450,32 @@ module atmosphere
     """
     **Analytical relaxation scheme for condensation fluxes.**
 
-    Description.
+    Calculates flux release by vertical latent heat transport using analytical 
+    function of T-T_dew. 
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `condensates::Array`              list of condensates (strings)
     """
     function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array=[])
-        
-        # Work variables
-        a::Float64 = 2.0e5 #max(maximum(abs.(atmos.flux_dif)) * 0.9, 10000.0)
-        pp::Float64 = 0.0
-        i_gas::Int = -1
-        dif::Array = zeros(Float64, atmos.nlev_c)
 
         # Reset clouds
         fill!(atmos.cloud_arr_r, 0.0)
         fill!(atmos.cloud_arr_l, 0.0)
         fill!(atmos.cloud_arr_f, 0.0)
+        fill!(atmos.flux_p, 0.0)
+
+        # Check if empty
+        if length(condensates) == 0
+            return nothing 
+        end 
         
+        # Work variables
+        a::Float64 = 2.0
+        pp::Float64 = 0.0
+        i_gas::Int = -1
+        dif::Array = zeros(Float64, atmos.nlev_c)
+
         # Calculate flux (negative) divergence due to latent heat release
         for i in 1:atmos.nlev_c
             for c in condensates
@@ -1480,8 +1487,11 @@ module atmosphere
                 end
 
                 Tsat = phys.calc_Tdew(c, pp)
-                if atmos.tmp[i] < Tsat
-                    dif[i] = (a/atmos.tmp[i] - a/Tsat )  # relaxation function
+                if atmos.tmp[i] < Tsat-1.0e-10
+                    # relaxation function
+                    # dif[i] = (a/atmos.tmp[i] - a/Tsat )
+                    dif[i] = (1.0/a)*(Tsat-atmos.tmp[i])^2.0
+
                     # println("Condensing $c at $i")
                     atmos.mask_p[i] = atmos.mask_decay 
                     atmos.mask_c[i] = 0
@@ -1496,11 +1506,8 @@ module atmosphere
 
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at surface
-        fill!(atmos.flux_p, 0.0)
         for i in range(start=atmos.nlev_l-1, stop=1, step=-1)
-            if atmos.mask_p[i] > 0
-                atmos.flux_p[i] = atmos.flux_p[i+1] - dif[i]
-            end 
+            atmos.flux_p[i] = atmos.flux_p[i+1] - dif[i]
         end 
 
         return nothing
@@ -1930,13 +1937,14 @@ module atmosphere
         var_fds =       defVar(ds, "fl_D_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fus =       defVar(ds, "fl_U_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fns =       defVar(ds, "fl_N_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fd =        defVar(ds, "fl_D",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fd =        defVar(ds , "fl_D",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fu =        defVar(ds, "fl_U",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fn =        defVar(ds, "fl_N",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fcd =       defVar(ds, "fl_C_DRY",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fcc =       defVar(ds, "fl_CNDCT",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fph =       defVar(ds, "fl_PHASE",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ft =        defVar(ds, "fl_tot",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fdiff =     defVar(ds, "fl_dif",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",     Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
         var_kzz =       defVar(ds, "Kzz",       Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
         var_bmin =      defVar(ds, "bandmin",   Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
@@ -1994,6 +2002,7 @@ module atmosphere
 
         var_ft[:] =     atmos.flux_tot
         var_hr[:] =     atmos.heating_rate
+        var_fdiff[:] =  atmos.flux_dif
 
         var_kzz[:] =    atmos.Kzz
 

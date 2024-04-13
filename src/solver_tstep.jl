@@ -63,7 +63,7 @@ module solver_tstep
                             max_steps::Int=1000, min_steps::Int=100, max_runtime::Float64=400.0,
                             step_rtol::Float64=1.0e-4, step_atol::Float64=1.0e-2,
                             conv_rtol::Float64=1.0e-4, conv_atol::Float64=1.0e-1
-                            )
+                            )::Bool
 
         if use_physical_dt
             @info "Begin physical timestepping"
@@ -605,7 +605,7 @@ module solver_tstep
             @warn @sprintf("TOA and BOA total fluxes have different signs")
         end
 
-        return nothing
+        return atmos.is_converged
 
     end # end solve_time
 
