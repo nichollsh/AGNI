@@ -1,4 +1,5 @@
 # AGNI configuration file 
+# This is the default configuration file - it does not solve for RCE
 title = "Default"                       # Name for this configuration file
 
 [planet]
