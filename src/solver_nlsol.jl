@@ -85,7 +85,7 @@ module solver_nlsol
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c 
-        if (sol_type >= 2)  # states 2,3,4
+        if (sol_type >= 2)  # states 2,3,4 also solve for tmp_surf
             arr_len += 1
         end
 
@@ -203,10 +203,10 @@ module solver_nlsol
                 resid[1] = atmos.flux_tot[1] - atmos.flux_eff
 
             elseif (sol_type == 4)
-                # Set flux_eff to value required to reach target_olr
-                atmos.flux_eff = atmos.target_olr + atmos.flux_u_sw[1] - atmos.flux_d_lw[1] - atmos.flux_d_sw[1]
-                # Set residuals using new flux_eff 
-                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
+                # Zero loss
+                resid[2:end] .= atmos.flux_dif[1:end]
+                # OLR is equal to target_olr
+                resid[1] = atmos.target_olr - atmos.flux_u_lw[1]
 
             end
 
@@ -556,7 +556,7 @@ module solver_nlsol
             if modplot > 0
                 if mod(step, modplot) == 0
                     plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates)
-                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct)
+                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense)
                 end 
             end 
                 

@@ -242,7 +242,7 @@ module plotting
     Plot the fluxes at each pressure level
     """
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, 
-                            incl_eff::Bool=false, incl_mlt::Bool=true, incl_cdct::Bool=true
+                            incl_eff::Bool=false, incl_mlt::Bool=true, incl_cdct::Bool=true, incl_phase::Bool=true
                         )
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
@@ -311,7 +311,9 @@ module plotting
         end 
 
         # Condensation 
-        plot!(plt, _symlog.(atmos.flux_p), arr_P, label="PHASE", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+        if incl_phase
+            plot!(plt, _symlog.(atmos.flux_p), arr_P, label="PHASE", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+        end
 
         # Sensible heat
         if atmos.flux_sens != 0.0
