@@ -1446,12 +1446,24 @@ module atmosphere
     end # end of mlt
 
 
+    """
+    **Calculate composition assuming chemical equilibrium at each level.**
+
+    Uses FastChem to calculate the gas composition at each level of the atmosphere.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    """
+    function solve_abundances_eq!(atmos::atmosphere.Atmos_t)
+        @error "Chemistry not yet implemented"
+    end 
+
 
     """
-    **Analytical relaxation scheme for condensation fluxes.**
+    **Analytical relaxation scheme for condensation fluxes in saturated regions.**
 
-    Calculates flux release by vertical latent heat transport using analytical 
-    function of T-T_dew. 
+    Calculates flux release by vertical latent heat transport using an heuristic 
+    function of the temperature difference T-T_dew. 
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
@@ -1474,10 +1486,21 @@ module atmosphere
         a::Float64 = 2.0
         pp::Float64 = 0.0
         i_gas::Int = -1
+        i_sat::Int = -1 
+        Tsat_lvl::Float64 = 0.0
+        Tsat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
+
+        # Get index of water 
+        i_h2o = findfirst(==("H2O"), atmos.gases)
 
         # Calculate flux (negative) divergence due to latent heat release
         for i in 1:atmos.nlev_c
+            # Reset 
+            Tsat_lvl = -1.0
+            i_sat = -1
+
+            # Check which condensate is saturated (if any)
             for c in condensates
                 # Get partial pressure 
                 i_gas = findfirst(==(c), atmos.gases)
@@ -1486,22 +1509,31 @@ module atmosphere
                     continue
                 end
 
+                # check saturation
                 Tsat = phys.calc_Tdew(c, pp)
-                if atmos.tmp[i] < Tsat-1.0e-10
-                    # relaxation function
-                    # dif[i] = (a/atmos.tmp[i] - a/Tsat )
-                    dif[i] = (1.0/a)*(Tsat-atmos.tmp[i])^2.0
-
-                    # println("Condensing $c at $i")
-                    atmos.mask_p[i] = atmos.mask_decay 
-                    atmos.mask_c[i] = 0
-                    if c == "H2O"
-                        atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                        atmos.cloud_arr_l[i] = atmos.cloud_val_l
-                        atmos.cloud_arr_f[i] = atmos.cloud_val_f
-                    end 
+                if (atmos.tmp[i] < Tsat-1.0e-10) && (Tsat > Tsat_lvl)
+                    Tsat_lvl = Tsat 
+                    i_sat = i_gas 
                 end 
             end # end condensate
+
+            # Relax tmp to appropriate Tsat value 
+            # This is gas that maximises Tsat and for which tmp < Tsat is true 
+            if i_sat > -1
+                # relaxation function
+                # dif[i] = (a/atmos.tmp[i] - a/Tsat )
+                dif[i] = (1.0/a)*(Tsat_lvl-atmos.tmp[i])^2.0
+
+                # println("Condensing $c at $i")
+                atmos.mask_p[i] = atmos.mask_decay 
+                atmos.mask_c[i] = 0
+                if i_sat == i_h2o
+                    atmos.cloud_arr_r[i] = atmos.cloud_val_r
+                    atmos.cloud_arr_l[i] = atmos.cloud_val_l
+                    atmos.cloud_arr_f[i] = atmos.cloud_val_f
+                end 
+            end # end relaxation 
+
         end # end levels 
 
         # Convert divergence to cell-edge fluxes
