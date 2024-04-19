@@ -758,10 +758,10 @@ module atmosphere
 
         # modules_gen/dimensioms_fixed_pcf.f90
         npd_cloud_component        =  4 #   Number of components of clouds.
-        npd_cloud_type             =  1 #   Number of permitted types of clouds.
+        npd_cloud_type             =  4 #   Number of permitted types of clouds.
         npd_overlap_coeff          = 18 #   Number of overlap coefficients for cloud
         npd_source_coeff           =  2 #   Number of coefficients for two-stream sources
-        npd_region                 =  3 # Number of regions in a layer
+        npd_region                 =  2 # Number of regions in a layer
 
         atmos.dimen.nd_profile                = npd_profile
         atmos.dimen.nd_flux_profile           = npd_profile
@@ -794,6 +794,7 @@ module atmosphere
         atmos.dimen.nd_aerosol_mode           = 1
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
+        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
@@ -1000,7 +1001,7 @@ module atmosphere
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
 
-        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
+        
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
 
         if atmos.control.l_cloud
@@ -1101,9 +1102,11 @@ module atmosphere
 
         # Set the two-stream approximation to be used (-t f)
         if lw
-            atmos.control.i_2stream = 12 # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
+            atmos.control.i_2stream = SOCRATES.rad_pcf.ip_elsasser
+            # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
         else
-            atmos.control.i_2stream = 16 # Practical improved fl ux method (original form of 1980)
+            atmos.control.i_2stream = SOCRATES.rad_pcf.ip_pifm80
+            # Practical improved flux method (original form of 1980)
         end
 
         #####################################
@@ -1119,12 +1122,12 @@ module atmosphere
 
         # The internal SOCRATES solver used for the two-stream calculations (-v flag)
         if atmos.control.l_cloud
-            # 16 is recommended for cloudy-sky
+            # 16 is recommended for cloudy-sky (ip_solver_mix_direct_hogan)
             # 17 is recommended for cloud with separate stratiform and convective regions
-            atmos.control.i_solver = 16 
+            atmos.control.i_solver = SOCRATES.rad_pcf.ip_solver_mix_direct_hogan 
         else 
-            # 13 is recommended for clear-sky
-            atmos.control.i_solver = 13  
+            # 13 is recommended for clear-sky (ip_solver_homogen_direct)
+            atmos.control.i_solver = SOCRATES.rad_pcf.ip_solver_homogen_direct
         end 
         
 
@@ -1428,16 +1431,13 @@ module atmosphere
     """
     function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array=[])
 
-        # Reset clouds
-        fill!(atmos.cloud_arr_r, 0.0)
-        fill!(atmos.cloud_arr_l, 0.0)
-        fill!(atmos.cloud_arr_f, 0.0)
-        fill!(atmos.flux_p, 0.0)
-
         # Check if empty
         if length(condensates) == 0
             return nothing 
         end 
+
+        # Reset flux
+        fill!(atmos.flux_p, 0.0)
         
         # Work variables
         a::Float64 = 2.0
@@ -1488,6 +1488,10 @@ module atmosphere
                     atmos.cloud_arr_r[i] = atmos.cloud_val_r
                     atmos.cloud_arr_l[i] = atmos.cloud_val_l
                     atmos.cloud_arr_f[i] = atmos.cloud_val_f
+                else
+                    atmos.cloud_arr_r[i] = 0.0
+                    atmos.cloud_arr_l[i] = 0.0
+                    atmos.cloud_arr_f[i] = 0.0
                 end 
             end # end relaxation 
 
@@ -1920,6 +1924,7 @@ module atmosphere
         var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
         var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf JANUS because of how Julia stores arrays
         var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c")) # ^^
+        var_cldf  =     defVar(ds, "cloud_frac",Float64, ("nlev_c",))
         var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
@@ -1972,6 +1977,7 @@ module atmosphere
                 var_x[i_gas, i_lvl] = atmos.layer_x[i_lvl, i_gas]
             end 
         end 
+        var_cldf[:] =   atmos.cloud_arr_f
 
         var_fdl[:] =    atmos.flux_d_lw
         var_ful[:] =    atmos.flux_u_lw

@@ -261,9 +261,6 @@ module setpt
         # apply condensation curve 
         atmosphere.apply_vlcc!(atmos, gas)
 
-        # apply cloud 
-        atmosphere.water_cloud!(atmos)
-
         # calculate properties 
         atmosphere.calc_layer_props!(atmos)
 
