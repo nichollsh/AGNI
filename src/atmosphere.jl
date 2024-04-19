@@ -500,7 +500,7 @@ module atmosphere
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `gas::String`             name of the gas (e.g. "H2O").
-    - `lvl::Int`                model level to measure mole fraction (-1 => use input_x value)
+    - `lvl::Int`                model level to measure mole fraction
 
     Returns:
     - `x::Float64`              mole fraction of `gas`.
@@ -511,12 +511,12 @@ module atmosphere
 
         x = 0.0
         if gas_valid in keys(atmos.input_x)
-            if lvl > 0
+            if (lvl >= 1) && (lvl <= atmos.nlev_c)
                 i_gas = findfirst(==(gas), atmos.gases)
                 x = atmos.layer_x[lvl,i_gas]
-            else 
-                x = atmos.input_x[gas_valid][1]
-            end
+            else
+                error("Invalid level provided ($lvl)") 
+            end 
         end 
 
         return x
@@ -638,53 +638,6 @@ module atmosphere
         # Set pressure cell-centre array using geometric mean
         atmos.p = zeros(Float64, atmos.nlev_c)
         atmos.p[1:end] .= sqrt.(atmos.pl[1:end-1].*atmos.pl[2:end])
-
-        return nothing
-    end
-
-    """
-    **Adapt pressure grid based on the input focus array.**
-
-    Increases the number of points in regions where the focus values are 
-    relatively large, at the cost of decreased points elsewhere in the grid. By
-    default this function will maintain the total number of grid points.
-
-    This will modify the pressure grid inside the atmos struct.
-    
-    Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    - `focus::Array`            values used to determine where to focus the grid; strictly positive-valued (length=atmos.nlev_c)
-    - `density::Int`            how much to increase the point-density (length=atmos.nlev_c)
-    - `percentile::Float64`     percentile threshold for where density should be increased
-    """
-    function adapt_mesh!(atmos::atmosphere.Atmos_t, focus::Array; density::Int=1, percentile::Float64=20.0)
-
-        @debug "Mesh refinement"
-
-        # Tolerance for where focus is increased 
-        atol::Float64 = quantile(focus, percentile*0.01)
-
-        # Upsample pressure array where necessary
-        x_upsampled = [atmos.pl[end]]
-        for i in 1:atmos.nlev_l-1 
-            push!(x_upsampled, atmos.pl[i])  # add original value
-            if focus[i] > atol   # add new value(s)
-                @debug "Upsampling at p=$(atmos.p[i])"
-                for j in 1:density  
-                    dxdj = (atmos.pl[i+1]-atmos.pl[i])/density * 0.9
-                    push!(x_upsampled, atmos.pl[i] + dxdj*j)
-                end
-            end
-        end 
-        sort!(x_upsampled)
-
-        # Set cell-edges
-        atmos.pl[:] = x_upsampled[round.(Int, range(1, length(x_upsampled), length=atmos.nlev_l))]
-
-        # Set cell-centres 
-        for i in 1:atmos.nlev_c
-            atmos.p[i] = sqrt(atmos.pl[i]*atmos.pl[i+1])
-        end 
 
         return nothing
     end
@@ -1347,9 +1300,13 @@ module atmosphere
     **Calculate dry convective fluxes using mixing length theory.**
 
     Uses the mixing length formulation outlined by Joyce & Tayar (2023), which 
-    was also implemented in Lee et al. (2023), and partially outlined in an 
+    was also implemented in Lee et al. (2024), and partially outlined in an 
     earlier paper by Robinson & Marley (2014).
 
+    https://arxiv.org/abs/2303.09596
+    https://doi.org/10.1093/mnras/stae537 
+    https://ui.adsabs.harvard.edu/abs/1962JGR....67.3095B/abstract
+    
     Convective energy transport fluxes are calculated at every level edge, just 
     like the radiative fluxes. This is not compatible with moist convection. By 
     using MLT to parameterise convection, we can also calculate Kzz directly.
@@ -1456,6 +1413,7 @@ module atmosphere
     """
     function solve_abundances_eq!(atmos::atmosphere.Atmos_t)
         @error "Chemistry not yet implemented"
+
     end 
 
 
