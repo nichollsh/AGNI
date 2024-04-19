@@ -361,16 +361,19 @@ module plotting
 
         # Get emission spectrum data
         xe = zeros(Float64, atmos.nbands)
-        ye = zeros(Float64, atmos.nbands)
+        yt = zeros(Float64, atmos.nbands)
+        yl = zeros(Float64, atmos.nbands)
+        ys = zeros(Float64, atmos.nbands)
         for ba in 1:atmos.nbands
             # x value - band centres [nm]
             xe[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
             
             # y value - spectral flux [erg s-1 cm-2 nm-1]
             w  = (atmos.bands_max[ba] - atmos.bands_min[ba]) * 1.0e9 # band width in nm
-            f  = atmos.band_u_lw[1, ba] + atmos.band_u_sw[1, ba] # raw flux in W m-2
-            ff = f / w * 1000.0 # converted to erg s-1 cm-2 nm-1
-            ye[ba] = ff
+            yl[ba] = atmos.band_u_lw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
+            ys[ba] = atmos.band_u_sw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
+            yt[ba] = yl[ba] + ys[ba]
+
         end
 
         # Get planck function values 
@@ -397,14 +400,17 @@ module plotting
         plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
 
         if incl_surf
-            plot!(plt, xp, yp, label="Surface",  color="brown3") # surface planck function
+            plot!(plt, xp, yp, label="Surface",  color="green") # surface planck function
         end
-        plot!(plt, xe, ye, label="Outgoing spectrum", color="black")  # emission spectrum
+
+        plot!(plt, xe, ys, label="SW spectrum", color="blue")  
+        plot!(plt, xe, yl, label="LW spectrum", color="red" ) 
+        plot!(plt, xe, yt, label="Total spectrum", color="black")  # emission spectrum 
 
         xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 70000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
-        ylims  = (max(1.0e-10,minimum(ye)) / 2, max(maximum(ye),maximum(yp)) * 2)
+        ylims  = (max(1.0e-10,minimum(yt)) / 2, max(maximum(yt),maximum(yp)) * 2)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         xlabel!(plt, "Wavelength [nm]")
