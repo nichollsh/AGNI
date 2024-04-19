@@ -382,6 +382,8 @@ function main()::Bool
 
     # Save plots
     @info "Plotting results"
+    plt_alb = plt_alb && (flag_cld || flag_ray)
+
     plt_ani && plotting.anim_solver(atmos)
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
