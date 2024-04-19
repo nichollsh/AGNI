@@ -279,6 +279,9 @@ function main()::Bool
             # condensing a volatile 
             idx_req += 1
             setpt.condensing!(atmos, initial_req[idx_req])
+            if flag_cld
+                atmosphere.water_cloud!(atmos)
+            end
 
         else 
             @error "Invalid initial state '$str_req'"
