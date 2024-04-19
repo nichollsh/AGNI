@@ -296,6 +296,7 @@ function main()::Bool
     dry_convect::Bool = !isempty(dry_type)
     use_mlt::Bool     = (dry_type == "mlt")
     modplot::Int      = 0
+    incl_conduct::Bool = false
 
     # Loop over requested solvers 
     return_success::Bool = true
@@ -325,7 +326,9 @@ function main()::Bool
                 atmosphere.sensible!(atmos)
             end 
             atmosphere.condense_relax!(atmos, condensates)
-            atmosphere.conduct!(atmos)
+            if incl_conduct
+                atmosphere.conduct!(atmos)
+            end
             atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct + atmos.flux_p
             atmos.flux_tot[end] += atmos.flux_sens
             atmos.flux_dif[:] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1]
@@ -339,7 +342,7 @@ function main()::Bool
             end
             solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
-                                dry_convect=dry_convect, condensates=condensates,
+                                dry_convect=dry_convect, condensates=condensates, conduct=incl_conduct,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
@@ -353,6 +356,7 @@ function main()::Bool
             end
             method = findfirst(==(sol), method_map)
             solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
+                                conduct=incl_conduct,
                                 dry_convect=dry_convect, condensates=condensates, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
@@ -379,7 +383,7 @@ function main()::Bool
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
     plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2), condensates=condensates)
-    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3))
+    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_phase=(length(condensates) > 0), incl_cdct=incl_conduct)
     plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"plot_emission.png"))
     plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 

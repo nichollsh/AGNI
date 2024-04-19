@@ -1010,7 +1010,8 @@ module atmosphere
             atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
             atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
         else
-            atmos.cld.n_condensed = 0
+            atmos.cld.n_condensed  = 0
+            atmos.cld.n_cloud_type = 0
         end
 
         atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
@@ -1080,7 +1081,7 @@ module atmosphere
         # Check files are acceptable and set instellation if doing SW flux
         if lw
             if !Bool(atmos.spectrum.Basic.l_present[6])
-                error("The spectral file contains no data for the Planckian function.\nCheck that the file contains a stellar spectrum or run AGNI with the `stf` argument.")
+                error("The spectral file contains no data for the Planckian function.\nCheck that the file contains a stellar spectrum.")
             end
 
             if Bool(atmos.spectrum.Basic.l_present[2])
@@ -1154,11 +1155,9 @@ module atmosphere
         # Cloud information
         ###################################################
 
-        if atmos.control.l_cloud
-            atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]   
-            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]  
-            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]  
-        end
+        atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]   
+        atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]  
+        atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]  
 
         ###################################################
         # Treatment of scattering
