@@ -22,7 +22,7 @@ title = "Default"                       # Name for this configuration file
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/Frostflow/4096/Frostflow.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
     input_vmr       = ""                                                # Path to input volume mixing ratios. Not required if planet.vmr is passed.
     output_dir      = "out/"                                            # Path to output directory.
