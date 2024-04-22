@@ -32,7 +32,7 @@ module solver_nlsol
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
-    - `dry_convect::Bool=true`          include dry convection
+    - `incl_convect::Bool=true`         include convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=false`             include conductive heat transport within the atmosphere
     - `max_steps::Int=2000`             maximum number of solver steps
@@ -48,7 +48,7 @@ module solver_nlsol
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, condensates::Array=[],
-                            dry_convect::Bool=true, sens_heat::Bool=false,
+                            incl_convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
@@ -157,9 +157,9 @@ module solver_nlsol
             end
 
             # +Dry convection
-            if dry_convect
+            if incl_convect
                 # Calc flux
-                atmosphere.mlt!(atmos)
+                atmosphere.mlt_dry!(atmos)
 
                 # Stabilise?
                 atmos.flux_cdry *= convect_sf
@@ -375,7 +375,7 @@ module solver_nlsol
         fill!(r_old, 1.0e98)
 
         # Stabilise convection?
-        stabilise_mlt = stabilise_mlt && dry_convect
+        stabilise_mlt = stabilise_mlt && incl_convect
         if !stabilise_mlt
             convect_sf = 1.0
         end

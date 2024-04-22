@@ -1333,7 +1333,7 @@ module atmosphere
     - `pmin::Float64=0.0`               pressure below which convection is disabled.
     - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=0.0, mltype::Int=1)
+    function mlt_dry!(atmos::atmosphere.Atmos_t; pmin::Float64=0.0, mltype::Int=1)
 
         # Reset arrays
         fill!(atmos.flux_cdry, 0.0)
