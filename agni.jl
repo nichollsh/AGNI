@@ -166,7 +166,7 @@ function main()::Bool
     flag_aer::Bool         = cfg["execution" ]["aerosol"]
     overlap::Int           = cfg["execution" ]["overlap_method"]
     thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
-    dry_type::String       = cfg["execution" ]["dry_convection"]
+    conv_type::String      = cfg["execution" ]["convection_type"]
     condensates::Array     = cfg["execution" ]["condensates"]
     incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
     sol_type::Int          = cfg["execution" ]["solution_type"]
@@ -296,8 +296,8 @@ function main()::Bool
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
     # Solver variables 
-    dry_convect::Bool = !isempty(dry_type)
-    use_mlt::Bool     = (dry_type == "mlt")
+    incl_convect::Bool = !isempty(conv_type)
+    use_mlt::Bool     = (conv_type == "mlt")
     modplot::Int      = 0
     incl_conduct::Bool = false
 
@@ -323,7 +323,7 @@ function main()::Bool
             atmosphere.radtrans!(atmos, true, calc_cf=true)
             atmosphere.radtrans!(atmos, false)
             if use_mlt 
-                atmosphere.mlt!(atmos)
+                atmosphere.mlt_dry!(atmos)
             end 
             if incl_sens 
                 atmosphere.sensible!(atmos)
@@ -345,7 +345,7 @@ function main()::Bool
             end
             solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
-                                dry_convect=dry_convect, condensates=condensates, conduct=incl_conduct,
+                                incl_convect=incl_convect, condensates=condensates, conduct=incl_conduct,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
@@ -360,7 +360,7 @@ function main()::Bool
             method = findfirst(==(sol), method_map)
             solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
                                 conduct=incl_conduct,
-                                dry_convect=dry_convect, condensates=condensates, sens_heat=incl_sens,
+                                incl_convect=incl_convect, condensates=condensates, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
             return_success = return_success && solver_success
