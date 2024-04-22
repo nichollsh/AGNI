@@ -1,5 +1,4 @@
 # AGNI configuration file 
-# This is designed to demonstrate a case similar to Figure1 of Selsis+23
 title = "Hot and dry"                    # Name for this configuration file
 
 [planet]
@@ -32,15 +31,15 @@ title = "Hot and dry"                    # Name for this configuration file
     cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
-    thermo_funct    = false                     # Accounting temperature dependence of thermodynamic properties?
+    thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
-    dry_convection  = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
+    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
     condensates     = []                        # List of volatiles which are allowed to condense.
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
     initial_state   = ["iso","1800"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     stabilise       = false                     # Use various methods to help stabilise the model?
-    converge_atol   = 1.0e-4                    # Convergence criterion on absolute flux lost [W m-2].
+    converge_atol   = 1.0e-2                    # Convergence criterion on absolute flux lost [W m-2].
     converge_rtol   = 1.0e-4                    # Convergence criterion on relative flux lost [dimensionless].
 
 

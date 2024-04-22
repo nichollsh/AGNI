@@ -34,7 +34,7 @@ module plotting
     """
     Plot the temperature-pressure profile.
     """
-    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_magma::Bool=false)
+    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_magma::Bool=false, condensates::Array=[])
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -46,12 +46,29 @@ module plotting
         # Create plot
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400), guidefontsize=9)
 
-        # Plot temperature
+        # Plot condensation curves 
+        if length(condensates) > 0
+            sat_t = zeros(Float64, atmos.nlev_l)
+            for c in condensates
+                for i in 1:atmos.nlev_l
+                    sat_t[i] = phys.calc_Tdew(c, atmos.pl[i])
+                end 
+                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.lookup_color[c], ls=:dot, label=phys.lookup_pretty[c])
+            end 
+        end
+
+        # Plot tmp_magma 
         if incl_magma
             scatter!(plt, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
         end
+
+        # Plot tmp_surf 
         scatter!(plt, [atmos.tmp_surf], [atmos.pl[end]*1e-5], color="brown3", label=L"T_s")
+
+        # Plot profile 
         plot!(plt, arr_T, arr_P, lc="black", lw=2, label=L"T(p)")
+
+        # Decorate
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
@@ -225,7 +242,7 @@ module plotting
     Plot the fluxes at each pressure level
     """
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, 
-                            incl_eff::Bool=false, incl_mlt::Bool=true, incl_cdct::Bool=true
+                            incl_eff::Bool=false, incl_mlt::Bool=true, incl_cdct::Bool=true, incl_phase::Bool=true
                         )
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
@@ -246,6 +263,7 @@ module plotting
         col_c = "#6495ed"
         col_t = "#ff4400"
         col_o = "#66CD00"
+        col_p = "#ecb000"
 
         alpha = 0.7
 
@@ -292,6 +310,11 @@ module plotting
             plot!(plt, _symlog.(atmos.flux_cdct), arr_P, label="CNDCT", lw=w*1.2, lc=col_o, ls=:solid, linealpha=alpha)
         end 
 
+        # Condensation 
+        if incl_phase
+            plot!(plt, _symlog.(atmos.flux_p), arr_P, label="PHASE", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+        end
+
         # Sensible heat
         if atmos.flux_sens != 0.0
             scatter!(plt, [_symlog(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_r, label="SENS")
@@ -303,10 +326,10 @@ module plotting
         # Overplot convection and condensation mask
         for i in 1:atmos.nlev_c
             if atmos.mask_c[i] > 0
-                plot!(plt, [xlims[1],xlims[2]], [arr_P[i], arr_P[i]], opacity=0.2, linewidth=3.5, color="goldenrod2", label="")
+                scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_c, label="")
             end 
             if atmos.mask_p[i] > 0
-                plot!(plt, [xlims[1],xlims[2]], [arr_P[i], arr_P[i]], opacity=0.2, linewidth=3.5, color="dodgerblue", label="")
+                scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_p, label="")
             end 
         end
 
@@ -338,16 +361,19 @@ module plotting
 
         # Get emission spectrum data
         xe = zeros(Float64, atmos.nbands)
-        ye = zeros(Float64, atmos.nbands)
+        yt = zeros(Float64, atmos.nbands)
+        yl = zeros(Float64, atmos.nbands)
+        ys = zeros(Float64, atmos.nbands)
         for ba in 1:atmos.nbands
             # x value - band centres [nm]
             xe[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
             
             # y value - spectral flux [erg s-1 cm-2 nm-1]
             w  = (atmos.bands_max[ba] - atmos.bands_min[ba]) * 1.0e9 # band width in nm
-            f  = atmos.band_u_lw[1, ba] + atmos.band_u_sw[1, ba] # raw flux in W m-2
-            ff = f / w * 1000.0 # converted to erg s-1 cm-2 nm-1
-            ye[ba] = ff
+            yl[ba] = atmos.band_u_lw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
+            ys[ba] = atmos.band_u_sw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
+            yt[ba] = yl[ba] + ys[ba]
+
         end
 
         # Get planck function values 
@@ -374,14 +400,17 @@ module plotting
         plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
 
         if incl_surf
-            plot!(plt, xp, yp, label="Surface",  color="brown3") # surface planck function
+            plot!(plt, xp, yp, label="Surface",  color="green") # surface planck function
         end
-        plot!(plt, xe, ye, label="Outgoing spectrum", color="black")  # emission spectrum
+
+        plot!(plt, xe, ys, label="SW spectrum", color="blue")  
+        plot!(plt, xe, yl, label="LW spectrum", color="red" ) 
+        plot!(plt, xe, yt, label="Total spectrum", color="black")  # emission spectrum 
 
         xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 70000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
-        ylims  = (max(1.0e-10,minimum(ye)) / 2, max(maximum(ye),maximum(yp)) * 2)
+        ylims  = (max(1.0e-10,minimum(yt)) / 2, max(maximum(yt),maximum(yp)) * 2)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         xlabel!(plt, "Wavelength [nm]")

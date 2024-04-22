@@ -158,10 +158,25 @@ else
     @warn "Fail"
     passing = false
 end
+
+
+# -------------
+# Test no-scattering case
+# -------------
+@info " "
+@info "Testing zero scattering"
+
+val_o = atmos.flux_u_sw[2]
+val_e = 0.0
+@info "Expected value = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
+if abs(val_e-val_o) < 1.0e-10
+    @info "Pass"
+else
+    @warn "Fail"
+    passing = false
+end
 atmosphere.deallocate!(atmos)
-
-
-
 
 # -------------
 # Test greenhouse effect

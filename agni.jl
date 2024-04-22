@@ -111,7 +111,7 @@ function open_config(cfg_path::String)::Dict
 end 
 
 # Main function!
-function main()
+function main()::Bool
 
     # Record start time 
     tbegin = time()
@@ -166,7 +166,7 @@ function main()
     flag_aer::Bool         = cfg["execution" ]["aerosol"]
     overlap::Int           = cfg["execution" ]["overlap_method"]
     thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
-    dry_type::String       = cfg["execution" ]["dry_convection"]
+    conv_type::String      = cfg["execution" ]["convection_type"]
     condensates::Array     = cfg["execution" ]["condensates"]
     incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
     sol_type::Int          = cfg["execution" ]["solution_type"]
@@ -279,9 +279,13 @@ function main()
             # condensing a volatile 
             idx_req += 1
             setpt.condensing!(atmos, initial_req[idx_req])
+            if flag_cld
+                atmosphere.water_cloud!(atmos)
+            end
 
         else 
-            error("Invalid initial state '$str_req'")
+            @error "Invalid initial state '$str_req'"
+            return false
         end 
         
         # iterate
@@ -292,11 +296,14 @@ function main()
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
     # Solver variables 
-    dry_convect::Bool = !isempty(dry_type)
-    use_mlt::Bool     = (dry_type == "mlt")
+    incl_convect::Bool = !isempty(conv_type)
+    use_mlt::Bool     = (conv_type == "mlt")
     modplot::Int      = 0
+    incl_conduct::Bool = false
 
     # Loop over requested solvers 
+    return_success::Bool = true
+    solver_success::Bool = true
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
     method::Int = 0
     if length(solvers_cmd) == 0  # is empty 
@@ -316,14 +323,18 @@ function main()
             atmosphere.radtrans!(atmos, true, calc_cf=true)
             atmosphere.radtrans!(atmos, false)
             if use_mlt 
-                atmosphere.mlt!(atmos)
+                atmosphere.mlt_dry!(atmos)
             end 
             if incl_sens 
                 atmosphere.sensible!(atmos)
             end 
-            atmosphere.conduct!(atmos)
-            atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct
+            atmosphere.condense_relax!(atmos, condensates)
+            if incl_conduct
+                atmosphere.conduct!(atmos)
+            end
+            atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct + atmos.flux_p
             atmos.flux_tot[end] += atmos.flux_sens
+            atmos.flux_dif[:] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1]
         
         # Timestepping
         elseif sol == "timestep"
@@ -332,12 +343,13 @@ function main()
             if plt_run 
                 modplot = 10
             end
-            solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
+            solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
-                                dry_convect=dry_convect, condensates=condensates,
+                                incl_convect=incl_convect, condensates=condensates, conduct=incl_conduct,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
+            return_success = return_success && solver_success
         
         # Nonlinear methods
         elseif (sol in method_map) 
@@ -346,15 +358,18 @@ function main()
                 modplot = 1
             end
             method = findfirst(==(sol), method_map)
-            solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
-                                dry_convect=dry_convect, condensates=condensates, sens_heat=incl_sens,
+            solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
+                                conduct=incl_conduct,
+                                incl_convect=incl_convect, condensates=condensates, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot)
+            return_success = return_success && solver_success
         else 
-            error("Invalid solver requested '$sol'")
+            @error "Invalid solver requested '$sol'"
+            return_success = false 
+            break
         end 
         @info " "
-
     end 
 
     @info "Total RT evalulations: $(atmos.num_rt_eval)"
@@ -367,11 +382,13 @@ function main()
 
     # Save plots
     @info "Plotting results"
+    plt_alb = plt_alb && (flag_cld || flag_ray)
+
     plt_ani && plotting.anim_solver(atmos)
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
-    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
-    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3))
+    plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2), condensates=condensates)
+    plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_phase=(length(condensates) > 0), incl_cdct=incl_conduct)
     plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"plot_emission.png"))
     plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 
@@ -384,8 +401,11 @@ function main()
     @info "Model runtime: $runtime seconds"
     @info "Goodbye"
 
-    return nothing 
+    return return_success 
 end 
 
 # Call main function 
-main()
+if main()
+    exit(0)
+end 
+exit(1)
