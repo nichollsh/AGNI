@@ -649,8 +649,9 @@ module atmosphere
     Arguments:
     - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
     - `stellar_spectrum::String`       path to stellar spectrum csv file (will not modify spectral file if this is left blank)
+    - `one_gas::String`                only include this gas in the RT (all gases used if blank)
     """
-    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String)
+    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String; one_gas::String="")
 
         if !atmos.is_param
             error("atmosphere parameters have not been set")
@@ -711,9 +712,20 @@ module atmosphere
 
         # Read-in spectral file to be used at runtime
         atmos.control.spectral_file = spectral_file_run
-        SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
-                              spectral_file=atmos.control.spectral_file, 
-                              l_all_gasses=true)
+
+        if isempty(one_gas)
+            SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
+                                spectral_file=atmos.control.spectral_file, 
+                                l_all_gasses=true)
+        else   
+            # set one to true 
+            kw_dict = Dict(eval(Meta.parse(":l_"*lowercase(one_gas))) => true)
+
+            # call set_spectrum
+            SOCRATES.set_spectrum(;spectrum=atmos.spectrum, 
+                                spectral_file=atmos.control.spectral_file, 
+                                l_all_gasses=false, kw_dict...)
+        end 
 
 
         #########################################
