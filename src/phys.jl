@@ -508,7 +508,7 @@ module phys
         return p0*exp(-(L/R)*(1.0/T_eval - 1.0/T0))
     end
 
-    # Get dew point temperature at a given pressure (derived from AEOLUS)
+    # Get dew point temperature at a given pressure
     function calc_Tdew(gas::String, p_eval::Float64)::Float64
 
         # Get properties

@@ -32,9 +32,9 @@ module solver_nlsol
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
-    - `dry_convect::Bool=true`          include dry convection
+    - `incl_convect::Bool=true`         include convection
     - `sens_heat::Bool=false`           include sensible heating 
-    - `conduct::Bool=true`              include conduction
+    - `conduct::Bool=false`             include conductive heat transport within the atmosphere
     - `max_steps::Int=2000`             maximum number of solver steps
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
@@ -48,8 +48,8 @@ module solver_nlsol
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, condensates::Array=[],
-                            dry_convect::Bool=true, sens_heat::Bool=false,
-                            conduct::Bool=true,
+                            incl_convect::Bool=true, sens_heat::Bool=false,
+                            conduct::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
                             method::Int=1, linesearch::Bool=true,
@@ -59,7 +59,7 @@ module solver_nlsol
 
         # Validate condensation case
         do_condense::Bool  = false 
-        if length(condensates) == 0
+        if length(condensates) > 0
             for c in condensates
                 if c in atmos.gases
                     do_condense = true 
@@ -85,7 +85,7 @@ module solver_nlsol
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c 
-        if (sol_type >= 2)  # states 2,3,4
+        if (sol_type >= 2)  # states 2,3,4 also solve for tmp_surf
             arr_len += 1
         end
 
@@ -150,10 +150,16 @@ module solver_nlsol
             atmosphere.radtrans!(atmos, false)
             atmos.flux_tot += atmos.flux_n
 
+            # +Condensation
+            if do_condense
+                atmosphere.condense_relax!(atmos, condensates)
+                atmos.flux_tot += atmos.flux_p
+            end
+
             # +Dry convection
-            if dry_convect
+            if incl_convect
                 # Calc flux
-                atmosphere.mlt!(atmos)
+                atmosphere.mlt_dry!(atmos)
 
                 # Stabilise?
                 atmos.flux_cdry *= convect_sf
@@ -180,42 +186,6 @@ module solver_nlsol
             # Additional energy input
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
 
-            # +Condensation
-            if do_condense
-
-                a::Float64 = max(maximum(abs.(atmos.flux_tot)), 10.0)
-                pp::Float64 = 0.0
-                i_gas::Int = -1
-
-                # Reset water cloud 
-                fill!(atmos.re[i]  , 0.0)
-                fill!(atmos.lwm[i] , 0.0)
-                fill!(atmos.clfr[i], 0.0)
-                
-                for i in 1:atmos.nlev_c
-                    for c in condensates
-                        # Get partial pressure 
-                        i_gas = findfirst(==(c), atmos.gases)
-                        pp = atmos.layer_x[i,i_gas] * atmos.p[i]
-                        if pp < 1.0e-10 
-                            continue
-                        end
-
-                        Tsat = phys.calc_Tdew(c, pp)
-                        if atmos.tmp[i] < Tsat
-                            atmos.flux_dif[i] += (a/atmos.tmp[i] - a/Tsat )
-                            println("Condensing $c at $i")
-                            atmos.mask_p[i] = atmos.mask_decay 
-                            if c == "H2O"
-                                atmos.re[i]   = atmos.cloud_val_r
-                                atmos.lwm[i]  = atmos.cloud_val_l
-                                atmos.clfr[i] = atmos.cloud_val_f
-                            end 
-                        end 
-                    end # end condensate
-                end # end levels 
-            end # end condensing
-
             # Calculate residuals subject to the solution type
             if (sol_type == 0) || (sol_type == 1)
                 # Zero loss with constant tmp_surf
@@ -233,10 +203,10 @@ module solver_nlsol
                 resid[1] = atmos.flux_tot[1] - atmos.flux_eff
 
             elseif (sol_type == 4)
-                # Set flux_eff to value required to reach target_olr
-                atmos.flux_eff = atmos.target_olr + atmos.flux_u_sw[1] - atmos.flux_d_lw[1] - atmos.flux_d_sw[1]
-                # Set residuals using new flux_eff 
-                resid[1:end] .= atmos.flux_tot[1:end] .- atmos.flux_eff
+                # Zero loss
+                resid[2:end] .= atmos.flux_dif[1:end]
+                # OLR is equal to target_olr
+                resid[1] = atmos.target_olr - atmos.flux_u_lw[1]
 
             end
 
@@ -322,7 +292,7 @@ module solver_nlsol
             error("Invalid method choice ($method)")
         end
 
-        @info @sprintf("    surf     = %d", sol_type)
+            @info @sprintf("    sol_type = %d", sol_type)
         if (sol_type == 1)
             @info @sprintf("    tmp_surf = %.2f K", atmos.tmp_surf)
         elseif (sol_type == 2)
@@ -356,7 +326,7 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         # Execution variables
         modprint::Int =         1       # Print frequency
-        x_dif_clip::Float64 =   300.0   # Maximum allowed step size
+        x_dif_clip::Float64 =   200.0   # Maximum allowed step size
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when stabilising convection
         
         # Tracking variables
@@ -390,6 +360,7 @@ module solver_nlsol
         x_dif_clip_step::Float64 = Inf # maximum step size (IN THIS STEP)
 
         # Linesearch parameters
+        ls_compassion::Float64  = 20.0     # factor by which cost is allowed to increase
         ls_scale::Float64       = 1.0     # best scale factor for linesearch 
         ls_test_cost::Float64   = Inf 
         ls_best_cost::Float64   = Inf 
@@ -404,7 +375,7 @@ module solver_nlsol
         fill!(r_old, 1.0e98)
 
         # Stabilise convection?
-        stabilise_mlt = stabilise_mlt && dry_convect
+        stabilise_mlt = stabilise_mlt && incl_convect
         if !stabilise_mlt
             convect_sf = 1.0
         end
@@ -522,10 +493,10 @@ module solver_nlsol
 
                 # Reset
                 stepflags *= "Ls"
-                ls_best_cost = c_old*10.0  # allow a cost increase of up to 10x
-                ls_best_scale = 0.1       # ^ this will require a step scale of 0.1
+                ls_best_cost = c_old*ls_compassion  # allow a cost increase 
+                ls_best_scale = 0.15     # ^ this will require a small step scale
 
-                for ls_scale in [0.3, 0.7, 1.0] # linesearch scales based on best cost reduction
+                for ls_scale in [0.5, 1.0, 1.5] # linesearch scale is set based on the best cost reduction
                     # try this scale factor 
                     x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
                     _fev!(x_cur, r_tst)
@@ -584,8 +555,8 @@ module solver_nlsol
             # Plot
             if modplot > 0
                 if mod(step, modplot) == 0
-                    plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2))
-                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3))
+                    plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates)
+                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense)
                 end 
             end 
                 

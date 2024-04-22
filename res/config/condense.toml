@@ -4,7 +4,7 @@ title = "Cloud test"                    # Name for this configuration file
 
 [planet]
     tmp_surf        = 1900.0            # Surface temperature [kelvin]
-    instellation    = 10000.0          # Stellar flux at planet's orbital distance [W m-2]
+    instellation    = 1000.0          # Stellar flux at planet's orbital distance [W m-2]
     albedo_b        = 0.0              # Pseudo bond-albedo which removes downscales the stellar flux by 1-this_value
     s0_fact         = 0.375           # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
     zenith_angle    = 48.19             # Characteristic zenith angle for incoming stellar radiation [degrees]
@@ -12,13 +12,13 @@ title = "Cloud test"                    # Name for this configuration file
     radius          = 6.37e6            # Planet radius at the surface [m]
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
     p_surf          = 800.0             # Total surface pressure [bar]
-    p_top           = 1e-6              # Total top-of-atmosphere pressure [bar]
+    p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
     tmp_eff         = 0.0               # Effective temperature
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/Oak/Oak.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
     output_dir      = "out/"                                            # Path to output directory.
 
@@ -26,22 +26,22 @@ title = "Cloud test"                    # Name for this configuration file
     silent          = false                     # Disable all printing?
     max_steps       = 200                       # Maximum number of solver steps.
     max_runtime     = 200                       # Maximum wall-clock solver runtime [s].
-    num_levels      = 100                        # Number of model levels.
+    num_levels      = 40                        # Number of model levels.
     continua        = true                      # Include absorption from continua?
     rayleigh        = false                     # Include rayleigh scattering?
-    cloud           = true                     # Include water cloud radiative properties?
+    cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = true                     # Accounting temperature dependence of thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
-    convection_type = ""                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
-    condensates     = []                   # List of volatiles which are allowed to condense.
-    solution_type   = 1                         # Solution type (see wiki).
-    solvers         = []                # Ordered list of solvers to apply (see wiki).
-    initial_state   = ["dry","con","H2O"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
+    condensates     = ["H2O"]                   # List of volatiles which are allowed to condense.
+    solution_type   = 3                         # Solution type (see wiki).
+    solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
+    initial_state   = ["iso","2000"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     stabilise       = false                     # Use various methods to help stabilise the model?
-    converge_atol   = 5.0e-2                    # Convergence criterion on absolute flux divergence [W m-2].
-    converge_rtol   = 1.0e-4                    # Convergence criterion on relative flux divergence [dimensionless].
+    converge_atol   = 0.1                    # Convergence criterion on absolute flux divergence [W m-2].
+    converge_rtol   = 1.0e-3                    # Convergence criterion on relative flux divergence [dimensionless].
 
 
 [plots]
