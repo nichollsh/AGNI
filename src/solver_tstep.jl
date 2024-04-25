@@ -43,6 +43,7 @@ module solver_tstep
     - `modprop::Int=1`                  frequency at which to update thermodynamic properties (0 => never)
     - `verbose::Bool=false`             verbose output
     - `modplot::Int=0`                  plot frequency (0 => no plots)
+    - `save_frames::Bool=true`          save plot frames
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `adams::Bool=true`                use Adams-Bashforth integrator
     - `dt_max::Float64=500.0            maximum time-step outside of the accelerated phase
@@ -58,18 +59,13 @@ module solver_tstep
                             sol_type::Int=1, use_physical_dt::Bool=false,
                             incl_convect::Bool=true, condensates::Array=[], use_mlt::Bool=true,
                             sens_heat::Bool=false, conduct::Bool=true, modprop::Int=1, 
-                            verbose::Bool=true, modplot::Int=0,
+                            verbose::Bool=true, modplot::Int=0, save_frames::Bool=true,
                             accel::Bool=true, adams::Bool=true, dt_max::Float64=500.0, 
                             max_steps::Int=1000, min_steps::Int=100, max_runtime::Float64=400.0,
                             step_rtol::Float64=1.0e-4, step_atol::Float64=1.0e-2,
                             conv_rtol::Float64=1.0e-4, conv_atol::Float64=1.0e-1
                             )::Bool
 
-        if use_physical_dt
-            @info "Begin physical timestepping"
-        else 
-            @info "Begin accelerated timestepping"
-        end 
 
         # Start timer 
         wct_start::Float64 = time()
@@ -124,6 +120,7 @@ module solver_tstep
         drel_dt::Float64   = Inf         # Rate of relative temperature change
         drel_dt_prev::Float64 = Inf      # Previous ^
         start_con::Bool       = false       # Convection has been started at any point
+        runtime::Float64  = 0.0
 
         oscil       = falses(atmos.nlev_c)          # layers which are oscillating
         dt          = ones(Float64,  atmos.nlev_c)  # time-step [days]
@@ -154,7 +151,6 @@ module solver_tstep
             step_stopaccel = 1
         end
 
-        plt_magma::Bool = (sol_type == 2)
         smooth_width::Int = 5
 
         # Store previous n atmosphere states
@@ -162,10 +158,26 @@ module solver_tstep
         hist_tmpl = zeros(Float64, (len_hist, atmos.nlev_l))   # temperature (ce)
         hist_hr   = zeros(Float64, (len_hist, atmos.nlev_c))   # heating rates (cc)
 
+        # Plots
+        path_prf::String = @sprintf("%s/solver_prf.png", atmos.OUT_DIR)
+        path_flx::String = @sprintf("%s/solver_flx.png", atmos.OUT_DIR)
+        function plot_step(i::Int, t::Float64)
+            if save_frames
+                title_prf = @sprintf("i = %d",i)
+                title_flx = @sprintf("t = %.1f s",t)
+            end
+            plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates, title=title_prf)
+            plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense, title=title_flx)
+            if save_frames
+                cp(path_prf,@sprintf("%s/frames/%04d_prf.png",atmos.OUT_DIR,i))
+                cp(path_flx,@sprintf("%s/frames/%04d_flx.png",atmos.OUT_DIR,i))
+            end 
+        end 
+ 
+
         # Plot initial state 
         if modplot > 0 
-            # file name prefixed with zz to make it appear last in directory
-            plotting.plot_solver(atmos, @sprintf("%s/zzframe_0000.png", atmos.OUT_DIR), incl_magma=plt_magma)
+            plot_step(0,0.0)
         end 
 
         # Main loop
@@ -184,7 +196,8 @@ module solver_tstep
             end
 
             # Check time 
-            if time()-wct_start > max_runtime 
+            runtime = time()-wct_start
+            if runtime > max_runtime 
                 break
             end 
 
@@ -431,7 +444,7 @@ module solver_tstep
             # Set bottom edge temperature 
             if (sol_type < 0) || (sol_type > 2)
                 # Error cases
-                error("Invalid surface state ($sol_type)")
+                error("Invalid surface state ($sol_type) for timestepping solver")
 
             elseif (sol_type == 0)
                 # Extrapolate (log-linear)
@@ -544,11 +557,8 @@ module solver_tstep
             # --------------------------------------
             # Make plots 
             # -------------------------------------- 
-            if (modplot > 0) && (mod(step,modplot) == 0)
-                plotting.plot_pt(atmos,     @sprintf("%s/solver_prf.png", atmos.OUT_DIR), incl_magma=(sol_type==2))
-                plotting.plot_fluxes(atmos, @sprintf("%s/solver_flx.png", atmos.OUT_DIR), incl_eff=(sol_type==3))
-                plotting.plot_solver(atmos, @sprintf("%s/solver_mon.png", atmos.OUT_DIR), hist_tmpl=hist_tmpl, incl_magma=plt_magma, step=step)
-                cp(@sprintf("%s/solver_mon.png", atmos.OUT_DIR), @sprintf("%s/zzframe_%04d.png", atmos.OUT_DIR, step), force=true)
+            if (modplot > 0) && (mod(step, modplot) == 0)
+                plot_step(step, runtime)
             end 
 
             # --------------------------------------
@@ -569,6 +579,9 @@ module solver_tstep
             atexit(exit)
 
         end # end main loop
+
+        rm(path_prf, force=true)
+        rm(path_flx, force=true)
 
         # Print information about the final state
         atmos.is_solved = true
