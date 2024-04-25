@@ -1,6 +1,6 @@
 # AGNI configuration file 
-# This is designed to test clouds
-title = "Cloud test"                    # Name for this configuration file
+# This is designed to test forced condensation
+title = "Condensation test"                    # Name for this configuration file
 
 [planet]
     tmp_surf        = 1900.0            # Surface temperature [kelvin]
@@ -24,7 +24,7 @@ title = "Cloud test"                    # Name for this configuration file
 
 [execution]
     silent          = false                     # Disable all printing?
-    max_steps       = 200                       # Maximum number of solver steps.
+    max_steps       = 300                       # Maximum number of solver steps.
     max_runtime     = 200                       # Maximum wall-clock solver runtime [s].
     num_levels      = 40                        # Number of model levels.
     continua        = true                      # Include absorption from continua?
@@ -52,5 +52,5 @@ title = "Cloud test"                    # Name for this configuration file
     emission        = true                      # Plot emission spectrum?
     albedo          = true                      # Plot spectral albedo?
     mixing_ratios   = true                      # Plot mixing ratios?
-    animate         = false                     # Make animation from runtime plots?
+    animate         = true                     # Make animation from runtime plots?
 
