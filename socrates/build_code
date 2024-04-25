@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 # Script to set-up and make the radiation code
 
 here=`pwd`
