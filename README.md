@@ -33,7 +33,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 
 ## Installation instructions
 - `$ cd socrates`
-- `$ cp ../res/Mk_cmd_PLAT ./make/Mk_cmd` where PLAT is your platform
+- `$ ./configure`
 - `$ ./build_code`
 - `$ source set_rad_env`
 - `$ cd julia`
