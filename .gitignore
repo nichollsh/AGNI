@@ -7,6 +7,7 @@ socrates/set_rad_env
 socrates/sbin/Cgen_null
 socrates/sbin/Cinc_field
 socrates/sbin/Cscale_field
+socrates/make/Mk_cmd
 
 # Spectral data 
 *.par 
