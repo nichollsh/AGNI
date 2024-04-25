@@ -7,6 +7,10 @@ FC=gfortran
 # FFLAGS= -g
 FFLAGS = -O2 -Wall -fPIC
 
+ifeq ($(shell uname -s),Darwin)
+	FFLAGS += -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/
+endif
+
 # SOCRATES library code must be built with -fPIC (eg edit Mk_cmd to add this option)
 # library location RAD_BIN is set by set_rad_env script in the top-level socrates working folder
 

@@ -3,7 +3,10 @@
 
 # Remove old files
 rm -rf "bin/"
-rm "set_rad_env"
+rm -f "set_rad_env"
+rm -f "sbin/Cgen_null"
+rm -f "sbin/Cinc_field"
+rm -f "sbin/Cscale_field"
 
 # Prepare Mk_cmd file 
 genpath="make/Mk_cmd"
@@ -21,8 +24,13 @@ if [ -z "$fc" ]; then
     echo "Cannot find gfortran"
     exit 1
 fi
-echo "FORTCOMP        = $fc -O3 -fPIC -c " >> $genpath
-echo "LINK            = $fc -O3 -fPIC " >> $genpath
+if  [[ "$OSTYPE" == "darwin"* ]]; then
+    extra="-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/"
+else 
+    extra=""
+fi 
+echo "FORTCOMP        = $fc -O3 -fPIC $extra -c " >> $genpath
+echo "LINK            = $fc -O3 -fPIC $extra " >> $genpath
 
 ar="$(command -v ar)"
 if [ -z "$ar" ]; then 
