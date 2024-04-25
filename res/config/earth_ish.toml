@@ -52,5 +52,5 @@ title = "Earth (ish)"                    # Name for this configuration file
     emission        = true                      # Plot emission spectrum?
     albedo          = true                      # Plot spectral albedo?
     mixing_ratios   = true                      # Plot mixing ratios?
-    animate         = false                     # Make animation from runtime plots?
+    animate         = true                     # Make animation from runtime plots?
 

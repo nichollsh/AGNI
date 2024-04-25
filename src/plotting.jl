@@ -34,7 +34,7 @@ module plotting
     """
     Plot the temperature-pressure profile.
     """
-    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_magma::Bool=false, condensates::Array=[])
+    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_magma::Bool=false, condensates::Array=[], title::String="")
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -44,7 +44,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400), guidefontsize=9)
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400), guidefontsize=9, titlefontsize=9)
 
         # Plot condensation curves 
         if length(condensates) > 0
@@ -73,6 +73,9 @@ module plotting
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
+        if !isempty(title)
+            title!(plt, title)
+        end 
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -242,7 +245,8 @@ module plotting
     Plot the fluxes at each pressure level
     """
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, 
-                            incl_eff::Bool=false, incl_mlt::Bool=true, incl_cdct::Bool=true, incl_phase::Bool=true
+                            incl_eff::Bool=false, incl_mlt::Bool=true, incl_cdct::Bool=true, incl_phase::Bool=true,
+                            title::String=""
                         )
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
@@ -256,7 +260,7 @@ module plotting
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
         w = 2.0
-        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, guidefontsize=9)
+        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, guidefontsize=9, size=(550,400), titlefontsize=9)
 
         col_r = "#c0c0c0"
         col_n = "#000000"
@@ -342,6 +346,9 @@ module plotting
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
+        if !isempty(title)
+            title!(plt, title)
+        end
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -535,31 +542,36 @@ module plotting
     """
     Animate output frames from solver, using ffmpeg
     """
-    function anim_solver(atmos::atmosphere.Atmos_t)
-
-        # Command line format:
-        # bash> ffmpeg -framerate 16 -i out/zzframe_%04d.png -pix_fmt yuv420p -y out/anim.mp4
-
-        runtime = 15.0 # seconds
+    function animate(atmos::atmosphere.Atmos_t, duration::Float64=15.0)
 
         # Find output files
         out = atmos.OUT_DIR
-        frames = glob("zzframe_*.png",out)
+        frames = glob("frames/*_prf.png",out)
         nframes = length(frames)
 
         # Animating fluxes?
-        frames2 = glob("zyframe_*.png",out)
+        frames2 = glob("frames/*_flx.png",out)
         fluxes = length(frames2) > 0
 
         # Create animation
         if nframes < 1
             @warn "Cannot animate solver because no output frames were found"
         else 
-            fps = max(nframes/runtime, 5)
-            run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/zzframe_*.png" -pix_fmt yuv420p -y $out/anim_tmp.mp4`)
+            fps = nframes/duration*1.0
+            # animate profile 
+            run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_prf.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_prf.mp4`)
+
+            # animate fluxes 
             if fluxes
-                run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/zyframe_*.png" -pix_fmt yuv420p -y $out/anim_flx.mp4`)
+                run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_flx.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_flx.mp4`)
             end
+
+            # combine videos 
+            if fluxes 
+                run(`ffmpeg -loglevel quiet -i $out/frames/ani_prf.mp4 -i $out/frames/ani_flx.mp4 -filter_complex "hstack,format=yuv420p" -c:v libx264 -crf 18 $out/anim.mp4`)
+            else 
+                cp("$out/frames/ani_prf.mp4", "$out/anim.mp4")
+            end 
         end
 
         return nothing

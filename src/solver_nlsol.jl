@@ -42,6 +42,7 @@ module solver_nlsol
     - `method::Int=1`                   numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `linesearch::Bool=true`           use a simple linesearch algorithm to determine the best step size
     - `modplot::Int=0`                  iteration frequency at which to make plots
+    - `save_frames::Bool=true`          save plotting frames
     - `stabilise_mlt::Bool=true`        stabilise convection by introducing it gradually
     - `conv_atol::Float64=1.0e-5`       convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
@@ -53,7 +54,8 @@ module solver_nlsol
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
                             method::Int=1, linesearch::Bool=true,
-                            modplot::Int=1, stabilise_mlt::Bool=true,
+                            modplot::Int=1, save_frames::Bool=true, 
+                            stabilise_mlt::Bool=true,
                             conv_atol::Float64=1.0e-5, conv_rtol::Float64=1.0e-3
                             )::Bool
 
@@ -278,20 +280,26 @@ module solver_nlsol
             return norm(_r)
         end 
 
+        # Plot
+        title_prf::String = ""
+        title_flx::String = ""
+        function plot_step(i::Int, t::Float64)
+            if save_frames
+                title_prf = @sprintf("i = %d",i)
+                title_flx = @sprintf("t = %.1f s",t)
+            end
+            plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates, title=title_prf)
+            plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense, title=title_flx)
+            if save_frames
+                cp(path_prf,@sprintf("%s/frames/%04d_prf.png",atmos.OUT_DIR,i))
+                cp(path_flx,@sprintf("%s/frames/%04d_flx.png",atmos.OUT_DIR,i))
+            end 
+        end 
+
         
         # ----------------------------------------------------------
         # Setup initial guess
         # ---------------------------------------------------------- 
-        if method == 1
-            @info "Begin Newton-Raphson iterations"
-        elseif method == 2
-            @info "Begin Gauss-Newton iterations"
-        elseif method == 3
-            @info "Begin Levenberg-Marquardt iterations"
-        else 
-            error("Invalid method choice ($method)")
-        end
-
             @info @sprintf("    sol_type = %d", sol_type)
         if (sol_type == 1)
             @info @sprintf("    tmp_surf = %.2f K", atmos.tmp_surf)
@@ -333,6 +341,7 @@ module solver_nlsol
         step::Int =         0       # Step number
         code::Int =         -1      # Status code 
         lml::Float64 =      2.0     # Levenberg-Marquardt lambda parameter
+        runtime::Float64  = 0.0
 
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
@@ -380,6 +389,11 @@ module solver_nlsol
             convect_sf = 1.0
         end
 
+        # Initial plot 
+        if modplot > 0
+            plot_step(0, 0.0)
+        end
+
         @info @sprintf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
         info_str::String = ""
         while true 
@@ -393,7 +407,8 @@ module solver_nlsol
             atmosphere.calc_layer_props!(atmos)
 
             # Check time 
-            if time()-wct_start > max_runtime 
+            runtime = time()-wct_start
+            if runtime > max_runtime 
                 code = 3
                 break
             end 
@@ -553,11 +568,8 @@ module solver_nlsol
             c_max = maximum(abs.(atmos.flux_tot))
 
             # Plot
-            if modplot > 0
-                if mod(step, modplot) == 0
-                    plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates)
-                    plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense)
-                end 
+            if (modplot > 0) && (mod(step, modplot) == 0)
+                plot_step(step, runtime)
             end 
                 
             # Inform user

@@ -133,6 +133,10 @@ function main()::Bool
         mkdir(output_dir)
     end 
 
+    # Frames folder 
+    rm(joinpath(output_dir,"frames"),force=true,recursive=true)
+    mkdir(joinpath(output_dir,"frames"))
+
     # Copy configuration file 
     cp(cfg_path, joinpath(output_dir, "agni.cfg"), force=true)
 
@@ -185,6 +189,7 @@ function main()::Bool
     plt_alb::Bool          = cfg["plots"     ]["albedo"]
     plt_vmr::Bool          = cfg["plots"     ]["mixing_ratios"]
     plt_ani::Bool          = cfg["plots"     ]["animate"]
+    plt_ani = plt_ani && plt_tmp
 
     # Read OPTIONAL configuration options from dict
     #     mixing ratios can be set either way
@@ -315,10 +320,13 @@ function main()::Bool
     for sol in solvers_cmd 
 
         sol = strip(lowercase(sol))
+        if isempty(sol)
+            sol = "none"
+        end 
+        @info "Solving with '$sol'"
 
         # No solve - just calc fluxes at the end
-        if isempty(sol)
-            @info "Solver = none"
+        if sol == "none"
             fill!(atmos.flux_tot, 0.0)
             atmosphere.radtrans!(atmos, true, calc_cf=true)
             atmosphere.radtrans!(atmos, false)
@@ -338,7 +346,6 @@ function main()::Bool
         
         # Timestepping
         elseif sol == "timestep"
-            @info "Solver = $sol"
             # Plotting at runtime
             if plt_run 
                 modplot = 10
@@ -347,13 +354,12 @@ function main()::Bool
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
                                 incl_convect=incl_convect, condensates=condensates, conduct=incl_conduct,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
-                                conv_atol=conv_atol, conv_rtol=conv_rtol,
+                                conv_atol=conv_atol, conv_rtol=conv_rtol, save_frames=plt_ani,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
             return_success = return_success && solver_success
         
         # Nonlinear methods
         elseif (sol in method_map) 
-            @info "Solver = $sol"
             if plt_run 
                 modplot = 1
             end
@@ -362,10 +368,10 @@ function main()::Bool
                                 conduct=incl_conduct,
                                 incl_convect=incl_convect, condensates=condensates, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
-                                stabilise_mlt=stabilise,modplot=modplot)
+                                stabilise_mlt=stabilise,modplot=modplot,save_frames=plt_ani)
             return_success = return_success && solver_success
         else 
-            @error "Invalid solver requested '$sol'"
+            @error "Invalid solver"
             return_success = false 
             break
         end 
@@ -384,7 +390,7 @@ function main()::Bool
     @info "Plotting results"
     plt_alb = plt_alb && (flag_cld || flag_ray)
 
-    plt_ani && plotting.anim_solver(atmos)
+    plt_ani && plotting.animate(atmos)
     plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
     plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2), condensates=condensates)
@@ -395,6 +401,7 @@ function main()::Bool
     # Deallocate atmosphere
     @info "Deallocating arrays"
     atmosphere.deallocate!(atmos)
+    rm(joinpath(output_dir,"frames"),force=true,recursive=true)
 
     # Finish up
     runtime = round(time() - tbegin, digits=2)
