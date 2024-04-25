@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 # Script to set-up and make the radiation code
 
 here=`pwd`
@@ -111,7 +111,7 @@ if [ -r /usr/share/Modules/init/bash ]
     . /usr/share/Modules/init/bash
 fi
 . ./set_prog_env
-make $1 && echo "All compiled OK"
+make $1 -j 6 && echo "All compiled OK"
 cd $here
 
 echo "Setting path to distribution in set_rad_env"
