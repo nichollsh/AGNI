@@ -412,6 +412,14 @@ module solver_nlsol
         info_str::String = ""
         while true 
 
+            # Reset flags 
+            #     Ch         = chemistry model was called
+            #     Sc,R       = stabilise convection, reduced this step
+            #     Cd, Fd     = finite differencing type 
+            #     Nr, Gn, Lm = stepping algorithm
+            #     Ls         = linesearch active
+            stepflags::String = ""
+
             # Update properties (cp, rho, etc.)
             if !all(isfinite, x_cur)
                 @error "Solution array contains NaNs and/or Infs "
@@ -420,6 +428,7 @@ module solver_nlsol
             _set_tmps!(x_cur)
             if chem_type in [1,2,3]
                 atmosphere.chemistry_eq!(atmos, chem_type)
+                stepflags *= "Ch"
             end 
             atmosphere.calc_layer_props!(atmos)
 
@@ -440,13 +449,6 @@ module solver_nlsol
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("    %4d  ", step)
             end
-
-            # Reset flags 
-            #     Sc,R       = stabilise convection, reduced this step
-            #     Cd, Fd     = finite differencing type 
-            #     Nr, Gn, Lm = stepping algorithm
-            #     Ls         = linesearch active
-            stepflags::String = ""
 
             # Check convective stabilisation
             if stabilise_mlt 

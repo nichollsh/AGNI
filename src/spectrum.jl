@@ -150,17 +150,18 @@ module spectrum
             write(f, outp_file*" \n")
 
             # write thermal source function + stellar spectrum
-            @info "Inserting stellar spectrum"
             for inp in star_inputs 
                 write(f, inp*" \n")
             end 
 
             # write rayleigh coefficients
             if insert_rscatter
-                @info "Inserting Rayleigh coefficients" 
+                @info "Inserting stellar spectrum and Rayleigh coefficients" 
                 write(f, "3 \n")       #  block 3, please
                 write(f, "c \n")       #  custom composition
                 write(f, "a \n")       #  all gases
+            else 
+                @info "Inserting stellar spectrum"
             end 
 
             # exit prep_spec 
