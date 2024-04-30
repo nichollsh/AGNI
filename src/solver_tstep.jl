@@ -37,6 +37,7 @@ module solver_tstep
     - `use_physical_dt::Bool=false`     use a single time-step across the entire column (for physical time-evolution)
     - `incl_convect::Bool=true`         enable convection
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
+    - `chem_type::Int=0`                chemistry type (see wiki)
     - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=true`              include conduction

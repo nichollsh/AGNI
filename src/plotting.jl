@@ -86,7 +86,7 @@ module plotting
     """
     Plot the VMRs of the atmosphere at each cell-centre location.
     """
-    function plot_x(atmos::atmosphere.Atmos_t, fname; dpi::Int=250)
+    function plot_vmr(atmos::atmosphere.Atmos_t, fname; dpi::Int=250)
         
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
