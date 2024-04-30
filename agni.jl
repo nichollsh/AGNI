@@ -422,10 +422,10 @@ function main()::Bool
     atmosphere.deallocate!(atmos)
 
     # Temp folders
-    # for fold in tmp_folds
-    #     fpth = joinpath(output_dir,fold)
-    #     rm(fpth,force=true,recursive=true)
-    # end
+    for fold in tmp_folds
+        fpth = joinpath(output_dir,fold)
+        rm(fpth,force=true,recursive=true)
+    end
 
     # Finish up
     runtime = round(time() - tbegin, digits=2)

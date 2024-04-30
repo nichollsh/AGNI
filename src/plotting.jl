@@ -96,8 +96,8 @@ module plotting
         # Create plot
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(500,400), guidefontsize=9)
 
-        # Plot mole fractions for each gas
-        xmin::Float64 = 0.1
+        # Plot log10 mole fractions for each gas
+        xmin::Float64 = -20
         this_min::Float64 = 0.0
         for (i_gas,gas) in enumerate(atmos.gases)  
             if haskey(phys.lookup_color, gas)
@@ -105,19 +105,20 @@ module plotting
             else 
                 c = "#"*bytes2hex(rand(UInt8, 3))
             end 
-            plot!(atmos.layer_x[1:end,i_gas], arr_P, label=phys.lookup_pretty[gas], lw=2.5, linealpha=0.7, color=c)
-            this_min = minimum(atmos.layer_x[1:end,i_gas])
-            if this_min > 1.0e-90
+            x_arr = log10.(atmos.layer_x[1:end,i_gas])
+            this_min = minimum(x_arr)
+            if this_min > -90
+                plot!(x_arr, arr_P, label=phys.lookup_pretty[gas], lw=2.5, linealpha=0.7, color=c)
                 xmin = min(xmin, this_min)
             end
         end
 
-        xlims  = (max(xmin, 1.0e-20)*0.5, 1.2)
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=0, step=1))
+        xlims  = (max(xmin, -12), 0.1)
+        xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties
-        xlabel!(plt, "Mole fraction")
-        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks)
+        xlabel!(plt, "log10(Mole fraction)")
+        xaxis!(plt, xlims=xlims, xticks=xticks)
 
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
