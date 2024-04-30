@@ -36,6 +36,7 @@ title = "Condensation test"                    # Name for this configuration fil
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
     condensates     = ["H2O"]                   # List of volatiles which are allowed to condense.
+    chemistry       = 0
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
     initial_state   = ["iso","2000"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
