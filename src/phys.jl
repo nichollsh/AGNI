@@ -31,6 +31,9 @@ module phys
     # Speed of light, m s-1
     const c_vac::Float64 = 299792458.0 # NIST CODATA
 
+    # List of elements included in the model 
+    const elements_list = ["H","C","N","O","S","P"]
+
     # Pretty-formatted names
     const lookup_pretty = Dict{String, String}([
         ("H2O",    "H₂O"      ), 
@@ -567,4 +570,101 @@ module phys
         return Tref/(1.0-(Tref*R/L)*log(p/pref)) 
     end 
 
-end 
+    # Get number of atoms inside molecule, returning a dictionary
+    function count_atoms(m::String)::Dict
+        # Setup 
+        out = Dict()
+        nchar::Int = length(m)
+        i::Int = 1 
+        elem::String = ""
+        count::Int=-1
+        last::Bool=false 
+
+        # Loop through string
+        while i <= nchar 
+            last = (i == nchar)
+
+            # new element 
+            if isuppercase(m[i])
+                count = 0
+                elem = string(m[i])
+                if !last && islowercase(m[i+1])  # two letter element name 
+                    elem = elem*string(m[i+1])
+                    i += 1
+                end
+            end 
+
+            # get count 
+            if count == 0   # expecting number 
+                # number of atoms 
+                if last || isletter(m[i+1]) # got letter => count=1
+                    count = 1
+                else
+                    count = parse(Int, m[i+1]) 
+                end 
+                # repeated element 
+                if elem in keys(out)
+                    out[elem] += count 
+                else 
+                    out[elem] = count 
+                end 
+                # reset 
+                elem = ""
+                count = -1 
+            end 
+            i += 1
+        end 
+        
+        return out 
+    end 
+
+    # Convert gas fastchem name (Hill notation) to SOCRATES name 
+    # Generally the algorithm is:
+    #   sort elements in alphabetical order
+    #   denote number of atoms with the integer count following element symbol 
+    #   include 1 for when only a single atom of element is present
+    const map_fastchem_name = Dict{String, String}([
+                                    ("H2O1" ,    "H2O"  ),
+                                    ("C1O2" ,    "CO2"  ),
+                                    ("O3" ,      "O3"   ),
+                                    ("N2O1" ,    "N2O"  ),
+                                    ("C1O1" ,    "CO"   ),
+                                    ("CH4" ,     "CH4"  ),
+                                    ("O2" ,      "O2"   ),
+                                    ("N1O1" ,    "NO"   ),
+                                    ("O2S1" ,    "SO2"  ),
+                                    ("N1O2" ,    "NO2"  ),
+                                    ("N1H3" ,    "NH3"  ),
+                                    ("H1N1O3" ,  "HNO3" ),
+                                    ("N2" ,      "N2"   ),
+                                    ("O1Ti1" ,   "TiO"  ),
+                                    ("V1O1" ,    "VO"   ),
+                                    ("H2" ,      "H2"   ),
+                                    ("He1" ,     "He"   ),
+                                    ("O1C1S1" ,  "OCS"  ),
+                                    ("Na1" ,     "Na"   ),
+                                    ("K1" ,      "K"    ),
+                                    ("Fe1H1" ,   "FeH"  ),
+                                    ("Cr1H1" ,   "CrH"  ),
+                                    ("Li1" ,     "Li"   ),
+                                    ("Rb1" ,     "Rb"   ),
+                                    ("Cs1" ,     "Cs"   ),
+                                    ("P1H3" ,    "PH3"  ),
+                                    ("C2H2" ,    "C2H2" ),
+                                    ("C1H1N1_1", "HCN"  ),
+                                    ("H2S1" ,    "H2S"  ),
+                                    ("Ar1" ,     "Ar"   ),
+                                    ("O1" ,      "O"    ),
+                                    ("N1" ,      "N"    ),
+                                    ("N1O3" ,    "NO3"  ),
+                                    ("N2O5" ,    "N2O5" ),
+                                    ("H2O2" ,    "H2O2" ),
+                                    ("C2H6" ,    "C2H6" ),
+                                    ("C1H3" ,    "CH3"  ),
+                                    ("C1H2O1" ,  "H2CO" ),
+                                    ("H1O2" ,    "HO2"  ),
+                                    ("Cl1H1" ,   "HCl"  ),
+                                    ("F1H1",     "HF"   ),
+                                ])
+    
+end # end module 
