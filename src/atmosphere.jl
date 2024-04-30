@@ -1495,7 +1495,6 @@ module atmosphere
 
                 # println("Condensing $c at $i")
                 atmos.mask_p[i] = atmos.mask_decay 
-                atmos.mask_c[i] = 0
                 if i_sat == i_h2o
                     atmos.cloud_arr_r[i] = atmos.cloud_val_r
                     atmos.cloud_arr_l[i] = atmos.cloud_val_l
