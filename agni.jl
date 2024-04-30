@@ -133,9 +133,13 @@ function main()::Bool
         mkdir(output_dir)
     end 
 
-    # Frames folder 
-    rm(joinpath(output_dir,"frames"),force=true,recursive=true)
-    mkdir(joinpath(output_dir,"frames"))
+    # Temp folders
+    tmp_folds = ["frames/", "fastchem/"]
+    for fold in tmp_folds
+        fpth = joinpath(output_dir,fold)
+        rm(fpth,force=true,recursive=true)
+        mkdir(fpth)
+    end
 
     # Copy configuration file 
     cp(cfg_path, joinpath(output_dir, "agni.cfg"), force=true)
@@ -172,6 +176,7 @@ function main()::Bool
     thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
     conv_type::String      = cfg["execution" ]["convection_type"]
     condensates::Array     = cfg["execution" ]["condensates"]
+    chem_type::Int         = cfg["execution" ]["chemistry"]
     incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
     sol_type::Int          = cfg["execution" ]["solution_type"]
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
@@ -223,7 +228,11 @@ function main()::Bool
     if sol_type == 4
         target_olr = cfg["planet"]["target_olr"]
     end    
-
+    #    path to fastchem 
+    fastchem_path::String = ""
+    if chem_type in [1,2,3] 
+        fastchem_path = cfg["files"]["fastchem_path"]
+    end 
 
     # Setup atmosphere
     @info "Setting up"
@@ -242,7 +251,8 @@ function main()::Bool
                             tmp_floor=5.0, target_olr=target_olr,
                             tmp_eff=tmp_eff, albedo_s=albedo_s,
                             thermo_functions=thermo_funct,
-                            C_d=turb_coeff, U=wind_speed
+                            C_d=turb_coeff, U=wind_speed,
+                            fastchem_path=fastchem_path
                     )
     atmosphere.allocate!(atmos,star_file)
 
@@ -378,6 +388,10 @@ function main()::Bool
         @info " "
     end 
 
+    if chem_type == 1
+        atmosphere.chemistry_eq!(atmos)
+    end 
+
     @info "Total RT evalulations: $(atmos.num_rt_eval)"
 
     # Write arrays
@@ -401,7 +415,12 @@ function main()::Bool
     # Deallocate atmosphere
     @info "Deallocating arrays"
     atmosphere.deallocate!(atmos)
-    rm(joinpath(output_dir,"frames"),force=true,recursive=true)
+
+    # Temp folders
+    # for fold in tmp_folds
+    #     fpth = joinpath(output_dir,fold)
+    #     rm(fpth,force=true,recursive=true)
+    # end
 
     # Finish up
     runtime = round(time() - tbegin, digits=2)

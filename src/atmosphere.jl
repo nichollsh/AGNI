@@ -191,6 +191,11 @@ module atmosphere
         # Heating rate felt at each level [K/day]
         heating_rate::Array{Float64,1} 
 
+        # FastChem stuff 
+        fastchem_flag::Bool             # Fastchem enabled?
+        fastchem_path::String           # Path to fastchem installation folder (incl. executable)
+        fastchem_work::String           # Path to fastchem dir inside AGNI output folder
+        
         Atmos_t() = new()
     end
 
@@ -252,6 +257,7 @@ module atmosphere
     - `flag_aerosol::Bool=false`        include aersols?
     - `flag_cloud::Bool=false`          include clouds?
     - `thermo_functions::Bool=true`     use temperature-dependent thermodynamic properties
+    - `fastchem_path::String=""`        path to FastChem folder (empty string => disabled)
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
@@ -278,7 +284,8 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
-                    thermo_functions::Bool =    true
+                    thermo_functions::Bool =    true,
+                    fastchem_path::String =     ""
                     )
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -486,6 +493,25 @@ module atmosphere
         if length(keys(atmos.input_x)) == 0
             error("No mole fractions were stored")
         end
+
+        # Fastchem 
+        atmos.fastchem_flag = false 
+        if !isempty(fastchem_path)
+            # check folder
+            atmos.fastchem_path = abspath(fastchem_path)
+            if !isdir(fastchem_path)
+                @error "Could not find fastchem folder at '$(fastchem_path)'"
+            end 
+            atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
+            
+            # check executable 
+            atmos.fastchem_flag = isfile(joinpath(fastchem_path,"fastchem")) 
+            if !atmos.fastchem_flag 
+                @error "Could not find fastchem executable inside '$(atmos.fastchem_path)' "
+            else 
+                @info "Found FastChem executable"
+            end 
+        end 
 
         # Record that the parameters are set
         atmos.is_param = true
@@ -1425,9 +1451,134 @@ module atmosphere
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     """
-    function solve_abundances_eq!(atmos::atmosphere.Atmos_t)
-        @error "Chemistry not yet implemented"
+    function chemistry_eq!(atmos::atmosphere.Atmos_t)
+        # Check fastchem enabled 
+        if !atmos.fastchem_flag
+            @warn "Fastchem is not enabled but `chemistry_eq!` was called"
+            return nothing 
+        end 
 
+        # Write config for fc (it's quite particular about the format)
+        confpath::String = joinpath(atmos.fastchem_work,"config.input")
+        open(confpath,"w") do f
+            write(f,"#Atmospheric profile input file \n")
+            write(f,joinpath(atmos.fastchem_work,"pt.dat")*" \n\n") 
+
+            write(f,"#Chemistry calculation type (gas phase only = g, equilibrium condensation = ce, rainout condensation = cr) \n")
+            write(f,"g \n\n")
+            
+            write(f,"#Chemistry output file \n")
+            write(f,joinpath(atmos.fastchem_work,"chemistry.dat")*" "*joinpath(atmos.fastchem_work,"condensates.dat")*" \n\n")
+
+            write(f,"#Monitor output file \n")
+            write(f,joinpath(atmos.fastchem_work,"monitor.dat")*" \n\n")
+
+            write(f,"#FastChem console verbose level (1 - 4); 1 = almost silent, 4 = detailed console output \n")
+            write(f,"1 \n\n")
+
+            write(f,"#Output mixing ratios (MR) or particle number densities (ND, default) \n")
+            write(f,"ND \n\n")
+
+            write(f,"#Element abundance file  \n")
+            write(f,joinpath(atmos.fastchem_work,"elements.dat")*" \n\n")
+
+            write(f,"#Species data files    \n")
+            logK = joinpath(atmos.fastchem_path,"input/","logK/")
+            write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
+
+            write(f,"#Accuracy of chemistry iteration \n")
+            write(f,"1.0e-5 \n\n")
+            
+            write(f,"#Accuracy of element conservation \n")
+            write(f,"1.0e-4 \n\n")
+
+            write(f,"#Max number of chemistry iterations  \n")
+            write(f,"80000 \n\n")
+
+            write(f,"#Max number internal solver iterations  \n")
+            write(f,"20000 \n\n")
+        end 
+
+
+        # Write PT profile 
+        open(joinpath(atmos.fastchem_work,"pt.dat"),"w") do f
+            write(f,"# AGNI temperature structure \n")
+            write(f,"# bar, kelvin \n")
+            for i in 1:atmos.nlev_c 
+                write(f,@sprintf("%.6e    %.6e \n",atmos.p[i],atmos.tmp[i]))
+            end 
+        end 
+
+        # Calculate elemental abundances 
+        # number densities normalised relative to hydrogen 
+        # for each element X, value = log10(N_X/N_H) + 12 
+        # N = X(P/(K*T) , where X is the VMR and K is boltz-const
+        N_t = zeros(Float64, length(phys.elements_list))                # total
+        N_g = zeros(Float64, length(phys.elements_list))                # this gas
+        for gas in atmos.gases
+            d = phys.count_atoms(gas)
+            fill!(N_g, 0.0)
+            for (i,e) in enumerate(phys.elements_list)
+                if e in keys(d)
+                    N_g[i] += d[e]
+                end 
+            end 
+            N_g *= get_x(atmos, gas, atmos.nlev_c) * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
+            N_t += N_g  # number/m^3
+        end 
+        
+
+        # Write elemental abundances 
+        open(joinpath(atmos.fastchem_work,"elements.dat"),"w") do f
+            write(f,"# Elemental abundances derived from AGNI volatiles \n")
+            for (i,e) in enumerate(phys.elements_list)
+                if N_t[i] > 1.0e-30
+                    write(f, @sprintf("%s    %.3f \n",e,log10(N_t[i]/N_t[1]) + 12.0))
+                end
+            end 
+        end 
+
+        # Run fastchem 
+        execpath::String = joinpath(atmos.fastchem_path,"fastchem")
+        run(pipeline(`$execpath $confpath`, stdout=devnull))
+
+        # Get output 
+        chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat")
+        if !isfile(chempath)
+            @error "Could not find fastchem output"
+            return nothing 
+        end 
+        (data,head) = readdlm(chempath, '\t', Float64, header=true)
+        data = transpose(data)  # convert to: gas, level
+
+        # Parse output 
+        g::String = ""
+        j::Int    = -1
+        N_t = data[4,:] # sum of: gas number densities 
+        for (i,h) in enumerate(head)  # for each column (level)
+            g = rstrip(lstrip(h))
+
+            # check if supported by SOCRATES
+            if g in keys(phys.map_fastchem_name) 
+                g = phys.map_fastchem_name[g]     # get formula
+
+                # check if supported by spectral file 
+                if g in atmos.gases
+                    j   = findfirst(==(g), atmos.gases)         # get index in gas list
+                    N_g = data[i,:]                             # number densities for this gas 
+                    atmos.layer_x[:,j] .= N_g[:] ./ N_t[:]      # mole fraction (VMR) for this gas 
+                end
+            end # not supported => skip
+        end 
+
+        # Renormalise mole fractions at each level  
+        tot::Float64 = 0.0
+        for i in 1:atmos.nlev_c 
+            tot = sum(atmos.layer_x[i,:])
+            atmos.layer_x[i,:] /= tot
+        end 
+
+        return nothing 
     end 
 
 
