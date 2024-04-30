@@ -231,7 +231,11 @@ function main()::Bool
     #    path to fastchem 
     fastchem_path::String = ""
     if chem_type in [1,2,3] 
-        fastchem_path = cfg["files"]["fastchem_path"]
+        if length(condensates)>0
+            @error "Misconfiguration: FastChem coupling is incompatible with AGNI condensation scheme"
+        else
+            fastchem_path = cfg["files"]["fastchem_path"]
+        end 
     end 
 
     # Setup atmosphere
@@ -310,6 +314,11 @@ function main()::Bool
     # Write initial state
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
+    # Do chemistry on initial composition
+    if chem_type in [1,2,3]
+        atmosphere.chemistry_eq!(atmos, chem_type)
+    end 
+
     # Solver variables 
     incl_convect::Bool = !isempty(conv_type)
     use_mlt::Bool     = (conv_type == "mlt")
@@ -361,7 +370,7 @@ function main()::Bool
                 modplot = 10
             end
             solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
-                                modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens,
+                                modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens, chem_type=chem_type,
                                 incl_convect=incl_convect, condensates=condensates, conduct=incl_conduct,
                                 accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol, save_frames=plt_ani,
@@ -375,7 +384,7 @@ function main()::Bool
             end
             method = findfirst(==(sol), method_map)
             solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
-                                conduct=incl_conduct,
+                                conduct=incl_conduct,  chem_type=chem_type,
                                 incl_convect=incl_convect, condensates=condensates, sens_heat=incl_sens,
                                 max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
                                 stabilise_mlt=stabilise,modplot=modplot,save_frames=plt_ani)
@@ -386,10 +395,6 @@ function main()::Bool
             break
         end 
         @info " "
-    end 
-
-    if chem_type == 1
-        atmosphere.chemistry_eq!(atmos)
     end 
 
     @info "Total RT evalulations: $(atmos.num_rt_eval)"
@@ -405,7 +410,7 @@ function main()::Bool
     plt_alb = plt_alb && (flag_cld || flag_ray)
 
     plt_ani && plotting.animate(atmos)
-    plt_vmr && plotting.plot_x(atmos,          joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
+    plt_vmr && plotting.plot_vmr(atmos,        joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
     plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
     plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2), condensates=condensates)
     plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_phase=(length(condensates) > 0), incl_cdct=incl_conduct)

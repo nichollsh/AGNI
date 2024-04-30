@@ -32,6 +32,7 @@ module solver_nlsol
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
+    - `chem_type::Int=0`                chemistry type (see wiki)
     - `incl_convect::Bool=true`         include convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=false`             include conductive heat transport within the atmosphere
@@ -48,7 +49,8 @@ module solver_nlsol
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1, condensates::Array=[],
+                            sol_type::Int=1, condensates::Array=[], 
+                            chem_type::Int=0,
                             incl_convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
@@ -84,6 +86,7 @@ module solver_nlsol
         # Plot paths 
         path_prf::String = @sprintf("%s/solver_prf.png", atmos.OUT_DIR)
         path_flx::String = @sprintf("%s/solver_flx.png", atmos.OUT_DIR)
+        path_vmr::String = @sprintf("%s/solver_vmr.png", atmos.OUT_DIR)
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c 
@@ -96,6 +99,7 @@ module solver_nlsol
         rb::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference
         x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
         fd_s::Float64           = 0.0                      # Row perturbation amount
+        do_chemistry::Bool      = (chem_type>0)
 
         # Convective flux scale factor 
         convect_sf::Float64 = 5.0e-5
@@ -138,7 +142,12 @@ module solver_nlsol
             # Set temperatures 
             _set_tmps!(x)
 
-            # Calculate layer properties if they are temperature-dependent
+            # # Chemistry
+            # if chem_type in [1,2,3]
+            #     atmosphere.chemistry_eq!(atmos, chem_type)
+            # end 
+
+            # Calculate layer properties
             if atmos.thermo_funct
                 atmosphere.calc_layer_props!(atmos)
             end 
@@ -288,11 +297,16 @@ module solver_nlsol
                 title_prf = @sprintf("i = %d",i)
                 title_flx = @sprintf("t = %.1f s",t)
             end
+
             plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates, title=title_prf)
             plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense, title=title_flx)
             if save_frames
                 cp(path_prf,@sprintf("%s/frames/%04d_prf.png",atmos.OUT_DIR,i))
                 cp(path_flx,@sprintf("%s/frames/%04d_flx.png",atmos.OUT_DIR,i))
+            end 
+
+            if do_chemistry
+                plotting.plot_vmr(atmos, path_vmr)
             end 
         end 
 
@@ -404,6 +418,9 @@ module solver_nlsol
                 break
             end 
             _set_tmps!(x_cur)
+            if chem_type in [1,2,3]
+                atmosphere.chemistry_eq!(atmos, chem_type)
+            end 
             atmosphere.calc_layer_props!(atmos)
 
             # Check time 
@@ -588,6 +605,7 @@ module solver_nlsol
         
         rm(path_prf, force=true)
         rm(path_flx, force=true)
+        rm(path_vmr, force=true)
         
         # ----------------------------------------------------------
         # Extract solution

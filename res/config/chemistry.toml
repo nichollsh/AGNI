@@ -36,9 +36,9 @@ title = "Equilibrium chemistry demo"                    # Name for this configur
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
     condensates     = []                        # List of volatiles which are allowed to condense.
-    chemistry       = 1                         # Chemistry type
+    chemistry       = 1                         # Chemistry type (see wiki)
     solution_type   = 3                         # Solution type (see wiki).
-    solvers         = []                # Ordered list of solvers to apply (see wiki).
+    solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
     initial_state   = ["iso","1800"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     stabilise       = false                     # Use various methods to help stabilise the model?
     converge_atol   = 1.0e-2                    # Convergence criterion on absolute flux lost [W m-2].

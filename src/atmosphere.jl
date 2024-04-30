@@ -1446,12 +1446,17 @@ module atmosphere
     """
     **Calculate composition assuming chemical equilibrium at each level.**
 
-    Uses FastChem to calculate the gas composition at each level of the atmosphere.
+    Uses FastChem to calculate the gas composition at each level of the atmosphere. Volatiles are converted to bulk
+    elemental abundances, which are then provided to FastChem alongside the temperature/pressure profile. FastChem is
+    currently called as an executable, which is not optimal.
+
+    This function DOES NOT automatically recalculate layer properties (e.g. mmw, density, height).
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `chem_type::Int`                  chemistry type (see wiki)
     """
-    function chemistry_eq!(atmos::atmosphere.Atmos_t)
+    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int)
         # Check fastchem enabled 
         if !atmos.fastchem_flag
             @warn "Fastchem is not enabled but `chemistry_eq!` was called"
@@ -1464,8 +1469,9 @@ module atmosphere
             write(f,"#Atmospheric profile input file \n")
             write(f,joinpath(atmos.fastchem_work,"pt.dat")*" \n\n") 
 
+            type_char = ["g","ce","cr"]
             write(f,"#Chemistry calculation type (gas phase only = g, equilibrium condensation = ce, rainout condensation = cr) \n")
-            write(f,"g \n\n")
+            write(f,"$(type_char[chem_type]) \n\n")
             
             write(f,"#Chemistry output file \n")
             write(f,joinpath(atmos.fastchem_work,"chemistry.dat")*" "*joinpath(atmos.fastchem_work,"condensates.dat")*" \n\n")
