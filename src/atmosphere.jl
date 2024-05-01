@@ -555,11 +555,16 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+    - `ok::Bool`                function result is ok
     """
-    function calc_layer_props!(atmos::atmosphere.Atmos_t)
+    function calc_layer_props!(atmos::atmosphere.Atmos_t)::Bool
         if !atmos.is_param
-            error(" atmosphere parameters have not been set")
+            error("atmosphere parameters have not been set")
         end
+
+        ok::Bool = true
 
         # Set pressure arrays in SOCRATES 
         atmos.atm.p[1, :] .= atmos.p[:]
@@ -624,13 +629,14 @@ module atmosphere
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
 
             if (dzl < 1e-20) || (dzc < 1e-20)
-                error("Height integration resulted in dz <= 0 at level $i")
+                @error "Height integration resulted in dz <= 0 at level $i"
+                ok = false 
             end
             if (dzl > 1e8) || (dzc > 1e8)
-                error("Height integration blew up at level $i")
+                @error "Height integration blew up at level $i"
+                ok = false 
             end
         end 
-
 
         # Mass
         for i in 1:atmos.atm.n_layer
@@ -638,7 +644,7 @@ module atmosphere
             atmos.atm.mass[1, i] = atmos.layer_mass[i]
         end
 
-        return nothing
+        return ok
     end 
 
     """
@@ -1455,12 +1461,19 @@ module atmosphere
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `chem_type::Int`                  chemistry type (see wiki)
+
+    Returns:
+    - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int)
+    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int)::Int
+
+        # Return code 
+        state::Int = 0
+
         # Check fastchem enabled 
         if !atmos.fastchem_flag
             @warn "Fastchem is not enabled but `chemistry_eq!` was called"
-            return nothing 
+            return 1
         end 
 
         # Write config for fc (it's quite particular about the format)
@@ -1548,19 +1561,46 @@ module atmosphere
         execpath::String = joinpath(atmos.fastchem_path,"fastchem")
         run(pipeline(`$execpath $confpath`, stdout=devnull))
 
-        # Get output 
+        # Check monitor output 
+        monitorpath::String = joinpath(atmos.fastchem_work,"monitor.dat")
+        data = readdlm(monitorpath, '\t', String)
+        fail_elem::String = ""
+        fail_conv::String = ""
+        for i in 1:atmos.nlev_c 
+            if data[i+1,6][1] == 'f'
+                fail_elem *= @sprintf("%d ",i) 
+            end 
+            if data[i+1,5][1] == 'f'
+                fail_conv *= @sprintf("%d ",i) 
+            end 
+        end 
+        if !isempty(fail_elem)
+            @debug "Element conservation failed at levels  "*fail_elem
+            state = 2
+        end 
+        if !isempty(fail_conv)
+            @debug "FastChem solver failed at levels  "*fail_conv
+            if state == 2
+                state = 4 
+            else 
+                state = 3
+            end 
+        end 
+
+        # Get gas chemistry output 
         chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat")
         if !isfile(chempath)
             @error "Could not find fastchem output"
-            return nothing 
+            return 1 
         end 
         (data,head) = readdlm(chempath, '\t', Float64, header=true)
         data = transpose(data)  # convert to: gas, level
 
-        # Parse output 
+        # Parse gas chemistry
         g::String = ""
         j::Int    = -1
         N_t = data[4,:] # sum of: gas number densities 
+        fill!(atmos.layer_x, 0.0)
         for (i,h) in enumerate(head)  # for each column (level)
             g = rstrip(lstrip(h))
 
@@ -1577,14 +1617,14 @@ module atmosphere
             end # not supported => skip
         end 
 
-        # Renormalise mole fractions at each level  
+        # Renormalise gas mole fractions at each level  
         tot::Float64 = 0.0
         for i in 1:atmos.nlev_c 
             tot = sum(atmos.layer_x[i,:])
             atmos.layer_x[i,:] /= tot
         end 
 
-        return nothing 
+        return state 
     end 
 
 
