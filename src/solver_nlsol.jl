@@ -355,7 +355,9 @@ module solver_nlsol
         step::Int =         0       # Step number
         code::Int =         -1      # Status code 
         lml::Float64 =      2.0     # Levenberg-Marquardt lambda parameter
-        runtime::Float64  = 0.0
+        runtime::Float64  = 0.0     # Model runtime [s]
+        fc_retcode::Int  =  0       # Fastchem return code
+        step_ok::Bool =     true    # Current step was fine
 
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
@@ -410,27 +412,18 @@ module solver_nlsol
 
         @info @sprintf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
         info_str::String = ""
+        stepflags::String = ""
         while true 
 
             # Reset flags 
-            #     Ch         = chemistry model was called
-            #     Sc,R       = stabilise convection, reduced this step
+            #     Cs, Cf     = chemistry model success, failure
+            #     Sc,Sr      = stabilise convection, reduced this step
             #     Cd, Fd     = finite differencing type 
             #     Nr, Gn, Lm = stepping algorithm
             #     Ls         = linesearch active
-            stepflags::String = ""
-
-            # Update properties (cp, rho, etc.)
-            if !all(isfinite, x_cur)
-                @error "Solution array contains NaNs and/or Infs "
-                break
-            end 
-            _set_tmps!(x_cur)
-            if chem_type in [1,2,3]
-                atmosphere.chemistry_eq!(atmos, chem_type)
-                stepflags *= "Ch"
-            end 
-            atmosphere.calc_layer_props!(atmos)
+            info_str  = ""
+            stepflags = ""
+            step_ok   = true 
 
             # Check time 
             runtime = time()-wct_start
@@ -445,15 +438,35 @@ module solver_nlsol
                 code = 1 
                 break 
             end 
-            info_str = ""
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("    %4d  ", step)
             end
 
+            # Check status of guess 
+            if !all(isfinite, x_cur)
+                code = 4 
+                break
+            end 
+            _set_tmps!(x_cur)
+
+            # Run chemistry scheme 
+            if chem_type in [1,2,3]
+                fc_retcode = atmosphere.chemistry_eq!(atmos, chem_type)
+                if fc_retcode == 0
+                    stepflags *= "Cs"
+                else 
+                    stepflags *= "Cf"
+                    step_ok = false
+                end
+            end 
+
+            # Update properties (mmw, density, height, etc.)
+            step_ok = step_ok && atmosphere.calc_layer_props!(atmos)
+
             # Check convective stabilisation
             if stabilise_mlt 
                 # We are stabilising
-                stepflags *= "Sc"
+                stepflags *= "S"
                 
                 # Check if sf needs to be increased
                 if c_cur < max(100.0*conv_rtol, 10.0)
@@ -469,24 +482,29 @@ module solver_nlsol
                         end
                     end 
                 end
+
+                if stepflags[end] == "S"
+                    stepflags *= "c"
+                end 
             else
                 # No stabilisation at this point
                 convect_sf = 1.0 
             end 
 
-            # Evaluate jacobian and residuals
+            # Evaluate residuals and finite-difference jacobian
             r_old[:] .= r_cur[:]
             if use_cendiff || (step == 1)
                 _calc_jac_res_cendiff!(x_cur, b, r_cur) 
-                stepflags *= "Cd"
+                stepflags *= "Fc"
             else
                 _calc_jac_res_fordiff!(x_cur, b, r_cur) 
-                stepflags *= "Fd"
+                stepflags *= "Ff"
             end 
 
             # Check if jacobian is singular 
             if abs(det(b)) < floatmin()*10.0
                 code = 2
+                step_ok = false 
                 break
             end 
 
@@ -594,7 +612,11 @@ module solver_nlsol
             # Inform user
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-9s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags)
-                @info info_str
+                if step_ok
+                    @info info_str
+                else
+                    @warn info_str 
+                end
             end
 
             # Converged?
@@ -623,6 +645,8 @@ module solver_nlsol
             @error "    failure (singular jacobian)"
         elseif code == 3
             @error "    failure (maximum time)"
+        elseif code == 4
+            @error "    failure (NaN temperature)"
         else 
             @error "    failure (unhandled)"
         end
