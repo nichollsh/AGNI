@@ -316,7 +316,7 @@ function main()::Bool
 
     # Do chemistry on initial composition
     if chem_type in [1,2,3]
-        atmosphere.chemistry_eq!(atmos, chem_type)
+        atmosphere.chemistry_eq!(atmos, chem_type, true)
     end 
 
     # Solver variables 
