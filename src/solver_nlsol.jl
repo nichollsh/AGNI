@@ -142,11 +142,6 @@ module solver_nlsol
             # Set temperatures 
             _set_tmps!(x)
 
-            # # Chemistry
-            # if chem_type in [1,2,3]
-            #     atmosphere.chemistry_eq!(atmos, chem_type)
-            # end 
-
             # Calculate layer properties
             if atmos.thermo_funct
                 atmosphere.calc_layer_props!(atmos)
@@ -326,7 +321,6 @@ module solver_nlsol
         elseif (sol_type == 4)
             @info @sprintf("    tgt_olr  = %.2f W m-2", atmos.target_olr)
         end 
-        
 
         # Allocate initial guess for the x array, as well as a,b arrays
         # Array storage structure:
@@ -451,7 +445,7 @@ module solver_nlsol
 
             # Run chemistry scheme 
             if chem_type in [1,2,3]
-                fc_retcode = atmosphere.chemistry_eq!(atmos, chem_type)
+                fc_retcode = atmosphere.chemistry_eq!(atmos, chem_type, false)
                 if fc_retcode == 0
                     stepflags *= "Cs"
                 else 
@@ -546,9 +540,9 @@ module solver_nlsol
                 # Reset
                 stepflags *= "Ls"
                 ls_best_cost = c_old*ls_compassion  # allow a cost increase 
-                ls_best_scale = 0.1     # ^ this will require a small step scale
+                ls_best_scale = 0.2     # ^ this will require a small step scale
 
-                for ls_scale in [0.4, 0.99] # linesearch scale is set based on the best cost reduction
+                for ls_scale in [0.7, 1.0] # linesearch scale is set based on the best cost reduction
                     # try this scale factor 
                     x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
                     _fev!(x_cur, r_tst)

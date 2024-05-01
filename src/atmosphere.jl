@@ -1461,11 +1461,12 @@ module atmosphere
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `chem_type::Int`                  chemistry type (see wiki)
+    - `write_cfg::Bool`                 write config and elements
 
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int)::Int
+    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool)::Int
 
         # Return code 
         state::Int = 0
@@ -1476,48 +1477,82 @@ module atmosphere
             return 1
         end 
 
-        # Write config for fc (it's quite particular about the format)
-        confpath::String = joinpath(atmos.fastchem_work,"config.input")
-        open(confpath,"w") do f
-            write(f,"#Atmospheric profile input file \n")
-            write(f,joinpath(atmos.fastchem_work,"pt.dat")*" \n\n") 
+        # Paths
+        execpath::String = joinpath(atmos.fastchem_path,"fastchem")             # Executable file 
+        confpath::String = joinpath(atmos.fastchem_work,"config.input")         # Configuration by AGNI
+        chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat")        # Chemistry by FastChem
 
-            type_char = ["g","ce","cr"]
-            write(f,"#Chemistry calculation type (gas phase only = g, equilibrium condensation = ce, rainout condensation = cr) \n")
-            write(f,"$(type_char[chem_type]) \n\n")
-            
-            write(f,"#Chemistry output file \n")
-            write(f,joinpath(atmos.fastchem_work,"chemistry.dat")*" "*joinpath(atmos.fastchem_work,"condensates.dat")*" \n\n")
+        # Write config, elements 
+        if write_cfg
+            # Write config (fastchem is quite particular about the format)
+            open(confpath,"w") do f
+                write(f,"#Atmospheric profile input file \n")
+                write(f,joinpath(atmos.fastchem_work,"pt.dat")*" \n\n") 
 
-            write(f,"#Monitor output file \n")
-            write(f,joinpath(atmos.fastchem_work,"monitor.dat")*" \n\n")
+                type_char = ["g","ce","cr"]
+                write(f,"#Chemistry calculation type (gas phase only = g, equilibrium condensation = ce, rainout condensation = cr) \n")
+                write(f,"$(type_char[chem_type]) \n\n")
+                
+                write(f,"#Chemistry output file \n")
+                write(f,joinpath(atmos.fastchem_work,"chemistry.dat")*" "*joinpath(atmos.fastchem_work,"condensates.dat")*" \n\n")
 
-            write(f,"#FastChem console verbose level (1 - 4); 1 = almost silent, 4 = detailed console output \n")
-            write(f,"1 \n\n")
+                write(f,"#Monitor output file \n")
+                write(f,joinpath(atmos.fastchem_work,"monitor.dat")*" \n\n")
 
-            write(f,"#Output mixing ratios (MR) or particle number densities (ND, default) \n")
-            write(f,"ND \n\n")
+                write(f,"#FastChem console verbose level (1 - 4); 1 = almost silent, 4 = detailed console output \n")
+                write(f,"1 \n\n")
 
-            write(f,"#Element abundance file  \n")
-            write(f,joinpath(atmos.fastchem_work,"elements.dat")*" \n\n")
+                write(f,"#Output mixing ratios (MR) or particle number densities (ND, default) \n")
+                write(f,"ND \n\n")
 
-            write(f,"#Species data files    \n")
-            logK = joinpath(atmos.fastchem_path,"input/","logK/")
-            write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
+                write(f,"#Element abundance file  \n")
+                write(f,joinpath(atmos.fastchem_work,"elements.dat")*" \n\n")
 
-            write(f,"#Accuracy of chemistry iteration \n")
-            write(f,"1.0e-5 \n\n")
-            
-            write(f,"#Accuracy of element conservation \n")
-            write(f,"1.0e-4 \n\n")
+                write(f,"#Species data files    \n")
+                logK = joinpath(atmos.fastchem_path,"input/","logK/")
+                write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
 
-            write(f,"#Max number of chemistry iterations  \n")
-            write(f,"80000 \n\n")
+                write(f,"#Accuracy of chemistry iteration \n")
+                write(f,"1.0e-5 \n\n")
+                
+                write(f,"#Accuracy of element conservation \n")
+                write(f,"1.0e-4 \n\n")
 
-            write(f,"#Max number internal solver iterations  \n")
-            write(f,"20000 \n\n")
-        end 
+                write(f,"#Max number of chemistry iterations  \n")
+                write(f,"80000 \n\n")
 
+                write(f,"#Max number internal solver iterations  \n")
+                write(f,"30000 \n\n")
+            end
+
+            # Calculate elemental abundances 
+            # number densities normalised relative to hydrogen 
+            # for each element X, value = log10(N_X/N_H) + 12 
+            # N = X(P/(K*T) , where X is the VMR and K is boltz-const
+            N_t = zeros(Float64, length(phys.elements_list))                # total
+            N_g = zeros(Float64, length(phys.elements_list))                # this gas
+            for gas in atmos.gases
+                d = phys.count_atoms(gas)
+                fill!(N_g, 0.0)
+                for (i,e) in enumerate(phys.elements_list)
+                    if e in keys(d)
+                        N_g[i] += d[e]
+                    end 
+                end 
+                N_g *= get_x(atmos, gas, atmos.nlev_c) * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
+                N_t += N_g  # number/m^3
+            end 
+
+            # Write elemental abundances 
+            open(joinpath(atmos.fastchem_work,"elements.dat"),"w") do f
+                write(f,"# Elemental abundances derived from AGNI volatiles \n")
+                for (i,e) in enumerate(phys.elements_list)
+                    if N_t[i] > 1.0e-30
+                        write(f, @sprintf("%s    %.3f \n",e,log10(N_t[i]/N_t[1]) + 12.0))
+                    end
+                end 
+            end 
+        end
 
         # Write PT profile 
         open(joinpath(atmos.fastchem_work,"pt.dat"),"w") do f
@@ -1528,37 +1563,7 @@ module atmosphere
             end 
         end 
 
-        # Calculate elemental abundances 
-        # number densities normalised relative to hydrogen 
-        # for each element X, value = log10(N_X/N_H) + 12 
-        # N = X(P/(K*T) , where X is the VMR and K is boltz-const
-        N_t = zeros(Float64, length(phys.elements_list))                # total
-        N_g = zeros(Float64, length(phys.elements_list))                # this gas
-        for gas in atmos.gases
-            d = phys.count_atoms(gas)
-            fill!(N_g, 0.0)
-            for (i,e) in enumerate(phys.elements_list)
-                if e in keys(d)
-                    N_g[i] += d[e]
-                end 
-            end 
-            N_g *= get_x(atmos, gas, atmos.nlev_c) * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
-            N_t += N_g  # number/m^3
-        end 
-        
-
-        # Write elemental abundances 
-        open(joinpath(atmos.fastchem_work,"elements.dat"),"w") do f
-            write(f,"# Elemental abundances derived from AGNI volatiles \n")
-            for (i,e) in enumerate(phys.elements_list)
-                if N_t[i] > 1.0e-30
-                    write(f, @sprintf("%s    %.3f \n",e,log10(N_t[i]/N_t[1]) + 12.0))
-                end
-            end 
-        end 
-
         # Run fastchem 
-        execpath::String = joinpath(atmos.fastchem_path,"fastchem")
         run(pipeline(`$execpath $confpath`, stdout=devnull))
 
         # Check monitor output 
@@ -1588,7 +1593,6 @@ module atmosphere
         end 
 
         # Get gas chemistry output 
-        chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat")
         if !isfile(chempath)
             @error "Could not find fastchem output"
             return 1 
