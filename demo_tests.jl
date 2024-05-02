@@ -69,7 +69,7 @@ end
 @info " "
 @info "Testing composition"
 
-tmp_surf           = 200.0    # Surface temperature [kelvin]
+tmp_surf        = 200.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00  # Instellation flux [W m-2]
 p_surf          = 50.0     # bar
 theta           = 65.0
