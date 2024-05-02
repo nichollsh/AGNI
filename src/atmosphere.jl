@@ -1,6 +1,5 @@
 # Contains the atmosphere module, which contains all of the core code 
-# for setting-up the atmosphere and running SOCRATES. A lot of this code was 
-# adapted from the SOCRATES-Julia examples.
+# for setting-up the atmosphere and handling files.
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
@@ -112,10 +111,14 @@ module atmosphere
         skin_k::Float64         # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
         tmp_magma::Float64      # Mantle temperature [K]
 
-        # Mole fractions (= VMR)
-        gases::Array{String,1}              # List of gas names 
-        input_x::Dict                       # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
-        layer_x::Array{Float64,2}           # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
+        # Gases (incl those not in spectralfile)
+        gas_all_num::Int                    # Number of gases
+        gas_all_names::Array{String,1}      # List of gas names
+        gas_all_dict::Dict{String, Array}   # Layer mole fractions in dict format, (key,value) = (gas_name,array)
+
+        # Gases (only those in spectralfile)
+        gas_soc_num::Int 
+        gas_soc_names::Array{String,1}
 
         # Layers' average properties
         thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
@@ -153,7 +156,7 @@ module atmosphere
         band_n_sw::Array{Float64,2}     # net upward, sw
 
         # Contribution function (to outgoing flux) per-band
-        contfunc_norm::Array{Float64,2}    # LW+SW, and normalised by maximum value at each wavelength
+        contfunc_norm::Array{Float64,2}    # LW only, and normalised by maximum value
 
         # Sensible heating
         C_d::Float64            # Turbulent exchange coefficient [dimensionless]
@@ -191,6 +194,11 @@ module atmosphere
         # Heating rate felt at each level [K/day]
         heating_rate::Array{Float64,1} 
 
+        # FastChem stuff 
+        fastchem_flag::Bool             # Fastchem enabled?
+        fastchem_path::String           # Path to fastchem installation folder (incl. executable)
+        fastchem_work::String           # Path to fastchem dir inside AGNI output folder
+        
         Atmos_t() = new()
     end
 
@@ -252,6 +260,7 @@ module atmosphere
     - `flag_aerosol::Bool=false`        include aersols?
     - `flag_cloud::Bool=false`          include clouds?
     - `thermo_functions::Bool=true`     use temperature-dependent thermodynamic properties
+    - `fastchem_path::String=""`        path to FastChem folder (empty string => disabled)
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
@@ -278,7 +287,8 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
-                    thermo_functions::Bool =    true
+                    thermo_functions::Bool =    true,
+                    fastchem_path::String =     ""
                     )
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -398,25 +408,31 @@ module atmosphere
             mf_source = 1
         end
         
-        # The values will be stored in a dict of arrays regardless, because 
-        # we do not yet know which order the gases should be indexed in.
-
-        atmos.input_x = Dict()  # dict of arrays 
+        # The values will be stored in a dict of arrays
+        atmos.gas_all_names = Array{String}(undef, 0)       # list of names 
+        atmos.gas_all_dict  = Dict{String, Array}()         # dict of arrays 
+        atmos.gas_all_num   = 0                             # number of gases
 
         # Dict input case
         if mf_source == 0
             @info "Composition set by dict"
             for (key, value) in mf_dict  # store as arrays
-                gas_valid = strip(key, ' ')
-                # If gas supported by socrates, store it 
-                if gas_valid in SOCRATES.input_head_pcf.header_gas
-                    atmos.input_x[gas_valid] = ones(Float64, atmos.nlev_c) * value
-                    @info("    added gas $gas_valid")
-                else
-                    @warn "    gas $gas_valid is not supported" 
+                gas_valid = strip(key, [' ','\t','\n'])
+                
+                # Check if repeated 
+                if gas_valid in atmos.gas_all_names
+                    @warn "    skipping duplicate gas $gas_valid"
+
+                # Not repeated...
+                else 
+                    # Store VMR 
+                    atmos.gas_all_dict[gas_valid] = ones(Float64, atmos.nlev_c)*value 
+                    push!(atmos.gas_all_names, gas_valid)
+                    atmos.gas_all_num += 1
+                    @info "    added gas $gas_valid"
                 end 
             end
-        end
+        end # end read VMR from dict
 
         # File input case 
         if mf_source == 1
@@ -427,20 +443,26 @@ module atmosphere
             @info "Composition set by file"
 
             # get header
-            mf_head = readlines(abspath(mf_path))[1]
+            mf_head = readline(abspath(mf_path))
             mf_head = mf_head[2:end]  # remove comment symbol at start
             mf_head = replace(mf_head, " " => "")  # remove whitespace
-            heads = split(mf_head, ",") # split by columm
+            heads   = split(mf_head, ",")[4:end] # split by column and drop first three
 
             # create arrays 
             for h in heads
-                gas_valid = strip(h, ' ')
-                if gas_valid in SOCRATES.input_head_pcf.header_gas
-                    atmos.input_x[gas_valid] = zeros(Float64, atmos.nlev_c)
-                    @info("    added gas $gas_valid")
-                else
-                    @warn "    gas $gas_valid is not supported" 
-                end
+                gas_valid = strip(h, [' ','\t','\n'])
+                # Check if repeated 
+                if gas_valid in atmos.gas_all_names
+                    @warn "    skipping duplicate gas $gas_valid"
+
+                # Not repeated...
+                else 
+                    # Store zero VMR for now
+                    atmos.gas_all_dict[gas_valid] = zeros(Float64, atmos.nlev_c)
+                    push!(atmos.gas_all_names, gas_valid)
+                    atmos.gas_all_num += 1
+                    @info "    added gas $gas_valid"
+                end 
             end 
 
             # get body
@@ -448,51 +470,83 @@ module atmosphere
             mf_body = transpose(mf_body)
 
             # set composition by interpolating with pressure array 
+            gidx::Int=0
             for li in 4:lastindex(heads)
+                # Gas index 
+                gidx += 1
 
-                gas = heads[li]
-
-                if !(gas in keys(atmos.input_x)) # skip tem, pre, hgt
-                    continue
-                end
-
+                # Arrays from file 
                 arr_p = mf_body[1,:]
                 arr_x = mf_body[li,:]
 
-                # Extend loaded profile to lower pressures (prevent domain error)
+                # Extend loaded profile to lower pressures (prevents domain error)
                 if arr_p[1] > atmos.p_toa
                     pushfirst!(arr_p,   atmos.p_toa/1.1)
                     pushfirst!(arr_x,   arr_x[1] )
                 end
 
-                # Extend loaded profile to higher pressures 
+                # Extend loaded profile to higher pressures (prevents domain error)
                 if arr_p[end] < atmos.p_boa
                     push!(arr_p,   atmos.p_boa*1.1)
                     push!(arr_x,   arr_x[end])
                 end
                 
-                # Set up interpolator
+                # Set up interpolator using file data 
                 itp = Interpolator(arr_p, arr_x)
                 
-                # Set values 
+                # Set values in atmos struct 
                 for i in 1:atmos.nlev_c
-                    atmos.input_x[gas][i] = itp(atmos.p[i])
+                    atmos.gas_all_dict[atmos.gas_all_names[gidx]][i] = itp(atmos.p[i])
                 end 
             end 
 
-        end
+        end # end read VMR from file 
 
         # Check that we actually stored some values
-        if length(keys(atmos.input_x)) == 0
+        if atmos.gas_all_num == 0
             error("No mole fractions were stored")
         end
+
+        # Normalise VMRs at each level
+        tot_vmr::Float64 = 0.0
+        for i in 1:atmos.nlev_c
+            # get total
+            tot_vmr = 0.0
+            for g in atmos.gas_all_names
+                tot_vmr += atmos.gas_all_dict[g][i]
+            end 
+            # normalise to 1
+            for g in atmos.gas_all_names
+                atmos.gas_all_dict[g][i] /= tot_vmr
+            end 
+        end
+
+        # Fastchem 
+        atmos.fastchem_flag = false 
+        if !isempty(fastchem_path)
+            # check folder
+            atmos.fastchem_path = abspath(fastchem_path)
+            if !isdir(fastchem_path)
+                @error "Could not find fastchem folder at '$(fastchem_path)'"
+            end 
+            atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
+            
+            # check executable 
+            atmos.fastchem_flag = isfile(joinpath(fastchem_path,"fastchem")) 
+            if !atmos.fastchem_flag 
+                @error "Could not find fastchem executable inside '$(atmos.fastchem_path)' "
+            else 
+                @info "Found FastChem executable"
+            end 
+        end 
 
         # Record that the parameters are set
         atmos.is_param = true
         atmos.is_solved = false 
         atmos.is_converged = false
+
         return nothing
-    end
+    end # end function setup 
 
     """
     **Get the mole fraction of a gas within the atmosphere.**
@@ -507,19 +561,16 @@ module atmosphere
     """
     function get_x(atmos::atmosphere.Atmos_t, gas::String, lvl::Int)::Float64
 
-        gas_valid = strip(gas, ' ')
-
-        x = 0.0
-        if gas_valid in keys(atmos.input_x)
+        if gas in atmos.gas_all_names
             if (lvl >= 1) && (lvl <= atmos.nlev_c)
-                i_gas = findfirst(==(gas), atmos.gases)
-                x = atmos.layer_x[lvl,i_gas]
+                return atmos.gas_all_dict[gas][lvl]
             else
                 error("Invalid level provided ($lvl)") 
             end 
+        else
+            @error "Invalid gas $gas queried in get_x()" 
+            return 0.0
         end 
-
-        return x
     end
 
     """
@@ -529,15 +580,23 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+    - `ok::Bool`                function result is ok
     """
-    function calc_layer_props!(atmos::atmosphere.Atmos_t)
+    function calc_layer_props!(atmos::atmosphere.Atmos_t)::Bool
         if !atmos.is_param
-            error(" atmosphere parameters have not been set")
+            error("atmosphere parameters have not been set")
         end
+
+        ok::Bool = true
 
         # Set pressure arrays in SOCRATES 
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+
+        # Temp value
+        vmr::Float64 = 0.0
 
         # mmw, cp, rho, kc
         fill!(atmos.layer_mmw    ,0.0)
@@ -545,21 +604,23 @@ module atmosphere
         fill!(atmos.layer_cp     ,0.0)
         fill!(atmos.layer_kc     ,0.0)
         fill!(atmos.layer_mass   ,0.0)
-        for i in 1:atmos.atm.n_layer
+        for i in 1:atmos.nlev_c
 
             # for each gas
-            for (i_gas, gas) in enumerate(atmos.gases)
+            for gas in atmos.gas_all_names
+
+                vmr = atmos.gas_all_dict[gas][i]
 
                 # set mmw
-                atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
+                atmos.layer_mmw[i] += vmr * phys.lookup_safe("mmw",gas)
 
                 # set cp, kc
                 if atmos.thermo_funct 
-                    atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
-                    atmos.layer_kc[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i])
+                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
+                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i])
                 else 
-                    atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas)
-                    atmos.layer_kc[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("kc",gas)
+                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas)
+                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas)
                 end
                 
             end
@@ -598,13 +659,14 @@ module atmosphere
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
 
             if (dzl < 1e-20) || (dzc < 1e-20)
-                error("Height integration resulted in dz <= 0 at level $i")
+                @error "Height integration resulted in dz <= 0 at level $i"
+                ok = false 
             end
             if (dzl > 1e8) || (dzc > 1e8)
-                error("Height integration blew up at level $i")
+                @error "Height integration blew up at level $i"
+                ok = false 
             end
         end 
-
 
         # Mass
         for i in 1:atmos.atm.n_layer
@@ -612,7 +674,7 @@ module atmosphere
             atmos.atm.mass[1, i] = atmos.layer_mass[i]
         end
 
-        return nothing
+        return ok
     end 
 
     """
@@ -907,69 +969,24 @@ module atmosphere
             atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
         end
 
-        # Set composition
-        atmos.gases = Array{String}(undef, atmos.spectrum.Gas.n_absorb)
-        atmos.layer_x = zeros(Float64, (atmos.nlev_c,length(atmos.gases)))
+        # Check supported gases
+        atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases 
+        atmos.gas_soc_names     = Array{String}(undef, atmos.gas_soc_num)   # list of names   
+        for i_gas in 1:atmos.gas_soc_num   # for each supported gas
+            atmos.gas_soc_names[i_gas] = SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
+        end 
 
-        #    check if all requested gases are in the spectral file 
-        is_in_spectral_file::Bool = false
-        for v_gas in keys(atmos.input_x)
-            is_in_spectral_file = false
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb
-                ti = atmos.spectrum.Gas.type_absorb[i_gas]
-                s_gas = SOCRATES.input_head_pcf.header_gas[ti]
+        # VMRs are provided to SOCRATES when radtrans is called
+        # For now, they are just stored inside the atmos struct
 
-                # is included?
-                if s_gas == v_gas 
-                    is_in_spectral_file = true 
-                end 
+        # Warn for unspported gases 
+        for g in atmos.gas_all_names 
+            if !(g in atmos.gas_soc_names) 
+                @warn "Gas $g is not present in the spectral file"
             end 
-            if !is_in_spectral_file 
-                @warn @sprintf("Gas %s is not present in the spectral file", v_gas)
-            end 
-        end
+        end 
 
-        #    loop over gases in the spectral file 
-        for i_gas in 1:atmos.spectrum.Gas.n_absorb
-            ti = atmos.spectrum.Gas.type_absorb[i_gas]
-            gas = SOCRATES.input_head_pcf.header_gas[ti]
-
-            atmos.gases[i_gas] = gas
-
-            #    is this gas included in the input VMRs?
-            if gas in keys(atmos.input_x)
-                atmos.layer_x[:,i_gas] .= atmos.input_x[gas]
-            else
-                atmos.layer_x[:,i_gas] .= 0.0
-            end
-
-            # Values are provided to SOCRATES when radtrans is called
-        end
-
-        # Renormalise mole fractions
-        for i in 1:atmos.nlev_c
-            tot = 0.0
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb 
-                tot += atmos.layer_x[i,i_gas]
-            end 
-
-            if tot == 0
-                error("Layer $i has all-zero mole fractions - check your spectral file")
-            end
-
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb
-                ti = atmos.spectrum.Gas.type_absorb[i_gas]
-                gas = SOCRATES.input_head_pcf.header_gas[ti]
-
-                atmos.layer_x[i,i_gas] /= tot
-
-                if gas in keys(atmos.input_x)
-                    atmos.input_x[gas][i] = atmos.layer_x[i,i_gas]
-                end
-
-            end 
-        end
-
+        # Calc layer properties
         calc_layer_props!(atmos)
 
         ################################
@@ -1074,550 +1091,192 @@ module atmosphere
         return nothing
     end  # end of allocate
 
-    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
-        if !atmos.is_alloc
-            error("atmosphere arrays have not been allocated")
-        end
-        if !atmos.is_param
-            error("atmosphere parameters have not been set")
-        end
-
-        atmos.num_rt_eval += 1
-
-        # Longwave or shortwave calculation?
-        if lw
-            atmos.control.isolir = SOCRATES.rad_pcf.ip_infra_red
-        else
-            atmos.control.isolir = SOCRATES.rad_pcf.ip_solar
-        end
-
-        # Check files are acceptable and set instellation if doing SW flux
-        if lw
-            if !Bool(atmos.spectrum.Basic.l_present[6])
-                error("The spectral file contains no data for the Planckian function.\nCheck that the file contains a stellar spectrum.")
-            end
-
-            if Bool(atmos.spectrum.Basic.l_present[2])
-                atmos.control.l_solar_tail_flux = true
-            end
-
-        else
-            if !Bool(atmos.spectrum.Basic.l_present[2])
-                error("The spectral file contains no solar spectral data.")
-            end
-             
-            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)   #   Convert the zenith angles to secants.
-            atmos.bound.solar_irrad[1] = atmos.toa_heating / cosd(atmos.zenith_degrees)
-        end
-
-        atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
-
-        # Set the two-stream approximation to be used (-t f)
-        if lw
-            atmos.control.i_2stream = SOCRATES.rad_pcf.ip_elsasser
-            # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
-        else
-            atmos.control.i_2stream = SOCRATES.rad_pcf.ip_pifm80
-            # Practical improved flux method (original form of 1980)
-        end
-
-        #####################################
-        # Angular integration
-        # see src/aux/angular_control_cdf.f
-        #####################################
-
-        # Cl_run_cdf +R flag
-        atmos.control.l_rescale = false
-        if atmos.control.l_rescale
-            atmos.control.l_henyey_greenstein_pf = true
-        end
-
-        # The internal SOCRATES solver used for the two-stream calculations (-v flag)
-        if atmos.control.l_cloud
-            # 16 is recommended for cloudy-sky (ip_solver_mix_direct_hogan)
-            # 17 is recommended for cloud with separate stratiform and convective regions
-            atmos.control.i_solver = SOCRATES.rad_pcf.ip_solver_mix_direct_hogan 
-        else 
-            # 13 is recommended for clear-sky (ip_solver_homogen_direct)
-            atmos.control.i_solver = SOCRATES.rad_pcf.ip_solver_homogen_direct
-        end 
-        
-
-        #      Arrays of fluxes must be of the full size.
-        atmos.dimen.nd_2sg_profile =        atmos.dimen.nd_profile
-        atmos.dimen.nd_flux_profile =       atmos.dimen.nd_profile
-        atmos.dimen.nd_radiance_profile =   1
-        atmos.dimen.nd_j_profile =          1
-        atmos.dimen.nd_viewing_level =      1
-        atmos.dimen.nd_sph_coeff =          1
-
-        # Reset dimen.nd_max_order to reduce memory requirements
-        atmos.dimen.nd_max_order = 1
-
-        #####################################
-        # surface properties
-        # see src/aux/assign_surface_char_cdf.f
-        # IP_surface_char  = 51, file suffix 'surf'
-        #####################################
-
-        if atmos.control.i_angular_integration == SOCRATES.rad_pcf.ip_two_stream
-            if !lw
-                atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_dir, :] .= atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :]
-            end
-        end
-
-        ###################################################
-        # Cloud information
-        ###################################################
-
-        atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]   
-        atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]  
-        atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]  
-
-        ###################################################
-        # Treatment of scattering
-        ###################################################
-
-        atmos.control.i_scatter_method = SOCRATES.rad_pcf.ip_scatter_full
-        for i in atmos.control.first_band:atmos.control.last_band
-            atmos.control.i_scatter_method_band[i] = atmos.control.i_scatter_method
-        end
-
-        ####################################################
-        # Temperature
-        ###################################################
-
-        atmos.atm.p[1, :] .= atmos.p[:]
-        atmos.atm.t[1, :] .= atmos.tmp[:]
-        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-        atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
-
-        if lw
-            atmos.bound.t_ground[1] = atmos.tmp_surf
-        end
-
-        if lw
-            atmos.control.l_ir_source_quad = true
-        end
-
-        ######################################################
-        # Run radiative transfer model
-        ######################################################   
-        
-        atmos.control.l_contrib_func_band = calc_cf
-
-        for i_gas in 1:length(atmos.gases)
-            for i in 1:atmos.nlev_c 
-                # convert mole fraction to mass mixing ratio
-                atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw", atmos.gases[i_gas]) / atmos.layer_mmw[i]
-            end
-        end 
-
-        SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
-                                atmos.atm, atmos.cld, atmos.aer, 
-                                atmos.bound, atmos.radout)
-
-        # Store new fluxes in atmos struct
-        idx::Int = 1
-        if lw 
-            # LW case
-            fill!(atmos.flux_u_lw, 0.0)
-            fill!(atmos.flux_d_lw, 0.0)
-            fill!(atmos.flux_n_lw, 0.0)
-            fill!(atmos.band_u_lw, 0.0)
-            fill!(atmos.band_d_lw, 0.0)
-            fill!(atmos.band_n_lw, 0.0)
-            for lv in 1:atmos.nlev_l      # sum over levels
-                for ba in 1:atmos.nbands  # sum over bands
-                    idx = lv+(ba-1)*atmos.nlev_l
-
-                    atmos.band_d_lw[lv,ba] = atmos.radout.flux_down[idx]
-                    atmos.band_u_lw[lv,ba] = atmos.radout.flux_up[idx]
-                    atmos.band_n_lw[lv,ba] = atmos.band_u_lw[lv,ba] - atmos.band_d_lw[lv,ba]
-
-                    atmos.flux_d_lw[lv] += max(0.0, atmos.radout.flux_down[idx])
-                    atmos.flux_u_lw[lv] += max(0.0, atmos.radout.flux_up[idx])
-                end 
-                atmos.flux_n_lw[lv] = atmos.flux_u_lw[lv] - atmos.flux_d_lw[lv] 
-            end
-
-            # Normalised contribution function (only LW stream contributes)
-            fill!(atmos.contfunc_norm,0.0)
-            if calc_cf
-                cf_max::Float64 = maximum(atmos.radout.contrib_funcf_band[1,:,:])
-                for ba in 1:atmos.dimen.nd_channel
-                    for lv in 1:atmos.nlev_c               
-                        atmos.contfunc_norm[lv,ba] = atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
-                    end 
-                end
-            end
-            atmos.is_out_lw = true 
-        else
-            # SW case
-            fill!(atmos.flux_u_sw, 0.0)
-            fill!(atmos.flux_d_sw, 0.0)
-            fill!(atmos.flux_n_sw, 0.0)
-            fill!(atmos.band_u_sw, 0.0)
-            fill!(atmos.band_d_sw, 0.0)
-            fill!(atmos.band_n_sw, 0.0)
-            for lv in 1:atmos.nlev_l                # sum over levels
-                for ba in 1:atmos.dimen.nd_channel  # sum over bands
-                    idx = lv+(ba-1)*atmos.nlev_l
-
-                    atmos.band_d_sw[lv,ba] = atmos.radout.flux_down[idx]
-                    atmos.band_u_sw[lv,ba] = atmos.radout.flux_up[idx]
-                    atmos.band_n_sw[lv,ba] = atmos.band_u_sw[lv,ba] - atmos.band_d_sw[lv,ba]
-
-                    atmos.flux_d_sw[lv] += max(0.0, atmos.radout.flux_down[idx])
-                    atmos.flux_u_sw[lv] += max(0.0, atmos.radout.flux_up[idx])
-                end 
-                atmos.flux_n_sw[lv] = atmos.flux_u_sw[lv] - atmos.flux_d_sw[lv]
-            end
-            atmos.is_out_sw = true
-        end
-
-        # Store net fluxes when we have both SW and LW components
-        if (atmos.is_out_lw && atmos.is_out_sw)
-            atmos.flux_d = atmos.flux_d_lw .+ atmos.flux_d_sw
-            atmos.flux_u = atmos.flux_u_lw .+ atmos.flux_u_sw
-            atmos.flux_n = atmos.flux_n_lw .+ atmos.flux_n_sw
-        end
-
-        return nothing
-    end # end of radtrans
-
-    # Calculate sensible heat flux (turbulence at surface boundary)
-    function sensible!(atmos::atmosphere.Atmos_t)
-        # TKE scheme for this 1D case
-        # transports energy from the surface to the bottom node
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmp_surf-atmos.tmp[end])
-        return nothing
-    end
-
-    # Calculate conductive fluxes 
-    function conduct!(atmos::atmosphere.Atmos_t)
-        # top layer 
-        atmos.flux_cdct[1] = 0.0
-
-        # bulk layers
-        for i in 2:atmos.nlev_l-1  
-            atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) * (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
-        end 
-        
-        # bottom layer 
-        atmos.flux_cdct[end] = atmos.layer_kc[end] * (atmos.tmp[end]-atmos.tmp_surf)/atmos.z[end]
-        return nothing
-    end 
-
-
-    """
-    **Calculate dry convective fluxes using mixing length theory.**
-
-    Uses the mixing length formulation outlined by Joyce & Tayar (2023), which 
-    was also implemented in Lee et al. (2024), and partially outlined in an 
-    earlier paper by Robinson & Marley (2014).
-
-    https://arxiv.org/abs/2303.09596
-    https://doi.org/10.1093/mnras/stae537 
-    https://ui.adsabs.harvard.edu/abs/1962JGR....67.3095B/abstract
     
-    Convective energy transport fluxes are calculated at every level edge, just 
-    like the radiative fluxes. This is not compatible with moist convection. By 
-    using MLT to parameterise convection, we can also calculate Kzz directly.
-
-    The mixing length is set to asymptotically approach H (for z>>H) or z (for 
-    z<H) as per Blackadar (1962). Or alternatively it can be set equal to H.
-
-    Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `pmin::Float64=0.0`               pressure below which convection is disabled.
-    - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
-    """
-    function mlt_dry!(atmos::atmosphere.Atmos_t; pmin::Float64=0.0, mltype::Int=1)
-
-        # Reset arrays
-        fill!(atmos.flux_cdry, 0.0)
-        fill!(atmos.Kzz,    0.0)
-
-        # Work variables 
-        H::Float64 = 0.0; l::Float64 = 0.0; w::Float64 = 0.0
-        m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
-        grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
-        grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0; grad_df::Float64 = 0.0
-
-        # Loop from bottom upwards (over cell-edges)
-        for i in range(start=atmos.nlev_l-1, step=-1, stop=3) 
-
-            # Optionally skip low pressures 
-            if atmos.pl[i] < pmin
-                continue
-            end
-
-            # Skip condensing regions
-            if (i <= atmos.nlev_c) && (atmos.mask_p[i] == atmos.mask_decay)
-                continue
-            end 
-
-            m1 = atmos.layer_mass[i-1]
-            m2 = atmos.layer_mass[i]
-            mt = m1+m2
-
-            grav = (atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1)/mt
-            mu   = (atmos.layer_mmw[i]  * m2 + atmos.layer_mmw[i-1]  * m1)/mt
-            c_p  = (atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1)/mt
-
-            grad_ad = (phys.R_gas / mu) / c_p
-            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) ) / ( log(atmos.p[i-1]/atmos.p[i]) )
-
-            # Check instability
-            if (grad_pr > grad_ad)
-
-                # Check if this layer is condensing (this shouldn't ever be
-                # true, because the condensation curve dT/dp is too shallow)
-                if atmos.mask_p[i] > 0
-                    @warn "Condensing region is unstable to dry convection"
-                end 
-
-                rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
-
-                if i <= atmos.nlev_c-1
-                    atmos.mask_c[i+1] = atmos.mask_decay
-                end
-                atmos.mask_c[i]   = atmos.mask_decay
-                atmos.mask_c[i-1] = atmos.mask_decay
-                
-                # Pressure scale height
-                H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
-
-                # Mixing length
-                if mltype == 0
-                    # Fixed
-                    l = H
-                elseif mltype == 1
-                    # Asymptotic 
-                    l = phys.k_vk * atmos.zl[i] / (1 + phys.k_vk * atmos.zl[i]/H)
-                else 
-                    # Otherwise
-                    error("Invalid mixing length type selected")
-                end
-
-                # Characteristic velocity (from Brunt-Vasalla frequency of parcel oscillations)
-                w = l * sqrt(grav/H * (grad_pr-grad_ad))
-
-                # Dry convective flux
-                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
-
-                # Thermal eddy diffusion coefficient
-                atmos.Kzz[i] = w * l
-            
-            end
-        end
-
-        return nothing
-    end # end of mlt
 
 
     """
     **Calculate composition assuming chemical equilibrium at each level.**
 
-    Uses FastChem to calculate the gas composition at each level of the atmosphere.
+    Uses FastChem to calculate the gas composition at each level of the atmosphere. Volatiles are converted to bulk
+    elemental abundances, which are then provided to FastChem alongside the temperature/pressure profile. FastChem is
+    currently called as an executable, which is not optimal.
+
+    This function DOES NOT automatically recalculate layer properties (e.g. mmw, density, height).
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `chem_type::Int`                  chemistry type (see wiki)
+    - `write_cfg::Bool`                 write config and elements
+    - `tmp_floor::Float64=500.0`        temperature floor for T(p) provided to FastChem
+
+    Returns:
+    - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function solve_abundances_eq!(atmos::atmosphere.Atmos_t)
-        @error "Chemistry not yet implemented"
+    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=500.0)::Int
 
-    end 
+        # Return code 
+        state::Int = 0
 
-
-    """
-    **Analytical relaxation scheme for condensation fluxes in saturated regions.**
-
-    Calculates flux release by vertical latent heat transport using an heuristic 
-    function of the temperature difference T-T_dew. 
-
-    Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `condensates::Array`              list of condensates (strings)
-    """
-    function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array=[])
-
-        # Check if empty
-        if length(condensates) == 0
-            return nothing 
+        # Check fastchem enabled 
+        if !atmos.fastchem_flag
+            @warn "Fastchem is not enabled but `chemistry_eq!` was called"
+            return 1
         end 
 
-        # Reset flux
-        fill!(atmos.flux_p, 0.0)
-        
-        # Work variables
-        a::Float64 = 2.0
-        pp::Float64 = 0.0
-        i_gas::Int = -1
-        i_sat::Int = -1 
-        Tsat_lvl::Float64 = 0.0
-        Tsat::Float64 = 0.0
-        dif::Array = zeros(Float64, atmos.nlev_c)
+        # Paths
+        execpath::String = joinpath(atmos.fastchem_path,"fastchem")             # Executable file 
+        confpath::String = joinpath(atmos.fastchem_work,"config.input")         # Configuration by AGNI
+        chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat")        # Chemistry by FastChem
 
-        # Get index of water 
-        i_h2o = findfirst(==("H2O"), atmos.gases)
+        # Write config, elements 
+        if write_cfg
+            # Write config (fastchem is quite particular about the format)
+            open(confpath,"w") do f
+                write(f,"#Atmospheric profile input file \n")
+                write(f,joinpath(atmos.fastchem_work,"pt.dat")*" \n\n") 
 
-        # Calculate flux (negative) divergence due to latent heat release
-        for i in 1:atmos.nlev_c
-            # Reset 
-            Tsat_lvl = -1.0
-            i_sat = -1
+                type_char = ["g","ce","cr"]
+                write(f,"#Chemistry calculation type (gas phase only = g, equilibrium condensation = ce, rainout condensation = cr) \n")
+                write(f,"$(type_char[chem_type]) \n\n")
+                
+                write(f,"#Chemistry output file \n")
+                write(f,joinpath(atmos.fastchem_work,"chemistry.dat")*" "*joinpath(atmos.fastchem_work,"condensates.dat")*" \n\n")
 
-            # Check which condensate is saturated (if any)
-            for c in condensates
-                # Get partial pressure 
-                i_gas = findfirst(==(c), atmos.gases)
-                pp = atmos.layer_x[i,i_gas] * atmos.p[i]
-                if pp < 1.0e-10 
-                    continue
-                end
+                write(f,"#Monitor output file \n")
+                write(f,joinpath(atmos.fastchem_work,"monitor.dat")*" \n\n")
 
-                # check saturation
-                Tsat = phys.calc_Tdew(c, pp)
-                if (atmos.tmp[i] < Tsat-1.0e-10) && (Tsat > Tsat_lvl)
-                    Tsat_lvl = Tsat 
-                    i_sat = i_gas 
+                write(f,"#FastChem console verbose level (1 - 4); 1 = almost silent, 4 = detailed console output \n")
+                write(f,"1 \n\n")
+
+                write(f,"#Output mixing ratios (MR) or particle number densities (ND, default) \n")
+                write(f,"ND \n\n")
+
+                write(f,"#Element abundance file  \n")
+                write(f,joinpath(atmos.fastchem_work,"elements.dat")*" \n\n")
+
+                write(f,"#Species data files    \n")
+                logK = joinpath(atmos.fastchem_path,"input/","logK/")
+                write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
+
+                write(f,"#Accuracy of chemistry iteration \n")
+                write(f,"1.0e-5 \n\n")
+                
+                write(f,"#Accuracy of element conservation \n")
+                write(f,"1.0e-4 \n\n")
+
+                write(f,"#Max number of chemistry iterations  \n")
+                write(f,"50000 \n\n")
+
+                write(f,"#Max number internal solver iterations  \n")
+                write(f,"10000 \n\n")
+            end
+
+            # Calculate elemental abundances 
+            # number densities normalised relative to hydrogen 
+            # for each element X, value = log10(N_X/N_H) + 12 
+            # N = X(P/(K*T) , where X is the VMR and K is boltz-const
+            N_t = zeros(Float64, length(phys.elements_list))                # total
+            N_g = zeros(Float64, length(phys.elements_list))                # this gas
+            for gas in atmos.gas_all_names
+                d = phys.count_atoms(gas)
+                fill!(N_g, 0.0)
+                for (i,e) in enumerate(phys.elements_list)
+                    if e in keys(d)
+                        N_g[i] += d[e]
+                    end 
                 end 
-            end # end condensate
+                N_g *= get_x(atmos, gas, atmos.nlev_c) * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
+                N_t += N_g  # number/m^3
+            end 
 
-            # Relax tmp to appropriate Tsat value 
-            # This is gas that maximises Tsat and for which tmp < Tsat is true 
-            if i_sat > -1
-                # relaxation function
-                # dif[i] = (a/atmos.tmp[i] - a/Tsat )
-                dif[i] = (1.0/a)*(Tsat_lvl-atmos.tmp[i])^2.0
-
-                # println("Condensing $c at $i")
-                atmos.mask_p[i] = atmos.mask_decay 
-                atmos.mask_c[i] = 0
-                if i_sat == i_h2o
-                    atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                    atmos.cloud_arr_l[i] = atmos.cloud_val_l
-                    atmos.cloud_arr_f[i] = atmos.cloud_val_f
-                else
-                    atmos.cloud_arr_r[i] = 0.0
-                    atmos.cloud_arr_l[i] = 0.0
-                    atmos.cloud_arr_f[i] = 0.0
+            # Write elemental abundances 
+            open(joinpath(atmos.fastchem_work,"elements.dat"),"w") do f
+                write(f,"# Elemental abundances derived from AGNI volatiles \n")
+                for (i,e) in enumerate(phys.elements_list)
+                    if N_t[i] > 1.0e-30
+                        write(f, @sprintf("%s    %.3f \n",e,log10(N_t[i]/N_t[1]) + 12.0))
+                    end
                 end 
-            end # end relaxation 
+            end 
+        end
 
-        end # end levels 
-
-        # Convert divergence to cell-edge fluxes
-        # Assuming zero condensation at surface
-        for i in range(start=atmos.nlev_l-1, stop=1, step=-1)
-            atmos.flux_p[i] = atmos.flux_p[i+1] - dif[i]
+        # Write PT profile 
+        open(joinpath(atmos.fastchem_work,"pt.dat"),"w") do f
+            write(f,"# AGNI temperature structure \n")
+            write(f,"# bar, kelvin \n")
+            for i in 1:atmos.nlev_c 
+                write(f,@sprintf("%.6e    %.6e \n", atmos.p[i], max(tmp_floor,atmos.tmp[i]) ))
+            end 
         end 
 
-        return nothing
-    end # end of condense_relax
+        # Run fastchem 
+        run(pipeline(`$execpath $confpath`, stdout=devnull))
 
-    """
-    **Calculate heating rates at cell-centres from the total flux.**
+        # Check monitor output 
+        monitorpath::String = joinpath(atmos.fastchem_work,"monitor.dat")
+        data = readdlm(monitorpath, '\t', String)
+        fail_elem::String = ""
+        fail_conv::String = ""
+        for i in 1:atmos.nlev_c 
+            if data[i+1,6][1] == 'f'
+                fail_elem *= @sprintf("%d ",i) 
+            end 
+            if data[i+1,5][1] == 'f'
+                fail_conv *= @sprintf("%d ",i) 
+            end 
+        end 
+        if !isempty(fail_elem)
+            @debug "Element conservation failed at levels  "*fail_elem
+            state = 2
+        end 
+        if !isempty(fail_conv)
+            @debug "FastChem solver failed at levels  "*fail_conv
+            if state == 2
+                state = 4 
+            else 
+                state = 3
+            end 
+        end 
 
-    Requires the total flux to have already been set (atmos.flux_tot). Heating 
-    rates are calculated in units of kelvin per day.
+        # Get gas chemistry output 
+        if !isfile(chempath)
+            @error "Could not find fastchem output"
+            return 1 
+        end 
+        (data,head) = readdlm(chempath, '\t', Float64, header=true)
+        data = transpose(data)  # convert to: gas, level
 
-    Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    """
-    function calc_hrates!(atmos::atmosphere.Atmos_t)
+        # Parse gas chemistry
+        g::String = ""
+        N_t = data[4,:] # at each level: sum of gas number densities 
+        for (i,h) in enumerate(head)  # for each column (gas)
+            g = rstrip(lstrip(h))
 
-        dF::Float64 = 0.0
-        dp::Float64 = 0.0
-
-        atmos.heating_rate[:] .= 0.0
-
-        for i in 1:atmos.nlev_c
-            dF = atmos.flux_tot[i+1] - atmos.flux_tot[i]
-            dp = atmos.pl[i+1] - atmos.pl[i]
-            atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i]) * dF/dp # K/s
-        end
-
-        atmos.heating_rate *= 86400.0 # K/day
-
-        return nothing
-    end
-
-     # Dry convective adjustment (returning the temperature tendency without modifying the atmos struct)
-     function adjust_dry(atmos::atmosphere.Atmos_t, nsteps::Int)
-
-        tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
-        tmp_tnd = zeros(Float64, atmos.nlev_c)  # temperature tendency
-
-        tmp_old[:] .+= atmos.tmp[:]
-
-        for i in 1:nsteps
-
-            # Downward pass
-            for i in 2:atmos.nlev_c
-
-                T1 = atmos.tmp[i-1]    # upper layer
-                p1 = atmos.p[i-1]
-
-                T2 = atmos.tmp[i]  # lower layer
-                p2 = atmos.p[i]
-                
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +  atmos.layer_cp[i] * atmos.layer_mmw[i])
-                pfact = (p1/p2)^(phys.R_gas / cp)
-                
-                # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
-                if T1 < T2*pfact
-                    Tbar = 0.5 * ( T1 + T2 )
-                    T2 = 2.0 * Tbar / (1.0 + pfact)
-                    T1 = T2 * pfact
-                    atmos.tmp[i-1] = T1
-                    atmos.tmp[i]   = T2
+            # check if gas is included in the model
+            if g in keys(phys.map_fastchem_name) 
+                g = phys.map_fastchem_name[g]  # convert name
+                if g in atmos.gas_all_names
+                    N_g = data[i,:]  # number densities for this gas 
+                    atmos.gas_all_dict[g][:] .= N_g[:] ./ N_t[:]    # mole fraction (VMR) for this gas 
                 end
-            end
+            end # not included => skip
+        end 
 
-            # Upward pass
-            for i in atmos.nlev_c:2
+        # Do not renormalise mixing ratios
 
-                T1 = atmos.tmp[i-1]
-                p1 = atmos.p[i-1]
-
-                T2 = atmos.tmp[i]
-                p2 = atmos.p[i]
-                
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + atmos.layer_cp[i] * atmos.layer_mmw[i])
-                pfact = (p1/p2)^(phys.R_gas / cp)
-
-                if T1 < T2*pfact
-                    Tbar = 0.5 * ( T1 + T2 )
-                    T2 = 2.0 * Tbar / ( 1.0 + pfact)
-                    T1 = T2 * pfact
-                    atmos.tmp[i-1] = T1
-                    atmos.tmp[i]   = T2 
-                end 
-            end
-        end
-        
-        # Calculate tendency
-        tmp_tnd[:] .= atmos.tmp[:] .- tmp_old[:]
-
-        # Restore temperature array
-        atmos.tmp[:] .= tmp_old[:]
-
-        return tmp_tnd
+        return state 
     end
+
 
     # Apply condensation according to vapour-liquid coexistance curve (return mask of condensing levels)
     function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
         changed = falses(atmos.nlev_c)
-        i_gas = findfirst(==(gas), atmos.gases)
 
         # Check if each level is condensing. If it is, place on phase curve
         for i in 1:atmos.nlev_c
 
-            x = atmos.layer_x[i,i_gas]
+            x = atmos.gas_all_dict[gas][i]
             if x < 1.0e-10 
                 continue
             end
@@ -1643,9 +1302,7 @@ module atmosphere
         fill!(atmos.cloud_arr_f, 0.0)
 
         # Get index of water 
-        if "H2O" in atmos.gases
-            i_gas::Int = findfirst(==("H2O"), atmos.gases)
-        else 
+        if !("H2O" in atmos.gas_all_names)
             return nothing
         end
 
@@ -1654,7 +1311,7 @@ module atmosphere
         Tsat::Float64   = 0.0  # dew point temperature of water vapour
         for i in 1:atmos.nlev_c
 
-            x = atmos.layer_x[i,i_gas]
+            x = atmos.gas_all_dict["H2O"][i]
             if x < 1.0e-10 
                 continue
             end
@@ -1828,7 +1485,7 @@ module atmosphere
         # Create dimensions
         nlev_c = Int(atmos.nlev_c)
         nlev_l = nlev_c + 1
-        ngases = length(atmos.gases)
+        ngases = atmos.gas_all_num
         nchars = 16
 
         defDim(ds, "nlev_c", nlev_c)        # Cell centres
@@ -1975,20 +1632,22 @@ module atmosphere
         var_grav[:]  =  atmos.layer_grav
         var_thick[:]  = atmos.layer_thick
 
-        for i_gas in 1:ngases 
+        # Composition
+        for (i_gas,gas) in enumerate(atmos.gas_all_names)
+            # Fill gas names
             for i_char in 1:nchars 
                 var_gases[i_char, i_gas] = ' '
             end 
-            for i_char in 1:length(atmos.gases[i_gas])
-                var_gases[i_char,i_gas] = atmos.gases[i_gas][i_char]
+            for i_char in 1:length(atmos.gas_all_names[i_gas])
+                var_gases[i_char,i_gas] = atmos.gas_all_names[i_gas][i_char]
+            end 
+
+            # Fill VMR
+            for i_lvl in 1:nlev_c
+                var_x[i_gas, i_lvl] = atmos.gas_all_dict[gas][i_lvl]
             end 
         end 
         
-        for i_gas in 1:ngases 
-            for i_lvl in 1:nlev_c
-                var_x[i_gas, i_lvl] = atmos.layer_x[i_lvl, i_gas]
-            end 
-        end 
         var_cldf[:] =   atmos.cloud_arr_f
 
         var_fdl[:] =    atmos.flux_d_lw
