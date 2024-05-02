@@ -17,10 +17,9 @@ using LoggingExtras
 @info "Begin runaway demo"
 
 # Include local jl files
-include("socrates/julia/src/SOCRATES.jl")
-
 push!(LOAD_PATH, joinpath(pwd(),"src"))
 import atmosphere
+import energy
 import setpt
 import phys
 import plotting
