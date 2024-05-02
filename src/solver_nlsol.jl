@@ -15,6 +15,7 @@ module solver_nlsol
     using LinearAlgebra
 
     import atmosphere 
+    import energy
     import phys
     import plotting
 
@@ -32,7 +33,8 @@ module solver_nlsol
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
-    - `incl_convect::Bool=true`         include convection
+    - `chem_type::Int=0`                chemistry type (see wiki)
+    - `convect::Bool=true`              include convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=false`             include conductive heat transport within the atmosphere
     - `max_steps::Int=2000`             maximum number of solver steps
@@ -48,8 +50,9 @@ module solver_nlsol
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1, condensates::Array=[],
-                            incl_convect::Bool=true, sens_heat::Bool=false,
+                            sol_type::Int=1, condensates::Array=[], 
+                            chem_type::Int=0,
+                            convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
@@ -63,7 +66,7 @@ module solver_nlsol
         do_condense::Bool  = false 
         if length(condensates) > 0
             for c in condensates
-                if c in atmos.gases
+                if c in atmos.gas_all_names
                     do_condense = true 
                 else 
                     @error "Invalid condensate '$c'"
@@ -84,6 +87,7 @@ module solver_nlsol
         # Plot paths 
         path_prf::String = @sprintf("%s/solver_prf.png", atmos.OUT_DIR)
         path_flx::String = @sprintf("%s/solver_flx.png", atmos.OUT_DIR)
+        path_vmr::String = @sprintf("%s/solver_vmr.png", atmos.OUT_DIR)
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c 
@@ -96,6 +100,7 @@ module solver_nlsol
         rb::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference
         x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
         fd_s::Float64           = 0.0                      # Row perturbation amount
+        do_chemistry::Bool      = (chem_type>0)
 
         # Convective flux scale factor 
         convect_sf::Float64 = 5.0e-5
@@ -138,52 +143,15 @@ module solver_nlsol
             # Set temperatures 
             _set_tmps!(x)
 
-            # Calculate layer properties if they are temperature-dependent
+            # Calculate layer properties
             if atmos.thermo_funct
                 atmosphere.calc_layer_props!(atmos)
             end 
 
-            # Reset fluxes
-            fill!(atmos.flux_tot, 0.0)
-            fill!(atmos.flux_dif, 0.0)
-
-            # +Radiation
-            atmosphere.radtrans!(atmos, true)
-            atmosphere.radtrans!(atmos, false)
-            atmos.flux_tot += atmos.flux_n
-
-            # +Condensation
-            if do_condense
-                atmosphere.condense_relax!(atmos, condensates)
-                atmos.flux_tot += atmos.flux_p
-            end
-
-            # +Dry convection
-            if incl_convect
-                # Calc flux
-                atmosphere.mlt_dry!(atmos)
-
-                # Stabilise?
-                atmos.flux_cdry *= convect_sf
-
-                # Add to total flux
-                atmos.flux_tot += atmos.flux_cdry
-            end
-
-            # +Surface turbulence
-            if sens_heat
-                atmosphere.sensible!(atmos)
-                atmos.flux_tot[end] += atmos.flux_sens
-            end
-
-            # +Conduction 
-            if conduct
-                atmosphere.conduct!(atmos)
-                atmos.flux_tot += atmos.flux_cdct
-            end
-
-            # Flux loss across each level 
-            atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
+            # Calculate fluxes
+            energy.calc_fluxes!(atmos, 
+                                do_condense,  convect, sens_heat, conduct, 
+                                condensates=condensates, convect_sf=convect_sf)
 
             # Additional energy input
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
@@ -288,11 +256,16 @@ module solver_nlsol
                 title_prf = @sprintf("i = %d",i)
                 title_flx = @sprintf("t = %.1f s",t)
             end
+
             plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates, title=title_prf)
             plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense, title=title_flx)
             if save_frames
                 cp(path_prf,@sprintf("%s/frames/%04d_prf.png",atmos.OUT_DIR,i))
                 cp(path_flx,@sprintf("%s/frames/%04d_flx.png",atmos.OUT_DIR,i))
+            end 
+
+            if do_chemistry
+                plotting.plot_vmr(atmos, path_vmr)
             end 
         end 
 
@@ -312,7 +285,6 @@ module solver_nlsol
         elseif (sol_type == 4)
             @info @sprintf("    tgt_olr  = %.2f W m-2", atmos.target_olr)
         end 
-        
 
         # Allocate initial guess for the x array, as well as a,b arrays
         # Array storage structure:
@@ -341,7 +313,9 @@ module solver_nlsol
         step::Int =         0       # Step number
         code::Int =         -1      # Status code 
         lml::Float64 =      2.0     # Levenberg-Marquardt lambda parameter
-        runtime::Float64  = 0.0
+        runtime::Float64  = 0.0     # Model runtime [s]
+        fc_retcode::Int  =  0       # Fastchem return code
+        step_ok::Bool =     true    # Current step was fine
 
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
@@ -384,7 +358,7 @@ module solver_nlsol
         fill!(r_old, 1.0e98)
 
         # Stabilise convection?
-        stabilise_mlt = stabilise_mlt && incl_convect
+        stabilise_mlt = stabilise_mlt && convect
         if !stabilise_mlt
             convect_sf = 1.0
         end
@@ -396,15 +370,18 @@ module solver_nlsol
 
         @info @sprintf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
         info_str::String = ""
+        stepflags::String = ""
         while true 
 
-            # Update properties (cp, rho, etc.)
-            if !all(isfinite, x_cur)
-                @error "Solution array contains NaNs and/or Infs "
-                break
-            end 
-            _set_tmps!(x_cur)
-            atmosphere.calc_layer_props!(atmos)
+            # Reset flags 
+            #     Cs, Cf     = chemistry model success, failure
+            #     Sc,Sr      = stabilise convection, reduced this step
+            #     Cd, Fd     = finite differencing type 
+            #     Nr, Gn, Lm = stepping algorithm
+            #     Ls         = linesearch active
+            info_str  = ""
+            stepflags = ""
+            step_ok   = true 
 
             # Check time 
             runtime = time()-wct_start
@@ -419,22 +396,35 @@ module solver_nlsol
                 code = 1 
                 break 
             end 
-            info_str = ""
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("    %4d  ", step)
             end
 
-            # Reset flags 
-            #     Sc,R       = stabilise convection, reduced this step
-            #     Cd, Fd     = finite differencing type 
-            #     Nr, Gn, Lm = stepping algorithm
-            #     Ls         = linesearch active
-            stepflags::String = ""
+            # Check status of guess 
+            if !all(isfinite, x_cur)
+                code = 4 
+                break
+            end 
+            _set_tmps!(x_cur)
+
+            # Run chemistry scheme 
+            if chem_type in [1,2,3]
+                fc_retcode = atmosphere.chemistry_eq!(atmos, chem_type, false)
+                if fc_retcode == 0
+                    stepflags *= "Cs"
+                else 
+                    stepflags *= "Cf"
+                    step_ok = false
+                end
+            end 
+
+            # Update properties (mmw, density, height, etc.)
+            step_ok = step_ok && atmosphere.calc_layer_props!(atmos)
 
             # Check convective stabilisation
             if stabilise_mlt 
                 # We are stabilising
-                stepflags *= "Sc"
+                stepflags *= "S"
                 
                 # Check if sf needs to be increased
                 if c_cur < max(100.0*conv_rtol, 10.0)
@@ -450,24 +440,29 @@ module solver_nlsol
                         end
                     end 
                 end
+
+                if stepflags[end] == "S"
+                    stepflags *= "c"
+                end 
             else
                 # No stabilisation at this point
                 convect_sf = 1.0 
             end 
 
-            # Evaluate jacobian and residuals
+            # Evaluate residuals and finite-difference jacobian
             r_old[:] .= r_cur[:]
             if use_cendiff || (step == 1)
                 _calc_jac_res_cendiff!(x_cur, b, r_cur) 
-                stepflags *= "Cd"
+                stepflags *= "Fc"
             else
                 _calc_jac_res_fordiff!(x_cur, b, r_cur) 
-                stepflags *= "Fd"
+                stepflags *= "Ff"
             end 
 
             # Check if jacobian is singular 
             if abs(det(b)) < floatmin()*10.0
                 code = 2
+                step_ok = false 
                 break
             end 
 
@@ -511,7 +506,7 @@ module solver_nlsol
                 ls_best_cost = c_old*ls_compassion  # allow a cost increase 
                 ls_best_scale = 0.1     # ^ this will require a small step scale
 
-                for ls_scale in [0.4, 0.99] # linesearch scale is set based on the best cost reduction
+                for ls_scale in [0.2, 0.5, 1.0] # linesearch scale is set based on the best cost reduction
                     # try this scale factor 
                     x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
                     _fev!(x_cur, r_tst)
@@ -575,7 +570,11 @@ module solver_nlsol
             # Inform user
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-9s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags)
-                @info info_str
+                if step_ok
+                    @info info_str
+                else
+                    @warn info_str 
+                end
             end
 
             # Converged?
@@ -588,6 +587,7 @@ module solver_nlsol
         
         rm(path_prf, force=true)
         rm(path_flx, force=true)
+        rm(path_vmr, force=true)
         
         # ----------------------------------------------------------
         # Extract solution
@@ -603,12 +603,14 @@ module solver_nlsol
             @error "    failure (singular jacobian)"
         elseif code == 3
             @error "    failure (maximum time)"
+        elseif code == 4
+            @error "    failure (NaN temperature)"
         else 
             @error "    failure (unhandled)"
         end
 
         _fev!(x_cur, zeros(Float64, arr_len))
-        atmosphere.calc_hrates!(atmos)
+        energy.calc_hrates!(atmos)
 
         # ----------------------------------------------------------
         # Print info

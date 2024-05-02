@@ -53,7 +53,7 @@ module plotting
                 for i in 1:atmos.nlev_l
                     sat_t[i] = phys.calc_Tdew(c, atmos.pl[i])
                 end 
-                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.lookup_color[c], ls=:dot, label=phys.lookup_pretty[c])
+                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label=phys.pretty_name(c))
             end 
         end
 
@@ -86,38 +86,37 @@ module plotting
     """
     Plot the VMRs of the atmosphere at each cell-centre location.
     """
-    function plot_x(atmos::atmosphere.Atmos_t, fname; dpi::Int=250)
+    function plot_vmr(atmos::atmosphere.Atmos_t, fname; dpi::Int=250)
         
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
         
         # Create plot
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(500,400), guidefontsize=9)
 
-        # Plot mole fractions for each gas
-        xmin::Float64 = 0.1
+        # Plot log10 mole fractions for each gas
+        xmin::Float64 = -20
         this_min::Float64 = 0.0
-        for (i_gas,gas) in enumerate(atmos.gases)  
-            if haskey(phys.lookup_color, gas)
-                c = phys.lookup_color[gas]
-            else 
-                c = "#"*bytes2hex(rand(UInt8, 3))
-            end 
-            plot!(atmos.layer_x[1:end,i_gas], arr_P, label=phys.lookup_pretty[gas], lw=2.5, linealpha=0.7, color=c)
-            this_min = minimum(atmos.layer_x[1:end,i_gas])
-            if this_min > 1.0e-90
+
+        for gas in atmos.gas_all_names
+            # get VMR
+            x_arr = log10.(clamp.(atmos.gas_all_dict[gas][:],1e-100, 1e100))
+            this_min = minimum(x_arr)
+            if this_min > -90
                 xmin = min(xmin, this_min)
             end
+
+            # plot gas
+            plot!(x_arr, arr_P, label=phys.pretty_name(gas), lw=2.5, linealpha=0.7, color=phys.pretty_color(gas))
         end
 
-        xlims  = (max(xmin, 1.0e-20)*0.5, 1.2)
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=0, step=1))
+        xlims  = (max(xmin, -12), 0.1)
+        xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties
-        xlabel!(plt, "Mole fraction")
-        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks)
+        xlabel!(plt, "log10(Mole fraction)")
+        xaxis!(plt, xlims=xlims, xticks=xticks)
 
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
@@ -127,118 +126,6 @@ module plotting
             savefig(plt, fname)
         end
         return plt 
-    end
-
-    """
-    Plot the current temperature-pressure profile, current heating rates, and
-    optionally the previous states that the atmosphere has taken.
-    """
-    function plot_solver(atmos::atmosphere.Atmos_t, fname::String; hist_tmpl::Array=[], incl_magma::Bool=false, dpi::Int=250, step::Int=-1)
-
-        lw=1.5
-        
-        # Header info
-        title = ""
-        if step > 0
-            title = "Step $step"
-        end
-
-        # Interleave cell-centre and cell-edge arrays for current atmosphere
-        arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
-        arr_P *= 1e-5
-
-        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
-        # Optionally get past atmosphere
-        plot_hist = !isempty(hist_tmpl)
-        if plot_hist 
-            len_hist = size(hist_tmpl, 1)-1
-            len_hist = min(len_hist, 4)  # don't plot more than 4 previous iterations
-        end
-
-        # Create plot 1
-        plt1 = plot(framestyle=:box, legend=:topright, ylims=ylims, yticks=yticks, title=title, titlefontsize=9)
-
-        # Plot surface temperature(s)
-        if incl_magma
-            scatter!(plt1, [atmos.tmp_magma], [atmos.pl[end]*1e-5], color="cornflowerblue", label=L"T_m") 
-        end
-        scatter!(plt1, [atmos.tmp_surf],     [atmos.pl[end]*1e-5], color="brown3",         label=L"T_s") 
-
-        # Plot temperature profiles 
-        plot!(plt1, arr_T, arr_P, lc="black", lw=lw, label=L"T_n")
-        if plot_hist 
-            for i in range(len_hist-1,1,step=-1)
-                xvals = hist_tmpl[i,1:end]
-                if count(x->x!=0.0, xvals) > 0
-                    alpha = Float64(i)/(len_hist)
-                    n = len_hist-i
-                    plot!(plt1, xvals, atmos.pl*1e-5, lc="black", linealpha=alpha, lw=lw, label=L"T_{n-%$n}")
-                end
-            end 
-        end
-
-        # Plot convection mask 
-        convective_p = []
-        convective_t = []
-        for i in 1:atmos.nlev_c
-            if atmos.mask_c[i] > 0
-                append!(convective_p, atmos.p[i]*1e-5)
-                append!(convective_t, atmos.tmp[i])
-            end 
-        end
-        if length(convective_p) > 0
-            scatter!(plt1, convective_t, convective_p, color="goldenrod2", label="Cnvct", markersize=2, markeralpha=0.8) 
-        end 
-
-        # Plot phase change mask 
-        pchange_p = []
-        pchange_t = []
-        for i in 1:atmos.nlev_c
-            if atmos.mask_p[i] > 0
-                append!(pchange_p, atmos.p[i]*1e-5)
-                append!(pchange_t, atmos.tmp[i])
-            end 
-        end
-        if length(pchange_p) > 0
-            scatter!(plt1, pchange_t, pchange_p, color="dodgerblue", label="Phase", markersize=2, markeralpha=0.8) 
-        end 
-        
-        xlabel!(plt1, "Temperature [K]")
-        ylabel!(plt1, "Pressure [bar]")
-        yflip!(plt1)
-        yaxis!(plt1, yscale=:log10)
-
-        # Process heating rates 
-        p =  atmos.p*1e-5
-        abshr = zeros(Float64, atmos.nlev_c)
-        poshr = trues(atmos.nlev_c)
-        for i in 1:atmos.nlev_c
-            abshr[i] = abs(atmos.heating_rate[i])
-            poshr[i] = (atmos.heating_rate[i] >= 0)
-        end 
-
-        xlims  = (1e-5, maximum(abshr))
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
-
-        # Create plot 2
-        plt2 = plot(framestyle=:box, legend=:topleft, ylims=ylims, yticks=yticks, xlims=xlims, xticks=xticks)
-
-        # Plot heating rate
-        plot!(plt2, abshr, p, lc="brown3", lw=lw, label=L"|H_{n-1}|")
-        scatter!(plt2, abshr[poshr],    p[poshr],    markershape=:diamond, markeralpha=0.8, label=L">0")
-        scatter!(plt2, abshr[.!poshr],  p[.!poshr],  markershape=:circle,  markeralpha=0.8, label=L"<0")
-        xlabel!(plt2, "Heating rate [K/day]")
-        yflip!(plt2)
-        yaxis!(plt2, yscale=:log10)
-        xaxis!(plt2, xscale=:log10)
-        
-        # Combine subplots and save
-        plt = plot(plt1, plt2, layout=(1,2), dpi=dpi)
-        savefig(plt, fname)
-
-        return nothing
     end
 
     """
@@ -259,17 +146,17 @@ module plotting
         xlims = (-xticks_pos[end], xticks_pos[end])
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
-        w = 2.0
         plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, guidefontsize=9, size=(550,400), titlefontsize=9)
 
-        col_r = "#c0c0c0"
-        col_n = "#000000"
-        col_c = "#6495ed"
-        col_t = "#ff4400"
-        col_o = "#66CD00"
-        col_p = "#ecb000"
+        col_r::String = "#c0c0c0"
+        col_n::String = "#000000"
+        col_c::String = "#6495ed"
+        col_t::String = "#ff4400"
+        col_o::String = "#66CD00"
+        col_p::String = "#ecb000"
 
         alpha = 0.7
+        w = 2.0
 
         # Legend dummy plots
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dot,   lw=w, lc=col_r, label="SW")
@@ -367,10 +254,10 @@ module plotting
         end
 
         # Get emission spectrum data
-        xe = zeros(Float64, atmos.nbands)
-        yt = zeros(Float64, atmos.nbands)
-        yl = zeros(Float64, atmos.nbands)
-        ys = zeros(Float64, atmos.nbands)
+        xe::Array{Float64, 1} = zeros(Float64, atmos.nbands)
+        yt::Array{Float64, 1} = zeros(Float64, atmos.nbands)
+        yl::Array{Float64, 1} = zeros(Float64, atmos.nbands)
+        ys::Array{Float64, 1} = zeros(Float64, atmos.nbands)
         for ba in 1:atmos.nbands
             # x value - band centres [nm]
             xe[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
@@ -442,9 +329,9 @@ module plotting
         end
 
         # Get data
-        x = zeros(Float64, atmos.nbands)    # band centres (reverse order)
-        y = zeros(Float64, atmos.nlev_c)    # pressure levels
-        z = zeros(Float64, (atmos.nlev_c,atmos.nbands))
+        x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
+        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)    # pressure levels
+        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_c,atmos.nbands))
 
         # Reversed?
         reversed::Bool = (atmos.bands_min[1] > atmos.bands_min[end])
@@ -510,8 +397,8 @@ module plotting
         end
 
         # Get data
-        x = zeros(Float64, atmos.nbands)
-        y = zeros(Float64, atmos.nbands)
+        x::Array{Float64, 1} = zeros(Float64, atmos.nbands)
+        y::Array{Float64, 1} = zeros(Float64, atmos.nbands)
 
         for ba in 1:atmos.nbands
             # x value - band centres [nm]
@@ -542,16 +429,16 @@ module plotting
     """
     Animate output frames from solver, using ffmpeg
     """
-    function animate(atmos::atmosphere.Atmos_t, duration::Float64=15.0)
+    function animate(atmos::atmosphere.Atmos_t, duration::Float64=12.0)
 
         # Find output files
-        out = atmos.OUT_DIR
+        out::String = atmos.OUT_DIR
         frames = glob("frames/*_prf.png",out)
-        nframes = length(frames)
+        nframes::Int = length(frames)
 
         # Animating fluxes?
         frames2 = glob("frames/*_flx.png",out)
-        fluxes = length(frames2) > 0
+        fluxes::Bool = length(frames2) > 0
 
         # Create animation
         if nframes < 1
@@ -568,7 +455,7 @@ module plotting
 
             # combine videos 
             if fluxes 
-                run(`ffmpeg -loglevel quiet -i $out/frames/ani_prf.mp4 -i $out/frames/ani_flx.mp4 -filter_complex "hstack,format=yuv420p" -c:v libx264 -crf 18 $out/anim.mp4`)
+                run(`ffmpeg -loglevel quiet -i $out/frames/ani_prf.mp4 -i $out/frames/ani_flx.mp4 -filter_complex "hstack,format=yuv420p" -c:v libx264 -crf 18 -y $out/anim.mp4`)
             else 
                 cp("$out/frames/ani_prf.mp4", "$out/anim.mp4")
             end 
