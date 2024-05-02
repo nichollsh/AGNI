@@ -15,11 +15,10 @@ using LoggingExtras
 
 @info "Begin tests"
 
-
 # Include local jl files
-include("socrates/julia/src/SOCRATES.jl")
 push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
 import atmosphere
+import energy
 import setpt
 import plotting 
 import phys
@@ -146,7 +145,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=2
                  )
 atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
-atmosphere.radtrans!(atmos, false)
+energy.radtrans!(atmos, false)
 
 val_e = toa_heating * cosd(theta)
 val_o = atmos.flux_d_sw[1]
@@ -210,7 +209,7 @@ atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
 setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
 setpt.condensing!(atmos, "H2O")
-atmosphere.radtrans!(atmos, true)
+energy.radtrans!(atmos, true)
 
 val_e = [270.0, 290.0]
 val_o = atmos.flux_u_lw[1]
@@ -256,8 +255,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=2
                  )
 atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
-atmosphere.radtrans!(atmos, true)
-atmosphere.radtrans!(atmos, false)
+energy.radtrans!(atmos, true)
+energy.radtrans!(atmos, false)
 
 val_e = [1.0e-4, 1e9]
 val_o = atmos.flux_u_sw[20]
@@ -306,10 +305,10 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
 atmosphere.allocate!(atmos,"res/stellar_spectra/trappist-1.txt")
 setpt.isothermal!(atmos, 300.0)
 atmos.flux_tot[:] .= 0.0
-atmosphere.radtrans!(atmos, true)
-atmosphere.radtrans!(atmos, false)
+energy.radtrans!(atmos, true)
+energy.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
-atmosphere.calc_hrates!(atmos)
+energy.calc_hrates!(atmos)
 val_e = [20.0, 70.0]  # tests have found ~54 K/day for this setup
 val_o = atmos.heating_rate[atmos.nlev_c-2]
 @info "Expected range = $(val_e) K/day"

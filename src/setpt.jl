@@ -234,10 +234,10 @@ module setpt
         # Renormalise mole fractions
         tot_vmr = 0.0
         for g in atmos.gas_all_names
-            tot_vmr += atmos.gas_all_dict[g][i]
+            tot_vmr += atmos.gas_all_dict[g][atmos.nlev_c]
         end 
         for g in atmos.gas_all_names
-            atmos.gas_all_dict[g][i] /= tot_vmr
+            atmos.gas_all_dict[g][atmos.nlev_c] /= tot_vmr
         end 
 
         # Generate new pressure grid 
