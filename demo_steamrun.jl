@@ -17,10 +17,9 @@ using LoggingExtras
 @info "Begin runaway demo"
 
 # Include local jl files
-include("socrates/julia/src/SOCRATES.jl")
-
 push!(LOAD_PATH, joinpath(pwd(),"src"))
 import atmosphere
+import energy
 import setpt
 import phys
 import plotting
@@ -76,7 +75,7 @@ for i in 1:run_len
     setpt.condensing!(atmos, "H2O")
 
     # Calculate LW fluxes 
-    atmosphere.radtrans!(atmos, true)
+    energy.radtrans!(atmos, true)
 
     olr = atmos.flux_u_lw[1]
     @info @sprintf("Tsurf = %4.1f K  ,  OLR = %5.1f W m-2 ",atmos.tmpl[end],olr)

@@ -14,11 +14,11 @@ module solver_tstep
     using Revise
 
     import atmosphere 
+    import energy
     import phys
     import setpt
     import plotting
 
-   
     """
     **Solve for radiative-convective equilibrium using accelerated time-stepping.**
 
@@ -35,8 +35,9 @@ module solver_tstep
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int=1`                 bottom layer temperature, 0: free | 1: fixed | 2: conductive skin
     - `use_physical_dt::Bool=false`     use a single time-step across the entire column (for physical time-evolution)
-    - `incl_convect::Bool=true`         enable convection
+    - `convect::Bool=true`              enable convection
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
+    - `chem_type::Int=0`                chemistry type (see wiki)
     - `use_mlt::Bool=true`              using mixing length theory to represent convection (otherwise use adjustment)
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=true`              include conduction
@@ -57,7 +58,7 @@ module solver_tstep
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, use_physical_dt::Bool=false,
-                            incl_convect::Bool=true, condensates::Array=[], use_mlt::Bool=true,
+                            convect::Bool=true, condensates::Array=[], use_mlt::Bool=true,
                             sens_heat::Bool=false, conduct::Bool=true, modprop::Int=1, 
                             verbose::Bool=true, modplot::Int=0, save_frames::Bool=true,
                             accel::Bool=true, adams::Bool=true, dt_max::Float64=500.0, 
@@ -83,7 +84,7 @@ module solver_tstep
 
         if length(condensates) > 0 
             for c in condensates
-                if condensate in atmos.gases
+                if condensate in atmos.gas_all_names
                     do_condense = true 
                 else 
                     error("Invalid condensate ('$c')")
@@ -266,7 +267,7 @@ module solver_tstep
             end
 
             # Introduce convection and condensation schemes
-            if !start_con && (step >= wait_con) && (incl_convect || do_condense)
+            if !start_con && (step >= wait_con) && (convect || do_condense)
                 start_con = true 
                 info_str *= @sprintf("(intro convect/condense) ")
             end
@@ -293,35 +294,12 @@ module solver_tstep
             # ----------------------------------------------------------
             # Get fluxes 
             # ---------------------------------------------------------- 
-            atmos.flux_tot[:] .= 0.0
-
-            # Radiation
-            atmosphere.radtrans!(atmos, true)
-            atmosphere.radtrans!(atmos, false)
-            atmos.flux_tot += atmos.flux_n
-
-            # Dry convection (MLT)
-            if use_mlt && incl_convect && start_con
-                atmosphere.mlt_dry!(atmos)
-                atmos.flux_tot += atmos.flux_cdry
-            end
-
-            # Turbulence
-            if sens_heat
-                atmosphere.sensible!(atmos)
-                atmos.flux_tot[end] += atmos.flux_sens
-            end
-
-            # Conduction
-            if conduct
-                atmosphere.conduct!(atmos)
-                atmos.flux_tot += atmos.flux_cdct
-            end
+            energy.calc_fluxes!(atmos, do_condense, use_mlt && convect && start_con, sens_heat, conduct, condensates=condensates)
 
             # ----------------------------------------------------------
             # Calculate heating rates
             # ---------------------------------------------------------- 
-            atmosphere.calc_hrates!(atmos)
+            energy.calc_hrates!(atmos)
 
             # ----------------------------------------------------------
             # Calculate step size for this step
@@ -392,7 +370,7 @@ module solver_tstep
             # ---------------------------------------------------------- 
             # Dry convective adjustment
             adj_changed = 0
-            if dryadj_steps > 0 && incl_convect && !use_mlt && start_con
+            if dryadj_steps > 0 && convect && !use_mlt && start_con
 
                 # do adjustment steps
                 tmp_tnd = atmosphere.adjust_dry(atmos, dryadj_steps)
@@ -419,7 +397,7 @@ module solver_tstep
                     for i in 1:atmos.nlev_c
                         if lvl_condensing[i]
                             adj_changed += 1
-                            atmos.mask_p[i]  = atmos.mask_decay
+                            atmos.mask_p[i] = atmos.mask_decay
                         end
                     end 
                 end
@@ -570,7 +548,7 @@ module solver_tstep
             # - solver is not being accelerated or smoothed
             flag_prev = flag_this
             flag_this = (F_rto_worst <= 1.0)
-            success   = flag_this && flag_prev && !is_smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!incl_convect && !do_condense))
+            success   = flag_this && flag_prev && !is_smooth && !accel && !stopaccel && (step > min_steps) && (start_con || (!convect && !do_condense))
             
             # --------------------------------------
             # Sleep in order to capture keyboard interrupt
