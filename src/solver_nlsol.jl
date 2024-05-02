@@ -504,9 +504,9 @@ module solver_nlsol
                 # Reset
                 stepflags *= "Ls"
                 ls_best_cost = c_old*ls_compassion  # allow a cost increase 
-                ls_best_scale = 0.2     # ^ this will require a small step scale
+                ls_best_scale = 0.1     # ^ this will require a small step scale
 
-                for ls_scale in [0.7, 1.0] # linesearch scale is set based on the best cost reduction
+                for ls_scale in [0.2, 0.5, 1.0] # linesearch scale is set based on the best cost reduction
                     # try this scale factor 
                     x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
                     _fev!(x_cur, r_tst)
