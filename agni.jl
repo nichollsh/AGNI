@@ -423,6 +423,14 @@ function main()::Bool
 
     # Temp folders
     if cfg["files"]["clean_output"]
+        # save fastchem outputs 
+        if chem_type in [1,2,3]
+            cp(joinpath(output_dir,"fastchem","chemistry.dat"),joinpath(output_dir,"fc_gas.dat"), force=true)
+            if chem_type in [2,3]
+                cp(joinpath(output_dir,"fastchem","condensates.dat"),joinpath(output_dir,"fc_con.dat"), force=true)
+            end 
+        end 
+        # remove folders
         for fold in tmp_folds
             fpth = joinpath(output_dir,fold)
             rm(fpth,force=true,recursive=true)

@@ -204,10 +204,14 @@ module setpt
             error("Atmosphere is not setup or allocated")
         end 
 
+        x::Float64 = 0.0
+        psat::Float64 = 0.0
+        Tsat::Float64 = 0.0
+
         # For each condensible volatile
-        for (i_gas, gas) in enumerate(atmos.gases)
+        for gas in atmos.gas_all_names
             # Get mole fraction at surface
-            x = atmosphere.get_x(atmos, gas, atmos.nlev_c)
+            x = atmos.gas_all_dict[gas][atmos.nlev_c]
             if x < 1.0e-10
                 continue 
             end
@@ -218,25 +222,28 @@ module setpt
             if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_safe("T_crit",gas))
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.layer_x[atmos.nlev_c, i_gas] = psat / atmos.p_boa  
+                atmos.gas_all_dict[gas][atmos.nlev_c] = psat / atmos.p_boa  
 
                 # Check that p_boa is still reasonable 
                 if atmos.p_boa <= 10.0 * atmos.p_toa 
                     error("Supersaturation check ($gas) resulted in an unreasonably small surface pressure")
                 end 
-
-                # Renormalise mole fractions
-                norm_factor = sum(atmos.layer_x[atmos.nlev_c, :])
-                for j_gas in 1:length(atmos.gases)
-                    atmos.layer_x[atmos.nlev_c, j_gas] /= norm_factor
-                end
-
-                # Generate new pressure grid 
-                atmosphere.generate_pgrid!(atmos)
             end
         end 
 
+        # Renormalise mole fractions
+        tot_vmr = 0.0
+        for g in atmos.gas_all_names
+            tot_vmr += atmos.gas_all_dict[g][i]
+        end 
+        for g in atmos.gas_all_names
+            atmos.gas_all_dict[g][i] /= tot_vmr
+        end 
+
+        # Generate new pressure grid 
+        atmosphere.generate_pgrid!(atmos)
         atmosphere.calc_layer_props!(atmos)
+        
         return nothing
     end
 
@@ -249,7 +256,7 @@ module setpt
         end 
 
         # gas is present?
-        if !(gas in atmos.gases)
+        if !(gas in atmos.gas_all_names)
             return nothing
         end
 

@@ -91,7 +91,6 @@ module plotting
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
         
         # Create plot
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(500,400), guidefontsize=9)
@@ -99,18 +98,24 @@ module plotting
         # Plot log10 mole fractions for each gas
         xmin::Float64 = -20
         this_min::Float64 = 0.0
-        for (i_gas,gas) in enumerate(atmos.gases)  
+
+        for gas in atmos.gas_all_names
+            # get color for plotting
             if haskey(phys.lookup_color, gas)
                 c = phys.lookup_color[gas]
             else 
                 c = "#"*bytes2hex(rand(UInt8, 3))
             end 
-            x_arr = log10.(atmos.layer_x[1:end,i_gas])
+
+            # get VMR
+            x_arr = log10.(clamp.(atmos.gas_all_dict[gas][:],1e-100, 1e100))
             this_min = minimum(x_arr)
             if this_min > -90
-                plot!(x_arr, arr_P, label=phys.lookup_pretty[gas], lw=2.5, linealpha=0.7, color=c)
                 xmin = min(xmin, this_min)
             end
+
+            # plot gas
+            plot!(x_arr, arr_P, label=phys.lookup_pretty[gas], lw=2.5, linealpha=0.7, color=c)
         end
 
         xlims  = (max(xmin, -12), 0.1)
