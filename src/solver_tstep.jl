@@ -84,7 +84,7 @@ module solver_tstep
 
         if length(condensates) > 0 
             for c in condensates
-                if condensate in atmos.gases
+                if condensate in atmos.gas_all_names
                     do_condense = true 
                 else 
                     error("Invalid condensate ('$c')")
