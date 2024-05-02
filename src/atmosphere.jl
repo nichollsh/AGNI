@@ -1457,11 +1457,12 @@ module atmosphere
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `chem_type::Int`                  chemistry type (see wiki)
     - `write_cfg::Bool`                 write config and elements
+    - `tmp_floor::Float64=500.0`        temperature floor for T(p) provided to FastChem
 
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool)::Int
+    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=500.0)::Int
 
         # Return code 
         state::Int = 0
@@ -1514,10 +1515,10 @@ module atmosphere
                 write(f,"1.0e-4 \n\n")
 
                 write(f,"#Max number of chemistry iterations  \n")
-                write(f,"80000 \n\n")
+                write(f,"50000 \n\n")
 
                 write(f,"#Max number internal solver iterations  \n")
-                write(f,"30000 \n\n")
+                write(f,"10000 \n\n")
             end
 
             # Calculate elemental abundances 
@@ -1526,7 +1527,7 @@ module atmosphere
             # N = X(P/(K*T) , where X is the VMR and K is boltz-const
             N_t = zeros(Float64, length(phys.elements_list))                # total
             N_g = zeros(Float64, length(phys.elements_list))                # this gas
-            for gas in atmos.gases
+            for gas in atmos.gas_all_names
                 d = phys.count_atoms(gas)
                 fill!(N_g, 0.0)
                 for (i,e) in enumerate(phys.elements_list)
@@ -1554,7 +1555,7 @@ module atmosphere
             write(f,"# AGNI temperature structure \n")
             write(f,"# bar, kelvin \n")
             for i in 1:atmos.nlev_c 
-                write(f,@sprintf("%.6e    %.6e \n",atmos.p[i],atmos.tmp[i]))
+                write(f,@sprintf("%.6e    %.6e \n", atmos.p[i], max(tmp_floor,atmos.tmp[i]) ))
             end 
         end 
 
@@ -1597,7 +1598,6 @@ module atmosphere
 
         # Parse gas chemistry
         g::String = ""
-        j::Int    = -1
         N_t = data[4,:] # at each level: sum of gas number densities 
         for (i,h) in enumerate(head)  # for each column (gas)
             g = rstrip(lstrip(h))
@@ -1605,7 +1605,7 @@ module atmosphere
             # check if gas is included in the model
             if g in keys(phys.map_fastchem_name) 
                 g = phys.map_fastchem_name[g]  # convert name
-                if g in atmos.gases
+                if g in atmos.gas_all_names
                     N_g = data[i,:]  # number densities for this gas 
                     atmos.gas_all_dict[g][:] .= N_g[:] ./ N_t[:]    # mole fraction (VMR) for this gas 
                 end
@@ -1650,7 +1650,6 @@ module atmosphere
         for i in 1:atmos.nlev_c
             # Reset 
             Tsat_lvl = -1.0
-            i_sat = -1
 
             # Check which condensate is saturated (if any)
             for c in condensates

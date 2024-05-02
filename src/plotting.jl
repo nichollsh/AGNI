@@ -53,7 +53,7 @@ module plotting
                 for i in 1:atmos.nlev_l
                     sat_t[i] = phys.calc_Tdew(c, atmos.pl[i])
                 end 
-                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.lookup_color[c], ls=:dot, label=phys.lookup_pretty[c])
+                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label=phys.pretty_name(c))
             end 
         end
 
@@ -100,13 +100,6 @@ module plotting
         this_min::Float64 = 0.0
 
         for gas in atmos.gas_all_names
-            # get color for plotting
-            if haskey(phys.lookup_color, gas)
-                c = phys.lookup_color[gas]
-            else 
-                c = "#"*bytes2hex(rand(UInt8, 3))
-            end 
-
             # get VMR
             x_arr = log10.(clamp.(atmos.gas_all_dict[gas][:],1e-100, 1e100))
             this_min = minimum(x_arr)
@@ -115,7 +108,7 @@ module plotting
             end
 
             # plot gas
-            plot!(x_arr, arr_P, label=phys.lookup_pretty[gas], lw=2.5, linealpha=0.7, color=c)
+            plot!(x_arr, arr_P, label=phys.pretty_name(gas), lw=2.5, linealpha=0.7, color=phys.pretty_color(gas))
         end
 
         xlims  = (max(xmin, -12), 0.1)
