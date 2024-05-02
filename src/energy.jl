@@ -401,29 +401,26 @@ module energy
     """
     function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array=[])
 
+        # Reset flux
+        fill!(atmos.flux_p, 0.0)
+
         # Check if empty
         if length(condensates) == 0
             return nothing 
         end 
 
-        # Reset flux
-        fill!(atmos.flux_p, 0.0)
-        
         # Work variables
         a::Float64 = 2.0
         pp::Float64 = 0.0
-        c_sat::String = ""
-        Tsat_lvl::Float64 = 0.0
-        Tsat::Float64 = 0.0
+        Psat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
 
-        # Calculate flux (negative) divergence due to latent heat release
-        for i in 1:atmos.nlev_c
-            # Reset 
-            Tsat_lvl = -1.0
+        # Calculate flux (negative) divergence due to latent heat release...
+        # For all condensates
+        for c in condensates
+            # For all levels 
+            for i in 1:atmos.nlev_c
 
-            # Check which condensate is saturated (if any)
-            for c in condensates
                 # Get partial pressure 
                 pp = atmos.gas_all_dict[c][i] * atmos.p[i]
                 if pp < 1.0e-10 
@@ -431,23 +428,18 @@ module energy
                 end
 
                 # check saturation
-                Tsat = phys.calc_Tdew(c, pp)
-                if (atmos.tmp[i] < Tsat-1.0e-10) && (Tsat > Tsat_lvl)
-                    Tsat_lvl = Tsat 
-                    c_sat = c 
+                Psat = phys.calc_Psat(c, atmos.tmp[i])
+                if (pp < Psat+1.0e-10)
+                    continue 
                 end 
-            end # end condensate
 
-            # Relax tmp to appropriate Tsat value 
-            # This is gas that maximises Tsat and for which tmp < Tsat is true 
-            if !isempty(c_sat)
                 # relaxation function
-                # dif[i] = (a/atmos.tmp[i] - a/Tsat )
-                dif[i] = (1.0/a)*(Tsat_lvl-atmos.tmp[i])^2.0
+                dif[i] += (1.0/a)*(pp-Psat)
+                # dif[i] += a/Psat - a/pp
 
-                # println("Condensing $c at $i")
+                # handle water cloud case 
                 atmos.mask_p[i] = atmos.mask_decay 
-                if c_sat == "H2O"
+                if c == "H2O"
                     atmos.cloud_arr_r[i] = atmos.cloud_val_r
                     atmos.cloud_arr_l[i] = atmos.cloud_val_l
                     atmos.cloud_arr_f[i] = atmos.cloud_val_f
@@ -456,9 +448,9 @@ module energy
                     atmos.cloud_arr_l[i] = 0.0
                     atmos.cloud_arr_f[i] = 0.0
                 end 
-            end # end relaxation 
 
-        end # end levels 
+            end # end levels 
+        end # end condensates 
 
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at surface
@@ -468,6 +460,8 @@ module energy
 
         return nothing
     end # end of condense_relax
+
+
 
     """
     **Calculate total flux at each level.**
