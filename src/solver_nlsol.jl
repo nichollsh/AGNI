@@ -65,7 +65,7 @@ module solver_nlsol
         do_condense::Bool  = false 
         if length(condensates) > 0
             for c in condensates
-                if c in atmos.gases
+                if c in atmos.gas_all_names
                     do_condense = true 
                 else 
                     @error "Invalid condensate '$c'"

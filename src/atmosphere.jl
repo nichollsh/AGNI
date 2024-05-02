@@ -112,10 +112,14 @@ module atmosphere
         skin_k::Float64         # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
         tmp_magma::Float64      # Mantle temperature [K]
 
-        # Mole fractions (= VMR)
-        gases::Array{String,1}              # List of gas names 
-        input_x::Dict                       # Layer mole fractions in dict format, incl gases not in spfile (key,value) = (gas_name,array)
-        layer_x::Array{Float64,2}           # Layer mole fractions in matrix format, excl gases not in spfile [lvl, gas_idx]
+        # Gases (incl those not in spectralfile)
+        gas_all_num::Int                    # Number of gases
+        gas_all_names::Array{String,1}      # List of gas names
+        gas_all_dict::Dict{String, Array}   # Layer mole fractions in dict format, (key,value) = (gas_name,array)
+
+        # Gases (only those in spectralfile)
+        gas_soc_num::Int 
+        gas_soc_names::Array{String,1}
 
         # Layers' average properties
         thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
@@ -153,7 +157,7 @@ module atmosphere
         band_n_sw::Array{Float64,2}     # net upward, sw
 
         # Contribution function (to outgoing flux) per-band
-        contfunc_norm::Array{Float64,2}    # LW+SW, and normalised by maximum value at each wavelength
+        contfunc_norm::Array{Float64,2}    # LW only, and normalised by maximum value
 
         # Sensible heating
         C_d::Float64            # Turbulent exchange coefficient [dimensionless]
@@ -405,25 +409,31 @@ module atmosphere
             mf_source = 1
         end
         
-        # The values will be stored in a dict of arrays regardless, because 
-        # we do not yet know which order the gases should be indexed in.
-
-        atmos.input_x = Dict()  # dict of arrays 
+        # The values will be stored in a dict of arrays
+        atmos.gas_all_names = Array{String}(undef, 0)       # list of names 
+        atmos.gas_all_dict  = Dict{String, Array}()         # dict of arrays 
+        atmos.gas_all_num   = 0                             # number of gases
 
         # Dict input case
         if mf_source == 0
             @info "Composition set by dict"
             for (key, value) in mf_dict  # store as arrays
-                gas_valid = strip(key, ' ')
-                # If gas supported by socrates, store it 
-                if gas_valid in SOCRATES.input_head_pcf.header_gas
-                    atmos.input_x[gas_valid] = ones(Float64, atmos.nlev_c) * value
-                    @info("    added gas $gas_valid")
-                else
-                    @warn "    gas $gas_valid is not supported" 
+                gas_valid = strip(key, [' ','\t','\n'])
+                
+                # Check if repeated 
+                if gas_valid in atmos.gas_all_names
+                    @warn "    skipping duplicate gas $gas_valid"
+
+                # Not repeated...
+                else 
+                    # Store VMR 
+                    atmos.gas_all_dict[gas_valid] = ones(Float64, atmos.nlev_c)*value 
+                    push!(atmos.gas_all_names, gas_valid)
+                    atmos.gas_all_num += 1
+                    @info "    added gas $gas_valid"
                 end 
             end
-        end
+        end # end read VMR from dict
 
         # File input case 
         if mf_source == 1
@@ -434,20 +444,26 @@ module atmosphere
             @info "Composition set by file"
 
             # get header
-            mf_head = readlines(abspath(mf_path))[1]
+            mf_head = readline(abspath(mf_path))
             mf_head = mf_head[2:end]  # remove comment symbol at start
             mf_head = replace(mf_head, " " => "")  # remove whitespace
-            heads = split(mf_head, ",") # split by columm
+            heads   = split(mf_head, ",")[4:end] # split by column and drop first three
 
             # create arrays 
             for h in heads
-                gas_valid = strip(h, ' ')
-                if gas_valid in SOCRATES.input_head_pcf.header_gas
-                    atmos.input_x[gas_valid] = zeros(Float64, atmos.nlev_c)
-                    @info("    added gas $gas_valid")
-                else
-                    @warn "    gas $gas_valid is not supported" 
-                end
+                gas_valid = strip(h, [' ','\t','\n'])
+                # Check if repeated 
+                if gas_valid in atmos.gas_all_names
+                    @warn "    skipping duplicate gas $gas_valid"
+
+                # Not repeated...
+                else 
+                    # Store zero VMR for now
+                    atmos.gas_all_dict[gas_valid] = zeros(Float64, atmos.nlev_c)
+                    push!(atmos.gas_all_names, gas_valid)
+                    atmos.gas_all_num += 1
+                    @info "    added gas $gas_valid"
+                end 
             end 
 
             # get body
@@ -455,43 +471,55 @@ module atmosphere
             mf_body = transpose(mf_body)
 
             # set composition by interpolating with pressure array 
+            gidx::Int=0
             for li in 4:lastindex(heads)
+                # Gas index 
+                gidx += 1
 
-                gas = heads[li]
-
-                if !(gas in keys(atmos.input_x)) # skip tem, pre, hgt
-                    continue
-                end
-
+                # Arrays from file 
                 arr_p = mf_body[1,:]
                 arr_x = mf_body[li,:]
 
-                # Extend loaded profile to lower pressures (prevent domain error)
+                # Extend loaded profile to lower pressures (prevents domain error)
                 if arr_p[1] > atmos.p_toa
                     pushfirst!(arr_p,   atmos.p_toa/1.1)
                     pushfirst!(arr_x,   arr_x[1] )
                 end
 
-                # Extend loaded profile to higher pressures 
+                # Extend loaded profile to higher pressures (prevents domain error)
                 if arr_p[end] < atmos.p_boa
                     push!(arr_p,   atmos.p_boa*1.1)
                     push!(arr_x,   arr_x[end])
                 end
                 
-                # Set up interpolator
+                # Set up interpolator using file data 
                 itp = Interpolator(arr_p, arr_x)
                 
-                # Set values 
+                # Set values in atmos struct 
                 for i in 1:atmos.nlev_c
-                    atmos.input_x[gas][i] = itp(atmos.p[i])
+                    atmos.gas_all_dict[atmos.gas_all_names[gidx]][i] = itp(atmos.p[i])
                 end 
             end 
 
-        end
+        end # end read VMR from file 
 
         # Check that we actually stored some values
-        if length(keys(atmos.input_x)) == 0
+        if atmos.gas_all_num == 0
             error("No mole fractions were stored")
+        end
+
+        # Normalise VMRs at each level
+        tot_vmr::Float64 = 0.0
+        for i in 1:atmos.nlev_c
+            # get total
+            tot_vmr = 0.0
+            for g in atmos.gas_all_names
+                tot_vmr += atmos.gas_all_dict[g][i]
+            end 
+            # normalise to 1
+            for g in atmos.gas_all_names
+                atmos.gas_all_dict[g][i] /= tot_vmr
+            end 
         end
 
         # Fastchem 
@@ -517,8 +545,9 @@ module atmosphere
         atmos.is_param = true
         atmos.is_solved = false 
         atmos.is_converged = false
+
         return nothing
-    end
+    end # end function setup 
 
     """
     **Get the mole fraction of a gas within the atmosphere.**
@@ -533,19 +562,16 @@ module atmosphere
     """
     function get_x(atmos::atmosphere.Atmos_t, gas::String, lvl::Int)::Float64
 
-        gas_valid = strip(gas, ' ')
-
-        x = 0.0
-        if gas_valid in keys(atmos.input_x)
+        if gas in atmos.gas_all_names
             if (lvl >= 1) && (lvl <= atmos.nlev_c)
-                i_gas = findfirst(==(gas), atmos.gases)
-                x = atmos.layer_x[lvl,i_gas]
+                return atmos.gas_all_dict[gas][lvl]
             else
                 error("Invalid level provided ($lvl)") 
             end 
+        else
+            @error "Invalid gas $gas queried in get_x()" 
+            return 0.0
         end 
-
-        return x
     end
 
     """
@@ -570,27 +596,32 @@ module atmosphere
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
 
+        # Temp value
+        vmr::Float64 = 0.0
+
         # mmw, cp, rho, kc
         fill!(atmos.layer_mmw    ,0.0)
         fill!(atmos.layer_density,0.0)
         fill!(atmos.layer_cp     ,0.0)
         fill!(atmos.layer_kc     ,0.0)
         fill!(atmos.layer_mass   ,0.0)
-        for i in 1:atmos.atm.n_layer
+        for i in 1:atmos.nlev_c
 
             # for each gas
-            for (i_gas, gas) in enumerate(atmos.gases)
+            for gas in atmos.gas_all_names
+
+                vmr = atmos.gas_all_dict[gas][i]
 
                 # set mmw
-                atmos.layer_mmw[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw",gas)
+                atmos.layer_mmw[i] += vmr * phys.lookup_safe("mmw",gas)
 
                 # set cp, kc
                 if atmos.thermo_funct 
-                    atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
-                    atmos.layer_kc[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i])
+                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
+                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i])
                 else 
-                    atmos.layer_cp[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("cp",gas)
-                    atmos.layer_kc[i] += atmos.layer_x[i,i_gas] * phys.lookup_safe("kc",gas)
+                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas)
+                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas)
                 end
                 
             end
@@ -939,69 +970,24 @@ module atmosphere
             atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
         end
 
-        # Set composition
-        atmos.gases = Array{String}(undef, atmos.spectrum.Gas.n_absorb)
-        atmos.layer_x = zeros(Float64, (atmos.nlev_c,length(atmos.gases)))
+        # Check supported gases
+        atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases 
+        atmos.gas_soc_names     = Array{String}(undef, atmos.gas_soc_num)   # list of names   
+        for i_gas in 1:atmos.gas_soc_num   # for each supported gas
+            atmos.gas_soc_names[i_gas] = SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
+        end 
 
-        #    check if all requested gases are in the spectral file 
-        is_in_spectral_file::Bool = false
-        for v_gas in keys(atmos.input_x)
-            is_in_spectral_file = false
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb
-                ti = atmos.spectrum.Gas.type_absorb[i_gas]
-                s_gas = SOCRATES.input_head_pcf.header_gas[ti]
+        # VMRs are provided to SOCRATES when radtrans is called
+        # For now, they are just stored inside the atmos struct
 
-                # is included?
-                if s_gas == v_gas 
-                    is_in_spectral_file = true 
-                end 
+        # Warn for unspported gases 
+        for g in atmos.gas_all_names 
+            if !(g in atmos.gas_soc_names) 
+                @warn "Gas $g is not present in the spectral file"
             end 
-            if !is_in_spectral_file 
-                @warn @sprintf("Gas %s is not present in the spectral file", v_gas)
-            end 
-        end
+        end 
 
-        #    loop over gases in the spectral file 
-        for i_gas in 1:atmos.spectrum.Gas.n_absorb
-            ti = atmos.spectrum.Gas.type_absorb[i_gas]
-            gas = SOCRATES.input_head_pcf.header_gas[ti]
-
-            atmos.gases[i_gas] = gas
-
-            #    is this gas included in the input VMRs?
-            if gas in keys(atmos.input_x)
-                atmos.layer_x[:,i_gas] .= atmos.input_x[gas]
-            else
-                atmos.layer_x[:,i_gas] .= 0.0
-            end
-
-            # Values are provided to SOCRATES when radtrans is called
-        end
-
-        # Renormalise mole fractions
-        for i in 1:atmos.nlev_c
-            tot = 0.0
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb 
-                tot += atmos.layer_x[i,i_gas]
-            end 
-
-            if tot == 0
-                error("Layer $i has all-zero mole fractions - check your spectral file")
-            end
-
-            for i_gas in 1:atmos.spectrum.Gas.n_absorb
-                ti = atmos.spectrum.Gas.type_absorb[i_gas]
-                gas = SOCRATES.input_head_pcf.header_gas[ti]
-
-                atmos.layer_x[i,i_gas] /= tot
-
-                if gas in keys(atmos.input_x)
-                    atmos.input_x[gas][i] = atmos.layer_x[i,i_gas]
-                end
-
-            end 
-        end
-
+        # Calc layer properties
         calc_layer_props!(atmos)
 
         ################################
@@ -1235,16 +1221,25 @@ module atmosphere
         ######################################################
         # Run radiative transfer model
         ######################################################   
-        
+
+        # Calculate contribution function?
         atmos.control.l_contrib_func_band = calc_cf
 
-        for i_gas in 1:length(atmos.gases)
+        # Set composition for each gas,level
+        for (i_gas,s_gas) in enumerate(atmos.gas_soc_names)
             for i in 1:atmos.nlev_c 
-                # convert mole fraction to mass mixing ratio
-                atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.layer_x[i,i_gas] * phys.lookup_safe("mmw", atmos.gases[i_gas]) / atmos.layer_mmw[i]
+                # skip unspecified gases
+                if s_gas in atmos.gas_all_names
+                    # convert mole fraction to mass mixing ratio
+                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_all_dict[s_gas][i] * phys.lookup_safe("mmw", s_gas) / atmos.layer_mmw[i]
+                else 
+                    atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0
+                end 
+                # do not normalise MMRs to 1
             end
         end 
 
+        # Do radiative transfer
         SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
                                 atmos.atm, atmos.cld, atmos.aer, 
                                 atmos.bound, atmos.radout)
@@ -1603,33 +1598,24 @@ module atmosphere
         # Parse gas chemistry
         g::String = ""
         j::Int    = -1
-        N_t = data[4,:] # sum of: gas number densities 
-        fill!(atmos.layer_x, 0.0)
-        for (i,h) in enumerate(head)  # for each column (level)
+        N_t = data[4,:] # at each level: sum of gas number densities 
+        for (i,h) in enumerate(head)  # for each column (gas)
             g = rstrip(lstrip(h))
 
-            # check if supported by SOCRATES
+            # check if gas is included in the model
             if g in keys(phys.map_fastchem_name) 
-                g = phys.map_fastchem_name[g]     # get formula
-
-                # check if supported by spectral file 
+                g = phys.map_fastchem_name[g]  # convert name
                 if g in atmos.gases
-                    j   = findfirst(==(g), atmos.gases)         # get index in gas list
-                    N_g = data[i,:]                             # number densities for this gas 
-                    atmos.layer_x[:,j] .= N_g[:] ./ N_t[:]      # mole fraction (VMR) for this gas 
+                    N_g = data[i,:]  # number densities for this gas 
+                    atmos.gas_all_dict[g][:] .= N_g[:] ./ N_t[:]    # mole fraction (VMR) for this gas 
                 end
-            end # not supported => skip
+            end # not included => skip
         end 
 
-        # Renormalise gas mole fractions at each level  
-        tot::Float64 = 0.0
-        for i in 1:atmos.nlev_c 
-            tot = sum(atmos.layer_x[i,:])
-            atmos.layer_x[i,:] /= tot
-        end 
+        # Do not renormalise mixing ratios
 
         return state 
-    end 
+    end
 
 
     """
@@ -1655,14 +1641,10 @@ module atmosphere
         # Work variables
         a::Float64 = 2.0
         pp::Float64 = 0.0
-        i_gas::Int = -1
-        i_sat::Int = -1 
+        c_sat::String = ""
         Tsat_lvl::Float64 = 0.0
         Tsat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
-
-        # Get index of water 
-        i_h2o = findfirst(==("H2O"), atmos.gases)
 
         # Calculate flux (negative) divergence due to latent heat release
         for i in 1:atmos.nlev_c
@@ -1673,8 +1655,7 @@ module atmosphere
             # Check which condensate is saturated (if any)
             for c in condensates
                 # Get partial pressure 
-                i_gas = findfirst(==(c), atmos.gases)
-                pp = atmos.layer_x[i,i_gas] * atmos.p[i]
+                pp = atmos.gas_all_dict[c][i] * atmos.p[i]
                 if pp < 1.0e-10 
                     continue
                 end
@@ -1683,20 +1664,20 @@ module atmosphere
                 Tsat = phys.calc_Tdew(c, pp)
                 if (atmos.tmp[i] < Tsat-1.0e-10) && (Tsat > Tsat_lvl)
                     Tsat_lvl = Tsat 
-                    i_sat = i_gas 
+                    c_sat = c 
                 end 
             end # end condensate
 
             # Relax tmp to appropriate Tsat value 
             # This is gas that maximises Tsat and for which tmp < Tsat is true 
-            if i_sat > -1
+            if !isempty(c_sat)
                 # relaxation function
                 # dif[i] = (a/atmos.tmp[i] - a/Tsat )
                 dif[i] = (1.0/a)*(Tsat_lvl-atmos.tmp[i])^2.0
 
                 # println("Condensing $c at $i")
                 atmos.mask_p[i] = atmos.mask_decay 
-                if i_sat == i_h2o
+                if c_sat == "H2O"
                     atmos.cloud_arr_r[i] = atmos.cloud_val_r
                     atmos.cloud_arr_l[i] = atmos.cloud_val_l
                     atmos.cloud_arr_f[i] = atmos.cloud_val_f
@@ -1812,12 +1793,11 @@ module atmosphere
     function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
         changed = falses(atmos.nlev_c)
-        i_gas = findfirst(==(gas), atmos.gases)
 
         # Check if each level is condensing. If it is, place on phase curve
         for i in 1:atmos.nlev_c
 
-            x = atmos.layer_x[i,i_gas]
+            x = atmos.gas_all_dict[gas][i]
             if x < 1.0e-10 
                 continue
             end
@@ -1843,9 +1823,7 @@ module atmosphere
         fill!(atmos.cloud_arr_f, 0.0)
 
         # Get index of water 
-        if "H2O" in atmos.gases
-            i_gas::Int = findfirst(==("H2O"), atmos.gases)
-        else 
+        if !("H2O" in atmos.gas_all_names)
             return nothing
         end
 
@@ -1854,7 +1832,7 @@ module atmosphere
         Tsat::Float64   = 0.0  # dew point temperature of water vapour
         for i in 1:atmos.nlev_c
 
-            x = atmos.layer_x[i,i_gas]
+            x = atmos.gas_all_dict["H2O"][i]
             if x < 1.0e-10 
                 continue
             end
@@ -2028,7 +2006,7 @@ module atmosphere
         # Create dimensions
         nlev_c = Int(atmos.nlev_c)
         nlev_l = nlev_c + 1
-        ngases = length(atmos.gases)
+        ngases = atmos.gas_all_num
         nchars = 16
 
         defDim(ds, "nlev_c", nlev_c)        # Cell centres
@@ -2175,20 +2153,22 @@ module atmosphere
         var_grav[:]  =  atmos.layer_grav
         var_thick[:]  = atmos.layer_thick
 
-        for i_gas in 1:ngases 
+        # Composition
+        for (i_gas,gas) in enumerate(atmos.gas_all_names)
+            # Fill gas names
             for i_char in 1:nchars 
                 var_gases[i_char, i_gas] = ' '
             end 
-            for i_char in 1:length(atmos.gases[i_gas])
-                var_gases[i_char,i_gas] = atmos.gases[i_gas][i_char]
+            for i_char in 1:length(atmos.gas_all_names[i_gas])
+                var_gases[i_char,i_gas] = atmos.gas_all_names[i_gas][i_char]
+            end 
+
+            # Fill VMR
+            for i_lvl in 1:nlev_c
+                var_x[i_gas, i_lvl] = atmos.gas_all_dict[gas][i_lvl]
             end 
         end 
         
-        for i_gas in 1:ngases 
-            for i_lvl in 1:nlev_c
-                var_x[i_gas, i_lvl] = atmos.layer_x[i_lvl, i_gas]
-            end 
-        end 
         var_cldf[:] =   atmos.cloud_arr_f
 
         var_fdl[:] =    atmos.flux_d_lw
