@@ -32,75 +32,30 @@ module phys
     const c_vac::Float64 = 299792458.0 # NIST CODATA
 
     # List of elements included in the model 
-    const elements_list = ["H","C","N","O","S","P"]
+    const elements_list = ["H","C","N","O","S","P", "Fe","Mg","Si","Ca","Al"]
 
-    # Pretty-formatted names
-    const lookup_pretty = Dict{String, String}([
-        ("H2O",    "H₂O"      ), 
-        ("CO2",    "CO₂"      ), 
-        ("O3",     "O₃"       ), 
-        ("N2O",    "N₂O"      ), 
-        ("CO",     "CO"       ), 
-        ("CH4",    "CH₄"      ), 
-        ("O2",     "O₂"       ), 
-        ("NO",     "NO"       ), 
-        ("SO2",    "SO₂"      ), 
-        ("NO2",    "NO₂"      ), 
-        ("NH3",    "NH₃"      ), 
-        ("HNO3",   "HNO₃"     ), 
-        ("N2",     "N₂"       ), 
-        ("CFC11",  "CFC11"    ), 
-        ("CFC12",  "CFC12"    ), 
-        ("CFC113", "CFC113"   ), 
-        ("HCFC22", "HCFC22"   ), 
-        ("HFC125", "HFC125"   ), 
-        ("HFC134A","HFC134A"  ), 
-        ("CFC114", "CFC114"   ), 
-        ("TiO",    "TiO"      ), 
-        ("VO",     "VO"       ), 
-        ("H2",     "H₂"       ), 
-        ("He",     "He"       ), 
-        ("OCS",    "OCS"      ), 
-        ("Na",     "Na"       ), 
-        ("K",      "K"        ), 
-        ("FeH",    "FeH"      ), 
-        ("CrH",    "CrH"      ), 
-        ("Li",     "Li"       ), 
-        ("Rb",     "Rb"       ), 
-        ("Cs",     "Cs"       ), 
-        ("PH3",    "PH₃"      ), 
-        ("C2H2",   "C₂H₂"     ), 
-        ("HCN",    "HCN"      ), 
-        ("H2S",    "H₂S"      ), 
-        ("Ar",     "Ar"       ), 
-        ("O",      "O"        ), 
-        ("N",      "N"        ), 
-        ("NO3",    "NO₃"      ), 
-        ("N2O5",   "N₂O₅"     ), 
-        ("HONO",   "HONO"     ), 
-        ("HO2NO2", "HO₂NO₂"   ), 
-        ("H2O2",   "H₂O₂"     ), 
-        ("C2H6",   "C₂H₆"     ), 
-        ("CH3",    "CH3"      ), 
-        ("H2CO",   "H₂CO"     ), 
-        ("HO2",    "HO₂"      ), 
-        ("HDO",    "HDO"      ), 
-        ("HCl",    "HCl"      ), 
-        ("HF",     "HF" )
-    ])
-
-    # Pre-defined absorber colors 
+    # Pre-defined colors 
     const lookup_color = Dict{String, String}([
+        # common volatiles 
         ("H2O", "#C720DD" ),
         ("CO2", "#D24901" ),
         ("H2" , "#008C01" ),
         ("CH4", "#027FB1" ),
         ("CO" , "#D1AC02" ),
         ("N2" , "#870036" ),
-        ("S"  , "#FF8FA1" ),
         ("O2" , "#00008B" ),
-        ("He" , "#30FF71" ),
         ("NH3", "#675200" ),
+
+        # volatile elements 
+        ("H"  , "#444444"),
+        ("C"  , "#eeeeee"),
+        ("O"  , "#0000ee"),
+        ("N"  , "#ffee00"),
+        ("S" ,  "#FF8FA1"),
+        ("He" , "#30FF71" ),
+
+        # refractory elements 
+        ("Fe" , "#ffaa11"),
     ])
 
     # Molecule mean molecular weight, kg mol-1
@@ -594,6 +549,8 @@ module phys
                 end
             end 
 
+            last = (i == nchar)
+
             # get count 
             if count == 0   # expecting number 
                 # number of atoms 
@@ -618,11 +575,54 @@ module phys
         return out 
     end 
 
-    # Convert gas fastchem name (Hill notation) to SOCRATES name 
-    # Generally the algorithm is:
+
+    # Convert formula to pretty unicode string 
+    function pretty_name(gas::String)::String 
+        out::String = ""
+        for c in gas 
+            if isnumeric(c)
+                d = parse(Int, c)
+                out *= Char(parse(Int,"208$d", base=16))
+            else
+                out *= c 
+            end 
+        end 
+        return out 
+    end 
+
+    # Get color from formula 
+    function pretty_color(gas::String)::String 
+        # Defined 
+        if gas in keys(lookup_color)
+            return lookup_color[gas]
+        end 
+
+        # Else, calculate color from atoms 
+        atoms = count_atoms(gas)
+        r::Float64 = 0.0
+        g::Float64 = 0.0
+        b::Float64 = 0.0
+        for e in keys(atoms)
+            r += parse(Int,lookup_color[e][2:3],base=16)*atoms[e]
+            g += parse(Int,lookup_color[e][4:5],base=16)*atoms[e]
+            b += parse(Int,lookup_color[e][6:7],base=16)*atoms[e]
+        end 
+        m::Float64 = max(r,g,b)
+
+        out::String = "#"
+        out *= string(floor(Int,255 * r/m),base=16,pad=2)
+        out *= string(floor(Int,255 * g/m),base=16,pad=2)
+        out *= string(floor(Int,255 * b/m),base=16,pad=2)
+        return out
+    end 
+
+    # Convert gas fastchem name (modified Hill notation) to SOCRATES/AGNI name 
+    # This is difficult to generalise into a nice conversion.
+    # Broadly, the algorithm is:
     #   sort elements in alphabetical order
     #   denote number of atoms with the integer count following element symbol 
     #   include 1 for when only a single atom of element is present
+    #   handle special cases (e.g. additional _1)
     const map_fastchem_name = Dict{String, String}([
                                     ("H2O1" ,    "H2O"  ),
                                     ("C1O2" ,    "CO2"  ),
