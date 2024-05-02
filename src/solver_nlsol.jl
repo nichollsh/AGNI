@@ -15,6 +15,7 @@ module solver_nlsol
     using LinearAlgebra
 
     import atmosphere 
+    import energy
     import phys
     import plotting
 
@@ -33,7 +34,7 @@ module solver_nlsol
     - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
     - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
     - `chem_type::Int=0`                chemistry type (see wiki)
-    - `incl_convect::Bool=true`         include convection
+    - `convect::Bool=true`              include convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=false`             include conductive heat transport within the atmosphere
     - `max_steps::Int=2000`             maximum number of solver steps
@@ -51,7 +52,7 @@ module solver_nlsol
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, condensates::Array=[], 
                             chem_type::Int=0,
-                            incl_convect::Bool=true, sens_heat::Bool=false,
+                            convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
@@ -147,47 +148,10 @@ module solver_nlsol
                 atmosphere.calc_layer_props!(atmos)
             end 
 
-            # Reset fluxes
-            fill!(atmos.flux_tot, 0.0)
-            fill!(atmos.flux_dif, 0.0)
-
-            # +Radiation
-            atmosphere.radtrans!(atmos, true)
-            atmosphere.radtrans!(atmos, false)
-            atmos.flux_tot += atmos.flux_n
-
-            # +Condensation
-            if do_condense
-                atmosphere.condense_relax!(atmos, condensates)
-                atmos.flux_tot += atmos.flux_p
-            end
-
-            # +Dry convection
-            if incl_convect
-                # Calc flux
-                atmosphere.mlt_dry!(atmos)
-
-                # Stabilise?
-                atmos.flux_cdry *= convect_sf
-
-                # Add to total flux
-                atmos.flux_tot += atmos.flux_cdry
-            end
-
-            # +Surface turbulence
-            if sens_heat
-                atmosphere.sensible!(atmos)
-                atmos.flux_tot[end] += atmos.flux_sens
-            end
-
-            # +Conduction 
-            if conduct
-                atmosphere.conduct!(atmos)
-                atmos.flux_tot += atmos.flux_cdct
-            end
-
-            # Flux loss across each level 
-            atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
+            # Calculate fluxes
+            energy.calc_fluxes!(atmos, 
+                                do_condense,  convect, sens_heat, conduct, 
+                                condensates=condensates, convect_sf=convect_sf)
 
             # Additional energy input
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
@@ -394,7 +358,7 @@ module solver_nlsol
         fill!(r_old, 1.0e98)
 
         # Stabilise convection?
-        stabilise_mlt = stabilise_mlt && incl_convect
+        stabilise_mlt = stabilise_mlt && convect
         if !stabilise_mlt
             convect_sf = 1.0
         end
@@ -646,7 +610,7 @@ module solver_nlsol
         end
 
         _fev!(x_cur, zeros(Float64, arr_len))
-        atmosphere.calc_hrates!(atmos)
+        energy.calc_hrates!(atmos)
 
         # ----------------------------------------------------------
         # Print info
