@@ -610,19 +610,23 @@ module atmosphere
             for gas in atmos.gas_all_names
 
                 vmr = atmos.gas_all_dict[gas][i]
-
                 # set mmw
                 atmos.layer_mmw[i] += vmr * phys.lookup_safe("mmw",gas)
+            end
 
+            for gas in atmos.gas_all_names
                 # set cp, kc
                 if atmos.thermo_funct 
-                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i])
-                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i])
+                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i]) *
+                        phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
+                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i]) *
+                        phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
                 else 
-                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas)
-                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas)
+                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas)*
+                        phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
+                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas)*
+                        phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
                 end
-                
             end
 
             # density (assumes ideal gas)
