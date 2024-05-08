@@ -15,7 +15,6 @@ socrates/make/Mk_cmd
 *.bin
 res/spectral_files/*/4096
 res/spectral_files/Reach/
-res/spectral_files/Dayspring
 
 # Output files 
 out/*
