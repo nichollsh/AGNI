@@ -595,8 +595,8 @@ module atmosphere
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
 
-        # Temp value
-        vmr::Float64 = 0.0
+        # Temp values
+        mmr::Float64 = 0.0
 
         # mmw, cp, rho, kc
         fill!(atmos.layer_mmw    ,0.0)
@@ -606,26 +606,20 @@ module atmosphere
         fill!(atmos.layer_mass   ,0.0)
         for i in 1:atmos.nlev_c
 
-            # for each gas
+            # set mmw
             for gas in atmos.gas_all_names
-
-                vmr = atmos.gas_all_dict[gas][i]
-                # set mmw
-                atmos.layer_mmw[i] += vmr * phys.lookup_safe("mmw",gas)
+                atmos.layer_mmw[i] += atmos.gas_all_dict[gas][i] * phys.lookup_safe("mmw",gas)
             end
 
+            # set cp, kc
             for gas in atmos.gas_all_names
-                # set cp, kc
+                mmr = atmos.gas_all_dict[gas][i] * phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
                 if atmos.thermo_funct 
-                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i]) *
-                        phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
-                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i]) *
-                        phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
+                    atmos.layer_cp[i] += mmr * phys.lookup_safe("cp",gas,tmp=atmos.tmp[i]) 
+                    atmos.layer_kc[i] += mmr * phys.lookup_safe("kc",gas,tmp=atmos.tmp[i]) 
                 else 
-                    atmos.layer_cp[i] += vmr * phys.lookup_safe("cp",gas)*
-                        phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
-                    atmos.layer_kc[i] += vmr * phys.lookup_safe("kc",gas)*
-                        phys.lookup_safe("mmw",gas)/atmos.layer_mmw[i]
+                    atmos.layer_cp[i] += mmr * phys.lookup_safe("cp",gas)
+                    atmos.layer_kc[i] += mmr * phys.lookup_safe("kc",gas)
                 end
             end
 
