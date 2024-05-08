@@ -1,0 +1,177 @@
+Hello
+
+Parameters
+    source: dace
+    alias:  Dayspring
+    vols:   H2O H2 CO2 CO CH4 N2
+    nband:  16
+    numin, numax, dnu : 1.0, 35000, 0.00 cm-1
+ 
+Verifying domain of input data
+    checking H2O
+        numin, numax = 1.0, 35000.0 cm-1
+    checking H2
+        numin, numax = 1.0, 35000.0 cm-1
+    checking CO2
+        numin, numax = 1.0, 20000.0 cm-1
+    checking CO
+        numin, numax = 1.0, 23000.0 cm-1
+    checking CH4
+        numin, numax = 1.0, 12000.0 cm-1
+    checking N2
+        numin, numax = 1.0, 35000.0 cm-1
+    numin, numax set to 1.0, 35000.0 cm-1 
+
+Mapping p,t points
+    searching in '/home/n/nichollsh/SOCRATES/spectraltools/data/dace/N2/'
+    found 3360 files
+    want 1440 files
+    finding best temperatures
+    finding best pressures
+    mapping to files
+     %: 10 20 30 40 50 60 70 80 90 100  
+    1440 files mapped, totalling 27.072 GB
+    done
+
+Finding best bands (method=3)...
+    band   1 : 1.01 - 150.51 cm-1     9900990.10 - 66440.77 nm
+    band   2 : 150.51 - 300.00 cm-1     66440.77 - 33333.33 nm
+    band   3 : 300.00 - 421.46 cm-1     33333.33 - 23727.04 nm
+    band   4 : 421.46 - 592.11 cm-1     23727.04 - 16888.75 nm
+    band   5 : 592.11 - 831.84 cm-1     16888.75 - 12021.54 nm
+    band   6 : 831.84 - 1168.63 cm-1     12021.54 - 8557.03 nm
+    band   7 : 1168.63 - 1641.79 cm-1     8557.03 - 6090.91 nm
+    band   8 : 1641.79 - 2306.51 cm-1     6090.91 - 4335.55 nm
+    band   9 : 2306.51 - 3240.37 cm-1     4335.55 - 3086.07 nm
+    band  10 : 3240.37 - 4552.33 cm-1     3086.07 - 2196.68 nm
+    band  11 : 4552.33 - 6395.47 cm-1     2196.68 - 1563.61 nm
+    band  12 : 6395.47 - 8984.87 cm-1     1563.61 - 1112.98 nm
+    band  13 : 8984.87 - 12622.66 cm-1     1112.98 - 792.23 nm
+    band  14 : 12622.66 - 17733.31 cm-1     792.23 - 563.91 nm
+    band  15 : 17733.31 - 24913.16 cm-1     563.91 - 401.39 nm
+    band  16 : 24913.16 - 34999.99 cm-1     401.39 - 285.71 nm
+    done
+
+Creating skeleton spectral file 'Dayspring'
+    number of bands: 16
+    numin , numax: 1.01 , 34999.99 cm-1
+    included volatiles (n=6): H2O H2 CO2 CO CH4 N2
+    most significant absorber: H2O
+    number of p,t points: 1440
+    unique p values [Pa]: 0.1 0.132 0.17 0.224 0.288 0.372 0.49 0.631 0.832 1.072 1.38 1.82 2.344 3.09 3.981 5.129 6.761 8.71 11.482 14.791 19.055 25.119 32.359 42.658 54.954 70.795 93.325 120.226 154.882 204.174 263.027 346.737 446.684 575.44 758.578 977.237 1288.25 1659.587 2137.962 2818.383 3630.781 4786.301 6165.95 7943.282 10471.285 13489.629 17782.794 22908.677 29512.092 38904.514 50118.723 66069.345 85113.804 107151.931 141253.754 181970.086 234422.882 309029.543 398107.171 524807.46 676082.975 870963.59 1148153.621 1479108.388 1949844.6 2511886.432 3235936.569 4265795.188 5495408.739 7244359.601 9332543.008 12022644.346 15848931.925 20417379.447 26915348.039 34673685.045 44668359.215 58884365.536 75857757.503 100000000.0
+    unique t values [K] : 100.0 273.0 419.0 564.0 783.0 928.0 1074.0 1220.0 1438.0 1584.0 1729.0 1875.0 2093.0 2239.0 2385.0 2530.0 2749.0 2895.0
+    number of continua: 9
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_skel.sf' 
+
+WARNING: Using pre-existing netCDF file for H2O lbl absorption. Any configuration mismatch here will lead to issues.
+WARNING: Using pre-existing netCDF file for H2 lbl absorption. Any configuration mismatch here will lead to issues.
+WARNING: Using pre-existing netCDF file for CO2 lbl absorption. Any configuration mismatch here will lead to issues.
+WARNING: Using pre-existing netCDF file for CO lbl absorption. Any configuration mismatch here will lead to issues.
+WARNING: Using pre-existing netCDF file for CH4 lbl absorption. Any configuration mismatch here will lead to issues.
+WARNING: Using pre-existing netCDF file for N2 lbl absorption. Any configuration mismatch here will lead to issues.
+Calculating k-coefficients for 'H2O' line absorption for 'Dayspring'...
+    band limits: [1, 16]
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_H2O_lbl.sf_k'
+
+Calculating k-coefficients for 'H2O-H2O' CIA for 'Dayspring'...
+    Using MT_CKD with band limits: [1, 14]
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_H2O-H2O_cia.sf_k'
+
+Calculating k-coefficients for 'N2-H2O' CIA for 'Dayspring'...
+    Using HITRAN CIA database
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_N2-H2O_cia.sf_k'
+
+Calculating k-coefficients for 'H2' line absorption for 'Dayspring'...
+    band limits: [1, 16]
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_H2_lbl.sf_k'
+
+Calculating k-coefficients for 'H2-H2' CIA for 'Dayspring'...
+    Using HITRAN CIA database
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_H2-H2_cia.sf_k'
+
+Calculating k-coefficients for 'CO2-H2' CIA for 'Dayspring'...
+    Using HITRAN CIA database
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_CO2-H2_cia.sf_k'
+
+Calculating k-coefficients for 'H2-CH4' CIA for 'Dayspring'...
+    Using HITRAN CIA database
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_H2-CH4_cia.sf_k'
+
+Calculating k-coefficients for 'N2-H2' CIA for 'Dayspring'...
+    Using HITRAN CIA database
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_N2-H2_cia.sf_k'
+
+Calculating k-coefficients for 'CO2' line absorption for 'Dayspring'...
+    band limits: [1, 14]
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_CO2_lbl.sf_k'
+
+Calculating k-coefficients for 'CO2-CO2' CIA for 'Dayspring'...
+    Using HITRAN CIA database
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_CO2-CO2_cia.sf_k'
+
+Calculating k-coefficients for 'CO2-CH4' CIA for 'Dayspring'...
+    Using HITRAN CIA database
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_CO2-CH4_cia.sf_k'
+
+Calculating k-coefficients for 'CO' line absorption for 'Dayspring'...
+    band limits: [1, 14]
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_CO_lbl.sf_k'
+
+Calculating k-coefficients for 'CH4' line absorption for 'Dayspring'...
+    band limits: [1, 12]
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_CH4_lbl.sf_k'
+
+Calculating k-coefficients for 'N2' line absorption for 'Dayspring'...
+    band limits: [1, 16]
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_N2_lbl.sf_k'
+
+Calculating k-coefficients for 'N2-N2' CIA for 'Dayspring'...
+    Using HITRAN CIA database
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_N2-N2_cia.sf_k'
+
+Calculating water droplet optical properties for 'Dayspring'...
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring_droplet.sct'
+
+Assembling final spectral file for 'Dayspring'...
+    line absorption: H2O H2 CO2 CO CH4 N2 
+    CIA: H2O-H2O H2-CH4 H2-H2 N2-H2 N2-N2 N2-H2O CO2-CO2 CO2-H2 CO2-CH4 
+    water droplets: yes
+    aerosols: (none)
+    ice: (none)
+    start
+    please wait...
+    done writing to '/home/n/nichollsh/SOCRATES/spectraltools/output/Dayspring.sf' 
+
+Goodbye

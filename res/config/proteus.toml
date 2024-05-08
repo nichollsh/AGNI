@@ -1,0 +1,64 @@
+# AGNI configuration file used when coupling to PROTEUS
+title = "PROTEUS configured"
+
+[planet]
+    p_top           = 1e-05
+    tmp_surf        = 3009.1074604027003
+    instellation    = 1029.8632959617698
+    s0_fact         = 0.375
+    albedo_b        = 0.1
+    zenith_angle    = 48.19
+    albedo_s        = 0.1
+    gravity         = 9.819943999997438
+    radius          = 6371000.0
+    p_surf          = 473.85000023493296
+    skin_k          = 2.0
+    skin_d          = 0.01
+    tmp_magma       = 3009.1074604027003
+
+[planet.vmr]
+    H2O = 0.03234803944204441
+    CO2 = 0.5959795214177834
+    H2 = 0.002655808798170364
+    N2 = 0.00416907886858995
+    CH4 = 3.85033782233133e-11
+    CO = 0.3648475514349085
+
+[files]
+    clean_output    = true
+    output_dir      = "out/"
+    input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"
+    input_star      = "res/stellar_spectra/sun.txt" 
+
+[execution]
+    silent          = false  
+    max_steps       = 200    
+    max_runtime     = 400    
+    continua        = true   
+    aerosol         = false  
+    overlap_method  = 4      
+    thermo_funct    = false  
+    sensible_heat   = false  
+
+    convection_type = "mlt" 
+    condensates     = [] 
+    solvers         = ["newton"]    
+    chemistry       = 0
+    initial_state   = ["iso","1800"] 
+    stabilise       = false   
+    converge_atol   = 1.0e-3  
+    converge_rtol   = 2.0e-3  
+    num_levels = 40
+    rayleigh = true
+    cloud = false
+    solution_type = 2
+
+[plots]
+    animate         = false
+    at_runtime = true
+    temperature = true
+    fluxes = true
+    contribution = true
+    emission = true
+    albedo = true
+    mixing_ratios = true
