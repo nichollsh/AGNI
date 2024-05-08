@@ -18,7 +18,7 @@ title = "Earth (ish)"                    # Name for this configuration file
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
     input_vmr       = "doc/example_earth/equ.csv"       # RFM mixing ratios
     output_dir      = "out/"                                            # Path to output directory.
@@ -39,7 +39,7 @@ title = "Earth (ish)"                    # Name for this configuration file
     condensates     = []         
     chemistry       = 0              
     solution_type   = 0                        
-    solvers         = []              # timestepping works best in this case
+    solvers         = ["timestep"]              # timestepping works best in this case
     initial_state   = ["dry","str","100"]       # dry adiabat + stratosphere at 100 K
     stabilise       = true                     
     converge_atol   = 1.0e-9                   

@@ -58,7 +58,9 @@ module solver_tstep
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, use_physical_dt::Bool=false,
-                            convect::Bool=true, condensates::Array=[], use_mlt::Bool=true,
+                            convect::Bool=true, condensates::Array=[], chem_type::Int=0,
+
+                            use_mlt::Bool=true,
                             sens_heat::Bool=false, conduct::Bool=true, modprop::Int=1, 
                             verbose::Bool=true, modplot::Int=0, save_frames::Bool=true,
                             accel::Bool=true, adams::Bool=true, dt_max::Float64=500.0, 
@@ -373,7 +375,7 @@ module solver_tstep
             if dryadj_steps > 0 && convect && !use_mlt && start_con
 
                 # do adjustment steps
-                tmp_tnd = atmosphere.adjust_dry(atmos, dryadj_steps)
+                tmp_tnd = energy.adjust_dry(atmos, dryadj_steps)
                 clamp!(tmp_tnd, -1.0 * dtmp_clip, dtmp_clip)
                 
                 # check which levels were changed
