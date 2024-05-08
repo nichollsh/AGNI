@@ -411,9 +411,9 @@ module solver_nlsol
             if chem_type in [1,2,3]
                 fc_retcode = atmosphere.chemistry_eq!(atmos, chem_type, false)
                 if fc_retcode == 0
-                    stepflags *= "Cs"
+                    stepflags *= "Cs-"
                 else 
-                    stepflags *= "Cf"
+                    stepflags *= "Cf-"
                     step_ok = false
                 end
             end 
@@ -444,6 +444,7 @@ module solver_nlsol
                 if stepflags[end] == "S"
                     stepflags *= "c"
                 end 
+                stepflags *= "-"
             else
                 # No stabilisation at this point
                 convect_sf = 1.0 
@@ -453,10 +454,10 @@ module solver_nlsol
             r_old[:] .= r_cur[:]
             if use_cendiff || (step == 1)
                 _calc_jac_res_cendiff!(x_cur, b, r_cur) 
-                stepflags *= "Fc"
+                stepflags *= "Fc-"
             else
                 _calc_jac_res_fordiff!(x_cur, b, r_cur) 
-                stepflags *= "Ff"
+                stepflags *= "Ff-"
             end 
 
             # Check if jacobian is singular 
@@ -472,12 +473,12 @@ module solver_nlsol
             if (method == 1)
                 # Newton-Raphson step 
                 x_dif = -b\r_cur
-                stepflags *= "Nr"
+                stepflags *= "Nr-"
 
             elseif method == 2
                 # Gauss-Newton step 
                 x_dif = -(b'*b) \ (b'*r_cur) 
-                stepflags *= "Gn"
+                stepflags *= "Gn-"
 
             elseif method == 3
                 # Levenberg-Marquardt step
@@ -490,7 +491,7 @@ module solver_nlsol
 
                 #    Update our estimate of the solution
                 x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
-                stepflags *= "Lm"
+                stepflags *= "Lm-"
             end
 
             # Limit step size according to inverse temperature (impacts high temperatures)
@@ -502,7 +503,7 @@ module solver_nlsol
             if linesearch && (step > 1)
 
                 # Reset
-                stepflags *= "Ls"
+                stepflags *= "Ls-"
                 ls_best_cost = c_old*ls_compassion  # allow a cost increase 
                 ls_best_scale = 0.1     # ^ this will require a small step scale
 
@@ -569,7 +570,7 @@ module solver_nlsol
                 
             # Inform user
             if mod(step,modprint) == 0 
-                info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-9s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags)
+                info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags[1:end-1])
                 if step_ok
                     @info info_str
                 else
