@@ -55,3 +55,6 @@ To run the program, execute `./agni.jl [cfg_path]`. If `[cfg_path]` is not provi
 To demo the steam runaway greenhouse effect, execute `./demo_steamrun.jl`.     
 To run the unit tests execute `./demo_steamrun.jl`.     
 
+## Contributors
+* Harrison Nicholls
+* Hamish Innes
