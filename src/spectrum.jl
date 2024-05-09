@@ -142,7 +142,7 @@ module spectrum
         open(execpath, "w") do f
             
             # exec prep_spec 
-            write(f, prep_spec*" <<EOF\n")
+            write(f, prep_spec*" <<-EOF\n")
 
             # paths
             write(f, orig_file*" \n")
@@ -166,7 +166,8 @@ module spectrum
 
             # exit prep_spec 
             write(f, "-1 \n")
-            write(f, "EOF \n")
+            write(f, "EOF\n")
+            write(f, " ")
         end
 
         # Run executable

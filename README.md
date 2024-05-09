@@ -21,7 +21,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 
 
 ## Requirements
-* Julia (version 1.9.1 or later)
+* Julia (NB: install only from julialang.org - do not use your system package manager)
 * gfortran (NB: do not use ifort or aocc)
 * netcdf-fortran
 * make
@@ -39,8 +39,8 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 - `$ cd julia`
 - `$ julia`
 - `julia> ]`
--  `(@v1.9) pkg> add OffsetArrays Revise PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse BinnedStatistics LoggingExtras`
--  `(@v1.9) pkg> activate .`
+-  `(@v1.10) pkg> add OffsetArrays Revise PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse BinnedStatistics LoggingExtras`
+-  `(@v1.10) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`
 -  `julia> include("generate_wrappers.jl")`
@@ -58,3 +58,5 @@ To run the unit tests execute `./demo_steamrun.jl`.
 ## Contributors
 * Harrison Nicholls
 * Hamish Innes
+
+
