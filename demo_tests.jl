@@ -75,12 +75,11 @@ p_surf          = 50.0     # bar
 theta           = 65.0
 mf_dict         = Dict([
                         ("H2O" , 0.5),
-                        ("CO2" , 0.1),
-                        ("O2"  , 0.1),
-                        ("He" , 0.1),
+                        ("CO2" , 0.2),
+                        ("N2"  , 0.1),
                         ("H2"  , 0.2)
                         ])
-spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
+spfile_name   = "res/spectral_files/Dayspring/16/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -129,7 +128,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.8),
                         ("CO2" , 0.2),
                         ])
-spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
+spfile_name   = "res/spectral_files/Dayspring/16/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -239,7 +238,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.6),
                         ("CO2" , 0.4),
                         ])
-spfile_name   = "res/spectral_files/Mallard/Mallard.sf"
+spfile_name   = "res/spectral_files/Dayspring/16/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
