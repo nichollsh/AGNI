@@ -50,8 +50,8 @@ module solver_nlsol
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1, condensates::Array=[], 
-                            chem_type::Int=0,
+                           sol_type::Int=1, condensates::Array=[],
+                            condensing::Array=[], chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
@@ -101,7 +101,7 @@ module solver_nlsol
         x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
         fd_s::Float64           = 0.0                      # Row perturbation amount
         do_chemistry::Bool      = (chem_type>0)
-
+        
         # Convective flux scale factor 
         convect_sf::Float64 = 5.0e-5
 
@@ -151,7 +151,8 @@ module solver_nlsol
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
                                 do_condense,  convect, sens_heat, conduct, 
-                                condensates=condensates, convect_sf=convect_sf)
+                                condensates=condensates, condensing=condensing,
+                                convect_sf=convect_sf)
 
             # Additional energy input
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
@@ -418,6 +419,13 @@ module solver_nlsol
                 end
             end 
 
+            # Do condensation here (doesn't affect fluxes currently)
+
+            # Reset condensing array
+            condensing = [String[] for x in 1:atmos.nlev_c]
+            atmosphere.condense_varyx!(atmos, condensing, condensates=condensates, 
+                                        gases=atmos.gas_all_names)
+            
             # Update properties (mmw, density, height, etc.)
             step_ok = step_ok && atmosphere.calc_layer_props!(atmos)
 

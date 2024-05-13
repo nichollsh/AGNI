@@ -304,7 +304,7 @@ module energy
     - `pmin::Float64=0.0`               pressure below which convection is disabled.
     - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=0.0, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t, condensing::Array; pmin::Float64=0.0, mltype::Int=1)
 
         # Reset arrays
         fill!(atmos.flux_cdry, 0.0)
@@ -315,9 +315,14 @@ module energy
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
         grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0; grad_df::Float64 = 0.0
+        beta::Float64 = 0.0; xv::Float64=0.0; xv_av::Float64=0.0
+        moist::Bool = false; inhib::Float64 = 0.0; condition::Bool = false
+        cmax::String = ""
 
         # Loop from bottom upwards (over cell-edges)
-        for i in range(start=atmos.nlev_l-1, step=-1, stop=3) 
+        for i in range(start=atmos.nlev_l-1, step=-1, stop=3)
+            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) ) / ( log(atmos.p[i-1]/atmos.p[i]) )
+            moist=false
 
             # Optionally skip low pressures 
             if atmos.pl[i] < pmin
@@ -336,12 +341,55 @@ module energy
             grav = (atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1)/mt
             mu   = (atmos.layer_mmw[i]  * m2 + atmos.layer_mmw[i-1]  * m1)/mt
             c_p  = (atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1)/mt
+            tmp = (atmos.tmp[i] * m2 + atmos.tmp[i-1] * m1)/mt
+            
 
-            grad_ad = (phys.R_gas / mu) / c_p
-            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) ) / ( log(atmos.p[i-1]/atmos.p[i]) )
+            # Define moist elsewhere eventually, link to condensates
+            # To do:
+            #  - Find regions where we are condensing (pass from the condensation scheme)
+            #  - Find the condensible with the largest value of (L/RT)^2*x 
+            #  - Calculate the adiabatic lapse rate
+            #  - Calculate stabilisation w.r.t. the adiabat using criterion
+            #  - Set the vapour contents to the new saturated value
+            #  - Adjust the dry component to compensate
+            
+
+            ## HII 13.05 - disabled the moist convection part of this code so that I can test
+            ##             condensation first!
+            
+            # if length(condensing[i])>0
+            #     # Check which condensible species has the largest (L/RT)^2*x
+                
+            #     maxval = -1000
+            #     for c in condensing[i]
+            #         xv_av = (atmos.gas_all_dict[c][i] * m2 + atmos.gas_all_dict[c][i-1]*m1)/mt
+            #         # Make sure L is molar quantity
+            #         L = phys.lookup_safe("l_vap", c)*phys.lookup_safe("mmw", c)
+                    
+            #         if (L/phys.R_gas/tmp)^2 * xv_av > maxval
+            #             maxval = (L/phys.R_gas/tmp)^2 * xv_av
+            #             cmax = c
+            #         end
+            #     end
+            #     mmw_v = phys.lookup_safe("mmw",cmax)
+            #     xv = (atmos.gas_all_dict[cmax][i]*m2 + atmos.gas_all_dict[cmax][i-1]*m1)/mt
+            #     beta = phys.lookup_safe("l_vap", cmax)*mmw_v/tmp/phys.R_gas
+
+            #     grad_ad = (1 - xv + beta*xv) / (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
+            #     # Critical value (in vmr, NOT mmr form, only when mmw_v>mmw_d)
+            #     if mmw_v > (mu - xv*mmw_v)/(1-xv)
+            #         inhib = phys.R_gas * tmp/L * (1-xv)/(mmw_v/mu - 1)
+            #         condition = (grad_pr > grad_ad) && xv < inhib
+            #     else
+            #         condition = (grad_pr > grad_ad)
+            #     end
+            # else
+                grad_ad = (phys.R_gas / mu) / c_p
+                condition = (grad_pr > grad_ad)
+            # end
 
             # Check instability
-            if (grad_pr > grad_ad)
+            if (condition)
 
                 # Check if this layer is condensing (this shouldn't ever be
                 # true, because the condensation curve dT/dp is too shallow)
@@ -477,7 +525,8 @@ module energy
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t, 
                             condense::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
-                            condensates::Array=[], convect_sf::Float64=1.0)
+                          condensates::Array=[],
+                          condensing::Array, convect_sf::Float64=1.0)
 
         # Reset fluxes
         fill!(atmos.flux_tot, 0.0)
@@ -489,15 +538,19 @@ module energy
         atmos.flux_tot += atmos.flux_n
 
         # +Condensation
-        if condense
-            energy.condense_relax!(atmos, condensates)
-            atmos.flux_tot += atmos.flux_p
-        end
+#        if condense
+#            energy.condense_relax!(atmos, condensates)
+#            atmos.flux_tot += atmos.flux_p
+#        end
 
+        #if condense
+        #    atmosphere.condense_varyx!(atmos.tmp, condensing, condensates, atmos.gas_all_names)
+        #end
+        
         # +Dry convection
         if convect
             # Calc flux
-            energy.mlt!(atmos)
+            energy.mlt!(atmos, condensing)
 
             # Stabilise?
             atmos.flux_cdry *= convect_sf
