@@ -3,26 +3,27 @@ title = "PROTEUS configured"
 
 [planet]
     p_top           = 1e-05
-    tmp_surf        = 3009.1074604027003
-    instellation    = 1029.8632959617698
+    tmp_surf        = 1000
+    instellation    = 800.0
     s0_fact         = 0.375
-    albedo_b        = 0.1
+    albedo_b        = 0.3
     zenith_angle    = 48.19
-    albedo_s        = 0.1
+    albedo_s        = 0.3
     gravity         = 9.819943999997438
     radius          = 6371000.0
-    p_surf          = 473.85000023493296
+    p_surf          = 473.000
     skin_k          = 2.0
     skin_d          = 0.01
     tmp_magma       = 3009.1074604027003
+    tmp_eff         = 0.0
 
 [planet.vmr]
-    H2O = 0.03234803944204441
-    CO2 = 0.5959795214177834
-    H2 = 0.002655808798170364
-    N2 = 0.00416907886858995
-    CH4 = 3.85033782233133e-11
-    CO = 0.3648475514349085
+    H2O = 0.2
+    CO2 = 0.5
+    H2 = 0.0
+    N2 = 0.0
+    CH4 = 0.0
+    CO = 0.3
 
 [files]
     clean_output    = true
@@ -32,7 +33,7 @@ title = "PROTEUS configured"
 
 [execution]
     silent          = false  
-    max_steps       = 200    
+    max_steps       = 200
     max_runtime     = 400    
     continua        = true   
     aerosol         = false  
@@ -41,17 +42,17 @@ title = "PROTEUS configured"
     sensible_heat   = false  
 
     convection_type = "mlt" 
-    condensates     = [] 
+    condensates     = ["H2O"] 
     solvers         = ["newton"]    
     chemistry       = 0
     initial_state   = ["iso","1800"] 
     stabilise       = false   
     converge_atol   = 1.0e-3  
     converge_rtol   = 2.0e-3  
-    num_levels = 40
+    num_levels = 50
     rayleigh = true
     cloud = false
-    solution_type = 2
+    solution_type = 3
 
 [plots]
     animate         = false

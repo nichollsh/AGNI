@@ -1265,8 +1265,64 @@ module atmosphere
         return state 
     end
 
+   # Condense species, neglecting the latent heating and relaxing the mixing ratio of the condensible species
+   # to the saturation value.
+function condense_varyx!(atmos::atmosphere.Atmos_t,
+                         condensing::Array; condensates::Array=[], gases::Array{String,1})
 
-    # Apply condensation according to vapour-liquid coexistance curve (return mask of condensing levels)
+        # Keep track of the minimum value of all condensates
+        minvals = Dict(s => 999999. for s in condensates)
+        
+        if length(condensates) == 0
+            return nothing
+        end
+    
+        # Check if a level is condensing (start from bottom to allow cold trap)
+        for i in atmos.nlev_c:-1:1
+            # Keep track of condensing species at each level
+            #condensing=Array{String}(undef, 0)
+            #condensing [String[] for x in 1:atmos.nlev_c]
+            # Keep track of the new condensing species amount
+            vap_new = 0.0
+            # Keep track of the old condensing species amount
+            vap_old = 0.0
+            for c in condensates
+                pp = atmos.gas_all_dict[c][i] * atmos.p[i]
+                # This assumes bottom of the atmosphere is dry, no condensation here
+                deep = atmos.gas_all_dict[c][end]
+                if pp < 1.e-10
+                    continue
+                end
+
+                # Check saturation
+                xsat = phys.calc_Psat(c, atmos.tmp[i])/atmos.p[i]
+                if xsat < deep
+                    # Condense! Track condensing substances and former values
+                    push!(condensing[i], c)
+                    vap_old = vap_old + atmos.gas_all_dict[c][i]
+
+                    # Check if condensible is monontonically decreasing in conc.
+                    if xsat < minvals[c]
+                        # Yes - then set to xsat
+                        vap_new = vap_new + xsat
+                        atmos.gas_all_dict[c][i] = xsat
+                        minvals[c] = xsat
+                    else
+                        # No - cold trap
+                        vap_new = vap_new + minvals[c]
+                        atmos.gas_all_dict[c][i] = minvals[c]
+                    end
+                end
+            end
+        
+            # Correct dry mixing ratios for missing condensate
+            for nc in setdiff(gases, condensing)
+                atmos.gas_all_dict[nc][i] = atmos.gas_all_dict[nc][i] * (1. - vap_new)/(1. - vap_old)
+            end
+        end
+    end
+
+# Apply condensation according to vapour-liquid coexistance curve (return mask of condensing levels)
     function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
         changed = falses(atmos.nlev_c)
