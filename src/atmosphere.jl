@@ -1276,8 +1276,12 @@ function condense_varyx!(atmos::atmosphere.Atmos_t,
         if length(condensates) == 0
             return nothing
         end
-    
-        # Check if a level is condensing (start from bottom to allow cold trap)
+
+        varying_x = [String[] for x in 1:atmos.nlev_c]
+    # Check if a level is condensing (start from bottom to allow cold trap)
+        for c in condensates
+            minvals[c] = atmos.gas_all_dict[c][end]
+        end
         for i in atmos.nlev_c:-1:1
             # Keep track of condensing species at each level
             #condensing=Array{String}(undef, 0)
@@ -1290,33 +1294,33 @@ function condense_varyx!(atmos::atmosphere.Atmos_t,
                 pp = atmos.gas_all_dict[c][i] * atmos.p[i]
                 # This assumes bottom of the atmosphere is dry, no condensation here
                 deep = atmos.gas_all_dict[c][end]
+                
                 if pp < 1.e-10
                     continue
                 end
 
                 # Check saturation
                 xsat = phys.calc_Psat(c, atmos.tmp[i])/atmos.p[i]
-                if xsat < deep
-                    # Condense! Track condensing substances and former values
-                    push!(condensing[i], c)
-                    vap_old = vap_old + atmos.gas_all_dict[c][i]
 
-                    # Check if condensible is monontonically decreasing in conc.
-                    if xsat < minvals[c]
-                        # Yes - then set to xsat
-                        vap_new = vap_new + xsat
-                        atmos.gas_all_dict[c][i] = xsat
-                        minvals[c] = xsat
-                    else
-                        # No - cold trap
-                        vap_new = vap_new + minvals[c]
-                        atmos.gas_all_dict[c][i] = minvals[c]
-                    end
+                if xsat < minvals[c]
+                    # Condensation
+                    push!(condensing[i], c)
+                    push!(varying_x[i], c)
+                    vap_old = vap_old + atmos.gas_all_dict[c][i]
+                    vap_new = vap_new + xsat
+                    atmos.gas_all_dict[c][i] = xsat
+                    minvals[c] = xsat
+                elseif minvals[c] + 1.e-13 < deep
+                    # Cold trapping
+                    push!(varying_x[i], c)
+                    vap_old = vap_old + atmos.gas_all_dict[c][i]
+                    vap_new = vap_new + minvals[c]
+                    atmos.gas_all_dict[c][i] = minvals[c]
                 end
             end
         
             # Correct dry mixing ratios for missing condensate
-            for nc in setdiff(gases, condensing)
+            for nc in setdiff(gases, varying_x)
                 atmos.gas_all_dict[nc][i] = atmos.gas_all_dict[nc][i] * (1. - vap_new)/(1. - vap_old)
             end
         end
