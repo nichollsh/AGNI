@@ -393,7 +393,8 @@ function main()::Bool
                                 convect=incl_convect, condensates=condensates, condensing=condensing,
                                 sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
                                 conv_rtol=conv_rtol, method=1,
-                                stabilise_mlt=stabilise,modplot=modplot,save_frames=plt_ani)
+                                stabilise_mlt=stabilise,modplot=modplot,save_frames=plt_ani,
+                                mf_dict =mf_dict  )
             return_success = return_success && solver_success
         else 
             @error "Invalid solver"

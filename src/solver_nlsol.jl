@@ -59,7 +59,8 @@ module solver_nlsol
                             method::Int=1, linesearch::Bool=true,
                             modplot::Int=1, save_frames::Bool=true, 
                             stabilise_mlt::Bool=true,
-                            conv_atol::Float64=1.0e-5, conv_rtol::Float64=1.0e-3
+                           conv_atol::Float64=1.0e-5, conv_rtol::Float64=1.0e-3,
+                           mf_dict::Dict=None
                             )::Bool
 
         # Validate condensation case
@@ -423,7 +424,7 @@ module solver_nlsol
 
             # Reset condensing array
             condensing = [String[] for x in 1:atmos.nlev_c]
-            atmosphere.condense_varyx!(atmos, condensing, condensates=condensates, 
+            atmosphere.condense_varyx!(atmos, condensing, mf_dict, condensates=condensates,
                                         gases=atmos.gas_all_names)
             
             # Update properties (mmw, density, height, etc.)

@@ -1268,7 +1268,8 @@ module atmosphere
    # Condense species, neglecting the latent heating and relaxing the mixing ratio of the condensible species
    # to the saturation value.
 function condense_varyx!(atmos::atmosphere.Atmos_t,
-                         condensing::Array; condensates::Array=[], gases::Array{String,1})
+                         condensing::Array, mf_dict::Dict;
+                         condensates::Array=[], gases::Array{String,1})
 
         # Keep track of the minimum value of all condensates
         minvals = Dict(s => 999999. for s in condensates)
@@ -1278,10 +1279,11 @@ function condense_varyx!(atmos::atmosphere.Atmos_t,
         end
 
         varying_x = [String[] for x in 1:atmos.nlev_c]
-    # Check if a level is condensing (start from bottom to allow cold trap)
+
         for c in condensates
-            minvals[c] = atmos.gas_all_dict[c][end]
+            minvals[c] = mf_dict[c]
         end
+        # Check if a level is condensing (start from bottom to allow cold trap)
         for i in atmos.nlev_c:-1:1
             # Keep track of condensing species at each level
             #condensing=Array{String}(undef, 0)
