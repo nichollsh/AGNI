@@ -589,6 +589,8 @@ module atmosphere
             error("atmosphere parameters have not been set")
         end
 
+        @debug "Calculate layer properties"
+
         ok::Bool = true
 
         # Set pressure arrays in SOCRATES 
@@ -648,6 +650,15 @@ module atmosphere
             dzc = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g1 * 0.5 * (atmos.pl[i+1] + atmos.p[i])) * (atmos.pl[i+1] - atmos.p[i]) 
             atmos.z[i] = atmos.zl[i+1] + dzc
 
+            if (dzc < 1e-20)
+                @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
+                ok = false 
+            end
+            if  (dzc > 1e8)
+                @error "Height integration blew up at level $i (l -> c)"
+                ok = false 
+            end
+
             # Integrate from centre to upper edge
             g2 = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
             dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * 0.5 * (atmos.p[i] + atmos.pl[i] )) * (atmos.p[i]- atmos.pl[i]) 
@@ -656,12 +667,12 @@ module atmosphere
             atmos.layer_grav[i] = sqrt(g1 * g2)
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
 
-            if (dzl < 1e-20) || (dzc < 1e-20)
-                @error "Height integration resulted in dz <= 0 at level $i"
+            if (dzl < 1e-20)
+                @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
                 ok = false 
             end
-            if (dzl > 1e8) || (dzc > 1e8)
-                @error "Height integration blew up at level $i"
+            if (dzl > 1e8)
+                @error "Height integration blew up at level $i (c -> l)"
                 ok = false 
             end
         end 
@@ -1267,7 +1278,7 @@ module atmosphere
 
    # Condense species, neglecting the latent heating and relaxing the mixing ratio of the condensible species
    # to the saturation value.
-function condense_varyx!(atmos::atmosphere.Atmos_t,
+    function condense_varyx!(atmos::atmosphere.Atmos_t,
                          condensing::Array; condensates::Array=[], gases::Array{String,1})
 
         # Keep track of the minimum value of all condensates
