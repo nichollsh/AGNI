@@ -15,15 +15,15 @@ title = "PROTEUS configured"
     skin_k          = 2.0
     skin_d          = 0.01
     tmp_magma       = 3009.1074604027003
-    tmp_eff         = 0.0
+    # tmp_eff         = 1000.0
 
 [planet.vmr]
-    H2O = 0.2
-    CO2 = 0.5
+    H2O = 0.7
+    CO2 = 0.2
     H2 = 0.0
     N2 = 0.0
     CH4 = 0.0
-    CO = 0.3
+    CO = 0.1
 
 [files]
     clean_output    = true
@@ -33,7 +33,7 @@ title = "PROTEUS configured"
 
 [execution]
     silent          = false  
-    max_steps       = 200
+    max_steps       = 2000
     max_runtime     = 400    
     continua        = true   
     aerosol         = false  
@@ -45,14 +45,14 @@ title = "PROTEUS configured"
     condensates     = ["H2O"] 
     solvers         = ["newton"]    
     chemistry       = 0
-    initial_state   = ["iso","1800"] 
+    initial_state   = ["dry","str","400"] 
     stabilise       = false   
     converge_atol   = 1.0e-3  
     converge_rtol   = 2.0e-3  
-    num_levels = 50
-    rayleigh = true
+    num_levels = 40
+    rayleigh = false
     cloud = false
-    solution_type = 3
+    solution_type = 2
 
 [plots]
     animate         = false
