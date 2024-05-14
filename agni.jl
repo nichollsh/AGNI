@@ -387,12 +387,12 @@ function main()::Bool
             if plt_run 
                 modplot = 1
             end
-            method = findfirst(==(sol), method_map)            
+            method_idx = findfirst(==(sol), method_map)            
             solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
                                 conduct=incl_conduct,  chem_type=chem_type,
                                 convect=incl_convect, condensates=condensates, condensing=condensing,
                                 sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
-                                conv_rtol=conv_rtol, method=1,
+                                conv_rtol=conv_rtol, method=method_idx,
                                 stabilise_mlt=stabilise,modplot=modplot,save_frames=plt_ani)
             return_success = return_success && solver_success
         else 

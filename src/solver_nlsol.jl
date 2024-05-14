@@ -19,7 +19,44 @@ module solver_nlsol
     import phys
     import plotting
 
+    # Golden section search to minimise a function
+    function gs_search(f::Function,a::Float64,b::Float64,dxtol::Float64,max_steps::Int)::Float64
+        c::Float64 = (-1+sqrt(5))/2
     
+        x1::Float64 = c*a + (1-c)*b
+        x2::Float64 = (1-c)*a + c*b
+
+        fx1::Float64 = f(x1)
+        fx2::Float64 = f(x2)
+
+        best::Float64 = 0.5*(a+b)
+    
+        for i = 1:max_steps
+            if fx1 < fx2
+                b = x2
+                x2 = x1
+                fx2 = fx1
+                x1 = c*a + (1-c)*b
+                fx1 = f(x1)
+            else
+                a = x1
+                x1 = x2
+                fx1 = fx2
+                x2 = (1-c)*a + c*b
+                fx2 = f(x2)
+            end
+
+            best = 0.5*(a+b)
+    
+            if abs(b-a) < dxtol
+                @debug "GS search succeeded after $(i+2) function evaluations (best = $best)"
+                break
+            end
+        end 
+    
+        return best
+    end 
+
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
 
@@ -164,8 +201,8 @@ module solver_nlsol
 
             elseif (sol_type == 2)
                 # Conductive boundary layer
-                resid[2:end] .= atmos.flux_dif[1:end]
-                resid[1] = atmos.flux_tot[end] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
+                resid[1:end-1] .= atmos.flux_dif[1:end]
+                resid[end] = atmos.flux_tot[end] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
 
             elseif (sol_type == 3)
                 # Zero loss
@@ -265,7 +302,7 @@ module solver_nlsol
                 cp(path_flx,@sprintf("%s/frames/%04d_flx.png",atmos.OUT_DIR,i))
             end 
 
-            if do_chemistry
+            if do_chemistry || (length(condensates) > 0)
                 plotting.plot_vmr(atmos, path_vmr)
             end 
         end 
@@ -344,11 +381,8 @@ module solver_nlsol
         x_dif_clip_step::Float64 = Inf # maximum step size (IN THIS STEP)
 
         # Linesearch parameters
-        ls_compassion::Float64  = 10.0     # factor by which cost is allowed to increase
-        ls_scale::Float64       = 1.0     # best scale factor for linesearch 
-        ls_test_cost::Float64   = Inf 
-        ls_best_cost::Float64   = Inf 
         ls_best_scale::Float64  = 1.0 
+        ls_max_steps::Int       = 20
 
         # Final setup
         x_cur[:] .= x_ini[:]
@@ -406,6 +440,7 @@ module solver_nlsol
                 code = 4 
                 break
             end 
+            clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
             _set_tmps!(x_cur)
 
             # Run chemistry scheme 
@@ -494,7 +529,7 @@ module solver_nlsol
                 if r_cur_2nm < r_old_2nm
                     lml /= 5.0
                 else 
-                    lml *= 1.5
+                    lml *= 2.5
                 end
 
                 #    Update our estimate of the solution
@@ -512,30 +547,21 @@ module solver_nlsol
 
                 # Reset
                 stepflags *= "Ls-"
-                ls_best_cost = c_old*ls_compassion  # allow a cost increase 
-                ls_best_scale = 0.1     # ^ this will require a small step scale
 
-                for ls_scale in [0.2, 0.5, 1.0] # linesearch scale is set based on the best cost reduction
-                    # try this scale factor 
-                    x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
-                    _fev!(x_cur, r_tst)
-
-                    # test improvement
-                    ls_test_cost = _cost(r_tst)
-                    if ls_test_cost < ls_best_cost 
-                        ls_best_scale = ls_scale 
-                        ls_best_cost = ls_test_cost 
-                    end 
+                # Linesearch cost function
+                function _costls!(scale::Float64)::Float64
+                    x_cur[:] .= x_old[:] .+ scale .* x_dif[:]
+                    _fev!(x_cur,r_tst)
+                    return _cost(r_tst)
                 end 
+
+                # Golden section search
+                ls_best_scale = gs_search(_costls!,0.1,1.0,1.0e-2,ls_max_steps)
 
                 # apply best linesearch scale 
                 x_dif[:] .*= ls_best_scale
 
             end # end linesearch 
-
-            # Test new step 
-            x_cur[:] .= x_old[:] .+ x_dif[:]
-            _fev!(x_cur, r_tst)
 
             # If convection stabilisation is disabled, check if this step would make the residuals worse.
             # If so, limit the maximum step size to a small value, maintaining the same descent direction.
