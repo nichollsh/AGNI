@@ -182,7 +182,7 @@ function main()::Bool
     sol_type::Int          = cfg["execution" ]["solution_type"]
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
     initial_req::Array     = cfg["execution" ]["initial_state"]
-    stabilise::Bool        = cfg["execution" ]["stabilise"]
+    wary::Bool             = cfg["execution" ]["wary"]
     conv_atol::Float64     = cfg["execution" ]["converge_atol"]
     conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
     max_steps::Int         = cfg["execution" ]["max_steps"]
@@ -377,7 +377,7 @@ function main()::Bool
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens, chem_type=chem_type,
                                                         convect=incl_convect, condensates=condensates,
                                                         conduct=incl_conduct,
-                                accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
+                                accel=wary, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol, save_frames=plt_ani,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
             return_success = return_success && solver_success
@@ -393,7 +393,7 @@ function main()::Bool
                                 convect=incl_convect, condensates=condensates, condensing=condensing,
                                 sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
                                 conv_rtol=conv_rtol, method=method_idx,
-                                stabilise_mlt=stabilise,modplot=modplot,save_frames=plt_ani)
+                                modulate_mlt=wary,modplot=modplot,save_frames=plt_ani)
             return_success = return_success && solver_success
         else 
             @error "Invalid solver"
