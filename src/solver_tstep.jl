@@ -47,9 +47,9 @@ module solver_tstep
     - `save_frames::Bool=true`          save plot frames
     - `accel::Bool=true`                enable accelerated fast period at the start 
     - `adams::Bool=true`                use Adams-Bashforth integrator
-    - `dt_max::Float64=500.0            maximum time-step outside of the accelerated phase
+    - `dt_max::Float64=1000.0            maximum time-step outside of the accelerated phase
     - `max_steps::Int=1000`             maximum number of solver steps
-    - `min_steps::Int=300`              minimum number of solver steps
+    - `min_steps::Int=100`              minimum number of solver steps
     - `max_runtime::Float64=400.0`      maximum runtime in wall-clock seconds
     - `step_rtol::Float64=1.0e-4`       step size: relative change in per-level temperature [dimensionless]
     - `step_atol::Float64=1.0e-2`       step size: absolute change in per-level temperature [K]
@@ -63,7 +63,7 @@ module solver_tstep
                             use_mlt::Bool=true,
                             sens_heat::Bool=false, conduct::Bool=true, modprop::Int=1, 
                             verbose::Bool=true, modplot::Int=0, save_frames::Bool=true,
-                            accel::Bool=true, adams::Bool=true, dt_max::Float64=500.0, 
+                            accel::Bool=true, adams::Bool=true, dt_max::Float64=1000.0, 
                             max_steps::Int=1000, min_steps::Int=100, max_runtime::Float64=400.0,
                             step_rtol::Float64=1.0e-4, step_atol::Float64=1.0e-2,
                             conv_rtol::Float64=1.0e-4, conv_atol::Float64=1.0e-1
