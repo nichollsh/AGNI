@@ -407,8 +407,7 @@ module solver_nlsol
         # Linesearch parameters
         ls_best_scale::Float64  = 1.0       # Best found scale
         ls_max_steps::Int       = 12        # Maximum golden section steps 
-        ls_begin_step::Int      = 2
-
+        
         # Final setup
         x_cur[:] .= x_ini[:]
         for di in 1:arr_len 
@@ -461,11 +460,6 @@ module solver_nlsol
                 info_str *= @sprintf("    %4d  ", step)
             end
             struggling = struggling || (step > max_steps*0.5)
-
-            # Enable LS now if struggling
-            if struggling && linesearch
-                ls_begin_step = 0
-            end 
 
             # Check status of guess 
             if !all(isfinite, x_cur)
@@ -527,7 +521,7 @@ module solver_nlsol
 
             # Evaluate residuals and estimate jacobian with finite-difference 
             r_old[:] .= r_cur[:]
-            if fdc || (step == 1) || struggling || (c_cur > c_old)
+            if fdc || (step == 1) || struggling || (c_cur > c_old*0.9)
                 # use central difference if: requested, at the start, struggling, or cost increased
                 _calc_jac_res!(x_cur, b, r_cur, true, fdo)
                 stepflags *= "C$fdo-"
@@ -575,7 +569,7 @@ module solver_nlsol
             x_dif[:] .*= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
 
             # Linesearch 
-            if linesearch && (step >= ls_begin_step)
+            if linesearch && (step > 1)
 
                 # Reset
                 stepflags *= "Ls-"
