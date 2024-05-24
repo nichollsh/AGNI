@@ -402,7 +402,6 @@ module solver_nlsol
         dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
         c_cur::Float64 = Inf        # current cost (i)
         c_old::Float64 = Inf        # old cost (i-1)
-        dx_max_step::Float64 = Inf  # maximum step size (IN THIS STEP)
 
         # Linesearch parameters
         ls_best_scale::Float64  = 1.0       # Best found scale
@@ -521,7 +520,7 @@ module solver_nlsol
 
             # Evaluate residuals and estimate jacobian with finite-difference 
             r_old[:] .= r_cur[:]
-            if fdc || (step == 1) || struggling || (c_cur > c_old*0.9)
+            if fdc || (step == 1) || struggling || (c_cur > c_old*0.8)
                 # use central difference if: requested, at the start, struggling, or cost increased
                 _calc_jac_res!(x_cur, b, r_cur, true, fdo)
                 stepflags *= "C$fdo-"
@@ -539,7 +538,6 @@ module solver_nlsol
             end 
 
             # Model step 
-            dx_max_step = dx_max
             x_old[:] = x_cur[:]
             if (method == 1)
                 # Newton-Raphson step 
@@ -566,7 +564,7 @@ module solver_nlsol
             end
 
             # Limit step size, without changing direction of dx vector
-            x_dif[:] .*= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
+            x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
             # Linesearch 
             if linesearch && (step > 1)
