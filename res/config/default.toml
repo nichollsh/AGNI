@@ -46,7 +46,7 @@ title = "Default"                       # Name for this configuration file
     solution_type   = 0                         # Solution type (see wiki).
     solvers         = []                        # Ordered list of solvers to apply (see wiki).
     initial_state   = ["dry", "con", "H2O"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
-    stabilise       = true                      # Use various methods to help stabilise the model?
+    wary            = true                      # Use various methods to help stabilise the model?
     converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
 
