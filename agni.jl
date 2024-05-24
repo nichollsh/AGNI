@@ -118,7 +118,7 @@ function main()::Bool
     tbegin = time()
 
     # Open and validate config file 
-    cfg_path::String = joinpath(ROOT_DIR, "res/config/proteus.toml")
+    cfg_path::String = joinpath(ROOT_DIR, "res/config/default.toml")
     if length(ARGS)>0
         cfg_path = ARGS[1]
     end
@@ -182,6 +182,7 @@ function main()::Bool
     sol_type::Int          = cfg["execution" ]["solution_type"]
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
     initial_req::Array     = cfg["execution" ]["initial_state"]
+    dx_max::Float64        = cfg["execution" ]["dx_max"]
     wary::Bool             = cfg["execution" ]["wary"]
     conv_atol::Float64     = cfg["execution" ]["converge_atol"]
     conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
@@ -375,8 +376,8 @@ function main()::Bool
             end
             solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens, chem_type=chem_type,
-                                                        convect=incl_convect, condensates=condensates,
-                                                        conduct=incl_conduct,
+                                convect=incl_convect, condensates=condensates,
+                                conduct=incl_conduct,
                                 accel=wary, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol, save_frames=plt_ani,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
@@ -392,7 +393,8 @@ function main()::Bool
                                 conduct=incl_conduct,  chem_type=chem_type,
                                 convect=incl_convect, condensates=condensates, condensing=condensing,
                                 sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
-                                conv_rtol=conv_rtol, method=method_idx,
+                                conv_rtol=conv_rtol, method=method_idx, 
+                                linesearch=true, x_dif_clip=dx_max,
                                 modulate_mlt=wary,modplot=modplot,save_frames=plt_ani)
             return_success = return_success && solver_success
         else 

@@ -44,6 +44,7 @@ title = "PROTEUS configured"
     convection_type = "mlt" 
     condensates     = [] 
     solvers         = ["newton"]    
+    dx_max          = 200.0                   
     chemistry       = 0
     initial_state   = ["dry","str","400"] 
     wary            = false   

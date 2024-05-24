@@ -34,17 +34,18 @@ title = "Default"                       # Name for this configuration file
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
     num_levels      = 70                        # Number of model levels.
     continua        = true                      # Include absorption from continua?
-    rayleigh        = true                     # Include rayleigh scattering?
+    rayleigh        = true                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
-    convection_type = ""                     # Convection type (mlt = use mixing length theory, adj = use convective adjustment).
+    convection_type = ""                        # Convection type (mlt = use mixing length theory, adj = use convective adjustment).
     condensates     = []                        # List of volatiles which are allowed to condense.
-    chemistry       = 0
+    chemistry       = 0                         # Chemistry type (see wiki
     solution_type   = 0                         # Solution type (see wiki).
     solvers         = []                        # Ordered list of solvers to apply (see wiki).
+    dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
     initial_state   = ["dry", "con", "H2O"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     wary            = true                      # Use various methods to help stabilise the model?
     converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
