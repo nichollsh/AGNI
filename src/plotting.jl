@@ -193,17 +193,17 @@ module plotting
 
         # Convective flux (MLT)
         if incl_mlt
-            plot!(plt, _symlog.(atmos.flux_cdry), arr_P, label="C_DRY", lw=w*1.2, lc=col_c, ls=:solid, linealpha=alpha)
+            plot!(plt, _symlog.(atmos.flux_cdry), arr_P, label="Convect", lw=w*1.2, lc=col_c, ls=:solid, linealpha=alpha)
         end 
 
         # Conduction 
         if incl_cdct
-            plot!(plt, _symlog.(atmos.flux_cdct), arr_P, label="CNDCT", lw=w*1.2, lc=col_o, ls=:solid, linealpha=alpha)
+            plot!(plt, _symlog.(atmos.flux_cdct), arr_P, label="Conduct", lw=w*1.2, lc=col_o, ls=:solid, linealpha=alpha)
         end 
 
         # Condensation 
         if incl_phase
-            plot!(plt, _symlog.(atmos.flux_p), arr_P, label="PHASE", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+            plot!(plt, _symlog.(atmos.flux_p), arr_P, label="Phase", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
         end
 
         # Sensible heat
@@ -212,7 +212,7 @@ module plotting
         end
 
         # Total flux
-        plot!(plt, _symlog.(atmos.flux_tot), arr_P, label="TOTAL", lw=w, lc=col_t, ls=:solid, linealpha=alpha)
+        plot!(plt, _symlog.(atmos.flux_tot), arr_P, label="Total", lw=w, lc=col_t, ls=:solid, linealpha=alpha)
 
         # Overplot convection and condensation mask
         for i in 1:atmos.nlev_c
@@ -297,9 +297,9 @@ module plotting
             plot!(plt, xp, yp, label="Surface",  color="green") # surface planck function
         end
 
-        plot!(plt, xe, ys, label="SW spectrum", color="blue")  
-        plot!(plt, xe, yl, label="LW spectrum", color="red" ) 
-        plot!(plt, xe, yt, label="Total spectrum", color="black")  # emission spectrum 
+        plot!(plt, xe, ys, lw=0.9, label="SW spectrum", color="blue")  
+        plot!(plt, xe, yl, lw=0.9, label="LW spectrum", color="red" ) 
+        plot!(plt, xe, yt, lw=0.5, label="Total spectrum", color="black")  # emission spectrum 
 
         xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 70000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))

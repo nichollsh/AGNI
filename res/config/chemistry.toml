@@ -39,6 +39,7 @@ title = "Equilibrium chemistry demo"                    # Name for this configur
     chemistry       = 1                         # Chemistry type (see wiki)
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
+    dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
     initial_state   = ["iso","2000"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     wary            = false                     # Use various methods to help stabilise the model?
     converge_atol   = 1.0e-2                    # Convergence criterion on absolute flux lost [W m-2].

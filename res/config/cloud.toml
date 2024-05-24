@@ -39,6 +39,7 @@ title = "Cloud test"                    # Name for this configuration file
     chemistry       = 0
     solution_type   = 1                         # Solution type (see wiki).
     solvers         = []                # Ordered list of solvers to apply (see wiki).
+    dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
     initial_state   = ["dry","con","H2O"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     wary            = false                     # Use various methods to help stabilise the model?
     converge_atol   = 5.0e-2                    # Convergence criterion on absolute flux divergence [W m-2].
