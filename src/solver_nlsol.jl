@@ -19,7 +19,44 @@ module solver_nlsol
     import phys
     import plotting
 
+    # Golden section search to minimise a function
+    function gs_search(f::Function,a::Float64,b::Float64,dxtol::Float64,max_steps::Int)::Float64
+        c::Float64 = (-1+sqrt(5))/2
     
+        x1::Float64 = c*a + (1-c)*b
+        x2::Float64 = (1-c)*a + c*b
+
+        fx1::Float64 = f(x1)
+        fx2::Float64 = f(x2)
+
+        best::Float64 = 0.5*(a+b)
+    
+        for i = 1:max_steps
+            if fx1 < fx2
+                b = x2
+                x2 = x1
+                fx2 = fx1
+                x1 = c*a + (1-c)*b
+                fx1 = f(x1)
+            else
+                a = x1
+                x1 = x2
+                fx1 = fx2
+                x2 = (1-c)*a + c*b
+                fx2 = f(x2)
+            end
+
+            best = 0.5*(a+b)
+    
+            if abs(b-a) < dxtol
+                @debug "GS search succeeded after $(i+2) function evaluations (best = $best)"
+                break
+            end
+        end 
+    
+        return best
+    end 
+
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
 
@@ -45,20 +82,20 @@ module solver_nlsol
     - `linesearch::Bool=true`           use a simple linesearch algorithm to determine the best step size
     - `modplot::Int=0`                  iteration frequency at which to make plots
     - `save_frames::Bool=true`          save plotting frames
-    - `stabilise_mlt::Bool=true`        stabilise convection by introducing it gradually
+    - `modulate_mlt::Bool=true`         improve convergence with convection by introducing MLT gradually
     - `conv_atol::Float64=1.0e-5`       convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1, condensates::Array=[], 
-                            chem_type::Int=0,
+                           sol_type::Int=1, condensates::Array=[],
+                            condensing::Array=[], chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
                             method::Int=1, linesearch::Bool=true,
                             modplot::Int=1, save_frames::Bool=true, 
-                            stabilise_mlt::Bool=true,
+                            modulate_mlt::Bool=true,
                             conv_atol::Float64=1.0e-5, conv_rtol::Float64=1.0e-3
                             )::Bool
 
@@ -101,7 +138,7 @@ module solver_nlsol
         x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
         fd_s::Float64           = 0.0                      # Row perturbation amount
         do_chemistry::Bool      = (chem_type>0)
-
+        
         # Convective flux scale factor 
         convect_sf::Float64 = 5.0e-5
 
@@ -151,7 +188,8 @@ module solver_nlsol
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
                                 do_condense,  convect, sens_heat, conduct, 
-                                condensates=condensates, convect_sf=convect_sf)
+                                condensates=condensates, condensing=condensing,
+                                convect_sf=convect_sf)
 
             # Additional energy input
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
@@ -163,8 +201,8 @@ module solver_nlsol
 
             elseif (sol_type == 2)
                 # Conductive boundary layer
-                resid[2:end] .= atmos.flux_dif[1:end]
-                resid[1] = atmos.flux_tot[end] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
+                resid[1:end-1] .= atmos.flux_dif[1:end]
+                resid[end] = atmos.flux_tot[end] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
 
             elseif (sol_type == 3)
                 # Zero loss
@@ -264,7 +302,7 @@ module solver_nlsol
                 cp(path_flx,@sprintf("%s/frames/%04d_flx.png",atmos.OUT_DIR,i))
             end 
 
-            if do_chemistry
+            if do_chemistry || (length(condensates) > 0)
                 plotting.plot_vmr(atmos, path_vmr)
             end 
         end 
@@ -307,7 +345,7 @@ module solver_nlsol
         # Execution variables
         modprint::Int =         1       # Print frequency
         x_dif_clip::Float64 =   200.0   # Maximum allowed step size
-        convect_incr::Float64 = 6.0     # Factor to increase convect_sf when stabilising convection
+        convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         
         # Tracking variables
         step::Int =         0       # Step number
@@ -316,6 +354,7 @@ module solver_nlsol
         runtime::Float64  = 0.0     # Model runtime [s]
         fc_retcode::Int  =  0       # Fastchem return code
         step_ok::Bool =     true    # Current step was fine
+        struggling::Bool =  false   # Model is (or was) struggling
 
         # Model statistics tracking
         r_med::Float64 =        9.0     # Median residual
@@ -343,11 +382,8 @@ module solver_nlsol
         x_dif_clip_step::Float64 = Inf # maximum step size (IN THIS STEP)
 
         # Linesearch parameters
-        ls_compassion::Float64  = 10.0     # factor by which cost is allowed to increase
-        ls_scale::Float64       = 1.0     # best scale factor for linesearch 
-        ls_test_cost::Float64   = Inf 
-        ls_best_cost::Float64   = Inf 
         ls_best_scale::Float64  = 1.0 
+        ls_max_steps::Int       = 20
 
         # Final setup
         x_cur[:] .= x_ini[:]
@@ -357,9 +393,9 @@ module solver_nlsol
         fill!(r_cur, 1.0e99)
         fill!(r_old, 1.0e98)
 
-        # Stabilise convection?
-        stabilise_mlt = stabilise_mlt && convect
-        if !stabilise_mlt
+        # Modulate convection?
+        modulate_mlt = modulate_mlt && convect
+        if !modulate_mlt
             convect_sf = 1.0
         end
 
@@ -375,7 +411,7 @@ module solver_nlsol
 
             # Reset flags 
             #     Cs, Cf     = chemistry model success, failure
-            #     Sc,Sr      = stabilise convection, reduced this step
+            #     Mc,Mr      = Modulate convection, reduced this step
             #     Cd, Fd     = finite differencing type 
             #     Nr, Gn, Lm = stepping algorithm
             #     Ls         = linesearch active
@@ -389,6 +425,7 @@ module solver_nlsol
                 code = 3
                 break
             end 
+            struggling = struggling || (runtime > max_runtime*0.6)
 
             # Update step counter
             step += 1
@@ -399,12 +436,14 @@ module solver_nlsol
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("    %4d  ", step)
             end
+            struggling = struggling || (step > max_steps*0.6)
 
             # Check status of guess 
             if !all(isfinite, x_cur)
                 code = 4 
                 break
             end 
+            clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
             _set_tmps!(x_cur)
 
             # Run chemistry scheme 
@@ -418,25 +457,32 @@ module solver_nlsol
                 end
             end 
 
+            # Do condensation here (doesn't affect fluxes currently)
+
+            # Reset condensing array
+            condensing = [String[] for x in 1:atmos.nlev_c]
+            atmosphere.condense_varyx!(atmos, condensing, condensates=condensates, 
+                                        gases=atmos.gas_all_names)
+            
             # Update properties (mmw, density, height, etc.)
             step_ok = step_ok && atmosphere.calc_layer_props!(atmos)
 
-            # Check convective stabilisation
-            if stabilise_mlt 
-                # We are stabilising
+            # Check convective modulation
+            if modulate_mlt 
+                # We are modulating
                 stepflags *= "S"
                 
                 # Check if sf needs to be increased
                 if c_cur < max(100.0*conv_rtol, 10.0)
                     if convect_sf < 1.0 
-                        # increase sf - reduce stabilisation by 10x
+                        # increase sf - reduce modulation by 10x
                         stepflags *= "r"
                         convect_sf = min(1.0, convect_sf*convect_incr)
                         @debug "convect_sf = $convect_sf"
                         
-                        # done stabilising 
+                        # done modulating 
                         if convect_sf > 0.99
-                            stabilise_mlt = false 
+                            modulate_mlt = false 
                         end
                     end 
                 end
@@ -446,13 +492,14 @@ module solver_nlsol
                 end 
                 stepflags *= "-"
             else
-                # No stabilisation at this point
+                # No modulation at this point
                 convect_sf = 1.0 
             end 
 
             # Evaluate residuals and finite-difference jacobian
             r_old[:] .= r_cur[:]
-            if use_cendiff || (step == 1)
+            if use_cendiff || (step == 1) || struggling
+                # use central difference if: requested, on first step, or struggling
                 _calc_jac_res_cendiff!(x_cur, b, r_cur) 
                 stepflags *= "Fc-"
             else
@@ -486,7 +533,7 @@ module solver_nlsol
                 if r_cur_2nm < r_old_2nm
                     lml /= 5.0
                 else 
-                    lml *= 1.5
+                    lml *= 2.5
                 end
 
                 #    Update our estimate of the solution
@@ -494,54 +541,31 @@ module solver_nlsol
                 stepflags *= "Lm-"
             end
 
-            # Limit step size according to inverse temperature (impacts high temperatures)
-            # for i in 1:atmos.nlev_c 
-            #     x_dif[i] = sign(x_dif[i]) * min(abs(x_dif[i]), step_fact/x_old[i]^1.1)  # slower changes at large temperatures
-            # end 
+            # Limit step size globally
+            if maximum(abs.(x_dif[:])) > x_dif_clip_step
+                x_dif[:] .*= x_dif_clip_step ./ maximum(abs.(x_dif[:]))
+            end
 
             # Linesearch 
             if linesearch && (step > 1)
 
                 # Reset
                 stepflags *= "Ls-"
-                ls_best_cost = c_old*ls_compassion  # allow a cost increase 
-                ls_best_scale = 0.1     # ^ this will require a small step scale
 
-                for ls_scale in [0.2, 0.5, 1.0] # linesearch scale is set based on the best cost reduction
-                    # try this scale factor 
-                    x_cur[:] .= x_old[:] .+ (ls_scale .* x_dif[:])
-                    _fev!(x_cur, r_tst)
-
-                    # test improvement
-                    ls_test_cost = _cost(r_tst)
-                    if ls_test_cost < ls_best_cost 
-                        ls_best_scale = ls_scale 
-                        ls_best_cost = ls_test_cost 
-                    end 
+                # Linesearch cost function
+                function _costls!(scale::Float64)::Float64
+                    x_cur[:] .= x_old[:] .+ scale .* x_dif[:]
+                    _fev!(x_cur,r_tst)
+                    return _cost(r_tst)
                 end 
+
+                # Golden section search
+                ls_best_scale = gs_search(_costls!,0.05,1.0,1.0e-2,ls_max_steps)
 
                 # apply best linesearch scale 
                 x_dif[:] .*= ls_best_scale
 
             end # end linesearch 
-
-            # Test new step 
-            x_cur[:] .= x_old[:] .+ x_dif[:]
-            _fev!(x_cur, r_tst)
-
-            # If convection stabilisation is disabled, check if this step would make the residuals worse.
-            # If so, limit the maximum step size to a small value, maintaining the same descent direction.
-            # for i in 1:arr_len 
-            #     if !stabilise_mlt && (abs(r_tst[i]-r_cur[i]) > abs(r_cur[i]) * step_rtol + step_atol) && ((i>atmos.nlev_c) || (atmos.mask_c[i] > 0))
-            #         x_dif_clip_step = 1.0e-2
-            #         break
-            #     end 
-            # end 
-
-            # Limit step size globally
-            if maximum(abs.(x_dif[:])) > x_dif_clip_step
-                x_dif[:] .*= x_dif_clip_step ./ maximum(abs.(x_dif[:]))
-            end
 
             # Take the step 
             x_cur[:] .= x_old[:] .+ x_dif[:]
@@ -579,7 +603,7 @@ module solver_nlsol
             end
 
             # Converged?
-            if (c_cur < conv_atol + conv_rtol * c_max) && !stabilise_mlt
+            if (c_cur < conv_atol + conv_rtol * c_max) && !modulate_mlt
                 code = 0
                 break
             end

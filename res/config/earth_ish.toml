@@ -41,7 +41,7 @@ title = "Earth (ish)"                    # Name for this configuration file
     solution_type   = 0                        
     solvers         = ["timestep"]              # timestepping works best in this case
     initial_state   = ["dry","str","100"]       # dry adiabat + stratosphere at 100 K
-    stabilise       = true                     
+    wary            = true                     
     converge_atol   = 1.0e-9                   
     converge_rtol   = 1.0e-7                   
 
