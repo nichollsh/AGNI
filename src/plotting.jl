@@ -96,7 +96,7 @@ module plotting
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(500,400), guidefontsize=9)
 
         # Plot log10 mole fractions for each gas
-        xmin::Float64 = -20
+        xmin::Float64 = -2
         this_min::Float64 = 0.0
 
         for gas in atmos.gas_all_names
