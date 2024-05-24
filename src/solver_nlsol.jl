@@ -74,12 +74,13 @@ module solver_nlsol
     - `convect::Bool=true`              include convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=false`             include conductive heat transport within the atmosphere
+    - `x_dif_clip::Float64=200.0`       maximum step size [K]
     - `max_steps::Int=2000`             maximum number of solver steps
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
     - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
     - `method::Int=1`                   numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
-    - `linesearch::Bool=true`           use a simple linesearch algorithm to determine the best step size
+    - `linesearch::Bool=true`           use a golden-section linesearch algorithm to determine the best step size
     - `modplot::Int=0`                  iteration frequency at which to make plots
     - `save_frames::Bool=true`          save plotting frames
     - `modulate_mlt::Bool=true`         improve convergence with convection by introducing MLT gradually
@@ -90,7 +91,7 @@ module solver_nlsol
                            sol_type::Int=1, condensates::Array=[],
                             condensing::Array=[], chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=false,
-                            conduct::Bool=false,
+                            conduct::Bool=false, x_dif_clip::Float64=200.0,
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
                             method::Int=1, linesearch::Bool=true,
@@ -344,7 +345,6 @@ module solver_nlsol
         # ---------------------------------------------------------- 
         # Execution variables
         modprint::Int =         1       # Print frequency
-        x_dif_clip::Float64 =   200.0   # Maximum allowed step size
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         
         # Tracking variables
@@ -382,8 +382,9 @@ module solver_nlsol
         x_dif_clip_step::Float64 = Inf # maximum step size (IN THIS STEP)
 
         # Linesearch parameters
-        ls_best_scale::Float64  = 1.0 
-        ls_max_steps::Int       = 20
+        ls_best_scale::Float64  = 1.0       # Best found scale
+        ls_max_steps::Int       = 20        # Maximum golden section steps 
+        ls_begin_step::Int      = 1
 
         # Final setup
         x_cur[:] .= x_ini[:]
@@ -425,7 +426,7 @@ module solver_nlsol
                 code = 3
                 break
             end 
-            struggling = struggling || (runtime > max_runtime*0.6)
+            struggling = struggling || (runtime > max_runtime*0.5)
 
             # Update step counter
             step += 1
@@ -436,7 +437,12 @@ module solver_nlsol
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("    %4d  ", step)
             end
-            struggling = struggling || (step > max_steps*0.6)
+            struggling = struggling || (step > max_steps*0.2)
+
+            # Enable LS now if struggling
+            if struggling && linesearch
+                ls_begin_step = 0
+            end 
 
             # Check status of guess 
             if !all(isfinite, x_cur)
@@ -470,7 +476,7 @@ module solver_nlsol
             # Check convective modulation
             if modulate_mlt 
                 # We are modulating
-                stepflags *= "S"
+                stepflags *= "M"
                 
                 # Check if sf needs to be increased
                 if c_cur < max(100.0*conv_rtol, 10.0)
@@ -487,7 +493,7 @@ module solver_nlsol
                     end 
                 end
 
-                if stepflags[end] == "S"
+                if stepflags[end] == "M"
                     stepflags *= "c"
                 end 
                 stepflags *= "-"
@@ -547,7 +553,7 @@ module solver_nlsol
             end
 
             # Linesearch 
-            if linesearch && (step > 1)
+            if linesearch && (step >= ls_begin_step)
 
                 # Reset
                 stepflags *= "Ls-"
