@@ -264,21 +264,14 @@ function main()::Bool
 
     # Set PT profile by looping over requests
     # Each request may be a command, or an argument following a command
-    @info "Setting initial T(p)"
     num_req::Int = length(initial_req)      # Number of requests
     idx_req::Int = 1                        # Index of current request
     str_req::String = "_unset"              # String of current request
-    #    print it 
-    prt_req::String = "    "
-    for req in initial_req
-        prt_req *= strip(lowercase(req))*", "
-    end 
-    @info "    "*prt_req[1:end-2]
-    #    apply it
+    prt_req::String = "Setting initial T(p): "
     while idx_req <= num_req
         # get command 
         str_req = strip(lowercase(initial_req[idx_req]))
-        
+        prt_req *= str_req*", "
 
         # handle requests  
         if str_req == "dry"
@@ -320,6 +313,7 @@ function main()::Bool
         # iterate
         idx_req += 1
     end 
+    @info prt_req[1:end-2]
 
     # Write initial state
     atmosphere.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
