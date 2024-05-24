@@ -74,11 +74,12 @@ module solver_nlsol
     - `convect::Bool=true`              include convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=false`             include conductive heat transport within the atmosphere
-    - `x_dif_clip::Float64=200.0`       maximum step size [K]
+    - `dx_max::Float64=200.0`           maximum step size [K]
     - `max_steps::Int=2000`             maximum number of solver steps
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
-    - `fdw::Float64=1.0e-4`             relative width of the "difference" in the finite-difference calculations
-    - `use_cendiff::Bool=false`         use central difference for calculating jacobian? If false, use forward difference
+    - `fdw::Float64=1.0e-4`             finite difference: relative width (dx/x) of the "difference"
+    - `fdc::Bool=false`                 finite difference: always use central difference? 
+    - `fdo::Int=2`                      finite difference: scheme order (2nd or 4th)
     - `method::Int=1`                   numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `linesearch::Bool=true`           use a golden-section linesearch algorithm to determine the best step size
     - `modplot::Int=0`                  iteration frequency at which to make plots
@@ -91,9 +92,10 @@ module solver_nlsol
                            sol_type::Int=1, condensates::Array=[],
                             condensing::Array=[], chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=false,
-                            conduct::Bool=false, x_dif_clip::Float64=200.0,
+                            conduct::Bool=false, 
+                            dx_max::Float64=200.0, 
                             max_steps::Int=2000, max_runtime::Float64=600.0,
-                            fdw::Float64=1.0e-4, use_cendiff::Bool=false, 
+                            fdw::Float64=1.0e-4, fdc::Bool=false, fdo::Int=2,
                             method::Int=1, linesearch::Bool=true,
                             modplot::Int=1, save_frames::Bool=true, 
                             modulate_mlt::Bool=true,
@@ -134,11 +136,14 @@ module solver_nlsol
         end
 
         # Work arrays 
-        rf::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference
-        rb::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference
-        x_s::Array{Float64,1}   = zeros(Float64, arr_len)  # Perturbed row, for jacobian
-        fd_s::Float64           = 0.0                      # Row perturbation amount
-        do_chemistry::Bool      = (chem_type>0)
+        rf1::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference (1 step)
+        rb1::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (1 step)
+        rf2::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference (2 step)
+        rb2::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (2 step)
+        x_s::Array{Float64,1}    = zeros(Float64, arr_len)  # Perturbed row, for jacobian
+        fd_s::Float64            = 0.0                      # Row perturbation amount
+        drdx::Float64            = 0.0                      # Jacobian element dr/dx
+        do_chemistry::Bool       = (chem_type>0)
         
         # Convective flux scale factor 
         convect_sf::Float64 = 5.0e-5
@@ -228,59 +233,77 @@ module solver_nlsol
             return nothing
         end  # end fev
 
-        # Calculate the jacobian and residuals at x using a central-difference method
-        function _calc_jac_res_cendiff!(x::Array, jacob::Array, resid::Array)
+        # Calculate the jacobian and residuals at x using a 2nd order central-difference method
+        function _calc_jac_res!(x::Array, jacob::Array, resid::Array, central::Bool, order::Int)
 
             # Evalulate residuals at x
             _fev!(x, resid)
 
-            for i in 1:arr_len  # for each x
+            # For each level...
+            for i in 1:arr_len 
+                
+                # Reset all levels
+                x_s[:] .= x[:]
 
-                # Calculate perturbation
+                # Reset residuals
+                fill!(rf1, 0.0)
+                fill!(rb1, 0.0)
+                fill!(rf2, 0.0)
+                fill!(rb2, 0.0)
+
+                # Calculate perturbation at this level
                 fd_s = x[i] * fdw
 
-                # Forward
-                x_s[:] .= x[:]
-                x_s[i] += fd_s * 0.5
-                _fev!(x_s, rf)
+                # Forward part (1 step)
+                x_s[i] = x[i] + fd_s
+                _fev!(x_s, rf1)
 
-                # Backward
-                x_s[i] -= fd_s    # Only need to modify this level; rest were set during the forward phase
-                _fev!(x_s, rb)
+                # Forward part (2 step)
+                if order == 4
+                    x_s[i] = x[i] + 2.0*fd_s
+                    _fev!(x_s, rf2)
+                end 
+
+                # Backward part
+                if central
+                    # (1 step)
+                    x_s[i] = x[i] - fd_s
+                    _fev!(x_s, rb1)
+
+                    # (2 step)
+                    if order == 4
+                        x_s[i] = x[i] - 2.0*fd_s
+                        _fev!(x_s, rb2)
+                    end 
+                end
 
                 # Set jacobian
-                for j in 1:arr_len  # for each r
-                    jacob[j,i] = (rf[j] - rb[j]) / fd_s
+                # https://www.dam.brown.edu/people/alcyew/handouts/numdiff.pdf
+                # https://en.wikipedia.org/wiki/Finite_difference_coefficient
+                for j in 1:arr_len  # for each residual
+                    jacob[j,i] = drdx
+                    if central 
+                        if order == 4
+                            # 4th order central difference 
+                            jacob[j,i] = (-rf2[j] + 8.0*rf1[j] - 8.0*rb1[j] + rb2[j])/(12.0*fd_s)
+                        else 
+                            # 2nd order central difference 
+                            jacob[j,i] = (rf1[j] - rb1[j])/(2.0*fd_s)
+                        end 
+                    else
+                        if order == 4
+                            # 4th order forward difference
+                            jacob[j,i] = (-rf2[j] + 4.0*rf1[j] - 3.0*resid[j])/(2.0*fd_s)
+                        else 
+                            # 2nd order forward difference
+                            jacob[j,i] = (rf1[j] - resid[j])/fd_s
+                        end  
+                    end 
                 end 
             end 
 
             return nothing
         end # end jr_cd
-
-        # Calculate the jacobian and residuals at x using a forward-difference method
-        function _calc_jac_res_fordiff!(x::Array, jacob::Array, resid::Array)
-
-            # Evalulate residuals at x
-            _fev!(x, resid)
-
-            for i in 1:arr_len  # for each x
-
-                # Calculate perturbation
-                fd_s = x[i] * fdw
-
-                # Forward
-                x_s[:] .= x[:]
-                x_s[i] += fd_s
-                _fev!(x_s, rf)
-
-                # Set jacobian
-                for j in 1:arr_len  # for each r
-                    jacob[j,i] =  (rf[j] - resid[j]) / fd_s
-                end 
-            end 
-
-            return nothing
-        end # end jr_fd
 
         # Cost function 
         function _cost(_r::Array)
@@ -379,12 +402,12 @@ module solver_nlsol
         dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
         c_cur::Float64 = Inf        # current cost (i)
         c_old::Float64 = Inf        # old cost (i-1)
-        x_dif_clip_step::Float64 = Inf # maximum step size (IN THIS STEP)
+        dx_max_step::Float64 = Inf  # maximum step size (IN THIS STEP)
 
         # Linesearch parameters
         ls_best_scale::Float64  = 1.0       # Best found scale
-        ls_max_steps::Int       = 20        # Maximum golden section steps 
-        ls_begin_step::Int      = 1
+        ls_max_steps::Int       = 12        # Maximum golden section steps 
+        ls_begin_step::Int      = 2
 
         # Final setup
         x_cur[:] .= x_ini[:]
@@ -411,10 +434,10 @@ module solver_nlsol
         while true 
 
             # Reset flags 
-            #     Cs, Cf     = chemistry model success, failure
-            #     Mc,Mr      = Modulate convection, reduced this step
-            #     Cd, Fd     = finite differencing type 
-            #     Nr, Gn, Lm = stepping algorithm
+            #     Cs, Cf     = chemistry model (s)uccess, (f)ailure
+            #     Mc,Mr      = Modulate convection: (r)educed this step
+            #     Td         = finite differencing type (T) and order (d)
+            #     Nr,Gn,Lm   = stepping algorithm
             #     Ls         = linesearch active
             info_str  = ""
             stepflags = ""
@@ -437,7 +460,7 @@ module solver_nlsol
             if mod(step,modprint) == 0 
                 info_str *= @sprintf("    %4d  ", step)
             end
-            struggling = struggling || (step > max_steps*0.2)
+            struggling = struggling || (step > max_steps*0.5)
 
             # Enable LS now if struggling
             if struggling && linesearch
@@ -502,15 +525,16 @@ module solver_nlsol
                 convect_sf = 1.0 
             end 
 
-            # Evaluate residuals and finite-difference jacobian
+            # Evaluate residuals and estimate jacobian with finite-difference 
             r_old[:] .= r_cur[:]
-            if use_cendiff || (step == 1) || struggling
-                # use central difference if: requested, on first step, or struggling
-                _calc_jac_res_cendiff!(x_cur, b, r_cur) 
-                stepflags *= "Fc-"
+            if fdc || (step == 1) || struggling || (c_cur > c_old)
+                # use central difference if: requested, at the start, struggling, or cost increased
+                _calc_jac_res!(x_cur, b, r_cur, true, fdo)
+                stepflags *= "C$fdo-"
             else
-                _calc_jac_res_fordiff!(x_cur, b, r_cur) 
-                stepflags *= "Ff-"
+                # otherwise, use forward difference
+                _calc_jac_res!(x_cur, b, r_cur, false, fdo)
+                stepflags *= "F$fdo-"
             end 
 
             # Check if jacobian is singular 
@@ -521,7 +545,7 @@ module solver_nlsol
             end 
 
             # Model step 
-            x_dif_clip_step = x_dif_clip
+            dx_max_step = dx_max
             x_old[:] = x_cur[:]
             if (method == 1)
                 # Newton-Raphson step 
@@ -547,10 +571,8 @@ module solver_nlsol
                 stepflags *= "Lm-"
             end
 
-            # Limit step size globally
-            if maximum(abs.(x_dif[:])) > x_dif_clip_step
-                x_dif[:] .*= x_dif_clip_step ./ maximum(abs.(x_dif[:]))
-            end
+            # Limit step size, without changing direction of dx vector
+            x_dif[:] .*= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
 
             # Linesearch 
             if linesearch && (step >= ls_begin_step)
