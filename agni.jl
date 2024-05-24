@@ -118,7 +118,7 @@ function main()::Bool
     tbegin = time()
 
     # Open and validate config file 
-    cfg_path::String = joinpath(ROOT_DIR, "res/config/default.toml")
+    cfg_path::String = joinpath(ROOT_DIR, "res/config/proteus.toml")
     if length(ARGS)>0
         cfg_path = ARGS[1]
     end
@@ -182,7 +182,7 @@ function main()::Bool
     sol_type::Int          = cfg["execution" ]["solution_type"]
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
     initial_req::Array     = cfg["execution" ]["initial_state"]
-    stabilise::Bool        = cfg["execution" ]["stabilise"]
+    wary::Bool             = cfg["execution" ]["wary"]
     conv_atol::Float64     = cfg["execution" ]["converge_atol"]
     conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
     max_steps::Int         = cfg["execution" ]["max_steps"]
@@ -331,12 +331,15 @@ function main()::Bool
     solver_success::Bool = true
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
     method::Int = 0
+    condensing::Array = [String[] for x in 1:atmos.nlev_c]
+    
     if length(solvers_cmd) == 0  # is empty 
         solvers_cmd = [""]
     end 
     if !isempty(solvers_cmd[end])  # append "no solve" case to end, for calculating cff
         push!(solvers_cmd, "")
-    end 
+    end
+
     for sol in solvers_cmd 
 
         sol = strip(lowercase(sol))
@@ -351,12 +354,12 @@ function main()::Bool
             energy.radtrans!(atmos, true, calc_cf=true)
             energy.radtrans!(atmos, false)
             if use_mlt 
-                energy.mlt!(atmos)
+                energy.mlt!(atmos, condensing)
             end 
             if incl_sens 
                 energy.sensible!(atmos)
             end 
-            energy.condense_relax!(atmos, condensates)
+            energy.condense_relax!(atmos)
             if incl_conduct
                 energy.conduct!(atmos)
             end
@@ -372,8 +375,9 @@ function main()::Bool
             end
             solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens, chem_type=chem_type,
-                                convect=incl_convect, condensates=condensates, conduct=incl_conduct,
-                                accel=stabilise, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
+                                                        convect=incl_convect, condensates=condensates,
+                                                        conduct=incl_conduct,
+                                accel=wary, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol, save_frames=plt_ani,
                                 max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
             return_success = return_success && solver_success
@@ -383,12 +387,13 @@ function main()::Bool
             if plt_run 
                 modplot = 1
             end
-            method = findfirst(==(sol), method_map)
+            method_idx = findfirst(==(sol), method_map)            
             solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
                                 conduct=incl_conduct,  chem_type=chem_type,
-                                convect=incl_convect, condensates=condensates, sens_heat=incl_sens,
-                                max_steps=max_steps, conv_atol=conv_atol, conv_rtol=conv_rtol, method=1,
-                                stabilise_mlt=stabilise,modplot=modplot,save_frames=plt_ani)
+                                convect=incl_convect, condensates=condensates, condensing=condensing,
+                                sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
+                                conv_rtol=conv_rtol, method=method_idx,
+                                modulate_mlt=wary,modplot=modplot,save_frames=plt_ani)
             return_success = return_success && solver_success
         else 
             @error "Invalid solver"
