@@ -268,9 +268,17 @@ function main()::Bool
     num_req::Int = length(initial_req)      # Number of requests
     idx_req::Int = 1                        # Index of current request
     str_req::String = "_unset"              # String of current request
+    #    print it 
+    prt_req::String = "    "
+    for req in initial_req
+        prt_req *= strip(lowercase(req))*", "
+    end 
+    @info "    "*prt_req[1:end-2]
+    #    apply it
     while idx_req <= num_req
         # get command 
         str_req = strip(lowercase(initial_req[idx_req]))
+        
 
         # handle requests  
         if str_req == "dry"
@@ -377,10 +385,9 @@ function main()::Bool
             solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens, chem_type=chem_type,
                                 convect=incl_convect, condensates=condensates,
-                                conduct=incl_conduct,
-                                accel=wary, step_rtol=1.0e-4, step_atol=1.0e-2, dt_max=1000.0,
+                                conduct=incl_conduct, accel=wary,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol, save_frames=plt_ani,
-                                max_steps=max_steps, min_steps=100, use_mlt=use_mlt)
+                                max_steps=max_steps, use_mlt=use_mlt)
             return_success = return_success && solver_success
         
         # Nonlinear methods
@@ -394,8 +401,8 @@ function main()::Bool
                                 convect=incl_convect, condensates=condensates, condensing=condensing,
                                 sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
                                 conv_rtol=conv_rtol, method=method_idx, 
-                                linesearch=true, x_dif_clip=dx_max,
-                                modulate_mlt=wary,modplot=modplot,save_frames=plt_ani)
+                                dx_max=dx_max, modulate_mlt=wary,
+                                modplot=modplot,save_frames=plt_ani)
             return_success = return_success && solver_success
         else 
             @error "Invalid solver"
