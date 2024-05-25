@@ -81,7 +81,7 @@ module solver_nlsol
     - `fdc::Bool=false`                 finite difference: always use central difference? 
     - `fdo::Int=2`                      finite difference: scheme order (2nd or 4th)
     - `method::Int=1`                   numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
-    - `linesearch::Bool=true`           use a golden-section linesearch algorithm to determine the best step size
+    - `linesearch::Bool=false`          use a golden-section linesearch algorithm to determine the best step size
     - `modplot::Int=0`                  iteration frequency at which to make plots
     - `save_frames::Bool=true`          save plotting frames
     - `modulate_mlt::Bool=true`         improve convergence with convection by introducing MLT gradually
@@ -93,10 +93,10 @@ module solver_nlsol
                             condensing::Array=[], chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false, 
-                            dx_max::Float64=200.0, 
+                            dx_max::Float64=200.0,  
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=1.0e-4, fdc::Bool=false, fdo::Int=2,
-                            method::Int=1, linesearch::Bool=true,
+                            method::Int=1, linesearch::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             modulate_mlt::Bool=true,
                             conv_atol::Float64=1.0e-5, conv_rtol::Float64=1.0e-3
