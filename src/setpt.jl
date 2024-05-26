@@ -118,6 +118,18 @@ module setpt
         return nothing
     end 
 
+    # Set atmosphere to be isothermal at the given temperature
+    function add!(atmos::atmosphere.Atmos_t, delta::Float64)
+        if !atmos.is_param
+            error("Atmosphere parameters not set")
+        end 
+        atmos.tmpl[:] .+= delta 
+        atmos.tmp[:]  .+= delta
+
+        atmosphere.calc_layer_props!(atmos)
+        return nothing
+    end 
+
     # Set atmosphere to dry adiabat
     function dry_adiabat!(atmos::atmosphere.Atmos_t)
         # Validate input

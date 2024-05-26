@@ -53,7 +53,7 @@ module energy
         # Check files are acceptable and set instellation if doing SW flux
         if lw
             if !Bool(atmos.spectrum.Basic.l_present[6])
-                error("The spectral file contains no data for the Planckian function.\nCheck that the file contains a stellar spectrum.")
+                error("The spectral file contains no data for the Planck function. Check that the file contains a stellar spectrum.")
             end
 
             if Bool(atmos.spectrum.Basic.l_present[2])
@@ -538,10 +538,10 @@ module energy
         atmos.flux_tot += atmos.flux_n
 
         # +Condensation
-#        if condense
-#            energy.condense_relax!(atmos, condensates)
-#            atmos.flux_tot += atmos.flux_p
-#        end
+        if condense
+           energy.condense_relax!(atmos, condensates)
+            atmos.flux_tot += atmos.flux_p
+        end
 
         #if condense
         #    atmosphere.condense_varyx!(atmos.tmp, condensing, condensates, atmos.gas_all_names)
