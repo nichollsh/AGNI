@@ -26,6 +26,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 * netcdf-fortran
 * make
 * OpenMP
+* ffmpeg (optional)
 
 ## Supported platforms
 * MacOS (ARM and x86-64)

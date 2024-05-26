@@ -183,7 +183,7 @@ function main()::Bool
     solvers_cmd::Array     = cfg["execution" ]["solvers"]
     initial_req::Array     = cfg["execution" ]["initial_state"]
     dx_max::Float64        = cfg["execution" ]["dx_max"]
-    wary::Bool             = cfg["execution" ]["wary"]
+    linesearch::Bool       = cfg["execution" ]["linesearch"]
     conv_atol::Float64     = cfg["execution" ]["converge_atol"]
     conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
     max_steps::Int         = cfg["execution" ]["max_steps"]
@@ -292,6 +292,11 @@ function main()::Bool
             # set from csv file 
             idx_req += 1
             setpt.fromcsv!(atmos,initial_req[idx_req])
+        
+        elseif str_req == "add"
+            # add X kelvin from the currently stored T(p)
+            idx_req += 1
+            setpt.add!(atmos,parse(Float64, initial_req[idx_req]))
 
         elseif str_req == "sat"
             # check surface supersaturation
@@ -333,7 +338,6 @@ function main()::Bool
     return_success::Bool = true
     solver_success::Bool = true
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
-    method::Int = 0
     condensing::Array = [String[] for x in 1:atmos.nlev_c]
     
     if length(solvers_cmd) == 0  # is empty 
@@ -369,6 +373,7 @@ function main()::Bool
             atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct + atmos.flux_p
             atmos.flux_tot[end] += atmos.flux_sens
             atmos.flux_dif[:] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1]
+            @info "    done"
         
         # Timestepping
         elseif sol == "timestep"
@@ -379,7 +384,7 @@ function main()::Bool
             solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
                                 modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens, chem_type=chem_type,
                                 convect=incl_convect, condensates=condensates,
-                                conduct=incl_conduct, accel=wary,
+                                conduct=incl_conduct, accel=true,
                                 conv_atol=conv_atol, conv_rtol=conv_rtol, save_frames=plt_ani,
                                 max_steps=max_steps, use_mlt=use_mlt)
             return_success = return_success && solver_success
@@ -395,7 +400,7 @@ function main()::Bool
                                 convect=incl_convect, condensates=condensates, condensing=condensing,
                                 sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
                                 conv_rtol=conv_rtol, method=method_idx, 
-                                dx_max=dx_max, modulate_mlt=wary,
+                                dx_max=dx_max, linesearch=linesearch,
                                 modplot=modplot,save_frames=plt_ani)
             return_success = return_success && solver_success
         else 
