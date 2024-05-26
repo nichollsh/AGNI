@@ -481,6 +481,11 @@ module energy
                     continue 
                 end 
 
+                # Check criticality 
+                if atmos.tmp[i] > phys.lookup_safe("t_crit",c)
+                    continue 
+                end 
+
                 # relaxation function
                 dif[i] += (1.0/a)*(pp-Psat)
                 # dif[i] += a/Psat - a/pp
@@ -509,8 +514,6 @@ module energy
         return nothing
     end # end of condense_relax
 
-
-
     """
     **Calculate total flux at each level.**
 
@@ -524,9 +527,9 @@ module energy
     - `convect_sf::Float64=1.0`         scale factor applied to convection fluxes
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t, 
-                            condense::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
+                          condense::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
                           condensates::Array=[],
-                          condensing::Array, convect_sf::Float64=1.0)
+                          condensing::Array=[], convect_sf::Float64=1.0)
 
         # Reset fluxes
         fill!(atmos.flux_tot, 0.0)

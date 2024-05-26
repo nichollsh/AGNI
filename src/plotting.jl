@@ -49,11 +49,20 @@ module plotting
         # Plot condensation curves 
         if length(condensates) > 0
             sat_t = zeros(Float64, atmos.nlev_l)
+            crt_i = atmos.nlev_l  # index at which criticality occurs
             for c in condensates
+                # for each level...
                 for i in 1:atmos.nlev_l
+                    # set point  
                     sat_t[i] = phys.calc_Tdew(c, atmos.pl[i])
+                    # check if supercritical
+                    if sat_t[i] > phys.lookup_safe("t_crit", c)
+                        crt_i = i 
+                        break
+                    end 
                 end 
-                plot!(plt, sat_t, atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label=phys.pretty_name(c))
+                # plot curve for this condensate
+                plot!(plt, sat_t[1:crt_i], atmos.pl[1:crt_i]*1e-5, lc=phys.pretty_color(c), ls=:dot, label=phys.pretty_name(c))
             end 
         end
 
@@ -162,7 +171,7 @@ module plotting
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dot,   lw=w, lc=col_r, label="SW")
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dash,  lw=w, lc=col_r, label="LW")
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=w, lc=col_r, label="LW+SW")
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=w, lc=col_n, label="UP+DN")
+        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=w, lc=col_n, label="UP-DN")
 
         # Zero line 
         plot!(plt, [0.0, 0.0], [arr_P[1], arr_P[end]], lw=0.4, lc="black", label="")
@@ -208,7 +217,7 @@ module plotting
 
         # Sensible heat
         if atmos.flux_sens != 0.0
-            scatter!(plt, [_symlog(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_r, label="SENS")
+            scatter!(plt, [_symlog(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_r, label="Sens.")
         end
 
         # Total flux

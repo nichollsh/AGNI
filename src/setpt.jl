@@ -85,19 +85,23 @@ module setpt
             end
         end
 
-        # Extend loaded grid isothermally to lower pressures (prevent domain error)
+        # Extrapolate loaded grid to lower pressures (prevent domain error)
         if (atmos.pl[1] < pl[1])
-            pushfirst!(pl,   atmos.pl[1]/1.1)
-            pushfirst!(tmpl, tmpl[1]  )
+            p_ext = atmos.pl[1]/1.1
+            t_ext = (tmpl[1] - tmpl[3])/(pl[1] - pl[3]) * (p_ext - pl[1])
+            pushfirst!(pl,   p_ext)
+            pushfirst!(tmpl, t_ext)
         end
 
-        # Extend loaded grid isothermally to higher pressures 
+        # Extrapolate loaded grid to higher pressures 
         if (atmos.pl[end] > pl[end])
-            push!(pl,   atmos.pl[end]*1.1)
-            push!(tmpl, tmpl[end])
+            p_ext = atmos.pl[end]*1.1
+            t_ext = (tmpl[end] - tmpl[end-2])/(pl[end] - pl[end-2]) * (p_ext - pl[end])
+            push!(pl,   p_ext)
+            push!(tmpl, t_ext)
         end
 
-        # Interpolate from the loaded grid to existing one
+        # Interpolate from the loaded grid to required one
         itp = Interpolator(pl, tmpl) 
         atmos.tmpl[:] .= itp.(atmos.pl[:])  # Cell edges 
         atmos.tmp[:]  .= itp.(atmos.p[:])   # Cell centres 
