@@ -357,22 +357,9 @@ function main()::Bool
 
         # No solve - just calc fluxes at the end
         if sol == "none"
-            fill!(atmos.flux_tot, 0.0)
-            energy.radtrans!(atmos, true, calc_cf=true)
-            energy.radtrans!(atmos, false)
-            if use_mlt 
-                energy.mlt!(atmos, condensing)
-            end 
-            if incl_sens 
-                energy.sensible!(atmos)
-            end 
-            energy.condense_relax!(atmos)
-            if incl_conduct
-                energy.conduct!(atmos)
-            end
-            atmos.flux_tot = atmos.flux_cdry + atmos.flux_n + atmos.flux_cdct + atmos.flux_p
-            atmos.flux_tot[end] += atmos.flux_sens
-            atmos.flux_dif[:] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1]
+            energy.calc_fluxes!(atmos, length(condensates)>0,  
+                                incl_convect, incl_sens, incl_conduct, 
+                                condensates=condensates)
             @info "    done"
         
         # Timestepping

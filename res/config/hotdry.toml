@@ -14,10 +14,12 @@ title = "Hot and dry"                    # Name for this configuration file
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
     tmp_eff         = 0.0               # Effective temperature
+    turb_coeff      = 1.0e-4
+    wind_speed      = 10.0
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Frostflow/48/Frostflow.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
     output_dir      = "out/"                                            # Path to output directory.
 
@@ -32,7 +34,7 @@ title = "Hot and dry"                    # Name for this configuration file
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
-    sensible_heat   = false                     # Include sensible heat transport at the surface?
+    sensible_heat   = true                     # Include sensible heat transport at the surface?
     convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
     condensates     = []                        # List of volatiles which are allowed to condense.
     chemistry       = 0
