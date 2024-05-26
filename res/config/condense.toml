@@ -41,7 +41,7 @@ title = "Condensation test"                    # Name for this configuration fil
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
     dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
     initial_state   = ["iso","2000"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
-    wary            = false                     # Use various methods to help stabilise the model?
+    linesearch      = true                     # Use linesearch?
     converge_atol   = 0.1                    # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-3                    # Convergence criterion on relative flux divergence [dimensionless].
 
