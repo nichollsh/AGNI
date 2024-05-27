@@ -12,11 +12,10 @@ module plotting
     using Plots
     using LaTeXStrings
     using Glob
-    using Revise
     using Printf
 
-    import atmosphere
-    import phys
+    import ..atmosphere
+    import ..phys
 
     # Symmetric log
     function _symlog(v::Float64)::Float64
