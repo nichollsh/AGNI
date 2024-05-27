@@ -39,10 +39,10 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 - `$ source set_rad_env`
 - `$ julia`
 - `julia> ]`
--  `(@v1.10) pkg> activate .`
+-  `(@v1.10) pkg> activate ../`
 -  `(@v1.10) pkg> instantiate`
 -  Press backspace
--  `julia> cd("socrates/julia/src")`
+-  `julia> cd("julia/src")`
 -  `julia> include("generate_wrappers.jl")`
 -  `julia> exit()`
 -  `$ cd lib`
