@@ -28,5 +28,7 @@ makedocs(
 
 deploydocs(
     repo = "github.com/nichollsh/AGNI.git",
+    push_preview=true,
+    devbranch="docs"
 )
 
