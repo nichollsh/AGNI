@@ -1,12 +1,12 @@
 # Generated automatically
-# System: Linux norma2.intra.astro.rug.nl 5.14.0-362.18.1.el9_3.0.1.x86_64 #1 SMP PREEMPT_DYNAMIC Sun Feb 11 13:49:23 UTC 2024 x86_64 x86_64 x86_64 GNU/Linux 
-# Date: Mon May 27 02:49:26 PM CEST 2024 
+# System: Darwin hnmacbook 23.5.0 Darwin Kernel Version 23.5.0: Wed May  1 20:12:58 PDT 2024; root:xnu-10063.121.3~5/RELEASE_ARM64_T6000 arm64 
+# Date: Mon 27 May 2024 14:23:20 BST 
  
-FORTCOMP        = /usr/bin/gfortran -O3 -fPIC  -c 
-LINK            = /usr/bin/gfortran -O3 -fPIC  
+FORTCOMP        = /opt/homebrew/bin/gfortran -O3 -fPIC -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/ -c 
+LINK            = /opt/homebrew/bin/gfortran -O3 -fPIC -L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/ 
 LIBLINK         = /usr/bin/ar rvu 
-INCCDF_PATH     = /usr/include -I/usr/lib64/gfortran/modules 
-LIBCDF_PATH     = netcdff 
+INCCDF_PATH     = /opt/homebrew/Cellar/netcdf-fortran/4.6.1/include -I/opt/homebrew/Cellar/netcdf-fortran/4.6.1/include -I/opt/homebrew/Cellar/netcdf-fortran/4.6.1/include 
+LIBCDF_PATH     = /opt/homebrew/Cellar/netcdf-fortran/4.6.1/lib 
 LIBCDF_NAME     = netcdff 
 OMPARG          = -fopenmp 
  
