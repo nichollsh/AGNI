@@ -74,7 +74,7 @@ module solver_nlsol
     - `convect::Bool=true`              include convection
     - `sens_heat::Bool=false`           include sensible heating 
     - `conduct::Bool=false`             include conductive heat transport within the atmosphere
-    - `dx_max::Float64=200.0`           maximum step size [K]
+    - `dx_max::Float64=400.0`           maximum step size [K]
     - `max_steps::Int=2000`             maximum number of solver steps
     - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
     - `fdw::Float64=1.0e-5`             finite difference: relative width (dx/x) of the "difference"
@@ -90,13 +90,13 @@ module solver_nlsol
     - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                           sol_type::Int=1, condensates::Array=[],
-                            condensing::Array=[], chem_type::Int=0,
+                            sol_type::Int=1, condensates::Array{String,1}=[],
+                            chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false, 
-                            dx_max::Float64=200.0,  
+                            dx_max::Float64=400.0,  
                             max_steps::Int=2000, max_runtime::Float64=600.0,
-                            fdw::Float64=1.0e-5, fdc::Bool=false, fdo::Int=2,
+                            fdw::Float64=5.0e-6, fdc::Bool=false, fdo::Int=2,
                             method::Int=1, 
                             linesearch::Bool=true, modulate_mlt::Bool=false,
                             detect_plateau::Bool=true,
@@ -142,7 +142,7 @@ module solver_nlsol
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
         fdr::Float64        =   0.2     # Use forward difference if cost ratio is below this value
-        ls_max_steps::Int  =    12      # Maximum golden section linesearch steps 
+        ls_max_steps::Int  =    15      # Maximum golden section linesearch steps 
         plateau_n::Int =        10      # Plateau declared when plateau_i > plateau_n
         plateau_s::Float64 =    100.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to in crement plateau_i
@@ -228,15 +228,20 @@ module solver_nlsol
             # Set temperatures 
             _set_tmps!(x)
 
-            # Calculate layer properties
-            if atmos.thermo_funct
+            # Do rainout
+            if do_condense
+                atmosphere.handle_saturation!(atmos,condensates)
+            end
+            
+            # Calculate layer properties if required, and haven't already
+            if atmos.thermo_funct || do_condense
                 atmosphere.calc_layer_props!(atmos)
             end 
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
                                 do_condense,  convect, sens_heat, conduct, 
-                                condensates=condensates, condensing=condensing,
+                                condensates=condensates,
                                 convect_sf=convect_sf)
 
             # Additional energy input
@@ -476,14 +481,6 @@ module solver_nlsol
                 end
             end 
 
-            # Do condensation here (doesn't affect fluxes currently)
-
-            # Reset condensing array
-            # condensing = [String[] for x in 1:atmos.nlev_c]
-            # atmosphere.condense_varyx!(atmos, condensing, 
-            #                             condensates=condensates, 
-            #                             gases=atmos.gas_all_names)
-            
             # Update properties (mmw, density, height, etc.)
             step_ok = step_ok && atmosphere.calc_layer_props!(atmos)
 

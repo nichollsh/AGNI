@@ -44,11 +44,11 @@ title = "PROTEUS configured"
     sensible_heat   = true  
 
     convection_type = "mlt" 
-    condensates     = ["H2O", "CO2", "CH4"] 
+    condensates     = [] 
     solvers         = ["newton"]    
-    dx_max          = 100.0                 
+    dx_max          = 400.0                 
     chemistry       = 0
-    initial_state   = ["csv", "res/config/pt_1.csv"] 
+    initial_state   = ["dry","str","1300"] 
     linesearch      = true
     converge_atol   = 1.0e-2  
     converge_rtol   = 2.0e-3  

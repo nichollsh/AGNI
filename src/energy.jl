@@ -288,9 +288,9 @@ module energy
     was also implemented in Lee et al. (2024), and partially outlined in an 
     earlier paper by Robinson & Marley (2014).
 
-    https://arxiv.org/abs/2303.09596
-    https://doi.org/10.1093/mnras/stae537 
-    https://ui.adsabs.harvard.edu/abs/1962JGR....67.3095B/abstract
+    https://arxiv.org/abs/2303.09596    
+    https://doi.org/10.1093/mnras/stae537    
+    https://ui.adsabs.harvard.edu/abs/1962JGR....67.3095B/abstract    
     
     Convective energy transport fluxes are calculated at every level edge, just 
     like the radiative fluxes. This is not compatible with moist convection. By 
@@ -304,7 +304,7 @@ module energy
     - `pmin::Float64=0.0`               pressure below which convection is disabled.
     - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t, condensing::Array; pmin::Float64=0.0, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=0.0, mltype::Int=1)
 
         # Reset arrays
         fill!(atmos.flux_cdry, 0.0)
@@ -525,37 +525,35 @@ module energy
     - `conduct::Bool`                   include conductive heat transport
     - `condensates::Array=[]`           list of condensates included in relaxation scheme 
     - `convect_sf::Float64=1.0`         scale factor applied to convection fluxes
+    - `calc_cf::Bool=false`             calculate LW contribution function?
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t, 
                           condense::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
                           condensates::Array=[],
-                          condensing::Array=[], convect_sf::Float64=1.0)
+                          convect_sf::Float64=1.0,
+                          calc_cf::Bool=false)
 
         # Reset fluxes
         fill!(atmos.flux_tot, 0.0)
         fill!(atmos.flux_dif, 0.0)
 
         # +Radiation
-        energy.radtrans!(atmos, true)
+        energy.radtrans!(atmos, true, calc_cf=calc_cf)
         energy.radtrans!(atmos, false)
         atmos.flux_tot += atmos.flux_n
 
         # +Condensation
-        if condense
-           energy.condense_relax!(atmos, condensates)
-            atmos.flux_tot += atmos.flux_p
-        end
+        # if condense
+        #    energy.condense_relax!(atmos, condensates)
+        #     atmos.flux_tot += atmos.flux_p
+        # end
 
-        #if condense
-        #    atmosphere.condense_varyx!(atmos.tmp, condensing, condensates, atmos.gas_all_names)
-        #end
-        
         # +Dry convection
         if convect
             # Calc flux
-            energy.mlt!(atmos, condensing)
+            energy.mlt!(atmos)
 
-            # Stabilise?
+            # Modulate?
             atmos.flux_cdry *= convect_sf
 
             # Add to total flux
