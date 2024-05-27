@@ -37,13 +37,12 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 - `$ ./configure`
 - `$ ./build_code`
 - `$ source set_rad_env`
-- `$ cd julia`
 - `$ julia`
 - `julia> ]`
--  `(@v1.10) pkg> add OffsetArrays PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse BinnedStatistics LoggingExtras`
 -  `(@v1.10) pkg> activate .`
+-  `(@v1.10) pkg> instantiate`
 -  Press backspace
--  `julia> cd("src")`
+-  `julia> cd("socrates/julia/src")`
 -  `julia> include("generate_wrappers.jl")`
 -  `julia> exit()`
 -  `$ cd lib`

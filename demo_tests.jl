@@ -1,12 +1,14 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # Activate environment
+ENV["GKSwstype"] = "100"
+ENV["LD_LIBRARY_PATH"] = ""
 import Pkg
 Pkg.activate(dirname(abspath(@__FILE__)))
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(PROGRAM_FILE))
-ENV["GKSwstype"] = "100"
+
 
 # Include libraries
 using LoggingExtras
