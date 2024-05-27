@@ -9,6 +9,10 @@ socrates/sbin/Cinc_field
 socrates/sbin/Cscale_field
 socrates/make/Mk_cmd
 
+# Package 
+deps/*.log
+test/out/
+
 # Spectral data 
 *.par 
 *.xsc
