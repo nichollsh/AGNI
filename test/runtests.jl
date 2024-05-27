@@ -1,14 +1,12 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
+# Get AGNI root directory
+ROOT_DIR = abspath(joinpath(dirname(abspath(PROGRAM_FILE)),"../"))
+
 # Activate environment
 ENV["GKSwstype"] = "100"
-ENV["LD_LIBRARY_PATH"] = ""
 import Pkg
-Pkg.activate(dirname(abspath(@__FILE__)))
-
-# Get AGNI root directory
-ROOT_DIR = dirname(abspath(PROGRAM_FILE))
-
+Pkg.activate(ROOT_DIR)
 
 # Include libraries
 using LoggingExtras
@@ -16,12 +14,12 @@ using LoggingExtras
 @info "Begin tests"
 
 # Include local jl files
-include("src/phys.jl")
-include("src/moving_average.jl")
-include("src/spectrum.jl")
-include("src/atmosphere.jl")
-include("src/setpt.jl")
-include("src/energy.jl")
+include("../src/phys.jl")
+include("../src/moving_average.jl")
+include("../src/spectrum.jl")
+include("../src/atmosphere.jl")
+include("../src/setpt.jl")
+include("../src/energy.jl")
 import .phys
 import .atmosphere
 import .setpt
@@ -84,7 +82,7 @@ mf_dict         = Dict([
                         ("N2"  , 0.1),
                         ("H2"  , 0.2)
                         ])
-spfile_name   = "res/spectral_files/Dayspring/16/Dayspring.sf"
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -133,7 +131,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.8),
                         ("CO2" , 0.2),
                         ])
-spfile_name   = "res/spectral_files/Dayspring/16/Dayspring.sf"
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -148,7 +146,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=false,
                          overlap_method=2
                  )
-atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
+atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 energy.radtrans!(atmos, false)
 
 val_e = toa_heating * cosd(theta)
@@ -194,7 +192,7 @@ theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0),
                         ])
-spfile_name   = "res/spectral_files/Oak/Oak.sf"
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/Oak.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -209,7 +207,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=false,
                          overlap_method=4
                  )
-atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
+atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
 setpt.condensing!(atmos, "H2O")
@@ -243,7 +241,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.6),
                         ("CO2" , 0.4),
                         ])
-spfile_name   = "res/spectral_files/Dayspring/16/Dayspring.sf"
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -258,7 +256,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=true,
                          overlap_method=2
                  )
-atmosphere.allocate!(atmos,"res/stellar_spectra/sun.txt")
+atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 energy.radtrans!(atmos, true)
 energy.radtrans!(atmos, false)
 
@@ -290,7 +288,7 @@ theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0)
                         ])
-spfile_name   = "res/spectral_files/Oak/Oak.sf"
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/Oak.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -306,7 +304,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=2,
                          thermo_functions=false
                  )
-atmosphere.allocate!(atmos,"res/stellar_spectra/trappist-1.txt")
+atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/trappist-1.txt"))
 setpt.isothermal!(atmos, 300.0)
 atmos.flux_tot[:] .= 0.0
 energy.radtrans!(atmos, true)
