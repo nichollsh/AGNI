@@ -45,7 +45,7 @@ if [ -z "$nf" ]; then
     echo "Cannot find nf-config"
     exit 1
 fi 
-cdfinc="$($nf --includedir)"
+cdfinc="$($nf --includedir) $($nf --fflags)"
 echo "INCCDF_PATH     = $cdfinc " >> $genpath
 cdflib="$($nf --flibs | cut -d " " -f 1 | tail -c +3)"
 echo "LIBCDF_PATH     = $cdflib " >> $genpath

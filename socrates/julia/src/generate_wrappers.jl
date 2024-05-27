@@ -5,6 +5,8 @@ include("GenFortranWrappers.jl")
 SOCRATES_DIR = "../../"
 SVN_REV=1226
 
+println("generate_wrappers")
+
 ######################################################################
 # Generate Julia and ISO_CBINDING Fortran wrappers for SOCRATES Types
 ######################################################################
