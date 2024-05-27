@@ -11,13 +11,11 @@ module solver_tstep
     using Printf
     using LoggingExtras
     using Statistics
-    using Revise
 
-    import atmosphere 
-    import energy
-    import phys
-    import setpt
-    import plotting
+    import ..atmosphere 
+    import ..energy
+    import ..phys
+    import ..plotting
 
     """
     **Solve for radiative-convective equilibrium using accelerated time-stepping.**

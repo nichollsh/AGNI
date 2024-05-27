@@ -10,16 +10,15 @@ end
 module energy  
 
     # System libraries 
-    using Revise
     using Printf
     using LinearAlgebra
     using Logging
     
     # Local files
-    import atmosphere
-    import moving_average
-    import phys
-    import spectrum
+    import ..atmosphere
+    import ..moving_average
+    import ..phys
+    import ..spectrum
 
     """
     **Calculate radiative fluxes using SOCRATES.**

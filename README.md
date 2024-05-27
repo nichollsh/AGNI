@@ -40,7 +40,7 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 - `$ cd julia`
 - `$ julia`
 - `julia> ]`
--  `(@v1.10) pkg> add OffsetArrays Revise PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse BinnedStatistics LoggingExtras`
+-  `(@v1.10) pkg> add OffsetArrays PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse BinnedStatistics LoggingExtras`
 -  `(@v1.10) pkg> activate .`
 -  Press backspace
 -  `julia> cd("src")`

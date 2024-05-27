@@ -10,7 +10,6 @@ end
 
 module spectrum 
 
-    using Revise
     using LoggingExtras
     using Printf
     using BinnedStatistics

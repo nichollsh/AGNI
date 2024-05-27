@@ -8,21 +8,30 @@
 ROOT_DIR = dirname(abspath(@__FILE__))
 ENV["GKSwstype"] = "100"
 
-# Include libraries
-using Revise
+# Include system libraries
 using LoggingExtras
 using Printf
 using TOML
 
-# Include local jl files
-push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
-import atmosphere
-import energy
-import setpt
-import plotting 
-import phys
-import solver_tstep
-import solver_nlsol 
+# Include local jl files (order matters)
+include("src/phys.jl")
+include("src/moving_average.jl")
+include("src/spectrum.jl")
+include("src/atmosphere.jl")
+include("src/setpt.jl")
+include("src/plotting.jl")
+include("src/energy.jl")
+include("src/solver_tstep.jl")
+include("src/solver_nlsol.jl")
+
+# Import src files
+import .phys
+import .atmosphere
+import .setpt
+import .plotting 
+import .energy
+import .solver_tstep
+import .solver_nlsol 
 
 # Setup terminal + file logging 
 function setup_logging(outpath::String, silent::Bool)

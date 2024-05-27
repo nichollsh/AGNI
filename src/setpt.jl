@@ -8,8 +8,8 @@ end
 
 module setpt
 
-    import phys
-    import atmosphere
+    import ..phys
+    import ..atmosphere
 
     using PCHIPInterpolation
 

@@ -11,13 +11,12 @@ module solver_nlsol
     using Printf
     using LoggingExtras
     using Statistics
-    using Revise
     using LinearAlgebra
 
-    import atmosphere 
-    import energy
-    import phys
-    import plotting
+    import ..atmosphere 
+    import ..energy
+    import ..phys
+    import ..plotting
 
     # Golden section search to minimise a function
     function gs_search(f::Function,a::Float64,b::Float64,dxtol::Float64,max_steps::Int)::Float64

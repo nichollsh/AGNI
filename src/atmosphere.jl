@@ -11,7 +11,6 @@ end
 module atmosphere
 
     # System libraries
-    using Revise
     using Printf
     using NCDatasets
     using DataStructures
@@ -24,9 +23,9 @@ module atmosphere
     
     # Local files
     include("../socrates/julia/src/SOCRATES.jl")
-    import moving_average
-    import phys
-    import spectrum
+    import ..moving_average
+    import ..phys
+    import ..spectrum
 
     # Versions
     AGNI_VERSION     = Symbol("0.2")

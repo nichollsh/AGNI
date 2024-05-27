@@ -8,7 +8,6 @@
 ROOT_DIR = dirname(abspath(@__FILE__))
 ENV["GKSwstype"] = "100"
 
-using Revise
 using Printf
 using Plots
 using DelimitedFiles
@@ -17,12 +16,18 @@ using LoggingExtras
 @info "Begin runaway demo"
 
 # Include local jl files
-push!(LOAD_PATH, joinpath(pwd(),"src"))
-import atmosphere
-import energy
-import setpt
-import phys
-import plotting
+include("src/phys.jl")
+include("src/moving_average.jl")
+include("src/spectrum.jl")
+include("src/atmosphere.jl")
+include("src/setpt.jl")
+include("src/plotting.jl")
+include("src/energy.jl")
+import .phys
+import .atmosphere
+import .setpt
+import .plotting
+import .energy
 
 # Configuration options
 instellation    = 1000.0  # Solar flux [W m-2]

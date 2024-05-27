@@ -10,18 +10,22 @@ ROOT_DIR = dirname(abspath(@__FILE__))
 ENV["GKSwstype"] = "100"
 
 # Include libraries
-using Revise
 using LoggingExtras
 
 @info "Begin tests"
 
 # Include local jl files
-push!(LOAD_PATH, joinpath(ROOT_DIR,"src"))
-import atmosphere
-import energy
-import setpt
-import plotting 
-import phys
+include("src/phys.jl")
+include("src/moving_average.jl")
+include("src/spectrum.jl")
+include("src/atmosphere.jl")
+include("src/setpt.jl")
+include("src/energy.jl")
+import .phys
+import .atmosphere
+import .setpt
+import .energy
+
 
 # Prepare
 output_dir    = "out/"
