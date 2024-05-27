@@ -14,6 +14,9 @@ deps/*.log
 test/out/
 Manifest.toml
 
+# Docs 
+docs/build
+
 # Spectral data 
 *.par 
 *.xsc
