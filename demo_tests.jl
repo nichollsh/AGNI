@@ -1,9 +1,8 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
-# -------------
-# This file runs a series of tests, to make sure that the model is behaving properly.
-# -------------
-
+# Activate environment
+import Pkg
+Pkg.activate(dirname(abspath(@__FILE__)))
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(PROGRAM_FILE))

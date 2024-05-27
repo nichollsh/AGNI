@@ -1,8 +1,8 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
-# -------------
-# AGNI executable file for demonstrating pure-steam runaway greenhouse effect
-# -------------
+# Activate environment
+import Pkg
+Pkg.activate(dirname(abspath(@__FILE__)))
 
 # Get AGNI root directory
 ROOT_DIR = dirname(abspath(PROGRAM_FILE))
