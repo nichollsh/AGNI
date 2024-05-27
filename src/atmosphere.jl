@@ -27,6 +27,8 @@ module atmosphere
     import ..phys
     import ..spectrum
 
+    export get_interleaved_pt!
+
     # Versions
     AGNI_VERSION     = Symbol("0.2")
     SOCRATES_VERSION = Symbol("2311")
@@ -1282,7 +1284,13 @@ module atmosphere
         return state 
     end
 
-    # Adjust gas VMRs according to saturation and cold-trap requirements
+    """
+    **Adjust gas VMRs according to saturation and cold-trap requirements**
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `condensates::Array`      list of condensible gases (strings)
+    """
     function handle_saturation!(atmos::atmosphere.Atmos_t, condensates::Array)
 
         # Work arrays 

@@ -33,7 +33,9 @@ module AGNI
     import .solver_tstep
     import .solver_nlsol 
 
-    # Setup terminal + file logging 
+    """
+    Setup terminal + file logging 
+    """
     function setup_logging(outpath::String, silent::Bool)
         # Remove old file 
         rm(outpath, force=true)
