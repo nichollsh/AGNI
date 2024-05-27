@@ -12,10 +12,9 @@ makedocs(
     format=format,
     pages = [
         "Introduction"  => ["index.md"],
-        "Examples"      => ["examples.md"],
         "Model"         => ["model.md"],
         "Usage"         => ["usage.md"],
-        "Examples"      => ["examples.md"],
+        "Examples"      => ["examples/index.md"],
         # "Subsection" => [
         #     ...
         # ]
@@ -23,8 +22,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/nichollsh/AGNI.git",
-    push_preview=true,
-    devbranch="main"
+    repo = "github.com/nichollsh/AGNI.git"
 )
 
