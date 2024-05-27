@@ -12,6 +12,7 @@ socrates/make/Mk_cmd
 # Package 
 deps/*.log
 test/out/
+Manifest.toml
 
 # Spectral data 
 *.par 
