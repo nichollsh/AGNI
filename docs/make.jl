@@ -1,6 +1,6 @@
 push!(LOAD_PATH,"../src/")
 
-using Documenter, AGNI
+using Documenter
 
 
 format = Documenter.HTML(edit_link = "main",
@@ -19,7 +19,6 @@ makedocs(
         "Model"         => ["model.md"],
         "Usage"         => ["usage.md"],
         "Examples"      => ["examples.md"],
-        "API"           => ["api.md"]
         # "Subsection" => [
         #     ...
         # ]
