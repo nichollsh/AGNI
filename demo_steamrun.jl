@@ -5,7 +5,7 @@
 # -------------
 
 # Get AGNI root directory
-ROOT_DIR = dirname(abspath(@__FILE__))
+ROOT_DIR = dirname(abspath(PROGRAM_FILE))
 ENV["GKSwstype"] = "100"
 
 using Printf
