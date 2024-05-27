@@ -25,4 +25,13 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
+
+      - name: SOCRATES
+        run: |
+          export LD_LIBRARY_PATH=""
+          cd socrates
+          ./configure
+          ./build_code 
+          source set_rad_env 
+          
     
