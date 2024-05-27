@@ -115,6 +115,7 @@ module atmosphere
         gas_all_num::Int                    # Number of gases
         gas_all_names::Array{String,1}      # List of gas names
         gas_all_dict::Dict{String, Array}   # Layer mole fractions in dict format, (key,value) = (gas_name,array)
+        gas_all_cond::Dict{String, Array}   # Layer condensation flags in dict format, (key,value) = (gas_name,array)
 
         # Gases (only those in spectralfile)
         gas_soc_num::Int 
@@ -409,9 +410,10 @@ module atmosphere
         end
         
         # The values will be stored in a dict of arrays
-        atmos.gas_all_names = Array{String}(undef, 0)       # list of names 
-        atmos.gas_all_dict  = Dict{String, Array}()         # dict of arrays 
-        atmos.gas_all_num   = 0                             # number of gases
+        atmos.gas_all_names = Array{String}(undef, 0)       # list of names (String)
+        atmos.gas_all_dict  = Dict{String, Array}()         # dict of VMR arrays (Float)
+        atmos.gas_all_cond  = Dict{String, Array}()         # dict of condensing arrays (Bool) 
+        atmos.gas_all_num   = 0                             # number of gases 
 
         # Dict input case
         if mf_source == 0
@@ -501,6 +503,11 @@ module atmosphere
             end 
 
         end # end read VMR from file 
+
+        # set condensation mask
+        for g in atmos.gas_all_names 
+            atmos.gas_all_cond[g] = falses(atmos.nlev_c)
+        end 
 
         # Check that we actually stored some values
         if atmos.gas_all_num == 0
@@ -1276,64 +1283,96 @@ module atmosphere
         return state 
     end
 
-   # Condense species, neglecting the latent heating and relaxing the mixing ratio of the condensible species
-   # to the saturation value.
-    function condense_varyx!(atmos::atmosphere.Atmos_t,
-                         condensing::Array; condensates::Array=[], gases::Array{String,1})
+    # Adjust gas VMRs according to saturation and cold-trap requirements
+    function handle_saturation!(atmos::atmosphere.Atmos_t, condensates::Array)
 
-        # Keep track of the minimum value of all condensates
-        minvals = Dict(s => 999999. for s in condensates)
-        
-        if length(condensates) == 0
-            return nothing
-        end
-    
-        # Check if a level is condensing (start from bottom to allow cold trap)
-        for i in atmos.nlev_c:-1:1
-            # Keep track of condensing species at each level
-            #condensing=Array{String}(undef, 0)
-            #condensing [String[] for x in 1:atmos.nlev_c]
-            # Keep track of the new condensing species amount
-            vap_new = 0.0
-            # Keep track of the old condensing species amount
-            vap_old = 0.0
+        # Work arrays 
+        maxvmr::Dict = Dict{String, Float64}()
+        x_sat::Float64 = 0.0
+        x_con::Float64 = 0.0
+        x_dry::Float64 = 0.0
+        x_dry_old::Float64 = 0.0
+        x_tot::Float64 = 0.0
+
+        # Set maximum value (for cold trapping)
+        for c in condensates 
+            maxvmr[c] = atmos.gas_all_dict[c][end]
+        end 
+
+        # Reset mixing ratios to surface values
+        # Reset condensation flags 
+        for g in atmos.gas_all_names
+           atmos.gas_all_dict[g][1:end-1] .= atmos.gas_all_dict[g][end]
+           atmos.gas_all_cond[g][:] .= false
+        end 
+
+        # Loop from bottom to top 
+        for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
+
+            x_con = 0.0
+
+            # For each condensate 
             for c in condensates
-                pp = atmos.gas_all_dict[c][i] * atmos.p[i]
-                # This assumes bottom of the atmosphere is dry, no condensation here
-                deep = atmos.gas_all_dict[c][end]
-                if pp < 1.e-10
-                    continue
-                end
 
-                # Check saturation
-                xsat = phys.calc_Psat(c, atmos.tmp[i])/atmos.p[i]
-                if xsat < deep
-                    # Condense! Track condensing substances and former values
-                    push!(condensing[i], c)
-                    vap_old = vap_old + atmos.gas_all_dict[c][i]
+                # check criticality 
+                if atmos.tmp[i] < phys.lookup_safe("t_crit",c)
+                    # if subcritical, mixing ratio set by saturation and cold-trapping
+                    x_sat = min(maxvmr[c], phys.calc_Psat(c, atmos.tmp[i]) / atmos.p[i])
+                else
+                    # if supercritical, mixing ratio only set by cold-trapping
+                    x_sat = maxvmr[c]
+                end 
 
-                    # Check if condensible is monontonically decreasing in conc.
-                    if xsat < minvals[c]
-                        # Yes - then set to xsat
-                        vap_new = vap_new + xsat
-                        atmos.gas_all_dict[c][i] = xsat
-                        minvals[c] = xsat
-                    else
-                        # No - cold trap
-                        vap_new = vap_new + minvals[c]
-                        atmos.gas_all_dict[c][i] = minvals[c]
-                    end
-                end
-            end
-        
-            # Correct dry mixing ratios for missing condensate
-            for nc in setdiff(gases, condensing)
-                atmos.gas_all_dict[nc][i] = atmos.gas_all_dict[nc][i] * (1. - vap_new)/(1. - vap_old)
-            end
-        end
-    end
+                # saturate and cold-trap
+                if atmos.gas_all_dict[c][i] > x_sat
 
-# Apply condensation according to vapour-liquid coexistance curve (return mask of condensing levels)
+                    # set new vmr
+                    atmos.gas_all_dict[c][i] = x_sat
+
+                    # store vmr for cold trapping at levels above this one
+                    maxvmr[c] = x_sat
+
+                    # add to total vmr of all condensing gases at this level
+                    x_con += x_sat
+
+                    # flag condensate as actively condensing at this level
+                    atmos.gas_all_cond[c][i] = true 
+                end 
+
+            end 
+
+            # Calculate current and target dry VMRs
+            x_dry = 1.0 - x_con 
+            x_dry_old = 0.0
+            for g in atmos.gas_all_names 
+                # skip condensing gases, since their VMR is set by saturation
+                if !atmos.gas_all_cond[g][i]
+                    x_dry_old += atmos.gas_all_dict[g][i]
+                end 
+            end 
+
+            # Renormalise VMR to unity, scaling DRY COMPONENTS ONLY
+            for g in atmos.gas_all_names 
+                if !atmos.gas_all_cond[g][i]
+                    atmos.gas_all_dict[g][i] *= x_dry / x_dry_old
+                end 
+            end 
+
+            # Check total VMR at this level 
+            x_tot = 0.0
+            for g in atmos.gas_all_names 
+                x_tot += atmos.gas_all_dict[g][i]
+            end 
+            if abs(x_tot - 1.0) > 1.0e-5
+                @warn @sprintf("Mixing ratios sum to %.8e (level %d)",x_tot,i)
+            end 
+
+        end # go to next level
+
+        return nothing 
+    end 
+
+    # Apply condensation according to vapour-liquid coexistance curve (return mask of condensing levels)
     function apply_vlcc!(atmos::atmosphere.Atmos_t, gas::String)
 
         changed = falses(atmos.nlev_c)

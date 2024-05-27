@@ -176,7 +176,7 @@ function main()::Bool
     overlap::Int           = cfg["execution" ]["overlap_method"]
     thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
     conv_type::String      = cfg["execution" ]["convection_type"]
-    condensates::Array     = cfg["execution" ]["condensates"]
+    condensates::Array{String,1} = cfg["execution"]["condensates"]
     chem_type::Int         = cfg["execution" ]["chemistry"]
     incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
     sol_type::Int          = cfg["execution" ]["solution_type"]
@@ -338,7 +338,6 @@ function main()::Bool
     return_success::Bool = true
     solver_success::Bool = true
     method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
-    condensing::Array = [String[] for x in 1:atmos.nlev_c]
     
     if length(solvers_cmd) == 0  # is empty 
         solvers_cmd = [""]
@@ -359,7 +358,7 @@ function main()::Bool
         if sol == "none"
             energy.calc_fluxes!(atmos, length(condensates)>0,  
                                 incl_convect, incl_sens, incl_conduct, 
-                                condensates=condensates)
+                                condensates=condensates, calc_cf=plt_cff)
             @info "    done"
         
         # Timestepping
@@ -384,7 +383,7 @@ function main()::Bool
             method_idx = findfirst(==(sol), method_map)            
             solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
                                 conduct=incl_conduct,  chem_type=chem_type,
-                                convect=incl_convect, condensates=condensates, condensing=condensing,
+                                convect=incl_convect, condensates=condensates, 
                                 sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
                                 conv_rtol=conv_rtol, method=method_idx, 
                                 dx_max=dx_max, linesearch=linesearch,
