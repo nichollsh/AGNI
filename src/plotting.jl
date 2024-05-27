@@ -13,6 +13,7 @@ module plotting
     using LaTeXStrings
     using Glob
     using Printf
+    using FFMPEG
 
     import ..atmosphere
     import ..phys
@@ -454,16 +455,16 @@ module plotting
         else 
             fps = nframes/duration*1.0
             # animate profile 
-            run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_prf.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_prf.mp4`)
+            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_prf.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_prf.mp4`)
 
             # animate fluxes 
             if fluxes
-                run(`ffmpeg -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_flx.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_flx.mp4`)
+                @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_flx.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_flx.mp4`)
             end
 
             # combine videos 
             if fluxes 
-                run(`ffmpeg -loglevel quiet -i $out/frames/ani_prf.mp4 -i $out/frames/ani_flx.mp4 -filter_complex "hstack,format=yuv420p" -c:v libx264 -crf 18 -y $out/anim.mp4`)
+                @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -i $out/frames/ani_prf.mp4 -i $out/frames/ani_flx.mp4 -filter_complex "hstack,format=yuv420p" -c:v libx264 -crf 18 -y $out/anim.mp4`)
             else 
                 cp("$out/frames/ani_prf.mp4", "$out/anim.mp4")
             end 
