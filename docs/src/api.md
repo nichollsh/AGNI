@@ -1,6 +1,0 @@
-# API
-
-```@autodocs
-Modules=[AGNI]
-
-```
