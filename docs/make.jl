@@ -1,7 +1,4 @@
-push!(LOAD_PATH,"../src/")
-
 using Documenter
-
 
 format = Documenter.HTML(edit_link = "main",
                          prettyurls = get(ENV, "CI", nothing) == "true",
@@ -25,10 +22,9 @@ makedocs(
     ]
 )
 
-
 deploydocs(
     repo = "github.com/nichollsh/AGNI.git",
     push_preview=true,
-    devbranch="docs"
+    devbranch="main"
 )
 
