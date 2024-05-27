@@ -13,12 +13,12 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 * `doc/`            - Further documentation
 * `out/`            - Output files
 * `res/`            - Resources
-* `src/`            - AGNI source code
+* `src/`            - AGNI package source code
+* `test/`           - Package tests
 * `socrates/`       - Directory containing SOCRATES and associated files (subject to the license therein)
+* `.github/`        - GitHub workflows
 * `agni.jl`         - AGNI executable
 * `demo_steamrun.jl`- Script to demonstrate the pure-steam runaway greenhouse effect
-* `demo_tests.jl`   - Script containing quick tests for verifying that the basics of the model are functioning
-
 
 ## Requirements
 * Julia (NB: install only from julialang.org - do not use your system package manager)
@@ -26,35 +26,40 @@ Consult the [AGNI Wiki](https://github.com/nichollsh/AGNI/wiki) on GitHub for in
 * netcdf-fortran
 * make
 * OpenMP
-* ffmpeg (optional)
 
 ## Supported platforms
 * MacOS (ARM and x86-64)
 * GNU/Linux (x86-64)
 
 ## Installation instructions
+- `$ export LD_LIBRARY_PATH=""`
 - `$ cd socrates`
 - `$ ./configure`
 - `$ ./build_code`
 - `$ source set_rad_env`
-- `$ cd julia`
 - `$ julia`
 - `julia> ]`
--  `(@v1.10) pkg> add OffsetArrays PCHIPInterpolation LaTeXStrings Plots NCDatasets DataStructures Glob ArgParse BinnedStatistics LoggingExtras`
--  `(@v1.10) pkg> activate .`
--  Press backspace
--  `julia> cd("src")`
--  `julia> include("generate_wrappers.jl")`
--  `julia> exit()`
--  `$ cd lib`
--  `$ make`
--  `$ cd ../../..`   
-You should end up in the root directory of the repository.    
+- `(@v1.10) pkg> activate ../`
+- `(AGNI) pkg> instantiate`
+- Press backspace
+- `julia> cd("julia/src")`
+- `julia> include("generate_wrappers.jl")`
+- `julia> exit()`
+- `$ cd julia/lib`
+- `$ make`
+- `$ cd ../../..`   
+You will end up in the root directory of the repository.    
+You should run the tests next.
+
+## Testing the code 
+- `$ julia`
+- `julia> ]`
+- `(@v1.10) pkg> activate .`
+- `(AGNI) pkg> test`
 
 ## Running the code
 To run the program, execute `./agni.jl [cfg_path]`. If `[cfg_path]` is not provided, then the default configuration file will be used.       
 To demo the steam runaway greenhouse effect, execute `./demo_steamrun.jl`.     
-To run the unit tests execute `./demo_steamrun.jl`.     
 
 ## Contributors
 * Harrison Nicholls

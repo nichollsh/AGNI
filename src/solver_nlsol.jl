@@ -280,7 +280,7 @@ module solver_nlsol
         end  # end fev
 
         # Calculate the jacobian and residuals at x using a 2nd order central-difference method
-        function _calc_jac_res!(x::Array, jacob::Array, resid::Array, central::Bool, order::Int)
+        function _calc_jac_res!(x::Array{Float64, 1}, jacob::Array{Float64, 2}, resid::Array{Float64 ,1}, central::Bool, order::Int)
 
             # Evalulate residuals at x
             _fev!(x, resid)

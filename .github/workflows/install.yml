@@ -1,0 +1,34 @@
+# Run this job on pushes to `main`, and for pull requests. If you don't specify
+# `branches: [main], then this actions runs _twice_ on pull requests, which is
+# annoying.
+
+on:
+  pull_request:
+    branches: [main]
+
+name: Install and build AGNI
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    name: Install and build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: NetCDF
+        run: |
+          sudo apt update 
+          sudo apt-get install libnetcdff-dev netcdf-bin gfortran gcc
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.10'
+
+      - name: SOCRATES
+        run: |
+          export LD_LIBRARY_PATH=""
+          cd socrates
+          ./configure
+          ./build_code 
+          source set_rad_env 
+          
+    
