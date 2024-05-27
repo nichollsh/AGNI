@@ -116,7 +116,7 @@ cd $here
 
 echo "Setting path to distribution in set_rad_env"
 sed "s#???#${here}#" sbin/set_rad_env_tmp > set_rad_env
-cat bin/set_prog_env >> set_rad_env
+#cat bin/set_prog_env >> set_rad_env
 
 date
 
