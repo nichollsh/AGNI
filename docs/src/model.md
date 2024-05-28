@@ -1,12 +1,12 @@
-# Overview 
+# Description 
 AGNI models a planetary atmosphere by treating it as a single column (1D) and splitting it up into levels of finite thickness. These levels are defined in pressure-space, and are arranged logarithmically between the surface and the top of the atmosphere. Quantities such as pressure and temperature are calculated at level-centres and level-edges, while energy fluxes are calculated only at the edges, and thermodynamic properties (e.g. heat capacity) are calculated only at their centres.
 
 ## Radiative transfer
 Radiative transfer (RT) refers to the transport of radiation energy through a medium subject to the characteristics of the medium. Radiation passing through an atmosphere is absorbed, emitted, scattered, and reflected. In the context of planetary atmospheres, we also have to handle their surfaces, cloud formation, and radiation from the host star.
 
-AGNI models RT using SOCRATES, a numerical code written by the UK Met Office, which is called by using a Julia interface originally written by Stuart Daines [(see their branch here)](https://code.metoffice.gov.uk/trac/socrates/browser/main/branches/dev/stuartdaines/r1126_julia_interface). SOCRATES solves the RT equation using a two-stream solution under a plane-parallel approximation. The atmosphere is assumed to be hydrostatically supported and to behave as an ideal gas. Opacity is calculated using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases.
+AGNI models RT using SOCRATES, a numerical code written by the UK Met Office which solves the RT equation using a two-stream solution under a plane-parallel approximation. SOCRATES is accessed using a Julia interface originally written by Stuart Daines. The atmosphere is assumed to be hydrostatically supported and to behave as an ideal gas. Opacity is calculated using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases. 
 
-For simulating gaseous absorption, the model fits k-terms to spectral absorption cross-section data from DACE. The MT_CKD model is used to estimate continuum absorption cross-sections. Rayleigh scattering and water cloud radiative effects are also included.
+For simulating gaseous absorption, the model fits k-terms to spectral absorption cross-section data from DACE. The MT_CKD model is used to estimate continuum absorption cross-sections. Rayleigh scattering and water cloud radiative effects are also included. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/nichollsh/SOCRATES) on GitHub.
 
 ## Convection
 Convection is a process that occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it's often parameterised in 3D global circulation models, as resolving convection is numerically difficult. Two convection parameterisations are included within the model: convective adjustment (CA), and mixing length theory (MLT). 
