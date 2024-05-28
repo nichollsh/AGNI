@@ -19,7 +19,7 @@ This page outlines requirements and installation steps for the code.
 - `$ ./build_code`
 - `$ source set_rad_env`
 - `$ julia`
-- `julia> ]`
+- `julia> ]` 
 - `(@v1.10) pkg> activate ../`
 - `(AGNI) pkg> instantiate`
 - Press backspace

@@ -1,12 +1,12 @@
-# Run this job on pushes to `main`, and for pull requests. If you don't specify
-# `branches: [main], then this actions runs _twice_ on pull requests, which is
-# annoying.
+# This job installs and builds AGNI
+# This occurs when a PR to main is created
+
+name: Install and build AGNI
 
 on:
   pull_request:
     branches: [main]
 
-name: Install and build AGNI
 jobs:
   install:
     runs-on: ubuntu-latest

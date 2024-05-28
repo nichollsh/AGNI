@@ -18,6 +18,7 @@ Consult the [AGNI Wiki](https://nichollsh.github.io/AGNI/) on GitHub for informa
 * `socrates/`       - Directory containing SOCRATES and associated files (subject to the license therein)
 * `.github/`        - GitHub workflows
 * `.vscode/`        - Visual Studio Code configuration 
+* `tutorials/`      - Notebooks and tutorials
 * `agni.jl`         - AGNI executable
 * `demo_steamrun.jl`- Script to demonstrate the pure-steam runaway greenhouse effect
 
