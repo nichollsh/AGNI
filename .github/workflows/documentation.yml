@@ -1,11 +1,17 @@
+# This job updates the documentation and pushes it to GitHub pages
+# This occurs when a PR to main is merged
+
 name: Documentation
 
 on:
-  push:
+  pull_request:
     branches: [main]
+    types:
+      - closed
 
 jobs:
   build:
+    if: github.event.pull_request.merged == true
     permissions:
       contents: write
       pull-requests: read
