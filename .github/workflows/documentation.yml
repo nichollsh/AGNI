@@ -4,14 +4,11 @@
 name: Documentation
 
 on:
-  pull_request:
+  push:
     branches: [main]
-    types:
-      - closed
 
 jobs:
   build:
-    if: github.event.pull_request.merged == true
     permissions:
       contents: write
       pull-requests: read
