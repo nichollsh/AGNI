@@ -1,6 +1,4 @@
-# Model overview
-
-## Overview 
+# Overview 
 AGNI models a planetary atmosphere by treating it as a single column (1D) and splitting it up into levels of finite thickness. These levels are defined in pressure-space, and are arranged logarithmically between the surface and the top of the atmosphere. Quantities such as pressure and temperature are calculated at level-centres and level-edges, while energy fluxes are calculated only at the edges, and thermodynamic properties (e.g. heat capacity) are calculated only at their centres.
 
 ## Radiative transfer
@@ -33,11 +31,11 @@ Depending on the system you wish to model, it is necessary to tell AGNI what kin
 ## Obtaining a solution
 AGNI is designed for modelling planetary atmospheres with high surface pressures and temperatures. This means that the radiative timescale differs by several orders of magnitude across the column, which makes obtaining a solution difficult. The model contains a suite of methods for obtaining a solution.
 
-### A) Time-stepping
-AGNI implements a multistep Adams-Bashforth integrator to integrate the heating rates at each level over time. This is very robust to the initial conditions provided, but is not able to obtain an energy-conserving solution very quickly. Various optimisations can be used, such as allowing each level to evolve on its own timescale, which provides unphysical intermediate solutions but a physical final state. Time-stepping methods such as these are used in other radiative-convective models (with their own enhancements) such as HELIOS and Exo_k.
+### A) Solving a non-linear system
+To obtain a temperature structure solution that conserves energy more precisely than a time-stepping method, it is possible to construct the model as a system of non-linear equations $\vec{r}(\vec{x})$. This algorithm obtains the roots of the nonlinear system formed by the flux divergence $r_i$ at each level $i$, with cell-centre temperatures used as the independent variables $x_i$. Finite-difference methods are used to estimate the jacobian matrix in this case. Similar methods have been used in a handful of planetary radiative-convective models (e.g. ATMO), but is more commonly used by the stellar physics community. Currently implemented solvers: Newton-Raphson, Gauss-Newton, and Levenberg-Marquardt. Optionally, the code uses a golden-section linesearch algorithm to determine the optimal step length. 
 
-### B) Solving a non-linear system
-To obtain a temperature structure solution that conserves energy more strictly than the time-stepping method, it is possible to construct the model as a system of non-linear equations $\vec{r}(\vec{x})$. This algorithm obtains the roots of the nonlinear system formed by the flux divergence at each level $r$, with cell-centre temperatures used as the independent variables $x$. Finite-difference methods are used to estimate the jacobian matrix in this case. This method has been used in a handful of planetary radiative-convective models (e.g. ATMO), but is more commonly used by the stellar physics community. Currently implemented solvers: Newton-Raphson, Gauss-Newton, and Levenberg-Marquardt.
+### B) Time-stepping
+AGNI also implements a multistep Adams-Bashforth integrator to integrate the heating rates at each level over time. This is very robust to the initial conditions provided, but is not able to obtain an energy-conserving solution very quickly. Each level to evolves on its own timescale, which provides unphysical intermediate solutions but a physical final state. Time-stepping methods such as these are used in other radiative-convective models (with their own enhancements) such as HELIOS and Exo_k. This method is not the primary solver within AGNI, so it in "maintainence mode" rather than active development.
 
 ## Other features
 AGNI can calculate emission spectra, provided with T(p) and the volume mixing ratios of the gases. This is performed using the same RT as the RCE calculations, so is limited in resolution by the choice of correlated-k bands. Similarly, the the contribution function can also be calculated.
