@@ -30,7 +30,7 @@ module atmosphere
     export get_interleaved_pt!
 
     # Versions
-    AGNI_VERSION     = Symbol("0.2")
+    AGNI_VERSION     = Symbol("0.3.0")
     SOCRATES_VERSION = Symbol("2311")
     
     # Solution types
