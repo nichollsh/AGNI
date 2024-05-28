@@ -32,7 +32,6 @@ socstar.dat
 
 # Misc files
 .DS_Store
-.vscode 
 __pycache__
 debug/
 nogit_*
