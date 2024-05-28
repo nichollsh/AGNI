@@ -11,7 +11,7 @@ makedocs(
     sitename="AGNI",
     format=format,
     pages = [
-        "index.md",
+        "Home" => "index.md",
         "model.md",
         "setup.md" ,
         "usage.md",
