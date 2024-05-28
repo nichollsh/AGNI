@@ -1,8 +1,7 @@
-# Usage
+# Running the model
+First, follow the [Getting started](@ref) instructions . Only read-on once you have confirmed that the code is working.  
 
-First, follow the instructions in the README file. Only read-on once you have confirmed that the code is working.
-
-## Running the model
+## Execution
 To run the model, simply execute `./agni.jl [cfg]` where `[cfg]` is the path to the required configuration file. If `[cfg]` is not passed, then the default configuration will be used.
 
 ## Configuration 

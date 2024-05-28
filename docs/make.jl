@@ -11,13 +11,12 @@ makedocs(
     sitename="AGNI",
     format=format,
     pages = [
-        "Introduction"  => ["index.md"],
-        "Model"         => ["model.md"],
-        "Usage"         => ["usage.md"],
-        "Examples"      => ["examples/index.md"],
-        # "Subsection" => [
-        #     ...
-        # ]
+        "index.md",
+        "model.md",
+        "setup.md" ,
+        "usage.md",
+        "examples/index.md",
+        "manual/index.md"
     ]
 )
 
