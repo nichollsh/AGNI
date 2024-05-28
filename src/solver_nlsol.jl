@@ -140,7 +140,7 @@ module solver_nlsol
         modprint::Int =         1       # Print frequency
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
-        fdr::Float64        =   0.2     # Use forward difference if cost ratio is below this value
+        fdr::Float64        =   0.3     # Use forward difference if cost ratio is below this value
         ls_max_steps::Int  =    15      # Maximum golden section linesearch steps 
         plateau_n::Int =        10      # Plateau declared when plateau_i > plateau_n
         plateau_s::Float64 =    100.0   # Scale factor applied to x_dif when plateau_i > plateau_n
