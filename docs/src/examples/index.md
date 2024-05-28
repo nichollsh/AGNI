@@ -1,24 +1,34 @@
 # Example outputs
 
 ## Pure steam runaway greenhouse effect
-By assuming the atmosphere temperature profile follows a dry adiabat from the surface and then water vapour-condensate coexistance curve defined by the Clausius-Claperyron relation at lower pressures, we see a characteristic relationship between OLR and the surface temperature ($T_s$). Initially OLR increases with $T_s$, but as the condensing layer (which is independent of $T_s$) starts to dominate the photosphere,  OLR and $T_s$ decouple. Eventually the atmosphere reaches a dry post-runaway state, and OLR increases rapidly with $T_s$ once more.
+By assuming the atmosphere temperature profile follows a dry adiabat and the water vapour-condensate coexistance curve defined by the Clausius-Claperyron relation, we see a characteristic relationship between the outgoing longwave radiation (OLR) and the surface temperature ($T_s$). Initially OLR increases with $T_s$, but as the condensing layer (which is independent of $T_s$) overlaps with the photosphere, OLR and $T_s$ decouple. Eventually the atmosphere reaches a dry post-runaway state, and OLR increases rapidly with $T_s$.
 ```@raw html
-  <img src="assets/runaway/curve.png" width=80% class="center"/>
+  <img src="assets/runaway/curve.png" width=70% class="center"/>
 ```
+You can find a Jupyter notebook which reproduces this result in the [tutorials directory](https://github.com/nichollsh/AGNI/tree/main/tutorials) of the repository.
 
-## Prescribed dry adiabat
-In this case, radiative fluxes (right) are calculated according to a temperature profile (left), which follows a dry adiabat from the surface to the top of the atmosphere. Because the temperature profile is entirely prescribed, the fluxes are not balanced locally or globally across the column.
+## Prescribed convective case
+In this case, a temperature profile is prescribed to follow a dry adiabat from the surface to a moist region, and then a pseudoadiabat to the top of the atmosphere. This is in line with previous works and the OLR curve above. 
 ```@raw html
-  <img src="assets/nosolve/pt.png" width=45% class="center"/> 
-  <img src="assets/nosolve/fl.png" width=45% class="center"/> 
+  <img src="assets/nosolve/plot_ptprofile.png" width=60% class="center"/> 
+```
+Radiative fluxes are then calculated according to this  temperature profile. Because the profile is prescribed, the fluxes are not balanced locally or globally across the column.
+```@raw html
+  <img src="assets/nosolve/plot_fluxes.png" width=60% class="center"/> 
 ```
 
 ## Radiative-convective solution
-The temperature profile (left) is solved such that energy is globally and locally conserved (see fluxes, right). Convection is parameterised using mixing length theory in this case, allowing the system to be solved using a Newton-Raphson method. 
+Instead, we can model an atmosphere such that that energy is globally and locally conserved. Convection is parameterised using mixing length theory in this case, allowing the system to be solved using a Newton-Raphson method. In the convective region at ~0.1 bar, we can see that the radiative fluxes and convective fluxes entirely cancel, because AGNI was asked to solve for a case with zero total flux transport. 
 ```@raw html
-  <img src="assets/withsolve/pt.png" width=45% class="center"/> 
-  <img src="assets/withsolve/fl.png" width=45% class="center"/> 
+  <img src="assets/withsolve/plot_ptprofile.png" width=60% class="center"/> 
+  <br />
+  <img src="assets/withsolve/plot_fluxes.png" width=60% class="center"/> 
 ```
 
-We can then plot the outgoing emission spectrum (left) and normalised contribution function (right). The spectrum clearly demonstrates complex water absorption features, but reproduces blackbody emission at longer wavelengths. The normalised contribution function quantifies how much each pressure level contributes to the outgoing emission spectrum at a given wavelength; this is then plotted versus wavelength and pressure. 
+We can also plot the outgoing emission spectrum and normalised contribution function. The spectrum clearly demonstrates complex water absorption features, and exceeds blackbody emission at shorter wavelengths due to Rayleigh scattering. The normalised contribution function quantifies how much each pressure level contributes to the outgoing emission spectrum at a given wavelength -- this is then plotted versus wavelength and pressure. 
 
+```@raw html
+  <img src="assets/withsolve/plot_emission.png" width=90% class="center"/> 
+  <br />
+  <img src="assets/withsolve/plot_contfunc.png" width=90% class="center"/> 
+```
