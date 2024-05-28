@@ -8,7 +8,6 @@ The model is distributed under a proprietary license. Only once it has been publ
 Consult the [AGNI Wiki](https://nichollsh.github.io/AGNI/) on GitHub for information about the model. 
     
 ## Repository structure 
-* `README.md`       - This file
 * `LICENSE.txt`     - License for use and re-use
 * `doc/`            - Further documentation
 * `out/`            - Output files
@@ -20,7 +19,6 @@ Consult the [AGNI Wiki](https://nichollsh.github.io/AGNI/) on GitHub for informa
 * `.vscode/`        - Visual Studio Code configuration 
 * `tutorials/`      - Notebooks and tutorials
 * `agni.jl`         - AGNI executable
-* `demo_steamrun.jl`- Script to demonstrate the pure-steam runaway greenhouse effect
 
 ## Installation and usage
 See the Getting Started page on the AGNI wiki for information on installing and using the model.

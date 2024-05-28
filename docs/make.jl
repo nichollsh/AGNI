@@ -21,6 +21,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/nichollsh/AGNI.git"
+    repo = "github.com/nichollsh/AGNI.git",
+    push_preview=true
 )
 
