@@ -23,8 +23,8 @@ AGNI is now installed as a package into a Julia environment in this directory.
 You should run the tests next.
 
 ## Testing
-- `$ julia`
-- `julia> ]`
-- `(@v1.10) pkg> activate .`
-- `(AGNI) pkg> test`
-These tests may trigger recompilation of depenencies.
+Run `./test/runtests.jl ` in your terminal. This will print information on whether tests passed or failed.   
+
+
+## Using the code
+See [Running the model](@ref) for information on using the code.

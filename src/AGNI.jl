@@ -33,6 +33,12 @@ module AGNI
     import .solver_tstep
     import .solver_nlsol 
 
+    # Export 
+    # export atmosphere
+    # export solver_nlsol
+    # export plotting
+    # export energy
+
     """
     Setup terminal + file logging 
     """
@@ -93,7 +99,9 @@ module AGNI
         return nothing 
     end 
 
-    # Open and validate config file 
+    """
+    Open and validate config file 
+    """
     function open_config(cfg_path::String)::Dict
 
         # open file 
@@ -122,7 +130,9 @@ module AGNI
         return cfg_dict 
     end 
 
-    # Main function!
+    """
+    Main function to be called by executable file
+    """
     function main()::Bool
 
         # Record start time 
