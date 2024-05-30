@@ -47,17 +47,19 @@ jobs:
       - name: Instantiate
         run: |
           source socrates/set_rad_env
-          echo $RAD_DIR
+          export LD_LIBRARY_PATH=""
           julia --project -e 'using Pkg; Pkg.instantiate()'
 
       - name: Build
         run: |
           source socrates/set_rad_env
+          export LD_LIBRARY_PATH=""
           julia --project -e 'using Pkg; Pkg.build()'
 
       - name: Test 
         run: |
           source socrates/set_rad_env
+          export LD_LIBRARY_PATH=""
           julia --project -e 'using Pkg; Pkg.test()'
           
     
