@@ -29,9 +29,6 @@ module atmosphere
 
     export get_interleaved_pt!
 
-    # Versions
-    AGNI_VERSION     = Symbol("0.3.0")
-    SOCRATES_VERSION = Symbol("2311")
     
     # Solution types
     SOL_TYPES::Array{String, 1} = [
@@ -44,6 +41,9 @@ module atmosphere
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
+
+        # Code version
+        AGNI_VERSION::String
 
         # Track state of atmos struct
         is_param::Bool      # Params have been set
@@ -58,6 +58,7 @@ module atmosphere
         OUT_DIR::String
 
         # SOCRATES objects
+        SOCRATES_VERSION::String
         dimen::SOCRATES.StrDim
         control::SOCRATES.StrCtrl
         spectrum::SOCRATES.StrSpecData
@@ -296,6 +297,12 @@ module atmosphere
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
             mkdir(OUT_DIR)
         end
+
+        # Code versions 
+        cd(ROOT_DIR) do 
+            atmos.AGNI_VERSION = "0.3.0"
+        end 
+        atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
 
         atmos.num_rt_eval = 0
 
@@ -1579,8 +1586,9 @@ module atmosphere
         ds.attrib["date"]               = Dates.format(now(), "yyyy-u-dd HH:MM:SS")
         ds.attrib["hostname"]           = gethostname()
         ds.attrib["username"]           = ENV["USER"]
-        ds.attrib["AGNI_version"]       = String(AGNI_VERSION)
-        ds.attrib["SOCRATES_version"]   = String(SOCRATES_VERSION )
+        ds.attrib["AGNI_version"]      = atmos.AGNI_VERSION
+        ds.attrib["SOCRATES_version"]  = atmos.SOCRATES_VERSION
+
 
         plat::String = "Generic"
         if Sys.isapple()
