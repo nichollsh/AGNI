@@ -131,7 +131,7 @@ module spectrum
     function insert_stellar_and_rscatter(orig_file::String, star_file::String, outp_file::String, insert_rscatter::Bool)
 
         # Inputs to prep_spec
-        prep_spec = abspath(dirname(abspath(@__FILE__))*"/../socrates/bin/prep_spec")
+        prep_spec = joinpath(ENV["RAD_DIR"],"bin","prep_spec")
         @debug "Using prep_spec at: "*prep_spec
         star_inputs = ["6","n","T","100 4000","1000",   "2","n",star_file,"y"]
 

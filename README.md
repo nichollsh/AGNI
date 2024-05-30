@@ -12,9 +12,9 @@ Consult the [AGNI Wiki](https://nichollsh.github.io/AGNI/) on GitHub for informa
 * `doc/`            - Further documentation
 * `out/`            - Output files
 * `res/`            - Resources
-* `src/`            - AGNI package source code
+* `src/`            - Package source code
 * `test/`           - Package tests
-* `socrates/`       - Directory containing SOCRATES and associated files (subject to the license therein)
+* `build/`          - Package build scripts
 * `.github/`        - GitHub workflows
 * `.vscode/`        - Visual Studio Code configuration 
 * `tutorials/`      - Notebooks and tutorials
