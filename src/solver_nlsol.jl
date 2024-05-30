@@ -228,9 +228,9 @@ module solver_nlsol
             _set_tmps!(x)
 
             # Do rainout
-            if do_condense
-                atmosphere.handle_saturation!(atmos,condensates)
-            end
+            # if do_condense
+            #     atmosphere.handle_saturation!(atmos,condensates)
+            # end
             
             # Calculate layer properties if required, and haven't already
             if atmos.thermo_funct || do_condense
