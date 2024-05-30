@@ -1,10 +1,13 @@
 #!/bin/bash
 
-# Remove old repo
+
 rm -rf socrates
 
 # Download
 git clone git@github.com:nichollsh/SOCRATES.git socrates
+
+# Environment
+export LD_LIBRARY_PATH=""
 
 # Install 
 cd socrates
