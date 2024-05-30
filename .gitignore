@@ -2,6 +2,8 @@
 *.mod
 *.o
 radiation_code.lock
+socrates 
+SOCRATES 
 
 # Package 
 deps/*.log
