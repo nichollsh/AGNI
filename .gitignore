@@ -2,12 +2,8 @@
 *.mod
 *.o
 radiation_code.lock
-socrates/bin/*
-socrates/set_rad_env
-socrates/sbin/Cgen_null
-socrates/sbin/Cinc_field
-socrates/sbin/Cscale_field
-socrates/make/Mk_cmd
+socrates 
+SOCRATES 
 
 # Package 
 deps/*.log

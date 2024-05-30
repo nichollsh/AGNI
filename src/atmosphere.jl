@@ -22,7 +22,7 @@ module atmosphere
     using Logging
     
     # Local files
-    include("../socrates/julia/src/SOCRATES.jl")
+    include(joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl"))
     import ..moving_average
     import ..phys
     import ..spectrum
