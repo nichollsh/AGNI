@@ -44,11 +44,11 @@ jobs:
           source set_rad_env 
           cd ..
         
-      - name: Instantiate
-        run: |
-          source socrates/set_rad_env
-          export LD_LIBRARY_PATH=""
-          julia --project -e 'using Pkg; Pkg.instantiate()'
+      # - name: Instantiate
+      #   run: |
+      #     source socrates/set_rad_env
+      #     export LD_LIBRARY_PATH=""
+      #     julia --project -e 'using Pkg; Pkg.instantiate()'
 
       - name: Build
         run: |
