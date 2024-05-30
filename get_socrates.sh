@@ -1,9 +1,7 @@
 #!/bin/bash
 
-
-rm -rf socrates
-
 # Download
+rm -rf socrates
 git clone git@github.com:nichollsh/SOCRATES.git socrates
 
 # Environment
@@ -16,3 +14,4 @@ cd socrates
 
 # Environment
 source ./set_rad_env
+export LD_LIBRARY_PATH=""
