@@ -16,16 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Setup system
       - name: NetCDF
         run: |
           sudo apt update 
           sudo apt-get install libnetcdff-dev netcdf-bin gfortran gcc
 
-      - name: Setup Julia
-        uses: julia-actions/setup-julia@v2
-        with:
-          version: '1.10'
-
+      # Setup SOCRATES
       - name: Get SOCRATES
         uses: actions/checkout@v4
         with:
@@ -40,14 +37,26 @@ jobs:
           ./build_code 
           source set_rad_env 
           cd ..
-
+        
+      # Setup AGNI
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.10'
+      
       - name: Instantiate
-        run: julia --project -e 'using Pkg; Pkg.instantiate()'
+        run: |
+          source socrates/set_rad_env
+          julia --project -e 'using Pkg; Pkg.instantiate()'
 
       - name: Build
-        run: julia --project -e 'using Pkg; Pkg.build()'
+        run: |
+          source socrates/set_rad_env
+          julia --project -e 'using Pkg; Pkg.build()'
 
       - name: Test 
-        run: julia --project -e 'using Pkg; Pkg.test()'
+        run: |
+          source socrates/set_rad_env
+          julia --project -e 'using Pkg; Pkg.test()'
           
     
