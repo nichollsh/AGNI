@@ -230,40 +230,45 @@ module atmosphere
         are performed.
 
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `ROOT_DIR::String`                AGNI root directory. 
-    - `OUT_DIR::String`                 Output directory.
-    - `spfile::String`                  path to spectral file.
-    - `instellation::Float64`           bolometric solar flux at the top of the atmosphere [W m-2]
-    - `s0_fact::Float64`                scale factor applied to instellation to account for planetary rotation (i.e. S_0^*/S_0 in Cronin+14)
-    - `albedo_b::Float64`               bond albedo scale factor applied to instellation in order to imitate shortwave reflection 
-    - `zenith_degrees::Float64`         angle of radiation from the star, relative to the zenith [degrees].
-    - `tmp_surf::Float64`               effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
-    - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
-    - `radius::Float64`                 planet radius at the surface [m].
-    - `nlev_centre::Int`                number of model levels.
-    - `p_surf::Float64`                 total surface pressure [bar].
-    - `p_top::Float64`                  total top of atmosphere pressure [bar].
-    - `mf_dict=nothing`                 dictionary of mole fractions in the format (key,value)=(gas,mf).
-    - `mf_path=nothing`                 path to file containing mole fractions at each level.
-    - `albedo_s::Float64=0.0`           surface albedo.
-    - `tmp_floor::Float64=5.0`          temperature floor [K].
-    - `C_d::Float64=0.001`              turbulent heat exchange coefficient [dimensionless].
-    - `U::Float64=10.0`                 surface wind speed [m s-1].
-    - `tmp_magma::Float64=3000.0`       mantle temperature [K] for sol_type==2.
-    - `skin_d::Float64=0.05`            skin thickness [m].
-    - `skin_k::Float64=2.0`             skin thermal conductivity [W m-1 K-1].
-    - `overlap_method::Int=4`           SOCRATES gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
-    - `target_olr::Float64=0.0`         target OLR [W m-2] for sol_type==4.
-    - `tmp_eff::Float64=0.0`            planet's effective brightness temperature [K] for sol_type==3.
-    - `all_channels::Bool=true`         use all channels available for RT?
-    - `flag_rayleigh::Bool=false`       include rayleigh scattering?
-    - `flag_gcontinuum::Bool=false`     include generalised continuum absorption?
-    - `flag_continuum::Bool=false`      include continuum absorption?
-    - `flag_aerosol::Bool=false`        include aersols?
-    - `flag_cloud::Bool=false`          include clouds?
-    - `thermo_functions::Bool=true`     use temperature-dependent thermodynamic properties
-    - `fastchem_path::String=""`        path to FastChem folder (empty string => disabled)
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.    
+    - `ROOT_DIR::String`                AGNI root directory.     
+    - `OUT_DIR::String`                 Output directory.    
+    - `spfile::String`                  path to spectral file.    
+    - `instellation::Float64`           bolometric solar flux at the top of the atmosphere [W m-2]    
+    - `s0_fact::Float64`                scale factor applied to instellation to account for planetary rotation (i.e. S_0^*/S_0 in Cronin+14)    
+    - `albedo_b::Float64`               bond albedo scale factor applied to instellation in order to imitate shortwave reflection     
+    - `zenith_degrees::Float64`         angle of radiation from the star, relative to the zenith [degrees].    
+    - `tmp_surf::Float64`               effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].    
+    - `gravity::Float64`                gravitational acceleration at the surface [m s-2].    
+    - `radius::Float64`                 planet radius at the surface [m].    
+    - `nlev_centre::Int`                number of model levels.    
+    - `p_surf::Float64`                 total surface pressure [bar].    
+    - `p_top::Float64`                  total top of atmosphere pressure [bar].    
+    - `mf_dict=nothing`                 dictionary of mole fractions in the format (key,value)=(gas,mf).    
+    - `mf_path=nothing`                 path to file containing mole fractions at each level.    
+
+    Optional arguments:
+    - `albedo_s::Float64`               surface albedo.   
+    - `tmp_floor::Float64`              temperature floor [K].   
+    - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].   
+    - `U::Float64`                      surface wind speed [m s-1].   
+    - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.   
+    - `skin_d::Float64`                 skin thickness [m].   
+    - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].   
+    - `overlap_method::Int`             gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).   
+    - `target_olr::Float64`             target OLR [W m-2] for sol_type==4.   
+    - `tmp_eff::Float64`                planet's effective brightness temperature [K] for sol_type==3.   
+    - `all_channels::Bool`              use all channels available for RT?   
+    - `flag_rayleigh::Bool`             include rayleigh scattering?   
+    - `flag_gcontinuum::Bool`           include generalised continuum absorption?   
+    - `flag_continuum::Bool`            include continuum absorption?   
+    - `flag_aerosol::Bool`              include aersols?   
+    - `flag_cloud::Bool`                include clouds?   
+    - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties   
+    - `fastchem_path::String`           path to FastChem folder (empty string => disabled)   
+
+    Returns:
+        Nothing
     """
     function setup!(atmos::atmosphere.Atmos_t, 
                     ROOT_DIR::String, OUT_DIR::String, 
@@ -594,10 +599,10 @@ module atmosphere
     Assumes that the atmosphere may be treated as an ideal gas.
 
     Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
 
     Returns:
-    - `ok::Bool`                function result is ok
+        - `ok::Bool`                function result is ok
     """
     function calc_layer_props!(atmos::atmosphere.Atmos_t)::Bool
         if !atmos.is_param

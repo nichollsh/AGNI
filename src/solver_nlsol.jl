@@ -18,7 +18,11 @@ module solver_nlsol
     import ..phys
     import ..plotting
 
-    # Golden section search to minimise a function
+    """
+    **Golden section search algorithm**
+    
+    Minimises a function `f` between the bounds `a` and `b`.
+    """
     function gs_search(f::Function,a::Float64,b::Float64,dxtol::Float64,max_steps::Int)::Float64
         c::Float64 = (-1+sqrt(5))/2
     
@@ -61,32 +65,35 @@ module solver_nlsol
 
     Solves the non-linear system of equations defined by the flux field
     divergence, minimising flux loss across a cell by iterating the temperature
-    profile.
+    profile. 
 
     Not compatible with convective adjustment; MLT must be used.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `sol_type::Int=1`                 solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
-    - `condensates::Array=[]`           condensates to model (if empty, no condensates are modelled)
-    - `chem_type::Int=0`                chemistry type (see wiki)
-    - `convect::Bool=true`              include convection
-    - `sens_heat::Bool=false`           include sensible heating 
-    - `conduct::Bool=false`             include conductive heat transport within the atmosphere
-    - `dx_max::Float64=400.0`           maximum step size [K]
-    - `max_steps::Int=2000`             maximum number of solver steps
-    - `max_runtime::Float64=600.0`      maximum runtime in wall-clock seconds
-    - `fdw::Float64=1.0e-5`             finite difference: relative width (dx/x) of the "difference"
-    - `fdc::Bool=false`                 finite difference: ALWAYS use central difference? 
-    - `fdo::Int=2`                      finite difference: scheme order (2nd or 4th)
-    - `method::Int=1`                   numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
-    - `linesearch::Bool=true`           use a golden-section linesearch algorithm to determine the best step size
-    - `modulate_mlt::Bool=false`        improve convergence with convection by introducing MLT gradually
-    - `detect_plateau::Bool=true`       assist solver when it is stuck in a region of small dF/dT
-    - `modplot::Int=0`                  iteration frequency at which to make plots
-    - `save_frames::Bool=true`          save plotting frames
-    - `conv_atol::Float64=1.0e-5`       convergence: absolute tolerance on per-level flux deviation [W m-2]
-    - `conv_rtol::Float64=1.0e-3`       convergence: relative tolerance on per-level flux deviation [dimensionless]
+    - `sol_type::Int`                   solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
+    - `condensates::Array`              condensates to model (if empty, no condensates are modelled)
+    - `chem_type::Int`                  chemistry type (see wiki)
+    - `convect::Bool`                   include convection
+    - `sens_heat::Bool`                 include sensible heating 
+    - `conduct::Bool`                   include conductive heat transport within the atmosphere
+    - `dx_max::Float64`                 maximum step size [K]
+    - `max_steps::Int`                  maximum number of solver steps
+    - `max_runtime::Float64`            maximum runtime in wall-clock seconds
+    - `fdw::Float64`                    finite difference: relative width (dx/x) of the "difference"
+    - `fdc::Bool`                       finite difference: ALWAYS use central difference? 
+    - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
+    - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
+    - `linesearch::Bool`                use a golden-section linesearch algorithm to determine the best step size
+    - `modulate_mlt::Bool`              improve convergence with convection by introducing MLT gradually
+    - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
+    - `modplot::Int`                    iteration frequency at which to make plots
+    - `save_frames::Bool`               save plotting frames
+    - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
+    - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
+
+    Returns:
+        Nothing
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, condensates::Array{String,1}=[],
