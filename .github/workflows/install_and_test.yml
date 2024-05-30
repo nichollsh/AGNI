@@ -21,15 +21,25 @@ jobs:
           sudo apt update 
           sudo apt-get install libnetcdff-dev netcdf-bin gfortran gcc
 
-      - uses: julia-actions/setup-julia@v2
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
 
-      - name: Key
-        run: ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa
-
-      - name: SOCRATES
-        run: ./get_socrates.sh
+      - name: Get SOCRATES
+        uses: actions/checkout@v4
+        with:
+          repository: 'nichollsh/SOCRATES'
+          path: 'socrates'
+        
+      - name: Build SOCRATES
+        run: |
+          export LD_LIBRARY_PATH=""
+          cd socrates
+          ./configure
+          ./build_code 
+          source set_rad_env 
+          cd ..
 
       - name: Instantiate
         run: julia --project -e 'using Pkg; Pkg.instantiate()'
