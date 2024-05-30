@@ -44,12 +44,6 @@ jobs:
           source set_rad_env 
           cd ..
         
-      # - name: Instantiate
-      #   run: |
-      #     source socrates/set_rad_env
-      #     export LD_LIBRARY_PATH=""
-      #     julia --project -e 'using Pkg; Pkg.instantiate()'
-
       - name: Build AGNI
         run: |
           source socrates/set_rad_env
@@ -60,6 +54,6 @@ jobs:
         run: |
           source socrates/set_rad_env
           export LD_LIBRARY_PATH=""
-          julia --project=. -e 'using Pkg; Pkg.test()'
+          ./test/runtests.jl
           
     

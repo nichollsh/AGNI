@@ -449,7 +449,9 @@ module phys
         return 0.0
     end
 
-    # Get saturation pressure at a given temperature
+    """
+    Get saturation pressure at a given temperature
+    """
     function calc_Psat(gas::String, T_eval::Float64)::Float64
 
         # Get properties
@@ -466,7 +468,9 @@ module phys
         return p0*exp(-(L/R)*(1.0/T_eval - 1.0/T0))
     end
 
-    # Get dew point temperature at a given pressure
+    """
+    Get dew point temperature at a given pressure
+    """
     function calc_Tdew(gas::String, p_eval::Float64)::Float64
 
         # Get properties
@@ -525,7 +529,9 @@ module phys
         return Tref/(1.0-(Tref*R/L)*log(p/pref)) 
     end 
 
-    # Get number of atoms inside molecule, returning a dictionary
+    """
+    Get number of atoms inside molecule, returning a dictionary
+    """
     function count_atoms(m::String)::Dict
         # Setup 
         out = Dict()
@@ -576,7 +582,9 @@ module phys
     end 
 
 
-    # Convert formula to pretty unicode string 
+    """
+    Convert formula to pretty unicode string 
+    """
     function pretty_name(gas::String)::String 
         out::String = ""
         for c in gas 
@@ -590,7 +598,9 @@ module phys
         return out 
     end 
 
-    # Get color from formula 
+    """
+    Generate a color for a formula 
+    """
     function pretty_color(gas::String)::String 
         # Defined 
         if gas in keys(lookup_color)
@@ -616,13 +626,16 @@ module phys
         return out
     end 
 
-    # Convert gas fastchem name (modified Hill notation) to SOCRATES/AGNI name 
-    # This is difficult to generalise into a nice conversion.
-    # Broadly, the algorithm is:
-    #   sort elements in alphabetical order
-    #   denote number of atoms with the integer count following element symbol 
-    #   include 1 for when only a single atom of element is present
-    #   handle special cases (e.g. additional _1)
+    """
+    Convert gas fastchem name (modified Hill notation) to SOCRATES/AGNI name.
+
+    This is difficult to generalise into a nice conversion.     
+    Broadly, the algorithm is:    
+    1. sort elements in alphabetical order
+    2. denote number of atoms with the integer count following element symbol 
+    3. include 1 for when only a single atom of element is present
+    4. handle special cases (e.g. additional _1)
+    """
     const map_fastchem_name = Dict{String, String}([
                                     ("H2O1" ,    "H2O"  ),
                                     ("C1O2" ,    "CO2"  ),
