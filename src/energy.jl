@@ -542,10 +542,10 @@ module energy
         atmos.flux_tot += atmos.flux_n
 
         # +Condensation
-        # if condense
-        #    energy.condense_relax!(atmos, condensates)
-        #     atmos.flux_tot += atmos.flux_p
-        # end
+        if condense
+           energy.condense_relax!(atmos, condensates)
+            atmos.flux_tot += atmos.flux_p
+        end
 
         # +Dry convection
         if convect
