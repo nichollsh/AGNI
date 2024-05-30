@@ -21,7 +21,7 @@ This page outlines requirements and installation steps for the code.
 You should run the tests next.
 
 ## SOCRATES 
-The SOCRATES radiative transfer school is packaged separately. If you haven't already installed it, this can be done by running `./get_socrates.sh`. 
+The SOCRATES radiative transfer code is packaged separately. If you haven't already installed it, this can be done by running `./get_socrates.sh`. 
 
 ## Testing
 - `$ julia`
