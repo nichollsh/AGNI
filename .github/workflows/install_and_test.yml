@@ -1,0 +1,40 @@
+# This job installs AGNI and SOCRATES, and tests AGNI
+# This occurs when a PR to main is created
+
+name: Install SOCRATES+AGNI
+
+on: push
+
+# on:
+#   pull_request:
+#     branches: [main]
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    name: Install and test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: NetCDF
+        run: |
+          sudo apt update 
+          sudo apt-get install libnetcdff-dev netcdf-bin gfortran gcc
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.10'
+
+      - name: SOCRATES
+        run: ./get_socrates.sh
+
+      - name: Instantiate
+        run: julia --project -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Build
+        run: julia --project -e 'using Pkg; Pkg.build()'
+
+      - name: Test 
+        run: julia --project -e 'using Pkg; Pkg.test()'
+          
+    
