@@ -27,8 +27,6 @@ module atmosphere
     import ..phys
     import ..spectrum
 
-    export get_interleaved_pt!
-
     
     # Solution types
     SOL_TYPES::Array{String, 1} = [

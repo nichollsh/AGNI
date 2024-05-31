@@ -1,12 +1,28 @@
 # Running the model
-First, follow the [Getting started](@ref) instructions. Only read-on once you have confirmed that the code is working.  
+First, follow the [Getting started](@ref) instructions. Only read-on once you 
+have confirmed that the code is working.  
 
-## Execution
-To run the model, simply execute `./agni.jl [cfg]` where `[cfg]` is the path to the required configuration file. If `[cfg]` is not passed, then the default configuration will be used.
+## Tutorials
+There are Jupyter notebooks containing tutorials in the `tutorials/` directory 
+of the repository.
+
+## General execution
+The environment variable `RAD_DIR` must point to the SOCRATES installation 
+directory. This is required for AGNI to find the SOCRATES libraries, and can be 
+done by running `source path/to/set_rad_env` in your terminal.       
+  
+Then to use the model, simply run `./agni.jl [cfg]` where `[cfg]` is the path 
+to the required configuration file. If `[cfg]` is not passed, then the default 
+configuration will be used.
 
 ## Configuration 
-AGNI configuration files are formatted using [TOML](https://toml.io/en/). There are examples in `res/config/`. 
-The default configuration file contains comments explaining the purpose of each parameter, although some are explained in greater detail below. Take care to format the variables in the TOML file correctly. There are no 'default values'. Not all parameters are required in all cases, but the model will return an error naming any parameters which are both necessary and absent.
+AGNI configuration files are formatted using [TOML](https://toml.io/en/). There 
+are examples in `res/config/`. The default configuration file contains comments 
+explaining the purpose of each parameter, although some are explained in greater 
+detail below. Take care to format the variables in the TOML file correctly. 
+There are no 'default values'. Not all parameters are required in all cases, 
+but the model will return an error naming any parameters which are both 
+necessary and absent.
 
 Broadly, the configuration files are broken up into four sections:
 * `[planet]` describes the physical characteristics of the planet
@@ -46,5 +62,6 @@ Specific parameters:
      - 3 : Equilibrium (condensates rained out)
 
 ## Outputs
-Results are optionally plotted and animated, and data will be saved as NetCDF or CSV files. 
+Results are optionally plotted and animated, and data will be saved as NetCDF 
+or CSV files. 
 

@@ -96,7 +96,7 @@ module solver_nlsol
         Nothing
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1, condensates::Array{String,1}=[],
+                            sol_type::Int=1, condensates::Array{String,1}=String[],
                             chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false, 
@@ -107,7 +107,7 @@ module solver_nlsol
                             linesearch::Bool=true, modulate_mlt::Bool=false,
                             detect_plateau::Bool=true,
                             modplot::Int=1, save_frames::Bool=true, 
-                            conv_atol::Float64=1.0e-5, conv_rtol::Float64=1.0e-3
+                            conv_atol::Float64=1.0e-3, conv_rtol::Float64=1.0e-3
                             )::Bool
 
         # Validate condensation case
