@@ -43,8 +43,14 @@ module AGNI
     Setup terminal + file logging 
     """
     function setup_logging(outpath::String, silent::Bool)
+
+        # File logging?
+        to_file::Bool = !isempty(outpath)
+
         # Remove old file 
-        rm(outpath, force=true)
+        if to_file
+            rm(outpath, force=true)
+        end
 
         # If silent 
         if silent 
@@ -58,18 +64,20 @@ module AGNI
         term_io::IO = stdout
 
         # Setup file logger
-        logger_file = FormatLogger(outpath; append=true) do io, args
-            if args.level == LoggingExtras.Info
-                level = "INFO"
-            elseif args.level == LoggingExtras.Warn
-                level = "WARN"
-            elseif args.level == LoggingExtras.Debug
-                level = "DEBUG"
-            elseif args.level == LoggingExtras.Error 
-                level = "ERROR"
-            end 
-            @printf(io, "[ %-5s ] %s \n", level, args.message)
-        end;
+        if to_file
+            logger_file = FormatLogger(outpath; append=true) do io, args
+                if args.level == LoggingExtras.Info
+                    level = "INFO"
+                elseif args.level == LoggingExtras.Warn
+                    level = "WARN"
+                elseif args.level == LoggingExtras.Debug
+                    level = "DEBUG"
+                elseif args.level == LoggingExtras.Error 
+                    level = "ERROR"
+                end 
+                @printf(io, "[ %-5s ] %s \n", level, args.message)
+            end;
+        end
 
         # Setup terminal logger 
         logger_term = FormatLogger() do io, args
@@ -92,7 +100,11 @@ module AGNI
         end;
 
         # Combine and set 
-        logger_both = TeeLogger(logger_file, logger_term);
+        if to_file
+            logger_both = TeeLogger(logger_file, logger_term);
+        else
+            logger_both = logger_term 
+        end 
         global_logger(logger_both)
         disable_logging(Logging.Debug) # disable debug; info only
 
