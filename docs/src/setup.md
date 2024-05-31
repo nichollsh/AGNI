@@ -10,20 +10,21 @@ This page outlines requirements and installation steps for the code.
 * GNU/Linux (x86-64)
 
 ## Installation
-- Setup SOCRATES by doing either **ONE** of the following...
-    - Follow the instructions on the SOCRATES GitHub page
-    - Run `./get_socrates.sh`
-- `$ julia`
-- `julia> ]` 
-- `(@v1.10) pkg> activate .` ← note the dot
-- `(AGNI) pkg> build`
-- Press backspace
-- `julia> exit()` 
-AGNI is now installed as a package into a Julia environment in this directory.   
-You should run the tests next.
+1. Setup SOCRATES by doing either **ONE** of the following...
+    - Follow the instructions on the SOCRATES GitHub page   
+    - Run `./get_socrates.sh`    
+2. `$ julia`
+3. `julia> ]` 
+4. `(@v1.10) pkg> activate .` ← note the dot
+5. `(AGNI) pkg> build`
+6. Press backspace
+7. `julia> exit()` 
+AGNI is now installed as a package into a Julia environment in the AGNI
+directory. You should run the tests next.
 
 ## Testing
-Run `./test/runtests.jl ` in your terminal. This will print information on whether tests passed or failed.   
+Run `./test/runtests.jl ` in your terminal. This will print information 
+on whether tests passed or failed.   
 
 
 ## Using the code

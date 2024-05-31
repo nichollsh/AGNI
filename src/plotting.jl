@@ -34,7 +34,11 @@ module plotting
     """
     Plot the temperature-pressure profile.
     """
-    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, incl_magma::Bool=false, condensates::Array=[], title::String="")
+    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; 
+                            dpi::Int=250,
+                            size_x::Int=500, size_y::Int=400,
+                            incl_magma::Bool=false, 
+                            condensates::Array=[], title::String="")
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -44,7 +48,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(500,400), guidefontsize=9, titlefontsize=9)
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(size_x,size_y), guidefontsize=9, titlefontsize=9)
 
         # Plot condensation curves 
         if length(condensates) > 0
@@ -95,14 +99,16 @@ module plotting
     """
     Plot the VMRs of the atmosphere at each cell-centre location.
     """
-    function plot_vmr(atmos::atmosphere.Atmos_t, fname; dpi::Int=250)
+    function plot_vmr(atmos::atmosphere.Atmos_t, fname::String; 
+                            dpi::Int=250,
+                            size_x::Int=500, size_y::Int=400)
         
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
         
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(500,400), guidefontsize=9)
+        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(size_x,size_y), guidefontsize=9)
 
         # Plot log10 mole fractions for each gas
         xmin::Float64 = -2
@@ -141,7 +147,9 @@ module plotting
     Plot the fluxes at each pressure level
     """
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, 
-                            incl_eff::Bool=false, incl_mlt::Bool=true, incl_cdct::Bool=true, incl_phase::Bool=true,
+                            size_x::Int=550, size_y::Int=400,
+                            incl_eff::Bool=false, incl_mlt::Bool=true, 
+                            incl_cdct::Bool=true, incl_phase::Bool=true,
                             title::String=""
                         )
 
@@ -155,7 +163,7 @@ module plotting
         xlims = (-xticks_pos[end], xticks_pos[end])
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
-        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, guidefontsize=9, size=(550,400), titlefontsize=9)
+        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, guidefontsize=9, size=(size_x,size_y), titlefontsize=9)
 
         col_r::String = "#c0c0c0"
         col_n::String = "#000000"
