@@ -133,9 +133,7 @@ module solver_nlsol
         wct_start::Float64 = time()
 
         # Plot paths 
-        path_prf::String = @sprintf("%s/solver_prf.png", atmos.OUT_DIR)
-        path_flx::String = @sprintf("%s/solver_flx.png", atmos.OUT_DIR)
-        path_vmr::String = @sprintf("%s/solver_vmr.png", atmos.OUT_DIR)
+        path_plt::String = @sprintf("%s/solver.png", atmos.OUT_DIR)
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c 
@@ -235,9 +233,9 @@ module solver_nlsol
             _set_tmps!(x)
 
             # Do rainout
-            # if do_condense
-            #     atmosphere.handle_saturation!(atmos,condensates)
-            # end
+            if do_condense
+                atmosphere.handle_saturation!(atmos,condensates)
+            end
             
             # Calculate layer properties if required, and haven't already
             if atmos.thermo_funct || do_condense
@@ -364,23 +362,24 @@ module solver_nlsol
         end 
 
         # Plot
-        title_prf::String = ""
-        title_flx::String = ""
-        function plot_step(i::Int, t::Float64)
-            if save_frames
-                title_prf = @sprintf("i = %d",i)
-                title_flx = @sprintf("t = %.1f s",t)
-            end
+        function plot_step()
 
-            plotting.plot_pt(atmos,     path_prf, incl_magma=(sol_type==2), condensates=condensates, title=title_prf)
-            plotting.plot_fluxes(atmos, path_flx, incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense, title=title_flx)
-            if save_frames
-                cp(path_prf,@sprintf("%s/frames/%04d_prf.png",atmos.OUT_DIR,i))
-                cp(path_flx,@sprintf("%s/frames/%04d_flx.png",atmos.OUT_DIR,i))
-            end 
+            # Info string
+            plt_info::String = ""
+            plt_info *= @sprintf("Iteration  %d \n",step)
+            plt_info *= @sprintf("Runtime    %.1f s \n",runtime)
+            plt_info *= @sprintf("Cost       %.2e  \n",c_cur)
 
-            if do_chemistry || (length(condensates) > 0)
-                plotting.plot_vmr(atmos, path_vmr)
+            # Make subplots (don't save to file)
+            plt_pt = plotting.plot_pt(atmos,     "", incl_magma=(sol_type==2), condensates=condensates)
+            plt_fl = plotting.plot_fluxes(atmos, "", incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense)
+            plt_mr = plotting.plot_vmr(atmos,    "")
+            
+            # Combined plot
+            plotting.combined(plt_pt, plt_fl, plt_mr, plt_info, path_plt)
+
+            if save_frames
+                cp(path_plt,@sprintf("%s/frames/%04d.png",atmos.OUT_DIR,step))
             end 
         end 
 
@@ -432,7 +431,7 @@ module solver_nlsol
 
         # Initial plot 
         if modplot > 0
-            plot_step(0, 0.0)
+            plot_step()
         end
 
         @info @sprintf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
@@ -626,7 +625,7 @@ module solver_nlsol
 
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
-                plot_step(step, runtime)
+                plot_step()
             end 
                 
             # Inform user
@@ -647,9 +646,7 @@ module solver_nlsol
 
         end # end solver loop
         
-        rm(path_prf, force=true)
-        rm(path_flx, force=true)
-        rm(path_vmr, force=true)
+        rm(path_plt, force=true)
         
         # ----------------------------------------------------------
         # Extract solution

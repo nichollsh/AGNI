@@ -446,7 +446,7 @@ module energy
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `condensates::Array`              list of condensates (strings)
     """
-    function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array=[])
+    function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array{String,1}=String[])
 
         # Reset flux
         fill!(atmos.flux_p, 0.0)
@@ -522,13 +522,13 @@ module energy
     - `convect::Bool`                   include MLT convection flux
     - `sens_heat::Bool`                 include TKE sensible heat transport 
     - `conduct::Bool`                   include conductive heat transport
-    - `condensates::Array=[]`           list of condensates included in relaxation scheme 
-    - `convect_sf::Float64=1.0`         scale factor applied to convection fluxes
+    - `condensates::Array`              list of condensates included
+    - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `calc_cf::Bool=false`             calculate LW contribution function?
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t, 
                           condense::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
-                          condensates::Array=[],
+                          condensates::Array{String,1}=String[],
                           convect_sf::Float64=1.0,
                           calc_cf::Bool=false)
 
@@ -543,7 +543,7 @@ module energy
 
         # +Condensation
         if condense
-           energy.condense_relax!(atmos, condensates)
+            energy.condense_relax!(atmos, condensates)
             atmos.flux_tot += atmos.flux_p
         end
 
