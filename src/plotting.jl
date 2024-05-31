@@ -130,7 +130,7 @@ module plotting
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties
-        xlabel!(plt, "log10(Mole fraction)")
+        xlabel!(plt, "log(Mole fraction)")
         xaxis!(plt, xlims=xlims, xticks=xticks)
 
         ylabel!(plt, "Pressure [bar]")
@@ -441,6 +441,22 @@ module plotting
             savefig(plt, fname)
         end
         return plt 
+    end
+
+    """ 
+    Combined plot 
+    """
+    function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String; dpi::Int=180, size_x::Int=800, size_y::Int=650)
+
+        plt_info = plot(legend=false, showaxis=false, grid=false)
+        annotate!(plt_info, (0.1, 0.7, text(info, family="Courier", :black, :left, 10)))
+
+        plt = plot(plt_pt, plt_fl, plt_mr, plt_info, dpi=dpi, layout=(2,2), size=(size_x, size_y))
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
     end 
 
     """
@@ -450,32 +466,15 @@ module plotting
 
         # Find output files
         out::String = atmos.OUT_DIR
-        frames = glob("frames/*_prf.png",out)
+        frames = glob("frames/*.png",out)
         nframes::Int = length(frames)
-
-        # Animating fluxes?
-        frames2 = glob("frames/*_flx.png",out)
-        fluxes::Bool = length(frames2) > 0
 
         # Create animation
         if nframes < 1
             @warn "Cannot animate solver because no output frames were found"
         else 
             fps = nframes/duration*1.0
-            # animate profile 
-            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_prf.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_prf.mp4`)
-
-            # animate fluxes 
-            if fluxes
-                @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_flx.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_flx.mp4`)
-            end
-
-            # combine videos 
-            if fluxes 
-                @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -i $out/frames/ani_prf.mp4 -i $out/frames/ani_flx.mp4 -filter_complex "hstack,format=yuv420p" -c:v libx264 -crf 18 -y $out/anim.mp4`)
-            else 
-                cp("$out/frames/ani_prf.mp4", "$out/anim.mp4")
-            end 
+            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/animation.mp4`)
         end
 
         return nothing

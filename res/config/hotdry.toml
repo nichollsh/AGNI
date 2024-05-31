@@ -19,7 +19,7 @@ title = "Hot and dry"                    # Name for this configuration file
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Frostflow/48/Frostflow.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
     output_dir      = "out/"                                            # Path to output directory.
 
