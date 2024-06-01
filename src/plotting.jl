@@ -126,7 +126,7 @@ module plotting
             plot!(x_arr, arr_P, label=phys.pretty_name(gas), lw=2.5, linealpha=0.7, color=phys.pretty_color(gas))
         end
 
-        xlims  = (max(xmin, -12), 0.1)
+        xlims  = (max(xmin-0.1, -12), 0.1)
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties
@@ -246,7 +246,7 @@ module plotting
         annotate!(plt, xlims[2]/2.0, arr_P[end], text("Upward"  , :black, :center, 9))
 
         # Finalise + save
-        xlabel!(plt, "log Unsigned flux [W m-2]")
+        xlabel!(plt, "log Unsigned flux [W m⁻²]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
@@ -449,7 +449,7 @@ module plotting
     function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String; dpi::Int=180, size_x::Int=800, size_y::Int=650)
 
         plt_info = plot(legend=false, showaxis=false, grid=false)
-        annotate!(plt_info, (0.1, 0.7, text(info, family="Courier", :black, :left, 10)))
+        annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
 
         plt = plot(plt_pt, plt_fl, plt_mr, plt_info, dpi=dpi, layout=(2,2), size=(size_x, size_y))
 
