@@ -447,7 +447,7 @@ module energy
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `condensates::Array`              list of condensates (strings)
     """
-    function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array=[])
+    function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array{String,1}=String[])
 
         # Reset flux
         fill!(atmos.flux_p, 0.0)
@@ -519,7 +519,8 @@ module energy
     """
     function condense_diffuse!(atmos::atmosphere.Atmos_t,  condensates::Array{String,1}=String[])
 
-        timescale::Float64 = 100.0
+        # Parameters 
+        timescale::Float64 = 100.0      # seconds
 
         # Reset flux
         fill!(atmos.flux_p, 0.0)
@@ -531,11 +532,12 @@ module energy
 
         # Work arrays 
         maxvmr::Dict = Dict{String, Float64}()
-        x_sat::Float64 = 0.0
-        x_con::Float64 = 0.0
-        x_dry::Float64 = 0.0
-        x_dry_old::Float64 = 0.0
-        x_tot::Float64 = 0.0
+        x_sat::Float64 =    0.0
+        x_con::Float64 =    0.0
+        x_dry::Float64 =    0.0
+        x_dry_old::Float64= 0.0
+        x_tot::Float64 =    0.0
+        delta_p::Float64 =  0.0
 
         # Set maximum value (for cold trapping)
         for c in condensates 
@@ -661,7 +663,13 @@ module energy
 
         # +Condensation
         if condense
-            energy.condense_diffuse!(atmos, condensates)
+            if atmos.gas_all_num == 1
+                # does NOT modify VMRs
+                energy.condense_relax!(atmos, condensates)
+            else 
+                # DOES modify VMRs
+                energy.condense_diffuse!(atmos, condensates)
+            end 
             atmos.flux_tot += atmos.flux_p
         end
 

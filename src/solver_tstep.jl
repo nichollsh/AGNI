@@ -56,7 +56,7 @@ module solver_tstep
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1, use_physical_dt::Bool=false,
-                            convect::Bool=true, condensates::Array=[], chem_type::Int=0,
+                            convect::Bool=true, condensates::Array{String,1}=String[], chem_type::Int=0,
 
                             use_mlt::Bool=true,
                             sens_heat::Bool=false, conduct::Bool=true, modprop::Int=1, 
