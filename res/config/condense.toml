@@ -3,7 +3,7 @@
 title = "Condensation test"                    # Name for this configuration file
 
 [planet]
-    tmp_surf        = 1900.0            # Surface temperature [kelvin]
+    tmp_surf        = 1400.0            # Surface temperature [kelvin]
     instellation    = 500.0          # Stellar flux at planet's orbital distance [W m-2]
     albedo_b        = 0.0              # Pseudo bond-albedo which removes downscales the stellar flux by 1-this_value
     s0_fact         = 0.375           # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
@@ -13,7 +13,7 @@ title = "Condensation test"                    # Name for this configuration fil
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
     p_surf          = 800.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
-    vmr             = { H2O=0.8, CO2=0.19, H2=0.01 }     # Volatile volume mixing ratios
+    vmr             = { H2O=1.0 }     # Volatile volume mixing ratios
     tmp_eff         = 0.0               # Effective temperature
 
 [files]

@@ -434,17 +434,83 @@ module energy
         return nothing
     end # end of mlt
 
+    """
+    **Analytical relaxation scheme for condensation fluxes.**
+
+    Calculates flux release by vertical latent heat transport using an heuristic 
+    function of the temperature difference T-T_dew. 
+
+    Updates fluxes. 
+    Does not update clouds or mixing ratios.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `condensates::Array`              list of condensates (strings)
+    """
+    function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array=[])
+
+        # Reset flux
+        fill!(atmos.flux_p, 0.0)
+
+        # Check if empty
+        if length(condensates) == 0
+            return nothing 
+        end 
+
+        # Work variables
+        a::Float64 = 2.0
+        pp::Float64 = 0.0
+        Psat::Float64 = 0.0
+        dif::Array = zeros(Float64, atmos.nlev_c)
+
+        # Calculate flux (negative) divergence due to latent heat release...
+        # For all condensates
+        for c in condensates
+            # For all levels 
+            for i in 1:atmos.nlev_c
+
+                # Get partial pressure 
+                pp = atmos.gas_all_dict[c][i] * atmos.p[i]
+                if pp < 1.0e-10 
+                    continue
+                end
+
+                # check saturation
+                Psat = phys.calc_Psat(c, atmos.tmp[i])
+                if (pp < Psat+1.0e-10)
+                    continue 
+                end 
+
+                # Check criticality 
+                if atmos.tmp[i] > phys.lookup_safe("t_crit",c)
+                    continue 
+                end 
+
+                # relaxation function
+                dif[i] += (1.0/a)*(pp-Psat)
+            end # end levels 
+        end # end condensates 
+
+        # Convert divergence to cell-edge fluxes
+        # Assuming zero condensation at surface
+        for i in range(start=atmos.nlev_l-1, stop=1, step=-1)
+            atmos.flux_p[i] = atmos.flux_p[i+1] - dif[i]
+        end 
+
+        return nothing
+    end # end of condense_relax
 
 
     """
-    **Analytical diffusive scheme for condensation.**
+    **Analytical diffusion scheme for condensation.**
 
     Integrates from bottom of model upwards. Condensate mixing ratios are
     reduced at each level to satisfy both cold-trapping and saturation 
     constraints (as in atmosphere.handle_saturation). Based on the amount of 
     condensation at each level, a phase change flux is calculated by assuming 
     some rainout timescale. 
-
+    
+    Updates fluxes and mixing ratios.
     Does not update clouds.
 
     Arguments:
