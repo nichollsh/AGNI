@@ -38,7 +38,7 @@ module plotting
                             dpi::Int=250,
                             size_x::Int=500, size_y::Int=400,
                             incl_magma::Bool=false, 
-                            condensates::Array=[], title::String="")
+                            condensates::Array{String,1}=String[], title::String="")
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)

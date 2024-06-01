@@ -110,8 +110,15 @@ module solver_nlsol
                             conv_atol::Float64=1.0e-3, conv_rtol::Float64=1.0e-3
                             )::Bool
 
-        # Validate condensation case
+        # Validate condensation cases
         do_condense::Bool  = false 
+        #    cannot have n_gas==n_cond AND n_cond>1, because it will overspecify
+        #    the total pressure within condensing regions
+        if (length(condensates) == atmos.gas_soc_num) && (length(condensates)>1)
+            @error "There must be at least one non-condensible gas"
+            return false 
+        end 
+        #    check if condensation is enabled
         if length(condensates) > 0
             for c in condensates
                 if c in atmos.gas_all_names
