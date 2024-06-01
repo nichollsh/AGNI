@@ -437,16 +437,23 @@ module energy
 
 
     """
-    **Analytical relaxation scheme for condensation fluxes in saturated regions.**
+    **Analytical diffusive scheme for condensation.**
 
-    Calculates flux release by vertical latent heat transport using an heuristic 
-    function of the temperature difference T-T_dew. 
+    Integrates from bottom of model upwards. Condensate mixing ratios are
+    reduced at each level to satisfy both cold-trapping and saturation 
+    constraints (as in atmosphere.handle_saturation). Based on the amount of 
+    condensation at each level, a phase change flux is calculated by assuming 
+    some rainout timescale. 
+
+    Does not update clouds.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `condensates::Array`              list of condensates (strings)
     """
-    function condense_relax!(atmos::atmosphere.Atmos_t, condensates::Array{String,1}=String[])
+    function condense_diffuse!(atmos::atmosphere.Atmos_t,  condensates::Array{String,1}=String[])
+
+        timescale::Float64 = 100.0
 
         # Reset flux
         fill!(atmos.flux_p, 0.0)
@@ -456,62 +463,112 @@ module energy
             return nothing 
         end 
 
-        # Work variables
-        a::Float64 = 2.0
-        pp::Float64 = 0.0
-        Psat::Float64 = 0.0
-        dif::Array = zeros(Float64, atmos.nlev_c)
+        # Work arrays 
+        maxvmr::Dict = Dict{String, Float64}()
+        x_sat::Float64 = 0.0
+        x_con::Float64 = 0.0
+        x_dry::Float64 = 0.0
+        x_dry_old::Float64 = 0.0
+        x_tot::Float64 = 0.0
 
-        # Calculate flux (negative) divergence due to latent heat release...
-        # For all condensates
-        for c in condensates
-            # For all levels 
-            for i in 1:atmos.nlev_c
+        # Set maximum value (for cold trapping)
+        for c in condensates 
+            maxvmr[c] = atmos.gas_all_dict[c][end]
+        end 
 
-                # Get partial pressure 
-                pp = atmos.gas_all_dict[c][i] * atmos.p[i]
-                if pp < 1.0e-10 
-                    continue
-                end
+        # Reset mixing ratios to surface values
+        # Reset condensation flags 
+        for g in atmos.gas_all_names
+            atmos.gas_all_dict[g][1:end-1] .= atmos.gas_all_dict[g][end]
+            atmos.gas_all_cond[g][:] .= false
+        end 
 
-                # check saturation
-                Psat = phys.calc_Psat(c, atmos.tmp[i])
-                if (pp < Psat+1.0e-10)
-                    continue 
-                end 
+        dfdp::Array = zeros(Float64, atmos.nlev_c)
 
-                # Check criticality 
-                if atmos.tmp[i] > phys.lookup_safe("t_crit",c)
-                    continue 
-                end 
+        # Loop from bottom to top 
+        for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
-                # relaxation function
-                dif[i] += (1.0/a)*(pp-Psat)
-                # dif[i] += a/Psat - a/pp
+            x_con = 0.0
 
-                # handle water cloud case 
-                atmos.mask_p[i] = atmos.mask_decay 
-                if c == "H2O"
-                    atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                    atmos.cloud_arr_l[i] = atmos.cloud_val_l
-                    atmos.cloud_arr_f[i] = atmos.cloud_val_f
+            # For each condensate 
+            for c in condensates
+
+                # check criticality 
+                if atmos.tmp[i] < phys.lookup_safe("t_crit",c)
+                    # if subcritical, mixing ratio set by saturation and cold-trapping
+                    x_sat = min(maxvmr[c], phys.calc_Psat(c, atmos.tmp[i]) / atmos.p[i])
                 else
-                    atmos.cloud_arr_r[i] = 0.0
-                    atmos.cloud_arr_l[i] = 0.0
-                    atmos.cloud_arr_f[i] = 0.0
+                    # if supercritical, mixing ratio only set by cold-trapping
+                    x_sat = maxvmr[c]
                 end 
 
-            end # end levels 
-        end # end condensates 
+                # saturate and cold-trap
+                if atmos.gas_all_dict[c][i] > x_sat
 
+                    # set new vmr
+                    atmos.gas_all_dict[c][i] = x_sat
+
+                    # store vmr for cold trapping at levels above this one
+                    maxvmr[c] = x_sat
+
+                    # add to total vmr of all condensing gases at this level
+                    x_con += x_sat
+
+                    # flag condensate as actively condensing at this level
+                    atmos.gas_all_cond[c][i] = true 
+                end 
+
+            end 
+
+            # Calculate current and target dry VMRs
+            x_dry = 1.0 - x_con 
+            x_dry_old = 0.0
+            for g in atmos.gas_all_names 
+                # skip condensing gases, since their VMR is set by saturation
+                if !atmos.gas_all_cond[g][i]
+                    x_dry_old += atmos.gas_all_dict[g][i]
+                end 
+            end 
+
+            # Renormalise VMR to unity, scaling DRY COMPONENTS ONLY
+            for g in atmos.gas_all_names 
+                if !atmos.gas_all_cond[g][i]
+                    atmos.gas_all_dict[g][i] *= x_dry / x_dry_old
+                end 
+            end 
+
+            # Check total VMR at this level 
+            x_tot = 0.0
+            for g in atmos.gas_all_names 
+                x_tot += atmos.gas_all_dict[g][i]
+            end 
+            if abs(x_tot - 1.0) > 1.0e-5
+                @warn @sprintf("Mixing ratios sum to %.8e (level %d)",x_tot,i)
+            end 
+
+            # Recalculate layer mmw 
+            atmos.layer_mmw[i] = 0.0
+            for g in atmos.gas_all_names
+                atmos.layer_mmw[i] += atmos.gas_all_dict[g][i] * phys.lookup_safe("mmw",g)
+            end
+
+            # Calculate latent heat release at this level from change in x_gas 
+            for c in condensates
+                # dp = p_moist - p_dry < 0
+                delta_p = atmos.p[i]*(atmos.gas_all_dict[c][i] - atmos.gas_all_dict[c][i+1])
+                dfdp[i] = phys.lookup_safe("l_vap",c) * phys.lookup_safe("mmw",c) / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
+            end 
+
+        end # go to next level
+        
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at surface
         for i in range(start=atmos.nlev_l-1, stop=1, step=-1)
-            atmos.flux_p[i] = atmos.flux_p[i+1] - dif[i]
+            atmos.flux_p[i] = dfdp[i] + atmos.flux_p[i+1]
         end 
 
-        return nothing
-    end # end of condense_relax
+        return nothing 
+    end 
 
     """
     **Calculate total flux at each level.**
@@ -536,16 +593,22 @@ module energy
         fill!(atmos.flux_tot, 0.0)
         fill!(atmos.flux_dif, 0.0)
 
+        # +Condensation
+        if condense
+            energy.condense_diffuse!(atmos, condensates)
+            atmos.flux_tot += atmos.flux_p
+        end
+
+        # Recalculate layer properties in light of either temperature change 
+        # or from condensation
+        if atmos.thermo_funct || condense
+            atmosphere.calc_layer_props!(atmos)
+        end 
+
         # +Radiation
         energy.radtrans!(atmos, true, calc_cf=calc_cf)
         energy.radtrans!(atmos, false)
         atmos.flux_tot += atmos.flux_n
-
-        # +Condensation
-        if condense
-            energy.condense_relax!(atmos, condensates)
-            atmos.flux_tot += atmos.flux_p
-        end
 
         # +Dry convection
         if convect
