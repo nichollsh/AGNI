@@ -38,7 +38,7 @@ module plotting
                             dpi::Int=250,
                             size_x::Int=500, size_y::Int=400,
                             incl_magma::Bool=false, 
-                            condensates::Array{String,1}=String[], title::String="")
+                            title::String="")
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -51,10 +51,10 @@ module plotting
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(size_x,size_y), guidefontsize=9, titlefontsize=9)
 
         # Plot condensation curves 
-        if length(condensates) > 0
+        if length(atmos.condensates) > 0
             sat_t = zeros(Float64, atmos.nlev_l)
             crt_i = atmos.nlev_l  # index at which criticality occurs
-            for c in condensates
+            for c in atmos.condensates
                 # for each level...
                 for i in 1:atmos.nlev_l
                     # set point  
@@ -149,7 +149,7 @@ module plotting
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, 
                             size_x::Int=550, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true, 
-                            incl_cdct::Bool=true, incl_phase::Bool=true,
+                            incl_cdct::Bool=true, incl_latent::Bool=true,
                             title::String=""
                         )
 
@@ -219,13 +219,13 @@ module plotting
         end 
 
         # Condensation 
-        if incl_phase
-            plot!(plt, _symlog.(atmos.flux_p), arr_P, label="Phase", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+        if incl_latent
+            plot!(plt, _symlog.(atmos.flux_l), arr_P, label="Latent", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
         end
 
         # Sensible heat
         if atmos.flux_sens != 0.0
-            scatter!(plt, [_symlog(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_r, label="Sens.")
+            scatter!(plt, [_symlog(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_r, label="Sensible")
         end
 
         # Total flux
@@ -236,7 +236,7 @@ module plotting
             if atmos.mask_c[i] > 0
                 scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_c, label="")
             end 
-            if atmos.mask_p[i] > 0
+            if atmos.mask_l[i] > 0
                 scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_p, label="")
             end 
         end

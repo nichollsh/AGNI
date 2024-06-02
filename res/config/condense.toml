@@ -1,5 +1,4 @@
 # AGNI configuration file 
-# This is designed to test forced condensation
 title = "Condensation test"                    # Name for this configuration file
 
 [planet]
@@ -14,6 +13,7 @@ title = "Condensation test"                    # Name for this configuration fil
     p_surf          = 800.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O=0.8, CO2=0.19, H2=0.01 }     # Volatile volume mixing ratios
+    condensates     = ["H2O"]
     tmp_eff         = 0.0               # Effective temperature
 
 [files]
@@ -34,15 +34,15 @@ title = "Condensation test"                    # Name for this configuration fil
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = false                     # Accounting temperature dependence of thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
-    convection_type = ""                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
-    condensates     = ["H2O"]                   # List of volatiles which are allowed to condense.
+    latent_heat     = true                      # Include latent heat release?
+    convection_type = ""                        # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
     chemistry       = 0
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
     dx_max          = 100.0                     # Maximum step size [Kelvin], when using nonlinear solvers
-    initial_state   = ["dry","str","1000"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
-    linesearch      = true                     # Use linesearch?
-    converge_atol   = 0.1                    # Convergence criterion on absolute flux divergence [W m-2].
+    initial_state   = ["dry","str","1000"]      # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    linesearch      = true                      # Use linesearch?
+    converge_atol   = 0.1                       # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-3                    # Convergence criterion on relative flux divergence [dimensionless].
 
 

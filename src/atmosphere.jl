@@ -116,6 +116,7 @@ module atmosphere
         gas_all_names::Array{String,1}      # List of gas names
         gas_all_dict::Dict{String, Array}   # Layer mole fractions in dict format, (key,value) = (gas_name,array)
         gas_all_cond::Dict{String, Array}   # Layer condensation flags in dict format, (key,value) = (gas_name,array)
+        condensates::Array{String, 1}       # List of condensing gases
 
         # Gases (only those in spectralfile)
         gas_soc_num::Int 
@@ -174,8 +175,8 @@ module atmosphere
         flux_cdct::Array{Float64,1} # Conductive flux [W m-2]
 
         # Cloud and condensation
-        flux_p::Array{Float64, 1}           # Condensation flux [W m-2]
-        mask_p::Array{Int,1}                # Layers which are (or were recently) condensing liquid
+        flux_l::Array{Float64, 1}           # Condensation flux [W m-2]
+        mask_l::Array{Int,1}                # Layers which are (or were recently) condensing
         #    These arrays give the cloud properties within layers containing cloud
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
         cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
@@ -243,7 +244,8 @@ module atmosphere
     - `p_surf::Float64`                 total surface pressure [bar].    
     - `p_top::Float64`                  total top of atmosphere pressure [bar].    
     - `mf_dict=nothing`                 dictionary of mole fractions in the format (key,value)=(gas,mf).    
-    - `mf_path=nothing`                 path to file containing mole fractions at each level.    
+    - `mf_path=nothing`                 path to file containing mole fractions at each level. 
+    - `condensates::Array{String,1}`    list of condensates (names)
 
     Optional arguments:
     - `albedo_s::Float64`               surface albedo.   
@@ -277,6 +279,7 @@ module atmosphere
                     nlev_centre::Int, p_surf::Float64, p_top::Float64;
                     mf_dict=                    nothing,
                     mf_path =                   nothing,
+                    condensates::Array{String,1} = String[],
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        80.0,
                     C_d::Float64 =              0.001,
@@ -303,7 +306,7 @@ module atmosphere
 
         # Code versions 
         cd(ROOT_DIR) do 
-            atmos.AGNI_VERSION = "0.3.0"
+            atmos.AGNI_VERSION = "0.4.0"
         end 
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
 
@@ -425,6 +428,7 @@ module atmosphere
         atmos.gas_all_dict  = Dict{String, Array}()         # dict of VMR arrays (Float)
         atmos.gas_all_cond  = Dict{String, Array}()         # dict of condensing arrays (Bool) 
         atmos.gas_all_num   = 0                             # number of gases 
+        atmos.condensates   = Array{String}(undef, 0)       # list of condensates (String)
 
         # Dict input case
         if mf_source == 0
@@ -514,6 +518,29 @@ module atmosphere
             end 
 
         end # end read VMR from file 
+
+        # store condensates 
+        for c in condensates
+            push!(atmos.condensates, c)
+        end 
+
+        # Cannot have n_gas==n_cond AND n_cond>1, because it will overspecify
+        #   the total pressure within condensing regions
+        if (length(atmos.condensates) == atmos.gas_soc_num) && (length(atmos.condensates)>1)
+            error("There must be at least one non-condensible gas")
+            return 
+        end 
+
+        # Validate condensate names 
+        if length(condensates) > 0
+            for c in condensates
+                if !(c in atmos.gas_all_names)
+                    @error "Invalid condensate '$c'"
+                    return false
+                end 
+            end
+        end 
+        
 
         # set condensation mask
         for g in atmos.gas_all_names 
@@ -1100,9 +1127,9 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
-        atmos.mask_p =            zeros(Int, atmos.nlev_c)
+        atmos.mask_l =            zeros(Int, atmos.nlev_c)
         atmos.mask_c =            zeros(Int, atmos.nlev_c)
-        atmos.flux_p =            zeros(Float64, atmos.nlev_l)  # Phase change (latent heat)
+        atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat
         atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection 
         atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction 
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
@@ -1299,9 +1326,8 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    - `condensates::Array`      list of condensible gases (strings)
     """
-    function handle_saturation!(atmos::atmosphere.Atmos_t, condensates::Array)
+    function handle_saturation!(atmos::atmosphere.Atmos_t)
 
         # Work arrays 
         maxvmr::Dict = Dict{String, Float64}()
@@ -1312,7 +1338,7 @@ module atmosphere
         x_tot::Float64 = 0.0
 
         # Set maximum value (for cold trapping)
-        for c in condensates 
+        for c in atmos.condensates 
             maxvmr[c] = atmos.gas_all_dict[c][end]
         end 
 
@@ -1329,7 +1355,7 @@ module atmosphere
             x_con = 0.0
 
             # For each condensate 
-            for c in condensates
+            for c in atmos.condensates
 
                 # check criticality 
                 if atmos.tmp[i] < phys.lookup_safe("t_crit",c)
@@ -1554,7 +1580,7 @@ module atmosphere
         rm(fname, force=true)
 
         open(fname, "w") do f
-            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , cnvct       , phase       , tot      \n")
+            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , convect     , latent      , tot      \n")
             write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
             for i in 1:atmos.nlev_l
                 @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
@@ -1562,7 +1588,7 @@ module atmosphere
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
-                          atmos.flux_cdry[i], atmos.flux_p[i],    atmos.flux_tot[i]
+                          atmos.flux_cdry[i], atmos.flux_l[i],    atmos.flux_tot[i]
                           )
             end
         end
@@ -1727,7 +1753,7 @@ module atmosphere
         var_fn =        defVar(ds, "fl_N",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fcd =       defVar(ds, "fl_cnvct",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fcc =       defVar(ds, "fl_cndct",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fph =       defVar(ds, "fl_phase",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+        var_fla =       defVar(ds, "fl_latent", Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_ft =        defVar(ds, "fl_tot",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
         var_fdiff =     defVar(ds, "fl_dif",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "W m-2"))
         var_hr =        defVar(ds, "hrate",     Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
@@ -1786,7 +1812,7 @@ module atmosphere
 
         var_fcd[:] =    atmos.flux_cdry
         var_fcc[:] =    atmos.flux_cdct
-        var_fph[:] =    atmos.flux_p
+        var_fla[:] =    atmos.flux_l
 
         var_ft[:] =     atmos.flux_tot
         var_hr[:] =     atmos.heating_rate
