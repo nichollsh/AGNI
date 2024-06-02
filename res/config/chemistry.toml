@@ -36,7 +36,7 @@ title = "Equilibrium chemistry demo"                    # Name for this configur
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     
-    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
+    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory).
     chemistry       = 1                         # Chemistry type (see wiki)
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
