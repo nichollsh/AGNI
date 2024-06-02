@@ -6,7 +6,7 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
-module solver_nlsol
+module solver
 
     using Printf
     using LoggingExtras
@@ -72,7 +72,6 @@ module solver_nlsol
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int`                   solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
-    - `condensates::Array`              condensates to model (if empty, no condensates are modelled)
     - `chem_type::Int`                  chemistry type (see wiki)
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating 
@@ -96,10 +95,10 @@ module solver_nlsol
         Nothing
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1, condensates::Array{String,1}=String[],
+                            sol_type::Int=1,
                             chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=false,
-                            conduct::Bool=false, 
+                            conduct::Bool=false, latent::Bool=false,
                             dx_max::Float64=400.0,  
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=5.0e-6, fdc::Bool=true, fdo::Int=2,
@@ -109,26 +108,6 @@ module solver_nlsol
                             modplot::Int=1, save_frames::Bool=true, 
                             conv_atol::Float64=1.0e-3, conv_rtol::Float64=1.0e-3
                             )::Bool
-
-        # Validate condensation cases
-        do_condense::Bool  = false 
-        #    cannot have n_gas==n_cond AND n_cond>1, because it will overspecify
-        #    the total pressure within condensing regions
-        if (length(condensates) == atmos.gas_soc_num) && (length(condensates)>1)
-            @error "There must be at least one non-condensible gas"
-            return false 
-        end 
-        #    check if condensation is enabled
-        if length(condensates) > 0
-            for c in condensates
-                if c in atmos.gas_all_names
-                    do_condense = true 
-                else 
-                    @error "Invalid condensate '$c'"
-                    return false
-                end 
-            end
-        end 
 
         # Validate sol_type
         if (sol_type < 0) || (sol_type > 4)
@@ -236,21 +215,20 @@ module solver_nlsol
 
             # Reset masks
             fill!(atmos.mask_c, 0.0)
-            fill!(atmos.mask_p, 0.0)
+            fill!(atmos.mask_l, 0.0)
            
             # Set temperatures 
             _set_tmps!(x)
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
-                                do_condense,  convect, sens_heat, conduct, 
-                                condensates=condensates,
+                                latent,  convect, sens_heat, conduct, 
                                 convect_sf=convect_sf)
 
-            # Do rainout
-            # if do_condense
-            #     atmosphere.handle_saturation!(atmos,condensates)
-            # end
+            # Handle rainout (but not energy release)
+            if !latent
+                atmosphere.handle_saturation!(atmos)
+            end
 
             # Calculate layer properties if required, and haven't already
             # if atmos.thermo_funct || !do_condense
@@ -358,9 +336,9 @@ module solver_nlsol
                             # 2nd order forward difference
                             jacob[j,i] = (rf1[j] - resid[j])/fd_s
                         end  
-                    end 
-                end 
-            end 
+                    end # end central/forward
+                end # end residuals
+            end # end levels
 
             return nothing
         end # end jr_cd
@@ -380,8 +358,8 @@ module solver_nlsol
             plt_info *= @sprintf("Cost       %.2e  \n",c_cur)
 
             # Make subplots (don't save to file)
-            plt_pt = plotting.plot_pt(atmos,     "", incl_magma=(sol_type==2), condensates=condensates)
-            plt_fl = plotting.plot_fluxes(atmos, "", incl_eff=(sol_type==3), incl_cdct=conduct, incl_phase=do_condense)
+            plt_pt = plotting.plot_pt(atmos,     "", incl_magma=(sol_type==2))
+            plt_fl = plotting.plot_fluxes(atmos, "", incl_eff=(sol_type==3), incl_cdct=conduct, incl_latent=latent)
             plt_mr = plotting.plot_vmr(atmos,    "")
             
             # Combined plot
