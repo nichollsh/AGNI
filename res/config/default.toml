@@ -14,6 +14,7 @@ title = "Default"                       # Name for this configuration file
     p_surf          = 270.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
+    condensates     = []                # List of condensible gases
     skin_d          = 0.01              # Conductive skin thickness [m]. Used when sol_type=2.
     skin_k          = 2.0               # Conductive skin conductivity [W m-1 K-1]. Used when sol_type=2.
     tmp_magma       = 3000.0            # Magma temperature [K]. Used when sol_type=2.
@@ -40,6 +41,7 @@ title = "Default"                       # Name for this configuration file
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
+    latent_heat     = false                     # Include heat release from phase change
     convection_type = ""                        # Convection type (mlt = use mixing length theory, adj = use convective adjustment).
     condensates     = []                        # List of volatiles which are allowed to condense.
     chemistry       = 0                         # Chemistry type (see wiki

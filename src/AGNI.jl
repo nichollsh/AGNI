@@ -21,8 +21,7 @@ module AGNI
     include("setpt.jl")
     include("plotting.jl")
     include("energy.jl")
-    include("solver_tstep.jl")
-    include("solver_nlsol.jl")
+    include("solver.jl")
 
     # Import src files
     import .phys
@@ -30,12 +29,11 @@ module AGNI
     import .setpt
     import .plotting 
     import .energy
-    import .solver_tstep
-    import .solver_nlsol 
+    import .solver 
 
     # Export 
     # export atmosphere
-    # export solver_nlsol
+    # export solver
     # export plotting
     # export energy
 
@@ -201,6 +199,7 @@ module AGNI
         gravity::Float64       = cfg["planet"]["gravity"]
         p_surf::Float64        = cfg["planet"]["p_surf"]
         p_top::Float64         = cfg["planet"]["p_top"]
+        condensates::Array{String,1} = cfg["planet"]["condensates"]
         #    solver stuff 
         spfile_name::String    = cfg["files" ]["input_sf"]
         star_file::String      = cfg["files" ]["input_star"]
@@ -212,9 +211,9 @@ module AGNI
         overlap::Int           = cfg["execution" ]["overlap_method"]
         thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
         conv_type::String      = cfg["execution" ]["convection_type"]
-        condensates::Array{String,1} = cfg["execution"]["condensates"]
         chem_type::Int         = cfg["execution" ]["chemistry"]
         incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
+        incl_latent::Bool      = cfg["execution" ]["latent_heat"]
         sol_type::Int          = cfg["execution" ]["solution_type"]
         solvers_cmd::Array     = cfg["execution" ]["solvers"]
         initial_req::Array     = cfg["execution" ]["initial_state"]
@@ -285,7 +284,8 @@ module AGNI
                                 tmp_surf, 
                                 gravity, radius,
                                 nlev_centre, p_surf, p_top,
-                                mf_dict=mf_dict, mf_path=mf_path,
+                                mf_dict=mf_dict, mf_path=mf_path, 
+                                condensates=condensates,
                                 flag_gcontinuum=flag_cnt, flag_rayleigh=flag_ray,
                                 flag_cloud=flag_cld, flag_aerosol=flag_aer,
                                 overlap_method=overlap,
@@ -394,32 +394,18 @@ module AGNI
             if sol == "none"
                 energy.calc_fluxes!(atmos, length(condensates)>0,  
                                     incl_convect, incl_sens, incl_conduct, 
-                                    condensates=condensates, calc_cf=plt_cff)
+                                    calc_cf=plt_cff)
                 @info "    done"
             
-            # Timestepping
-            elseif sol == "timestep"
-                # Plotting at runtime
-                if plt_run 
-                    modplot = 10
-                end
-                solver_success = solver_tstep.solve_energy!(atmos, sol_type=sol_type, use_physical_dt=false,
-                                    modplot=modplot, modprop=5, verbose=true,  sens_heat=incl_sens, chem_type=chem_type,
-                                    convect=incl_convect, condensates=condensates,
-                                    conduct=incl_conduct, accel=true,
-                                    conv_atol=conv_atol, conv_rtol=conv_rtol, save_frames=plt_ani,
-                                    max_steps=max_steps, use_mlt=use_mlt)
-                return_success = return_success && solver_success
-            
-            # Nonlinear methods
+            # Nonlinear solver
             elseif (sol in method_map) 
                 if plt_run 
                     modplot = 1
                 end
                 method_idx = findfirst(==(sol), method_map)            
-                solver_success = solver_nlsol.solve_energy!(atmos, sol_type=sol_type, 
+                solver_success = solver.solve_energy!(atmos, sol_type=sol_type, 
                                     conduct=incl_conduct,  chem_type=chem_type,
-                                    convect=incl_convect, condensates=condensates, 
+                                    convect=incl_convect, latent=incl_latent,
                                     sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
                                     conv_rtol=conv_rtol, method=method_idx, 
                                     dx_max=dx_max, linesearch=linesearch,
@@ -448,8 +434,8 @@ module AGNI
         plt_ani && plotting.animate(atmos)
         plt_vmr && plotting.plot_vmr(atmos,        joinpath(atmos.OUT_DIR,"plot_vmrs.png"))
         plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
-        plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2), condensates=condensates)
-        plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_phase=(length(condensates) > 0), incl_cdct=incl_conduct)
+        plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
+        plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
         plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"plot_emission.png"))
         plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 

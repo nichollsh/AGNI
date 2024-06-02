@@ -18,6 +18,7 @@ title = "PROTEUS configured"
     # tmp_eff         = 1000.0
     turb_coeff      = 1.0e-3
     wind_speed      = 10.0
+    condensates     = []
 
 [planet.vmr]
     H2O = 0.7
@@ -42,7 +43,7 @@ title = "PROTEUS configured"
     overlap_method  = 4      
     thermo_funct    = true  
     sensible_heat   = true  
-
+    latent_heat     = false
     convection_type = "mlt" 
     condensates     = [] 
     solvers         = ["newton"]    

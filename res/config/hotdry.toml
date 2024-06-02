@@ -13,6 +13,7 @@ title = "Hot and dry"                    # Name for this configuration file
     p_surf          = 270.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
+    condensates     = []                
     tmp_eff         = 0.0               # Effective temperature
     turb_coeff      = 1.0e-4
     wind_speed      = 10.0
@@ -35,6 +36,7 @@ title = "Hot and dry"                    # Name for this configuration file
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = true                     # Include sensible heat transport at the surface?
+    latent_heat     = false 
     convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
     condensates     = []                        # List of volatiles which are allowed to condense.
     chemistry       = 0

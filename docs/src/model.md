@@ -9,13 +9,20 @@ AGNI models RT using SOCRATES, a numerical code written by the UK Met Office whi
 For simulating gaseous absorption, the model fits k-terms to spectral absorption cross-section data from DACE. The MT_CKD model is used to estimate continuum absorption cross-sections. Rayleigh scattering and water cloud radiative effects are also included. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/nichollsh/SOCRATES) on GitHub.
 
 ## Convection
-Convection is a process that occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it's often parameterised in 3D global circulation models, as resolving convection is numerically difficult. Two convection parameterisations are included within the model: convective adjustment (CA), and mixing length theory (MLT). 
-
-CA forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat, while ensuring that enthalpy is conserved. Only dry adjustment is included in the model. This does not allow the convective energy fluxes to be calculated directly.
-
+Convection is a process that occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it's often parameterised in 3D global circulation models, as resolving convection is numerically difficult. AGNI uses 
+mixing length theory (MLT) to parameterise convection. This is in contrast to convective adjustment, which forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat, while ensuring that enthalpy is conserved. 
+   
 MLT directly calculates the energy flux associated with convective heat transport, and thus is the preferred parameterisation within the model. It assumes that parcels of gas are diffused over a characteristic _mixing length_, transporting energy in the process.
-
+   
 Heat capacities are temperature-dependent, calculated using the Shomate Equation with coefficients derived from the NIST website.
+
+## Latent heat
+Gases release energy (latent heat) into their surroundings when condensing into a liquid or solid. This is included in the model 
+through a diffusive condensation scheme, which assumes a fixed condensation timescale. This takes place as follows... firstly, 
+the mixing ratios of the gases are updated according to the temperature profile, where rainout occurs until all condensibles are 
+saturated or sub-saturated. The mixing ratios of dry species are increased in order to satisfy the total pressure at condensing
+levels. The heat released associated with the change in partial pressure of condensible gases is used to calculate a latent
+heating rate. This is then integrated to provide a latent heat transport flux.
 
 ## Solar flux
 The radiation component requires two boundary conditions the energy. The first is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the instellation, a scale factor, a grey bond albedo, and the solar zenith angle. All of these may be provided to the model through the configuration file.
@@ -30,15 +37,11 @@ Depending on the system you wish to model, it is necessary to tell AGNI what kin
 
 ## Obtaining a solution
 AGNI is designed for modelling planetary atmospheres with high surface pressures and temperatures. This means that the radiative timescale differs by several orders of magnitude across the column, which makes obtaining a solution difficult. The model contains a suite of methods for obtaining a solution.
-
-### A) Solving a non-linear system
+    
 To obtain a temperature structure solution that conserves energy more precisely than a time-stepping method, it is possible to construct the model as a system of non-linear equations $\vec{r}(\vec{x})$. This algorithm obtains the roots of the nonlinear system formed by the flux divergence $r_i$ at each level $i$, with cell-centre temperatures used as the independent variables $x_i$. Finite-difference methods are used to estimate the jacobian matrix in this case. Similar methods have been used in a handful of planetary radiative-convective models (e.g. ATMO), but is more commonly used by the stellar physics community. Currently implemented solvers: Newton-Raphson, Gauss-Newton, and Levenberg-Marquardt. Optionally, the code uses a golden-section linesearch algorithm to determine the optimal step length. 
 
-### B) Time-stepping
-AGNI also implements a multistep Adams-Bashforth integrator to integrate the heating rates at each level over time. This is very robust to the initial conditions provided, but is not able to obtain an energy-conserving solution very quickly. Each level to evolves on its own timescale, which provides unphysical intermediate solutions but a physical final state. Time-stepping methods such as these are used in other radiative-convective models (with their own enhancements) such as HELIOS and Exo_k. This method is not the primary solver within AGNI, so it in "maintainence mode" rather than active development.
-
 ## Other features
-AGNI can calculate emission spectra, provided with T(p) and the volume mixing ratios of the gases. This is performed using the same RT as the RCE calculations, so is limited in resolution by the choice of correlated-k bands. Similarly, the the contribution function can also be calculated.
+AGNI can calculate emission spectra, provided with T(p) and the volume mixing ratios of the gases. This is performed using the same RT as the RCE calculations, so is limited in resolution by the choice of correlated-k bands. Similarly, the longwave contribution function can also be calculated.
 
 ## Julia and Fortran
 AGNI is primarily written in Julia, while SOCRATES itself is written in Fortran. Julia was chosen because it allows the SOCRATES binaries to be included in the precompiled code, which significantly improves performance.
