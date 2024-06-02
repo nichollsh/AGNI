@@ -264,7 +264,11 @@ module setpt
     end
 
 
-    # Set atmosphere to phase curve of gas when it enters the condensible region (does not modify tmp_surf)
+    """
+    Set T = max(T,T_dew) for a specified gas.
+
+    Does not modify VMRs or surface temperature.
+    """
     function condensing!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 

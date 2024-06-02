@@ -36,7 +36,7 @@ title = "Cloud test"                    # Name for this configuration file
     thermo_funct    = true                     # Accounting temperature dependence of thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false 
-    convection_type = ""                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
+    convection_type = ""                     # Convection type ("" = no convection, "mlt" = use mixing length theory).
     chemistry       = 0
     solution_type   = 1                         # Solution type (see wiki).
     solvers         = []                # Ordered list of solvers to apply (see wiki).

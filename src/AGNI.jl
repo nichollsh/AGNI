@@ -392,7 +392,7 @@ module AGNI
 
             # No solve - just calc fluxes at the end
             if sol == "none"
-                energy.calc_fluxes!(atmos, length(condensates)>0,  
+                energy.calc_fluxes!(atmos, incl_latent,  
                                     incl_convect, incl_sens, incl_conduct, 
                                     calc_cf=plt_cff)
                 @info "    done"

@@ -37,7 +37,7 @@ title = "Hot and dry"                    # Name for this configuration file
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = true                     # Include sensible heat transport at the surface?
     latent_heat     = false 
-    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
+    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory).
     condensates     = []                        # List of volatiles which are allowed to condense.
     chemistry       = 0
     solution_type   = 3                         # Solution type (see wiki).

@@ -132,9 +132,9 @@ module solver
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
         fdr::Float64        =   0.2    # Use forward difference if cost ratio is below this value
-        ls_max_steps::Int  =    16      # Maximum golden section linesearch steps 
+        ls_max_steps::Int  =    20      # Maximum golden section linesearch steps 
         ls_min_scale::Float64 = 0.01    # Lower bracket for linesearch 
-        ls_conv::Float64   =    1.0e-2  # Bracket size for linesearch convergence
+        ls_conv::Float64   =    5.0e-3  # Bracket size for linesearch convergence
         plateau_n::Int =        10      # Plateau declared when plateau_i > plateau_n
         plateau_s::Float64 =    100.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to in crement plateau_i
@@ -230,10 +230,10 @@ module solver
                 atmosphere.handle_saturation!(atmos)
             end
 
-            # Calculate layer properties if required, and haven't already
-            # if atmos.thermo_funct || !do_condense
-            #     atmosphere.calc_layer_props!(atmos)
-            # end 
+            # Calculate layer properties if required and haven't already
+            if atmos.thermo_funct
+                atmosphere.calc_layer_props!(atmos)
+            end 
 
             # Additional energy input
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick

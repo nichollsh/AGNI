@@ -42,7 +42,7 @@ title = "Default"                       # Name for this configuration file
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     # Include heat release from phase change
-    convection_type = ""                        # Convection type (mlt = use mixing length theory, adj = use convective adjustment).
+    convection_type = ""                        # Convection type (mlt = use mixing length theory).
     condensates     = []                        # List of volatiles which are allowed to condense.
     chemistry       = 0                         # Chemistry type (see wiki
     solution_type   = 0                         # Solution type (see wiki).
