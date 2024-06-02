@@ -432,7 +432,8 @@ module energy
     **Analytical relaxation scheme for condensation fluxes.**
 
     Calculates flux release by vertical latent heat transport using an heuristic 
-    function of the temperature difference T-T_dew. 
+    function of the supersaturation amount pp-psat. Only valid when a single 
+    gas is included in the model, otherwise condense_diffuse should be used.
 
     Updates fluxes. 
     Does not update clouds or mixing ratios.
@@ -442,9 +443,13 @@ module energy
     """
     function condense_relax!(atmos::atmosphere.Atmos_t)
 
+        # Get name 
+        c::String = atmos.gas_all_names[1]
+
         # Reset flux and mask 
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, 0)
+        fill!(atmos.gas_all_cond[c], false)
 
         # Check if empty
         if length(atmos.condensates) == 0
@@ -452,47 +457,46 @@ module energy
         end 
 
         # Work variables
-        a::Float64 = 2.0
+        a::Float64 = 1.0e-1
         pp::Float64 = 0.0
         Psat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
 
+
         # Calculate flux (negative) divergence due to latent heat release...
-        # For all condensates
-        for c in atmos.condensates
-            # For all levels 
-            for i in 1:atmos.nlev_c
+        # For all levels 
+        for i in 1:atmos.nlev_c
 
-                # Get partial pressure 
-                pp = atmos.gas_all_dict[c][i] * atmos.p[i]
-                if pp < 1.0e-10 
-                    continue
-                end
+            # Get partial pressure 
+            pp = atmos.gas_all_dict[c][i] * atmos.p[i]
+            if pp < 1.0e-10 
+                continue
+            end
 
-                # check saturation
-                Psat = phys.calc_Psat(c, atmos.tmp[i])
-                if (pp < Psat+1.0e-10)
-                    continue 
-                end 
+            # check saturation
+            Psat = phys.calc_Psat(c, atmos.tmp[i])
+            if (pp < Psat+1.0e-10)
+                continue 
+            end 
 
-                # Check criticality 
-                if atmos.tmp[i] > phys.lookup_safe("t_crit",c)
-                    continue 
-                end 
+            # Check criticality 
+            if atmos.tmp[i] > phys.lookup_safe("t_crit",c)
+                continue 
+            end 
 
-                # relaxation function
-                dif[i] += (1.0/a)*(pp-Psat)
+            # relaxation function
+            dif[i] = -a*(pp-Psat)
 
-                # set mask 
-                atmos.mask_l[i] = atmos.mask_decay
+            # set mask 
+            atmos.mask_l[i] = atmos.mask_decay
+            atmos.gas_all_cond[c][i] = true
 
-            end # end levels 
-        end # end condensates 
+        end # end levels 
 
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at surface
         for i in range(start=atmos.nlev_l-1, stop=1, step=-1)
-            atmos.flux_l[i] = atmos.flux_l[i+1] * (atmos.pl[i+1]-atmos.pl[i])  - dif[i]
+            atmos.flux_l[i] = dif[i]*(atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i+1]
         end 
 
         return nothing
@@ -517,7 +521,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameters 
-        timescale::Float64 = 100.0      # seconds
+        timescale::Float64 = 50.0      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -669,9 +673,8 @@ module energy
             atmos.flux_tot += atmos.flux_l
         end 
 
-        # Recalculate layer properties in light of either temperature change 
-        # or from condensation
-        if atmos.thermo_funct || latent
+        # Recalculate layer properties if condensation occurs
+        if length(atmos.condensates) > 0
             atmosphere.calc_layer_props!(atmos)
         end 
 
