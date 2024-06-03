@@ -1517,6 +1517,9 @@ module atmosphere
             atmos.tmpl[1] = 0.9 * atmos.tmpl[1] + 0.1 * top_old_e
         end
 
+        # Clamp
+        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
+
         # Second interpolation back to cell-centres.
         # This can help prevent grid-imprinting issues, but in some cases it can 
         # lead to unphysical behaviour, because it gives the interpolator too 

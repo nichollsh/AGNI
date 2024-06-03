@@ -131,7 +131,7 @@ module solver
         modprint::Int =         1       # Print frequency
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
-        fdr::Float64        =   0.2    # Use forward difference if cost ratio is below this value
+        fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
         ls_max_steps::Int  =    20      # Maximum golden section linesearch steps 
         ls_min_scale::Float64 = 0.01    # Lower bracket for linesearch 
         ls_conv::Float64   =    5.0e-3  # Bracket size for linesearch convergence
@@ -505,7 +505,7 @@ module solver
                 convect_sf = 1.0 
             end 
 
-            # Evaluate residuals and estimate jacobian with finite-difference 
+            # Evaluate residuals and estimate jacobian
             r_old[:] .= r_cur[:]
             if fdc || (step == 1) || (c_cur/c_old > fdr)
                 # use central difference if: 
@@ -516,7 +516,7 @@ module solver
                 # otherwise, use forward difference
                 _calc_jac_res!(x_cur, b, r_cur, false, fdo)
                 stepflags *= "F$fdo-"
-            end 
+            end
 
             # Check if jacobian is singular 
             if abs(det(b)) < floatmin()*10.0
