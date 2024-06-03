@@ -520,8 +520,8 @@ module energy
     """
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
-        # Parameters 
-        timescale::Float64 = 50.0      # seconds
+        # Parameter 
+        timescale::Float64 = 2000.0      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
