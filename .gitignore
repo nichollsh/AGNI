@@ -30,4 +30,5 @@ socstar.dat
 .DS_Store
 __pycache__
 debug/
-nogit_*
+nogit*
+.osfcli.config
