@@ -328,6 +328,11 @@ module AGNI
                 # set from csv file 
                 idx_req += 1
                 setpt.fromcsv!(atmos,initial_req[idx_req])
+
+            elseif str_req == "ncdf"
+                # set from NetCDF file 
+                idx_req += 1
+                setpt.fromncdf!(atmos,initial_req[idx_req])
             
             elseif str_req == "add"
                 # add X kelvin from the currently stored T(p)

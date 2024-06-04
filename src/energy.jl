@@ -195,7 +195,7 @@ module energy
             fill!(atmos.band_d_lw, 0.0)
             fill!(atmos.band_n_lw, 0.0)
             for lv in 1:atmos.nlev_l      # sum over levels
-                for ba in 1:atmos.nbands  # sum over bands
+                for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
 
                     atmos.band_d_lw[lv,ba] = atmos.radout.flux_down[idx]
@@ -510,7 +510,7 @@ module energy
     reduced at each level to satisfy both cold-trapping and saturation 
     constraints (as in atmosphere.handle_saturation). Based on the amount of 
     condensation at each level, a phase change flux is calculated by assuming 
-    some rainout timescale. 
+    a fixed condensation timescale. 
     
     Updates fluxes and mixing ratios.
     Does not update clouds.
@@ -627,7 +627,7 @@ module energy
                 if atmos.gas_all_cond[c][i]
                     # dp = p_moist - p_dry < 0
                     delta_p = atmos.p[i]*(atmos.gas_all_dict[c][i] - atmos.gas_all_dict[c][i+1])
-                    dfdp[i] += phys.lookup_safe("l_vap",c) * phys.lookup_safe("mmw",c) / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
+                    dfdp[i] -= phys.lookup_safe("l_vap",c) * phys.lookup_safe("mmw",c) / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
                 end
             end 
 
@@ -635,8 +635,8 @@ module energy
         
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at surface, integrating upwards
-        for i in range(start=atmos.nlev_l-1, stop=1, step=-1)
-            atmos.flux_l[i] = dfdp[i] * (atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i+1]
+        for i in range(start=atmos.nlev_l-2, stop=1, step=-1)
+            atmos.flux_l[i] = dfdp[i] * (atmos.pl[i]-atmos.pl[i+1]) + atmos.flux_l[i+1]
         end 
 
         return nothing 
