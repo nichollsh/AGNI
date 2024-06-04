@@ -1,5 +1,4 @@
-# Contains the atmosphere module, which contains all of the core code 
-# for setting-up the atmosphere and handling files.
+# Contains the atmosphere module
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
@@ -1644,6 +1643,7 @@ module atmosphere
         defDim(ds, "ngases", ngases)        # Gases
         defDim(ds, "nchars", nchars)        # Length of string containing gas names
         defDim(ds, "nbands", atmos.nbands)  # Number of spectral bands
+        defDim(ds, "nchannels", atmos.dimen.nd_channel)  # Number of spectral channels used for calculations
 
         # ----------------------
         # Scalar quantities  
