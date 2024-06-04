@@ -333,8 +333,8 @@ module atmosphere
         atmos.tmp_ceiling =     2.0e4
 
         if nlev_centre < 25 
-            @warn "Adjusted number of levels to 25"
             nlev_centre = 25
+            @warn "Adjusted number of levels to $nlev_centre"
         end 
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
@@ -376,9 +376,6 @@ module atmosphere
         atmos.control.l_cloud =         flag_cloud
         atmos.control.l_drop =          flag_cloud
         atmos.control.l_ice  =          false
-
-        # store contribution function?
-        # atmos.control.l_contrib_func_band = false
 
         # Initialise temperature grid to be isothermal
         atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tmp_surf
