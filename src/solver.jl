@@ -221,11 +221,6 @@ module solver
             # Set temperatures 
             _set_tmps!(x)
 
-            # Calculate fluxes
-            energy.calc_fluxes!(atmos, 
-                                latent,  convect, sens_heat, conduct, 
-                                convect_sf=convect_sf)
-
             # Handle rainout (but not energy release)
             if !latent
                 atmosphere.handle_saturation!(atmos)
@@ -235,6 +230,12 @@ module solver
             if atmos.thermo_funct
                 atmosphere.calc_layer_props!(atmos)
             end 
+
+            # Calculate fluxes
+            energy.calc_fluxes!(atmos, 
+                                latent,  convect, sens_heat, conduct, 
+                                convect_sf=convect_sf)
+
 
             # Additional energy input
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
