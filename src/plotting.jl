@@ -480,6 +480,31 @@ module plotting
         return nothing
     end
 
+    """
+    Plot jacobian matrix 
+    """
+    function jacobian(b::Array, fname::String; 
+                            dpi::Int=200, size_x::Int=600, size_y::Int=500)
+        
+        lim = maximum(abs.(b))
+
+        plt = plot(framestyle=:box, dpi=dpi, 
+                    guidefontsize=9, size=(size_x, size_y),
+                    title="∂r/∂x [W m⁻² K⁻¹]",
+                    clim=(-lim,lim))
+
+        # show jacobian 
+        heatmap!(plt, b, color=:RdBu)
+
+        xlabel!(plt, "Cell-centre index")
+        ylabel!(plt, "Cell-centre index")
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+
+        return plt 
+    end 
 
 end # end module plotting
 
