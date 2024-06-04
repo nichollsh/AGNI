@@ -132,12 +132,12 @@ module solver
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        ls_max_steps::Int  =    20      # Maximum golden section linesearch steps 
+        ls_max_steps::Int  =    20      # Maximum linesearch steps 
         ls_min_scale::Float64 = 0.01    # Lower bracket for linesearch 
-        ls_conv::Float64   =    5.0e-3  # Bracket size for linesearch convergence
-        plateau_n::Int =        10      # Plateau declared when plateau_i > plateau_n
+        plateau_n::Int =        6      # Plateau declared when plateau_i > plateau_n
         plateau_s::Float64 =    100.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to in crement plateau_i
+        ls_tau::Float64   =     0.5     # linesearch shrink factor
 
         # Execution variables
         #     finite difference 
@@ -161,7 +161,8 @@ module solver
         lml::Float64             = 2.0        # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf        # current cost (i)
         c_old::Float64           = Inf        # old cost (i-1)
-        ls_best_scale::Float64   = 1.0        # Best found linesearch scale
+        ls_alpha::Float64        = 1.0        # linesearch scale factor 
+        dx_limit::Float64        = 1.0        # dx limit in this step
 
         #     tracking
         step::Int =         0       # Step number
@@ -178,7 +179,7 @@ module solver
         x_med::Float64 =        0.0     # Median solution
         x_max::Float64 =        0.0     # Maximum solution (sign agnostic)
         iworst::Int =           0       # Level which is furthest from convergence
-        dxmax::Float64 =        9.0     # Maximum change in solution array
+        dx_stat::Float64 =      9.0     # Maximum change in solution array
         r_cur_2nm::Float64 =    0.01    # Two-norm of residuals 
         r_old_2nm::Float64 =    0.02    # Previous ^
 
@@ -552,6 +553,8 @@ module solver
             end
 
             # Extrapolate step if on plateau 
+            #    this acts to give the solver a 'nudge' in (hopefully) the 
+            #    right direction. Otherwise, this perturbation can still help.
             if plateau_i > plateau_n
                 x_dif[:] .*= plateau_s
                 plateau_i = 0
@@ -559,26 +562,34 @@ module solver
             end 
 
             # Limit step size, without changing direction of dx vector
-            x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
+            dx_limit = dx_max 
+            dx_limit = min(dx_limit, minimum(x_old + x_dif)-atmos.tmp_floor)
+            x_dif[:] .*= min(1.0, dx_limit / maximum(abs.(x_dif[:])))
 
-            # Linesearch 
+            # Backtracking linesearch 
+            # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
             if linesearch && (step > 1)
 
                 # Reset
                 stepflags *= "Ls-"
 
-                # Linesearch cost function
-                function _costls!(scale::Float64)::Float64
-                    x_cur[:] .= x_old[:] .+ scale .* x_dif[:]
+                # Full step 
+                ls_alpha = 1.0 
+                for li in 1:ls_max_steps
+                    x_cur[:] .= x_old[:] .+ ls_alpha .* x_dif[:]
                     _fev!(x_cur,r_tst)
-                    return _cost(r_tst)
+                    if _cost(r_tst) < c_cur 
+                        break 
+                    end 
+                    ls_alpha *= ls_tau
+                    if ls_alpha < ls_min_scale
+                        ls_alpha = ls_min_scale
+                        break
+                    end 
                 end 
 
-                # Golden section search
-                ls_best_scale = gs_search(_costls!,ls_min_scale,1.0,ls_conv,ls_max_steps)
-
                 # apply best linesearch scale 
-                x_dif[:] .*= ls_best_scale
+                x_dif[:] .*= ls_alpha
 
             end # end linesearch 
 
@@ -593,22 +604,22 @@ module solver
 
             # If cost ratio is near unity, then the model is struggling
             # to move around because it's on a "plateau" in solution space
-            if (plateau_r < c_cur/c_old < 1.001 ) && detect_plateau
+            if (plateau_r < c_cur/c_old < 1.01 ) && detect_plateau
                 plateau_i += 1
             else 
                 plateau_i = 0
             end 
 
             # Model statistics 
-            r_med   = median(r_cur)
-            iworst  = argmax(abs.(r_cur))
-            r_max   = r_cur[iworst]
-            x_med   = median(x_cur)
-            x_max   = x_cur[argmax(abs.(x_cur))]
-            dxmax   = maximum(abs.(x_dif))
-            r_old_2nm   = r_cur_2nm
-            r_cur_2nm   = norm(r_cur)
-            c_max = maximum(abs.(atmos.flux_tot))
+            r_med   =   median(r_cur)
+            iworst  =   argmax(abs.(r_cur))
+            r_max   =   r_cur[iworst]
+            x_med   =   median(x_cur)
+            x_max   =   x_cur[argmax(abs.(x_cur))]
+            dx_stat =   maximum(abs.(x_dif))
+            r_old_2nm = r_cur_2nm
+            r_cur_2nm = norm(r_cur)
+            c_max =     maximum(abs.(atmos.flux_tot))
 
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
@@ -617,7 +628,7 @@ module solver
                 
             # Inform user
             if mod(step,modprint) == 0 
-                info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dxmax, stepflags[1:end-1])
+                info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
                 if step_ok
                     @info info_str
                 else
