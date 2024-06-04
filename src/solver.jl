@@ -85,6 +85,7 @@ module solver
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `linesearch::Bool`                use a golden-section linesearch algorithm to determine the best step size
     - `modulate_mlt::Bool`              improve convergence with convection by introducing MLT gradually
+    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns as required
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
@@ -104,7 +105,7 @@ module solver
                             fdw::Float64=5.0e-6, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
                             linesearch::Bool=true, modulate_mlt::Bool=false,
-                            detect_plateau::Bool=true,
+                            detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             conv_atol::Float64=1.0e-3, conv_rtol::Float64=1.0e-3
                             )::Bool
@@ -158,11 +159,11 @@ module solver
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)               # Test for rejection residuals
         dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
-        lml::Float64             = 2.0        # Levenberg-Marquardt lambda parameter
-        c_cur::Float64           = Inf        # current cost (i)
-        c_old::Float64           = Inf        # old cost (i-1)
-        ls_alpha::Float64        = 1.0        # linesearch scale factor 
-        dx_limit::Float64        = 1.0        # dx limit in this step
+        perturb::Array{Bool,1}   = falses(arr_len)      # Mask for levels which should be perturbed
+        lml::Float64             = 2.0                  # Levenberg-Marquardt lambda parameter
+        c_cur::Float64           = Inf                  # current cost (i)
+        c_old::Float64           = Inf                  # old cost (i-1)
+        ls_alpha::Float64        = 1.0                  # linesearch scale factor 
 
         #     tracking
         step::Int =         0       # Step number
@@ -184,7 +185,7 @@ module solver
         r_old_2nm::Float64 =    0.02    # Previous ^
 
         # Calculate the (remaining) temperatures from known temperatures
-        function _set_tmps!(_x::Array)
+        function _set_tmps!(_x::Array{Float64,1})
             # Read new guess
             clamp!(_x, atmos.tmp_floor+1.0, atmos.tmp_ceiling-1.0)
             for i in 1:atmos.nlev_c
@@ -212,7 +213,7 @@ module solver
         end # end set_tmps
 
         # Objective function
-        function _fev!(x::Array,resid::Array)
+        function _fev!(x::Array{Float64,1},resid::Array{Float64,1})
 
             # Reset masks
             fill!(atmos.mask_c, 0.0)
@@ -274,13 +275,18 @@ module solver
         end  # end fev
 
         # Calculate the jacobian and residuals at x using a 2nd order central-difference method
-        function _calc_jac_res!(x::Array{Float64, 1}, jacob::Array{Float64, 2}, resid::Array{Float64 ,1}, central::Bool, order::Int)
+        function _calc_jac_res!(x::Array{Float64, 1}, jacob::Array{Float64, 2}, 
+                                    resid::Array{Float64 ,1}, central::Bool, order::Int,
+                                    which::Array{Bool,1})
 
             # Evalulate residuals at x
             _fev!(x, resid)
 
             # For each level...
             for i in 1:arr_len 
+                if !which[i]
+                    continue 
+                end 
                 
                 # Reset all levels
                 x_s[:] .= x[:]
@@ -507,16 +513,36 @@ module solver
                 convect_sf = 1.0 
             end 
 
-            # Evaluate residuals and estimate jacobian
+            # Determine which parts of the Jacobian matrix need to be updated
+            if (step == 1) || perturb_all || (c_cur*0.1 < conv_atol + conv_rtol * c_max)
+                # Update whole matrix if:
+                #    on first step, was requested, or near global convergence
+                fill!(perturb, true)
+            else 
+                # Skip updating levels where the residuals are small-ish, so
+                #    that this column of J will be left with the last values
+                #    calculated by the finite-difference scheme. This is probs
+                #    okay as long as the jacobian is almost diagonal.
+                for i in 3:arr_len-2
+                    if (maximum(abs.(r_cur[i-1:i+1])) < 2.0) #&& perturb[i]
+                        perturb[i] = false
+                        @info "Skip perturb $i"
+                    else 
+                        perturb[i] = true 
+                    end 
+                end 
+            end 
+
+            # Evaluate residuals and estimate Jacobian matrix where required
             r_old[:] .= r_cur[:]
             if fdc || (step == 1) || (c_cur/c_old > fdr)
                 # use central difference if: 
                 #    requested, at the start, or insufficient cost decrease
-                _calc_jac_res!(x_cur, b, r_cur, true, fdo)
+                _calc_jac_res!(x_cur, b, r_cur, true, fdo, perturb)
                 stepflags *= "C$fdo-"
             else
                 # otherwise, use forward difference
-                _calc_jac_res!(x_cur, b, r_cur, false, fdo)
+                _calc_jac_res!(x_cur, b, r_cur, false, fdo, perturb)
                 stepflags *= "F$fdo-"
             end
 
@@ -526,6 +552,8 @@ module solver
                 step_ok = false 
                 break
             end 
+
+            plotting.jacobian(b, "out/jacobian.png")
 
             # Model step 
             x_old[:] = x_cur[:]
@@ -563,9 +591,7 @@ module solver
             end 
 
             # Limit step size, without changing direction of dx vector
-            dx_limit = dx_max 
-            dx_limit = min(dx_limit, minimum(x_old + x_dif)-atmos.tmp_floor)
-            x_dif[:] .*= min(1.0, dx_limit / maximum(abs.(x_dif[:])))
+            x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
             # Backtracking linesearch 
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
