@@ -20,7 +20,7 @@ title = "Hot and dry"                    # Name for this configuration file
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
     output_dir      = "out/"                                            # Path to output directory.
 
@@ -43,7 +43,7 @@ title = "Hot and dry"                    # Name for this configuration file
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
     dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
-    initial_state   = ["iso","1800"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    initial_state   = ["iso","1200"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     linesearch      = false                     # Use linesearch?
     converge_atol   = 1.0e-2                    # Convergence criterion on absolute flux lost [W m-2].
     converge_rtol   = 1.0e-4                    # Convergence criterion on relative flux lost [dimensionless].
