@@ -20,7 +20,7 @@ title = "Condensation test"                    # Name for this configuration fil
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/nogit/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
     output_dir      = "out/"                                            # Path to output directory.
 
