@@ -524,9 +524,8 @@ module solver
                 #    calculated by the finite-difference scheme. This is probs
                 #    okay as long as the jacobian is almost diagonal.
                 for i in 3:arr_len-2
-                    if (maximum(abs.(r_cur[i-1:i+1])) < 2.0) #&& perturb[i]
+                    if (maximum(abs.(r_cur[i-1:i+1])) < 1.0) #&& perturb[i]
                         perturb[i] = false
-                        @info "Skip perturb $i"
                     else 
                         perturb[i] = true 
                     end 
@@ -553,7 +552,7 @@ module solver
                 break
             end 
 
-            plotting.jacobian(b, "out/jacobian.png")
+            plotting.jacobian(b, "out/jacobian.png", perturb=perturb)
 
             # Model step 
             x_old[:] = x_cur[:]

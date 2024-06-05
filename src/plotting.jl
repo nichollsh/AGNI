@@ -483,7 +483,8 @@ module plotting
     """
     Plot jacobian matrix 
     """
-    function jacobian(b::Array, fname::String; 
+    function jacobian(b::Array{Float64,2}, fname::String; 
+                            perturb::Array{Bool,1}=Bool[],
                             dpi::Int=200, size_x::Int=600, size_y::Int=500)
         
         lim = maximum(abs.(b))
@@ -491,10 +492,17 @@ module plotting
         plt = plot(framestyle=:box, dpi=dpi, 
                     guidefontsize=9, size=(size_x, size_y),
                     title="∂r/∂x [W m⁻² K⁻¹]",
-                    clim=(-lim,lim))
+                    clim=(-lim,lim), grid=false)
 
         # show jacobian 
         heatmap!(plt, b, color=:RdBu)
+
+        # show perturbed levels 
+        l = length(perturb)
+        if l > 0
+            scatter!(plt, zeros(Float64, l)[perturb], collect(1:l)[perturb], 
+                        color=:black,label="",markershape=:rtriangle)
+        end 
 
         xlabel!(plt, "Cell-centre index")
         ylabel!(plt, "Cell-centre index")
