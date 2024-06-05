@@ -665,7 +665,7 @@ module energy
 
         # +Condensation energy flux
         if latent
-            if atmos.gas_all_num == 1
+            if atmos.single_component
                 # does NOT modify VMRs
                 energy.condense_relax!(atmos)
             else 
