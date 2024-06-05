@@ -171,12 +171,10 @@ module AGNI
         end 
 
         # Temp folders
-        tmp_folds = ["frames/", "fastchem/"]
-        for fold in tmp_folds
-            fpth = joinpath(output_dir,fold)
-            rm(fpth,force=true,recursive=true)
-            mkdir(fpth)
-        end
+        dir_fastchem = joinpath(output_dir,"fastchem/")
+        dir_frames   = joinpath(output_dir,"frames/")
+        rm(dir_fastchem,force=true,recursive=true)
+        rm(dir_frames,force=true,recursive=true)
 
         # Copy configuration file 
         cp(cfg_path, joinpath(output_dir, "agni.cfg"), force=true)
@@ -274,6 +272,7 @@ module AGNI
                 @error "Misconfiguration: FastChem coupling is incompatible with AGNI condensation scheme"
             else
                 fastchem_path = cfg["files"]["fastchem_path"]
+                mkdir(dir_fastchem)
             end 
         end 
 
@@ -371,6 +370,11 @@ module AGNI
             atmosphere.chemistry_eq!(atmos, chem_type, true)
         end 
 
+        # Frame dir
+        if plt_ani
+            mkdir(dir_frames)
+        end 
+
         # Solver variables 
         incl_convect::Bool= !isempty(conv_type)
         use_mlt::Bool     = (conv_type == "mlt")
@@ -460,10 +464,8 @@ module AGNI
                 end 
             end 
             # remove folders
-            for fold in tmp_folds
-                fpth = joinpath(output_dir,fold)
-                rm(fpth,force=true,recursive=true)
-            end
+            rm(dir_fastchem,force=true,recursive=true)
+            rm(dir_frames,force=true,recursive=true)
         end
 
         # Finish up
