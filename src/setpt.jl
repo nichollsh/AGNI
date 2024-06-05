@@ -111,6 +111,34 @@ module setpt
         return nothing
     end
 
+    """
+    Load atmosphere data from NetCDF file (must have same number of levels)
+    """
+    function fromncdf!(atmos::atmosphere.Atmos_t, fpath::String)
+
+        # Check file exists
+        if !isfile(fpath)
+            error("The file '$fpath' does not exist")
+        end 
+
+        # Open file 
+        fpath = abspath(fpath)
+        ds = Dataset(fpath,"r")
+
+        # Properties 
+        atmos.tmp_surf = ds["tmp_surf"][1]
+        atmos.tmp[:] =  ds["tmp"][:]
+        atmos.tmpl[:] = ds["tmpl"][:]
+        atmos.p[:] =    ds["p"][:]
+        atmos.pl[:] =   ds["pl"][:]
+
+        # Close file 
+        close(ds)
+
+        atmosphere.calc_layer_props!(atmos)
+        return nothing
+    end # end load_ncdf
+
     # Set atmosphere to be isothermal at the given temperature
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
         if !atmos.is_param
