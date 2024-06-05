@@ -435,8 +435,8 @@ module AGNI
         # Write arrays
         @info "Writing results"
         dump.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
-        dump.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
         dump.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
+        dump.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 
         # Save plots
         @info "Plotting results"

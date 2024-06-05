@@ -466,6 +466,7 @@ module solver
             end 
 
             # Update step counter
+            @debug "        iterate"
             step += 1
             if step > max_steps
                 code = 1 
@@ -485,6 +486,7 @@ module solver
 
             # Run chemistry scheme 
             if chem_type in [1,2,3]
+                @debug "        chemistry"
                 fc_retcode = atmosphere.chemistry_eq!(atmos, chem_type, false)
                 if fc_retcode == 0
                     stepflags *= "Cs-"
@@ -527,6 +529,7 @@ module solver
             end 
 
             # Determine which parts of the Jacobian matrix need to be updated
+            @debug "        jacobian"
             if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max)
                 # Update whole matrix if:
                 #    on first step, was requested, or near global convergence
@@ -565,16 +568,19 @@ module solver
             x_old[:] = x_cur[:]
             if (method == 1)
                 # Newton-Raphson step 
+                @debug "        NR step"
                 x_dif = -b\r_cur
                 stepflags *= "Nr-"
 
             elseif method == 2
                 # Gauss-Newton step 
+                @debug "        GN step"
                 x_dif = -(b'*b) \ (b'*r_cur) 
                 stepflags *= "Gn-"
 
             elseif method == 3
                 # Levenberg-Marquardt step
+                @debug "        LM step"
                 #    Calculate damping parameter ("delayed gratification")
                 if r_cur_2nm < r_old_2nm
                     lml /= 5.0
@@ -602,6 +608,7 @@ module solver
             # Backtracking linesearch 
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
             if linesearch && (step > 1)
+                @debug "        linesearch"
 
                 # Reset
                 stepflags *= "Ls-"
@@ -669,6 +676,7 @@ module solver
             end
 
             # Converged?
+            @debug "        check convergence"
             if (c_cur < conv_atol + conv_rtol * c_max) && !modulate_mlt
                 code = 0
                 break
