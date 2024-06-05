@@ -7,7 +7,7 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
 end 
 
 
-module saveload 
+module dump 
 
     import ..atmosphere
 
@@ -16,7 +16,6 @@ module saveload
     using LoggingExtras
     using Printf
     using Dates
-
 
     """
     Write Pressure-Temperature profile to a CSV file 
@@ -316,32 +315,5 @@ module saveload
         return nothing
     end # end write_ncdf
 
-    """
-    Load atmosphere data from NetCDF file (must have same number of levels)
-    """
-    function load_ncdf!(atmos::atmosphere.Atmos_t, fpath::String)
-
-        # Check file exists
-        if !isfile(fpath)
-            error("The file '$fpath' does not exist")
-        end 
-
-        # Open file 
-        fpath = abspath(fpath)
-        ds = Dataset(fpath,"r")
-
-        # Properties 
-        atmos.tmp_surf = ds["tmp_surf"][1]
-        atmos.tmp[:] =  ds["tmp"][:]
-        atmos.tmpl[:] = ds["tmpl"][:]
-        atmos.p[:] =    ds["p"][:]
-        atmos.pl[:] =   ds["pl"][:]
-
-        # Close file 
-        close(ds)
-
-        atmosphere.calc_layer_props!(atmos)
-        return nothing
-    end # end load_ncdf
 
 end 
