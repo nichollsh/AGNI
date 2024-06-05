@@ -112,6 +112,7 @@ module atmosphere
         gas_all_dict::Dict{String, Array}   # Layer mole fractions in dict format, (key,value) = (gas_name,array)
         gas_all_cond::Dict{String, Array}   # Layer condensation flags in dict format, (key,value) = (gas_name,array)
         condensates::Array{String, 1}       # List of condensing gases
+        single_component::Bool              # Does a single gas make up 100% of layer at any point in the column?
 
         # Gases (only those in spectralfile)
         gas_soc_num::Int 
@@ -300,10 +301,10 @@ module atmosphere
         end
 
         # Code versions 
-        cd(ROOT_DIR) do 
-            atmos.AGNI_VERSION = "0.4.0"
-        end 
+        atmos.AGNI_VERSION = "0.4.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
+        @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
+        @debug "SOCRATES VERSION = $(atmos.SOCRATES_VERSION)"
 
         atmos.num_rt_eval = 0
 
@@ -532,7 +533,6 @@ module atmosphere
                 end 
             end
         end 
-        
 
         # set condensation mask
         for g in atmos.gas_all_names 
@@ -557,6 +557,15 @@ module atmosphere
                 atmos.gas_all_dict[g][i] /= tot_vmr
             end 
         end
+
+        # Check if atmosphere is (in reality) composed of a single gas at 
+        #    any point, since this has implications for the condensation scheme
+        atmos.single_component = false
+        for i in 1:atmos.nlev_c 
+            for g in atmos.gas_all_names 
+                atmos.single_component = atmos.single_component || (atmos.gas_all_dict[g][i]>1.0-1.0e-10)
+            end 
+        end 
 
         # Fastchem 
         atmos.fastchem_flag = false 
@@ -625,8 +634,6 @@ module atmosphere
         if !atmos.is_param
             error("atmosphere parameters have not been set")
         end
-
-        @debug "Calculate layer properties"
 
         ok::Bool = true
 
@@ -761,6 +768,7 @@ module atmosphere
     """
     function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String; one_gas::String="")
 
+        @debug "Allocate atmosphere"
         if !atmos.is_param
             error("atmosphere parameters have not been set")
         end
