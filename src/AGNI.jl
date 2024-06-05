@@ -19,7 +19,7 @@ module AGNI
     include("spectrum.jl")
     include("atmosphere.jl")
     include("setpt.jl")
-    include("saveload.jl")
+    include("dump.jl")
     include("plotting.jl")
     include("energy.jl")
     include("solver.jl")
@@ -28,7 +28,7 @@ module AGNI
     import .phys
     import .atmosphere
     import .setpt
-    import .saveload
+    import .dump
     import .plotting 
     import .energy
     import .solver 
@@ -364,7 +364,7 @@ module AGNI
         @info prt_req[1:end-2]
 
         # Write initial state
-        saveload.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
+        dump.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
 
         # Do chemistry on initial composition
         if chem_type in [1,2,3]
@@ -430,9 +430,9 @@ module AGNI
 
         # Write arrays
         @info "Writing results"
-        saveload.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
-        saveload.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
-        saveload.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
+        dump.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
+        dump.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
+        dump.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
 
         # Save plots
         @info "Plotting results"

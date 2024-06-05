@@ -120,27 +120,40 @@ module solver
         wct_start::Float64 = time()
 
         # Plot paths 
-        path_plt::String = @sprintf("%s/solver.png", atmos.OUT_DIR)
+        path_plt::String = joinpath(atmos.OUT_DIR,"solver.png")
+        path_jac::String = joinpath(atmos.OUT_DIR,"jacobian.png")
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c 
         if (sol_type >= 2)  # states 2,3,4 also solve for tmp_surf
             arr_len += 1
         end
-
+        
+        # --------------------
         # Execution parameters
+        # --------------------
         modprint::Int =         1       # Print frequency
+        #    convection 
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
-        fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        ls_max_steps::Int  =    20      # Maximum linesearch steps 
-        ls_min_scale::Float64 = 0.01    # Lower bracket for linesearch 
-        plateau_n::Int =        6      # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    100.0   # Scale factor applied to x_dif when plateau_i > plateau_n
-        plateau_r::Float64 =    0.95    # Cost ratio for determining whether to in crement plateau_i
-        ls_tau::Float64   =     0.5     # linesearch shrink factor
 
+        #    finite difference 
+        fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
+        perturb_conv::Float64 = 0.01    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
+        perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
+
+        #    linesearch 
+        ls_max_steps::Int  =    12      # Maximum linesearch steps 
+        ls_tau::Float64   =     0.7     # linesearch shrink factor
+
+        #    plateau 
+        plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
+        plateau_s::Float64 =    100.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
+
+        # --------------------
         # Execution variables
+        # --------------------
         #     finite difference 
         rf1::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference  (+1 dx)
         rb1::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (-1 dx)
@@ -514,21 +527,17 @@ module solver
             end 
 
             # Determine which parts of the Jacobian matrix need to be updated
-            if (step == 1) || perturb_all || (c_cur*0.1 < conv_atol + conv_rtol * c_max)
+            if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max)
                 # Update whole matrix if:
                 #    on first step, was requested, or near global convergence
                 fill!(perturb, true)
             else 
-                # Skip updating levels where the residuals are small-ish, so
+                # Skip updating Jacobian where the residuals are small, so
                 #    that this column of J will be left with the last values
-                #    calculated by the finite-difference scheme. This is probs
-                #    okay as long as the jacobian is almost diagonal.
+                #    calculated by the finite-difference scheme. This is okay
+                #    as long as the jacobian is approx diagonally dominant.
                 for i in 3:arr_len-2
-                    if (maximum(abs.(r_cur[i-1:i+1])) < 1.0) #&& perturb[i]
-                        perturb[i] = false
-                    else 
-                        perturb[i] = true 
-                    end 
+                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || (atmos.mask_l[i] > 0)
                 end 
             end 
 
@@ -551,8 +560,6 @@ module solver
                 step_ok = false 
                 break
             end 
-
-            plotting.jacobian(b, "out/jacobian.png", perturb=perturb)
 
             # Model step 
             x_old[:] = x_cur[:]
@@ -602,15 +609,13 @@ module solver
                 # Full step 
                 ls_alpha = 1.0 
                 for li in 1:ls_max_steps
+                    if li > 1
+                        ls_alpha *= ls_tau
+                    end 
                     x_cur[:] .= x_old[:] .+ ls_alpha .* x_dif[:]
                     _fev!(x_cur,r_tst)
                     if _cost(r_tst) < c_cur 
                         break 
-                    end 
-                    ls_alpha *= ls_tau
-                    if ls_alpha < ls_min_scale
-                        ls_alpha = ls_min_scale
-                        break
                     end 
                 end 
 
@@ -650,6 +655,7 @@ module solver
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
                 plot_step()
+                plotting.jacobian(b, path_jac, perturb=perturb)
             end 
                 
             # Inform user
@@ -671,6 +677,7 @@ module solver
         end # end solver loop
         
         rm(path_plt, force=true)
+        rm(path_jac, force=true)
         
         # ----------------------------------------------------------
         # Extract solution

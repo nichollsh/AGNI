@@ -198,8 +198,8 @@ module energy
                 for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
 
-                    atmos.band_d_lw[lv,ba] = atmos.radout.flux_down[idx]
-                    atmos.band_u_lw[lv,ba] = atmos.radout.flux_up[idx]
+                    atmos.band_d_lw[lv,ba] = max(0.0, atmos.radout.flux_down[idx])
+                    atmos.band_u_lw[lv,ba] = max(0.0, atmos.radout.flux_up[idx])
                     atmos.band_n_lw[lv,ba] = atmos.band_u_lw[lv,ba] - atmos.band_d_lw[lv,ba]
 
                     atmos.flux_d_lw[lv] += max(0.0, atmos.radout.flux_down[idx])
@@ -231,8 +231,8 @@ module energy
                 for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
 
-                    atmos.band_d_sw[lv,ba] = atmos.radout.flux_down[idx]
-                    atmos.band_u_sw[lv,ba] = atmos.radout.flux_up[idx]
+                    atmos.band_d_sw[lv,ba] = max(0.0,atmos.radout.flux_down[idx])
+                    atmos.band_u_sw[lv,ba] = max(0.0,atmos.radout.flux_up[idx])
                     atmos.band_n_sw[lv,ba] = atmos.band_u_sw[lv,ba] - atmos.band_d_sw[lv,ba]
 
                     atmos.flux_d_sw[lv] += max(0.0, atmos.radout.flux_down[idx])

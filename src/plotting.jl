@@ -473,7 +473,7 @@ module plotting
         if nframes < 1
             @warn "Cannot animate solver because no output frames were found"
         else 
-            fps = nframes/duration*1.0
+            fps::Float64 = nframes/duration*1.0
             @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/animation.mp4`)
         end
 
@@ -487,21 +487,21 @@ module plotting
                             perturb::Array{Bool,1}=Bool[],
                             dpi::Int=200, size_x::Int=600, size_y::Int=500)
         
-        lim = maximum(abs.(b))
+        lim::Float64 = maximum(abs.(b))     # colourbar limits
+        l::Int = length(perturb)            # show perturbed levels?
 
         plt = plot(framestyle=:box, dpi=dpi, 
                     guidefontsize=9, size=(size_x, size_y),
                     title="∂r/∂x [W m⁻² K⁻¹]",
-                    clim=(-lim,lim), grid=false)
+                    clim=(-lim,lim), grid=false, yflip=true)
 
         # show jacobian 
         heatmap!(plt, b, color=:RdBu)
 
         # show perturbed levels 
-        l = length(perturb)
         if l > 0
-            scatter!(plt, zeros(Float64, l)[perturb], collect(1:l)[perturb], 
-                        color=:black,label="",markershape=:rtriangle)
+            scatter!(plt, collect(1:l)[perturb], ones(Float64, l)[perturb]*(l+1),
+                        color=:black,label="",markershape=:utriangle)
         end 
 
         xlabel!(plt, "Cell-centre index")
