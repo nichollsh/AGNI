@@ -12,6 +12,7 @@ module setpt
     import ..atmosphere
 
     using PCHIPInterpolation
+    using NCDatasets
 
     # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
@@ -109,6 +110,34 @@ module setpt
         atmosphere.calc_layer_props!(atmos)
         return nothing
     end
+
+    """
+    Load atmosphere data from NetCDF file (must have same number of levels)
+    """
+    function fromncdf!(atmos::atmosphere.Atmos_t, fpath::String)
+
+        # Check file exists
+        if !isfile(fpath)
+            error("The file '$fpath' does not exist")
+        end 
+
+        # Open file 
+        fpath = abspath(fpath)
+        ds = Dataset(fpath,"r")
+
+        # Properties 
+        atmos.tmp_surf = ds["tmp_surf"][1]
+        atmos.tmp[:] =  ds["tmp"][:]
+        atmos.tmpl[:] = ds["tmpl"][:]
+        atmos.p[:] =    ds["p"][:]
+        atmos.pl[:] =   ds["pl"][:]
+
+        # Close file 
+        close(ds)
+
+        atmosphere.calc_layer_props!(atmos)
+        return nothing
+    end # end load_ncdf
 
     # Set atmosphere to be isothermal at the given temperature
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
@@ -264,7 +293,11 @@ module setpt
     end
 
 
-    # Set atmosphere to phase curve of gas when it enters the condensible region (does not modify tmp_surf)
+    """
+    Set T = max(T,T_dew) for a specified gas.
+
+    Does not modify VMRs or surface temperature.
+    """
     function condensing!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
