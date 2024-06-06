@@ -25,7 +25,7 @@ Instead, we can model an atmosphere such that that energy is globally and locall
   <img src="assets/withsolve/plot_fluxes.png" width=60% class="center"/> 
 ```
 
-We can also plot the outgoing emission spectrum and normalised contribution function. The spectrum clearly demonstrates complex water absorption features, and exceeds blackbody emission at shorter wavelengths due to Rayleigh scattering. The normalised contribution function quantifies how much each pressure level contributes to the outgoing emission spectrum at a given wavelength -- this is then plotted versus wavelength and pressure. 
+We can also plot the outgoing emission spectrum and normalised longwave contribution function (CF). The spectrum clearly demonstrates complex water absorption features, and exceeds blackbody emission at shorter wavelengths due to Rayleigh scattering. The CF quantifies how much each pressure level contributes to the outgoing emission spectrum at a given wavelength -- this is then plotted versus wavelength and pressure. 
 
 ```@raw html
   <img src="assets/withsolve/plot_emission.png" width=90% class="center"/> 

@@ -13,6 +13,7 @@ title = "Equilibrium chemistry demo"                    # Name for this configur
     p_surf          = 270.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 0.6, CO2=0.1, N2=0.1, SO2=0.1, O2=0.05, Fe=0.05}     # Volatile volume mixing ratios
+    condensates     = []
     tmp_eff         = 0.0               # Effective temperature
 
 [files]
@@ -34,8 +35,8 @@ title = "Equilibrium chemistry demo"                    # Name for this configur
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
-    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
-    condensates     = []                        # List of volatiles which are allowed to condense.
+    latent_heat     = false                     
+    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory).
     chemistry       = 1                         # Chemistry type (see wiki)
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).

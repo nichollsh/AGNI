@@ -1,10 +1,9 @@
 # AGNI configuration file 
-# This is designed to test forced condensation
 title = "Condensation test"                    # Name for this configuration file
 
 [planet]
-    tmp_surf        = 1900.0            # Surface temperature [kelvin]
-    instellation    = 1000.0          # Stellar flux at planet's orbital distance [W m-2]
+    tmp_surf        = 1700.0            # Surface temperature [kelvin]
+    instellation    = 30.0          # Stellar flux at planet's orbital distance [W m-2]
     albedo_b        = 0.0              # Pseudo bond-albedo which removes downscales the stellar flux by 1-this_value
     s0_fact         = 0.375           # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
     zenith_angle    = 48.19             # Characteristic zenith angle for incoming stellar radiation [degrees]
@@ -13,8 +12,11 @@ title = "Condensation test"                    # Name for this configuration fil
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
     p_surf          = 800.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
-    vmr             = { H2O=0.7, CO2=0.2, H2=0.1 }     # Volatile volume mixing ratios
-    tmp_eff         = 0.0               # Effective temperature
+    vmr             = { H2O=0.1, CO2=0.9, CH4=0.09, H2=0.01}     # Volatile volume mixing ratios
+    condensates     = ["H2O","CO2"]
+    tmp_eff         = 4.0               # Effective temperature
+    turb_coeff      = 1.0e-4
+    wind_speed      = 10.0
 
 [files]
     clean_output    = true
@@ -26,23 +28,23 @@ title = "Condensation test"                    # Name for this configuration fil
     silent          = false                     # Disable all printing?
     max_steps       = 300                       # Maximum number of solver steps.
     max_runtime     = 200                       # Maximum wall-clock solver runtime [s].
-    num_levels      = 40                        # Number of model levels.
+    num_levels      = 30                        # Number of model levels.
     continua        = true                      # Include absorption from continua?
     rayleigh        = false                     # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = false                     # Accounting temperature dependence of thermodynamic properties?
-    sensible_heat   = false                     # Include sensible heat transport at the surface?
-    convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
-    condensates     = ["H2O"]                   # List of volatiles which are allowed to condense.
+    sensible_heat   = true                     # Include sensible heat transport at the surface?
+    latent_heat     = true                      # Include latent heat release?
+    convection_type = "mlt"                        # Convection type ("" = no convection, "mlt" = use mixing length theory).
     chemistry       = 0
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
-    dx_max          = 400.0                     # Maximum step size [Kelvin], when using nonlinear solvers
-    initial_state   = ["dry","str","1000"]            # Ordered list of requests describing the initial state of the atmosphere (see wiki).
-    linesearch      = true                     # Use linesearch?
-    converge_atol   = 0.1                    # Convergence criterion on absolute flux divergence [W m-2].
+    dx_max          = 500.0                     # Maximum step size [Kelvin], when using nonlinear solvers
+    initial_state   = ["iso","1000"]      # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    linesearch      = true                      # Use linesearch?
+    converge_atol   = 0.1                       # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-3                    # Convergence criterion on relative flux divergence [dimensionless].
 
 

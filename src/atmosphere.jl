@@ -1,5 +1,4 @@
-# Contains the atmosphere module, which contains all of the core code 
-# for setting-up the atmosphere and handling files.
+# Contains the atmosphere module
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
@@ -7,18 +6,14 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end 
 
-
 module atmosphere
 
     # System libraries
     using Printf
-    using NCDatasets
-    using DataStructures
     using DelimitedFiles
     using PCHIPInterpolation
     using LinearAlgebra
     using Statistics
-    using Dates
     using Logging
     
     # Local files
@@ -116,6 +111,8 @@ module atmosphere
         gas_all_names::Array{String,1}      # List of gas names
         gas_all_dict::Dict{String, Array}   # Layer mole fractions in dict format, (key,value) = (gas_name,array)
         gas_all_cond::Dict{String, Array}   # Layer condensation flags in dict format, (key,value) = (gas_name,array)
+        condensates::Array{String, 1}       # List of condensing gases
+        single_component::Bool              # Does a single gas make up 100% of layer at any point in the column?
 
         # Gases (only those in spectralfile)
         gas_soc_num::Int 
@@ -174,8 +171,8 @@ module atmosphere
         flux_cdct::Array{Float64,1} # Conductive flux [W m-2]
 
         # Cloud and condensation
-        flux_p::Array{Float64, 1}           # Condensation flux [W m-2]
-        mask_p::Array{Int,1}                # Layers which are (or were recently) condensing liquid
+        flux_l::Array{Float64, 1}           # Condensation flux [W m-2]
+        mask_l::Array{Int,1}                # Layers which are (or were recently) condensing
         #    These arrays give the cloud properties within layers containing cloud
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
         cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
@@ -243,7 +240,8 @@ module atmosphere
     - `p_surf::Float64`                 total surface pressure [bar].    
     - `p_top::Float64`                  total top of atmosphere pressure [bar].    
     - `mf_dict=nothing`                 dictionary of mole fractions in the format (key,value)=(gas,mf).    
-    - `mf_path=nothing`                 path to file containing mole fractions at each level.    
+    - `mf_path=nothing`                 path to file containing mole fractions at each level. 
+    - `condensates::Array{String,1}`    list of condensates (names)
 
     Optional arguments:
     - `albedo_s::Float64`               surface albedo.   
@@ -277,6 +275,7 @@ module atmosphere
                     nlev_centre::Int, p_surf::Float64, p_top::Float64;
                     mf_dict=                    nothing,
                     mf_path =                   nothing,
+                    condensates::Array{String,1} = String[],
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        80.0,
                     C_d::Float64 =              0.001,
@@ -302,10 +301,10 @@ module atmosphere
         end
 
         # Code versions 
-        cd(ROOT_DIR) do 
-            atmos.AGNI_VERSION = "0.3.0"
-        end 
+        atmos.AGNI_VERSION = "0.4.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
+        @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
+        @debug "SOCRATES VERSION = $(atmos.SOCRATES_VERSION)"
 
         atmos.num_rt_eval = 0
 
@@ -331,8 +330,8 @@ module atmosphere
         atmos.tmp_ceiling =     2.0e4
 
         if nlev_centre < 25 
-            @warn "Adjusted number of levels to 25"
             nlev_centre = 25
+            @warn "Adjusted number of levels to $nlev_centre"
         end 
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
@@ -374,9 +373,6 @@ module atmosphere
         atmos.control.l_cloud =         flag_cloud
         atmos.control.l_drop =          flag_cloud
         atmos.control.l_ice  =          false
-
-        # store contribution function?
-        # atmos.control.l_contrib_func_band = false
 
         # Initialise temperature grid to be isothermal
         atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tmp_surf
@@ -425,6 +421,7 @@ module atmosphere
         atmos.gas_all_dict  = Dict{String, Array}()         # dict of VMR arrays (Float)
         atmos.gas_all_cond  = Dict{String, Array}()         # dict of condensing arrays (Bool) 
         atmos.gas_all_num   = 0                             # number of gases 
+        atmos.condensates   = Array{String}(undef, 0)       # list of condensates (String)
 
         # Dict input case
         if mf_source == 0
@@ -515,6 +512,28 @@ module atmosphere
 
         end # end read VMR from file 
 
+        # store condensates 
+        for c in condensates
+            push!(atmos.condensates, c)
+        end 
+
+        # Cannot have n_gas==n_cond AND n_cond>1, because it will overspecify
+        #   the total pressure within condensing regions
+        if (length(atmos.condensates) == atmos.gas_soc_num) && (length(atmos.condensates)>1)
+            error("There must be at least one non-condensible gas")
+            return 
+        end 
+
+        # Validate condensate names 
+        if length(condensates) > 0
+            for c in condensates
+                if !(c in atmos.gas_all_names)
+                    @error "Invalid condensate '$c'"
+                    return false
+                end 
+            end
+        end 
+
         # set condensation mask
         for g in atmos.gas_all_names 
             atmos.gas_all_cond[g] = falses(atmos.nlev_c)
@@ -538,6 +557,15 @@ module atmosphere
                 atmos.gas_all_dict[g][i] /= tot_vmr
             end 
         end
+
+        # Check if atmosphere is (in reality) composed of a single gas at 
+        #    any point, since this has implications for the condensation scheme
+        atmos.single_component = false
+        for i in 1:atmos.nlev_c 
+            for g in atmos.gas_all_names 
+                atmos.single_component = atmos.single_component || (atmos.gas_all_dict[g][i]>1.0-1.0e-10)
+            end 
+        end 
 
         # Fastchem 
         atmos.fastchem_flag = false 
@@ -606,8 +634,6 @@ module atmosphere
         if !atmos.is_param
             error("atmosphere parameters have not been set")
         end
-
-        @debug "Calculate layer properties"
 
         ok::Bool = true
 
@@ -742,6 +768,7 @@ module atmosphere
     """
     function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String; one_gas::String="")
 
+        @debug "Allocate atmosphere"
         if !atmos.is_param
             error("atmosphere parameters have not been set")
         end
@@ -1100,9 +1127,9 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
-        atmos.mask_p =            zeros(Int, atmos.nlev_c)
+        atmos.mask_l =            zeros(Int, atmos.nlev_c)
         atmos.mask_c =            zeros(Int, atmos.nlev_c)
-        atmos.flux_p =            zeros(Float64, atmos.nlev_l)  # Phase change (latent heat)
+        atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat
         atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection 
         atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction 
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
@@ -1299,9 +1326,8 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    - `condensates::Array`      list of condensible gases (strings)
     """
-    function handle_saturation!(atmos::atmosphere.Atmos_t, condensates::Array)
+    function handle_saturation!(atmos::atmosphere.Atmos_t)
 
         # Work arrays 
         maxvmr::Dict = Dict{String, Float64}()
@@ -1312,7 +1338,7 @@ module atmosphere
         x_tot::Float64 = 0.0
 
         # Set maximum value (for cold trapping)
-        for c in condensates 
+        for c in atmos.condensates 
             maxvmr[c] = atmos.gas_all_dict[c][end]
         end 
 
@@ -1329,7 +1355,7 @@ module atmosphere
             x_con = 0.0
 
             # For each condensate 
-            for c in condensates
+            for c in atmos.condensates
 
                 # check criticality 
                 if atmos.tmp[i] < phys.lookup_safe("t_crit",c)
@@ -1491,6 +1517,9 @@ module atmosphere
             atmos.tmpl[1] = 0.9 * atmos.tmpl[1] + 0.1 * top_old_e
         end
 
+        # Clamp
+        clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
+
         # Second interpolation back to cell-centres.
         # This can help prevent grid-imprinting issues, but in some cases it can 
         # lead to unphysical behaviour, because it gives the interpolator too 
@@ -1527,297 +1556,6 @@ module atmosphere
         arr_P[end] = atmos.pl[end]
         
         return arr_P, arr_T
-    end 
-
-    # Write current interleaved pressure/temperature grid to a CSV file
-    function write_pt(atmos::atmosphere.Atmos_t, fname::String)
-
-        arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
-
-        # Remove old file if exists
-        rm(fname, force=true)
-
-        open(fname, "w") do f
-            write(f, "# pressure  , temperature \n")
-            write(f, "# [Pa]      , [K] \n")
-            for i in 1:atmos.nlev_l+atmos.nlev_c
-                @printf(f, "%1.5e , %1.5e \n", arr_P[i], arr_T[i])
-            end
-        end
-        return nothing
-    end
-
-    # Write current cell-edge fluxes to a CSV file
-    function write_fluxes(atmos::atmosphere.Atmos_t, fname::String)
-
-        # Remove old file if exists
-        rm(fname, force=true)
-
-        open(fname, "w") do f
-            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , cnvct       , phase       , tot      \n")
-            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
-            for i in 1:atmos.nlev_l
-                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
-                          atmos.pl[i], 
-                          atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
-                          atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
-                          atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
-                          atmos.flux_cdry[i], atmos.flux_p[i],    atmos.flux_tot[i]
-                          )
-            end
-        end
-        return nothing
-    end
-
-    # Write atmosphere data to a NetCDF file
-    function write_ncdf(atmos::atmosphere.Atmos_t, fname::String)
-
-        # See the tutorial at:
-        # https://github.com/Alexander-Barth/NCDatasets.jl#create-a-netcdf-file
-
-        # Note that the content of the NetCDF file is designed to be compatible
-        # with what JANUS writes. As a result, they can both be integrated 
-        # into PROTEUS without compatibility issues.
-
-        # Create dataset handle
-        fname = abspath(fname)
-        rm(fname, force=true)
-        ds = Dataset(fname,"c")
-
-        # Global attributes
-        ds.attrib["description"]        = "AGNI atmosphere data"
-        ds.attrib["date"]               = Dates.format(now(), "yyyy-u-dd HH:MM:SS")
-        ds.attrib["hostname"]           = gethostname()
-        ds.attrib["username"]           = ENV["USER"]
-        ds.attrib["AGNI_version"]      = atmos.AGNI_VERSION
-        ds.attrib["SOCRATES_version"]  = atmos.SOCRATES_VERSION
-
-
-        plat::String = "Generic"
-        if Sys.isapple()
-            plat = "Darwin"
-        elseif Sys.iswindows()
-            plat = "Windows"
-        elseif Sys.islinux()
-            plat = "Linux"
-        end
-        ds.attrib["platform"] = plat
-        
-        # ----------------------
-        # Create dimensions
-        nlev_c = Int(atmos.nlev_c)
-        nlev_l = nlev_c + 1
-        ngases = atmos.gas_all_num
-        nchars = 16
-
-        defDim(ds, "nlev_c", nlev_c)        # Cell centres
-        defDim(ds, "nlev_l", nlev_l)        # Cell edges
-        defDim(ds, "ngases", ngases)        # Gases
-        defDim(ds, "nchars", nchars)        # Length of string containing gas names
-        defDim(ds, "nbands", atmos.nbands)  # Number of spectral bands
-
-        # ----------------------
-        # Scalar quantities  
-        #    Create variables
-        var_tmp_surf =  defVar(ds, "tmp_surf",      Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
-        var_tmp_eff =   defVar(ds, "tmp_eff",       Float64, (), attrib = OrderedDict("units" => "K"))      # Effective temperature [K]
-        var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
-        var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
-        var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
-        var_toah =      defVar(ds, "toa_heating",   Float64, (), attrib = OrderedDict("units" => "W m-2"))  # TOA SW BC
-        var_tmagma =    defVar(ds, "tmagma",        Float64, (), attrib = OrderedDict("units" => "K"))      # Magma temperature
-        var_tmin =      defVar(ds, "tfloor",        Float64, (), attrib = OrderedDict("units" => "K"))      # Minimum temperature
-        var_tmax =      defVar(ds, "tceiling",      Float64, (), attrib = OrderedDict("units" => "K"))      # Maximum temperature
-        var_plrad =     defVar(ds, "planet_radius", Float64, (), attrib = OrderedDict("units" => "m"))      # Value taken for planet radius
-        var_gsurf =     defVar(ds, "surf_gravity",  Float64, (), attrib = OrderedDict("units" => "m s-2"))  # Surface gravity
-        var_albsurf =   defVar(ds, "surf_albedo",   Float64, ())                                            # Surface albedo
-        var_fray =      defVar(ds, "flag_rayleigh", Char, ())                                               # Includes rayleigh scattering?
-        var_fcon =      defVar(ds, "flag_continuum",Char, ())                                               # Includes continuum absorption?
-        var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())                                               # Includes clouds?
-        var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())                                               # Using temperature-dependent thermodynamic functions
-        var_ssol =      defVar(ds, "solved"        ,Char, ())                                               # Has a solver been used?
-        var_scon =      defVar(ds, "converged"     ,Char, ())                                               # Did the solver converge?
-        var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg"))    # Zenith angle of direct stellar radiation
-        var_sknd =      defVar(ds, "cond_skin_d"   ,Float64, (), attrib = OrderedDict("units" => "m"))      # Conductive skin thickness
-        var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1"))    # Conductive skin thermal conductivity
-        var_specfile =  defVar(ds, "specfile"      ,String, ())     # Path to spectral file when read
-        var_starfile =  defVar(ds, "starfile"      ,String, ())     # Path to star file when read
-
-        #     Store data
-        var_tmp_surf[1] =   atmos.tmp_surf 
-        var_tmp_eff[1] =    atmos.tmp_eff 
-        var_inst[1] =       atmos.instellation
-        var_s0fact[1] =     atmos.s0_fact
-        var_albbond[1] =    atmos.albedo_b
-        var_znth[1] =       atmos.zenith_degrees
-        var_toah[1] =       atmos.toa_heating
-        var_tmagma[1] =     atmos.tmp_magma
-        var_tmin[1] =       atmos.tmp_floor
-        var_tmax[1] =       atmos.tmp_ceiling
-        var_plrad[1]  =     atmos.rp
-        var_gsurf[1] =      atmos.grav_surf
-        var_albsurf[1] =    atmos.albedo_s
-
-        if atmos.control.l_rayleigh
-            var_fray[1] = 'y'
-        else
-            var_fray[1] = 'n'
-        end 
-
-        if atmos.control.l_cont_gen
-            var_fcon[1] = 'y'
-        else
-            var_fcon[1] = 'n'
-        end 
-
-        if atmos.control.l_cloud
-            var_fcld[1] = 'y'
-        else
-            var_fcld[1] = 'n'
-        end 
-
-        if atmos.thermo_funct
-            var_tfun[1] = 'y'
-        else
-            var_tfun[1] = 'n'
-        end 
-
-        if atmos.is_solved
-            var_ssol[1] = 'y'
-        else 
-            var_ssol[1] = 'n'
-        end
-
-        if atmos.is_converged
-            var_scon[1] = 'y'
-        else 
-            var_scon[1] = 'n'
-        end
-
-        var_sknd[1] = atmos.skin_d
-        var_sknk[1] = atmos.skin_k
-
-        var_specfile[1] = atmos.spectral_file
-        var_starfile[1] = atmos.star_file
-
-        # ----------------------
-        # Vector quantities
-        #    Create variables
-        var_p =         defVar(ds, "p",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "Pa"))
-        var_pl =        defVar(ds, "pl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "Pa"))
-        var_tmp =       defVar(ds, "tmp",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "K"))
-        var_tmpl =      defVar(ds, "tmpl",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "K"))
-        var_z =         defVar(ds, "z",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
-        var_zl =        defVar(ds, "zl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
-        var_thick =     defVar(ds, "dz",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
-        var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
-        var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "J K-1 kg-1"))
-        var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
-        var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf JANUS because of how Julia stores arrays
-        var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c")) # ^^
-        var_cldf  =     defVar(ds, "cloud_frac",Float64, ("nlev_c",))
-        var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fds =       defVar(ds, "fl_D_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fus =       defVar(ds, "fl_U_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fns =       defVar(ds, "fl_N_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fd =        defVar(ds , "fl_D",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fu =        defVar(ds, "fl_U",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fn =        defVar(ds, "fl_N",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fcd =       defVar(ds, "fl_cnvct",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fcc =       defVar(ds, "fl_cndct",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fph =       defVar(ds, "fl_phase",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_ft =        defVar(ds, "fl_tot",    Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-        var_fdiff =     defVar(ds, "fl_dif",    Float64, ("nlev_c",), attrib = OrderedDict("units" => "W m-2"))
-        var_hr =        defVar(ds, "hrate",     Float64, ("nlev_c",), attrib = OrderedDict("units" => "K day-1"))
-        var_kzz =       defVar(ds, "Kzz",       Float64, ("nlev_l",), attrib = OrderedDict("units" => "m2 s-1"))
-        var_bmin =      defVar(ds, "bandmin",   Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
-        var_bmax =      defVar(ds, "bandmax",   Float64, ("nbands",), attrib = OrderedDict("units" => "m"))
-        var_bdl =       defVar(ds, "ba_D_LW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bul =       defVar(ds, "ba_U_LW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bnl =       defVar(ds, "ba_N_LW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bds =       defVar(ds, "ba_D_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bus =       defVar(ds, "ba_U_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
-        var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c"))
-
-        #     Store data
-        var_p[:] =      atmos.p
-        var_pl[:] =     atmos.pl
-        var_tmp[:] =    atmos.tmp
-        var_tmpl[:] =   atmos.tmpl
-        var_z[:]    =   atmos.z
-        var_zl[:]   =   atmos.zl
-        var_mmw[:]  =   atmos.layer_mmw
-        var_cp[:]  =    atmos.layer_cp
-        var_grav[:]  =  atmos.layer_grav
-        var_thick[:]  = atmos.layer_thick
-
-        # Composition
-        for (i_gas,gas) in enumerate(atmos.gas_all_names)
-            # Fill gas names
-            for i_char in 1:nchars 
-                var_gases[i_char, i_gas] = ' '
-            end 
-            for i_char in 1:length(atmos.gas_all_names[i_gas])
-                var_gases[i_char,i_gas] = atmos.gas_all_names[i_gas][i_char]
-            end 
-
-            # Fill VMR
-            for i_lvl in 1:nlev_c
-                var_x[i_gas, i_lvl] = atmos.gas_all_dict[gas][i_lvl]
-            end 
-        end 
-        
-        var_cldf[:] =   atmos.cloud_arr_f
-
-        var_fdl[:] =    atmos.flux_d_lw
-        var_ful[:] =    atmos.flux_u_lw
-        var_fnl[:] =    atmos.flux_n_lw
-
-        var_fds[:] =    atmos.flux_d_sw
-        var_fus[:] =    atmos.flux_u_sw
-        var_fns[:] =    atmos.flux_n_sw
-        
-        var_fd[:] =     atmos.flux_d
-        var_fu[:] =     atmos.flux_u
-        var_fn[:] =     atmos.flux_n
-
-        var_fcd[:] =    atmos.flux_cdry
-        var_fcc[:] =    atmos.flux_cdct
-        var_fph[:] =    atmos.flux_p
-
-        var_ft[:] =     atmos.flux_tot
-        var_hr[:] =     atmos.heating_rate
-        var_fdiff[:] =  atmos.flux_dif
-
-        var_kzz[:] =    atmos.Kzz
-
-        var_bmin[:] =   atmos.bands_min
-        var_bmax[:] =   atmos.bands_max
-
-        for lv in 1:atmos.nlev_l 
-            for ba in 1:atmos.nbands
-                var_bul[ba, lv] = atmos.band_u_lw[lv, ba]
-                var_bdl[ba, lv] = atmos.band_d_lw[lv, ba]
-                var_bnl[ba, lv] = atmos.band_n_lw[lv, ba]
-                var_bus[ba, lv] = atmos.band_u_sw[lv, ba]
-                var_bds[ba, lv] = atmos.band_d_sw[lv, ba]
-                var_bns[ba, lv] = atmos.band_n_sw[lv, ba]
-            end 
-        end 
-
-        for lc in 1:atmos.nlev_c
-            for ba in 1:atmos.nbands
-                var_cfn[ba, lc] = atmos.contfunc_norm[lc, ba]
-            end 
-        end 
-
-        # ----------------------
-        # Close
-        close(ds)
-        return nothing
     end 
 
 end

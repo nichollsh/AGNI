@@ -14,11 +14,12 @@ title = "Cloud test"                    # Name for this configuration file
     p_surf          = 800.0             # Total surface pressure [bar]
     p_top           = 1e-6              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
+    condensates     = ["H2O"]
     tmp_eff         = 0.0               # Effective temperature
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/Oak/Oak.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
     output_dir      = "out/"                                            # Path to output directory.
 
@@ -34,8 +35,8 @@ title = "Cloud test"                    # Name for this configuration file
     overlap_method  = 4                         # Method for treating line overlap.
     thermo_funct    = true                     # Accounting temperature dependence of thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
-    convection_type = ""                     # Convection type ("" = no convection, "mlt" = use mixing length theory, "adj" = use convective adjustment).
-    condensates     = []                   # List of volatiles which are allowed to condense.
+    latent_heat     = false 
+    convection_type = ""                     # Convection type ("" = no convection, "mlt" = use mixing length theory).
     chemistry       = 0
     solution_type   = 1                         # Solution type (see wiki).
     solvers         = []                # Ordered list of solvers to apply (see wiki).

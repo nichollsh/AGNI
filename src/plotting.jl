@@ -38,7 +38,7 @@ module plotting
                             dpi::Int=250,
                             size_x::Int=500, size_y::Int=400,
                             incl_magma::Bool=false, 
-                            condensates::Array=[], title::String="")
+                            title::String="")
         
         # Interleave cell-centre and cell-edge arrays
         arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
@@ -51,10 +51,10 @@ module plotting
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(size_x,size_y), guidefontsize=9, titlefontsize=9)
 
         # Plot condensation curves 
-        if length(condensates) > 0
+        if length(atmos.condensates) > 0
             sat_t = zeros(Float64, atmos.nlev_l)
             crt_i = atmos.nlev_l  # index at which criticality occurs
-            for c in condensates
+            for c in atmos.condensates
                 # for each level...
                 for i in 1:atmos.nlev_l
                     # set point  
@@ -126,11 +126,11 @@ module plotting
             plot!(x_arr, arr_P, label=phys.pretty_name(gas), lw=2.5, linealpha=0.7, color=phys.pretty_color(gas))
         end
 
-        xlims  = (max(xmin, -12), 0.1)
+        xlims  = (max(xmin-0.1, -12), 0.1)
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties
-        xlabel!(plt, "log10(Mole fraction)")
+        xlabel!(plt, "log(Mole fraction)")
         xaxis!(plt, xlims=xlims, xticks=xticks)
 
         ylabel!(plt, "Pressure [bar]")
@@ -149,7 +149,7 @@ module plotting
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250, 
                             size_x::Int=550, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true, 
-                            incl_cdct::Bool=true, incl_phase::Bool=true,
+                            incl_cdct::Bool=true, incl_latent::Bool=true,
                             title::String=""
                         )
 
@@ -219,13 +219,13 @@ module plotting
         end 
 
         # Condensation 
-        if incl_phase
-            plot!(plt, _symlog.(atmos.flux_p), arr_P, label="Phase", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+        if incl_latent
+            plot!(plt, _symlog.(atmos.flux_l), arr_P, label="Latent", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
         end
 
         # Sensible heat
         if atmos.flux_sens != 0.0
-            scatter!(plt, [_symlog(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_r, label="Sens.")
+            scatter!(plt, [_symlog(atmos.flux_sens)], [arr_P[end]], markershape=:utriangle, markercolor=col_r, label="Sensible")
         end
 
         # Total flux
@@ -236,7 +236,7 @@ module plotting
             if atmos.mask_c[i] > 0
                 scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_c, label="")
             end 
-            if atmos.mask_p[i] > 0
+            if atmos.mask_l[i] > 0
                 scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_p, label="")
             end 
         end
@@ -246,7 +246,7 @@ module plotting
         annotate!(plt, xlims[2]/2.0, arr_P[end], text("Upward"  , :black, :center, 9))
 
         # Finalise + save
-        xlabel!(plt, "log Unsigned flux [W m-2]")
+        xlabel!(plt, "log Unsigned flux [W m⁻²]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
@@ -441,6 +441,22 @@ module plotting
             savefig(plt, fname)
         end
         return plt 
+    end
+
+    """ 
+    Combined plot 
+    """
+    function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String; dpi::Int=180, size_x::Int=800, size_y::Int=650)
+
+        plt_info = plot(legend=false, showaxis=false, grid=false)
+        annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
+
+        plt = plot(plt_pt, plt_fl, plt_mr, plt_info, dpi=dpi, layout=(2,2), size=(size_x, size_y))
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
     end 
 
     """
@@ -450,37 +466,53 @@ module plotting
 
         # Find output files
         out::String = atmos.OUT_DIR
-        frames = glob("frames/*_prf.png",out)
+        frames = glob("frames/*.png",out)
         nframes::Int = length(frames)
-
-        # Animating fluxes?
-        frames2 = glob("frames/*_flx.png",out)
-        fluxes::Bool = length(frames2) > 0
 
         # Create animation
         if nframes < 1
             @warn "Cannot animate solver because no output frames were found"
         else 
-            fps = nframes/duration*1.0
-            # animate profile 
-            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_prf.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_prf.mp4`)
-
-            # animate fluxes 
-            if fluxes
-                @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*_flx.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/frames/ani_flx.mp4`)
-            end
-
-            # combine videos 
-            if fluxes 
-                @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -i $out/frames/ani_prf.mp4 -i $out/frames/ani_flx.mp4 -filter_complex "hstack,format=yuv420p" -c:v libx264 -crf 18 -y $out/anim.mp4`)
-            else 
-                cp("$out/frames/ani_prf.mp4", "$out/anim.mp4")
-            end 
+            fps::Float64 = nframes/duration*1.0
+            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/animation.mp4`)
         end
 
         return nothing
     end
 
+    """
+    Plot jacobian matrix 
+    """
+    function jacobian(b::Array{Float64,2}, fname::String; 
+                            perturb::Array{Bool,1}=Bool[],
+                            dpi::Int=200, size_x::Int=600, size_y::Int=500)
+        
+        lim::Float64 = maximum(abs.(b))     # colourbar limits
+        l::Int = length(perturb)            # show perturbed levels?
+
+        plt = plot(framestyle=:box, dpi=dpi, 
+                    guidefontsize=9, size=(size_x, size_y),
+                    title="∂r/∂x [W m⁻² K⁻¹]",
+                    clim=(-lim,lim), grid=false, yflip=true)
+
+        # show jacobian 
+        heatmap!(plt, b, color=:RdBu)
+
+        # show perturbed levels 
+        if l > 0
+            scatter!(plt, collect(1:l)[perturb], ones(Float64, l)[perturb]*(l+1),
+                        color=:black,label="",markershape=:utriangle)
+        end 
+
+        xlabel!(plt, "Cell-centre index")
+        ylabel!(plt, "Cell-centre index")
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+
+        return plt 
+    end 
 
 end # end module plotting
 

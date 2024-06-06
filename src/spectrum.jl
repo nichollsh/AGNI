@@ -51,7 +51,7 @@ module spectrum
     - `star_file::String`   Path to output file
     - `nbins_max::Int`      Maximum number of points in the spectrum
     """
-    function write_to_socrates_format(wl::Array, fl::Array, star_file::String, nbins_max::Int=99900)
+    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1}, star_file::String, nbins_max::Int=99900)
 
         len_wl::Int = length(wl)
         len_fl::Int = length(fl)
