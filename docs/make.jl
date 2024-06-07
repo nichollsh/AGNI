@@ -14,7 +14,7 @@ makedocs(
     format=format,
     pages = [
         "Home" => "index.md",
-        "model.md",
+        "model/index.md",
         "setup.md" ,
         "usage.md",
         "examples/index.md",

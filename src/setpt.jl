@@ -170,6 +170,8 @@ module setpt
             error("Atmosphere is not setup or allocated")
         end 
 
+        atmosphere.calc_layer_props!(atmos)
+
         # Calculate cell-centre values
         for idx in 1:atmos.nlev_c
             cp = atmos.layer_cp[idx] * atmos.layer_mmw[idx]

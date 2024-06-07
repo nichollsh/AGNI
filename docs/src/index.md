@@ -9,5 +9,6 @@ BSD 3-Clause Clear License once published in a journal.
 Follow [Getting started](@ref) for information on installing the code and 
 obtaining results.
 
-Pronounced: _ag-nee_. Named after the fire deity of Hinduism.
+Contact: `harrison.nicholls [a] physics.ox.ac.uk`
 
+Pronounced: _ag-nee_. Named after the fire deity of Hinduism.
