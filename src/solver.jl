@@ -139,16 +139,16 @@ module solver
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        perturb_conv::Float64 = 0.01    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
-        perturb_crit::Float64 = 0.5     # Require Jacobian update at level i when r_i>perturb_crit
+        perturb_conv::Float64 = 0.03    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
+        perturb_crit::Float64 = 0.7     # Require Jacobian update at level i when r_i>perturb_crit
 
         #    linesearch 
-        ls_max_steps::Int  =    12      # Maximum linesearch steps 
-        ls_tau::Float64   =     0.7     # linesearch shrink factor
+        ls_max_steps::Int  =    13      # maximum steps 
+        ls_min_scale::Float64 = 1.0e-4  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    100.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =    400.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -213,9 +213,10 @@ module solver
                 # For state=1, tmpl[end] is held constant
 
                 # Extrapolate (log-linear)
-                grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
-                grad_dp = log(atmos.p[end]/atmos.p[end-1])
-                atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
+                # grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
+                # grad_dp = log(atmos.p[end]/atmos.p[end-1])
+                # atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
+                atmos.tmpl[end] = atmos.tmp[end]
 
                 if (sol_type >= 2)  # states 2,3,4
                     atmos.tmp_surf = _x[end]  # Surface brightness temperature
@@ -605,7 +606,7 @@ module solver
             # Limit step size, without changing direction of dx vector
             x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
-            # Backtracking linesearch 
+            # Linesearch 
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
             if linesearch && (step > 1)
                 @debug "        linesearch"
@@ -613,20 +614,17 @@ module solver
                 # Reset
                 stepflags *= "Ls-"
 
-                # Full step 
-                ls_alpha = 1.0 
-                for li in 1:ls_max_steps
-                    if li > 1
-                        ls_alpha *= ls_tau
-                    end 
-                    x_cur[:] .= x_old[:] .+ ls_alpha .* x_dif[:]
+                # Internal function minimised by GS search
+                function _ls_func(scale::Float64)::Float64
+                    x_cur[:] .= x_old[:] .+ scale .* x_dif[:]
                     _fev!(x_cur,r_tst)
-                    if _cost(r_tst) < c_cur 
-                        break 
-                    end 
+                    return _cost(r_tst)
                 end 
 
-                # apply best linesearch scale 
+                # Use golden-section minimisation to find best scale
+                ls_alpha = gs_search(_ls_func, ls_min_scale, 1.0, ls_min_scale, ls_max_steps)
+
+                # Apply best scale from linesearch
                 x_dif[:] .*= ls_alpha
 
             end # end linesearch 

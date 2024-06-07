@@ -329,7 +329,7 @@ module energy
             end
 
             # Skip condensing regions
-            # if (i <= atmos.nlev_c) && (atmos.mask_l[i] == atmos.mask_decay)
+            # if (atmos.mask_l[i] > 0)
             #     continue
             # end 
 
@@ -457,7 +457,7 @@ module energy
         end 
 
         # Work variables
-        a::Float64 = 1.0e-1
+        a::Float64 = 1.0 
         pp::Float64 = 0.0
         Psat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
@@ -521,7 +521,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 1000.0      # seconds
+        timescale::Float64 = 1e5      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -637,6 +637,9 @@ module energy
         # Assuming zero condensation at surface, integrating upwards
         for i in range(start=atmos.nlev_l-2, stop=1, step=-1)
             atmos.flux_l[i] = dfdp[i] * (atmos.pl[i]-atmos.pl[i+1]) + atmos.flux_l[i+1]
+            if abs(atmos.flux_l[i]) > 0.0
+                atmos.mask_l[i] = atmos.mask_decay
+            end 
         end 
 
         return nothing 

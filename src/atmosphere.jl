@@ -733,9 +733,9 @@ module atmosphere
     """
     **Generate pressure grid.**
 
-    Equally log-spaced between p_boa and p_boa. The bottom-most cell is set with 
-    a bespoke of p_boa*(1-boundary_scale), which ensures that it is sufficiently thin
-    to avoid numerical instabilities. 
+    Equally log-spaced between p_boa and p_boa. The topmost and bottommost layers 
+    have bespoke relative thicknesses of 1±boundary_scale, in order to avoid 
+    numerical instabilities.
     
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
@@ -1498,12 +1498,9 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `limit_change::Bool=false`        limit change relative to old value
     - `back_interp::Bool=false`         interpolate resultant tmpl back to tmp (should be avoided)
     """
-    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t; limit_change::Bool=false, back_interp::Bool=false)
-
-        top_old_e::Float64 = atmos.tmpl[1]
+    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t; back_interp::Bool=false)
 
         # Interpolate temperature to bulk cell-edge values (log-linear)
         itp = Interpolator(log.(atmos.p), atmos.tmp)
@@ -1513,9 +1510,6 @@ module atmosphere
         grad_dt = atmos.tmp[1] - atmos.tmp[2]
         grad_dp = log(atmos.p[1]/atmos.p[2])
         atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log(atmos.pl[1]/atmos.p[1])
-        if limit_change
-            atmos.tmpl[1] = 0.9 * atmos.tmpl[1] + 0.1 * top_old_e
-        end
 
         # Clamp
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
