@@ -26,7 +26,6 @@ module atmosphere
     # Solution types
     SOL_TYPES::Array{String, 1} = [
         "steadystate_ext",  # zero divergence at fixed tmp_surf, extrapolated tmpl[end]
-        "steadystate_cst",  # zero divergence at fixed tmp_surf, constant tmpl[end]
         "cond_skin",        # set tmp_surf such that conductive skin conserves energy flux
         "flux_eff",         # total flux at each level equal to flux_eff
         "target_olr",       # OLR is equal to target_olr
@@ -1494,7 +1493,7 @@ module atmosphere
     **Set cell-edge temperatures from cell-centre values.**
 
     Uses interpolation within the bulk of the column and extrapolation for the 
-    topmost edge. Does not set the bottommost edge.
+    topmost edge. 
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
@@ -1507,9 +1506,14 @@ module atmosphere
         atmos.tmpl[2:end-1] .= itp.(log.(atmos.pl[2:end-1]))
 
         # Extrapolate top edge temperature (log-linear)
-        grad_dt = atmos.tmp[1] - atmos.tmp[2]
-        grad_dp = log(atmos.p[1]/atmos.p[2])
+        grad_dt::Float64 = atmos.tmp[1] - atmos.tmp[2]
+        grad_dp::Float64 = log(atmos.p[1]/atmos.p[2])
         atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log(atmos.pl[1]/atmos.p[1])
+
+        # Extrapolate bottom edge (log-linear)
+        grad_dt = atmos.tmp[end]-atmos.tmpl[end-1]
+        grad_dp = log(atmos.p[end]/atmos.pl[end-1])
+        atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
 
         # Clamp
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)

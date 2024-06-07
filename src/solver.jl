@@ -71,7 +71,7 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `sol_type::Int`                   solution type, 0: free | 1: fixed | 2: skin | 3: tmp_eff | 4: tgt_olr
+    - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: tmp_eff | 4: tgt_olr
     - `chem_type::Int`                  chemistry type (see wiki)
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating 
@@ -111,7 +111,7 @@ module solver
                             )::Bool
 
         # Validate sol_type
-        if (sol_type < 0) || (sol_type > 4)
+        if (sol_type < 1) || (sol_type > 4)
             @error "Invalid solution type ($sol_type)"
             return false
         end
@@ -205,23 +205,12 @@ module solver
                 atmos.tmp[i] = _x[i]
             end
 
-            # Interpolate temperature to cell-edge values (not incl. bottommost value)
+            # Interpolate temperature to cell-edge values
             atmosphere.set_tmpl_from_tmp!(atmos)
 
-            # Set bottom edge temperature 
-            if (sol_type != 1) 
-                # For state=1, tmpl[end] is held constant
-
-                # Extrapolate (log-linear)
-                # grad_dt = atmos.tmp[end]-atmos.tmp[end-1]
-                # grad_dp = log(atmos.p[end]/atmos.p[end-1])
-                # atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
-                atmos.tmpl[end] = atmos.tmp[end]
-
-                if (sol_type >= 2)  # states 2,3,4
-                    atmos.tmp_surf = _x[end]  # Surface brightness temperature
-                end
-            end 
+            if (sol_type >= 2)  # states 2,3,4
+                atmos.tmp_surf = _x[end]  # Surface brightness temperature
+            end
             
             return nothing
         end # end set_tmps
@@ -256,13 +245,14 @@ module solver
             atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
 
             # Calculate residuals subject to the solution type
-            if (sol_type == 0) || (sol_type == 1)
+            if (sol_type == 1)
                 # Zero loss with constant tmp_surf
                 resid[1:end] .= atmos.flux_dif[1:end]
 
             elseif (sol_type == 2)
-                # Conductive boundary layer
+                # Zero loss 
                 resid[1:end-1] .= atmos.flux_dif[1:end]
+                # Conductive boundary layer
                 resid[end] = atmos.flux_tot[end] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
 
             elseif (sol_type == 3)

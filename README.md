@@ -5,7 +5,13 @@ AGNI relies on SOCRATES (2311) for calculating radiances. The radiative transfer
 
 The model is distributed under a proprietary license. Only once it has been published will the model be distributed under a FOSS license. If you use the model in a publication (once it is open), please cite my paper describing the model.
 
-Consult the [AGNI Wiki](https://nichollsh.github.io/AGNI/) on GitHub for information about the model. 
+Consult the [AGNI documentation](https://nichollsh.github.io/AGNI/) for information about the model. 
+
+You can contact me at: `harrison.nicholls [a] physics.ox.ac.uk`
+
+## Installation and usage
+See the Getting Started page in the [documentation](https://nichollsh.github.io/AGNI/) for information on installing and using the model.
+
     
 ## Repository structure 
 * `LICENSE.txt`     - License for use and re-use
@@ -19,12 +25,4 @@ Consult the [AGNI Wiki](https://nichollsh.github.io/AGNI/) on GitHub for informa
 * `.vscode/`        - Visual Studio Code configuration 
 * `tutorials/`      - Notebooks and tutorials
 * `agni.jl`         - AGNI executable
-
-## Installation and usage
-See the Getting Started page on the AGNI wiki for information on installing and using the model.
-
-## Contributors
-* Harrison Nicholls
-* Hamish Innes
-
 

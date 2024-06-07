@@ -1,19 +1,19 @@
 # AGNI configuration file 
-title = "Hot and dry"                    # Name for this configuration file
+title = "Comparison with Selsis+23"                    # Name for this configuration file
 
 [planet]
     tmp_surf        = 2000.0            # Surface temperature [kelvin]
-    instellation    = 44000.0          # Stellar flux at planet's orbital distance [W m-2]
-    albedo_b        = 0.18              # Pseudo bond-albedo which removes downscales the stellar flux by 1-this_value
-    s0_fact         = 0.6652           # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
-    zenith_angle    = 60.0             # Characteristic zenith angle for incoming stellar radiation [degrees]
+    instellation    = 40000          # Stellar flux at planet's orbital distance [W m-2]
+    albedo_b        = 0.0              # Pseudo bond-albedo which removes downscales the stellar flux by 1-this_value
+    s0_fact         = 0.375             # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
+    zenith_angle    = 48.19             # Characteristic zenith angle for incoming stellar radiation [degrees]
     albedo_s        = 0.0               # Surface albedo
     radius          = 6.37e6            # Planet radius at the surface [m]
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
     p_surf          = 270.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
-    condensates     = []                
+    condensates     = ["H2O"]                
     tmp_eff         = 0.0               # Effective temperature
     turb_coeff      = 1.0e-4
     wind_speed      = 10.0
@@ -28,22 +28,22 @@ title = "Hot and dry"                    # Name for this configuration file
     silent          = false                     # Disable all printing?
     max_steps       = 200                       # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
-    num_levels      = 35                        # Number of model levels.
+    num_levels      = 40                        # Number of model levels.
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
-    thermo_funct    = true                     # Use temperature-dependent thermodynamic properties?
+    thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = true                     # Include sensible heat transport at the surface?
-    latent_heat     = false 
+    latent_heat     = true 
     convection_type = "mlt"                     # Convection type ("" = no convection, "mlt" = use mixing length theory).
     condensates     = []                        # List of volatiles which are allowed to condense.
     chemistry       = 0
     solution_type   = 3                         # Solution type (see wiki).
     solvers         = ["newton"]                # Ordered list of solvers to apply (see wiki).
     dx_max          = 400.0                     # Maximum step size [Kelvin], when using nonlinear solvers
-    initial_state   = ["iso","2300"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    initial_state   = ["ncdf","nogit_debug/selsis_ff/40/atm.nc"]       # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     linesearch      = false                     # Use linesearch?
     converge_atol   = 1.0e-2                    # Convergence criterion on absolute flux lost [W m-2].
     converge_rtol   = 1.0e-4                    # Convergence criterion on relative flux lost [dimensionless].
