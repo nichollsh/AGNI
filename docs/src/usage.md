@@ -32,11 +32,9 @@ Broadly, the configuration files are broken up into four sections:
 
 Some `execution` parameters:
 * `solution_type` tells the model which state to solve for. The allowed values (integers) are...
-     - 0 : zero flux divergence at fixed `tmp_surf`, extrapolated `tmpl[end]`
-     - 1 : zero flux divergence at fixed `tmp_surf`, constant `tmpl[end]`
+     - 1 : zero flux divergence at fixed `tmp_surf`
      - 2 : zero flux divergence, with `tmp_surf` set such that the conductive skin (CBL) conserves energy flux
      - 3 : the net upward flux at each layer is equal to `flux_eff = sigma * tmp_eff^4`
-     - 4 : zero flux divergence and `OLR = target_olr`
    
 * `solvers` tells the model which solvers to use. This is a list of strings, so multiple solvers can be applied sequentially. An empty string is always appended to the end of this list. Allowed solvers are...
      - [empty string] : no solving takes place, so the model just calculates fluxes using the initial state
@@ -56,9 +54,9 @@ Some `execution` parameters:
    
 * `chem_type` describes the type of chemistry to implement within the model. This is handled externally by FastChem. You must also provide the path to the FastChem installation directory `fastchem_path` in the `[files]` section. The allowed values (integers) are...
      - 0 : Disabled 
-     - 1 : Equilibrium (gas only)
-     - 2 : Equilibrium (condensates retained)
-     - 3 : Equilibrium (condensates rained out)
+     - 1 : Equilibrium, gas phase only
+     - 2 : Equilibrium, with condensation (condensates retained)
+     - 3 : Equilibrium, with condensation (condensates rained out)
 
 ## Outputs
 Results are optionally plotted and animated, and data will be saved as NetCDF 

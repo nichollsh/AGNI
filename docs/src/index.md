@@ -9,6 +9,7 @@ BSD 3-Clause Clear License once published in a journal.
 Follow [Getting started](@ref) for information on installing the code and 
 obtaining results.
 
-Contact: `harrison.nicholls [a] physics.ox.ac.uk`
+Contact: `harrison.nicholls [a] physics.ox.ac.uk`     
+GitHub: https://github.com/nichollsh/AGNI    
 
 Pronounced: _ag-nee_. Named after the fire deity of Hinduism.
