@@ -1,18 +1,20 @@
 # Model description 
-AGNI models a planetary atmosphere by treating it as a single column (1D) and splitting it up into levels of finite thickness. These levels are defined in pressure-space, and are arranged logarithmically between the surface and the top of the atmosphere. Quantities such as pressure and temperature are calculated at level-centres and level-edges, while energy fluxes are calculated only at the edges, and thermodynamic properties (e.g. heat capacity) are calculated only at their centres.
+AGNI models a planetary atmosphere by treating it as a single column (1D) and splitting it up into levels of finite thickness. These levels are defined in pressure-space, and are arranged logarithmically between the surface and the top of the atmosphere. The atmosphere is assumed to be plane-parallel. Quantities such as pressure and temperature are calculated at level-centres and level-edges, while energy fluxes are calculated only at the edges, and thermodynamic properties (e.g. heat capacity) are calculated only at their centres.
 
 ## Radiative transfer
 Radiative transfer (RT) refers to the transport of radiation energy through a medium subject to the characteristics of the medium. Radiation passing through an atmosphere is absorbed, emitted, scattered, and reflected. In the context of planetary atmospheres, we also have to handle their surfaces, cloud formation, and radiation from the host star.
-
-AGNI models RT using SOCRATES, a numerical code written by the UK Met Office which solves the RT equation using a two-stream solution under a plane-parallel approximation. SOCRATES is accessed using a Julia interface originally written by Stuart Daines. The atmosphere is assumed to be hydrostatically supported and to behave as an ideal gas. Opacity is calculated using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases. 
-
-For simulating gaseous absorption, the model fits k-terms to spectral absorption cross-section data from DACE. The MT_CKD model is used to estimate continuum absorption cross-sections. Rayleigh scattering and water cloud radiative effects are also included. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/nichollsh/SOCRATES) on GitHub.
+   
+AGNI simulates RT using SOCRATES, a numerical code written by the UK Met Office which solves the RT equation using a two-stream solution. SOCRATES is accessed using a Julia interface originally written by Stuart Daines. The atmosphere is assumed to be hydrostatically supported and to behave as an ideal gas. Opacity is handle using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases. 
+   
+The model uses k-terms fitted to spectral absorption cross-section data from [DACE](https://dace.unige.ch/opacityDatabase/?#). The MT_CKD model is used to estimate water continuum absorption cross-sections. Other continuua are derived from the HITRAN tables. Rayleigh scattering and water cloud radiative properties are also included. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/nichollsh/SOCRATES) on GitHub. The flowchart below outlines how these absorption data are converted into a 'spectral file'.
+```@raw html
+  <img src="assets/spectral_flowchart.svg" width=100% class="center"/> 
+```
 
 ## Convection
-Convection is a process that occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it's often parameterised in 3D global circulation models, as resolving convection is numerically difficult. AGNI uses 
-mixing length theory (MLT) to parameterise convection. This is in contrast to convective adjustment, which forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat, while ensuring that enthalpy is conserved. 
+Convection is a turbulent process which occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it is typically parameterised inside 3D global circulation models as resolving convection is numerically expensive. AGNI uses mixing length theory (MLT) to parameterise convection. This is in contrast to convective adjustment, which forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat while ensuring that enthalpy is conserved. 
    
-MLT directly calculates the energy flux associated with convective heat transport, and thus is the preferred parameterisation within the model. It assumes that parcels of gas are diffused over a characteristic _mixing length_, transporting energy in the process.
+MLT directly calculates the energy flux associated with convective heat transport, and thus is the preferred parameterisation within the model. It assumes that parcels of gas are diffused over a characteristic _mixing length_, transporting energy in the process. This requires choosing a scale for this mixing length, but in practice this has very little impact on the results from the model.
    
 Heat capacities are temperature-dependent, calculated using the Shomate Equation with coefficients derived from the NIST website.
 
@@ -88,17 +90,20 @@ c(\bm{x}) < c_a + c_r \cdot \underset{i}{\max} \text{ } |F_i|
 which represents a state where the fluxes are sufficiently conserved.
 
 ### Iterative steps 
-The model solves for $\bm{x}$ iteratively, starting from some initial guess. The initial guess should be any reasonable temperature profile which is not significantly cooler than the expected solution. The flowchart below outlines the solution process.
-
+The model solves for $\bm{x}$ iteratively, starting from some initial guess. The initial guess should be any reasonable temperature profile which is not significantly cooler than the expected solution. The flowchart below broadly outlines the solution process.
 ```@raw html
-  <img src="assets/flowchart.svg" width=40% class="center"/> 
+  <img src="assets/model_flowchart.svg" width=50% class="center"/> 
 ```
 The Jacobian matrix $\bm{J}$ represents the directional gradient of the residuals with respect to the solution vector. It is a square matrix with elements set according to 
 ```math
 J_{uv} = \frac{\partial r_u}{\partial x_v}
 ```
-AGNI estimates $\bm{J}$ using finite-differences, requiring $N+1$ evalulations of $\bm{r}$ in order to fill the matrix. This corresponds to $2(N+1)+1$ objective function calculations under a 2nd order central-difference scheme. Each level $v$ with temperature $x_v$ is perturbed by an amount $\pm \varepsilon x_v$ in order to fill a single column of $\bm{J}$. As such, it can be expensive to construct a full Jacobian, especially when it is discarded at the end of each iteration. To reduce the total number of calculations AGNI retains some of the columns in $\bm{J}$ between model iterations. This assumes that the second derivative of the residuals is small. A column $v$ is retained only when $\max |r_i| \lt 0.7$ for $i \in \{v-1, v, v+1\}$.
-    
+AGNI estimates $\bm{J}$ using finite-differences, requiring $N+1$ evalulations of $\bm{r}$ in order to fill the matrix. This corresponds to $2(N+1)+1$ objective function calculations under a 2nd order central-difference scheme. Each level $v$ with temperature $x_v$ is perturbed by an amount $\pm \varepsilon x_v$ in order to fill a single column of $\bm{J}$. As such, it can be expensive to construct a full Jacobian, especially when it is discarded at the end of each iteration. To reduce the total number of calculations AGNI retains some of the columns in $\bm{J}$ between model iterations. This assumes that the second derivative of the residuals is small. A column $v$ is retained only when 
+```math 
+\max |r_i| \lt 0.7 \text{ for } i \in \{v-1, v, v+1\}
+```
+and when $c(\bm{x})/10$ does **not** satisfy the convergence criteria.   
+   
 With a Jacobian constructed, we can calculate an update $\bm{d}$ to the solution vector $\bm{x} \rightarrow \bm{x} + \bm{d}$. This is primarily done via the Newton-Raphson method 
 ```math 
 \bm{d} = -\bm{J}^{-1} \bm{r}
