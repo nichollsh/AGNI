@@ -19,7 +19,7 @@ module spectrum
     """
     **Load stellar spectrum from a text file.**
 
-    The flux needs to be provided at 1 AU from the star's surface.
+    The flux needs to be scaled to the top of the atmosphere.
 
     Arguments:
     - `path::String`        Path to the file
@@ -98,7 +98,7 @@ module spectrum
         open(star_file, "w") do f
 
             # Header
-            write(f, "Star spectrum at 1 AU. Created by AGNI. \n")
+            write(f, "Star spectrum at TOA. Created by AGNI. \n")
             write(f, "      WAVELENGTH        IRRADIANCE\n")
             write(f, "          (m)               (W/m3)\n")
             write(f, "*BEGIN_DATA\n")

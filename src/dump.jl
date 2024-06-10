@@ -27,6 +27,8 @@ module dump
         # Remove old file if exists
         rm(fname, force=true)
 
+        @debug "Writing T(p) csv to $fname"
+
         open(fname, "w") do f
             write(f, "# pressure  , temperature \n")
             write(f, "# [Pa]      , [K] \n")
@@ -44,6 +46,8 @@ module dump
 
         # Remove old file if exists
         rm(fname, force=true)
+
+        @debug "Writing fluxes csv to $fname"
 
         open(fname, "w") do f
             write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , convect     , latent      , tot      \n")
@@ -70,6 +74,8 @@ module dump
         fname = abspath(fname)
         rm(fname, force=true)
 
+        @debug "Writing NetCDF to $fname"
+
         # See the tutorial at:
         # https://github.com/Alexander-Barth/NCDatasets.jl#create-a-netcdf-file
 
@@ -78,8 +84,8 @@ module dump
         # into PROTEUS without compatibility issues.
 
         # Absorb output from these calls, because they spam the Debug logger
-        new_logger = NullLogger()
-        with_logger(new_logger) do
+        @debug "ALL OUTPUT SUPPRESSED"
+        with_logger(NullLogger()) do
 
             ds = Dataset(fname,"c")
 
@@ -314,7 +320,9 @@ module dump
             end 
 
             close(ds)
-        end 
+        end # suppress output 
+        @debug "ALL OUTPUT RESTORED"
+
         return nothing
     end # end write_ncdf
 
