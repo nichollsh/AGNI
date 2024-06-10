@@ -27,7 +27,7 @@ levels. The heat released associated with the change in partial pressure of cond
 heating rate. This is then integrated to provide a latent heat transport flux.
 
 ## Solar flux
-A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, a grey planetary albedo, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to 1 AU.
+A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, a grey planetary albedo, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
 
 ## Obtaining a solution
 
