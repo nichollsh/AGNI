@@ -303,6 +303,7 @@ module atmosphere
         atmos.AGNI_VERSION = "0.4.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
+        @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
         @debug "SOCRATES VERSION = $(atmos.SOCRATES_VERSION)"
 
         atmos.num_rt_eval = 0
@@ -590,6 +591,7 @@ module atmosphere
         atmos.is_solved = false 
         atmos.is_converged = false
 
+        @debug "Setup complete"
         return nothing
     end # end function setup 
 
@@ -1140,11 +1142,10 @@ module atmosphere
 
         # Mark as allocated
         atmos.is_alloc = true
+        @debug "Allocate complete"
 
         return nothing
     end  # end of allocate
-
-    
 
 
     """
@@ -1510,10 +1511,9 @@ module atmosphere
         grad_dp::Float64 = log(atmos.p[1]/atmos.p[2])
         atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log(atmos.pl[1]/atmos.p[1])
 
-        # Extrapolate bottom edge (log-linear)
-        grad_dt = atmos.tmp[end]-atmos.tmpl[end-1]
-        grad_dp = log(atmos.p[end]/atmos.pl[end-1])
-        atmos.tmpl[end] = atmos.tmp[end] + grad_dt/grad_dp * log(atmos.pl[end]/atmos.p[end])
+        # Set bottom edge to bottom cell-centre value 
+        # This is fine because the bottom cell is very small (in pressure space)
+        atmos.tmpl[end]=atmos.tmp[end]
 
         # Clamp
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
