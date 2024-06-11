@@ -460,12 +460,13 @@ module energy
         a::Float64 = 1.0 
         pp::Float64 = 0.0
         Psat::Float64 = 0.0
+        qsat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
 
 
         # Calculate flux (negative) divergence due to latent heat release...
         # For all levels 
-        for i in 1:atmos.nlev_c
+        for i in 1:atmos.nlev_c-1
 
             # Get partial pressure 
             pp = atmos.gas_all_dict[c][i] * atmos.p[i]
@@ -475,7 +476,8 @@ module energy
 
             # check saturation
             Psat = phys.calc_Psat(c, atmos.tmp[i])
-            if (pp < Psat+1.0e-10)
+            qsat = Psat/atmos.p[i]
+            if (atmos.gas_all_dict[c][i] < qsat+1.0e-10)
                 continue 
             end 
 
@@ -485,18 +487,19 @@ module energy
             end 
 
             # relaxation function
-            dif[i] = -a*(pp-Psat)
+            dif[i] = a*(atmos.gas_all_dict[c][i]-qsat)
 
             # set mask 
-            atmos.mask_l[i] = atmos.mask_decay
+            atmos.mask_l[i]   = atmos.mask_decay
+            atmos.mask_l[i+1] = atmos.mask_decay
             atmos.gas_all_cond[c][i] = true
 
         end # end levels 
 
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at surface
-        for i in range(start=atmos.nlev_l-1, stop=1, step=-1)
-            atmos.flux_l[i] = dif[i]*(atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i+1]
+        for i in range(start=1, stop=atmos.nlev_c, step=1)
+            atmos.flux_l[i+1] = dif[i]*(atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i]
         end 
 
         return nothing
@@ -521,7 +524,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 1e5      # seconds
+        timescale::Float64 = 1e4      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -628,6 +631,10 @@ module energy
                     # dp = p_moist - p_dry < 0
                     delta_p = atmos.p[i]*(atmos.gas_all_dict[c][i] - atmos.gas_all_dict[c][i+1])
                     dfdp[i] -= phys.lookup_safe("l_vap",c) * phys.lookup_safe("mmw",c) / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
+
+                    # set mask 
+                    atmos.mask_l[i]   = atmos.mask_decay
+                    atmos.mask_l[i+1] = atmos.mask_decay
                 end
             end 
 
@@ -635,11 +642,8 @@ module energy
         
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at surface, integrating upwards
-        for i in range(start=atmos.nlev_l-2, stop=1, step=-1)
-            atmos.flux_l[i] = dfdp[i] * (atmos.pl[i]-atmos.pl[i+1]) + atmos.flux_l[i+1]
-            if abs(atmos.flux_l[i]) > 0.0
-                atmos.mask_l[i] = atmos.mask_decay
-            end 
+        for i in range(start=1, stop=atmos.nlev_c, step=1)
+            atmos.flux_l[i+1] = dfdp[i] * (atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i]
         end 
 
         return nothing 

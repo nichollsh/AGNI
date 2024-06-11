@@ -140,7 +140,7 @@ module solver
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        perturb_conv::Float64 = 0.03    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
+        perturb_conv::Float64 = 0.01    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
         perturb_crit::Float64 = 0.9     # Require Jacobian update at level i when r_i>perturb_crit
 
         #    linesearch 
@@ -520,7 +520,7 @@ module solver
 
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
-            if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max)
+            if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max) 
                 # Update whole matrix if:
                 #    on first step, was requested, or near global convergence
                 fill!(perturb, true)
@@ -530,7 +530,7 @@ module solver
                 #    calculated by the finite-difference scheme. This is okay
                 #    as long as the jacobian is approx diagonally dominant.
                 for i in 3:arr_len-2
-                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || (atmos.mask_l[i] > 0)
+                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || (atmos.mask_l[i] > 0) || (atmos.mask_l[i] > 0)
                 end 
             end 
 
