@@ -7,7 +7,10 @@ The model is distributed under a proprietary license. Only once it has been publ
 
 Consult the [AGNI documentation](https://nichollsh.github.io/AGNI/) for information about the model. 
 
-You can contact me at: `harrison.nicholls [a] physics.ox.ac.uk`
+Contact: `harrison.nicholls [a] physics.ox.ac.uk`   
+    
+GitHub: https://github.com/nichollsh/AGNI    
+
 
 ## Installation and usage
 See the Getting Started page in the [documentation](https://nichollsh.github.io/AGNI/) for information on installing and using the model.
