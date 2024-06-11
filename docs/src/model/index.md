@@ -24,7 +24,7 @@ through a diffusive condensation scheme, which assumes a fixed condensation time
 the mixing ratios of the gases are updated according to the temperature profile, where rainout occurs until all condensibles are 
 saturated or sub-saturated. The mixing ratios of dry species are increased in order to satisfy the total pressure at condensing
 levels. The heat released associated with the change in partial pressure of condensible gases is used to calculate a latent
-heating rate. This is then integrated to provide a latent heat transport flux.
+heating rate. This is then integrated (from the TOA downwards) to provide a latent heat transport flux at cell-edges.
 
 ## Solar flux
 A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, a grey planetary albedo, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
