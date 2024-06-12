@@ -13,15 +13,16 @@ title = "Condensation test"                    # Name for this configuration fil
     p_surf          = 100.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O=0.6, CO2=0.3, CH4=0.09, H2=0.01}     # Volatile volume mixing ratios
-    condensates     = ["H2O", "CO2"]
+    # vmr = {H2O=1.0}
+    condensates     = ["H2O"]
     tmp_eff         = 200.0               # Effective temperature
     turb_coeff      = 1.0e-4
     wind_speed      = 10.0
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/nogit/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file.
-    # input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"    
+    input_sf        = "res/spectral_files/nogit/Dayspring/16/Dayspring.sf"    # Path to SOCRATES spectral file.
+    # input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"    
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum.
     output_dir      = "out/"                                            # Path to output directory.
 
