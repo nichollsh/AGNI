@@ -109,7 +109,7 @@ module atmosphere
         gas_all_num::Int                    # Number of gases
         gas_all_names::Array{String,1}      # List of gas names
         gas_all_dict::Dict{String, Array}   # Layer mole fractions in dict format, (key,value) = (gas_name,array)
-        gas_all_cond::Dict{String, Array}   # Layer condensation flags in dict format, (key,value) = (gas_name,array)
+        gas_all_phase::Dict{String, Array}  # Layer condensation flags in dict format, (key,value) = (gas_name,array)
         condensates::Array{String, 1}       # List of condensing gases
         single_component::Bool              # Does a single gas make up 100% of layer at any point in the column?
 
@@ -419,7 +419,7 @@ module atmosphere
         # The values will be stored in a dict of arrays
         atmos.gas_all_names = Array{String}(undef, 0)       # list of names (String)
         atmos.gas_all_dict  = Dict{String, Array}()         # dict of VMR arrays (Float)
-        atmos.gas_all_cond  = Dict{String, Array}()         # dict of condensing arrays (Bool) 
+        atmos.gas_all_phase = Dict{String, Array}()         # dict for phase change (Bool) 
         atmos.gas_all_num   = 0                             # number of gases 
         atmos.condensates   = Array{String}(undef, 0)       # list of condensates (String)
 
@@ -536,7 +536,7 @@ module atmosphere
 
         # set condensation mask
         for g in atmos.gas_all_names 
-            atmos.gas_all_cond[g] = falses(atmos.nlev_c)
+            atmos.gas_all_phase[g] = falses(atmos.nlev_c)
         end 
 
         # Check that we actually stored some values
@@ -1324,18 +1324,22 @@ module atmosphere
     """
     **Adjust gas VMRs according to saturation and cold-trap requirements**
 
+    Volatiles which are allowed to condense are rained-out at condensing levels
+    until the gas is exactly saturated, not supersaturated.
+
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
     function handle_saturation!(atmos::atmosphere.Atmos_t)
 
         # Work arrays 
-        maxvmr::Dict = Dict{String, Float64}()
-        x_sat::Float64 = 0.0
-        x_con::Float64 = 0.0
-        x_dry::Float64 = 0.0
-        x_dry_old::Float64 = 0.0
-        x_tot::Float64 = 0.0
+        maxvmr::Dict =      Dict{String, Float64}()     # max running VMR for each condensible 
+        cond_kg::Dict =     Dict{String, Float64}()     # rainout kg for each condensible 
+        x_sat::Float64 =    0.0
+        x_con::Float64 =    0.0
+        x_dry::Float64 =    0.0
+        x_dry_old::Float64= 0.0
+        x_tot::Float64 =    0.0
 
         # Set maximum value (for cold trapping)
         for c in atmos.condensates 
@@ -1343,10 +1347,10 @@ module atmosphere
         end 
 
         # Reset mixing ratios to surface values
-        # Reset condensation flags 
+        # Reset phase change flags 
         for g in atmos.gas_all_names
            atmos.gas_all_dict[g][1:end-1] .= atmos.gas_all_dict[g][end]
-           atmos.gas_all_cond[g][:] .= false
+           atmos.gas_all_phase[g][:] .= false
         end 
 
         # Loop from bottom to top 
@@ -1356,6 +1360,9 @@ module atmosphere
 
             # For each condensate 
             for c in atmos.condensates
+
+                # reset rain 
+                cond_kg[c] = 0.0
 
                 # check criticality 
                 if atmos.tmp[i] < phys.lookup_safe("t_crit",c)
@@ -1369,34 +1376,37 @@ module atmosphere
                 # saturate and cold-trap
                 if atmos.gas_all_dict[c][i] > x_sat
 
+                    # set rainout kg 
+                    dx = atmos.gas_all_dict[c][i] - x_sat
+                    cond_kg[c] = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0 * (phys.lookup_safe("mmw",c)/atmos.layer_mmw[i])*atmos.p[i]*dx/atmos.layer_grav[i]
+
                     # set new vmr
                     atmos.gas_all_dict[c][i] = x_sat
 
                     # store vmr for cold trapping at levels above this one
                     maxvmr[c] = x_sat
 
-                    # add to total vmr of all condensing gases at this level
+                    # add to total vmr of ALL condensing gases at this level
                     x_con += x_sat
 
                     # flag condensate as actively condensing at this level
-                    atmos.gas_all_cond[c][i] = true 
+                    atmos.gas_all_phase[c][i] = true 
                 end 
-
-            end 
+            end # end condensates
 
             # Calculate current and target dry VMRs
             x_dry = 1.0 - x_con 
             x_dry_old = 0.0
             for g in atmos.gas_all_names 
                 # skip condensing gases, since their VMR is set by saturation
-                if !atmos.gas_all_cond[g][i]
+                if !atmos.gas_all_phase[g][i]
                     x_dry_old += atmos.gas_all_dict[g][i]
                 end 
             end 
 
             # Renormalise VMR to unity, scaling DRY COMPONENTS ONLY
             for g in atmos.gas_all_names 
-                if !atmos.gas_all_cond[g][i]
+                if !atmos.gas_all_phase[g][i]
                     atmos.gas_all_dict[g][i] *= x_dry / x_dry_old
                 end 
             end 
@@ -1407,7 +1417,7 @@ module atmosphere
                 x_tot += atmos.gas_all_dict[g][i]
             end 
             if abs(x_tot - 1.0) > 1.0e-5
-                @warn @sprintf("Mixing ratios sum to %.8e (level %d)",x_tot,i)
+                @warn @sprintf("Mixing ratios sum to %.6e (level %d)",x_tot,i)
             end 
 
             # Recalculate layer mmw 
@@ -1416,7 +1426,61 @@ module atmosphere
                 atmos.layer_mmw[i] += atmos.gas_all_dict[g][i] * phys.lookup_safe("mmw",g)
             end
 
-        end # go to next level
+            # Distribute condensate into unsaturated layers below this one (evaporation)
+            #   integrate downwards from this condensing layer (i)
+            for c in atmos.condensates  # loop over condensates 
+
+                # no rain => skip this condensate 
+                if cond_kg[c] < 1.0e-10
+                    continue 
+                end 
+
+                for j in 2:atmos.nlev_c 
+                    # wait for bottom of condensing region  
+                    if atmos.gas_all_phase[c][j]
+                        continue 
+                    end 
+
+                    # layer area
+                    layer_area = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0
+
+                    # partial pressure change that would saturate this layer 
+                    dp_sat = phys.calc_Psat(c,atmos.tmp[j]) - atmos.gas_all_dict[c][j]
+
+                    # ^ converted to kg of gas 
+                    dm_sat = layer_area*(phys.lookup_safe("mmw",c)/atmos.layer_mmw[j])*dp_sat/atmos.layer_grav[j]
+                    
+                    # can we evaporate all rain within this layer?
+                    if cond_kg[c] < dm_sat 
+                        dm_sat = cond_kg[c]
+                    end 
+
+                    # evaporation efficiency 
+                    dm_sat *= 0.3
+
+                    # additional partial pressure from evaporation 
+                    dp_sat = dm_sat * atmos.layer_grav[j] / (layer_area * atmos.layer_mmw[j] / phys.lookup_safe("mmw",c))
+
+                    # convert extra pp to extra vmr
+                    atmos.gas_all_dict[c][j] += dp_sat / atmos.p[j]
+                    
+                    # reduce total kg of rain correspondingly 
+                    cond_kg[c] -= dm_sat
+
+                    # @printf("Evaporated %.3e kg of %s at %d \n", dm_sat, c, j)
+
+                    # all rain evaporated?
+                    if cond_kg[c] < 1.0e-10 
+                        break 
+                    end 
+
+                end # go to next j level (below)
+
+            end # end condensates
+
+            # calc_layer_props!(atmos)
+
+        end # go to next i level (above)
 
         return nothing 
     end 

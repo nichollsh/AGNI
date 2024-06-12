@@ -449,7 +449,7 @@ module energy
         # Reset flux and mask 
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, 0)
-        fill!(atmos.gas_all_cond[c], false)
+        fill!(atmos.gas_all_phase[c], false)
 
         # Check if empty
         if length(atmos.condensates) == 0
@@ -492,7 +492,7 @@ module energy
             # set mask 
             atmos.mask_l[i]   = atmos.mask_decay
             atmos.mask_l[i+1] = atmos.mask_decay
-            atmos.gas_all_cond[c][i] = true
+            atmos.gas_all_phase[c][i] = true
 
         end # end levels 
 
@@ -524,7 +524,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 10.0      # seconds
+        timescale::Float64 = 1e4      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -547,7 +547,7 @@ module energy
 
             # Calculate latent heat release at this level from change in x_gas 
             for c in atmos.condensates
-                if atmos.gas_all_cond[c][i]
+                if atmos.gas_all_phase[c][i]
                     # dp = p_moist - p_dry < 0
                     delta_p = atmos.p[i]*(atmos.gas_all_dict[c][i] - atmos.gas_all_dict[c][i+1])
                     dfdp[i] -= phys.lookup_safe("l_vap",c) * phys.lookup_safe("mmw",c) / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
