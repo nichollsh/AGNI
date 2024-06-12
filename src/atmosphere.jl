@@ -1410,6 +1410,12 @@ module atmosphere
                 @warn @sprintf("Mixing ratios sum to %.8e (level %d)",x_tot,i)
             end 
 
+            # Recalculate layer mmw 
+            atmos.layer_mmw[i] = 0.0
+            for g in atmos.gas_all_names
+                atmos.layer_mmw[i] += atmos.gas_all_dict[g][i] * phys.lookup_safe("mmw",g)
+            end
+
         end # go to next level
 
         return nothing 

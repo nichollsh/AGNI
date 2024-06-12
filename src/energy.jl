@@ -536,94 +536,14 @@ module energy
         end 
 
         # Work arrays 
-        maxvmr::Dict = Dict{String, Float64}()
-        x_sat::Float64 =    0.0
-        x_con::Float64 =    0.0
-        x_dry::Float64 =    0.0
-        x_dry_old::Float64= 0.0
-        x_tot::Float64 =    0.0
         delta_p::Float64 =  0.0
-
-        # Set maximum value (for cold trapping)
-        for c in atmos.condensates 
-            maxvmr[c] = atmos.gas_all_dict[c][end]
-        end 
-
-        # Reset mixing ratios to surface values
-        # Reset condensation flags 
-        for g in atmos.gas_all_names
-            atmos.gas_all_dict[g][1:end-1] .= atmos.gas_all_dict[g][end]
-            atmos.gas_all_cond[g][:] .= false
-        end 
-
         dfdp::Array = zeros(Float64, atmos.nlev_c)
+
+        # Handle rainout
+        atmosphere.handle_saturation!(atmos)
 
         # Loop from bottom to top 
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
-
-            x_con = 0.0
-
-            # For each condensate 
-            for c in atmos.condensates
-
-                # check criticality 
-                if atmos.tmp[i] < phys.lookup_safe("t_crit",c)
-                    # if subcritical, mixing ratio set by saturation and cold-trapping
-                    x_sat = min(maxvmr[c], phys.calc_Psat(c, atmos.tmp[i]) / atmos.p[i])
-                else
-                    # if supercritical, mixing ratio only set by cold-trapping
-                    x_sat = maxvmr[c]
-                end 
-
-                # saturate and cold-trap
-                if atmos.gas_all_dict[c][i] > x_sat
-
-                    # set new vmr
-                    atmos.gas_all_dict[c][i] = x_sat
-
-                    # store vmr for cold trapping at levels above this one
-                    maxvmr[c] = x_sat
-
-                    # add to total vmr of all condensing gases at this level
-                    x_con += x_sat
-
-                    # flag condensate as actively condensing at this level
-                    atmos.gas_all_cond[c][i] = true 
-                end 
-
-            end 
-
-            # Calculate current and target dry VMRs
-            x_dry = 1.0 - x_con 
-            x_dry_old = 0.0
-            for g in atmos.gas_all_names 
-                # skip condensing gases, since their VMR is set by saturation
-                if !atmos.gas_all_cond[g][i]
-                    x_dry_old += atmos.gas_all_dict[g][i]
-                end 
-            end 
-
-            # Renormalise VMR to unity, scaling DRY COMPONENTS ONLY
-            for g in atmos.gas_all_names 
-                if !atmos.gas_all_cond[g][i]
-                    atmos.gas_all_dict[g][i] *= x_dry / x_dry_old
-                end 
-            end 
-
-            # Check total VMR at this level 
-            x_tot = 0.0
-            for g in atmos.gas_all_names 
-                x_tot += atmos.gas_all_dict[g][i]
-            end 
-            if abs(x_tot - 1.0) > 1.0e-5
-                @warn @sprintf("Mixing ratios sum to %.8e (level %d)",x_tot,i)
-            end 
-
-            # Recalculate layer mmw 
-            atmos.layer_mmw[i] = 0.0
-            for g in atmos.gas_all_names
-                atmos.layer_mmw[i] += atmos.gas_all_dict[g][i] * phys.lookup_safe("mmw",g)
-            end
 
             # Calculate latent heat release at this level from change in x_gas 
             for c in atmos.condensates
