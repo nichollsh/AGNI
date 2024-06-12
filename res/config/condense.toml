@@ -12,7 +12,7 @@ title = "Condensation test"                    # Name for this configuration fil
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
     p_surf          = 100.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
-    vmr             = { H2O=0.6, CO2=0.3, CH4=0.09, H2=0.01}     # Volatile volume mixing ratios
+    vmr             = { H2O=0.8, CO2=0.1, CH4=0.08, H2=0.02}     # Volatile volume mixing ratios
     # vmr = {H2O=1.0}
     condensates     = ["H2O"]
     tmp_eff         = 200.0               # Effective temperature

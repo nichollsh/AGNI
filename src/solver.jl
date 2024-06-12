@@ -232,7 +232,7 @@ module solver
             end
 
             # Calculate layer properties if required and haven't already
-            if atmos.thermo_funct
+            if atmos.thermo_funct || !latent
                 atmosphere.calc_layer_props!(atmos)
             end 
 
