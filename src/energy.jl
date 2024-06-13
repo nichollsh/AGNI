@@ -171,7 +171,7 @@ module energy
                 # skip unspecified gases
                 if s_gas in atmos.gas_all_names
                     # convert mole fraction to mass mixing ratio
-                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_all_dict[s_gas][i] * phys.lookup_safe("mmw", s_gas) / atmos.layer_mmw[i]
+                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_all_vmr[s_gas][i] * phys.lookup_safe("mmw", s_gas) / atmos.layer_mmw[i]
                 else 
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0
                 end 
@@ -361,7 +361,7 @@ module energy
                 
             #     maxval = -1000
             #     for c in condensing[i]
-            #         xv_av = (atmos.gas_all_dict[c][i] * m2 + atmos.gas_all_dict[c][i-1]*m1)/mt
+            #         xv_av = (atmos.gas_all_vmr[c][i] * m2 + atmos.gas_all_vmr[c][i-1]*m1)/mt
             #         # Make sure L is molar quantity
             #         L = phys.lookup_safe("l_vap", c)*phys.lookup_safe("mmw", c)
                     
@@ -371,7 +371,7 @@ module energy
             #         end
             #     end
             #     mmw_v = phys.lookup_safe("mmw",cmax)
-            #     xv = (atmos.gas_all_dict[cmax][i]*m2 + atmos.gas_all_dict[cmax][i-1]*m1)/mt
+            #     xv = (atmos.gas_all_vmr[cmax][i]*m2 + atmos.gas_all_vmr[cmax][i-1]*m1)/mt
             #     beta = phys.lookup_safe("l_vap", cmax)*mmw_v/tmp/phys.R_gas
 
             #     grad_ad = (1 - xv + beta*xv) / (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
@@ -469,7 +469,7 @@ module energy
         for i in 1:atmos.nlev_c-1
 
             # Get partial pressure 
-            pp = atmos.gas_all_dict[c][i] * atmos.p[i]
+            pp = atmos.gas_all_vmr[c][i] * atmos.p[i]
             if pp < 1.0e-10 
                 continue
             end
@@ -477,7 +477,7 @@ module energy
             # check saturation
             Psat = phys.calc_Psat(c, atmos.tmp[i])
             qsat = Psat/atmos.p[i]
-            if (atmos.gas_all_dict[c][i] < qsat+1.0e-10)
+            if (atmos.gas_all_vmr[c][i] < qsat+1.0e-10)
                 continue 
             end 
 
@@ -487,7 +487,7 @@ module energy
             end 
 
             # relaxation function
-            dif[i] = a*(atmos.gas_all_dict[c][i]-qsat)
+            dif[i] = a*(atmos.gas_all_vmr[c][i]-qsat)
 
             # set mask 
             atmos.mask_l[i]   = atmos.mask_decay
@@ -549,7 +549,7 @@ module energy
             for c in atmos.condensates
                 if atmos.gas_all_phase[c][i]
                     # dp = p_moist - p_dry < 0
-                    delta_p = atmos.p[i]*(atmos.gas_all_dict[c][i] - atmos.gas_all_dict[c][i+1])
+                    delta_p = atmos.p[i]*(atmos.gas_all_vmr[c][i] - atmos.gas_all_vmr[c][i+1])
                     dfdp[i] -= phys.lookup_safe("l_vap",c) * phys.lookup_safe("mmw",c) / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
 
                     # set mask 

@@ -271,7 +271,7 @@ module dump
 
                 # Fill VMR
                 for i_lvl in 1:nlev_c
-                    var_x[i_gas, i_lvl] = atmos.gas_all_dict[gas][i_lvl]
+                    var_x[i_gas, i_lvl] = atmos.gas_all_vmr[gas][i_lvl]
                 end 
             end 
             
