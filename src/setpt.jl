@@ -258,7 +258,7 @@ module setpt
         # For each condensible volatile
         for gas in atmos.gas_all_names
             # Get mole fraction at surface
-            x = atmos.gas_all_dict[gas][atmos.nlev_c]
+            x = atmos.gas_all_vmr[gas][atmos.nlev_c]
             if x < 1.0e-10
                 continue 
             end
@@ -269,7 +269,7 @@ module setpt
             if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_safe("T_crit",gas))
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.gas_all_dict[gas][atmos.nlev_c] = psat / atmos.p_boa  
+                atmos.gas_all_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa  
 
                 # Check that p_boa is still reasonable 
                 if atmos.p_boa <= 10.0 * atmos.p_toa 
@@ -281,10 +281,10 @@ module setpt
         # Renormalise mole fractions
         tot_vmr = 0.0
         for g in atmos.gas_all_names
-            tot_vmr += atmos.gas_all_dict[g][atmos.nlev_c]
+            tot_vmr += atmos.gas_all_vmr[g][atmos.nlev_c]
         end 
         for g in atmos.gas_all_names
-            atmos.gas_all_dict[g][atmos.nlev_c] /= tot_vmr
+            atmos.gas_all_vmr[g][atmos.nlev_c] /= tot_vmr
         end 
 
         # Generate new pressure grid 

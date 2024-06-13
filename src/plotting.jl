@@ -116,7 +116,7 @@ module plotting
 
         for gas in atmos.gas_all_names
             # get VMR
-            x_arr = log10.(clamp.(atmos.gas_all_dict[gas][:],1e-100, 1e100))
+            x_arr = log10.(clamp.(atmos.gas_all_vmr[gas][:],1e-100, 1e100))
             this_min = minimum(x_arr)
             if this_min > -90
                 xmin = min(xmin, this_min)

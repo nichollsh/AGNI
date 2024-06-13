@@ -106,7 +106,7 @@ module solver
                             fdw::Float64=5.0e-6, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
                             linesearch::Bool=true, modulate_mlt::Bool=false,
-                            detect_plateau::Bool=true, perturb_all::Bool=true,
+                            detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             modprint::Int=1,
                             conv_atol::Float64=1.0e-3, conv_rtol::Float64=1.0e-3
@@ -144,12 +144,12 @@ module solver
         perturb_crit::Float64 = 0.9     # Require Jacobian update at level i when r_i>perturb_crit
 
         #    linesearch 
-        ls_max_steps::Int  =    19      # maximum steps 
-        ls_min_scale::Float64 = 1.0e-5  # minimum scale
+        ls_max_steps::Int  =    22      # maximum steps 
+        ls_min_scale::Float64 = 1.0e-2  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    600.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =    1000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
