@@ -524,7 +524,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 1e4      # seconds
+        timescale::Float64 = 2e4      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -556,14 +556,15 @@ module energy
                     atmos.mask_l[i]   = atmos.mask_decay
                     atmos.mask_l[i+1] = atmos.mask_decay
                 end
+
             end 
 
         end # go to next level
-        
+
         # Convert divergence to cell-edge fluxes
-        # Assuming zero condensation at surface, integrating upwards
+        # Assuming zero condensation at TOA, integrating downwards
         for i in range(start=1, stop=atmos.nlev_c, step=1)
-            atmos.flux_l[i+1] = dfdp[i] * (atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i]
+            atmos.flux_l[i+1] = max(0.0, dfdp[i] * (atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i])
         end 
 
         return nothing 

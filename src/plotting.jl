@@ -60,13 +60,16 @@ module plotting
                     # set point  
                     sat_t[i] = phys.calc_Tdew(c, atmos.pl[i])
                     # check if supercritical
-                    if sat_t[i] > phys.lookup_safe("t_crit", c)
+                    if sat_t[i] >= phys.lookup_safe("t_crit", c)
                         crt_i = i 
                         break
                     end 
                 end 
-                # plot curve for this condensate
-                plot!(plt, sat_t[1:crt_i], atmos.pl[1:crt_i]*1e-5, lc=phys.pretty_color(c), ls=:dot, label=phys.pretty_name(c))
+                # plot liquid-vapour curve for this condensate, stopping at critical point
+                plot!(plt, sat_t[1:crt_i], atmos.pl[1:crt_i]*1e-5, lc=phys.pretty_color(c), ls=:dash, label=phys.pretty_name(c))
+
+                # plot critical temperature 
+                plot!(plt, ones(Float64, atmos.nlev_l)*phys.lookup_safe("t_crit", c), atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label="")
             end 
         end
 
@@ -232,12 +235,13 @@ module plotting
         plot!(plt, _symlog.(atmos.flux_tot), arr_P, label="Total", lw=w, lc=col_t, ls=:solid, linealpha=alpha)
 
         # Overplot convection and condensation mask
+        #    by indicating it with scatter points of the corresponding colour
         for i in 1:atmos.nlev_c
             if atmos.mask_c[i] > 0
-                scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_c, label="")
+                scatter!(plt, [-0.2], [arr_P[i]], opacity=0.9, markersize=2, msw=0.5, color=col_c, label="")
             end 
             if atmos.mask_l[i] > 0
-                scatter!(plt, [0.0], [arr_P[i]], opacity=0.9, markersize=2, color=col_p, label="")
+                scatter!(plt, [0.2], [arr_P[i]], opacity=0.9, markersize=2, msw=0.5, color=col_p, label="")
             end 
         end
 
