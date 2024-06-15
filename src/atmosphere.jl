@@ -1321,6 +1321,15 @@ module atmosphere
         return state 
     end
 
+    """
+    **Normalise gas VMRs, keeping condensates unchanged**
+
+    Only acts on a single model level.
+
+    Parameters:
+    - `atmos::atmosphere.Atmos_t`       atmosphere structure 
+    - `i::Int`                          level index to normalise 
+    """
     function normalise_vmrs!(atmos::atmosphere.Atmos_t, i::Int)
         # Work variables 
         x_con::Float64 =    0.0
@@ -1476,6 +1485,7 @@ module atmosphere
                         else 
                             # supercritical (can take up any amount of evaporated rain - just choose a big number)
                             dp_sat = 1.0e99
+                            cond_kg[c] = 0.0
                         end 
 
                         # Calculate kg of gas that would saturate 
