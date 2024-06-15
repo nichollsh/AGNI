@@ -144,8 +144,8 @@ module solver
         perturb_crit::Float64 = 0.9     # Require Jacobian update at level i when r_i>perturb_crit
 
         #    linesearch 
-        ls_max_steps::Int  =    22      # maximum steps 
-        ls_min_scale::Float64 = 1.0e-4  # minimum scale
+        ls_max_steps::Int  =    20      # maximum steps 
+        ls_min_scale::Float64 = 2.0e-4  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
