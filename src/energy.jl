@@ -507,12 +507,12 @@ module energy
 
 
     """
-    **Analytical diffusion scheme for condensation.**
+    **Analytical diffusion scheme for condensation and evaporation.**
 
     Integrates from bottom of model upwards. Condensate mixing ratios are
     reduced at each level to satisfy both cold-trapping and saturation 
     constraints (as in atmosphere.handle_saturation). Based on the amount of 
-    condensation at each level, a phase change flux is calculated by assuming 
+    phase change at each level, a phase change flux is calculated by assuming 
     a fixed condensation timescale. 
     
     Updates fluxes and mixing ratios.
@@ -524,7 +524,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 2e4      # seconds
+        timescale::Float64 = 1e5      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -601,11 +601,6 @@ module energy
                 energy.condense_diffuse!(atmos)
             end 
             atmos.flux_tot += atmos.flux_l
-        end 
-
-        # Recalculate layer properties if condensation occurs
-        if length(atmos.condensates) > 0
-            atmosphere.calc_layer_props!(atmos)
         end 
 
         # +Radiation
