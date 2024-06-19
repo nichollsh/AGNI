@@ -219,8 +219,8 @@ module dump
             var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "J K-1 kg-1"))
             var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
             var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf JANUS because of how Julia stores arrays
-            var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c")) # ^^
-            var_cldf  =     defVar(ds, "cloud_frac",Float64, ("nlev_c",))
+            var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c"), attrib = OrderedDict("units" => "mol mol-1")) # ^^
+            var_cldl  =     defVar(ds, "cloud_mmr", Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg kg-1"))
             var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
@@ -275,7 +275,7 @@ module dump
                 end 
             end 
             
-            var_cldf[:] =   atmos.cloud_arr_f
+            var_cldl[:] =   atmos.cloud_arr_l
 
             var_fdl[:] =    atmos.flux_d_lw
             var_ful[:] =    atmos.flux_u_lw

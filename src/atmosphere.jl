@@ -128,49 +128,49 @@ module atmosphere
         layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
 
         # Calculated bolometric radiative fluxes (W m-2)
-        flux_eff::Float64               # Effective flux  [W m-2] for sol_type=3
-        target_olr::Float64             # Target olr [W m-2] for sol_type=4
+        flux_eff::Float64                   # Effective flux  [W m-2] for sol_type=3
+        target_olr::Float64                 # Target olr [W m-2] for sol_type=4
 
-        flux_d_lw::Array{Float64,1}     # down component, lw 
-        flux_u_lw::Array{Float64,1}     # up component, lw
-        flux_n_lw::Array{Float64,1}     # net upward, lw
+        flux_d_lw::Array{Float64,1}         # down component, lw 
+        flux_u_lw::Array{Float64,1}         # up component, lw
+        flux_n_lw::Array{Float64,1}         # net upward, lw
 
-        flux_d_sw::Array{Float64,1}     # down component, sw 
-        flux_u_sw::Array{Float64,1}     # up component, sw
-        flux_n_sw::Array{Float64,1}     # net upward, sw
+        flux_d_sw::Array{Float64,1}         # down component, sw 
+        flux_u_sw::Array{Float64,1}         # up component, sw
+        flux_n_sw::Array{Float64,1}         # net upward, sw
 
-        flux_d::Array{Float64,1}        # down component, lw+sw 
-        flux_u::Array{Float64,1}        # up component, lw+sw 
-        flux_n::Array{Float64,1}        # net upward, lw+sw 
+        flux_d::Array{Float64,1}            # down component, lw+sw 
+        flux_u::Array{Float64,1}            # up component, lw+sw 
+        flux_n::Array{Float64,1}            # net upward, lw+sw 
 
         # Calculated per-band radiative fluxes (W m-2)
-        band_d_lw::Array{Float64,2}     # down component, lw 
-        band_u_lw::Array{Float64,2}     # up component, lw
-        band_n_lw::Array{Float64,2}     # net upward, lw
+        band_d_lw::Array{Float64,2}         # down component, lw 
+        band_u_lw::Array{Float64,2}         # up component, lw
+        band_n_lw::Array{Float64,2}         # net upward, lw
 
-        band_d_sw::Array{Float64,2}     # down component, sw 
-        band_u_sw::Array{Float64,2}     # up component, sw
-        band_n_sw::Array{Float64,2}     # net upward, sw
+        band_d_sw::Array{Float64,2}         # down component, sw 
+        band_u_sw::Array{Float64,2}         # up component, sw
+        band_n_sw::Array{Float64,2}         # net upward, sw
 
         # Contribution function (to outgoing flux) per-band
-        contfunc_norm::Array{Float64,2}    # LW only, and normalised by maximum value
+        contfunc_norm::Array{Float64,2}     # LW only, and normalised by maximum value
 
         # Sensible heating
-        C_d::Float64            # Turbulent exchange coefficient [dimensionless]
-        U::Float64              # Wind speed [m s-1]
-        flux_sens::Float64      # Turbulent flux
+        C_d::Float64                        # Turbulent exchange coefficient [dimensionless]
+        U::Float64                          # Wind speed [m s-1]
+        flux_sens::Float64                  # Turbulent flux
 
         # Convection 
-        mask_c::Array{Int,1}       # Layers which are (or were recently) convective (value is set to >0)
-        mask_decay::Int            # How long is 'recent'
-        flux_cdry::Array{Float64,1}  # Dry convective fluxes from MLT
-        Kzz::Array{Float64,1}      # Eddy diffusion coefficient from MLT
+        mask_c::Array{Int,1}                # Layers which are (or were recently) convective (value is set to >0)
+        mask_decay::Int                     # How long is 'recent'
+        flux_cdry::Array{Float64,1}         # Dry convective fluxes from MLT
+        Kzz::Array{Float64,1}               # Eddy diffusion coefficient from MLT
 
         # Conduction 
-        flux_cdct::Array{Float64,1} # Conductive flux [W m-2]
+        flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
 
         # Cloud and condensation
-        flux_l::Array{Float64, 1}           # Condensation flux [W m-2]
+        flux_l::Array{Float64, 1}           # Latent heat energy flux [W m-2]
         mask_l::Array{Int,1}                # Layers which are (or were recently) condensing
         #    These arrays give the cloud properties within layers containing cloud
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
@@ -1385,14 +1385,17 @@ module atmosphere
     function handle_saturation!(atmos::atmosphere.Atmos_t)
 
         # Parameters 
-        evap_enabled::Bool =        true    # Enable re-vaporation of rain
-        evap_efficiency::Float64 =  1.0     # Evaporation efficiency
+        evap_enabled::Bool =            true    # Enable re-vaporation of rain
+        evap_efficiency::Float64 =      1.0     # Evaporation efficiency
+        cond_retention_frac::Float64 =  0.5     # Condensate retention fraction (0 => complete rainout)
 
         # Work arrays 
         maxvmr::Dict{String, Float64} = Dict{String, Float64}()     # max running VMR for each condensible 
-        cond_kg::Dict{String,Float64} = Dict{String, Float64}()     # rainout kg for each condensible 
-        x_sat::Float64 =    0.0
-        supcrit::Bool =     false
+        cond_kg::Dict{String,Float64} = Dict{String, Float64}()     # condensed kg for each condensible 
+        rain_kg::Dict{String,Float64} = Dict{String, Float64}()     # rainout kg for each condensible
+        x_sat::Float64 =        0.0
+        layer_area::Float64 =   0.0
+        supcrit::Bool =         false
 
         # Set maximum value (for cold trapping)
         for c in atmos.condensates 
@@ -1406,13 +1409,21 @@ module atmosphere
            atmos.gas_all_phase[g][:] .= false
         end 
 
+        # Reset water cloud
+        fill!(atmos.cloud_arr_r, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        fill!(atmos.cloud_arr_f, 0.0)
+
         # Loop from bottom to top 
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
+
+            layer_area = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0
 
             # For each condensate 
             for c in atmos.condensates
 
                 # reset rain 
+                rain_kg[c] = 0.0
                 cond_kg[c] = 0.0
 
                 # check criticality 
@@ -1430,7 +1441,8 @@ module atmosphere
 
                     # set rainout kg 
                     dx = atmos.gas_all_vmr[c][i] - x_sat
-                    cond_kg[c] = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0 * (phys.lookup_safe("mmw",c)/atmos.layer_mmw[i])*atmos.p[i]*dx/atmos.layer_grav[i]
+                    cond_kg[c] = layer_area * (phys.lookup_safe("mmw",c)/atmos.layer_mmw[i])*atmos.p[i]*dx/atmos.layer_grav[i]
+                    rain_kg[c] = cond_kg[c] * (1.0 - cond_retention_frac)
 
                     # set new vmr
                     atmos.gas_all_vmr[c][i] = x_sat
@@ -1446,7 +1458,7 @@ module atmosphere
             end # end condensates
 
             # for c in atmos.condensates
-            #     @printf("At %d: generated %s rain: %.3e kg \n", i, c, cond_kg[c])
+            #     @printf("At %d: generated %s rain: %.3e kg \n", i, c, rain_kg[c])
             # end
 
             normalise_vmrs!(atmos, i)
@@ -1457,13 +1469,27 @@ module atmosphere
                 atmos.layer_mmw[i] += atmos.gas_all_vmr[g][i] * phys.lookup_safe("mmw",g)
             end
 
+            # Set water cloud at this level
+            if "H2O" in atmos.condensates
+                # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
+                atmos.cloud_arr_l[i] = (cond_kg["H2O"] * cond_retention_frac / layer_area) / atmos.layer_mass[i]
+
+                if atmos.cloud_arr_l[i] > 1.0
+                    @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
+                end 
+
+                # droplet radius and area fraction (fixed values)
+                atmos.cloud_arr_r[i] = atmos.cloud_val_r
+                atmos.cloud_arr_f[i] = atmos.cloud_val_f
+            end 
+
             # Evaporate condensate withon unsaturated layers below this one
             #   integrate downwards from this condensing layer (i)
             if evap_enabled
                 for c in atmos.condensates  # loop over condensates 
 
                     # no rain => skip this condensate 
-                    if cond_kg[c] < 1.0e-10
+                    if rain_kg[c] < 1.0e-10
                         continue 
                     end 
 
@@ -1485,15 +1511,15 @@ module atmosphere
                         else 
                             # supercritical (can take up any amount of evaporated rain - just choose a big number)
                             dp_sat = 1.0e99
-                            cond_kg[c] = 0.0
+                            rain_kg[c] = 0.0
                         end 
 
                         # Calculate kg of gas that would saturate 
                         dm_sat = layer_area*(phys.lookup_safe("mmw",c)/atmos.layer_mmw[j])*dp_sat/atmos.layer_grav[j]
                         
                         # can we evaporate all rain within this layer?
-                        if cond_kg[c] < dm_sat 
-                            dm_sat = cond_kg[c]
+                        if rain_kg[c] < dm_sat 
+                            dm_sat = rain_kg[c]
                         end 
 
                         # Evaporation efficiency factor 
@@ -1510,7 +1536,7 @@ module atmosphere
                         atmos.gas_all_vmr[c][j] += dp_sat / atmos.p[j]
                         
                         # reduce total kg of rain correspondingly 
-                        cond_kg[c] -= dm_sat
+                        rain_kg[c] -= dm_sat
 
                         # flag this region as containing a phase change 
                         if !supcrit
@@ -1528,16 +1554,19 @@ module atmosphere
                         end
 
                         # all rain evaporated?
-                        if cond_kg[c] < 1.0e-10 
+                        if rain_kg[c] < 1.0e-10 
                             break 
                         end 
 
                     end # go to next j level (below)
                     
-                    # @printf("      Surface: Landed %s rain %.3e kg \n", c, cond_kg[c])
+                    # @printf("      Surface: Landed %s rain %.3e kg \n", c, rain_kg[c])
 
                 end # end condensates
             end # end evaporation 
+
+            # Calculate layer properties 
+            # calc_layer_props!(atmos)
 
         end # go to next i level (above)
 
