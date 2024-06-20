@@ -4,7 +4,7 @@ title = "Hot and dry"                    # Name for this configuration file
 [planet]
     tmp_surf        = 2000.0            # Surface temperature [kelvin]
     instellation    = 44000.0          # Stellar flux at planet's orbital distance [W m-2]
-    albedo_b        = 0.18              # Pseudo bond-albedo which removes downscales the stellar flux by 1-this_value
+    albedo_b        = 0.18              # Pseudo bond-albedo which downscales the stellar flux by 1-this_value
     s0_fact         = 0.6652           # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
     zenith_angle    = 60.0             # Characteristic zenith angle for incoming stellar radiation [degrees]
     albedo_s        = 0.0               # Surface albedo
@@ -21,11 +21,11 @@ title = "Hot and dry"                    # Name for this configuration file
 [files]
     clean_output    = true
     input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"    # Path to SOCRATES spectral file.
-    input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum scaled to 1 AU.
+    input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum.
     output_dir      = "out/"                                            # Path to output directory.
 
 [execution]
-    silent          = false                     # Disable all printing?
+    verbosity       = 1                         # Log level (0: none, 1: normal, 2: debug)
     max_steps       = 200                       # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
     num_levels      = 35                        # Number of model levels.

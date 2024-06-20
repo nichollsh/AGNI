@@ -40,9 +40,13 @@ module AGNI
     # export energy
 
     """
-    Setup terminal + file logging 
+    **Setup terminal logging and file logging**
+
+    Arguments:
+    - `outpath::String`     output file (empty to disable file logging)
+    - `verbosity::Int`      verbosity (0: silent, 1: normal, 2: debug)
     """
-    function setup_logging(outpath::String, silent::Bool)
+    function setup_logging(outpath::String, verbosity::Int)
 
         # File logging?
         to_file::Bool = !isempty(outpath)
@@ -53,7 +57,7 @@ module AGNI
         end
 
         # If silent 
-        if silent 
+        if verbosity==0 
             global_logger(MinLevelLogger(current_logger(), Logging.Error))
             return nothing
         end 
@@ -106,13 +110,22 @@ module AGNI
             logger_both = logger_term 
         end 
         global_logger(logger_both)
-        disable_logging(Logging.Debug) # disable debug; info only
+
+        if verbosity == 1
+            disable_logging(Logging.Debug) # disable debug; info only
+        end 
 
         return nothing 
     end 
 
     """
-    Open and validate config file 
+    **Open and validate config file.**
+
+    Arguments:
+    - `cfg_path::String`        path to configuration file
+
+    Returns:
+    - `cfg_dict::Dict`          dictionary containing the configuration
     """
     function open_config(cfg_path::String)::Dict
 
@@ -143,7 +156,14 @@ module AGNI
     end 
 
     """
-    Main function to be called by executable file
+    **Main function to be called by executable file.**
+
+    This function parses the cfg file provided by the call arguments, and runs 
+    AGNI according to these requirements. It will also save and plot the 
+    output as requested by the cfg file.
+    
+    Returns:
+    - `return_success::Bool`        flag for model success
     """
     function main()::Bool
 
@@ -170,6 +190,13 @@ module AGNI
             mkdir(output_dir)
         end 
 
+        # Logging 
+        verbosity::Int = cfg["execution"]["verbosity"]
+        setup_logging(joinpath(output_dir, "agni.log"), verbosity)
+
+        # Hello
+        @info "Hello"
+
         # Temp folders
         dir_fastchem = joinpath(output_dir,"fastchem/")
         dir_frames   = joinpath(output_dir,"frames/")
@@ -179,15 +206,8 @@ module AGNI
         # Copy configuration file 
         cp(cfg_path, joinpath(output_dir, "agni.cfg"), force=true)
 
-        # Logging 
-        silent::Bool = cfg["execution"]["silent"]
-        setup_logging(joinpath(output_dir, "agni.log"), silent)
-
-        # Hello
-        @info "Hello"
-        @info "Using configuration '$(cfg["title"])'"
-
         # Read REQUIRED configuration options from dict 
+        @info "Using configuration '$(cfg["title"])'"
         #    planet stuff 
         tmp_surf::Float64      = cfg["planet"]["tmp_surf"]
         instellation::Float64  = cfg["planet"]["instellation"]
@@ -367,11 +387,13 @@ module AGNI
 
         # Do chemistry on initial composition
         if chem_type in [1,2,3]
+            @debug "Initial chemistry"
             atmosphere.chemistry_eq!(atmos, chem_type, true)
         end 
 
         # Frame dir
         if plt_ani
+            @debug "Will animate"
             mkdir(dir_frames)
         end 
 
@@ -451,11 +473,12 @@ module AGNI
         plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 
         # Deallocate atmosphere
-        @info "Deallocating arrays"
+        @info "Deallocating memory"
         atmosphere.deallocate!(atmos)
 
         # Temp folders
         if cfg["files"]["clean_output"]
+            @debug "Cleaning output folder"
             # save fastchem outputs 
             if chem_type in [1,2,3]
                 cp(joinpath(output_dir,"fastchem","chemistry.dat"),joinpath(output_dir,"fc_gas.dat"), force=true)
