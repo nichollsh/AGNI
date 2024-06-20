@@ -27,6 +27,8 @@ module dump
         # Remove old file if exists
         rm(fname, force=true)
 
+        @debug "Writing T(p) csv to $fname"
+
         open(fname, "w") do f
             write(f, "# pressure  , temperature \n")
             write(f, "# [Pa]      , [K] \n")
@@ -44,6 +46,8 @@ module dump
 
         # Remove old file if exists
         rm(fname, force=true)
+
+        @debug "Writing fluxes csv to $fname"
 
         open(fname, "w") do f
             write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , convect     , latent      , tot      \n")
@@ -70,6 +74,8 @@ module dump
         fname = abspath(fname)
         rm(fname, force=true)
 
+        @debug "Writing NetCDF to $fname"
+
         # See the tutorial at:
         # https://github.com/Alexander-Barth/NCDatasets.jl#create-a-netcdf-file
 
@@ -78,8 +84,8 @@ module dump
         # into PROTEUS without compatibility issues.
 
         # Absorb output from these calls, because they spam the Debug logger
-        new_logger = NullLogger()
-        with_logger(new_logger) do
+        @debug "ALL OUTPUT SUPPRESSED"
+        with_logger(NullLogger()) do
 
             ds = Dataset(fname,"c")
 
@@ -213,8 +219,8 @@ module dump
             var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "J K-1 kg-1"))
             var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
             var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf JANUS because of how Julia stores arrays
-            var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c")) # ^^
-            var_cldf  =     defVar(ds, "cloud_frac",Float64, ("nlev_c",))
+            var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c"), attrib = OrderedDict("units" => "mol mol-1")) # ^^
+            var_cldl  =     defVar(ds, "cloud_mmr", Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg kg-1"))
             var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
@@ -265,11 +271,11 @@ module dump
 
                 # Fill VMR
                 for i_lvl in 1:nlev_c
-                    var_x[i_gas, i_lvl] = atmos.gas_all_dict[gas][i_lvl]
+                    var_x[i_gas, i_lvl] = atmos.gas_all_vmr[gas][i_lvl]
                 end 
             end 
             
-            var_cldf[:] =   atmos.cloud_arr_f
+            var_cldl[:] =   atmos.cloud_arr_l
 
             var_fdl[:] =    atmos.flux_d_lw
             var_ful[:] =    atmos.flux_u_lw
@@ -314,7 +320,9 @@ module dump
             end 
 
             close(ds)
-        end 
+        end # suppress output 
+        @debug "ALL OUTPUT RESTORED"
+
         return nothing
     end # end write_ncdf
 
