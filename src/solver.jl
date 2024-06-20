@@ -89,6 +89,7 @@ module solver
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
+    - `modprint::Int`                   iteration frequency at which to print info
     - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
 
@@ -107,6 +108,7 @@ module solver
                             linesearch::Bool=true, modulate_mlt::Bool=false,
                             detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
+                            modprint::Int=1,
                             conv_atol::Float64=1.0e-3, conv_rtol::Float64=1.0e-3
                             )::Bool
 
@@ -132,23 +134,22 @@ module solver
         # --------------------
         # Execution parameters
         # --------------------
-        modprint::Int =         1       # Print frequency
         #    convection 
         convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
         convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        perturb_conv::Float64 = 0.03    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
-        perturb_crit::Float64 = 0.7     # Require Jacobian update at level i when r_i>perturb_crit
+        perturb_conv::Float64 = 0.01    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
+        perturb_crit::Float64 = 0.9     # Require Jacobian update at level i when r_i>perturb_crit
 
         #    linesearch 
-        ls_max_steps::Int  =    13      # maximum steps 
-        ls_min_scale::Float64 = 1.0e-4  # minimum scale
+        ls_max_steps::Int  =    22      # maximum steps 
+        ls_min_scale::Float64 = 2.0e-3  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    400.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =    1000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -231,9 +232,7 @@ module solver
             end
 
             # Calculate layer properties if required and haven't already
-            if atmos.thermo_funct
-                atmosphere.calc_layer_props!(atmos)
-            end 
+            atmosphere.calc_layer_props!(atmos)
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
@@ -463,9 +462,7 @@ module solver
                 code = 1 
                 break 
             end 
-            if mod(step,modprint) == 0 
-                info_str *= @sprintf("    %4d  ", step)
-            end
+            info_str *= @sprintf("    %4d  ", step)
 
             # Check status of guess 
             if !all(isfinite, x_cur)
@@ -521,7 +518,7 @@ module solver
 
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
-            if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max)
+            if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max) 
                 # Update whole matrix if:
                 #    on first step, was requested, or near global convergence
                 fill!(perturb, true)
@@ -531,7 +528,7 @@ module solver
                 #    calculated by the finite-difference scheme. This is okay
                 #    as long as the jacobian is approx diagonally dominant.
                 for i in 3:arr_len-2
-                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || (atmos.mask_l[i] > 0)
+                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || (atmos.mask_l[i] > 0) || (atmos.mask_l[i] > 0)
                 end 
             end 
 
@@ -613,6 +610,7 @@ module solver
 
                 # Use golden-section minimisation to find best scale
                 ls_alpha = gs_search(_ls_func, ls_min_scale, 1.0, ls_min_scale, ls_max_steps)
+                ls_alpha = max(min(ls_alpha,1.0), ls_min_scale)
 
                 # Apply best scale from linesearch
                 x_dif[:] .*= ls_alpha
@@ -654,11 +652,13 @@ module solver
             end 
                 
             # Inform user
-            if mod(step,modprint) == 0 
-                info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
+            info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
+            if (modprint>0) && (mod(step, modprint)==0)
+                @info info_str
+            else
                 if step_ok
-                    @info info_str
-                else
+                    @debug info_str 
+                else 
                     @warn info_str 
                 end
             end

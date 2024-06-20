@@ -35,7 +35,7 @@ title = "PROTEUS configured"
     input_star      = "res/stellar_spectra/sun.txt" 
 
 [execution]
-    silent          = false  
+    verbosity       = 1                              
     max_steps       = 2000
     max_runtime     = 400    
     continua        = true   
