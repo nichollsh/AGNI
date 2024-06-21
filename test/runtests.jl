@@ -46,7 +46,7 @@ passing = true
 # -------------
 @info " "
 @info "Testing heat capacity functions"
-data_H2O::phys.Gas_t = phys.load_gas("H2O")
+data_H2O::phys.Gas_t = phys.load_gas("H2O", true)
 c_expt::Array{Float64, 1} = [35.22, 41.27 , 51.20 , 55.74 , 59.40 ]     # Expected values of cp [J mol-1 K-1]
 t_test::Array{Float64, 1} = [500.0, 1000.0, 2000.0, 3000.0, 5000.0]     # Tested values of temperature 
 cp_pass = true 
@@ -186,7 +186,7 @@ atmosphere.deallocate!(atmos)
 @info " "
 @info "Testing greenhouse effect"
 
-tmp_surf           = 1300.0    # Surface temperature [kelvin]
+tmp_surf        = 1300.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00    # Instellation flux [W m-2]
 p_surf          = 300.0    # bar
 theta           = 45.0
@@ -206,7 +206,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict=mf_dict,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
-                         overlap_method=4
+                         overlap_method=4, 
+                         condensates=["H2O"]
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.prevent_surfsupersat!(atmos)
