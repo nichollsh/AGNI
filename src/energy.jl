@@ -171,7 +171,7 @@ module energy
                 # skip unspecified gases
                 if s_gas in atmos.gas_all_names
                     # convert mole fraction to mass mixing ratio
-                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_all_vmr[s_gas][i] * phys.lookup_safe("mmw", s_gas) / atmos.layer_mmw[i]
+                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_all_vmr[s_gas][i] * atmos.gas_all_struct[s_gas].mmw / atmos.layer_mmw[i]
                 else 
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0
                 end 
@@ -459,7 +459,6 @@ module energy
         # Work variables
         a::Float64 = 1.0 
         pp::Float64 = 0.0
-        Psat::Float64 = 0.0
         qsat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
 
@@ -475,14 +474,13 @@ module energy
             end
 
             # check saturation
-            Psat = phys.calc_Psat(c, atmos.tmp[i])
-            qsat = Psat/atmos.p[i]
+            qsat = phys.get_Psat(atmos.gas_all_struct[c], atmo.tmp[i])/atmos.p[i]
             if (atmos.gas_all_vmr[c][i] < qsat+1.0e-10)
                 continue 
             end 
 
             # Check criticality 
-            if atmos.tmp[i] > phys.lookup_safe("t_crit",c)
+            if atmos.tmp[i] > atmos.gas_all_struct[c].T_crit
                 continue 
             end 
 
@@ -550,7 +548,7 @@ module energy
                 if atmos.gas_all_phase[c][i]
                     # dp = p_moist - p_dry < 0
                     delta_p = atmos.p[i]*(atmos.gas_all_vmr[c][i] - atmos.gas_all_vmr[c][i+1])
-                    dfdp[i] -= phys.lookup_safe("l_vap",c) * phys.lookup_safe("mmw",c) / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
+                    dfdp[i] -= phys.get_Lv(atmos.gas_all_struct[c], atmos.tmp[i]) * atmos.gas_all_struct[c].mmw / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
 
                     # set mask 
                     atmos.mask_l[i]   = atmos.mask_decay

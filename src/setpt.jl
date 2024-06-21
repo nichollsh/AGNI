@@ -253,7 +253,6 @@ module setpt
 
         x::Float64 = 0.0
         psat::Float64 = 0.0
-        Tsat::Float64 = 0.0
 
         # For each condensible volatile
         for gas in atmos.gas_all_names
@@ -263,10 +262,14 @@ module setpt
                 continue 
             end
 
+            # Check criticality 
+            if (atmos.tmpl[end] > atmos.gas_all_struct[gas].T_crit)
+                continue 
+            end 
+
             # Check surface pressure (should not be supersaturated)
-            psat = phys.calc_Psat(gas, atmos.tmpl[end])
-            Tsat = phys.calc_Tdew(gas, atmos.p_boa*x)
-            if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_safe("T_crit",gas))
+            psat = phys.get_Psat(atmos.gas_all_dict[gas], atmos.tmpl[end])
+            if x*atmos.pl[end] > psat
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
                 atmos.gas_all_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa  
@@ -311,13 +314,29 @@ module setpt
             return nothing
         end
 
-        # gas has thermodynamics setup?
-        if phys.lookup_safe("L_vap",gas) < 1e-20
-            return nothing
-        end
+        # gas is dry?
+        if !(gas in atmos.condensates)
+            return 
+        end 
 
-        # apply condensation curve 
-        atmosphere.apply_vlcc!(atmos, gas)
+        x::Float64 = 0.0
+        Tdew::Float64 = 0.0
+
+        # Check if each level is condensing. If it is, place on phase curve
+        for i in 1:atmos.nlev_c
+
+            x = atmos.gas_all_vmr[gas][i]
+            if x < 1.0e-10 
+                continue
+            end
+
+            # Set cell-centre temperatures
+            Tdew = phys.get_Tdew(atmos.gas_all_struct[gas], atmos.p[i])
+            atmos.tmp[i] = max(atmos.tmp[i], Tdew)
+        end
+        
+        # Set cell-edge temperatures
+        atmosphere.set_tmpl_from_tmp!(atmos)
 
         # calculate properties 
         atmosphere.calc_layer_props!(atmos)
