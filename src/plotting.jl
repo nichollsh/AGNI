@@ -58,18 +58,18 @@ module plotting
                 # for each level...
                 for i in 1:atmos.nlev_l
                     # check if supercritical
-                    if atmos.tmpl[i] >= atmos.gas_all_struct[c].T_crit
+                    if atmos.tmpl[i] >= atmos.gas_dat[c].T_crit
                         crt_i = i 
                         break
                     end 
                     # set point  
-                    sat_p[i] = phys.get_Psat(atmos.gas_all_struct[c], atmos.tmpl[i])
+                    sat_p[i] = phys.get_Psat(atmos.gas_dat[c], atmos.tmpl[i])
                 end 
                 # plot liquid-vapour curve for this condensate, stopping at critical point
                 plot!(plt, atmos.tmpl[1:crt_i], sat_p[1:crt_i]*1e-5, lc=phys.pretty_color(c), ls=:dash, label=phys.pretty_name(c))
 
                 # plot critical temperature 
-                plot!(plt, ones(Float64, atmos.nlev_l)*atmos.gas_all_struct[c].T_crit, atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label="")
+                plot!(plt, ones(Float64, atmos.nlev_l)*atmos.gas_dat[c].T_crit, atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label="")
             end 
         end
 
@@ -117,9 +117,9 @@ module plotting
         xmin::Float64 = -2
         this_min::Float64 = 0.0
 
-        for gas in atmos.gas_all_names
+        for gas in atmos.gas_names
             # get VMR
-            x_arr = log10.(clamp.(atmos.gas_all_vmr[gas][:],1e-100, 1e100))
+            x_arr = log10.(clamp.(atmos.gas_vmr[gas][:],1e-100, 1e100))
             this_min = minimum(x_arr)
             if this_min > -90
                 xmin = min(xmin, this_min)
