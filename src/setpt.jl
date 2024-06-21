@@ -255,24 +255,24 @@ module setpt
         psat::Float64 = 0.0
 
         # For each condensible volatile
-        for gas in atmos.gas_all_names
+        for gas in atmos.gas_names
             # Get mole fraction at surface
-            x = atmos.gas_all_vmr[gas][atmos.nlev_c]
+            x = atmos.gas_vmr[gas][atmos.nlev_c]
             if x < 1.0e-10
                 continue 
             end
 
             # Check criticality 
-            if (atmos.tmpl[end] > atmos.gas_all_struct[gas].T_crit)
+            if (atmos.tmpl[end] > atmos.gas_dat[gas].T_crit)
                 continue 
             end 
 
             # Check surface pressure (should not be supersaturated)
-            psat = phys.get_Psat(atmos.gas_all_dict[gas], atmos.tmpl[end])
+            psat = phys.get_Psat(atmos.gas_dict[gas], atmos.tmpl[end])
             if x*atmos.pl[end] > psat
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.gas_all_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa  
+                atmos.gas_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa  
 
                 # Check that p_boa is still reasonable 
                 if atmos.p_boa <= 10.0 * atmos.p_toa 
@@ -283,11 +283,11 @@ module setpt
 
         # Renormalise mole fractions
         tot_vmr = 0.0
-        for g in atmos.gas_all_names
-            tot_vmr += atmos.gas_all_vmr[g][atmos.nlev_c]
+        for g in atmos.gas_names
+            tot_vmr += atmos.gas_vmr[g][atmos.nlev_c]
         end 
-        for g in atmos.gas_all_names
-            atmos.gas_all_vmr[g][atmos.nlev_c] /= tot_vmr
+        for g in atmos.gas_names
+            atmos.gas_vmr[g][atmos.nlev_c] /= tot_vmr
         end 
 
         # Generate new pressure grid 
@@ -310,7 +310,7 @@ module setpt
         end 
 
         # gas is present?
-        if !(gas in atmos.gas_all_names)
+        if !(gas in atmos.gas_names)
             return nothing
         end
 
@@ -325,13 +325,13 @@ module setpt
         # Check if each level is condensing. If it is, place on phase curve
         for i in 1:atmos.nlev_c
 
-            x = atmos.gas_all_vmr[gas][i]
+            x = atmos.gas_vmr[gas][i]
             if x < 1.0e-10 
                 continue
             end
 
             # Set cell-centre temperatures
-            Tdew = phys.get_Tdew(atmos.gas_all_struct[gas], atmos.p[i])
+            Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i])
             atmos.tmp[i] = max(atmos.tmp[i], Tdew)
         end
         

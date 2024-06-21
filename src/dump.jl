@@ -111,7 +111,7 @@ module dump
             # Create dimensions
             nlev_c = Int(atmos.nlev_c)
             nlev_l = nlev_c + 1
-            ngases = atmos.gas_all_num
+            ngases = atmos.gas_num
             nchars = 16
 
             defDim(ds, "nlev_c", nlev_c)        # Cell centres
@@ -260,18 +260,18 @@ module dump
             var_thick[:]  = atmos.layer_thick
 
             # Composition
-            for (i_gas,gas) in enumerate(atmos.gas_all_names)
+            for (i_gas,gas) in enumerate(atmos.gas_names)
                 # Fill gas names
                 for i_char in 1:nchars 
                     var_gases[i_char, i_gas] = ' '
                 end 
-                for i_char in 1:length(atmos.gas_all_names[i_gas])
-                    var_gases[i_char,i_gas] = atmos.gas_all_names[i_gas][i_char]
+                for i_char in 1:length(atmos.gas_names[i_gas])
+                    var_gases[i_char,i_gas] = atmos.gas_names[i_gas][i_char]
                 end 
 
                 # Fill VMR
                 for i_lvl in 1:nlev_c
-                    var_x[i_gas, i_lvl] = atmos.gas_all_vmr[gas][i_lvl]
+                    var_x[i_gas, i_lvl] = atmos.gas_vmr[gas][i_lvl]
                 end 
             end 
             
