@@ -10,6 +10,7 @@ module phys
 
     using NCDatasets
     using PCHIPInterpolation
+    using LoggingExtras
 
     # Sources:
     # - Pierrehumbert (2010)
@@ -102,6 +103,10 @@ module phys
         formula::String     # Formula used by SOCRATES
         JANAF_name::String  # JANAF name 
 
+        # Is this a stub?
+        #   This is the case when we cannot find an appropriate data file
+        stub::Bool
+
         # Constituent atoms (dictionary of numbers)
         atoms::Dict{String, Int}
 
@@ -115,17 +120,17 @@ module phys
         # Saturation curve 
         sat_T::Array{Float64,1}     # Reference temperatures [K]
         sat_P::Array{Float64,1}     # Corresponding saturation pressures [Pa]
-        sat_i::Interpolator         # Interpolator struct
+        sat_I::Interpolator         # Interpolator struct
 
         # Latent heat (enthalpy) of phase change
         lat_T::Array{Float64,1}     # Reference temperatures [K]
         lat_H::Array{Float64,1}     # Corresponding heats [J kg-1]
-        lat_i::Interpolator         # Interpolator struct
+        lat_I::Interpolator         # Interpolator struct
 
         # Specific heat capacity
         cap_T::Array{Float64,1}     # Reference temperatures [K]
-        cap_C::Array{Float64,1}     # Corresponding Cp values [J mol-1 K-1]
-        cap_i::Interpolator         # Interpolator struct
+        cap_C::Array{Float64,1}     # Corresponding Cp values [J K-1 kg-1]
+        cap_I::Interpolator         # Interpolator struct
 
         # Plotting colour (hex code) and label
         plot_color::String 
@@ -156,7 +161,6 @@ module phys
         # refractory elements 
         ("Fe" , "#ff22ff"),
     ])
-
 
     """
     Get number of atoms from formula, returning a dictionary
@@ -217,7 +221,7 @@ module phys
 
         # already defined?
         if m in keys(lookup_mmw)
-           return lookup_mmw[formula]
+           return lookup_mmw[m]
         end 
 
         # get atoms 
@@ -281,9 +285,11 @@ module phys
     """
     function load_gas(formula::String)::Gas_t
 
+        @debug ("Loading data for gas $formula")
+
         # Clean input and get file path
-        formula = strip(formula)
-        fpath = joinpath(abspath(@__FILE__), "..", "res", "thermo", "$formula.ncdf" )
+        formula = String(strip(formula))
+        fpath = abspath(joinpath(dirname(abspath(@__FILE__)), "..", "res", "thermo", "$formula.ncdf" ))
 
         # Initialise struct 
         gas = Gas_t()
@@ -297,8 +303,11 @@ module phys
         gas.plot_label = pretty_name(formula)
 
         # Check if we have data from file 
-        if !isfile(fpath)
+        gas.stub = !isfile(fpath)
+        if gas.stub
             # no data => generate stub
+            @debug("    stub")
+
             gas.mmw = get_mmw(formula)
             gas.JANAF_name = "_unknown"
 
@@ -320,13 +329,14 @@ module phys
 
         else
             # have data => load from file 
+            @debug("    ncdf")
             ds = Dataset(fpath,"r")
 
             # scalar properties  
             gas.mmw = ds["mmw"][1]
             gas.T_trip = ds["T_trip"][1]
             gas.T_crit = ds["T_crit"][1]
-            gas.JANAF_name = ds["JANAF"][1]
+            gas.JANAF_name = String(ds["JANAF"][:])
 
             # variable properties 
             gas.cap_T = ds["cap_T"][:]
@@ -341,58 +351,16 @@ module phys
             # close file 
             close(ds)
 
+            # setup interpolators 
+            gas.cap_I = Interpolator(gas.cap_T, gas.cap_C)
+            gas.lat_I = Interpolator(gas.lat_T, gas.lat_H)
+            gas.sat_I = Interpolator(gas.sat_T, gas.sat_P)
+
         end 
 
+        @debug("    done")
         return gas
     end # end load_gas 
-
-    """
-    Helper function to find the nearest index in an array to a value 
-    """
-    function _findnearest(val::Float64, arr:Array{Float64,1})::Int
-        return findmin(abs.(arr-val))[2]
-    end 
-
-    """
-    Helper function to find the two elements of an array which bound a value.
-    
-    Assumes that the array is sorted.
-    """
-    function _findbounding(val::Float64, arr:Array{Float64,1})::Tuple{Int,Int}
-
-        # Get length of the search array
-        l::Int = length(arr)
-
-        # Invalid case 
-        if l < 2
-            error("Cannot find bounding elements in array of length <2")
-        end 
-
-        # Trivial case 
-        if l == 2
-            return (1,2)
-        end 
-
-        # Closest element
-        i::Int = _findnearest(val, arr)
-
-        # Handle cases where we are at either end of the array
-        if i == 1
-            return (1,2)
-        elseif i == l
-            return (l-1,l)
-        end 
-
-        # Check either side
-        if arr[i] > val 
-            # left side 
-            return (i-1, i)
-        else 
-            # right side 
-            return (i, i+1)
-        end 
-
-    end 
 
     """
     **Get gas saturation pressure for a given temperature.**
@@ -409,22 +377,86 @@ module phys
     """
     function get_Psat(gas::Gas_t, t::Float64=-1.0)::Float64 
 
+        # Handle stub case 
+        if gas.stub 
+            return gas.sat_P[1]
+        end 
+
         # Above critical point. In practice, a check for this should be made 
         #    before any attempts to evaluate this function.
         if t > gas.T_crit
             return fbig 
         end 
 
-        # Temperature not provided 
+        # Temperature not provided => use triple point 
         if t < 0.0
             t = gas.T_trip + 1.0e-2
         end 
 
-        # Find nearest lookup points 
-        b::Tuple{Int, Int} = _findbounding(gas.sat_T, t)
+        # Get value from interpolator
+        return gas.sat_I(t)
+    end 
 
-        # Interpolate between points 
-        out::Float64 = ()/(gas.sat_Tb[1]-b[0])
+    """
+    **Get gas enthalpy (latent heat) of phase change.**
+
+    If temperature is ommitted, then the triple point is used. If the
+    temperature is above the critical point, then a zero value is returned.
+
+    Arguments:
+    - `gas::Gas_t`              the gas struct to be used
+    - `t::Float64`              temperature [K]
+
+    Returns:
+    - `h::Float64`              enthalpy of phase change [J kg-1]
+    """
+    function get_Lv(gas::Gas_t, t::Float64=-1.0)::Float64 
+
+        # Handle stub case 
+        if gas.stub 
+            return gas.lat_H[1]
+        end 
+
+        # Above critical point
+        if t > gas.T_crit
+            return 0.0
+        end 
+
+        # Temperature not provided => use triple point 
+        if t < 0.0
+            t = gas.T_trip + 1.0e-2
+        end 
+
+        # Get value from interpolator
+        return gas.vap_I(t)
+    end 
+
+    """
+    **Get gas heat capacity for a given temperature.**
+
+    If temperature is ommitted, then the triple point is used.
+
+    Arguments:
+    - `gas::Gas_t`              the gas struct to be used
+    - `t::Float64`              temperature [K]
+
+    Returns:
+    - `cp::Float64`             heat capacity of gas [J K-1 kg-1]
+    """
+    function get_Cp(gas::Gas_t, t::Float64=-1.0)::Float64 
+
+        # Handle stub case 
+        if gas.stub 
+            return gas.cap_C[1]
+        end 
+
+        # Temperature not provided => use triple point 
+        if t < 0.0
+            t = gas.T_trip + 1.0e-2
+        end 
+
+        # Get value from interpolator
+        return gas.cap_I(t)
     end 
     
 end # end module 
