@@ -107,6 +107,9 @@ module phys
         #   This is the case when we cannot find an appropriate data file
         stub::Bool
 
+        # Should evaluations be temperature-dependent or use constant values?
+        tmp_dep::Bool
+
         # Constituent atoms (dictionary of numbers)
         atoms::Dict{String, Int}
 
@@ -283,7 +286,7 @@ module phys
     """
     Load gas data into a new struct  
     """
-    function load_gas(formula::String)::Gas_t
+    function load_gas(formula::String, tmp_dep::Bool)::Gas_t
 
         @debug ("Loading data for gas $formula")
 
@@ -294,6 +297,7 @@ module phys
         # Initialise struct 
         gas = Gas_t()
         gas.formula = formula 
+        gas.tmp_dep = tmp_dep
 
         # Count atoms 
         gas.atoms = count_atoms(formula)
@@ -365,8 +369,8 @@ module phys
     """
     **Get gas saturation pressure for a given temperature.**
 
-    If temperature is ommitted, then the triple point is used. If the
-    temperature is above the critical point, then a large value is returned.
+    If the temperature is above the critical point, then a large value 
+    is returned.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -375,7 +379,7 @@ module phys
     Returns:
     - `p::Float64`              saturation pressure [Pa]
     """
-    function get_Psat(gas::Gas_t, t::Float64=-1.0)::Float64 
+    function get_Psat(gas::Gas_t, t::Float64)::Float64 
 
         # Handle stub case 
         if gas.stub 
@@ -388,8 +392,8 @@ module phys
             return fbig 
         end 
 
-        # Temperature not provided => use triple point 
-        if t < 0.0
+        # Constant value
+        if !gas.tmp_dep
             t = gas.T_trip + 1.0e-2
         end 
 
@@ -398,10 +402,39 @@ module phys
     end 
 
     """
+    **Approximate dew point temperature without interpolation**
+
+    This should be avoided as much as possible.
+
+    Arguments:
+    - `gas::Gas_t`              the gas struct to be used
+    - `p::Float64`              pressure [Pa]
+
+    Returns:
+    - `t::Float64`              dew point temperature [K]
+    """
+    function get_Tdew(gas::Gas_t, p::Float64)::Float64 
+
+        # Handle stub case 
+        if gas.stub 
+            return 0.0
+        end 
+
+        # Out of range
+        if p > maximum(gas.sat_P)
+            return 0.0 
+        end 
+
+        # Find closest value in array 
+        i::Int = argmin(abs.(gas.sat_P .- p))
+        return gas.sat_T[i]
+    end 
+
+    """
     **Get gas enthalpy (latent heat) of phase change.**
 
-    If temperature is ommitted, then the triple point is used. If the
-    temperature is above the critical point, then a zero value is returned.
+    If the temperature is above the critical point, then a zero value 
+    is returned.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -410,7 +443,7 @@ module phys
     Returns:
     - `h::Float64`              enthalpy of phase change [J kg-1]
     """
-    function get_Lv(gas::Gas_t, t::Float64=-1.0)::Float64 
+    function get_Lv(gas::Gas_t, t::Float64)::Float64 
 
         # Handle stub case 
         if gas.stub 
@@ -422,8 +455,8 @@ module phys
             return 0.0
         end 
 
-        # Temperature not provided => use triple point 
-        if t < 0.0
+        # Constanta value
+        if !gas.tmp_dep
             t = gas.T_trip + 1.0e-2
         end 
 
@@ -434,8 +467,6 @@ module phys
     """
     **Get gas heat capacity for a given temperature.**
 
-    If temperature is ommitted, then the triple point is used.
-
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
     - `t::Float64`              temperature [K]
@@ -443,20 +474,36 @@ module phys
     Returns:
     - `cp::Float64`             heat capacity of gas [J K-1 kg-1]
     """
-    function get_Cp(gas::Gas_t, t::Float64=-1.0)::Float64 
+    function get_Cp(gas::Gas_t, t::Float64)::Float64 
 
         # Handle stub case 
         if gas.stub 
             return gas.cap_C[1]
         end 
 
-        # Temperature not provided => use triple point 
-        if t < 0.0
+        # Constant value
+        if !gas.tmp_dep
             t = gas.T_trip + 1.0e-2
         end 
 
         # Get value from interpolator
         return gas.cap_I(t)
+    end 
+
+    """
+    **Get gas thermal conductivity at a given temperature.**
+
+    Arguments:
+    - `gas::Gas_t`              the gas struct to be used
+    - `t::Float64`              temperature [K]
+
+    Returns:
+    - `kc::Float64`             thermal conductivity [W m-1 K-1]
+    """
+    function get_Kc(gas::Gas_t, t::Float64=-1.0)::Float64 
+
+        return 0.0
+        
     end 
     
 end # end module 

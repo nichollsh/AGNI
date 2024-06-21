@@ -52,24 +52,24 @@ module plotting
 
         # Plot condensation curves 
         if length(atmos.condensates) > 0
-            sat_t = zeros(Float64, atmos.nlev_l)
+            sat_p = zeros(Float64, atmos.nlev_l)
             crt_i = atmos.nlev_l  # index at which criticality occurs
             for c in atmos.condensates
                 # for each level...
                 for i in 1:atmos.nlev_l
-                    # set point  
-                    sat_t[i] = phys.calc_Tdew(c, atmos.pl[i])
                     # check if supercritical
-                    if sat_t[i] >= phys.lookup_safe("t_crit", c)
+                    if atmos.tmpl[i] >= atmos.gas_all_struct[c].T_crit
                         crt_i = i 
                         break
                     end 
+                    # set point  
+                    sat_p[i] = phys.get_Psat(atmos.gas_all_struct[c], atmos.tmpl[i])
                 end 
                 # plot liquid-vapour curve for this condensate, stopping at critical point
-                plot!(plt, sat_t[1:crt_i], atmos.pl[1:crt_i]*1e-5, lc=phys.pretty_color(c), ls=:dash, label=phys.pretty_name(c))
+                plot!(plt, atmos.tmpl[1:crt_i], sat_p[1:crt_i]*1e-5, lc=phys.pretty_color(c), ls=:dash, label=phys.pretty_name(c))
 
                 # plot critical temperature 
-                plot!(plt, ones(Float64, atmos.nlev_l)*phys.lookup_safe("t_crit", c), atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label="")
+                plot!(plt, ones(Float64, atmos.nlev_l)*atmos.gas_all_struct[c].T_crit, atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label="")
             end 
         end
 
