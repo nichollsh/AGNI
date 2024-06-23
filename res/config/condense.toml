@@ -38,7 +38,7 @@ title = "Condensation test"                    # Name for this configuration fil
     cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
-    thermo_funct    = false                     # Accounting temperature dependence of thermodynamic properties?
+    thermo_funct    = true                     # Accounting temperature dependence of thermodynamic properties?
     sensible_heat   = true                     # Include sensible heat transport at the surface?
     latent_heat     = true                      # Include latent heat release?
     convection_type = "mlt"                        # Convection type ("" = no convection, "mlt" = use mixing length theory).
