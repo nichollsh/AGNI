@@ -301,6 +301,11 @@ module phys
 
         # Count atoms 
         gas.atoms = count_atoms(formula)
+        for e in keys(gas.atoms)
+            if !(e in elements_list)
+                error("Gas '$formula' contains unsupported element '$e'")
+            end 
+        end 
         
         # Set plotting color and label 
         gas.plot_color = pretty_color(formula)

@@ -1027,30 +1027,24 @@ module atmosphere
         # VMRs are provided to SOCRATES when radtrans is called
         # For now, they are just stored inside the atmos struct
 
-        # Warn for unspported gases 
-        for g in atmos.gas_names 
-            if !(g in atmos.gas_soc_names) 
-                @warn "Gas $g is not present in the spectral file"
-            end 
-        end 
-
         # Print info on the gases
+        @info "Allocated atmosphere with composition"
         gas_flags::String = ""
         for g in atmos.gas_names 
             gas_flags = ""
-            if g in atmos.gas_soc_names     # flag as included in radtrans
-                gas_flags *= "xsec "
+            if !(g in atmos.gas_soc_names)  # flag as included in radtrans
+                gas_flags *= "NO_OPACITY "
             end
             if g in atmos.condensates       # flag as condensible 
-                gas_flags *= "cond "
+                gas_flags *= "CNDSBLE "
             end 
             if atmos.gas_dat[g].stub        # flag as containing stub thermo data
-                gas_flags *= "stub "
+                gas_flags *= "NO_THERMO "
             end 
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
             end 
-            @info @sprintf("    added gas %-5s %s", g, gas_flags)
+            @info @sprintf("    %6.2e %-5s %s", atmos.gas_vmr[g][end], g, gas_flags)
         end 
  
 
