@@ -41,35 +41,38 @@ module plotting
                             title::String="")
         
         # Interleave cell-centre and cell-edge arrays
-        arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
-        arr_P *= 1e-5
-
-        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
+        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
         plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(size_x,size_y), guidefontsize=9, titlefontsize=9)
 
-        # Plot condensation curves 
+        # Plot phase boundary 
         if length(atmos.condensates) > 0
-            sat_p = zeros(Float64, atmos.nlev_l)
-            crt_i = atmos.nlev_l  # index at which criticality occurs
+            sat_t::Array{Float64,1} = zeros(Float64, atmos.nlev_c)
+            crt_i::Int = atmos.nlev_c  # index at which criticality occurs
             for c in atmos.condensates
+
                 # for each level...
-                for i in 1:atmos.nlev_l
+                i = 1
+                crt_i = atmos.nlev_c
+                while (i < crt_i) && (i <= atmos.nlev_c)
+                    # get dew point temperature from this partial pressure 
+                    sat_t[i] = phys.get_Tdew(atmos.gas_dat[c], atmos.pl[i]*atmos.gas_vmr[c][i]) 
+
                     # check if supercritical
-                    if atmos.tmpl[i] >= atmos.gas_dat[c].T_crit
-                        crt_i = i 
-                        break
+                    if sat_t[i] >= atmos.gas_dat[c].T_crit
+                        crt_i = i
                     end 
-                    # set point  
-                    sat_p[i] = phys.get_Psat(atmos.gas_dat[c], atmos.tmpl[i])
+
+                    i += 1
                 end 
-                # plot liquid-vapour curve for this condensate, stopping at critical point
-                plot!(plt, atmos.tmpl[1:crt_i], sat_p[1:crt_i]*1e-5, lc=phys.pretty_color(c), ls=:dash, label=phys.pretty_name(c))
+
+                # plot phase boundary for this condensate, stopping at critical point
+                plot!(plt, sat_t[1:crt_i], atmos.p[1:crt_i]*1e-5, lc=atmos.gas_dat[c].plot_color, ls=:dot, label=atmos.gas_dat[c].plot_label)
 
                 # plot critical temperature 
-                plot!(plt, ones(Float64, atmos.nlev_l)*atmos.gas_dat[c].T_crit, atmos.pl*1e-5, lc=phys.pretty_color(c), ls=:dot, label="")
+                # scatter!(plt, [atmos.gas_dat[c].T_crit], [atmos.p[crt_i]*1e-5], mc=atmos.gas_dat[c].plot_color, label="")
             end 
         end
 
@@ -82,7 +85,7 @@ module plotting
         scatter!(plt, [atmos.tmp_surf], [atmos.pl[end]*1e-5], color="brown3", label=L"T_s")
 
         # Plot profile 
-        plot!(plt, arr_T, arr_P, lc="black", lw=2, label=L"T(p)")
+        plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=2, label=L"T(p)")
 
         # Decorate
         xlabel!(plt, "Temperature [K]")
