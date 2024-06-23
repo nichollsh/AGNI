@@ -440,7 +440,6 @@ module atmosphere
                     atmos.gas_vmr[gas_valid] = ones(Float64, atmos.nlev_c)*value 
                     push!(atmos.gas_names, gas_valid)
                     atmos.gas_num += 1
-                    @info "    added gas $gas_valid"
                 end 
             end
         end # end read VMR from dict
@@ -463,16 +462,11 @@ module atmosphere
             for h in heads
                 gas_valid = strip(h, [' ','\t','\n'])
                 # Check if repeated 
-                if gas_valid in atmos.gas_names
-                    @warn "    skipping duplicate gas $gas_valid"
-
-                # Not repeated...
-                else 
+                if !(gas_valid in atmos.gas_names)
                     # Store zero VMR for now
                     atmos.gas_vmr[gas_valid] = zeros(Float64, atmos.nlev_c)
                     push!(atmos.gas_names, gas_valid)
                     atmos.gas_num += 1
-                    @info "    added gas $gas_valid"
                 end 
             end 
 
@@ -571,6 +565,22 @@ module atmosphere
         # Load gas thermodynamic data 
         for g in atmos.gas_names 
             atmos.gas_dat[g] = phys.load_gas(g, atmos.thermo_funct)
+        end 
+
+        # Print info on the gases
+        gas_flags::String = ""
+        for g in atmos.gas_names 
+            gas_flags = ""
+            if g in atmos.condensates
+                gas_flags *= "cond "
+            end 
+            if atmos.gas_dat[g].stub
+                gas_flags *= "stub "
+            end 
+            if !isempty(gas_flags)
+                gas_flags = "($(gas_flags[1:end-1]))"
+            end 
+            @info "    added gas $g $gas_flags"
         end 
 
         # Fastchem 
@@ -1664,8 +1674,9 @@ module atmosphere
 
     # Get interleaved cell-centre and cell-edge PT grid
     function get_interleaved_pt(atmos::atmosphere.Atmos_t)
-        arr_T = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
-        arr_P = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
+        arr_T::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
+        arr_P::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
+        idx::Int = 1
 
         # top
         arr_T[1] = atmos.tmpl[1]

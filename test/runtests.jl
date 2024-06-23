@@ -47,8 +47,8 @@ passing = true
 @info " "
 @info "Testing heat capacity functions"
 data_H2O::phys.Gas_t = phys.load_gas("H2O", true)
-c_expt::Array{Float64, 1} = [35.22, 41.27 , 51.20 , 55.74 , 59.40 ]     # Expected values of cp [J mol-1 K-1]
-t_test::Array{Float64, 1} = [500.0, 1000.0, 2000.0, 3000.0, 5000.0]     # Tested values of temperature 
+c_expt::Array{Float64, 1} = [4.975, 35.22, 41.27 , 51.20 , 55.74 , 59.40 ]     # Expected values of cp [J mol-1 K-1]
+t_test::Array{Float64, 1} = [10.0,  500.0, 1000.0, 2000.0, 3000.0, 5000.0]     # Tested values of temperature 
 cp_pass = true 
 for i in 1:5
     c_this = phys.get_Cp(data_H2O, t_test[i]) * data_H2O.mmw # get value and convert units 

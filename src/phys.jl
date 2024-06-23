@@ -392,11 +392,6 @@ module phys
             return fbig 
         end 
 
-        # Constant value
-        if !gas.tmp_dep
-            t = gas.T_trip + 1.0e-2
-        end 
-
         # Get value from interpolator
         return gas.sat_I(t)
     end 
@@ -404,7 +399,7 @@ module phys
     """
     **Approximate dew point temperature without interpolation**
 
-    This should be avoided as much as possible.
+    This should be avoided as much as possible. Does not check for criticality.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -418,11 +413,6 @@ module phys
         # Handle stub case 
         if gas.stub 
             return 0.0
-        end 
-
-        # Out of range
-        if p > maximum(gas.sat_P)
-            return 0.0 
         end 
 
         # Find closest value in array 
@@ -455,13 +445,13 @@ module phys
             return 0.0
         end 
 
-        # Constanta value
+        # Constant value
         if !gas.tmp_dep
             t = gas.T_trip + 1.0e-2
         end 
 
         # Get value from interpolator
-        return gas.vap_I(t)
+        return gas.lat_I(t)
     end 
 
     """
