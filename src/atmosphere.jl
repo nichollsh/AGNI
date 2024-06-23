@@ -567,22 +567,6 @@ module atmosphere
             atmos.gas_dat[g] = phys.load_gas(g, atmos.thermo_funct)
         end 
 
-        # Print info on the gases
-        gas_flags::String = ""
-        for g in atmos.gas_names 
-            gas_flags = ""
-            if g in atmos.condensates
-                gas_flags *= "cond "
-            end 
-            if atmos.gas_dat[g].stub
-                gas_flags *= "stub "
-            end 
-            if !isempty(gas_flags)
-                gas_flags = "($(gas_flags[1:end-1]))"
-            end 
-            @info "    added gas $g $gas_flags"
-        end 
-
         # Fastchem 
         atmos.fastchem_flag = false 
         if !isempty(fastchem_path)
@@ -1049,6 +1033,26 @@ module atmosphere
                 @warn "Gas $g is not present in the spectral file"
             end 
         end 
+
+        # Print info on the gases
+        gas_flags::String = ""
+        for g in atmos.gas_names 
+            gas_flags = ""
+            if g in atmos.gas_soc_names     # flag as included in radtrans
+                gas_flags *= "xsec "
+            end
+            if g in atmos.condensates       # flag as condensible 
+                gas_flags *= "cond "
+            end 
+            if atmos.gas_dat[g].stub        # flag as containing stub thermo data
+                gas_flags *= "stub "
+            end 
+            if !isempty(gas_flags)
+                gas_flags = "($(gas_flags[1:end-1]))"
+            end 
+            @info @sprintf("    added gas %-5s %s", g, gas_flags)
+        end 
+ 
 
         # Calc layer properties
         calc_layer_props!(atmos)
