@@ -254,7 +254,7 @@ module setpt
         x::Float64 = 0.0
         psat::Float64 = 0.0
 
-        # For each condensible volatile
+        # For each condensable volatile
         for gas in atmos.gas_names
             # Get mole fraction at surface
             x = atmos.gas_vmr[gas][atmos.nlev_c]
