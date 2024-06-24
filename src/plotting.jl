@@ -58,7 +58,7 @@ module plotting
                 crt_i = atmos.nlev_c
                 while (i < crt_i) && (i <= atmos.nlev_c)
                     # get dew point temperature from this partial pressure 
-                    sat_t[i] = phys.get_Tdew(atmos.gas_dat[c], atmos.pl[i]*atmos.gas_vmr[c][i]) 
+                    sat_t[i] = phys.get_Tdew(atmos.gas_dat[c], atmos.pl[i]) 
 
                     # check if supercritical
                     if sat_t[i] >= atmos.gas_dat[c].T_crit
