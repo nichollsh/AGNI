@@ -145,11 +145,11 @@ module solver
 
         #    linesearch 
         ls_max_steps::Int  =    22      # maximum steps 
-        ls_min_scale::Float64 = 2.0e-3  # minimum scale
+        ls_min_scale::Float64 = 1.0e-3  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    1000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =    80.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -581,15 +581,6 @@ module solver
                 stepflags *= "Lm-"
             end
 
-            # Extrapolate step if on plateau 
-            #    this acts to give the solver a 'nudge' in (hopefully) the 
-            #    right direction. Otherwise, this perturbation can still help.
-            if plateau_i > plateau_n
-                x_dif[:] .*= plateau_s
-                plateau_i = 0
-                stepflags *= "X-"
-            end 
-
             # Limit step size, without changing direction of dx vector
             x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
@@ -617,6 +608,16 @@ module solver
 
             end # end linesearch 
 
+            # Extrapolate step if on plateau 
+            #    this acts to give the solver a 'nudge' in (hopefully) the 
+            #    right direction. Otherwise, this perturbation can still help.
+            if plateau_i > plateau_n
+                x_dif[:] .*= plateau_s
+                plateau_i = 0
+                stepflags *= "X-"
+            end 
+
+
             # Take the step 
             x_cur[:] .= x_old[:] .+ x_dif[:]
             clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
@@ -628,7 +629,7 @@ module solver
 
             # If cost ratio is near unity, then the model is struggling
             # to move around because it's on a "plateau" in solution space
-            if (plateau_r < c_cur/c_old < 1.01 ) && detect_plateau
+            if (plateau_r < c_cur/c_old < 1.0/plateau_r ) && detect_plateau
                 plateau_i += 1
             else 
                 plateau_i = 0

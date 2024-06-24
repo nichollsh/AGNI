@@ -346,7 +346,7 @@ module energy
             # Define moist elsewhere eventually, link to condensates
             # To do:
             #  - Find regions where we are condensing (pass from the condensation scheme)
-            #  - Find the condensible with the largest value of (L/RT)^2*x 
+            #  - Find the condensable with the largest value of (L/RT)^2*x 
             #  - Calculate the adiabatic lapse rate
             #  - Calculate stabilisation w.r.t. the adiabat using criterion
             #  - Set the vapour contents to the new saturated value
@@ -357,7 +357,7 @@ module energy
             ##             condensation first!
             
             # if length(condensing[i])>0
-            #     # Check which condensible species has the largest (L/RT)^2*x
+            #     # Check which condensable species has the largest (L/RT)^2*x
                 
             #     maxval = -1000
             #     for c in condensing[i]
@@ -522,7 +522,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 1e5      # seconds
+        timescale::Float64 = 5e4      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -534,7 +534,7 @@ module energy
         end 
 
         # Work arrays 
-        delta_p::Float64 =  0.0
+        layer_area::Float64 =  0.0
         dfdp::Array = zeros(Float64, atmos.nlev_c)
 
         # Handle rainout
@@ -543,18 +543,17 @@ module energy
         # Loop from bottom to top 
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
+            layer_area = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0
+
             # Calculate latent heat release at this level from change in x_gas 
             for c in atmos.condensates
                 if atmos.gas_phase[c][i]
-                    # dp = p_moist - p_dry < 0
-                    delta_p = atmos.p[i]*(atmos.gas_vmr[c][i] - atmos.gas_vmr[c][i+1])
-                    dfdp[i] -= phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_dat[c].mmw / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
+                    dfdp[i] = phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_cprod[c][i] / ( (atmos.pl[i+1]-atmos.pl[i]) * timescale * layer_area)
 
                     # set mask 
                     atmos.mask_l[i]   = atmos.mask_decay
                     atmos.mask_l[i+1] = atmos.mask_decay
                 end
-
             end 
 
         end # go to next level
