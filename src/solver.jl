@@ -149,7 +149,7 @@ module solver
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    80.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =    8000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -581,6 +581,15 @@ module solver
                 stepflags *= "Lm-"
             end
 
+            # Extrapolate step if on plateau 
+            #    this acts to give the solver a 'nudge' in (hopefully) the 
+            #    right direction. Otherwise, this perturbation can still help.
+            if plateau_i > plateau_n
+                x_dif[:] .*= plateau_s
+                plateau_i = 0
+                stepflags *= "X-"
+            end 
+
             # Limit step size, without changing direction of dx vector
             x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
@@ -607,16 +616,6 @@ module solver
                 x_dif[:] .*= ls_alpha
 
             end # end linesearch 
-
-            # Extrapolate step if on plateau 
-            #    this acts to give the solver a 'nudge' in (hopefully) the 
-            #    right direction. Otherwise, this perturbation can still help.
-            if plateau_i > plateau_n
-                x_dif[:] .*= plateau_s
-                plateau_i = 0
-                stepflags *= "X-"
-            end 
-
 
             # Take the step 
             x_cur[:] .= x_old[:] .+ x_dif[:]
