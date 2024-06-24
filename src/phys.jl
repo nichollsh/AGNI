@@ -43,6 +43,8 @@ module phys
 
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict{String, Float64}([
+        ("C",  0.012011 ),
+        ("H",  0.001008 ),
         ("H2O", 1.801530E-02 ), 
         ("CO2", 4.401000E-02 ), 
         ("O3", 4.799820E-02 ), 
@@ -56,13 +58,6 @@ module phys
         ("NH3", 1.703060E-02 ), 
         ("HNO3", 6.301290E-02 ), 
         ("N2", 2.801340E-02 ), 
-        ("CFC11", 1.373686E-01 ), 
-        ("CFC12", 1.209140E-01 ), 
-        ("CFC113", 1.873765E-01 ), 
-        ("HCFC22", 8.646892E-02 ), 
-        ("HFC125", 1.200223E-01 ), 
-        ("HFC134A", 1.020318E-01 ), 
-        ("CFC114", 1.709210E-01 ), 
         ("TiO", 6.386600E-02 ), 
         ("VO", 6.694090E-02 ), 
         ("H2", 2.015880E-03 ), 
@@ -163,6 +158,7 @@ module phys
 
         # refractory elements 
         ("Fe" , "#ff22ff"),
+        ("Si" , "#FF9D35"),
     ])
 
     """
@@ -228,7 +224,7 @@ module phys
         end 
 
         # get atoms 
-        atoms = count_atoms(m)
+        atoms::Dict{String, Int} = count_atoms(m)
 
         # add up atoms 
         mmw::Float64 = 0.0
@@ -236,7 +232,7 @@ module phys
             mmw += lookup_mmw[k]*atoms[k]
         end
 
-        return 
+        return mmw
     end
 
     """
@@ -310,6 +306,8 @@ module phys
         # Set plotting color and label 
         gas.plot_color = pretty_color(formula)
         gas.plot_label = pretty_name(formula)
+
+        get_mmw(formula)
 
         # Check if we have data from file 
         gas.stub = !isfile(fpath)
