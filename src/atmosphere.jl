@@ -1429,6 +1429,7 @@ module atmosphere
         fill!(atmos.cloud_arr_l, 0.0)
         fill!(atmos.cloud_arr_f, 0.0)
 
+
         # Loop from bottom to top (does not include bottommost level)
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
@@ -1437,26 +1438,27 @@ module atmosphere
             # For each condensate 
             for c in atmos.condensates
 
-                # reset rain 
-                rain_kg[c] = 0.0
-                cond_kg[c] = 0.0
+                # Reset condensation and rain
+                cond_kg[c] = 0.0                    # kg of 'c' condensate produced at this level 
+                rain_kg[c] = 0.0                    # kg of ^ rained-out from this level
 
                 # check criticality 
                 supcrit = atmos.tmp[i] > atmos.gas_dat[c].T_crit+1.0e-10
-                if !supcrit
-                    # if subcritical, mixing ratio set by saturation and cold-trapping
-                    x_sat = min(maxvmr[c], phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i]) / atmos.p[i])
-                else
-                    # if supercritical, mixing ratio only set by cold-trapping
-                    x_sat = maxvmr[c]
-                end 
 
-                # saturate and cold-trap
-                if atmos.gas_vmr[c][i] > x_sat
+                # saturation mixing ratio 
+                x_sat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i]) / atmos.p[i]
+
+                # cold trap 
+                if atmos.gas_vmr[c][i] > maxvmr[c]
+                    atmos.gas_vmr[c][i] = maxvmr[c]
+                    atmos.gas_phase[c][i] = true 
+                end 
+                
+                # condense if supersaturated
+                if (atmos.gas_vmr[c][i] > x_sat) && !supcrit
 
                     # set rainout kg 
-                    dx = atmos.gas_vmr[c][i] - x_sat
-                    cond_kg[c] = layer_area * (atmos.gas_dat[c].mmw/atmos.layer_mmw[i])*atmos.p[i]*dx/atmos.layer_grav[i]
+                    cond_kg[c] = layer_area * (atmos.gas_dat[c].mmw/atmos.layer_mmw[i])*atmos.p[i]*(atmos.gas_vmr[c][i] - x_sat)/atmos.layer_grav[i]
                     rain_kg[c] = cond_kg[c] * (1.0 - cond_retention_frac)
 
                     # condensation yield at this level 
@@ -1469,9 +1471,7 @@ module atmosphere
                     maxvmr[c] = x_sat
 
                     # flag condensate as actively condensing at this level
-                    if !supcrit 
-                        atmos.gas_phase[c][i] = true 
-                    end
+                    atmos.gas_phase[c][i] = true 
                 end 
             end # end condensates
 
