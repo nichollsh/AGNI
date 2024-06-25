@@ -170,26 +170,27 @@ module setpt
             error("Atmosphere is not setup or allocated")
         end 
 
+        # Thermodynamics etc 
         atmosphere.calc_layer_props!(atmos)
 
-        # Calculate cell-centre values
-        for idx in 1:atmos.nlev_c
-            cp = atmos.layer_cp[idx] * atmos.layer_mmw[idx]
-            atmos.tmp[idx] = atmos.tmpl[end] * ( atmos.p[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
-        end
-        
-        # Calculate cell-edge values
-        for idx in 2:atmos.nlev_l-1
-            cp = 0.5 * ( atmos.layer_cp[idx-1] * atmos.layer_mmw[idx-1] + atmos.layer_cp[idx] * atmos.layer_mmw[idx])
-            atmos.tmpl[idx] = atmos.tmpl[end] * ( atmos.pl[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
-        end
+        grad::Float64 = 0.0
 
-        # Calculate top boundary
-        dt = atmos.tmp[1]-atmos.tmpl[2]
-        dp = atmos.p[1]-atmos.pl[2]
-        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
+        # Calculate values 
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
+            # Cell-edge to cell-centre 
+            grad = phys.R_gas * atmos.tmpl[i+1] / (atmos.pl[i+1] * atmos.layer_mmw[i] * atmos.layer_cp[i])
+            atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
+
+            # Cell-centre to cell-edge 
+            grad = phys.R_gas * atmos.tmp[i] / (atmos.p[i] * atmos.layer_mmw[i] * atmos.layer_cp[i])
+            atmos.tmpl[i] = atmos.tmp[i] + grad * (atmos.pl[i]-atmos.p[i])
+
+        end 
+
+        # Thermodynamics at new temperature profile 
         atmosphere.calc_layer_props!(atmos)
+
         return nothing
     end 
 
@@ -313,11 +314,6 @@ module setpt
         if !(gas in atmos.gas_names)
             return nothing
         end
-
-        # gas is dry?
-        if !(gas in atmos.condensates)
-            return 
-        end 
 
         x::Float64 = 0.0
         Tdew::Float64 = 0.0
