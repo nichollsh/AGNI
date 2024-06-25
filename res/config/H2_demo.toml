@@ -32,7 +32,7 @@ title = "Adiabatic H2 demo"                       # Name for this configuration 
     cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
-    thermo_funct    = true                     # Use temperature-dependent thermodynamic properties?
+    thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     # Include heat release from phase change
     convection_type = ""                        # Convection type (mlt = use mixing length theory).

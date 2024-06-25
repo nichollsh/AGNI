@@ -195,11 +195,12 @@ module setpt
             # Cell-edge to cell-centre 
             grad = phys.R_gas * atmos.tmpl[i+1] / (atmos.pl[i+1] * atmos.layer_mmw[i] * atmos.layer_cp[i])
             atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
+            atmos.tmp[i] = max(atmos.tmp[i], atmos.tmp_floor)
 
             # Cell-centre to cell-edge 
             grad = phys.R_gas * atmos.tmp[i] / (atmos.p[i] * atmos.layer_mmw[i] * atmos.layer_cp[i])
             atmos.tmpl[i] = atmos.tmp[i] + grad * (atmos.pl[i]-atmos.p[i])
-
+            atmos.tmpl[i] = max(atmos.tmpl[i], atmos.tmp_floor)
         end 
 
         # Thermodynamics at new temperature profile 
