@@ -145,11 +145,11 @@ module solver
 
         #    linesearch 
         ls_max_steps::Int  =    22      # maximum steps 
-        ls_min_scale::Float64 = 2.0e-3  # minimum scale
+        ls_min_scale::Float64 = 1.0e-3  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    1000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =    8000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -628,7 +628,7 @@ module solver
 
             # If cost ratio is near unity, then the model is struggling
             # to move around because it's on a "plateau" in solution space
-            if (plateau_r < c_cur/c_old < 1.01 ) && detect_plateau
+            if (plateau_r < c_cur/c_old < 1.0/plateau_r ) && detect_plateau
                 plateau_i += 1
             else 
                 plateau_i = 0

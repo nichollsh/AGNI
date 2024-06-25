@@ -17,15 +17,14 @@ See the Getting Started page in the [documentation](https://nichollsh.github.io/
 
     
 ## Repository structure 
+* `agni.jl`         - AGNI executable
 * `LICENSE.txt`     - License for use and re-use
 * `doc/`            - Further documentation
 * `out/`            - Output files
-* `res/`            - Resources
+* `res/`            - Resources (configuration files, etc.)
 * `src/`            - Package source code
 * `test/`           - Package tests
-* `build/`          - Package build scripts
+* `tutorials/`      - Notebooks and tutorials
 * `.github/`        - GitHub workflows
 * `.vscode/`        - Visual Studio Code configuration 
-* `tutorials/`      - Notebooks and tutorials
-* `agni.jl`         - AGNI executable
 

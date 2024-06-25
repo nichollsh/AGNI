@@ -16,7 +16,6 @@ module energy
     
     # Local files
     import ..atmosphere
-    import ..moving_average
     import ..phys
     import ..spectrum
 
@@ -169,9 +168,9 @@ module energy
         for (i_gas,s_gas) in enumerate(atmos.gas_soc_names)
             for i in 1:atmos.nlev_c 
                 # skip unspecified gases
-                if s_gas in atmos.gas_all_names
+                if s_gas in atmos.gas_names
                     # convert mole fraction to mass mixing ratio
-                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_all_vmr[s_gas][i] * phys.lookup_safe("mmw", s_gas) / atmos.layer_mmw[i]
+                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_vmr[s_gas][i] * atmos.gas_dat[s_gas].mmw / atmos.layer_mmw[i]
                 else 
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0
                 end 
@@ -346,7 +345,7 @@ module energy
             # Define moist elsewhere eventually, link to condensates
             # To do:
             #  - Find regions where we are condensing (pass from the condensation scheme)
-            #  - Find the condensible with the largest value of (L/RT)^2*x 
+            #  - Find the condensable with the largest value of (L/RT)^2*x 
             #  - Calculate the adiabatic lapse rate
             #  - Calculate stabilisation w.r.t. the adiabat using criterion
             #  - Set the vapour contents to the new saturated value
@@ -357,11 +356,11 @@ module energy
             ##             condensation first!
             
             # if length(condensing[i])>0
-            #     # Check which condensible species has the largest (L/RT)^2*x
+            #     # Check which condensable species has the largest (L/RT)^2*x
                 
             #     maxval = -1000
             #     for c in condensing[i]
-            #         xv_av = (atmos.gas_all_vmr[c][i] * m2 + atmos.gas_all_vmr[c][i-1]*m1)/mt
+            #         xv_av = (atmos.gas_vmr[c][i] * m2 + atmos.gas_vmr[c][i-1]*m1)/mt
             #         # Make sure L is molar quantity
             #         L = phys.lookup_safe("l_vap", c)*phys.lookup_safe("mmw", c)
                     
@@ -371,7 +370,7 @@ module energy
             #         end
             #     end
             #     mmw_v = phys.lookup_safe("mmw",cmax)
-            #     xv = (atmos.gas_all_vmr[cmax][i]*m2 + atmos.gas_all_vmr[cmax][i-1]*m1)/mt
+            #     xv = (atmos.gas_vmr[cmax][i]*m2 + atmos.gas_vmr[cmax][i-1]*m1)/mt
             #     beta = phys.lookup_safe("l_vap", cmax)*mmw_v/tmp/phys.R_gas
 
             #     grad_ad = (1 - xv + beta*xv) / (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
@@ -444,12 +443,12 @@ module energy
     function condense_relax!(atmos::atmosphere.Atmos_t)
 
         # Get name 
-        c::String = atmos.gas_all_names[1]
+        c::String = atmos.gas_names[1]
 
         # Reset flux and mask 
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, 0)
-        fill!(atmos.gas_all_phase[c], false)
+        fill!(atmos.gas_ptran[c], false)
 
         # Check if empty
         if length(atmos.condensates) == 0
@@ -459,7 +458,6 @@ module energy
         # Work variables
         a::Float64 = 1.0 
         pp::Float64 = 0.0
-        Psat::Float64 = 0.0
         qsat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
 
@@ -469,30 +467,29 @@ module energy
         for i in 1:atmos.nlev_c-1
 
             # Get partial pressure 
-            pp = atmos.gas_all_vmr[c][i] * atmos.p[i]
+            pp = atmos.gas_vmr[c][i] * atmos.p[i]
             if pp < 1.0e-10 
                 continue
             end
 
             # check saturation
-            Psat = phys.calc_Psat(c, atmos.tmp[i])
-            qsat = Psat/atmos.p[i]
-            if (atmos.gas_all_vmr[c][i] < qsat+1.0e-10)
+            qsat = phys.get_Psat(atmos.gas_dat[c], atmo.tmp[i])/atmos.p[i]
+            if (atmos.gas_vmr[c][i] < qsat+1.0e-10)
                 continue 
             end 
 
             # Check criticality 
-            if atmos.tmp[i] > phys.lookup_safe("t_crit",c)
+            if atmos.tmp[i] > atmos.gas_dat[c].T_crit
                 continue 
             end 
 
             # relaxation function
-            dif[i] = a*(atmos.gas_all_vmr[c][i]-qsat)
+            dif[i] = a*(atmos.gas_vmr[c][i]-qsat)
 
             # set mask 
             atmos.mask_l[i]   = atmos.mask_decay
             atmos.mask_l[i+1] = atmos.mask_decay
-            atmos.gas_all_phase[c][i] = true
+            atmos.gas_ptran[c][i] = true
 
         end # end levels 
 
@@ -511,12 +508,11 @@ module energy
 
     Integrates from bottom of model upwards. Condensate mixing ratios are
     reduced at each level to satisfy both cold-trapping and saturation 
-    constraints (as in atmosphere.handle_saturation). Based on the amount of 
+    constraints (via atmosphere.handle_saturation). Based on the amount of 
     phase change at each level, a phase change flux is calculated by assuming 
     a fixed condensation timescale. 
     
     Updates fluxes and mixing ratios.
-    Does not update clouds.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
@@ -536,7 +532,7 @@ module energy
         end 
 
         # Work arrays 
-        delta_p::Float64 =  0.0
+        layer_area::Float64 =  0.0
         dfdp::Array = zeros(Float64, atmos.nlev_c)
 
         # Handle rainout
@@ -545,18 +541,17 @@ module energy
         # Loop from bottom to top 
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
+            layer_area = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0
+
             # Calculate latent heat release at this level from change in x_gas 
             for c in atmos.condensates
-                if atmos.gas_all_phase[c][i]
-                    # dp = p_moist - p_dry < 0
-                    delta_p = atmos.p[i]*(atmos.gas_all_vmr[c][i] - atmos.gas_all_vmr[c][i+1])
-                    dfdp[i] -= phys.lookup_safe("l_vap",c) * phys.lookup_safe("mmw",c) / (atmos.layer_grav[i]*atmos.p[i]*atmos.layer_mmw[i]) * delta_p / timescale 
+                if atmos.gas_ptran[c][i]
+                    dfdp[i] = phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / ( (atmos.pl[i+1]-atmos.pl[i]) * timescale * layer_area)
 
                     # set mask 
                     atmos.mask_l[i]   = atmos.mask_decay
                     atmos.mask_l[i+1] = atmos.mask_decay
                 end
-
             end 
 
         end # go to next level
