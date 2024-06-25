@@ -556,8 +556,8 @@ module atmosphere
             end 
         end
 
-        # Check if atmosphere is (in reality) composed of a single gas at 
-        #    any point, since this has implications for the condensation scheme
+        # Check if atmosphere is (by VMR) composed of a single gas at any of
+        #    the levels, since this has implications for the condensation scheme
         atmos.single_component = false
         for i in 1:atmos.nlev_c 
             for g in atmos.gas_names 
@@ -575,9 +575,9 @@ module atmosphere
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to 
-        #   default to, although the user should specify a profile in the cfg.
+        #   default to, although the user must specify a profile in the cfg.
         for g in atmos.gas_names 
-            atmos.tmpl[end] = max(atmos.tmpl[end], atmos.gas_dat[g].T_crit+20.0)
+            atmos.tmpl[end] = max(atmos.tmpl[end], atmos.gas_dat[g].T_crit+5.0)
             fill!(atmos.tmpl, atmos.tmpl[end])
             fill!(atmos.tmp, atmos.tmpl[end])
         end 
