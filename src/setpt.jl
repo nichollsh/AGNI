@@ -182,6 +182,16 @@ module setpt
         # Calculate values 
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
+            # Set cp based on temperature at the level below this one
+            tmp_eval = atmos.tmp_surf 
+            if i < atmos.nlev_c 
+                tmp_eval = atmos.tmp[i+1]
+            end
+            atmos.layer_cp[i] = 0.0
+            for gas in atmos.gas_names
+                atmos.layer_cp[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw * phys.get_Cp(atmos.gas_dat[gas], tmp_eval) / atmos.layer_mmw[i]
+            end
+
             # Cell-edge to cell-centre 
             grad = phys.R_gas * atmos.tmpl[i+1] / (atmos.pl[i+1] * atmos.layer_mmw[i] * atmos.layer_cp[i])
             atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
@@ -268,12 +278,12 @@ module setpt
             end
 
             # Check criticality 
-            if (atmos.tmpl[end] > atmos.gas_dat[gas].T_crit)
+            if (atmos.tmp_surf > atmos.gas_dat[gas].T_crit)
                 continue 
             end 
 
             # Check surface pressure (should not be supersaturated)
-            psat = phys.get_Psat(atmos.gas_dict[gas], atmos.tmpl[end])
+            psat = phys.get_Psat(atmos.gas_dat[gas], atmos.tmp_surf)
             if x*atmos.pl[end] > psat
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat

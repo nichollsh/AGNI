@@ -16,7 +16,6 @@ module energy
     
     # Local files
     import ..atmosphere
-    import ..moving_average
     import ..phys
     import ..spectrum
 

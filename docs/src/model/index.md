@@ -16,15 +16,17 @@ Convection is a turbulent process which occurs across more than one spatial dime
    
 MLT directly calculates the energy flux associated with convective heat transport, and thus is the preferred parameterisation within the model. It assumes that parcels of gas are diffused over a characteristic _mixing length_, transporting energy in the process. This requires choosing a scale for this mixing length, but in practice this has very little impact on the results from the model.
    
-Heat capacities are temperature-dependent, calculated using the Shomate Equation with coefficients derived from the NIST website.
+Heat capacities are temperature-dependent, using values derived from the JANAF database.
 
-## Latent heat
-Gases release energy (latent heat) into their surroundings when condensing into a liquid or solid. This is included in the model 
+## Phase change
+Gases release energy ("latent heat" or "enthalpy") into their surroundings when condensing into a liquid or solid. This is included in the model 
 through a diffusive condensation scheme, which assumes a fixed condensation timescale. This takes place as follows... firstly, 
 the mixing ratios of the gases are updated according to the temperature profile, where rainout occurs until all condensibles are 
 saturated or sub-saturated. The mixing ratios of dry species are increased in order to satisfy the total pressure at condensing
 levels. The heat released associated with the change in partial pressure of condensible gases is used to calculate a latent
 heating rate. This is then integrated (from the TOA downwards) to provide a latent heat transport flux at cell-edges.
+   
+Latent heats are temperature-dependent, using values derived from Coker (2007) and Wagner & Pruß (2001).
 
 ## Solar flux
 A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, a grey planetary albedo, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.

@@ -479,6 +479,9 @@ module phys
             t = gas.T_trip + 1.0e-2
         end 
 
+        # Temperature floor, since we can get weird behaviour as Cp -> 0.
+        t = max(t, 2.0)
+
         # Get value from interpolator
         return gas.cap_I(t)
     end 

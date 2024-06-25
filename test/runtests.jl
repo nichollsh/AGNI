@@ -15,7 +15,6 @@ using LoggingExtras
 
 # Include local jl files
 include("../src/phys.jl")
-include("../src/moving_average.jl")
 include("../src/spectrum.jl")
 include("../src/atmosphere.jl")
 include("../src/setpt.jl")
