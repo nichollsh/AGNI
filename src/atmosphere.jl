@@ -375,9 +375,9 @@ module atmosphere
         atmos.control.l_drop =          flag_cloud
         atmos.control.l_ice  =          false
 
-        # Initialise temperature grid to be isothermal
-        atmos.tmpl = ones(Float64, atmos.nlev_l) .* atmos.tmp_surf
-        atmos.tmp =  ones(Float64, atmos.nlev_c) .* atmos.tmp_surf
+        # Initialise temperature grid 
+        atmos.tmpl = zeros(Float64, atmos.nlev_l)
+        atmos.tmp =  zeros(Float64, atmos.nlev_c)
 
         # Initialise pressure grid with current p_toa and p_boa
         generate_pgrid!(atmos)
@@ -573,6 +573,15 @@ module atmosphere
             end
         end 
 
+        # Set initial temperature profile to a small value which still keeps
+        #   all of the gases supercritical. This should be a safe condition to 
+        #   default to, although the user should specify a profile in the cfg.
+        for g in atmos.gas_names 
+            atmos.tmpl[end] = max(atmos.tmpl[end], atmos.gas_dat[g].T_crit+20.0)
+            fill!(atmos.tmpl, atmos.tmpl[end])
+            fill!(atmos.tmp, atmos.tmpl[end])
+        end 
+
         # Fastchem 
         atmos.fastchem_flag = false 
         if !isempty(fastchem_path)
@@ -698,7 +707,7 @@ module atmosphere
 
             # Integrate from lower edge to centre
             g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2.0)
-            dzc = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g1 * 0.5 * (atmos.pl[i+1] + atmos.p[i])) * (atmos.pl[i+1] - atmos.p[i]) 
+            dzc = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g1 * atmos.p[i]) * (atmos.pl[i+1] - atmos.p[i]) 
             if (dzc < 1e-20)
                 @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
                 ok = false 
@@ -712,7 +721,7 @@ module atmosphere
 
             # Integrate from centre to upper edge
             g2 = GMpl / ((atmos.rp + atmos.z[i])^2.0)
-            dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * 0.5 * (atmos.p[i] + atmos.pl[i] )) * (atmos.p[i]- atmos.pl[i]) 
+            dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * atmos.p[i]) * (atmos.p[i]- atmos.pl[i]) 
             if (dzl < 1e-20)
                 @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
                 ok = false 
