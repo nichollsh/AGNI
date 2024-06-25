@@ -700,7 +700,7 @@ module atmosphere
                 @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
                 ok = false 
             end
-            if  (dzc > 1e8)
+            if  (dzc > 1e9)
                 @error "Height integration blew up at level $i (l -> c)"
                 ok = false 
             end
@@ -717,7 +717,7 @@ module atmosphere
                 @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
                 ok = false 
             end
-            if (dzl > 1e8)
+            if (dzl > 1e9)
                 @error "Height integration blew up at level $i (c -> l)"
                 ok = false 
             end
