@@ -319,7 +319,7 @@ module setpt
 
     Does not modify VMRs or surface temperature.
     """
-    function condensing!(atmos::atmosphere.Atmos_t, gas::String)
+    function saturation!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup or allocated")
@@ -343,7 +343,10 @@ module setpt
 
             # Set cell-centre temperatures
             Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i])
-            atmos.tmp[i] = max(atmos.tmp[i], Tdew)
+            if atmos.tmp[i] < Tdew 
+                atmos.tmp[i] = Tdew 
+                atmos.gas_ptran[gas][i] = true
+            end 
         end
         
         # Set cell-edge temperatures

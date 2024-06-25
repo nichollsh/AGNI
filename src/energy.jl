@@ -183,6 +183,22 @@ module energy
                                 atmos.atm, atmos.cld, atmos.aer, 
                                 atmos.bound, atmos.radout)
 
+        # Check finite 
+        if !all(isfinite, atmos.radout.flux_down)
+            if lw 
+                @error "Non-finite value in LW DN flux array"
+            else 
+                @error "Non-finite value in SW DN flux array"
+            end 
+        end 
+        if !all(isfinite, atmos.radout.flux_up)
+            if lw 
+                @error "Non-finite value in LW UP flux array"
+            else 
+                @error "Non-finite value in SW UP flux array"
+            end 
+        end 
+
         # Store new fluxes in atmos struct
         idx::Int = 1
         if lw 
