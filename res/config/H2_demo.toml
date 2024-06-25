@@ -11,8 +11,8 @@ title = "Default"                       # Name for this configuration file
     albedo_s        = 0.0               # Surface albedo
     radius          = 6.37e6            # Planet radius at the surface [m]
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
-    p_surf          = 500.0             # Total surface pressure [bar]
-    p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
+    p_surf          = 1000.0             # Total surface pressure [bar]
+    p_top           = 1e-4              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2 = 1.0 }     # Volatile volume mixing ratios
     condensates     = []                # List of condensable gases
 
@@ -27,13 +27,13 @@ title = "Default"                       # Name for this configuration file
     verbosity       = 1                         # Log level (0: none, 1: normal, 2: debug)
     max_steps       = 20000                     # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
-    num_levels      = 200                       # Number of model levels.
+    num_levels      = 180                       # Number of model levels.
     continua        = true                      # Include absorption from continua?
     rayleigh        = false                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
     aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = 4                         # Method for treating line overlap.
-    thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
+    thermo_funct    = true                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     # Include heat release from phase change
     convection_type = ""                        # Convection type (mlt = use mixing length theory).
