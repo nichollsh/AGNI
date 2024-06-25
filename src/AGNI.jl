@@ -367,7 +367,7 @@ module AGNI
             elseif str_req == "con"
                 # condensing a volatile 
                 idx_req += 1
-                setpt.condensing!(atmos, initial_req[idx_req])
+                setpt.saturation!(atmos, initial_req[idx_req])
                 if flag_cld
                     atmosphere.water_cloud!(atmos)
                 end
@@ -463,6 +463,8 @@ module AGNI
         # Save plots
         @info "Plotting results"
         plt_alb = plt_alb && (flag_cld || flag_ray)
+
+        flag_cld && plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
 
         plt_ani && plotting.animate(atmos)
         plt_vmr && plotting.plot_vmr(atmos,        joinpath(atmos.OUT_DIR,"plot_vmrs.png"))

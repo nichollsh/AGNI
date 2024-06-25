@@ -40,7 +40,6 @@ module plotting
                             incl_magma::Bool=false, 
                             title::String="")
         
-        # Interleave cell-centre and cell-edge arrays
         ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
@@ -89,6 +88,50 @@ module plotting
 
         # Decorate
         xlabel!(plt, "Temperature [K]")
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10)
+        if !isempty(title)
+            title!(plt, title)
+        end 
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
+    end
+
+    """
+    Plot the cloud mass mixing ratio and area fraction.
+    """
+    function plot_cloud(atmos::atmosphere.Atmos_t, fname::String; 
+                            dpi::Int=250,
+                            size_x::Int=500, size_y::Int=400,
+                            title::String="")
+        
+        xlims = (-1, 101)
+        xticks = collect(range(start=0.0, stop=100.0, step=10.0))
+
+        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
+        # Create plot
+        plt = plot(framestyle=:box, 
+                    xlims=xlims, xticks=xticks,
+                    ylims=ylims, yticks=yticks, 
+                    legend=:outertopright, dpi=dpi, 
+                    size=(size_x,size_y), guidefontsize=9, titlefontsize=9)
+
+        # Temperature profile for reference
+        tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
+        plot!(plt, tmp_nrm*100.0, atmos.p*1e-5, lc="black", linealpha=0.3, label=L"\hat{T}(p)")
+
+        # Plot cloud profiles
+        plot!(plt, atmos.cloud_arr_l*100.0, atmos.p*1e-5, lw=2, lc="black", label="MMR")
+        plot!(plt, atmos.cloud_arr_f*100.0, atmos.p*1e-5, lw=2, lc="red",   label="Area frac.", ls=:dot)
+
+        # Decorate
+        xlabel!(plt, "Quantity [%]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)

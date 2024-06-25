@@ -362,6 +362,8 @@ module solver
         # Plot current state
         function plot_step()
 
+            plotting.plot_cloud(atmos, "out/cloud.png")
+
             # Info string
             plt_info::String = ""
             plt_info *= @sprintf("Iteration  %d \n",step)
