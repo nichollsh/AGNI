@@ -448,7 +448,7 @@ module energy
         # Reset flux and mask 
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, 0)
-        fill!(atmos.gas_phase[c], false)
+        fill!(atmos.gas_ptran[c], false)
 
         # Check if empty
         if length(atmos.condensates) == 0
@@ -489,7 +489,7 @@ module energy
             # set mask 
             atmos.mask_l[i]   = atmos.mask_decay
             atmos.mask_l[i+1] = atmos.mask_decay
-            atmos.gas_phase[c][i] = true
+            atmos.gas_ptran[c][i] = true
 
         end # end levels 
 
@@ -508,12 +508,11 @@ module energy
 
     Integrates from bottom of model upwards. Condensate mixing ratios are
     reduced at each level to satisfy both cold-trapping and saturation 
-    constraints (as in atmosphere.handle_saturation). Based on the amount of 
+    constraints (via atmosphere.handle_saturation). Based on the amount of 
     phase change at each level, a phase change flux is calculated by assuming 
     a fixed condensation timescale. 
     
     Updates fluxes and mixing ratios.
-    Does not update clouds.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
@@ -546,8 +545,8 @@ module energy
 
             # Calculate latent heat release at this level from change in x_gas 
             for c in atmos.condensates
-                if atmos.gas_phase[c][i]
-                    dfdp[i] = phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_cprod[c][i] / ( (atmos.pl[i+1]-atmos.pl[i]) * timescale * layer_area)
+                if atmos.gas_ptran[c][i]
+                    dfdp[i] = phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / ( (atmos.pl[i+1]-atmos.pl[i]) * timescale * layer_area)
 
                     # set mask 
                     atmos.mask_l[i]   = atmos.mask_decay
