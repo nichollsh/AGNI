@@ -170,9 +170,13 @@ module setpt
             error("Atmosphere is not setup or allocated")
         end 
 
+        # Set surface 
+        atmos.tmpl[end] = atmos.tmp_surf
+
         # Thermodynamics etc 
         atmosphere.calc_layer_props!(atmos)
 
+        # Lapse rate dT/dp 
         grad::Float64 = 0.0
 
         # Calculate values 
