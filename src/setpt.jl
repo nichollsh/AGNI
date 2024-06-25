@@ -170,26 +170,42 @@ module setpt
             error("Atmosphere is not setup or allocated")
         end 
 
+        # Set surface 
+        atmos.tmpl[end] = atmos.tmp_surf
+
+        # Thermodynamics etc 
         atmosphere.calc_layer_props!(atmos)
 
-        # Calculate cell-centre values
-        for idx in 1:atmos.nlev_c
-            cp = atmos.layer_cp[idx] * atmos.layer_mmw[idx]
-            atmos.tmp[idx] = atmos.tmpl[end] * ( atmos.p[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
-        end
-        
-        # Calculate cell-edge values
-        for idx in 2:atmos.nlev_l-1
-            cp = 0.5 * ( atmos.layer_cp[idx-1] * atmos.layer_mmw[idx-1] + atmos.layer_cp[idx] * atmos.layer_mmw[idx])
-            atmos.tmpl[idx] = atmos.tmpl[end] * ( atmos.pl[idx] / atmos.pl[end] ) ^ ( phys.R_gas / cp )
-        end
+        # Lapse rate dT/dp 
+        grad::Float64 = 0.0
 
-        # Calculate top boundary
-        dt = atmos.tmp[1]-atmos.tmpl[2]
-        dp = atmos.p[1]-atmos.pl[2]
-        atmos.tmpl[1] = atmos.tmp[1] + dt/dp * (atmos.pl[1] - atmos.p[1])
+        # Calculate values 
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
+            # Set cp based on temperature at the level below this one
+            tmp_eval = atmos.tmp_surf 
+            if i < atmos.nlev_c 
+                tmp_eval = atmos.tmp[i+1]
+            end
+            atmos.layer_cp[i] = 0.0
+            for gas in atmos.gas_names
+                atmos.layer_cp[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw * phys.get_Cp(atmos.gas_dat[gas], tmp_eval) / atmos.layer_mmw[i]
+            end
+
+            # Cell-edge to cell-centre 
+            grad = phys.R_gas * atmos.tmpl[i+1] / (atmos.pl[i+1] * atmos.layer_mmw[i] * atmos.layer_cp[i])
+            atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
+            atmos.tmp[i] = max(atmos.tmp[i], atmos.tmp_floor)
+
+            # Cell-centre to cell-edge 
+            grad = phys.R_gas * atmos.tmp[i] / (atmos.p[i] * atmos.layer_mmw[i] * atmos.layer_cp[i])
+            atmos.tmpl[i] = atmos.tmp[i] + grad * (atmos.pl[i]-atmos.p[i])
+            atmos.tmpl[i] = max(atmos.tmpl[i], atmos.tmp_floor)
+        end 
+
+        # Thermodynamics at new temperature profile 
         atmosphere.calc_layer_props!(atmos)
+
         return nothing
     end 
 
@@ -253,23 +269,26 @@ module setpt
 
         x::Float64 = 0.0
         psat::Float64 = 0.0
-        Tsat::Float64 = 0.0
 
-        # For each condensible volatile
-        for gas in atmos.gas_all_names
+        # For each condensable volatile
+        for gas in atmos.gas_names
             # Get mole fraction at surface
-            x = atmos.gas_all_vmr[gas][atmos.nlev_c]
+            x = atmos.gas_vmr[gas][atmos.nlev_c]
             if x < 1.0e-10
                 continue 
             end
 
+            # Check criticality 
+            if (atmos.tmp_surf > atmos.gas_dat[gas].T_crit)
+                continue 
+            end 
+
             # Check surface pressure (should not be supersaturated)
-            psat = phys.calc_Psat(gas, atmos.tmpl[end])
-            Tsat = phys.calc_Tdew(gas, atmos.p_boa*x)
-            if (atmos.tmpl[end] < Tsat) && (atmos.tmpl[end] < phys.lookup_safe("T_crit",gas))
+            psat = phys.get_Psat(atmos.gas_dat[gas], atmos.tmp_surf)
+            if x*atmos.pl[end] > psat
                 # Reduce amount of volatile until reaches phase curve 
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.gas_all_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa  
+                atmos.gas_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa  
 
                 # Check that p_boa is still reasonable 
                 if atmos.p_boa <= 10.0 * atmos.p_toa 
@@ -280,11 +299,11 @@ module setpt
 
         # Renormalise mole fractions
         tot_vmr = 0.0
-        for g in atmos.gas_all_names
-            tot_vmr += atmos.gas_all_vmr[g][atmos.nlev_c]
+        for g in atmos.gas_names
+            tot_vmr += atmos.gas_vmr[g][atmos.nlev_c]
         end 
-        for g in atmos.gas_all_names
-            atmos.gas_all_vmr[g][atmos.nlev_c] /= tot_vmr
+        for g in atmos.gas_names
+            atmos.gas_vmr[g][atmos.nlev_c] /= tot_vmr
         end 
 
         # Generate new pressure grid 
@@ -307,17 +326,28 @@ module setpt
         end 
 
         # gas is present?
-        if !(gas in atmos.gas_all_names)
+        if !(gas in atmos.gas_names)
             return nothing
         end
 
-        # gas has thermodynamics setup?
-        if phys.lookup_safe("L_vap",gas) < 1e-20
-            return nothing
-        end
+        x::Float64 = 0.0
+        Tdew::Float64 = 0.0
 
-        # apply condensation curve 
-        atmosphere.apply_vlcc!(atmos, gas)
+        # Check if each level is condensing. If it is, place on phase curve
+        for i in 1:atmos.nlev_c
+
+            x = atmos.gas_vmr[gas][i]
+            if x < 1.0e-10 
+                continue
+            end
+
+            # Set cell-centre temperatures
+            Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i])
+            atmos.tmp[i] = max(atmos.tmp[i], Tdew)
+        end
+        
+        # Set cell-edge temperatures
+        atmosphere.set_tmpl_from_tmp!(atmos)
 
         # calculate properties 
         atmosphere.calc_layer_props!(atmos)
