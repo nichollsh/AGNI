@@ -277,7 +277,7 @@ module atmosphere
                     mf_path =                   nothing,
                     condensates::Array{String,1} = String[],
                     albedo_s::Float64 =         0.0,
-                    tmp_floor::Float64 =        80.0,
+                    tmp_floor::Float64 =        2.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
                     tmp_magma::Float64 =        3000.0,

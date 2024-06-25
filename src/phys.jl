@@ -427,7 +427,7 @@ module phys
     **Get gas enthalpy (latent heat) of phase change.**
 
     If the temperature is above the critical point, then a zero value 
-    is returned.
+    is returned. Evaluates at the triple point if `gas.tmp_dep=false`.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -460,6 +460,8 @@ module phys
     """
     **Get gas heat capacity for a given temperature.**
 
+    Evaluates at the triple point if `gas.tmp_dep=false`.
+
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
     - `t::Float64`              temperature [K]
@@ -480,7 +482,7 @@ module phys
         end 
 
         # Temperature floor, since we can get weird behaviour as Cp -> 0.
-        t = max(t, 2.0)
+        t = max(t, 0.5)
 
         # Get value from interpolator
         return gas.cap_I(t)

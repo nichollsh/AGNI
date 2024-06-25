@@ -2,7 +2,7 @@
 title = "Condensation test"                    # Name for this configuration file
 
 [planet]
-    tmp_surf        = 2500.0            # Surface temperature [kelvin]
+    tmp_surf        = 1700.0            # Surface temperature [kelvin]
     instellation    = 1300.0          # Stellar flux at planet's orbital distance [W m-2]
     albedo_b        = 0.0              # Pseudo bond-albedo which downscales the stellar flux by 1-this_value
     s0_fact         = 0.375           # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
@@ -10,7 +10,7 @@ title = "Condensation test"                    # Name for this configuration fil
     albedo_s        = 0.2               # Surface albedo
     radius          = 6.37e6            # Planet radius at the surface [m]
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
-    p_surf          = 1000.0             # Total surface pressure [bar]
+    p_surf          = 7000.0             # Total surface pressure [bar]
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O=0.8, CO2=0.1, CH4=0.08, H2=0.02}     # Volatile volume mixing ratios
     condensates     = ["H2O", "CO2"]
@@ -24,7 +24,6 @@ title = "Condensation test"                    # Name for this configuration fil
 [files]
     clean_output    = true
     input_sf        = "res/spectral_files/nogit/Dayspring/16/Dayspring.sf"    # Path to SOCRATES spectral file.
-    # input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"    
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum.
     output_dir      = "out/"                                            # Path to output directory.
 

@@ -311,7 +311,7 @@ module AGNI
                                 flag_cloud=flag_cld, flag_aerosol=flag_aer,
                                 overlap_method=overlap,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
-                                tmp_floor=5.0, target_olr=target_olr,
+                                target_olr=target_olr,
                                 tmp_eff=tmp_eff, albedo_s=albedo_s,
                                 thermo_functions=thermo_funct,
                                 C_d=turb_coeff, U=wind_speed,
