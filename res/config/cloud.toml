@@ -19,7 +19,7 @@ title = "Cloud test"                    # Name for this configuration file
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Frostflow/48/Frostflow.sf"    # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum.
     output_dir      = "out/"                                            # Path to output directory.
 
@@ -27,7 +27,7 @@ title = "Cloud test"                    # Name for this configuration file
     verbosity       = 1                         # Log level (0: none, 1: normal, 2: debug)
     max_steps       = 200                       # Maximum number of solver steps.
     max_runtime     = 200                       # Maximum wall-clock solver runtime [s].
-    num_levels      = 100                        # Number of model levels.
+    num_levels      = 105                        # Number of model levels.
     continua        = true                      # Include absorption from continua?
     rayleigh        = false                     # Include rayleigh scattering?
     cloud           = true                     # Include water cloud radiative properties?

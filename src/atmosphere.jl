@@ -170,17 +170,17 @@ module atmosphere
         # Conduction 
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
 
-        # Cloud and condensation
+        # Phase change 
         flux_l::Array{Float64, 1}           # Latent heat energy flux [W m-2]
-        mask_l::Array{Int,1}                # Layers which are (or were recently) condensing
-        #    These arrays give the cloud properties within layers containing cloud
+        mask_l::Array{Int,1}                # Layers which are (or were recently) undergoing phase transition
+
+        # Clouds
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
         cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
         cloud_arr_f::Array{Float64,1}       # Total cloud area fraction in layers. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
-        #    These floats give the default values that the above arrays are filled with upon cloud formation
-        cloud_val_r::Float64 
-        cloud_val_l::Float64 
-        cloud_val_f::Float64 
+        cloud_val_r::Float64                # \
+        cloud_val_l::Float64                #  |-> Default scalar values to above arrays
+        cloud_val_f::Float64                # /
 
         # Cell-internal heating 
         ediv_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-3] (e.g. from advection)
@@ -401,7 +401,7 @@ module atmosphere
         # Hardcoded cloud properties 
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
-        atmos.cloud_val_f   = 0.8     # 80% of the cell "area" is cloud
+        atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
 
         # Read mole fractions
         if isnothing(mf_dict) && isnothing(mf_path)
@@ -905,11 +905,11 @@ module atmosphere
         npd_opt_level_cloud_prsc = 170 # Size allocated for levels of prescribed cloudy optical properties
 
         # modules_gen/dimensioms_fixed_pcf.f90
-        npd_cloud_component        =  4 #   Number of components of clouds.
-        npd_cloud_type             =  4 #   Number of permitted types of clouds.
+        npd_cloud_component        =  1 #   Number of components of clouds.
+        npd_cloud_type             =  1 #   Number of permitted types of clouds.
         npd_overlap_coeff          = 18 #   Number of overlap coefficients for cloud
         npd_source_coeff           =  2 #   Number of coefficients for two-stream sources
-        npd_region                 =  2 # Number of regions in a layer
+        npd_region                 =  1 # Number of regions in a layer
 
         atmos.dimen.nd_profile                = npd_profile
         atmos.dimen.nd_flux_profile           = npd_profile
@@ -942,7 +942,6 @@ module atmosphere
         atmos.dimen.nd_aerosol_mode           = 1
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
-        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
@@ -1118,7 +1117,7 @@ module atmosphere
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
 
-        
+        SOCRATES.allocate_cld(  atmos.cld,    atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
 
         if atmos.control.l_cloud
@@ -1161,9 +1160,10 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
-        atmos.mask_l =            zeros(Int, atmos.nlev_c)
-        atmos.mask_c =            zeros(Int, atmos.nlev_c)
-        atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat
+        atmos.mask_l =            zeros(Int, atmos.nlev_c)      # Phase change 
+        atmos.mask_c =            zeros(Int, atmos.nlev_c)      # Dry convection
+
+        atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat / phase change 
         atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection 
         atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction 
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
@@ -1449,7 +1449,6 @@ module atmosphere
         fill!(atmos.cloud_arr_l, 0.0)
         fill!(atmos.cloud_arr_f, 0.0)
 
-
         # Loop from bottom to top (does not include bottommost level)
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
@@ -1492,6 +1491,20 @@ module atmosphere
 
                     # flag condensate as actively condensing at this level
                     atmos.gas_ptran[c][i] = true 
+
+                    # Set water cloud at this level
+                    if c == "H2O"
+                        # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
+                        atmos.cloud_arr_l[i] = (cond_kg["H2O"] * cond_retention_frac / layer_area) / atmos.layer_mass[i]
+
+                        if atmos.cloud_arr_l[i] > 1.0
+                            @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
+                        end 
+
+                        # droplet radius and area fraction (fixed values)
+                        atmos.cloud_arr_r[i] = atmos.cloud_val_r
+                        atmos.cloud_arr_f[i] = atmos.cloud_val_f
+                    end 
                 end 
             end # end condensates
 
@@ -1506,20 +1519,6 @@ module atmosphere
             for g in atmos.gas_names
                 atmos.layer_mmw[i] += atmos.gas_vmr[g][i] * atmos.gas_dat[g].mmw
             end
-
-            # Set water cloud at this level
-            if "H2O" in atmos.condensates
-                # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
-                atmos.cloud_arr_l[i] = (cond_kg["H2O"] * cond_retention_frac / layer_area) / atmos.layer_mass[i]
-
-                if atmos.cloud_arr_l[i] > 1.0
-                    @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
-                end 
-
-                # droplet radius and area fraction (fixed values)
-                atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                atmos.cloud_arr_f[i] = atmos.cloud_val_f
-            end 
 
             # Evaporate condensate withon unsaturated layers below this one
             #   integrate downwards from this condensing layer (i)
@@ -1611,7 +1610,7 @@ module atmosphere
         return nothing 
     end 
 
-    # Set cloud properties within condensing regions
+    # Set cloud properties within condensing regions.
     function water_cloud!(atmos::atmosphere.Atmos_t)
 
         # Reset 
@@ -1624,19 +1623,18 @@ module atmosphere
             return nothing
         end
 
-        # Check if each level is condensing. If it is, place on phase curve
-        x::Float64      = 0.0  # vmr of water vapour
-        Tsat::Float64   = 0.0  # dew point temperature of water vapour
-        for i in 1:atmos.nlev_c
+        # Set level-by-level
+        x::Float64      = 0.0 
+        for i in 1:atmos.nlev_c-1
 
+            # Water VMR
             x = atmos.gas_vmr["H2O"][i]
             if x < 1.0e-10 
                 continue
             end
 
-            # Cell centre only
-            # Check if partial pressure > P_sat
-            if atmos.p[i]*atmos.gas_vmr["H2O"][i] > phys.get_Psat(atmos.gas_dat["H2O"], atmos.tmp[i])
+            # Use mask from atmos struct
+            if atmos.gas_ptran["H2O"][i]
                 atmos.cloud_arr_r[i] = atmos.cloud_val_r
                 atmos.cloud_arr_l[i] = atmos.cloud_val_l
                 atmos.cloud_arr_f[i] = atmos.cloud_val_f
