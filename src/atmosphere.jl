@@ -648,54 +648,57 @@ module atmosphere
         atmos.atm.p[1, :] .= atmos.p[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
 
-        # Temp values
-        mmr::Float64 = 0.0
+        # Set MMW at each level
+        fill!(atmos.layer_mmw, 0.0)
+        for i in 1:atmos.nlev_c
+            for gas in atmos.gas_names
+                atmos.layer_mmw[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw
+            end
+        end
 
-        # mmw, cp, rho, kc
-        fill!(atmos.layer_mmw    ,0.0)
+        # Temporary values
+        mmr::Float64 = 0.0
+        g1::Float64 = 0.0
+        g2::Float64 = 0.0
+        dzc::Float64= 0.0
+        GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
+
+        # Reset arrays 
+        fill!(atmos.z         ,  0.0)
+        fill!(atmos.zl        ,  0.0)
+        fill!(atmos.layer_grav,  0.0)
+        fill!(atmos.layer_thick, 0.0)
         fill!(atmos.layer_density,0.0)
         fill!(atmos.layer_cp     ,0.0)
         fill!(atmos.layer_kc     ,0.0)
         fill!(atmos.layer_mass   ,0.0)
-        for i in 1:atmos.nlev_c
 
-            # set mmw
-            for gas in atmos.gas_names
-                atmos.layer_mmw[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw
-            end
+        # Integrate from bottom upwards
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
-            # set cp, kc
+            # Set cp, kc at this level 
+            atmos.layer_cp[i] = 0.0
+            atmos.layer_kc[i] = 0.0
             for gas in atmos.gas_names
                 mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
                 atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
                 atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
             end
 
-            # density (assumes ideal gas)
-            atmos.layer_density[i] = ( atmos.p[i] * atmos.layer_mmw[i] )  / (phys.R_gas * atmos.tmp[i]) 
-            atmos.atm.density[1,i] = atmos.layer_density[i]
-        end
-
-        # geometrical height and gravity
-        # dz = -dp / (rho * g)
-        fill!(atmos.z         ,  0.0)
-        fill!(atmos.zl        ,  0.0)
-        fill!(atmos.layer_grav,  0.0)
-        fill!(atmos.layer_thick, 0.0)
-        g1::Float64 = 0.0
-        g2::Float64 = 0.0
-        dzc::Float64= 0.0
-        for i in range(atmos.nlev_c, 1, step=-1)
+            # Temporarily copy this cp, kc to the level above
+            #     since they are needed for doing the hydrostatic integration
+            if i > 1
+                atmos.layer_cp[i-1] = atmos.layer_cp[i]
+                atmos.layer_kc[i-1] = atmos.layer_kc[i]
+            end 
 
             # Technically, g and z should be integrated as coupled equations,
             # but here they are not. This loose integration has been found to 
             # be reasonable in all of my tests.
 
             # Integrate from lower edge to centre
-            g1 = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.zl[i+1])^2.0)
+            g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2.0)
             dzc = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g1 * 0.5 * (atmos.pl[i+1] + atmos.p[i])) * (atmos.pl[i+1] - atmos.p[i]) 
-            atmos.z[i] = atmos.zl[i+1] + dzc
-
             if (dzc < 1e-20)
                 @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
                 ok = false 
@@ -703,16 +706,13 @@ module atmosphere
             if  (dzc > 1e9)
                 @error "Height integration blew up at level $i (l -> c)"
                 ok = false 
+                dzc = 1e9
             end
+            atmos.z[i] = atmos.zl[i+1] + dzc
 
             # Integrate from centre to upper edge
-            g2 = atmos.grav_surf * (atmos.rp^2.0) / ((atmos.rp + atmos.z[i])^2.0)
+            g2 = GMpl / ((atmos.rp + atmos.z[i])^2.0)
             dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * 0.5 * (atmos.p[i] + atmos.pl[i] )) * (atmos.p[i]- atmos.pl[i]) 
-            atmos.zl[i] = atmos.z[i] + dzl
-
-            atmos.layer_grav[i] = sqrt(g1 * g2)
-            atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
-
             if (dzl < 1e-20)
                 @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
                 ok = false 
@@ -720,13 +720,24 @@ module atmosphere
             if (dzl > 1e9)
                 @error "Height integration blew up at level $i (c -> l)"
                 ok = false 
+                dzl = 1e9
             end
+            atmos.zl[i] = atmos.z[i] + dzl
+            
+            # Layer average gravity [m s-2]
+            atmos.layer_grav[i] = GMpl / ((atmos.rp + atmos.z[i])^2.0)
+
+            # Layer geometrical thickness [m]
+            atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
         end 
 
-        # Mass
+        # Mass (technically area density [kg m-2]) and density [kg m-3]
         for i in 1:atmos.atm.n_layer
             atmos.layer_mass[i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
-            atmos.atm.mass[1, i] = atmos.layer_mass[i]
+            atmos.atm.mass[1, i] = atmos.layer_mass[i]          # pass to SOCRATES
+
+            atmos.layer_density[i] = ( atmos.p[i] * atmos.layer_mmw[i] )  / (phys.R_gas * atmos.tmp[i]) 
+            atmos.atm.density[1,i] = atmos.layer_density[i]     # pass to SOCRATES
         end
 
         return ok
@@ -1054,7 +1065,7 @@ module atmosphere
         end 
  
 
-        # Calc layer properties
+        # Calc layer properties using initial temperature profile 
         calc_layer_props!(atmos)
 
         ################################
