@@ -15,7 +15,6 @@ module AGNI
 
     # Include local jl files (order matters)
     include("phys.jl")
-    include("moving_average.jl")
     include("spectrum.jl")
     include("atmosphere.jl")
     include("setpt.jl")
