@@ -125,7 +125,7 @@ module dump
             # Scalar quantities  
             #    Create variables
             var_tmp_surf =  defVar(ds, "tmp_surf",      Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
-            var_tmp_eff =   defVar(ds, "tmp_eff",       Float64, (), attrib = OrderedDict("units" => "K"))      # Effective temperature [K]
+            var_tmp_int =   defVar(ds, "tmp_int",       Float64, (), attrib = OrderedDict("units" => "K"))      # Effective temperature [K]
             var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
             var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
             var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
@@ -150,7 +150,7 @@ module dump
 
             #     Store data
             var_tmp_surf[1] =   atmos.tmp_surf 
-            var_tmp_eff[1] =    atmos.tmp_eff 
+            var_tmp_int[1] =    atmos.tmp_int 
             var_inst[1] =       atmos.instellation
             var_s0fact[1] =     atmos.s0_fact
             var_albbond[1] =    atmos.albedo_b

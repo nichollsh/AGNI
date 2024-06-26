@@ -275,9 +275,9 @@ module AGNI
             tmp_magma   = cfg["planet"]["tmp_magma"]
         end 
         #     effective temperature case 
-        tmp_eff::Float64 = 0.0
+        tmp_int::Float64 = 0.0
         if sol_type == 3
-            tmp_eff = cfg["planet"]["tmp_eff"]
+            tmp_int = cfg["planet"]["tmp_int"]
         end 
         #     target OLR case 
         target_olr::Float64 = 0.0
@@ -311,7 +311,7 @@ module AGNI
                                 overlap_method=overlap,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
-                                tmp_eff=tmp_eff, albedo_s=albedo_s,
+                                tmp_int=tmp_int, albedo_s=albedo_s,
                                 thermo_functions=thermo_funct,
                                 C_d=turb_coeff, U=wind_speed,
                                 fastchem_path=fastchem_path

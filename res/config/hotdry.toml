@@ -14,7 +14,7 @@ title = "Hot and dry"
     p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
     vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
     condensates     = []                
-    tmp_eff         = 0.0               # Effective temperature
+    tmp_int         = 0.0               # Effective temperature
     turb_coeff      = 1.0e-4
     wind_speed      = 10.0
 

@@ -17,5 +17,5 @@ This can be achieved by setting the following parameters in AGNI:
 
 To solve for these profiles, we need to set the net flux boundary condition such
 that the same OLR is achieved. This may be done via:
-    F_eff = sigma (T_eff)^4 = OTR + F_UP_SW - F_DN_SW 
+    F_int = sigma (T_int)^4 = OTR + F_UP_SW - F_DN_SW 
 

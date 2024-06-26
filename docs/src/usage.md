@@ -34,7 +34,7 @@ Some `execution` parameters:
 * `solution_type` tells the model which state to solve for. The allowed values (integers) are...
      - 1 : zero flux divergence at fixed `tmp_surf`
      - 2 : zero flux divergence, with `tmp_surf` set such that the conductive skin (CBL) conserves energy flux
-     - 3 : the net upward flux at each layer is equal to `flux_eff = sigma * tmp_eff^4`
+     - 3 : the net upward flux at each layer is equal to `flux_int = sigma * tmp_int^4`
    
 * `solvers` tells the model which solvers to use. This is a list of strings, so multiple solvers can be applied sequentially. An empty string is always appended to the end of this list. Allowed solvers are...
      - [empty string] : no solving takes place, so the model just calculates fluxes using the initial state

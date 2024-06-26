@@ -131,4 +131,4 @@ using a 1D golden-section search method on $\alpha$. This means that the model i
 AGNI can calculate emission spectra, provided with T(p) and the volume mixing ratios of the gases. This is performed using the same RT as the RCE calculations, so is limited in resolution by the choice of correlated-k bands. Similarly, the longwave contribution function can also be calculated.
 
 ## Julia and Fortran
-AGNI is primarily written in Julia, while SOCRATES itself is written in Fortran. Julia was chosen because it allows the SOCRATES binaries to be included in the precompiled code, which significantly improves performance.
+AGNI is primarily written in Julia, while SOCRATES itself is written in Fortran. Julia was chosen because it allows the SOCRATES binaries to be included in the precompiled code, which significantly improves performance. In theory, it is possible to call AGNI from a Python program via [PythonCall.jl](https://github.com/JuliaPy/PythonCall.jl).
