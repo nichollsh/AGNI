@@ -458,18 +458,18 @@ module energy
     """
     function condense_relax!(atmos::atmosphere.Atmos_t)
 
+        # Check if empty
+        if length(atmos.condensates) == 0
+            return nothing 
+        end 
+        
         # Get name 
-        c::String = atmos.gas_names[1]
+        c::String = atmos.condensates[1]
 
         # Reset flux and mask 
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, 0)
         fill!(atmos.gas_ptran[c], false)
-
-        # Check if empty
-        if length(atmos.condensates) == 0
-            return nothing 
-        end 
 
         # Work variables
         a::Float64 = 1.0 
@@ -477,10 +477,14 @@ module energy
         qsat::Float64 = 0.0
         dif::Array = zeros(Float64, atmos.nlev_c)
 
-
         # Calculate flux (negative) divergence due to latent heat release...
         # For all levels 
         for i in 1:atmos.nlev_c-1
+
+            # Check criticality 
+            if atmos.tmp[i] > atmos.gas_dat[c].T_crit
+                continue 
+            end 
 
             # Get partial pressure 
             pp = atmos.gas_vmr[c][i] * atmos.p[i]
@@ -489,13 +493,8 @@ module energy
             end
 
             # check saturation
-            qsat = phys.get_Psat(atmos.gas_dat[c], atmo.tmp[i])/atmos.p[i]
+            qsat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i])/atmos.p[i]
             if (atmos.gas_vmr[c][i] < qsat+1.0e-10)
-                continue 
-            end 
-
-            # Check criticality 
-            if atmos.tmp[i] > atmos.gas_dat[c].T_crit
                 continue 
             end 
 

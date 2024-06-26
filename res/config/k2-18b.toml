@@ -14,7 +14,7 @@ title = "Roughly K2-18b @ IW-4"
     p_top           = 1e-5           
     vmr             = { H2O=0.0085, N2=0.0009, H2=0.7931, CO=0.0111, CH4=0.1864  }    
     condensates     = ["H2O","CH4","CO"]               
-    tmp_eff         = 0.0
+    tmp_int         = 100.0
     turb_coeff      = 0.001           
     wind_speed      = 2.0             
 

@@ -14,7 +14,7 @@ title = "Test clouds w/ prescribed T(p)"
     p_top           = 1e-6         
     vmr             = { H2O = 1.0 }
     condensates     = ["H2O"]
-    tmp_eff         = 0.0          
+    tmp_int         = 0.0          
 
 [files]
     clean_output    = true
