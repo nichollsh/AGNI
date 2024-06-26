@@ -211,7 +211,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
-setpt.condensing!(atmos, "H2O")
+setpt.saturation!(atmos, "H2O")
 energy.radtrans!(atmos, true)
 
 val_e = [270.0, 290.0]

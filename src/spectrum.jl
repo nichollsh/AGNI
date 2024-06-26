@@ -12,7 +12,7 @@ module spectrum
 
     using LoggingExtras
     using Printf
-    using BinnedStatistics
+    using PCHIPInterpolation
     using DelimitedFiles
     using LinearAlgebra
 
@@ -77,11 +77,14 @@ module spectrum
             lfl = log10.(fl)
             lwl = log10.(wl)
 
-            # Fit histogram
-            bin_e, bin_c, bin_v = binnedStatistic(lwl,lfl,nbins=tgt_bins,statistic=:mean)
+            # Downsample spectrum onto N=tgt_bins, logwavelength space
+            itp = Interpolator(lwl, lfl)
+            bin_c = collect(range(start=lwl[1],  stop=lwl[end], length=tgt_bins))
+            bin_v = zeros(Float64, tgt_bins)
+            bin_v[:] .= itp.(bin_c[:])
 
-            owl = 10 .^ Array(bin_c[:])
-            ofl = 10 .^ Array(bin_v[:])
+            owl = 10.0 .^ Array(bin_c[:])
+            ofl = 10.0 .^ Array(bin_v[:])
 
         # No binning required
         else 
