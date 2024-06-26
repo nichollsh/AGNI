@@ -71,7 +71,7 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: tmp_eff | 4: tgt_olr
+    - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: tmp_int | 4: tgt_olr
     - `chem_type::Int`                  chemistry type (see wiki)
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating 
@@ -109,7 +109,7 @@ module solver
                             detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             modprint::Int=1,
-                            conv_atol::Float64=1.0e-3, conv_rtol::Float64=1.0e-3
+                            conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
                             )::Bool
 
         # Validate sol_type
@@ -117,6 +117,9 @@ module solver
             @error "Invalid solution type ($sol_type)"
             return false
         end
+        if detect_plateau && !linesearch
+            @warn "Plateau nudging enabled without linesearch - expect instability"
+        end 
 
         # Start timer 
         wct_start::Float64 = time()
@@ -257,8 +260,8 @@ module solver
             elseif (sol_type == 3)
                 # Zero loss
                 resid[2:end] .= atmos.flux_dif[1:end]
-                # Total flux at TOA is equal to sigma*tmp_eff^4
-                resid[1] = atmos.flux_tot[1] - atmos.flux_eff
+                # Total flux at TOA is equal to sigma*tmp_int^4
+                resid[1] = atmos.flux_tot[1] - atmos.flux_int
 
             elseif (sol_type == 4)
                 # Zero loss
@@ -394,8 +397,8 @@ module solver
             @info @sprintf("    skin_d   = %.2f m",         atmos.skin_d)
             @info @sprintf("    skin_k   = %.2f W K-1 m-1", atmos.skin_k)
         elseif (sol_type == 3)
-            @info @sprintf("    tmp_eff  = %.2f K",     atmos.tmp_eff)
-            @info @sprintf("    f_eff    = %.2f W m-2", atmos.flux_eff)
+            @info @sprintf("    tmp_int  = %.2f K",     atmos.tmp_int)
+            @info @sprintf("    f_int    = %.2f W m-2", atmos.flux_int)
         elseif (sol_type == 4)
             @info @sprintf("    tgt_olr  = %.2f W m-2", atmos.target_olr)
         end 
@@ -434,7 +437,9 @@ module solver
             plot_step()
         end
 
-        @info @sprintf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
+        if modprint > 0
+            @info @sprintf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
+        end 
         info_str::String = ""
         stepflags::String = ""
         while true 
@@ -683,7 +688,7 @@ module solver
         atmos.is_solved = true
         atmos.is_converged = false 
         if code == 0
-            @info "    success"
+            @info "    success in $step steps"
             atmos.is_converged = true
         elseif code == 1
             @error "    failure (maximum iterations)"

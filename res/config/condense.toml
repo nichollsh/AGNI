@@ -14,7 +14,7 @@ title = "Condensation test"                    # Name for this configuration fil
     p_top           = 1e-5            
     vmr             = { H2O=0.8, CO2=0.1, CH4=0.08, H2=0.02}    
     condensates     = ["H2O", "CO2"]
-    tmp_eff         = 0.0            
+    tmp_int         = 0.0            
     turb_coeff      = 1.0e-4
     wind_speed      = 10.0
     skin_k          = 2.0

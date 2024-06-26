@@ -225,9 +225,9 @@ module plotting
         # Zero line 
         plot!(plt, [0.0, 0.0], [arr_P[1], arr_P[end]], lw=0.4, lc="black", label="")
 
-        # Effective flux
+        # Intrinsic/interior flux
         if incl_eff
-            plot!(plt, [_symlog(atmos.flux_eff)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="EFF")
+            plot!(plt, [_symlog(atmos.flux_int)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="INT")
         end
 
         # LW component

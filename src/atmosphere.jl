@@ -26,7 +26,7 @@ module atmosphere
     SOL_TYPES::Array{String, 1} = [
         "steadystate_ext",  # zero divergence at fixed tmp_surf, extrapolated tmpl[end]
         "cond_skin",        # set tmp_surf such that conductive skin conserves energy flux
-        "flux_eff",         # total flux at each level equal to flux_eff
+        "flux_int",         # total flux at each level equal to flux_int
         "target_olr",       # OLR is equal to target_olr
     ]
 
@@ -71,7 +71,7 @@ module atmosphere
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (cronin+14)
         tmp_surf::Float64               # Surface brightness temperature [K]
-        tmp_eff::Float64                # Effective temperature of the planet [K]
+        tmp_int::Float64                # Effective temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
 
@@ -128,7 +128,7 @@ module atmosphere
         layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
 
         # Calculated bolometric radiative fluxes (W m-2)
-        flux_eff::Float64                   # Effective flux  [W m-2] for sol_type=3
+        flux_int::Float64                   # Effective flux  [W m-2] for sol_type=3
         target_olr::Float64                 # Target olr [W m-2] for sol_type=4
 
         flux_d_lw::Array{Float64,1}         # down component, lw 
@@ -252,7 +252,7 @@ module atmosphere
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].   
     - `overlap_method::Int`             gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).   
     - `target_olr::Float64`             target OLR [W m-2] for sol_type==4.   
-    - `tmp_eff::Float64`                planet's effective brightness temperature [K] for sol_type==3.   
+    - `tmp_int::Float64`                planet's effective brightness temperature [K] for sol_type==3.   
     - `all_channels::Bool`              use all channels available for RT?   
     - `flag_rayleigh::Bool`             include rayleigh scattering?   
     - `flag_gcontinuum::Bool`           include generalised continuum absorption?   
@@ -284,7 +284,7 @@ module atmosphere
                     skin_k::Float64 =           2.0,
                     overlap_method::Int =       4,
                     target_olr::Float64 =       0.0,
-                    tmp_eff::Float64 =          0.0,
+                    tmp_int::Float64 =          0.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -336,7 +336,7 @@ module atmosphere
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.tmp_surf =        max(tmp_surf, atmos.tmp_floor)
-        atmos.tmp_eff =         tmp_eff
+        atmos.tmp_int =         tmp_int
         atmos.grav_surf =       max(1.0e-7, gravity)
         atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
@@ -345,7 +345,7 @@ module atmosphere
         atmos.s0_fact =         max(s0_fact,0.0)
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) * s0_fact * cosd(atmos.zenith_degrees)
 
-        atmos.flux_eff =        phys.sigma * (atmos.tmp_eff)^4.0  
+        atmos.flux_int =        phys.sigma * (atmos.tmp_int)^4.0  
         atmos.target_olr =      max(1.0e-20,target_olr)
         
         atmos.mask_decay =      15 
