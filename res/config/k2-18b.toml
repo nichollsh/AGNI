@@ -1,0 +1,61 @@
+# AGNI configuration file 
+title = "Roughly K2-18b @ IW-4"                   
+
+[planet]
+    tmp_surf        = 1000.0         
+    instellation    = 19261.0        
+    albedo_b        = 0.0            
+    s0_fact         = 0.6652         
+    zenith_angle    = 60.0           
+    albedo_s        = 0.0            
+    radius          = 1.6628E7       
+    gravity         = 12.43          
+    p_surf          = 237.473        
+    p_top           = 1e-5           
+    vmr             = { H2O=0.0085, N2=0.0009, H2=0.7931, CO=0.0111, CH4=0.1864  }    
+    condensates     = ["H2O","CH4","CO"]               
+    tmp_eff         = 0.0
+    turb_coeff      = 0.001           
+    wind_speed      = 2.0             
+
+[files]
+    clean_output    = true
+    input_sf        = "res/spectral_files/nogit/Dayspring/256/Dayspring.sf"   
+    input_star      = "res/stellar_spectra/gj1214.txt"                       
+    input_vmr       = ""                                                     
+    output_dir      = "out/"                                                 
+
+[execution]
+    verbosity       = 1                  
+    max_steps       = 20000              
+    max_runtime     = 400                
+    num_levels      = 45                 
+    continua        = true               
+    rayleigh        = true               
+    cloud           = false              
+    aerosol         = false              
+    overlap_method  = 4                  
+    thermo_funct    = true               
+    sensible_heat   = true               
+    latent_heat     = true               
+    convection_type = "mlt"              
+    condensates     = []                 
+    chemistry       = 0                  
+    solution_type   = 3                  
+    solvers         = ["newton"]         
+    dx_max          = 200.0              
+    initial_state   = ["iso","1000"]     
+    linesearch      = false              
+    converge_atol   = 1.0e-3             
+    converge_rtol   = 1.0e-1             
+
+[plots]
+    at_runtime      = true         
+    temperature     = true         
+    fluxes          = true         
+    contribution    = true         
+    emission        = true         
+    albedo          = true         
+    mixing_ratios   = true         
+    animate         = false        
+

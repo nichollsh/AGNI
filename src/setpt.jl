@@ -102,10 +102,12 @@ module setpt
             push!(tmpl, t_ext)
         end
 
-        # Interpolate from the loaded grid to required one
-        itp = Interpolator(pl, tmpl) 
-        atmos.tmpl[:] .= itp.(atmos.pl[:])  # Cell edges 
-        atmos.tmp[:]  .= itp.(atmos.p[:])   # Cell centres 
+        # Interpolate from the loaded grid to the required one
+        #   This uses log-pressures in order to make the interpolation behave 
+        #   reasonably across the entire grid.
+        itp = Interpolator(log10.(pl), tmpl) 
+        atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
+        atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
 
         atmosphere.calc_layer_props!(atmos)
         return nothing
@@ -319,7 +321,7 @@ module setpt
 
     Does not modify VMRs or surface temperature.
     """
-    function condensing!(atmos::atmosphere.Atmos_t, gas::String)
+    function saturation!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
             error("Atmosphere is not setup or allocated")
@@ -343,7 +345,10 @@ module setpt
 
             # Set cell-centre temperatures
             Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i])
-            atmos.tmp[i] = max(atmos.tmp[i], Tdew)
+            if atmos.tmp[i] < Tdew 
+                atmos.tmp[i] = Tdew 
+                atmos.gas_ptran[gas][i] = true
+            end 
         end
         
         # Set cell-edge temperatures

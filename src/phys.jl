@@ -39,7 +39,10 @@ module phys
     const fbig::Float64 = 1e90
 
     # List of elements included in the model 
-    const elements_list = ["H","C","N","O","S","P", "Fe","Mg","Si","Ca","Al"]
+    const elements_list::Array{String,1} = ["H","C","N","O","S","P", "Fe","Mg","Si","Ca","Al"]
+
+    # 0 degrees celcius, in kelvin 
+    const zero_celcius::Float64 = 273.15
 
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict{String, Float64}([
@@ -116,6 +119,7 @@ module phys
         T_crit::Float64 
 
         # Saturation curve 
+        no_sat::Bool                # No saturation data
         sat_T::Array{Float64,1}     # Reference temperatures [K]
         sat_P::Array{Float64,1}     # Corresponding saturation pressures [Pa]
         sat_I::Interpolator         # Interpolator struct
@@ -311,6 +315,7 @@ module phys
 
         # Check if we have data from file 
         gas.stub = !isfile(fpath)
+        gas.no_sat = false
         if gas.stub
             # no data => generate stub
             @debug("    stub")
@@ -329,6 +334,7 @@ module phys
             # saturation pressure set to large value (ensures always gas phase)
             gas.sat_T = [0.0, fbig]
             gas.sat_P = [fbig, fbig]
+            gas.no_sat = true
 
             # critical set to large value (never supercritical)
             gas.T_crit = fbig
@@ -354,6 +360,9 @@ module phys
 
             gas.sat_T = ds["sat_T"][:]
             gas.sat_P = ds["sat_P"][:]
+            if length(gas.sat_P) < 3
+                gas.no_sat = true
+            end 
 
             # close file 
             close(ds)
@@ -390,8 +399,8 @@ module phys
         end 
 
         # Above critical point. In practice, a check for this should be made 
-        #    before any attempts to evaluate this function.
-        if t > gas.T_crit
+        #    before any attempt to evaluate this function.
+        if t > gas.T_crit + 1.0e-5
             return fbig 
         end 
 
@@ -400,9 +409,9 @@ module phys
     end 
 
     """
-    **Approximate dew point temperature without interpolation**
+    **Approximate the dew point temperature without interpolation**
 
-    This should be avoided as much as possible. Does not check for criticality.
+    This should be avoided as much as possible.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -420,14 +429,14 @@ module phys
 
         # Find closest value in array 
         i::Int = argmin(abs.(gas.sat_P .- p))
-        return gas.sat_T[i]
+        return min(gas.sat_T[i], gas.T_crit)
     end 
 
     """
     **Get gas enthalpy (latent heat) of phase change.**
 
     If the temperature is above the critical point, then a zero value 
-    is returned. Evaluates at the triple point if `gas.tmp_dep=false`.
+    is returned. Evaluates at 0 Celcius if `gas.tmp_dep=false`.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -450,7 +459,7 @@ module phys
 
         # Constant value
         if !gas.tmp_dep
-            t = gas.T_trip + 1.0e-2
+            t = zero_celcius
         end 
 
         # Get value from interpolator
@@ -460,7 +469,7 @@ module phys
     """
     **Get gas heat capacity for a given temperature.**
 
-    Evaluates at the triple point if `gas.tmp_dep=false`.
+    Evaluates at 0 Celcius if `gas.tmp_dep=false`.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -478,7 +487,7 @@ module phys
 
         # Constant value
         if !gas.tmp_dep
-            t = gas.T_trip + 1.0e-2
+            t = zero_celcius
         end 
 
         # Temperature floor, since we can get weird behaviour as Cp -> 0.

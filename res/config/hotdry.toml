@@ -1,5 +1,5 @@
 # AGNI configuration file 
-title = "Hot and dry"                    # Name for this configuration file
+title = "Hot and dry"              
 
 [planet]
     tmp_surf        = 2000.0            # Surface temperature [kelvin]
