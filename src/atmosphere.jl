@@ -642,16 +642,18 @@ module atmosphere
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+        - `ignore_errors::Bool`     do not generate errors from hydrostatic integrator.
 
     Returns:
         - `ok::Bool`                function result is ok
     """
-    function calc_layer_props!(atmos::atmosphere.Atmos_t)::Bool
+    function calc_layer_props!(atmos::atmosphere.Atmos_t; ignore_errors::Bool=false)::Bool
         if !atmos.is_param
             error("atmosphere parameters have not been set")
         end
 
         ok::Bool = true
+        dz_max::Float64 = 1e9
 
         # Set pressure arrays in SOCRATES 
         atmos.atm.p[1, :] .= atmos.p[:]
@@ -708,30 +710,32 @@ module atmosphere
             # Integrate from lower edge to centre
             g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2.0)
             dzc = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g1 * atmos.p[i]) * (atmos.pl[i+1] - atmos.p[i]) 
-            if (dzc < 1e-20)
-                @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
-                ok = false 
+            if !ignore_errors
+                if (dzc < 1e-20)
+                    @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
+                    ok = false 
+                end
+                if  (dzc > dz_max)
+                    @error "Height integration blew up at level $i (l -> c)"
+                    ok = false 
+                end
             end
-            if  (dzc > 1e9)
-                @error "Height integration blew up at level $i (l -> c)"
-                ok = false 
-                dzc = 1e9
-            end
-            atmos.z[i] = atmos.zl[i+1] + dzc
+            atmos.z[i] = atmos.zl[i+1] + min(dzc,dz_max)
 
             # Integrate from centre to upper edge
             g2 = GMpl / ((atmos.rp + atmos.z[i])^2.0)
             dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * atmos.p[i]) * (atmos.p[i]- atmos.pl[i]) 
-            if (dzl < 1e-20)
-                @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
-                ok = false 
+            if !ignore_errors 
+                if (dzl < 1e-20)
+                    @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
+                    ok = false 
+                end
+                if (dzl > 1e9)
+                    @error "Height integration blew up at level $i (c -> l)"
+                    ok = false 
+                end
             end
-            if (dzl > 1e9)
-                @error "Height integration blew up at level $i (c -> l)"
-                ok = false 
-                dzl = 1e9
-            end
-            atmos.zl[i] = atmos.z[i] + dzl
+            atmos.zl[i] = atmos.z[i] + min(dzl,dz_max)
             
             # Layer average gravity [m s-2]
             atmos.layer_grav[i] = GMpl / ((atmos.rp + atmos.z[i])^2.0)
@@ -1074,7 +1078,12 @@ module atmosphere
  
 
         # Calc layer properties using initial temperature profile 
-        calc_layer_props!(atmos)
+        #    Can generate weird issues since the TOA temperature can be large 
+        #    large but pressure small, which gives it a low density. With the 
+        #    hydrostatic integrator, this can cause dz to blow up, especially 
+        #    with a low MMW gas. Should be okay as long as the T(p) provided 
+        #    by the user is more reasonable. Silence errors *in this case*. 
+        calc_layer_props!(atmos, ignore_errors=true)
 
         ################################
         # Aerosol processes
