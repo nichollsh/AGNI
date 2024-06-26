@@ -40,7 +40,6 @@ module plotting
                             incl_magma::Bool=false, 
                             title::String="")
         
-        # Interleave cell-centre and cell-edge arrays
         ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
@@ -49,30 +48,22 @@ module plotting
 
         # Plot phase boundary 
         if length(atmos.condensates) > 0
-            sat_t::Array{Float64,1} = zeros(Float64, atmos.nlev_c)
-            crt_i::Int = atmos.nlev_c  # index at which criticality occurs
+            sat_n::Int = 100
+            sat_p::Array{Float64,1} = zeros(Float64, sat_n)
+            sat_t::Array{Float64,1} = zeros(Float64, sat_n)
             for c in atmos.condensates
 
-                # for each level...
-                i = 1
-                crt_i = atmos.nlev_c
-                while (i < crt_i) && (i <= atmos.nlev_c)
-                    # get dew point temperature from this partial pressure 
-                    sat_t[i] = phys.get_Tdew(atmos.gas_dat[c], atmos.pl[i]) 
-
-                    # check if supercritical
-                    if sat_t[i] >= atmos.gas_dat[c].T_crit
-                        crt_i = i
-                    end 
-
-                    i += 1
+                if atmos.gas_dat[c].no_sat
+                    continue 
                 end 
 
-                # plot phase boundary for this condensate, stopping at critical point
-                plot!(plt, sat_t[1:crt_i], atmos.p[1:crt_i]*1e-5, lc=atmos.gas_dat[c].plot_color, ls=:dot, label=atmos.gas_dat[c].plot_label)
+                for i in 1:sat_n 
+                    sat_t[i] = atmos.gas_dat[c].T_crit * i/sat_n
+                    sat_p[i] = phys.get_Psat(atmos.gas_dat[c], sat_t[i]) * 1e-5
+                end 
 
-                # plot critical temperature 
-                # scatter!(plt, [atmos.gas_dat[c].T_crit], [atmos.p[crt_i]*1e-5], mc=atmos.gas_dat[c].plot_color, label="")
+                # plot phase boundary for this condensate
+                plot!(plt, sat_t, sat_p, lc=atmos.gas_dat[c].plot_color, ls=:dot, label=atmos.gas_dat[c].plot_label)
             end 
         end
 
@@ -89,6 +80,50 @@ module plotting
 
         # Decorate
         xlabel!(plt, "Temperature [K]")
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10)
+        if !isempty(title)
+            title!(plt, title)
+        end 
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt 
+    end
+
+    """
+    Plot the cloud mass mixing ratio and area fraction.
+    """
+    function plot_cloud(atmos::atmosphere.Atmos_t, fname::String; 
+                            dpi::Int=250,
+                            size_x::Int=500, size_y::Int=400,
+                            title::String="")
+        
+        xlims = (-1, 101)
+        xticks = collect(range(start=0.0, stop=100.0, step=10.0))
+
+        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
+        # Create plot
+        plt = plot(framestyle=:box, 
+                    xlims=xlims, xticks=xticks,
+                    ylims=ylims, yticks=yticks, 
+                    legend=:outertopright, dpi=dpi, 
+                    size=(size_x,size_y), guidefontsize=9, titlefontsize=9)
+
+        # Temperature profile for reference
+        tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
+        plot!(plt, tmp_nrm*100.0, atmos.p*1e-5, lc="black", linealpha=0.3, label=L"\hat{T}(p)")
+
+        # Plot cloud profiles
+        plot!(plt, atmos.cloud_arr_l*100.0, atmos.p*1e-5, lw=2, lc="black", label="MMR")
+        plot!(plt, atmos.cloud_arr_f*100.0, atmos.p*1e-5, lw=2, lc="red",   label="Area frac.", ls=:dot)
+
+        # Decorate
+        xlabel!(plt, "Quantity [%]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)

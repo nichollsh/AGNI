@@ -11,16 +11,12 @@ GNU/Linux and MacOS (including ARM) are supported.
 
 ## Installation
 1. Download AGNI from GitHub, either as a zip from the website or using Git 
-    `git clone https://github.com/nichollsh/AGNI.git`
-1. Setup SOCRATES by doing either **ONE** of the following...
+          `git clone https://github.com/nichollsh/AGNI.git`
+2. `cd AGNI`
+3. Setup SOCRATES by doing either **ONE** of the following...
     - Follow the instructions on the SOCRATES GitHub page   
     - Run `source get_socrates.sh`    
-2. `$ julia`
-3. `julia> ]` 
-4. `(@v1.10) pkg> activate .` ← note the dot
-5. `(AGNI) pkg> build`
-6. Press backspace to exit the package manager
-7. `julia> exit()` 
+4. `$ julia -e 'using Pkg; Pkg.activate("."); Pkg.build()'`
 AGNI is now installed as a package into a Julia environment in the AGNI
 directory. You should run the tests next.
 

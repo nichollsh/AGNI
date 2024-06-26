@@ -18,7 +18,6 @@ module atmosphere
     
     # Local files
     include(joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl"))
-    import ..moving_average
     import ..phys
     import ..spectrum
 
@@ -170,17 +169,17 @@ module atmosphere
         # Conduction 
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
 
-        # Cloud and condensation
+        # Phase change 
         flux_l::Array{Float64, 1}           # Latent heat energy flux [W m-2]
-        mask_l::Array{Int,1}                # Layers which are (or were recently) condensing
-        #    These arrays give the cloud properties within layers containing cloud
+        mask_l::Array{Int,1}                # Layers which are (or were recently) undergoing phase transition
+
+        # Clouds
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
         cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
         cloud_arr_f::Array{Float64,1}       # Total cloud area fraction in layers. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
-        #    These floats give the default values that the above arrays are filled with upon cloud formation
-        cloud_val_r::Float64 
-        cloud_val_l::Float64 
-        cloud_val_f::Float64 
+        cloud_val_r::Float64                # \
+        cloud_val_l::Float64                #  |-> Default scalar values to above arrays
+        cloud_val_f::Float64                # /
 
         # Cell-internal heating 
         ediv_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-3] (e.g. from advection)
@@ -301,7 +300,7 @@ module atmosphere
         end
 
         # Code versions 
-        atmos.AGNI_VERSION = "0.5.0"
+        atmos.AGNI_VERSION = "0.5.1"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -401,7 +400,7 @@ module atmosphere
         # Hardcoded cloud properties 
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
-        atmos.cloud_val_f   = 0.8     # 80% of the cell "area" is cloud
+        atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
 
         # Read mole fractions
         if isnothing(mf_dict) && isnothing(mf_path)
@@ -642,16 +641,18 @@ module atmosphere
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+        - `ignore_errors::Bool`     do not generate errors from hydrostatic integrator.
 
     Returns:
         - `ok::Bool`                function result is ok
     """
-    function calc_layer_props!(atmos::atmosphere.Atmos_t)::Bool
+    function calc_layer_props!(atmos::atmosphere.Atmos_t; ignore_errors::Bool=false)::Bool
         if !atmos.is_param
             error("atmosphere parameters have not been set")
         end
 
         ok::Bool = true
+        dz_max::Float64 = 1e9
 
         # Set pressure arrays in SOCRATES 
         atmos.atm.p[1, :] .= atmos.p[:]
@@ -708,30 +709,32 @@ module atmosphere
             # Integrate from lower edge to centre
             g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2.0)
             dzc = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g1 * atmos.p[i]) * (atmos.pl[i+1] - atmos.p[i]) 
-            if (dzc < 1e-20)
-                @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
-                ok = false 
+            if !ignore_errors
+                if (dzc < 1e-20)
+                    @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
+                    ok = false 
+                end
+                if  (dzc > dz_max)
+                    @error "Height integration blew up at level $i (l -> c)"
+                    ok = false 
+                end
             end
-            if  (dzc > 1e9)
-                @error "Height integration blew up at level $i (l -> c)"
-                ok = false 
-                dzc = 1e9
-            end
-            atmos.z[i] = atmos.zl[i+1] + dzc
+            atmos.z[i] = atmos.zl[i+1] + min(dzc,dz_max)
 
             # Integrate from centre to upper edge
             g2 = GMpl / ((atmos.rp + atmos.z[i])^2.0)
             dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * atmos.p[i]) * (atmos.p[i]- atmos.pl[i]) 
-            if (dzl < 1e-20)
-                @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
-                ok = false 
+            if !ignore_errors 
+                if (dzl < 1e-20)
+                    @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
+                    ok = false 
+                end
+                if (dzl > 1e9)
+                    @error "Height integration blew up at level $i (c -> l)"
+                    ok = false 
+                end
             end
-            if (dzl > 1e9)
-                @error "Height integration blew up at level $i (c -> l)"
-                ok = false 
-                dzl = 1e9
-            end
-            atmos.zl[i] = atmos.z[i] + dzl
+            atmos.zl[i] = atmos.z[i] + min(dzl,dz_max)
             
             # Layer average gravity [m s-2]
             atmos.layer_grav[i] = GMpl / ((atmos.rp + atmos.z[i])^2.0)
@@ -905,11 +908,11 @@ module atmosphere
         npd_opt_level_cloud_prsc = 170 # Size allocated for levels of prescribed cloudy optical properties
 
         # modules_gen/dimensioms_fixed_pcf.f90
-        npd_cloud_component        =  4 #   Number of components of clouds.
-        npd_cloud_type             =  4 #   Number of permitted types of clouds.
+        npd_cloud_component        =  1 #   Number of components of clouds.
+        npd_cloud_type             =  1 #   Number of permitted types of clouds.
         npd_overlap_coeff          = 18 #   Number of overlap coefficients for cloud
         npd_source_coeff           =  2 #   Number of coefficients for two-stream sources
-        npd_region                 =  2 # Number of regions in a layer
+        npd_region                 =  1 # Number of regions in a layer
 
         atmos.dimen.nd_profile                = npd_profile
         atmos.dimen.nd_flux_profile           = npd_profile
@@ -942,7 +945,6 @@ module atmosphere
         atmos.dimen.nd_aerosol_mode           = 1
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
-        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
@@ -1075,7 +1077,12 @@ module atmosphere
  
 
         # Calc layer properties using initial temperature profile 
-        calc_layer_props!(atmos)
+        #    Can generate weird issues since the TOA temperature can be large 
+        #    large but pressure small, which gives it a low density. With the 
+        #    hydrostatic integrator, this can cause dz to blow up, especially 
+        #    with a low MMW gas. Should be okay as long as the T(p) provided 
+        #    by the user is more reasonable. Silence errors *in this case*. 
+        calc_layer_props!(atmos, ignore_errors=true)
 
         ################################
         # Aerosol processes
@@ -1118,7 +1125,7 @@ module atmosphere
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
 
-        
+        SOCRATES.allocate_cld(  atmos.cld,    atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
 
         if atmos.control.l_cloud
@@ -1161,9 +1168,10 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
-        atmos.mask_l =            zeros(Int, atmos.nlev_c)
-        atmos.mask_c =            zeros(Int, atmos.nlev_c)
-        atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat
+        atmos.mask_l =            zeros(Int, atmos.nlev_c)      # Phase change 
+        atmos.mask_c =            zeros(Int, atmos.nlev_c)      # Dry convection
+
+        atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat / phase change 
         atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection 
         atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction 
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)
@@ -1449,7 +1457,6 @@ module atmosphere
         fill!(atmos.cloud_arr_l, 0.0)
         fill!(atmos.cloud_arr_f, 0.0)
 
-
         # Loop from bottom to top (does not include bottommost level)
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
@@ -1492,6 +1499,20 @@ module atmosphere
 
                     # flag condensate as actively condensing at this level
                     atmos.gas_ptran[c][i] = true 
+
+                    # Set water cloud at this level
+                    if c == "H2O"
+                        # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
+                        atmos.cloud_arr_l[i] = (cond_kg["H2O"] * cond_retention_frac / layer_area) / atmos.layer_mass[i]
+
+                        if atmos.cloud_arr_l[i] > 1.0
+                            @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
+                        end 
+
+                        # droplet radius and area fraction (fixed values)
+                        atmos.cloud_arr_r[i] = atmos.cloud_val_r
+                        atmos.cloud_arr_f[i] = atmos.cloud_val_f
+                    end 
                 end 
             end # end condensates
 
@@ -1506,20 +1527,6 @@ module atmosphere
             for g in atmos.gas_names
                 atmos.layer_mmw[i] += atmos.gas_vmr[g][i] * atmos.gas_dat[g].mmw
             end
-
-            # Set water cloud at this level
-            if "H2O" in atmos.condensates
-                # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
-                atmos.cloud_arr_l[i] = (cond_kg["H2O"] * cond_retention_frac / layer_area) / atmos.layer_mass[i]
-
-                if atmos.cloud_arr_l[i] > 1.0
-                    @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
-                end 
-
-                # droplet radius and area fraction (fixed values)
-                atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                atmos.cloud_arr_f[i] = atmos.cloud_val_f
-            end 
 
             # Evaporate condensate withon unsaturated layers below this one
             #   integrate downwards from this condensing layer (i)
@@ -1611,7 +1618,7 @@ module atmosphere
         return nothing 
     end 
 
-    # Set cloud properties within condensing regions
+    # Set cloud properties within condensing regions.
     function water_cloud!(atmos::atmosphere.Atmos_t)
 
         # Reset 
@@ -1624,19 +1631,18 @@ module atmosphere
             return nothing
         end
 
-        # Check if each level is condensing. If it is, place on phase curve
-        x::Float64      = 0.0  # vmr of water vapour
-        Tsat::Float64   = 0.0  # dew point temperature of water vapour
-        for i in 1:atmos.nlev_c
+        # Set level-by-level
+        x::Float64      = 0.0 
+        for i in 1:atmos.nlev_c-1
 
+            # Water VMR
             x = atmos.gas_vmr["H2O"][i]
             if x < 1.0e-10 
                 continue
             end
 
-            # Cell centre only
-            # Check if partial pressure > P_sat
-            if atmos.p[i]*atmos.gas_vmr["H2O"][i] > phys.get_Psat(atmos.gas_dat["H2O"], atmos.tmp[i])
+            # Use mask from atmos struct
+            if atmos.gas_ptran["H2O"][i]
                 atmos.cloud_arr_r[i] = atmos.cloud_val_r
                 atmos.cloud_arr_l[i] = atmos.cloud_val_l
                 atmos.cloud_arr_f[i] = atmos.cloud_val_f
@@ -1647,18 +1653,18 @@ module atmosphere
     end
 
     # Smooth temperature at cell-centres 
-    function smooth_centres!(atmos::atmosphere.Atmos_t, width::Int)
+    # function smooth_centres!(atmos::atmosphere.Atmos_t, width::Int)
 
-        if width > 2
-            if mod(width,2) == 0
-                width += 1 # window width has to be an odd number
-            end
-            atmos.tmp = moving_average.hma(atmos.tmp, width)
-        end 
-        clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
+    #     if width > 2
+    #         if mod(width,2) == 0
+    #             width += 1 # window width has to be an odd number
+    #         end
+    #         atmos.tmp = moving_average.hma(atmos.tmp, width)
+    #     end 
+    #     clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
-        return nothing
-    end
+    #     return nothing
+    # end
 
     """
     **Set cell-edge temperatures from cell-centre values.**
