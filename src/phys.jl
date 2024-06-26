@@ -41,7 +41,7 @@ module phys
     # List of elements included in the model 
     const elements_list::Array{String,1} = ["H","C","N","O","S","P", "Fe","Mg","Si","Ca","Al"]
 
-    # 0 degrees celcius in kelvin 
+    # 0 degrees celcius, in kelvin 
     const zero_celcius::Float64 = 273.15
 
     # Molecule mean molecular weight, kg mol-1
@@ -119,6 +119,7 @@ module phys
         T_crit::Float64 
 
         # Saturation curve 
+        no_sat::Bool                # No saturation data
         sat_T::Array{Float64,1}     # Reference temperatures [K]
         sat_P::Array{Float64,1}     # Corresponding saturation pressures [Pa]
         sat_I::Interpolator         # Interpolator struct
@@ -314,6 +315,7 @@ module phys
 
         # Check if we have data from file 
         gas.stub = !isfile(fpath)
+        gas.no_sat = false
         if gas.stub
             # no data => generate stub
             @debug("    stub")
@@ -332,6 +334,7 @@ module phys
             # saturation pressure set to large value (ensures always gas phase)
             gas.sat_T = [0.0, fbig]
             gas.sat_P = [fbig, fbig]
+            gas.no_sat = true
 
             # critical set to large value (never supercritical)
             gas.T_crit = fbig
@@ -357,6 +360,9 @@ module phys
 
             gas.sat_T = ds["sat_T"][:]
             gas.sat_P = ds["sat_P"][:]
+            if length(gas.sat_P) < 3
+                gas.no_sat = true
+            end 
 
             # close file 
             close(ds)
@@ -393,8 +399,8 @@ module phys
         end 
 
         # Above critical point. In practice, a check for this should be made 
-        #    before any attempts to evaluate this function.
-        if t >= gas.T_crit
+        #    before any attempt to evaluate this function.
+        if t > gas.T_crit + 1.0e-5
             return fbig 
         end 
 

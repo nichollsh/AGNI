@@ -48,30 +48,22 @@ module plotting
 
         # Plot phase boundary 
         if length(atmos.condensates) > 0
-            sat_t::Array{Float64,1} = zeros(Float64, atmos.nlev_c)
-            crt_i::Int = atmos.nlev_c  # index at which criticality occurs
+            sat_n::Int = 100
+            sat_p::Array{Float64,1} = zeros(Float64, sat_n)
+            sat_t::Array{Float64,1} = zeros(Float64, sat_n)
             for c in atmos.condensates
 
-                # for each level...
-                i = 1
-                crt_i = atmos.nlev_c
-                while (i < crt_i) && (i <= atmos.nlev_c)
-                    # get dew point temperature from this partial pressure 
-                    sat_t[i] = phys.get_Tdew(atmos.gas_dat[c], atmos.pl[i]) 
-
-                    # check if supercritical
-                    if sat_t[i] >= atmos.gas_dat[c].T_crit
-                        crt_i = i
-                    end 
-
-                    i += 1
+                if atmos.gas_dat[c].no_sat
+                    continue 
                 end 
 
-                # plot phase boundary for this condensate, stopping at critical point
-                plot!(plt, sat_t[1:crt_i], atmos.p[1:crt_i]*1e-5, lc=atmos.gas_dat[c].plot_color, ls=:dot, label=atmos.gas_dat[c].plot_label)
+                for i in 1:sat_n 
+                    sat_t[i] = atmos.gas_dat[c].T_crit * i/sat_n
+                    sat_p[i] = phys.get_Psat(atmos.gas_dat[c], sat_t[i]) * 1e-5
+                end 
 
-                # plot critical temperature 
-                # scatter!(plt, [atmos.gas_dat[c].T_crit], [atmos.p[crt_i]*1e-5], mc=atmos.gas_dat[c].plot_color, label="")
+                # plot phase boundary for this condensate
+                plot!(plt, sat_t, sat_p, lc=atmos.gas_dat[c].plot_color, ls=:dot, label=atmos.gas_dat[c].plot_label)
             end 
         end
 

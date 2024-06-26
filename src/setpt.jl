@@ -102,10 +102,12 @@ module setpt
             push!(tmpl, t_ext)
         end
 
-        # Interpolate from the loaded grid to required one
-        itp = Interpolator(pl, tmpl) 
-        atmos.tmpl[:] .= itp.(atmos.pl[:])  # Cell edges 
-        atmos.tmp[:]  .= itp.(atmos.p[:])   # Cell centres 
+        # Interpolate from the loaded grid to the required one
+        #   This uses log-pressures in order to make the interpolation behave 
+        #   reasonably across the entire grid.
+        itp = Interpolator(log10.(pl), tmpl) 
+        atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
+        atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
 
         atmosphere.calc_layer_props!(atmos)
         return nothing
