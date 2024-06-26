@@ -18,7 +18,6 @@ module atmosphere
     
     # Local files
     include(joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl"))
-    import ..moving_average
     import ..phys
     import ..spectrum
 
@@ -1654,18 +1653,18 @@ module atmosphere
     end
 
     # Smooth temperature at cell-centres 
-    function smooth_centres!(atmos::atmosphere.Atmos_t, width::Int)
+    # function smooth_centres!(atmos::atmosphere.Atmos_t, width::Int)
 
-        if width > 2
-            if mod(width,2) == 0
-                width += 1 # window width has to be an odd number
-            end
-            atmos.tmp = moving_average.hma(atmos.tmp, width)
-        end 
-        clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
+    #     if width > 2
+    #         if mod(width,2) == 0
+    #             width += 1 # window width has to be an odd number
+    #         end
+    #         atmos.tmp = moving_average.hma(atmos.tmp, width)
+    #     end 
+    #     clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
 
-        return nothing
-    end
+    #     return nothing
+    # end
 
     """
     **Set cell-edge temperatures from cell-centre values.**
