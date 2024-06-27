@@ -18,6 +18,9 @@ module plotting
     import ..atmosphere
     import ..phys
 
+    # Default plotting configuration
+    default(fontfamily="sans-serif", framestyle=:box, label=nothing, grid=true, guidefontsize=9, titlefontsize=9)
+
     # Symmetric log
     function _symlog(v::Float64)::Float64
         if abs(v) < 1.0
@@ -44,7 +47,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(size_x,size_y), guidefontsize=9, titlefontsize=9)
+        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(size_x,size_y))
 
         # Plot phase boundary 
         if length(atmos.condensates) > 0
@@ -108,11 +111,10 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(framestyle=:box, 
-                    xlims=xlims, xticks=xticks,
+        plt = plot( xlims=xlims, xticks=xticks,
                     ylims=ylims, yticks=yticks, 
                     legend=:outertopright, dpi=dpi, 
-                    size=(size_x,size_y), guidefontsize=9, titlefontsize=9)
+                    size=(size_x,size_y))
 
         # Temperature profile for reference
         tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
@@ -149,7 +151,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
         
         # Create plot
-        plt = plot(framestyle=:box, ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(size_x,size_y), guidefontsize=9)
+        plt = plot(ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(size_x,size_y))
 
         # Plot log10 mole fractions for each gas
         xmin::Float64 = -2
@@ -204,7 +206,7 @@ module plotting
         xlims = (-xticks_pos[end], xticks_pos[end])
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
-        plt = plot(legend=:outertopright, framestyle=:box, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, guidefontsize=9, size=(size_x,size_y), titlefontsize=9)
+        plt = plot(legend=:outertopright, ylims=ylims, yticks=yticks, xticks=(xticks, xticklabels), xlims=xlims, dpi=dpi, size=(size_x,size_y))
 
         col_r::String = "#c0c0c0"
         col_n::String = "#000000"
@@ -350,7 +352,7 @@ module plotting
         end 
 
         # Make plot
-        plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
+        plt = plot(dpi=dpi)
 
         if incl_surf
             plot!(plt, xp, yp, label="Surface",  color="green") # surface planck function
@@ -424,7 +426,7 @@ module plotting
         end 
 
         # Make plot
-        plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9, colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
+        plt = plot(dpi=dpi, colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
 
         heatmap!(plt, x,y,z, c=:devon)
 
@@ -468,7 +470,7 @@ module plotting
         end
 
         # Make plot
-        plt = plot(framestyle=:box, dpi=dpi, guidefontsize=9)
+        plt = plot(dpi=dpi)
 
         plot!(plt, x, y, label="", color="black")
 
@@ -532,10 +534,9 @@ module plotting
         lim::Float64 = maximum(abs.(b))     # colourbar limits
         l::Int = length(perturb)            # show perturbed levels?
 
-        plt = plot(framestyle=:box, dpi=dpi, 
-                    guidefontsize=9, size=(size_x, size_y),
+        plt = plot(dpi=dpi, size=(size_x, size_y),
                     title="∂r/∂x [W m⁻² K⁻¹]",
-                    clim=(-lim,lim), grid=false, yflip=true)
+                    clim=(-lim,lim), yflip=true)
 
         # show jacobian 
         heatmap!(plt, b, color=:RdBu)
