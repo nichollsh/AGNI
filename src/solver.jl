@@ -144,11 +144,11 @@ module solver
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        perturb_conv::Float64 = 0.01    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
-        perturb_crit::Float64 = 0.9     # Require Jacobian update at level i when r_i>perturb_crit
+        perturb_conv::Float64 = 0.02    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
+        perturb_crit::Float64 = 1.0     # Require Jacobian update at level i when r_i>perturb_crit
 
         #    linesearch 
-        ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
+        ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.5     # backtracking step size
         ls_increase::Float64 =  1.01    # factor by which cost can increase
         ls_max_steps::Int  =    10      # maximum steps 
