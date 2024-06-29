@@ -399,7 +399,7 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c) 
 
         # Hardcoded cloud properties 
-        atmos.cond_alpha    = 0.1     # 10% of condensate formed will NOT rainout
+        atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
@@ -1435,7 +1435,7 @@ module atmosphere
     function handle_saturation!(atmos::atmosphere.Atmos_t)
 
         # Parameters 
-        evap_enabled::Bool =            true    # Enable re-vaporation of rain
+        evap_enabled::Bool =            false    # Enable re-vaporation of rain
         evap_efficiency::Float64 =      1.0     # Evaporation efficiency
 
         # Work arrays 
@@ -1615,6 +1615,8 @@ module atmosphere
             end # end evaporation 
 
         end # go to next i level (above)
+
+        calc_layer_props!(atmos)
 
         return nothing 
     end 
