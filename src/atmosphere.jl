@@ -778,12 +778,11 @@ module atmosphere
         # Surface pressure 
         atmos.pl[end]      = atmos.p_boa 
 
-        # Bottom two layers
-        atmos.pl[end-1] = atmos.pl[end  ]*(1.0-boundary_scale)
-        atmos.pl[end-2] = atmos.pl[end-1]*(1.0-boundary_scale)
+        # Bottom layer
+        atmos.pl[end-1] = atmos.pl[end]*(1.0-boundary_scale)
 
         # Logarithmically-spaced levels
-        atmos.pl[1:end-2] .= 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.pl[end-2]), length=atmos.nlev_l-2)
+        atmos.pl[1:end-1] .= 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.pl[end-1]), length=atmos.nlev_l-1)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p = zeros(Float64, atmos.nlev_c)
