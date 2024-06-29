@@ -414,7 +414,7 @@ module energy
                 atmos.mask_c[i-1] = atmos.mask_decay
                 
                 # Pressure scale height
-                H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
+                H = phys.R_gas * tmp / (mu * grav)
 
                 # Mixing length
                 if mltype == 0
@@ -432,7 +432,7 @@ module energy
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
+                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * tmp * l/H * (grad_pr-grad_ad)
 
                 # Thermal eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
@@ -574,7 +574,7 @@ module energy
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at TOA, integrating downwards
         for i in range(start=1, stop=atmos.nlev_c, step=1)
-            atmos.flux_l[i+1] = max(0.0, dfdp[i] * (atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i])
+            atmos.flux_l[i+1] = dfdp[i] * (atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i]
         end 
 
         return nothing 

@@ -117,9 +117,10 @@ module solver
             @error "Invalid solution type ($sol_type)"
             return false
         end
-        if detect_plateau && !linesearch
-            @warn "Plateau nudging enabled without linesearch - expect instability"
-        end 
+        # if detect_plateau && !linesearch
+        #     @warn "Plateau nudging enabled without linesearch - expect instability"
+        # end 
+        detect_plateau = detect_plateau && linesearch
 
         # Start timer 
         wct_start::Float64 = time()
