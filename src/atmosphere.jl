@@ -1527,17 +1527,16 @@ module atmosphere
                 end 
             end # end condensates
 
-            # for c in atmos.condensates
-            #     @printf("At %d: generated %s rain: %.3e kg \n", i, c, rain_kg[c])
-            # end
-
+            # renormalise mixing ratios 
             normalise_vmrs!(atmos, i)
 
-            # Recalculate layer mmw 
-            atmos.layer_mmw[i] = 0.0
-            for g in atmos.gas_names
-                atmos.layer_mmw[i] += atmos.gas_vmr[g][i] * atmos.gas_dat[g].mmw
-            end
+            # Recalculate layer mmw
+            # atmos.layer_mmw[i] = 0.0
+            # for g in atmos.gas_names
+            #     atmos.layer_mmw[i] += atmos.gas_vmr[g][i] * atmos.gas_dat[g].mmw
+            # end
+
+            calc_layer_props!(atmos)
 
             # Evaporate condensate withon unsaturated layers below this one
             #   integrate downwards from this condensing layer (i)
@@ -1620,9 +1619,6 @@ module atmosphere
 
                 end # end condensates
             end # end evaporation 
-
-            # Calculate layer properties 
-            # calc_layer_props!(atmos)
 
         end # go to next i level (above)
 
