@@ -109,7 +109,7 @@ module atmosphere
         gas_vmr::Dict{String, Array{Float64,1}}     # Layer mole fractions in dict format, (key,value) = (gas_name,array)
         gas_ptran::Dict{String, Array{Bool, 1}}     # Layer phase transition flag in dict format, (key,value) = (gas_name,array)
         gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
-        gas_yield::Dict{String, Array{Float64,1}}   # condensate yield at each level (can be negative, representing evaporation)
+        gas_yield::Dict{String, Array{Float64,1}}   # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
         condensates::Array{String, 1}                   # List of condensing gases (strings)
         single_component::Bool                          # Does a single gas make up 100% of layer at any point in the column?
 
@@ -1440,10 +1440,9 @@ module atmosphere
 
         # Work arrays 
         maxvmr::Dict{String, Float64} = Dict{String, Float64}()     # max running VMR for each condensable 
-        cond_kg::Dict{String,Float64} = Dict{String, Float64}()     # condensed kg for each condensable 
-        rain_kg::Dict{String,Float64} = Dict{String, Float64}()     # rainout kg for each condensable
+        cond_kg::Dict{String,Float64} = Dict{String, Float64}()     # condensed kg/m2 for each condensable 
+        rain_kg::Dict{String,Float64} = Dict{String, Float64}()     # rainout kg/m2 for each condensable
         x_sat::Float64 =        0.0
-        layer_area::Float64 =   0.0
         supcrit::Bool =         false
 
         # Set maximum value (for cold trapping)
@@ -1468,14 +1467,12 @@ module atmosphere
         # Loop from bottom to top (does not include bottommost level)
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
-            layer_area = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0
-
             # For each condensate 
             for c in atmos.condensates
 
                 # Reset condensation and rain
-                cond_kg[c] = 0.0                    # kg of 'c' condensate produced at this level 
-                rain_kg[c] = 0.0                    # kg of ^ rained-out from this level
+                cond_kg[c] = 0.0                    # kg/m2 of 'c' condensate produced at this level 
+                rain_kg[c] = 0.0                    # kg/m2 of ^ rained-out from this level
 
                 # check criticality 
                 supcrit = atmos.tmp[i] > atmos.gas_dat[c].T_crit+1.0e-10
@@ -1495,8 +1492,8 @@ module atmosphere
                 # condense if supersaturated
                 if (atmos.gas_vmr[c][i] > x_sat) && !supcrit
 
-                    # set rainout kg 
-                    cond_kg[c] = layer_area * (atmos.gas_dat[c].mmw/atmos.layer_mmw[i])*atmos.p[i]*(atmos.gas_vmr[c][i] - x_sat)/atmos.layer_grav[i]
+                    # set rainout kg/m2
+                    cond_kg[c] = (atmos.gas_dat[c].mmw/atmos.layer_mmw[i])*atmos.p[i]*(atmos.gas_vmr[c][i] - x_sat)/atmos.layer_grav[i]
                     rain_kg[c] = cond_kg[c] * (1.0 - atmos.cond_alpha)
 
                     # condensation yield at this level 
@@ -1514,7 +1511,7 @@ module atmosphere
                     # Set water cloud at this level
                     if c == "H2O"
                         # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
-                        atmos.cloud_arr_l[i] = (cond_kg["H2O"] * atmos.cond_alpha / layer_area) / atmos.layer_mass[i]
+                        atmos.cloud_arr_l[i] = (cond_kg["H2O"] * atmos.cond_alpha) / atmos.layer_mass[i]
 
                         if atmos.cloud_arr_l[i] > 1.0
                             @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
@@ -1555,9 +1552,6 @@ module atmosphere
                             continue 
                         end 
 
-                        # layer area
-                        layer_area = 4.0*pi*(atmos.z[j]+atmos.rp)^2.0
-
                         # Calculate partial pressure change required for saturation
                         supcrit = atmos.tmp[j] > atmos.gas_dat[c].T_crit
                         if supcrit
@@ -1571,8 +1565,8 @@ module atmosphere
                             
                         end 
 
-                        # Calculate kg of gas that would saturate 
-                        dm_sat = layer_area*(atmos.gas_dat[c].mmw/atmos.layer_mmw[j])*dp_sat/atmos.layer_grav[j]
+                        # Calculate kg/m2 of gas that would saturate 
+                        dm_sat = (atmos.gas_dat[c].mmw/atmos.layer_mmw[j])*dp_sat/atmos.layer_grav[j]
                         
                         # can we evaporate all rain within this layer?
                         if rain_kg[c] < dm_sat 
@@ -1588,7 +1582,7 @@ module atmosphere
                         atmos.gas_yield[c][j] -= dm_sat
 
                         # additional partial pressure from evaporation 
-                        dp_sat = dm_sat * atmos.layer_grav[j] / (layer_area * atmos.layer_mmw[j] / atmos.gas_dat[c].mmw)
+                        dp_sat = dm_sat * atmos.layer_grav[j] / (atmos.layer_mmw[j] / atmos.gas_dat[c].mmw)
 
                         # convert extra pp to extra vmr
                         atmos.gas_vmr[c][j] += dp_sat / atmos.p[j]

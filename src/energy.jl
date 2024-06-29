@@ -535,7 +535,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 1e5      # seconds
+        timescale::Float64 = 5e5      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -547,7 +547,6 @@ module energy
         end 
 
         # Work arrays 
-        layer_area::Float64 =  0.0
         dfdp::Array = zeros(Float64, atmos.nlev_c)
 
         # Handle rainout
@@ -556,12 +555,10 @@ module energy
         # Loop from bottom to top 
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
-            layer_area = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0
-
             # Calculate latent heat release at this level from change in x_gas 
             for c in atmos.condensates
                 if atmos.gas_ptran[c][i]
-                    dfdp[i] = phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / ( (atmos.pl[i+1]-atmos.pl[i]) * timescale * layer_area)
+                    dfdp[i] = phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / ( (atmos.pl[i+1]-atmos.pl[i]) * timescale)
 
                     # set mask 
                     atmos.mask_l[i]   = atmos.mask_decay
