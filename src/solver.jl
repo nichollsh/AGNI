@@ -83,7 +83,7 @@ module solver
     - `fdc::Bool`                       finite difference: ALWAYS use central difference? 
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
-    - `linesearch::Bool`                use a golden-section linesearch algorithm to determine the best step size
+    - `linesearch::Bool`                use a linesearch algorithm to determine the best step size
     - `modulate_mlt::Bool`              improve convergence with convection by introducing MLT gradually
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns as required
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
@@ -148,12 +148,14 @@ module solver
         perturb_crit::Float64 = 0.9     # Require Jacobian update at level i when r_i>perturb_crit
 
         #    linesearch 
-        ls_max_steps::Int  =    22      # maximum steps 
+        ls_tau::Float64    =    0.5     # backtracking step size
+        ls_increase::Float64 =  1.01   # factor by which cost can increase
+        ls_max_steps::Int  =    12      # maximum steps 
         ls_min_scale::Float64 = 1.0e-3  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    8000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =   8000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -182,6 +184,7 @@ module solver
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
         ls_alpha::Float64        = 1.0                  # linesearch scale factor 
+        ls_cost::Float64         = 1.0e99               # linesearch cost 
 
         #     tracking
         step::Int =         0       # Step number
@@ -608,6 +611,8 @@ module solver
 
                 # Reset
                 stepflags *= "Ls-"
+                ls_alpha = 2.0      # full step
+                ls_cost  = 1.0e99   # big number 
 
                 # Internal function minimised by GS search
                 function _ls_func(scale::Float64)::Float64
@@ -617,7 +622,19 @@ module solver
                 end 
 
                 # Use golden-section minimisation to find best scale
-                ls_alpha = gs_search(_ls_func, ls_min_scale, 1.0, ls_min_scale, ls_max_steps)
+                # ls_alpha = gs_search(_ls_func, ls_min_scale, 1.0, ls_min_scale, ls_max_steps)
+
+                # Use backtracking line search to find best scale
+                for il in 1:ls_max_steps
+                    ls_cost = _ls_func(ls_alpha)
+                    if ls_cost <= c_cur*ls_increase
+                        break
+                    else 
+                        ls_alpha *= ls_tau
+                    end 
+                end 
+
+                # ensure scale factor is in valid range
                 ls_alpha = max(min(ls_alpha,1.0), ls_min_scale)
 
                 # Apply best scale from linesearch
