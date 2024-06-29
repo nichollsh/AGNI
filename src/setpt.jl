@@ -127,12 +127,37 @@ module setpt
         fpath = abspath(fpath)
         ds = Dataset(fpath,"r")
 
-        # Properties 
+        # Allocate interleaved temperature profile 
+        nlev_c::Int = length(ds["p"][:])
+        arr_n::Int = nlev_c + nlev_c + 1
+        arr_T::Array{Float64, 1} = zeros(Float64, arr_n)
+        arr_P::Array{Float64, 1} = zeros(Float64, arr_n)
+
+        # top
+        arr_T[1] = ds["tmpl"][1]
+        arr_P[1] = min(ds["pl"][1],atmos.pl[1])         # extend to lower pressures if required
+
+        # middle 
+        idx::Int = 0
+        for i in 1:nlev_c
+            idx = (i-1)*2
+            arr_T[idx+1] = ds["tmpl"][i]
+            arr_T[idx+2] = ds["tmp"][i]
+            arr_P[idx+1] = ds["pl"][i]
+            arr_P[idx+2] = ds["p"][i]
+        end 
+
+        # bottom
+        arr_T[end] = ds["tmpl"][end]
+        arr_P[end] = max(ds["pl"][end], atmos.pl[end])      # extend to higher pressures if required 
+
+        # interpolate 
+        itp = Interpolator(log10.(arr_P), arr_T) 
+        atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
+        atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
+
+        # properties 
         atmos.tmp_surf = ds["tmp_surf"][1]
-        atmos.tmp[:] =  ds["tmp"][:]
-        atmos.tmpl[:] = ds["tmpl"][:]
-        atmos.p[:] =    ds["p"][:]
-        atmos.pl[:] =   ds["pl"][:]
 
         # Close file 
         close(ds)

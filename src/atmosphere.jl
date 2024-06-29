@@ -174,6 +174,7 @@ module atmosphere
         mask_l::Array{Int,1}                # Layers which are (or were recently) undergoing phase transition
 
         # Clouds
+        cond_alpha::Float64                 # Condensate retention fraction (i.e. how much goes into forming clouds vs rainout)
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m]. 
         cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
         cloud_arr_f::Array{Float64,1}       # Total cloud area fraction in layers. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
@@ -398,6 +399,7 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c) 
 
         # Hardcoded cloud properties 
+        atmos.cond_alpha    = 0.1     # 10% of condensate formed will NOT rainout
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
@@ -758,8 +760,8 @@ module atmosphere
     """
     **Generate pressure grid.**
 
-    Equally log-spaced between p_boa and p_boa. The topmost and bottommost layers 
-    have bespoke relative thicknesses of 1±boundary_scale, in order to avoid 
+    Equally log-spaced between p_boa and p_boa. The bottommost layer has a 
+    bespoke relative thicknesses of 1-boundary_scale, in order to avoid 
     numerical instabilities.
     
     Arguments:
@@ -770,10 +772,18 @@ module atmosphere
 
         boundary_scale = max(min(boundary_scale, 1.0-1.0e-8), 1.0e-8)
 
-        # Logarithmically-spaced levels
+        # Allocate cell-edge pressure array 
         atmos.pl           = zeros(Float64, atmos.nlev_l)
+
+        # Surface pressure 
         atmos.pl[end]      = atmos.p_boa 
-        atmos.pl[1:end-1] .= 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.p_boa*(1.0-boundary_scale)), length=atmos.nlev_l-1)
+
+        # Bottom two layers
+        atmos.pl[end-1] = atmos.pl[end  ]*(1.0-boundary_scale)
+        atmos.pl[end-2] = atmos.pl[end-1]*(1.0-boundary_scale)
+
+        # Logarithmically-spaced levels
+        atmos.pl[1:end-2] .= 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.pl[end-2]), length=atmos.nlev_l-2)
 
         # Set pressure cell-centre array using geometric mean
         atmos.p = zeros(Float64, atmos.nlev_c)
@@ -1428,7 +1438,6 @@ module atmosphere
         # Parameters 
         evap_enabled::Bool =            true    # Enable re-vaporation of rain
         evap_efficiency::Float64 =      1.0     # Evaporation efficiency
-        cond_retention_frac::Float64 =  0.5     # Condensate retention fraction (0 => complete rainout)
 
         # Work arrays 
         maxvmr::Dict{String, Float64} = Dict{String, Float64}()     # max running VMR for each condensable 
@@ -1478,7 +1487,10 @@ module atmosphere
                 # cold trap 
                 if atmos.gas_vmr[c][i] > maxvmr[c]
                     atmos.gas_vmr[c][i] = maxvmr[c]
-                    atmos.gas_ptran[c][i] = true 
+                    atmos.gas_ptran[c][i] = true
+                    # This is not a phase transition, but this flag is used 
+                    # to tell the normalise_vmr() function not to adjust the 
+                    # mixing ratio of this gas, since it's set by the cold trap. 
                 end 
                 
                 # condense if supersaturated
@@ -1486,7 +1498,7 @@ module atmosphere
 
                     # set rainout kg 
                     cond_kg[c] = layer_area * (atmos.gas_dat[c].mmw/atmos.layer_mmw[i])*atmos.p[i]*(atmos.gas_vmr[c][i] - x_sat)/atmos.layer_grav[i]
-                    rain_kg[c] = cond_kg[c] * (1.0 - cond_retention_frac)
+                    rain_kg[c] = cond_kg[c] * (1.0 - atmos.cond_alpha)
 
                     # condensation yield at this level 
                     atmos.gas_yield[c][i] += cond_kg[c]
@@ -1503,7 +1515,7 @@ module atmosphere
                     # Set water cloud at this level
                     if c == "H2O"
                         # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
-                        atmos.cloud_arr_l[i] = (cond_kg["H2O"] * cond_retention_frac / layer_area) / atmos.layer_mass[i]
+                        atmos.cloud_arr_l[i] = (cond_kg["H2O"] * atmos.cond_alpha / layer_area) / atmos.layer_mass[i]
 
                         if atmos.cloud_arr_l[i] > 1.0
                             @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
