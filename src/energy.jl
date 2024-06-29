@@ -414,7 +414,7 @@ module energy
                 atmos.mask_c[i-1] = atmos.mask_decay
                 
                 # Pressure scale height
-                H = phys.R_gas * tmp / (mu * grav)
+                H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
 
                 # Mixing length
                 if mltype == 0
@@ -432,7 +432,7 @@ module energy
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * tmp * l/H * (grad_pr-grad_ad)
+                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
 
                 # Thermal eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
@@ -535,7 +535,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 5e5      # seconds
+        timescale::Float64 = 1e5      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -547,7 +547,7 @@ module energy
         end 
 
         # Work arrays 
-        dfdp::Array = zeros(Float64, atmos.nlev_c)
+        df::Array = zeros(Float64, atmos.nlev_c)
 
         # Handle rainout
         atmosphere.handle_saturation!(atmos)
@@ -558,7 +558,7 @@ module energy
             # Calculate latent heat release at this level from change in x_gas 
             for c in atmos.condensates
                 if atmos.gas_ptran[c][i]
-                    dfdp[i] = phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / ( (atmos.pl[i+1]-atmos.pl[i]) * timescale)
+                    df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
 
                     # set mask 
                     atmos.mask_l[i]   = atmos.mask_decay
@@ -571,7 +571,7 @@ module energy
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at TOA, integrating downwards
         for i in range(start=1, stop=atmos.nlev_c, step=1)
-            atmos.flux_l[i+1] = dfdp[i] * (atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i]
+            atmos.flux_l[i+1] = df[i] + atmos.flux_l[i]
         end 
 
         return nothing 
