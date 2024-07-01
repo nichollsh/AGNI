@@ -372,7 +372,7 @@ module setpt
             Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i])
             if atmos.tmp[i] < Tdew 
                 atmos.tmp[i] = Tdew 
-                atmos.gas_ptran[gas][i] = true
+                atmos.gas_sat[gas][i] = true
             end 
         end
         
