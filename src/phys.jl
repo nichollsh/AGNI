@@ -235,11 +235,11 @@ module phys
         ("C"  , "#ff0000"),
         ("O"  , "#00ff00"),
         ("N"  , "#ffff00"),
-        ("S" ,  "#00ffee"),
+        ("S" ,  "#ff22ff"),
 
         # refractory elements 
-        ("Fe" , "#ff22ff"),
-        ("Si" , "#FF9D35"),
+        ("Fe" , "#888888"),
+        ("Si" , "#aa2277"),
     ])
 
     """
@@ -363,7 +363,7 @@ module phys
     end 
 
     """
-    Generate a color for a formula 
+    Generate a colour hex code from a molecular formula 
     """
     function pretty_color(gas::String)::String 
         # Defined 
@@ -371,7 +371,7 @@ module phys
             return lookup_color[gas]
         end 
 
-        # Else, calculate color from atoms 
+        # Else, generate colour from atoms 
         atoms = count_atoms(gas)
         r::Float64 = 0.0
         g::Float64 = 0.0
@@ -383,6 +383,12 @@ module phys
         end 
         m::Float64 = max(r,g,b)
 
+        # prevents the colour getting too close to white 
+        if r+g+b > 705
+            m *= 255.0/235.0 
+        end 
+
+        # convert to hex code
         out::String = "#"
         out *= string(floor(Int,255 * r/m),base=16,pad=2)
         out *= string(floor(Int,255 * g/m),base=16,pad=2)
