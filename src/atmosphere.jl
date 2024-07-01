@@ -1351,19 +1351,48 @@ module atmosphere
         data = transpose(data)  # convert to: gas, level
 
         # Parse gas chemistry
-        g::String = ""
+        g_fc::String = "_unset"
+        d_fc::Dict = Dict{String, Int}()
+        g_in::String = "_unset"
+        match::Bool = false 
         N_t = data[4,:] # at each level: sum of gas number densities 
-        for (i,h) in enumerate(head)  # for each column (gas)
-            g = rstrip(lstrip(h))
 
-            # check if gas is included in the model
-            if g in keys(phys.map_fastchem_name) 
-                g = phys.map_fastchem_name[g]  # convert name
-                if g in atmos.gas_names
-                    N_g = data[i,:]  # number densities for this gas 
-                    atmos.gas_vmr[g][:] .= N_g[:] ./ N_t[:]    # mole fraction (VMR) for this gas 
-                end
-            end # not included => skip
+        for (i,h) in enumerate(head)  # for each column (gas)
+            g_fc = rstrip(lstrip(h))
+            match = false
+
+            # skip T and P 
+            if i < 3
+                continue 
+            end 
+
+            # firstly, check if have the FC name already stored
+            for g in atmos.gas_names
+                if atmos.gas_dat[g].fastchem_name == g_fc 
+                    match = true 
+                    g_in = g
+                    break
+                end 
+            end 
+
+            # not stored => search based on atoms 
+            if !match 
+                d_fc = phys.count_atoms(g_fc)  # get atoms dict from FC name 
+
+                for g in atmos.gas_names
+                    if phys.same_atoms(d_fc, atmos.gas_dat[g].atoms)
+                        match = true
+                        g_in = g
+                        break 
+                    end
+                end 
+            end 
+
+            # matched?
+            if match 
+                N_g = data[i,:]  # number densities for this gas 
+                atmos.gas_vmr[g_in][:] .= N_g[:] ./ N_t[:]    # mole fraction (VMR) for this gas 
+            end 
         end 
 
         # Do not renormalise mixing ratios
