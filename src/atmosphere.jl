@@ -1214,12 +1214,12 @@ module atmosphere
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `chem_type::Int`                  chemistry type (see wiki)
     - `write_cfg::Bool`                 write config and elements
-    - `tmp_floor::Float64=500.0`        temperature floor for T(p) provided to FastChem
+    - `tmp_floor::Float64`              temperature floor for T(p) provided to FastChem
 
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=800.0)::Int
+    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=700.0)::Int
 
         @debug "Running equilibrium chemistry"
 
@@ -1229,6 +1229,12 @@ module atmosphere
         # Check fastchem enabled 
         if !atmos.fastchem_flag
             @warn "Fastchem is not enabled but `chemistry_eq!` was called"
+            return 1
+        end 
+
+        # Check minimum temperature 
+        if maximum(atmos.tmpl) < tmp_floor 
+            @warn "Temperature profile is entirely too cold for FastChem. Not doing chemistry."
             return 1
         end 
 
@@ -1270,16 +1276,16 @@ module atmosphere
                 write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
 
                 write(f,"#Accuracy of chemistry iteration \n")
-                write(f,"1.0e-5 \n\n")
+                write(f,"1.0e-4 \n\n")
                 
                 write(f,"#Accuracy of element conservation \n")
                 write(f,"1.0e-4 \n\n")
 
                 write(f,"#Max number of chemistry iterations  \n")
-                write(f,"50000 \n\n")
+                write(f,"60000 \n\n")
 
                 write(f,"#Max number internal solver iterations  \n")
-                write(f,"10000 \n\n")
+                write(f,"30000 \n\n")
             end
 
             # Calculate elemental abundances 
@@ -1420,6 +1426,17 @@ module atmosphere
         # Do not renormalise mixing ratios, since this is done by fastchem
         # If we are missing gases then that's okay.
 
+        # Find where we truncated the temperature profile, and make sure that regions above that use the same x_gas values 
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
+            if atmos.tmp[i] < tmp_floor
+                for g in atmos.gas_names 
+                    atmos.gas_vmr[g][1:i] .= atmos.gas_vmr[g][i+1]
+                end 
+                break 
+            end 
+        end 
+
+        # See docstring for return codes
         return state 
     end
 
