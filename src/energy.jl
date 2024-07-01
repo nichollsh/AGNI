@@ -469,7 +469,7 @@ module energy
         # Reset flux and mask 
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, 0)
-        fill!(atmos.gas_ptran[c], false)
+        fill!(atmos.gas_sat[c], false)
 
         # Work variables
         a::Float64 = 1.0 
@@ -504,7 +504,7 @@ module energy
             # set mask 
             atmos.mask_l[i]   = atmos.mask_decay
             atmos.mask_l[i+1] = atmos.mask_decay
-            atmos.gas_ptran[c][i] = true
+            atmos.gas_sat[c][i] = true
 
         end # end levels 
 
@@ -555,9 +555,10 @@ module energy
         # Loop from bottom to top 
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
-            # Calculate latent heat release at this level from change in x_gas 
+            # Calculate latent heat release at this level from the contributions
+            #   of condensation (+) and evaporation (-), and a fixed timescale.
             for c in atmos.condensates
-                if atmos.gas_ptran[c][i]
+                if atmos.gas_sat[c][i]
                     df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
 
                     # set mask 
