@@ -238,7 +238,7 @@ module solver
             atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout (but not energy release)
-            if !latent
+            if !latent && atmos.condense_any
                 atmosphere.handle_saturation!(atmos)
             end
 
@@ -691,13 +691,13 @@ module solver
             # Inform user
             info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, c_cur, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
             if (modprint>0) && (mod(step, modprint)==0)
-                @info info_str
-            else
                 if step_ok
-                    @debug info_str 
+                    @info info_str 
                 else 
                     @warn info_str 
                 end
+            else
+                @debug info_str 
             end
 
             # Converged?

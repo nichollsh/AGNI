@@ -459,7 +459,7 @@ module energy
     function condense_relax!(atmos::atmosphere.Atmos_t)
 
         # Check if empty
-        if length(atmos.condensates) == 0
+        if !atmos.condense_any
             return nothing 
         end 
         
@@ -542,7 +542,7 @@ module energy
         fill!(atmos.mask_l, 0)
 
         # Check if empty
-        if length(atmos.condensates) == 0
+        if !atmos.condense_any
             return nothing 
         end 
 
@@ -600,7 +600,7 @@ module energy
         fill!(atmos.flux_dif, 0.0)
 
         # +Condensation energy flux
-        if latent
+        if latent || atmos.condense_any
             if atmos.single_component
                 # does NOT modify VMRs
                 energy.condense_relax!(atmos)
