@@ -238,7 +238,7 @@ module solver
             atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout (but not energy release)
-            if !latent
+            if !latent && atmos.condense_any
                 atmosphere.handle_saturation!(atmos)
             end
 
