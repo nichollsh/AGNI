@@ -50,7 +50,7 @@ module plotting
         plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(size_x,size_y))
 
         # Plot phase boundary 
-        if length(atmos.condensates) > 0
+        if atmos.condense_any
             sat_n::Int = 100
             sat_p::Array{Float64,1} = zeros(Float64, sat_n)
             sat_t::Array{Float64,1} = zeros(Float64, sat_n)
