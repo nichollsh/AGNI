@@ -414,7 +414,7 @@ module energy
                 atmos.mask_c[i-1] = atmos.mask_decay
                 
                 # Pressure scale height
-                H = phys.R_gas * tmp / (mu * grav)
+                H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
 
                 # Mixing length
                 if mltype == 0
@@ -432,7 +432,7 @@ module energy
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * tmp * l/H * (grad_pr-grad_ad)
+                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
 
                 # Thermal eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
@@ -469,7 +469,7 @@ module energy
         # Reset flux and mask 
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, 0)
-        fill!(atmos.gas_ptran[c], false)
+        fill!(atmos.gas_sat[c], false)
 
         # Work variables
         a::Float64 = 1.0 
@@ -504,7 +504,7 @@ module energy
             # set mask 
             atmos.mask_l[i]   = atmos.mask_decay
             atmos.mask_l[i+1] = atmos.mask_decay
-            atmos.gas_ptran[c][i] = true
+            atmos.gas_sat[c][i] = true
 
         end # end levels 
 
@@ -535,7 +535,7 @@ module energy
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 1e5      # seconds
+        timescale::Float64 = 8e5      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -547,8 +547,7 @@ module energy
         end 
 
         # Work arrays 
-        layer_area::Float64 =  0.0
-        dfdp::Array = zeros(Float64, atmos.nlev_c)
+        df::Array = zeros(Float64, atmos.nlev_c)
 
         # Handle rainout
         atmosphere.handle_saturation!(atmos)
@@ -556,12 +555,11 @@ module energy
         # Loop from bottom to top 
         for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
-            layer_area = 4.0*pi*(atmos.z[i]+atmos.rp)^2.0
-
-            # Calculate latent heat release at this level from change in x_gas 
+            # Calculate latent heat release at this level from the contributions
+            #   of condensation (+) and evaporation (-), and a fixed timescale.
             for c in atmos.condensates
-                if atmos.gas_ptran[c][i]
-                    dfdp[i] = phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / ( (atmos.pl[i+1]-atmos.pl[i]) * timescale * layer_area)
+                if atmos.gas_sat[c][i]
+                    df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
 
                     # set mask 
                     atmos.mask_l[i]   = atmos.mask_decay
@@ -574,7 +572,7 @@ module energy
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at TOA, integrating downwards
         for i in range(start=1, stop=atmos.nlev_c, step=1)
-            atmos.flux_l[i+1] = dfdp[i] * (atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i]
+            atmos.flux_l[i+1] = df[i] + atmos.flux_l[i]
         end 
 
         return nothing 

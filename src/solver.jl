@@ -83,7 +83,7 @@ module solver
     - `fdc::Bool`                       finite difference: ALWAYS use central difference? 
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
-    - `linesearch::Bool`                use a golden-section linesearch algorithm to determine the best step size
+    - `linesearch::Bool`                use a linesearch algorithm to determine the best step size
     - `modulate_mlt::Bool`              improve convergence with convection by introducing MLT gradually
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns as required
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
@@ -103,7 +103,7 @@ module solver
                             conduct::Bool=false, latent::Bool=false,
                             dx_max::Float64=400.0,  
                             max_steps::Int=2000, max_runtime::Float64=600.0,
-                            fdw::Float64=5.0e-6, fdc::Bool=true, fdo::Int=2,
+                            fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
                             linesearch::Bool=true, modulate_mlt::Bool=false,
                             detect_plateau::Bool=true, perturb_all::Bool=false,
@@ -144,16 +144,19 @@ module solver
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        perturb_conv::Float64 = 0.01    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
-        perturb_crit::Float64 = 0.9     # Require Jacobian update at level i when r_i>perturb_crit
+        perturb_conv::Float64 = 0.02    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
+        perturb_crit::Float64 = 1.0     # Require Jacobian update at level i when r_i>perturb_crit
 
         #    linesearch 
-        ls_max_steps::Int  =    22      # maximum steps 
+        ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
+        ls_tau::Float64    =    0.5     # backtracking step size
+        ls_increase::Float64 =  1.01    # factor by which cost can increase
+        ls_max_steps::Int  =    10      # maximum steps 
         ls_min_scale::Float64 = 1.0e-3  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    8000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =   8000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -182,6 +185,7 @@ module solver
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
         ls_alpha::Float64        = 1.0                  # linesearch scale factor 
+        ls_cost::Float64         = 1.0e99               # linesearch cost 
 
         #     tracking
         step::Int =         0       # Step number
@@ -230,13 +234,13 @@ module solver
             # Set temperatures 
             _set_tmps!(x)
 
+            # Calculate layer properties if required and haven't already
+            atmosphere.calc_layer_props!(atmos)
+
             # Handle rainout (but not energy release)
             if !latent
                 atmosphere.handle_saturation!(atmos)
             end
-
-            # Calculate layer properties if required and haven't already
-            atmosphere.calc_layer_props!(atmos)
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
@@ -360,7 +364,8 @@ module solver
 
         # Cost function to minimise
         function _cost(_r::Array)
-            return norm(_r)
+            # return norm(_r)
+            return maximum(abs.(_r[:]))
         end 
 
         # Plot current state
@@ -439,7 +444,7 @@ module solver
         end
 
         if modprint > 0
-            @info @sprintf("    step  resid_med  resid_2nm  flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
+            @info @sprintf("    step  resid_med    cost     flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
         end 
         info_str::String = ""
         stepflags::String = ""
@@ -608,6 +613,8 @@ module solver
 
                 # Reset
                 stepflags *= "Ls-"
+                ls_alpha = 1.0      # full step
+                ls_cost  = 1.0e99   # big number 
 
                 # Internal function minimised by GS search
                 function _ls_func(scale::Float64)::Float64
@@ -616,9 +623,31 @@ module solver
                     return _cost(r_tst)
                 end 
 
-                # Use golden-section minimisation to find best scale
-                ls_alpha = gs_search(_ls_func, ls_min_scale, 1.0, ls_min_scale, ls_max_steps)
-                ls_alpha = max(min(ls_alpha,1.0), ls_min_scale)
+                if ls_method == 1
+                    # Use golden-section minimisation to find best scale
+                    ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha, ls_min_scale, ls_max_steps)
+
+                elseif ls_method == 2
+                    # Use backtracking line search to find best scale
+                    for il in 1:ls_max_steps
+                        ls_cost = _ls_func(ls_alpha)
+                        if ls_cost <= c_cur*ls_increase
+                            # this scale is good 
+                            break
+                        else 
+                            # scale is not good - try shrinking it further 
+                            ls_alpha *= ls_tau
+                            if ls_alpha < ls_min_scale
+                                # scale too small!
+                                ls_alpha = ls_min_scale
+                                break 
+                            end 
+                        end 
+                    end 
+
+                else 
+                    error("Invalid linesearch algorithm $ls_method")
+                end 
 
                 # Apply best scale from linesearch
                 x_dif[:] .*= ls_alpha
@@ -660,7 +689,7 @@ module solver
             end 
                 
             # Inform user
-            info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, r_cur_2nm, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
+            info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, c_cur, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
             if (modprint>0) && (mod(step, modprint)==0)
                 @info info_str
             else
