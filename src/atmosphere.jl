@@ -1296,8 +1296,9 @@ module atmosphere
                         N_g[i] += d[e]
                     end 
                 end 
+                # will be normalised in later code 
                 N_g *= get_x(atmos, gas, atmos.nlev_c) * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
-                N_t += N_g  # number/m^3
+                N_t += N_g  
             end 
 
             # Write elemental abundances 
@@ -1305,6 +1306,7 @@ module atmosphere
                 write(f,"# Elemental abundances derived from AGNI volatiles \n")
                 for (i,e) in enumerate(phys.elements_list)
                     if N_t[i] > 1.0e-30
+                        # normalise relative to hydrogen
                         write(f, @sprintf("%s    %.3f \n",e,log10(N_t[i]/N_t[1]) + 12.0))
                         count_elem_nonzero += 1
                     end
@@ -1317,7 +1319,7 @@ module atmosphere
             write(f,"# AGNI temperature structure \n")
             write(f,"# bar, kelvin \n")
             for i in 1:atmos.nlev_c 
-                write(f,@sprintf("%.6e    %.6e \n", atmos.p[i], max(tmp_floor,atmos.tmp[i]) ))
+                write(f,@sprintf("%.6e    %.6e \n", atmos.p[i]*1e-5, max(tmp_floor,atmos.tmp[i]) ))
             end 
         end 
 
