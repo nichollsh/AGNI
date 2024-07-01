@@ -292,7 +292,7 @@ module phys
 
         # Clean input and get file path
         formula = String(strip(formula))
-        fpath = abspath(joinpath(dirname(abspath(@__FILE__)), "..", "res", "thermo", "$formula.ncdf" ))
+        fpath = abspath(joinpath(dirname(abspath(@__FILE__)), "..", "res", "thermo", "$formula.nc" ))
 
         # Initialise struct 
         gas = Gas_t()

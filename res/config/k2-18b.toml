@@ -14,7 +14,7 @@ title = "Roughly K2-18b @ IW-4"
     p_top           = 1e-5           
     vmr             = { H2O=0.0085, N2=0.0009, H2=0.7931, CO=0.0111, CH4=0.1864  }    
     condensates     = ["H2O","CH4","CO"]               
-    tmp_int         = 100.0
+    tmp_int         = 0.0
     turb_coeff      = 0.001           
     wind_speed      = 2.0             
 
@@ -29,7 +29,7 @@ title = "Roughly K2-18b @ IW-4"
     verbosity       = 1                  
     max_steps       = 20000              
     max_runtime     = 400                
-    num_levels      = 45                 
+    num_levels      = 42                 
     continua        = true               
     rayleigh        = true               
     cloud           = false              
@@ -47,7 +47,7 @@ title = "Roughly K2-18b @ IW-4"
     initial_state   = ["iso","1000"]     
     linesearch      = false              
     converge_atol   = 1.0e-3             
-    converge_rtol   = 1.0e-1             
+    converge_rtol   = 1.0e-2             
 
 [plots]
     at_runtime      = true         
