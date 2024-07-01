@@ -46,8 +46,7 @@ module phys
 
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict{String, Float64}([
-        ("C",  0.012011 ),
-        ("H",  0.001008 ),
+        # molecules
         ("H2O", 1.801530E-02 ), 
         ("CO2", 4.401000E-02 ), 
         ("O3", 4.799820E-02 ), 
@@ -64,22 +63,13 @@ module phys
         ("TiO", 6.386600E-02 ), 
         ("VO", 6.694090E-02 ), 
         ("H2", 2.015880E-03 ), 
-        ("He", 4.002602E-03 ), 
         ("OCS", 6.007500E-02 ), 
-        ("Na", 2.298977E-02 ), 
-        ("K", 3.909830E-02 ), 
         ("FeH", 5.685300E-02 ), 
         ("CrH", 5.300400E-02 ), 
-        ("Li", 6.941000E-03 ), 
-        ("Rb", 8.546780E-02 ), 
-        ("Cs", 1.329055E-01 ), 
         ("PH3", 3.399758E-02 ), 
         ("C2H2", 2.603730E-02 ), 
         ("HCN", 2.702530E-02 ), 
         ("H2S", 3.408100E-02 ), 
-        ("Ar", 3.994800E-02 ), 
-        ("O", 1.599940E-02 ), 
-        ("N", 1.400674E-02 ), 
         ("NO3", 6.301280E-02 ), 
         ("N2O5", 1.080104E-01 ), 
         ("HONO", 4.701340E-02 ), 
@@ -91,15 +81,102 @@ module phys
         ("HO2", 3.300670E-02 ), 
         ("HDO", 1.902140E-02 ), 
         ("HCl", 3.646100E-02 ), 
-        ("HF", 2.000689E-02 )
+        ("HF", 2.000689E-02 ),
+
+        # elements from https://iupac.qmul.ac.uk/AtWt/
+        ("H",  1.008000000e-03 ),
+        ("He",  4.002000000e-03 ),
+        ("Li",  6.940000000e-03 ),
+        ("Be",  9.012000000e-03 ),
+        ("B",  1.081000000e-02 ),
+        ("C",  1.201100000e-02 ),
+        ("N",  1.400700000e-02 ),
+        ("O",  1.599900000e-02 ),
+        ("F",  1.899800000e-02 ),
+        ("Ne",  2.017970000e-02 ),
+        ("Na",  2.298900000e-02 ),
+        ("Mg",  2.430500000e-02 ),
+        ("Al",  2.698100000e-02 ),
+        ("Si",  2.808500000e-02 ),
+        ("P",  3.097300000e-02 ),
+        ("S",  3.206000000e-02 ),
+        ("Cl",  3.545000000e-02 ),
+        ("Ar",  3.995000000e-02 ),
+        ("K",  3.909830000e-02 ),
+        ("Ca",  4.007800000e-02 ),
+        ("Sc",  4.495500000e-02 ),
+        ("Ti",  4.786700000e-02 ),
+        ("V",  5.094150000e-02 ),
+        ("Cr",  5.199610000e-02 ),
+        ("Mn",  5.493800000e-02 ),
+        ("Fe",  5.584500000e-02 ),
+        ("Co",  5.893300000e-02 ),
+        ("Ni",  5.869340000e-02 ),
+        ("Cu",  6.354600000e-02 ),
+        ("Zn",  6.538000000e-02 ),
+        ("Ga",  6.972300000e-02 ),
+        ("Ge",  7.263000000e-02 ),
+        ("As",  7.492100000e-02 ),
+        ("Se",  7.897100000e-02 ),
+        ("Br",  7.990400000e-02 ),
+        ("Kr",  8.379800000e-02 ),
+        ("Rb",  8.546780000e-02 ),
+        ("Sr",  8.762000000e-02 ),
+        ("Y",  8.890500000e-02 ),
+        ("Zr",  9.122400000e-02 ),
+        ("Nb",  9.290600000e-02 ),
+        ("Mo",  9.595000000e-02 ),
+        ("Ru",  1.010700000e-01 ),
+        ("Rh",  1.029050000e-01 ),
+        ("Pd",  1.064200000e-01 ),
+        ("Ag",  1.078682000e-01 ),
+        ("Cd",  1.124140000e-01 ),
+        ("In",  1.148180000e-01 ),
+        ("Sn",  1.187100000e-01 ),
+        ("Sb",  1.217600000e-01 ),
+        ("Te",  1.276000000e-01 ),
+        ("I",  1.269040000e-01 ),
+        ("Xe",  1.312930000e-01 ),
+        ("Cs",  1.329050000e-01 ),
+        ("Ba",  1.373270000e-01 ),
+        ("La",  1.389050000e-01 ),
+        ("Ce",  1.401160000e-01 ),
+        ("Pr",  1.409070000e-01 ),
+        ("Nd",  1.442420000e-01 ),
+        ("Sm",  1.503600000e-01 ),
+        ("Eu",  1.519640000e-01 ),
+        ("Gd",  1.572500000e-01 ),
+        ("Tb",  1.589250000e-01 ),
+        ("Dy",  1.625000000e-01 ),
+        ("Ho",  1.649300000e-01 ),
+        ("Er",  1.672590000e-01 ),
+        ("Tm",  1.689340000e-01 ),
+        ("Yb",  1.730450000e-01 ),
+        ("Lu",  1.749668000e-01 ),
+        ("Hf",  1.784860000e-01 ),
+        ("Ta",  1.809470000e-01 ),
+        ("W",  1.838400000e-01 ),
+        ("Re",  1.862070000e-01 ),
+        ("Os",  1.902300000e-01 ),
+        ("Ir",  1.922170000e-01 ),
+        ("Pt",  1.950840000e-01 ),
+        ("Au",  1.969660000e-01 ),
+        ("Hg",  2.005920000e-01 ),
+        ("Tl",  2.043800000e-01 ),
+        ("Pb",  2.072000000e-01 ),
+        ("Bi",  2.089800000e-01 ),
+        ("Th",  2.320377000e-01 ),
+        ("Pa",  2.310350000e-01 ),
+        ("U",  2.380280000e-01),
     ])
 
     # Structure containing data for a single gas
     mutable struct Gas_t 
 
         # Names 
-        formula::String     # Formula used by SOCRATES
-        JANAF_name::String  # JANAF name 
+        formula::String         # Formula used by SOCRATES
+        JANAF_name::String      # JANAF name 
+        fastchem_name::String   # FastChem name (to be determined from FC output file)
 
         # Is this a stub?
         #   This is the case when we cannot find an appropriate data file
@@ -158,11 +235,11 @@ module phys
         ("C"  , "#ff0000"),
         ("O"  , "#00ff00"),
         ("N"  , "#ffff00"),
-        ("S" ,  "#00ffee"),
+        ("S" ,  "#ff22ff"),
 
         # refractory elements 
-        ("Fe" , "#ff22ff"),
-        ("Si" , "#FF9D35"),
+        ("Fe" , "#888888"),
+        ("Si" , "#aa2277"),
     ])
 
     """
@@ -218,6 +295,36 @@ module phys
     end 
 
     """
+    Check if two gas atom dicts are equivalent
+    """
+    function same_atoms(d1::Dict, d2::Dict)::Bool  
+
+        # check if have same atoms at all
+        for k in keys(d1)
+            if !(k in keys(d2))
+                return false 
+            end 
+        end 
+
+        # ^^ reverse combination
+        for k in keys(d2)
+            if !(k in keys(d1))
+                return false 
+            end 
+        end 
+
+        # check counts
+        for k in keys(d1)
+            if d1[k] != d2[k]
+                return false  
+            end 
+        end 
+        
+        # if we haven't returned false so far, then it must be true
+        return true 
+    end 
+
+    """
     Calculate species mean molecular weight [kg mol-1] from formula or use known value
     """
     function get_mmw(m::String)::Float64
@@ -256,7 +363,7 @@ module phys
     end 
 
     """
-    Generate a color for a formula 
+    Generate a colour hex code from a molecular formula 
     """
     function pretty_color(gas::String)::String 
         # Defined 
@@ -264,7 +371,7 @@ module phys
             return lookup_color[gas]
         end 
 
-        # Else, calculate color from atoms 
+        # Else, generate colour from atoms 
         atoms = count_atoms(gas)
         r::Float64 = 0.0
         g::Float64 = 0.0
@@ -276,6 +383,12 @@ module phys
         end 
         m::Float64 = max(r,g,b)
 
+        # prevents the colour getting too close to white 
+        if r+g+b > 705
+            m *= 255.0/235.0 
+        end 
+
+        # convert to hex code
         out::String = "#"
         out *= string(floor(Int,255 * r/m),base=16,pad=2)
         out *= string(floor(Int,255 * g/m),base=16,pad=2)
@@ -306,6 +419,9 @@ module phys
                 error("Gas '$formula' contains unsupported element '$e'")
             end 
         end 
+
+        # Fastchem name (to be learned later)
+        gas.fastchem_name = "_unknown"
         
         # Set plotting color and label 
         gas.plot_color = pretty_color(formula)

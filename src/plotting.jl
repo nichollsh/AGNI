@@ -50,7 +50,7 @@ module plotting
         plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright, dpi=dpi, size=(size_x,size_y))
 
         # Plot phase boundary 
-        if length(atmos.condensates) > 0
+        if atmos.condense_any
             sat_n::Int = 100
             sat_p::Array{Float64,1} = zeros(Float64, sat_n)
             sat_t::Array{Float64,1} = zeros(Float64, sat_n)
@@ -154,9 +154,9 @@ module plotting
         plt = plot(ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(size_x,size_y))
 
         # Plot log10 mole fractions for each gas
+        xminmin::Float64 = -8
         xmin::Float64 = -2
         this_min::Float64 = 0.0
-
         for gas in atmos.gas_names
             # get VMR
             x_arr = log10.(clamp.(atmos.gas_vmr[gas][:],1e-100, 1e100))
@@ -169,7 +169,7 @@ module plotting
             plot!(x_arr, arr_P, label=phys.pretty_name(gas), lw=2.5, linealpha=0.7, color=phys.pretty_color(gas))
         end
 
-        xlims  = (max(xmin-0.1, -12), 0.1)
+        xlims  = (max(xmin-0.1, xminmin), 0.1)
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties
