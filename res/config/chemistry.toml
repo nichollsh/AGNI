@@ -12,7 +12,7 @@ title = "Equilibrium chemistry demo"                    # Name for this configur
     gravity         = 9.81      
     p_surf          = 270.0     
     p_top           = 1e-5      
-    vmr             = { H2O = 0.2, CO2=0.1, N2=0.1, SO2=0.2, O2=0.05, FeO2=0.05, OH=0.0, H=0.0, CH4=0.0, CO=0.5, H2=0.0, SO=0.0, NH3=0.0, NH2=0.0, H2S=0.0, H2SO4=0.0}     # Volatile volume mixing ratios
+    vmr             = { H2O = 0.1, CO2=0.1, N2=0.1, SO2=0.05, O2=0.05, FeO2=0.05, OH=0.0, H=0.0, CH4=0.1, CO=0.5, H2=0.5, SO=0.0, NH3=0.0, NH2=0.0, H2S=0.0, H2SO4=0.0}     # Volatile volume mixing ratios
     condensates     = []
     tmp_int         = 0.0    
     
