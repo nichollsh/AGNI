@@ -110,8 +110,9 @@ module atmosphere
         gas_sat::Dict{String, Array{Bool, 1}}       # Layer is saturated or cold-trapped
         gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
         gas_yield::Dict{String, Array{Float64,1}}   # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
-        condensates::Array{String, 1}                   # List of condensing gases (strings)
-        single_component::Bool                          # Does a single gas make up 100% of layer at any point in the column?
+        condensates::Array{String, 1}               # List of condensing gases (strings)
+        condense_any::Bool                          # length(condensates)>0 ?
+        single_component::Bool                      # Does a single gas make up 100% of layer at any point in the column?
 
         # Gases (only those in spectralfile)
         gas_soc_num::Int 
@@ -301,7 +302,7 @@ module atmosphere
         end
 
         # Code versions 
-        atmos.AGNI_VERSION = "0.5.1"
+        atmos.AGNI_VERSION = "0.5.2"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -523,7 +524,9 @@ module atmosphere
         end 
 
         # Validate condensate names 
+        atmos.condense_any = false
         if length(condensates) > 0
+            atmos.condense_any = true
             for c in condensates
                 if !(c in atmos.gas_names)
                     @error "Invalid condensate '$c'"
@@ -1081,7 +1084,7 @@ module atmosphere
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
             end 
-            @info @sprintf("    %6.2e %-5s %s", atmos.gas_vmr[g][end], g, gas_flags)
+            @info @sprintf("    %6.2e %-6s %s", atmos.gas_vmr[g][end], g, gas_flags)
         end 
  
 
@@ -1211,12 +1214,14 @@ module atmosphere
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `chem_type::Int`                  chemistry type (see wiki)
     - `write_cfg::Bool`                 write config and elements
-    - `tmp_floor::Float64=500.0`        temperature floor for T(p) provided to FastChem
+    - `tmp_floor::Float64`              temperature floor for T(p) provided to FastChem
 
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=500.0)::Int
+    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=700.0)::Int
+
+        @debug "Running equilibrium chemistry"
 
         # Return code 
         state::Int = 0
@@ -1226,6 +1231,14 @@ module atmosphere
             @warn "Fastchem is not enabled but `chemistry_eq!` was called"
             return 1
         end 
+
+        # Check minimum temperature 
+        if maximum(atmos.tmpl) < tmp_floor 
+            @warn "Temperature profile is entirely too cold for FastChem. Not doing chemistry."
+            return 1
+        end 
+
+        count_elem_nonzero::Int = 0
 
         # Paths
         execpath::String = joinpath(atmos.fastchem_path,"fastchem")             # Executable file 
@@ -1263,16 +1276,16 @@ module atmosphere
                 write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
 
                 write(f,"#Accuracy of chemistry iteration \n")
-                write(f,"1.0e-5 \n\n")
+                write(f,"1.0e-4 \n\n")
                 
                 write(f,"#Accuracy of element conservation \n")
                 write(f,"1.0e-4 \n\n")
 
                 write(f,"#Max number of chemistry iterations  \n")
-                write(f,"50000 \n\n")
+                write(f,"60000 \n\n")
 
                 write(f,"#Max number internal solver iterations  \n")
-                write(f,"10000 \n\n")
+                write(f,"30000 \n\n")
             end
 
             # Calculate elemental abundances 
@@ -1289,8 +1302,9 @@ module atmosphere
                         N_g[i] += d[e]
                     end 
                 end 
+                # will be normalised in later code 
                 N_g *= get_x(atmos, gas, atmos.nlev_c) * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
-                N_t += N_g  # number/m^3
+                N_t += N_g  
             end 
 
             # Write elemental abundances 
@@ -1298,7 +1312,9 @@ module atmosphere
                 write(f,"# Elemental abundances derived from AGNI volatiles \n")
                 for (i,e) in enumerate(phys.elements_list)
                     if N_t[i] > 1.0e-30
+                        # normalise relative to hydrogen
                         write(f, @sprintf("%s    %.3f \n",e,log10(N_t[i]/N_t[1]) + 12.0))
+                        count_elem_nonzero += 1
                     end
                 end 
             end 
@@ -1309,7 +1325,7 @@ module atmosphere
             write(f,"# AGNI temperature structure \n")
             write(f,"# bar, kelvin \n")
             for i in 1:atmos.nlev_c 
-                write(f,@sprintf("%.6e    %.6e \n", atmos.p[i], max(tmp_floor,atmos.tmp[i]) ))
+                write(f,@sprintf("%.6e    %.6e \n", atmos.p[i]*1e-5, max(tmp_floor,atmos.tmp[i]) ))
             end 
         end 
 
@@ -1350,24 +1366,77 @@ module atmosphere
         (data,head) = readdlm(chempath, '\t', Float64, header=true)
         data = transpose(data)  # convert to: gas, level
 
-        # Parse gas chemistry
-        g::String = ""
-        N_t = data[4,:] # at each level: sum of gas number densities 
-        for (i,h) in enumerate(head)  # for each column (gas)
-            g = rstrip(lstrip(h))
-
-            # check if gas is included in the model
-            if g in keys(phys.map_fastchem_name) 
-                g = phys.map_fastchem_name[g]  # convert name
-                if g in atmos.gas_names
-                    N_g = data[i,:]  # number densities for this gas 
-                    atmos.gas_vmr[g][:] .= N_g[:] ./ N_t[:]    # mole fraction (VMR) for this gas 
-                end
-            end # not included => skip
+        # Clear VMRs 
+        for g in atmos.gas_names
+            fill!(atmos.gas_vmr[g], 0.0)
         end 
 
-        # Do not renormalise mixing ratios
+        # Parse gas chemistry
+        g_fc::String = "_unset"
+        d_fc::Dict = Dict{String, Int}()
+        g_in::String = "_unset"
+        match::Bool = false 
+        N_t = data[4,:] # at each level: sum of gas number densities 
 
+        for (i,h) in enumerate(head)  # for each column (gas)
+
+            # skip T and P 
+            if i <= 5+count_elem_nonzero
+                continue 
+            end 
+
+            # parse name 
+            g_fc = rstrip(lstrip(h))
+            if occursin("_", g_fc)
+                g_fc = split(g_fc, "_")[1]
+            end
+            g_fc = replace(g_fc, "cis"=>"", "trans"=>"")
+
+            match = false
+
+            # firstly, check if we have the FC name already stored
+            for g in atmos.gas_names
+                if atmos.gas_dat[g].fastchem_name == g_fc 
+                    match = true 
+                    g_in = g
+                    break
+                end 
+            end 
+
+            # not stored => search based on atoms 
+            if !match 
+                d_fc = phys.count_atoms(g_fc)  # get atoms dict from FC name 
+
+                for g in atmos.gas_names
+                    if phys.same_atoms(d_fc, atmos.gas_dat[g].atoms)
+                        match = true
+                        g_in = g
+                        break 
+                    end
+                end 
+            end 
+
+            # matched?
+            if match 
+                N_g = data[i,:]  # number densities for this gas 
+                atmos.gas_vmr[g_in][:] .+= N_g[:] ./ N_t[:]    # mole fraction (VMR) for this gas 
+            end 
+        end 
+
+        # Do not renormalise mixing ratios, since this is done by fastchem
+        # If we are missing gases then that's okay.
+
+        # Find where we truncated the temperature profile, and make sure that regions above that use the same x_gas values 
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
+            if atmos.tmp[i] < tmp_floor
+                for g in atmos.gas_names 
+                    atmos.gas_vmr[g][1:i] .= atmos.gas_vmr[g][i+1]
+                end 
+                break 
+            end 
+        end 
+
+        # See docstring for return codes
         return state 
     end
 
