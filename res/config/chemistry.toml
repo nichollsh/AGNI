@@ -3,8 +3,8 @@ title = "Equilibrium chemistry demo"                    # Name for this configur
 
 [planet]
     tmp_surf        = 2200.0    
-    instellation    = 44000.0   
-    albedo_b        = 0.18      
+    instellation    = 10000.0   
+    albedo_b        = 0.0      
     s0_fact         = 0.375     
     zenith_angle    = 48.19     
     albedo_s        = 0.0       
@@ -29,7 +29,7 @@ title = "Equilibrium chemistry demo"                    # Name for this configur
     max_runtime     = 400                      
     num_levels      = 45                       
     continua        = true                     
-    rayleigh        = false                    
+    rayleigh        = true                    
     cloud           = false                    
     aerosol         = false                    
     overlap_method  = 4                        
