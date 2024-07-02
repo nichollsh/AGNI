@@ -3,7 +3,7 @@ title = "Condensation test"                    # Name for this configuration fil
 
 [planet]
     tmp_surf        = 2000.0          
-    instellation    = 1300.0          
+    instellation    = 2500.0          
     albedo_b        = 0.0             
     s0_fact         = 0.375           
     zenith_angle    = 48.19           
@@ -31,7 +31,7 @@ title = "Condensation test"                    # Name for this configuration fil
     verbosity       = 1                
     max_steps       = 300              
     max_runtime     = 200              
-    num_levels      = 40               
+    num_levels      = 35               
     continua        = true             
     rayleigh        = false            
     cloud           = false            

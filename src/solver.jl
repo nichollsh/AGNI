@@ -146,6 +146,7 @@ module solver
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
         perturb_conv::Float64 = 0.02    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
         perturb_crit::Float64 = 1.0     # Require Jacobian update at level i when r_i>perturb_crit
+        perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
         ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
@@ -531,7 +532,7 @@ module solver
 
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
-            if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max) 
+            if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max) || mod(step,perturb_mod)==0
                 # Update whole matrix if:
                 #    on first step, was requested, or near global convergence
                 fill!(perturb, true)
