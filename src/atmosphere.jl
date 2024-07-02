@@ -1559,7 +1559,7 @@ module atmosphere
                 if (atmos.gas_vmr[c][i] > x_sat) && !supcrit
 
                     # set rainout kg/m2
-                    cond_kg[c] = atmos.layer_mmw[i]*atmos.p[i]*(atmos.gas_vmr[c][i] - x_sat)/(atmos.layer_grav[i] * atmos.gas_dat[c].mmw)
+                    cond_kg[c] = atmos.gas_dat[c].mmw*atmos.p[i]*(atmos.gas_vmr[c][i] - x_sat)/(atmos.layer_grav[i] * atmos.layer_mmw[i])
                     rain_kg[c] = cond_kg[c] * (1.0 - atmos.cond_alpha)
 
                     # condensation yield at this level 
@@ -1624,7 +1624,7 @@ module atmosphere
                         end 
 
                         # Calculate kg/m2 of gas that would saturate 
-                        dm_sat = atmos.layer_mmw[j]*dp_sat/(atmos.layer_grav[j] * atmos.gas_dat[c].mmw)
+                        dm_sat = atmos.gas_dat[c].mmw * dp_sat/(atmos.layer_grav[j] * atmos.layer_mmw[j])
 
                         # Evaporation efficiency factor 
                         #   This fraction of the rain that *could* be evaporated
@@ -1641,9 +1641,16 @@ module atmosphere
                         atmos.gas_yield[c][j] -= dm_sat
 
                         # add partial pressure from evaporation to pp at this level
-                        dp_sat = dm_sat * atmos.layer_grav[j] * atmos.gas_dat[c].mmw / atmos.layer_mmw[j]
+                        dp_sat = dm_sat * atmos.layer_grav[j] * atmos.layer_mmw[j] / atmos.gas_dat[c].mmw 
 
                         # convert extra pp to extra vmr
+                        # ---------------------
+                        # WARNING
+                        # THIS IS NOT CORRECT. IT WILL LEAD TO sum(x_gas)>1
+                        # IN MANY CASES BECAUSE OF THE PREDEFINED PRESSURE GRID 
+                        # THIS NEEDS TO RE-ADJUST THE WHOLE PRESSURE GRID IN 
+                        # ORDER TO CONSERVE MASS! 
+                        # ----------------------
                         atmos.gas_vmr[c][j] += dp_sat / atmos.p[j]
                         
                         # reduce total kg of rain correspondingly 
