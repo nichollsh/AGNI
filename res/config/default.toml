@@ -1,20 +1,18 @@
-# AGNI configuration file 
 # This is the default configuration file - it does not solve for RCE
+# The variables are explained below. If you want to model your own conditions, 
+# try making a copy of this file and then modifying it.
+
 title = "Default"                       # Name for this configuration file
 
 [planet]
     tmp_surf        = 2000.0            # Surface temperature [kelvin]
     instellation    = 44000.0           # Stellar flux at planet's orbital distance [W m-2]
-    albedo_b        = 0.18             # Pseudo bond-albedo which downscales the stellar flux by 1-this_value
+    albedo_b        = 0.18              # Pseudo bond-albedo which downscales the stellar flux by 1-this_value
     s0_fact         = 0.6652            # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13)
     zenith_angle    = 60.0              # Characteristic zenith angle for incoming stellar radiation [degrees]
     albedo_s        = 0.0               # Surface albedo
     radius          = 6.37e6            # Planet radius at the surface [m]
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
-    p_surf          = 270.0             # Total surface pressure [bar]
-    p_top           = 1e-5              # Total top-of-atmosphere pressure [bar]
-    vmr             = { H2O = 1.0 }     # Volatile volume mixing ratios
-    condensates     = []                # List of condensable gases
     skin_d          = 0.01              # Conductive skin thickness [m]. Used when sol_type=2.
     skin_k          = 2.0               # Conductive skin conductivity [W m-1 K-1]. Used when sol_type=2.
     tmp_magma       = 3000.0            # Magma temperature [K]. Used when sol_type=2.
@@ -23,13 +21,21 @@ title = "Default"                       # Name for this configuration file
     wind_speed      = 2.0               # Effective wind speed for sensible heat [m s-1].
 
 [files]
-    clean_output    = true
-    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"    # Path to SOCRATES spectral file.
+    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"   # Path to SOCRATES spectral file.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum.
-    input_vmr       = ""                                                # Path to input volume mixing ratios. Not required if planet.vmr is passed.
     output_dir      = "out/"                                            # Path to output directory.
 
+[composition]
+    p_surf          = 270.0                     # Total surface pressure [bar]
+    p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar] 
+    vmr_dict        = { H2O = 1.0}              # Volatile volume mixing ratios (=mole fractions)
+    vmr_path        = ""                        # Path to input volume mixing ratios. Not required if planet.vmr is passed.
+    include_all     = false                     # Track extra gases, even when their mixing ratio is zero
+    chemistry       = 0                         # Chemistry type (see wiki)
+    condensates     = []                        # List of volatiles which are allowed to condense.    
+
 [execution]
+    clean_output    = true                      # Clean the output folder at model startup
     verbosity       = 1                         # Log level (0: none, 1: normal, 2: debug)
     max_steps       = 20000                     # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
@@ -43,8 +49,6 @@ title = "Default"                       # Name for this configuration file
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     # Include heat release from phase change
     convection_type = ""                        # Convection type (mlt = use mixing length theory).
-    condensates     = []                        # List of volatiles which are allowed to condense.
-    chemistry       = 0                         # Chemistry type (see wiki
     solution_type   = 0                         # Solution type (see wiki).
     solvers         = []                        # Ordered list of solvers to apply (see wiki).
     dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers

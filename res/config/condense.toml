@@ -1,5 +1,5 @@
 # AGNI configuration file 
-title = "Condensation test"                    # Name for this configuration file
+title = "Condensation test"        
 
 [planet]
     tmp_surf        = 2000.0          
@@ -10,10 +10,6 @@ title = "Condensation test"                    # Name for this configuration fil
     albedo_s        = 0.2             
     radius          = 6.37e6          
     gravity         = 9.81            
-    p_surf          = 7000.0          
-    p_top           = 1e-5            
-    vmr             = { H2O=0.8, CO2=0.1, CH4=0.08, H2=0.02}    
-    condensates     = ["H2O", "CO2"]
     tmp_int         = 0.0            
     turb_coeff      = 1.0e-4
     wind_speed      = 10.0
@@ -27,8 +23,17 @@ title = "Condensation test"                    # Name for this configuration fil
     input_star      = "res/stellar_spectra/sun.txt"                         
     output_dir      = "out/"                                                
 
+[composition]
+    p_surf          = 7000.0          
+    p_top           = 1e-5            
+    vmr_dict        = { H2O=0.8, CO2=0.1, CH4=0.08, H2=0.02}    
+    include_all     = false
+    chemistry       = 0                 
+    condensates     = ["H2O", "CO2"]    
+
 [execution]
-    verbosity       = 1                
+    clean_output    = true             
+    verbosity       = 1
     max_steps       = 300              
     max_runtime     = 200              
     num_levels      = 35               
@@ -41,7 +46,6 @@ title = "Condensation test"                    # Name for this configuration fil
     sensible_heat   = true             
     latent_heat     = true             
     convection_type = "mlt"            
-    chemistry       = 0             
     solution_type   = 1                
     solvers         = ["newton"]       
     dx_max          = 600.0            
