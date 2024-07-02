@@ -184,7 +184,7 @@ module AGNI
 
         # Output folder 
         output_dir = abspath(cfg["files"]["output_dir"])
-        if cfg["files"]["clean_output"] || !(ispath(output_dir) && isdir(output_dir))
+        if cfg["execution"]["clean_output"] || !(ispath(output_dir) && isdir(output_dir))
             rm(output_dir,force=true,recursive=true)
             mkdir(output_dir)
         end 
@@ -216,9 +216,54 @@ module AGNI
         radius::Float64        = cfg["planet"]["radius"]
         zenith::Float64        = cfg["planet"]["zenith_angle"]
         gravity::Float64       = cfg["planet"]["gravity"]
-        p_surf::Float64        = cfg["planet"]["p_surf"]
-        p_top::Float64         = cfg["planet"]["p_top"]
-        condensates::Array{String,1} = cfg["planet"]["condensates"]
+        
+        #    composition stuff 
+        p_top::Float64                  = cfg["composition"]["p_top"]
+        condensates::Array{String,1}    = cfg["composition"]["condensates"]
+        chem_type::Int                  = cfg["composition"]["chemistry"]
+        p_surf::Float64                 = 0.0
+        mf_dict::Dict{String, Float64}  = Dict{String, Float64}()
+        mf_path::String                 = ""
+        use_all_gases::Bool             = cfg["composition"]["include_all"]
+        fastchem_path::String           = ""
+        if haskey(cfg["composition"],"p_surf")
+            # set composition using VMRs + Psurf
+            if haskey(cfg["composition"],"vmr_dict")
+                # from dict in cfg file 
+                mf_dict = cfg["composition"]["vmr_dict"]
+            elseif haskey(cfg["composition"], "vmr_path") 
+                # from csv file to be read-in
+                mf_path = cfg["files"]["input_vmr"]
+            else
+                @error "Misconfiguration: if providing p_surf, must also provide VMRs"
+                exit(1)
+            end 
+            p_surf = cfg["composition"]["p_surf"]
+
+        elseif haskey(cfg["composition"], "p_dict")
+            # set composition from partial pressures (converted to mixing ratios)
+            pp_dict::Dict{String, Float64} = cfg["composition"]["p_dict"]
+            for k in keys(pp_dict)
+                p_surf += pp_dict[k]
+            end 
+            for k in keys(pp_dict)
+                mf_dict[k] = pp_dict[k]/p_surf
+            end 
+
+        else
+            @error "Misconfiguration: must provide either p_dict or p_surf+VMRs"
+            exit(1)
+        end 
+        if chem_type in [1,2,3] 
+            if length(condensates)>0
+                @error "Misconfiguration: FastChem coupling is incompatible with AGNI condensation scheme"
+                exit(1)
+            else
+                fastchem_path = cfg["files"]["fastchem_path"]
+                mkdir(dir_fastchem)
+            end 
+        end 
+
         #    solver stuff 
         spfile_name::String    = cfg["files" ]["input_sf"]
         star_file::String      = cfg["files" ]["input_star"]
@@ -230,7 +275,6 @@ module AGNI
         overlap::Int           = cfg["execution" ]["overlap_method"]
         thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
         conv_type::String      = cfg["execution" ]["convection_type"]
-        chem_type::Int         = cfg["execution" ]["chemistry"]
         incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
         incl_latent::Bool      = cfg["execution" ]["latent_heat"]
         sol_type::Int          = cfg["execution" ]["solution_type"]
@@ -241,6 +285,7 @@ module AGNI
         conv_atol::Float64     = cfg["execution" ]["converge_atol"]
         conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
         max_steps::Int         = cfg["execution" ]["max_steps"]
+
         #    plotting stuff 
         plt_run::Bool          = cfg["plots"     ]["at_runtime"]
         plt_tmp::Bool          = cfg["plots"     ]["temperature"]
@@ -253,14 +298,6 @@ module AGNI
         plt_ani = plt_ani && plt_tmp
 
         # Read OPTIONAL configuration options from dict
-        #     mixing ratios can be set either way
-        if haskey(cfg["planet"],"vmr")
-            mf_dict = cfg["planet"]["vmr"]
-            mf_path = nothing
-        else 
-            mf_dict = nothing
-            mf_path = cfg["files"]["input_vmr"]
-        end 
         #     sensible heat at the surface 
         turb_coeff::Float64 = 0.0; wind_speed::Float64 = 0.0
         if incl_sens
@@ -284,16 +321,6 @@ module AGNI
         if sol_type == 4
             target_olr = cfg["planet"]["target_olr"]
         end    
-        #    path to fastchem 
-        fastchem_path::String = ""
-        if chem_type in [1,2,3] 
-            if length(condensates)>0
-                @error "Misconfiguration: FastChem coupling is incompatible with AGNI condensation scheme"
-            else
-                fastchem_path = cfg["files"]["fastchem_path"]
-                mkdir(dir_fastchem)
-            end 
-        end 
 
         # Setup atmosphere
         @info "Setting up"
@@ -304,7 +331,8 @@ module AGNI
                                 tmp_surf, 
                                 gravity, radius,
                                 nlev_centre, p_surf, p_top,
-                                mf_dict=mf_dict, mf_path=mf_path, 
+                                mf_dict, mf_path, 
+                                
                                 condensates=condensates,
                                 flag_gcontinuum=flag_cnt, flag_rayleigh=flag_ray,
                                 flag_cloud=flag_cld, flag_aerosol=flag_aer,
@@ -314,7 +342,8 @@ module AGNI
                                 tmp_int=tmp_int, albedo_s=albedo_s,
                                 thermo_functions=thermo_funct,
                                 C_d=turb_coeff, U=wind_speed,
-                                fastchem_path=fastchem_path
+                                fastchem_path=fastchem_path,
+                                use_all_gases=use_all_gases
                         )
         atmosphere.allocate!(atmos,star_file)
 
@@ -375,6 +404,8 @@ module AGNI
                 @error "Invalid initial state '$str_req'"
                 return false
             end 
+
+            atmosphere.calc_layer_props!(atmos, ignore_errors=true)
             
             # iterate
             idx_req += 1
@@ -478,7 +509,7 @@ module AGNI
         atmosphere.deallocate!(atmos)
 
         # Temp folders
-        if cfg["files"]["clean_output"]
+        if cfg["execution"]["clean_output"]
             @debug "Cleaning output folder"
             # save fastchem outputs 
             if chem_type in [1,2,3]
