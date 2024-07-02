@@ -145,7 +145,10 @@ module plotting
     function plot_vmr(atmos::atmosphere.Atmos_t, fname::String; 
                             dpi::Int=250,
                             size_x::Int=500, size_y::Int=400)
-        
+
+        # X-axis minimum allowed left-hand-side limit (log units)
+        minmin_x::Float64 = -8
+
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
@@ -154,22 +157,44 @@ module plotting
         plt = plot(ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(size_x,size_y))
 
         # Plot log10 mole fractions for each gas
-        xminmin::Float64 = -8
-        xmin::Float64 = -2
-        this_min::Float64 = 0.0
-        for gas in atmos.gas_names
-            # get VMR
-            x_arr = log10.(clamp.(atmos.gas_vmr[gas][:],1e-100, 1e100))
-            this_min = minimum(x_arr)
-            if this_min > -90
-                xmin = min(xmin, this_min)
-            end
+        gas_xsurf::Array = zeros(Float64, atmos.gas_num)
+        gas::String = ""
+        for i in 1:atmos.gas_num 
+            gas = atmos.gas_names[i]
 
-            # plot gas
-            plot!(x_arr, arr_P, label=phys.pretty_name(gas), lw=2.5, linealpha=0.7, color=phys.pretty_color(gas))
+            # store surface value
+            gas_xsurf[i] = log10(clamp(atmos.gas_vmr[gas][end],1e-100, 1e100))
         end
 
-        xlims  = (max(xmin-0.1, xminmin), 0.1)
+        num_plotted::Int = 0
+        arr_x::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
+        min_x::Float64 = -3
+        for i in reverse(sortperm(gas_xsurf))
+            # Plot gases in order of descending abundance, so that the legend 
+            #    shows the most interesting gases at the top of the list.
+
+            # Avoid plotting too many gases, since this makes it unreadable
+            if num_plotted > 20
+                break 
+            end 
+
+            # Get data
+            gas = atmos.gas_names[i]
+            arr_x[:] .= atmos.gas_vmr[gas][:]
+            if minimum(arr_x) < 1e-90 
+                continue 
+            end 
+            arr_x[:] .= log10.(arr_x[:])
+
+            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label, 
+                    lw=2.5, linealpha=0.7, color=atmos.gas_dat[gas].plot_color)
+
+            num_plotted += 1
+
+            min_x = min(min_x, minimum(arr_x))
+        end
+
+        xlims  = (max(min_x, minmin_x)-0.1, 0.1)
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties

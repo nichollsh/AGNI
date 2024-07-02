@@ -47,6 +47,7 @@ module atmosphere
         # Directories
         ROOT_DIR::String
         OUT_DIR::String
+        THERMO_DIR::String
 
         # SOCRATES objects
         SOCRATES_VERSION::String
@@ -110,6 +111,7 @@ module atmosphere
         gas_sat::Dict{String, Array{Bool, 1}}       # Layer is saturated or cold-trapped
         gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
         gas_yield::Dict{String, Array{Float64,1}}   # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
+        gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
         single_component::Bool                      # Does a single gas make up 100% of layer at any point in the column?
@@ -240,11 +242,11 @@ module atmosphere
     - `nlev_centre::Int`                number of model levels.    
     - `p_surf::Float64`                 total surface pressure [bar].    
     - `p_top::Float64`                  total top of atmosphere pressure [bar].    
-    - `mf_dict=nothing`                 dictionary of mole fractions in the format (key,value)=(gas,mf).    
-    - `mf_path=nothing`                 path to file containing mole fractions at each level. 
-    - `condensates::Array{String,1}`    list of condensates (names)
+    - `mf_dict::Dict`                   dictionary of VMRs in the format (key,value)=(gas,mf).    
+    - `mf_path::String`                 path to file containing VMRs at each level. 
 
     Optional arguments:
+    - `condensates::Array{String,1}`    list of condensates (names)
     - `albedo_s::Float64`               surface albedo.   
     - `tmp_floor::Float64`              temperature floor [K].   
     - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].   
@@ -254,7 +256,7 @@ module atmosphere
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].   
     - `overlap_method::Int`             gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).   
     - `target_olr::Float64`             target OLR [W m-2] for sol_type==4.   
-    - `tmp_int::Float64`                planet's effective brightness temperature [K] for sol_type==3.   
+    - `tmp_int::Float64`                planet's effective (or internal) brightness temperature [K] for sol_type==3.   
     - `all_channels::Bool`              use all channels available for RT?   
     - `flag_rayleigh::Bool`             include rayleigh scattering?   
     - `flag_gcontinuum::Bool`           include generalised continuum absorption?   
@@ -263,6 +265,7 @@ module atmosphere
     - `flag_cloud::Bool`                include clouds?   
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties   
     - `fastchem_path::String`           path to FastChem folder (empty string => disabled)   
+    - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
 
     Returns:
         Nothing
@@ -273,9 +276,9 @@ module atmosphere
                     instellation::Float64, s0_fact::Float64, albedo_b::Float64, zenith_degrees::Float64,
                     tmp_surf::Float64,
                     gravity::Float64, radius::Float64,
-                    nlev_centre::Int, p_surf::Float64, p_top::Float64;
-                    mf_dict=                    nothing,
-                    mf_path =                   nothing,
+                    nlev_centre::Int, p_surf::Float64, p_top::Float64,
+                    mf_dict::Dict{String, Float64}, mf_path::String;
+
                     condensates::Array{String,1} = String[],
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        2.0,
@@ -294,7 +297,8 @@ module atmosphere
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
                     thermo_functions::Bool =    true,
-                    fastchem_path::String =     ""
+                    fastchem_path::String =     "",
+                    use_all_gases::Bool =       false
                     )
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -302,7 +306,7 @@ module atmosphere
         end
 
         # Code versions 
-        atmos.AGNI_VERSION = "0.5.2"
+        atmos.AGNI_VERSION = "0.5.3"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -322,6 +326,7 @@ module atmosphere
         # Set the parameters (and make sure that they're reasonable)
         atmos.ROOT_DIR =        abspath(ROOT_DIR)
         atmos.OUT_DIR =         abspath(OUT_DIR)
+        atmos.THERMO_DIR  =     joinpath(atmos.ROOT_DIR, "res", "thermo")
         atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
@@ -359,7 +364,8 @@ module atmosphere
         atmos.skin_k =          max(1.0e-6,skin_k)
 
         if p_top > p_surf 
-            error("p_top must be less than p_surf")
+            @error "p_top must be less than p_surf"
+            return false
         end
 
         atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
@@ -406,23 +412,26 @@ module atmosphere
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
 
         # Read mole fractions
-        if isnothing(mf_dict) && isnothing(mf_path)
-            error("No mole fractions provided")
+        if !isempty(mf_path) && !isempty(mf_dict)
+            @error "VMRs provided twice"
+            return false
         end
 
-        if !isnothing(mf_dict) && !isnothing(mf_path)
-            error("Mole fractions provided twice")
+        if isempty(mf_path) && isempty(mf_dict)
+            @error "VMRs not provided"
+            return false
         end
 
-        mf_source::Int = 0  # source for mf (0: dict, 1: file)
-        if isnothing(mf_dict) && !isnothing(mf_path)
-            mf_source = 1
+        mf_source::Int = 1  # source for mf (0: dict, 1: file)
+        if isempty(mf_path)
+            mf_source = 0
         end
         
         # The values will be stored in a dict of arrays
         atmos.gas_names =   Array{String}(undef, 0)           # list of names (String)
         atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of data structures (phys.Gas_t)
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays (Float)
+        atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
         atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation/coldtrapping (Bool) 
         atmos.gas_yield =   Dict{String, Array{Float64,1}}()  # dict of condensate yield values (Float [kg])
         atmos.gas_num   =   0                                 # number of gases 
@@ -452,7 +461,8 @@ module atmosphere
         if mf_source == 1
             # check file 
             if !isfile(mf_path)
-                error("Could not read file '$mf_path'")
+                @error "Could not read VMR file '$mf_path'"
+                return false
             end
             @info "Composition set by file"
 
@@ -511,16 +521,47 @@ module atmosphere
 
         end # end read VMR from file 
 
+        # add extra gases if required 
+        if use_all_gases
+
+            # for each gas in the file
+            open(joinpath(atmos.THERMO_DIR, "standard.txt"), "r") do hdl 
+                for gas in readlines(hdl)
+                    # comment line 
+                    if isempty(gas) || occursin("#",gas)
+                        continue 
+                    end 
+                    gas = strip(gas)
+                    
+                    # duplicate
+                    if gas in atmos.gas_names
+                        continue 
+                    end 
+
+                    # add gas
+                    atmos.gas_vmr[gas] = zeros(Float64, atmos.nlev_c)
+                    push!(atmos.gas_names, gas)
+                    atmos.gas_num += 1
+                end
+            end 
+        end 
+
+        # backup mixing ratios from current state 
+        for k in keys(atmos.gas_vmr)
+            atmos.gas_ovmr[k] = zeros(Float64, atmos.nlev_c)
+            atmos.gas_ovmr[k][:] .= atmos.gas_vmr[k][:]
+        end 
+
         # store condensates 
         for c in condensates
             push!(atmos.condensates, c)
         end 
 
-        # Cannot have n_gas==n_cond AND n_cond>1, because it will overspecify
+        # Cannot have n_gas==n_cond, because it will overspecify
         #   the total pressure within condensing regions
-        if (length(atmos.condensates) == atmos.gas_soc_num) && (length(atmos.condensates)>1)
-            error("There must be at least one non-condensable gas")
-            return 
+        if (length(atmos.condensates) == atmos.gas_num) && (atmos.gas_num > 1)
+            @error "There must be at least one non-condensable gas"
+            return false
         end 
 
         # Validate condensate names 
@@ -543,7 +584,8 @@ module atmosphere
 
         # Check that we actually stored some values
         if atmos.gas_num == 0
-            error("No mole fractions were stored")
+            @error "No gases were stored"
+            return false
         end
 
         # Normalise VMRs at each level
@@ -571,9 +613,9 @@ module atmosphere
 
         # Load gas thermodynamic data 
         for g in atmos.gas_names 
-            atmos.gas_dat[g] = phys.load_gas(g, atmos.thermo_funct)
+            atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g, atmos.thermo_funct)
             if (g in atmos.condensates) && (atmos.gas_dat[g].stub)
-                error("No thermodynamic data found for condensable gas $g")
+                @warn "No thermodynamic data found for condensable gas $g"
             end
         end 
 
@@ -593,6 +635,7 @@ module atmosphere
             atmos.fastchem_path = abspath(fastchem_path)
             if !isdir(fastchem_path)
                 @error "Could not find fastchem folder at '$(fastchem_path)'"
+                return 
             end 
             atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
             
@@ -600,6 +643,7 @@ module atmosphere
             atmos.fastchem_flag = isfile(joinpath(fastchem_path,"fastchem")) 
             if !atmos.fastchem_flag 
                 @error "Could not find fastchem executable inside '$(atmos.fastchem_path)' "
+                return 
             else 
                 @info "Found FastChem executable"
             end 
@@ -613,31 +657,6 @@ module atmosphere
         @debug "Setup complete"
         return nothing
     end # end function setup 
-
-    """
-    **Get the mole fraction of a gas within the atmosphere.**
-
-    Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    - `gas::String`             name of the gas (e.g. "H2O").
-    - `lvl::Int`                model level to measure mole fraction
-
-    Returns:
-    - `x::Float64`              mole fraction of `gas`.
-    """
-    function get_x(atmos::atmosphere.Atmos_t, gas::String, lvl::Int)::Float64
-
-        if gas in atmos.gas_names
-            if (lvl >= 1) && (lvl <= atmos.nlev_c)
-                return atmos.gas_vmr[gas][lvl]
-            else
-                error("Invalid level provided ($lvl)") 
-            end 
-        else
-            @error "Invalid gas $gas queried in get_x()" 
-            return 0.0
-        end 
-    end
 
     """
     **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
@@ -1068,9 +1087,11 @@ module atmosphere
         # For now, they are just stored inside the atmos struct
 
         # Print info on the gases
-        @info "Allocated atmosphere with composition"
+        @info "Allocated atmosphere with composition:"
         gas_flags::String = ""
-        for g in atmos.gas_names 
+        g::String = ""
+        for i in 1:atmos.gas_num
+            g = atmos.gas_names[i]
             gas_flags = ""
             if !(g in atmos.gas_soc_names)  # flag as included in radtrans
                 gas_flags *= "NO_OPACITY "
@@ -1084,7 +1105,7 @@ module atmosphere
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
             end 
-            @info @sprintf("    %6.2e %-6s %s", atmos.gas_vmr[g][end], g, gas_flags)
+            @info @sprintf("    %3d %-6s %6.2e %s", i, g, atmos.gas_vmr[g][end], gas_flags)
         end 
  
 
@@ -1302,8 +1323,10 @@ module atmosphere
                         N_g[i] += d[e]
                     end 
                 end 
-                # will be normalised in later code 
-                N_g *= get_x(atmos, gas, atmos.nlev_c) * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
+                # Get gas abundance from original VMR value, since the running 
+                #    one will be updated using FastChem's output. These will 
+                #    be normalised later in this function.
+                N_g *= atmos.gas_ovmr[gas][atmos.nlev_c] * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
                 N_t += N_g  
             end 
 

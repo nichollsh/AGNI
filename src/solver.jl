@@ -491,9 +491,9 @@ module solver
                 @debug "        chemistry"
                 fc_retcode = atmosphere.chemistry_eq!(atmos, chem_type, false)
                 if fc_retcode == 0
-                    stepflags *= "Cs-"
+                    stepflags *= "Cs-"  # chemistry success 
                 else 
-                    stepflags *= "Cf-"
+                    stepflags *= "Cf-"  # chemistry failure
                     step_ok = false
                 end
             end 
