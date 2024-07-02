@@ -234,12 +234,14 @@ module phys
         ("H"  , "#0000ff"),
         ("C"  , "#ff0000"),
         ("O"  , "#00ff00"),
-        ("N"  , "#ffff00"),
+        ("N"  , "#eeaa00"),
         ("S" ,  "#ff22ff"),
+        ("P" ,  "#33ccff"),
 
         # refractory elements 
         ("Fe" , "#888888"),
         ("Si" , "#aa2277"),
+        ("Mg" , "#996633"),
     ])
 
     """
@@ -399,13 +401,13 @@ module phys
     """
     Load gas data into a new struct  
     """
-    function load_gas(formula::String, tmp_dep::Bool)::Gas_t
+    function load_gas(thermo_dir::String, formula::String, tmp_dep::Bool)::Gas_t
 
         @debug ("Loading data for gas $formula")
 
         # Clean input and get file path
         formula = String(strip(formula))
-        fpath = abspath(joinpath(dirname(abspath(@__FILE__)), "..", "res", "thermo", "$formula.nc" ))
+        fpath = joinpath(thermo_dir, "$formula.nc" )
 
         # Initialise struct 
         gas = Gas_t()

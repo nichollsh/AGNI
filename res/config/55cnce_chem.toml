@@ -10,29 +10,25 @@ title = "Roughly 55 Cancri e @ fO2=IW-4"
     albedo_s        = 0.0            
     radius          = 1.1959e7 
     gravity         = 22.304  
-    p_surf          = 854.894   
-    p_top           = 1e-6           
-
-    # Set surface abundances 
-    # First 6 are set by outgassing code 
-    # SO2, FeO2 set to 0.01 to "sprinkle in" some S and Fe 
-    # Others set to zero but allowed to be modelled
-    vmr             = { H2O=0.0017, CO2=0.0, N2=0.0001, H2=0.5837, CO=0.4095, CH4=0.005,    SO2=0.01, FeO2=0.01,     O2=0.00, OH=0.0, H=0.0, SO=0.0, NH3=0.0, NH2=0.0, H2S=0.0, H2SO4=0.0}    
-    condensates     = []               
     tmp_int         = 0.0
     turb_coeff      = 0.001           
-    wind_speed      = 2.0             
-
+    wind_speed      = 2.0      
+           
 [files]
-    clean_output    = true
     input_sf        = "res/spectral_files/nogit/Dayspring/48/Dayspring.sf"   
     input_star      = "res/stellar_spectra/sun.txt"                       
-    input_vmr       = ""                                                     
     output_dir      = "out/"       
     fastchem_path   = "/Users/nichollsh/Projects/fastchem/"
-                                          
+
+[composition]
+    p_top           = 1e-6     
+    p_dict          = {H2O=1.435, CO2=0.11, N2=0.043, H2=499.004, CO=350.044, CH4=4.258,    SO2=0.01, FeO2=0.01}
+    include_all     = true 
+    chemistry       = 1                  
+    condensates     = []               
 
 [execution]
+    clean_output    = true
     verbosity       = 1                  
     max_steps       = 20000              
     max_runtime     = 400                
@@ -46,8 +42,6 @@ title = "Roughly 55 Cancri e @ fO2=IW-4"
     sensible_heat   = true               
     latent_heat     = true               
     convection_type = "mlt"              
-    condensates     = []                 
-    chemistry       = 1                  
     solution_type   = 3                  
     solvers         = ["newton"]         
     dx_max          = 200.0              
