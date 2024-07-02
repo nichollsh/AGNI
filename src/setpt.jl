@@ -109,7 +109,6 @@ module setpt
         atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
         atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
 
-        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -162,7 +161,6 @@ module setpt
         # Close file 
         close(ds)
 
-        atmosphere.calc_layer_props!(atmos)
         return nothing
     end # end load_ncdf
 
@@ -174,7 +172,6 @@ module setpt
         atmos.tmpl[:] .= set_tmp 
         atmos.tmp[:]  .= set_tmp
 
-        atmosphere.calc_layer_props!(atmos)
         return nothing
     end 
 
@@ -186,7 +183,6 @@ module setpt
         atmos.tmpl[:] .+= delta 
         atmos.tmp[:]  .+= delta
 
-        atmosphere.calc_layer_props!(atmos)
         return nothing
     end 
 
@@ -199,9 +195,6 @@ module setpt
 
         # Set surface 
         atmos.tmpl[end] = atmos.tmp_surf
-
-        # Thermodynamics etc 
-        atmosphere.calc_layer_props!(atmos)
 
         # Lapse rate dT/dp 
         grad::Float64 = 0.0
@@ -230,8 +223,6 @@ module setpt
             atmos.tmpl[i] = max(atmos.tmpl[i], atmos.tmp_floor)
         end 
 
-        # Thermodynamics at new temperature profile 
-        atmosphere.calc_layer_props!(atmos)
 
         return nothing
     end 
@@ -260,7 +251,6 @@ module setpt
             atmos.tmpl[1] = strat_tmp 
         end
 
-        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -283,7 +273,6 @@ module setpt
         # Set cell-centres 
         atmos.tmp[1:end] .= 0.5 .* (atmos.tmpl[1:end-1] + atmos.tmpl[2:end])
 
-        atmosphere.calc_layer_props!(atmos)
         return nothing
     end
 
@@ -335,7 +324,6 @@ module setpt
 
         # Generate new pressure grid 
         atmosphere.generate_pgrid!(atmos)
-        atmosphere.calc_layer_props!(atmos)
         
         return nothing
     end
@@ -378,9 +366,6 @@ module setpt
         
         # Set cell-edge temperatures
         atmosphere.set_tmpl_from_tmp!(atmos)
-
-        # calculate properties 
-        atmosphere.calc_layer_props!(atmos)
 
         return nothing
     end

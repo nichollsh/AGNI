@@ -9,11 +9,7 @@ title = "Comparison with Selsis+23"
     zenith_angle    = 48.19          
     albedo_s        = 0.0            
     radius          = 6.37e6         
-    gravity         = 9.81           
-    p_surf          = 270.0          
-    p_top           = 1e-5           
-    vmr             = { H2O = 1.0 }  
-    condensates     = ["H2O"]        
+    gravity         = 9.81               
     tmp_int         = 0.0            
     turb_coeff      = 1.0e-4
     wind_speed      = 10.0
@@ -24,7 +20,18 @@ title = "Comparison with Selsis+23"
     input_star      = "res/stellar_spectra/sun.txt"                     
     output_dir      = "out/"                                            
 
+
+[composition]
+    p_surf          = 270.0         
+    p_top           = 1e-5          
+    vmr_dict        = { H2O = 1.0}  
+    vmr_path        = ""            
+    include_all     = false         
+    chemistry       = 0             
+    condensates     = ["H2O"]        
+
 [execution]
+    clean_output    = true 
     verbosity       = 1             
     max_steps       = 200           
     max_runtime     = 400           
