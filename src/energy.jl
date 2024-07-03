@@ -169,7 +169,7 @@ module energy
             for i in 1:atmos.nlev_c 
                 # skip unspecified gases
                 if s_gas in atmos.gas_names
-                    # convert mole fraction to mass mixing ratio
+                    # convert VOLUME mixing ratio to MASS mixing ratio
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_vmr[s_gas][i] * atmos.gas_dat[s_gas].mmw / atmos.layer_mmw[i]
                 else 
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0

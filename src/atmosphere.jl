@@ -107,7 +107,7 @@ module atmosphere
         # Gas variables (incl gases which are not in spectralfile)
         gas_num::Int                                # Number of gases
         gas_names::Array{String,1}                  # List of gas names
-        gas_vmr::Dict{String, Array{Float64,1}}     # Layer mole fractions in dict format, (key,value) = (gas_name,array)
+        gas_vmr::Dict{String, Array{Float64,1}}     # Layer volume mixing ratios in dict, (key,value) = (gas_name,array)
         gas_sat::Dict{String, Array{Bool, 1}}       # Layer is saturated or cold-trapped
         gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
         gas_yield::Dict{String, Array{Float64,1}}   # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
@@ -411,7 +411,7 @@ module atmosphere
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
 
-        # Read mole fractions
+        # Read VMRs
         if !isempty(mf_path) && !isempty(mf_dict)
             @error "VMRs provided twice"
             return false
@@ -1105,7 +1105,7 @@ module atmosphere
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
             end 
-            @info @sprintf("    %3d %-6s %6.2e %s", i, g, atmos.gas_vmr[g][end], gas_flags)
+            @info @sprintf("    %3d %-7s %6.2e %s", i, g, atmos.gas_vmr[g][end], gas_flags)
         end 
  
 
@@ -1240,7 +1240,7 @@ module atmosphere
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=700.0)::Int
+    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=200.0)::Int
 
         @debug "Running equilibrium chemistry"
 
@@ -1303,18 +1303,18 @@ module atmosphere
                 write(f,"1.0e-4 \n\n")
 
                 write(f,"#Max number of chemistry iterations  \n")
-                write(f,"60000 \n\n")
+                write(f,"50000 \n\n")
 
                 write(f,"#Max number internal solver iterations  \n")
-                write(f,"30000 \n\n")
+                write(f,"20000 \n\n")
             end
 
             # Calculate elemental abundances 
             # number densities normalised relative to hydrogen 
             # for each element X, value = log10(N_X/N_H) + 12 
             # N = X(P/(K*T) , where X is the VMR and K is boltz-const
-            N_t = zeros(Float64, length(phys.elements_list))                # total
-            N_g = zeros(Float64, length(phys.elements_list))                # this gas
+            N_t = zeros(Float64, length(phys.elements_list))      # total atoms in all gases
+            N_g = zeros(Float64, length(phys.elements_list))      # atoms in current gas
             for gas in atmos.gas_names
                 d = phys.count_atoms(gas)
                 fill!(N_g, 0.0)
@@ -1327,7 +1327,7 @@ module atmosphere
                 #    one will be updated using FastChem's output. These will 
                 #    be normalised later in this function.
                 N_g *= atmos.gas_ovmr[gas][atmos.nlev_c] * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
-                N_t += N_g  
+                N_t += N_g  # add atoms in this gas to total atoms 
             end 
 
             # Write elemental abundances 
@@ -1335,10 +1335,11 @@ module atmosphere
                 write(f,"# Elemental abundances derived from AGNI volatiles \n")
                 for (i,e) in enumerate(phys.elements_list)
                     if N_t[i] > 1.0e-30
+                        # skip this element if its abundance is too small
                         # normalise relative to hydrogen
                         write(f, @sprintf("%s    %.3f \n",e,log10(N_t[i]/N_t[1]) + 12.0))
                         count_elem_nonzero += 1
-                    end
+                    end 
                 end 
             end 
         end
@@ -1442,7 +1443,7 @@ module atmosphere
             # matched?
             if match 
                 N_g = data[i,:]  # number densities for this gas 
-                atmos.gas_vmr[g_in][:] .+= N_g[:] ./ N_t[:]    # mole fraction (VMR) for this gas 
+                atmos.gas_vmr[g_in][:] .+= N_g[:] ./ N_t[:]    # VMR for this gas 
             end 
         end 
 
