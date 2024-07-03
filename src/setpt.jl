@@ -288,7 +288,7 @@ module setpt
 
         # For each condensable volatile
         for gas in atmos.gas_names
-            # Get mole fraction at surface
+            # Get VMR at surface
             x = atmos.gas_vmr[gas][atmos.nlev_c]
             if x < 1.0e-10
                 continue 
@@ -313,7 +313,7 @@ module setpt
             end
         end 
 
-        # Renormalise mole fractions
+        # Renormalise VMRs
         tot_vmr = 0.0
         for g in atmos.gas_names
             tot_vmr += atmos.gas_vmr[g][atmos.nlev_c]

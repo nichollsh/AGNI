@@ -147,7 +147,7 @@ module plotting
                             size_x::Int=500, size_y::Int=400)
 
         # X-axis minimum allowed left-hand-side limit (log units)
-        minmin_x::Float64 = -8
+        minmin_x::Float64 = -10
 
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
@@ -156,7 +156,7 @@ module plotting
         # Create plot
         plt = plot(ylims=ylims, yticks=yticks, dpi=dpi, legend=:outertopright, size=(size_x,size_y))
 
-        # Plot log10 mole fractions for each gas
+        # Plot log10 VMRs for each gas
         gas_xsurf::Array = zeros(Float64, atmos.gas_num)
         gas::String = ""
         for i in 1:atmos.gas_num 
@@ -189,6 +189,10 @@ module plotting
             plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label, 
                     lw=2.5, linealpha=0.7, color=atmos.gas_dat[gas].plot_color)
 
+            scatter!([log10(atmos.gas_ovmr[gas][end])], [arr_P[end]], label="", 
+                        opacity=0.9, markersize=2, msw=0.5,
+                        color=atmos.gas_dat[gas].plot_color)
+
             num_plotted += 1
 
             min_x = min(min_x, minimum(arr_x))
@@ -198,7 +202,7 @@ module plotting
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties
-        xlabel!(plt, "log(Mole fraction)")
+        xlabel!(plt, "log Volume Mixing Ratio")
         xaxis!(plt, xlims=xlims, xticks=xticks)
 
         ylabel!(plt, "Pressure [bar]")
@@ -222,7 +226,7 @@ module plotting
                         )
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
-        ylims  = (arr_P[1]*0.95, arr_P[end]*2.0)
+        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         max_fl = log10(max(100.0, maximum(abs.(atmos.flux_tot)), maximum(atmos.flux_u), maximum(atmos.flux_d)))
@@ -311,11 +315,11 @@ module plotting
         end
 
         # Labels 
-        annotate!(plt, xlims[1]/2.0, arr_P[end], text("Downward", :black, :center, 9))
-        annotate!(plt, xlims[2]/2.0, arr_P[end], text("Upward"  , :black, :center, 9))
+        annotate!(plt, xlims[1]/2.0, arr_P[end]*0.8, text("Downward", :black, :center, 9))
+        annotate!(plt, xlims[2]/2.0, arr_P[end]*0.8, text("Upward"  , :black, :center, 9))
 
         # Finalise + save
-        xlabel!(plt, "log Unsigned flux [W m⁻²]")
+        xlabel!(plt, "log Unsigned Flux [W m⁻²]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
@@ -327,7 +331,7 @@ module plotting
             savefig(plt, fname)
         end
         return plt 
-    end
+    end 
 
     """
     Plot emission spectrum at the TOA
@@ -411,7 +415,8 @@ module plotting
 
         # Check that we have data 
         if !atmos.is_out_lw
-            error("Cannot plot contribution function because radiances have not been calculated")
+            @error "Cannot plot contribution function because radiances have not been calculated"
+            return 
         end
 
         # Get data
@@ -479,7 +484,8 @@ module plotting
 
         # Check that we have data 
         if !(atmos.is_out_lw && atmos.is_out_sw)
-            error("Cannot plot contribution function because radiances have not been calculated")
+            @error "Cannot plot spectral albedo because radiances have not been calculated"
+            return 
         end
 
         # Get data
