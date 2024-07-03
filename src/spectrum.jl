@@ -70,28 +70,21 @@ module spectrum
         end
         clamp!(fl, 1.0e-45, 1.0e+45)  # Clamp values
 
-        # Bin data if required 
-        if tgt_bins < len_wl
+        # Bin data to required number of bins...
 
-            # Log data first 
-            lfl = log10.(fl)
-            lwl = log10.(wl)
+        # Log data first 
+        lfl = log10.(fl)
+        lwl = log10.(wl)
 
-            # Downsample spectrum onto N=tgt_bins, logwavelength space
-            itp = Interpolator(lwl, lfl)
-            bin_c = collect(range(start=lwl[1],  stop=lwl[end], length=tgt_bins))
-            bin_v = zeros(Float64, tgt_bins)
-            bin_v[:] .= itp.(bin_c[:])
+        # Downsample spectrum onto N=tgt_bins, logwavelength space
+        itp = Interpolator(lwl, lfl)
+        bin_c = collect(range(start=lwl[1],  stop=lwl[end], length=tgt_bins))
+        bin_v = zeros(Float64, tgt_bins)
+        bin_v[:] .= itp.(bin_c[:])
 
-            owl = 10.0 .^ Array(bin_c[:])
-            ofl = 10.0 .^ Array(bin_v[:])
+        owl = 10.0 .^ Array(bin_c[:])
+        ofl = 10.0 .^ Array(bin_v[:])
 
-        # No binning required
-        else 
-            owl = wl 
-            ofl = fl
-        end 
-        
         # Convert units
         owl = owl .* 1.0e-9  # [nm] -> [m]
         ofl = ofl .* 1.0e6   # [erg s-1 cm-2 nm-1] -> [W m-3]
