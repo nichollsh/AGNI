@@ -15,7 +15,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     wind_speed      = 2.0      
            
 [files]
-    input_sf        = "res/spectral_files/nogit/Dayspring/256/Dayspring.sf"   
+    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"   
     input_star      = "res/stellar_spectra/hd97658.txt"                       
     output_dir      = "out/"       
 

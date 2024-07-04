@@ -500,7 +500,6 @@ module AGNI
 
         # Save plots
         @info "Plotting results"
-        plt_alb = plt_alb && (flag_cld || flag_ray)
 
         flag_cld && plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
 

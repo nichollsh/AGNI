@@ -1033,6 +1033,7 @@ module atmosphere
         end 
 
         #    pass albedos to socrates 
+        fill!(atmos.bound.rho_alb, 0.0)
         atmos.bound.rho_alb[1, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s_arr
 
         ###########################################
