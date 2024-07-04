@@ -20,7 +20,7 @@ title = "Condensation test"
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/nogit/Dayspring/16/Dayspring.sf"  
+    input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"  
     input_star      = "res/stellar_spectra/sun.txt"                         
     output_dir      = "out/"                                                
 
