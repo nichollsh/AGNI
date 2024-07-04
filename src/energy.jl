@@ -66,8 +66,8 @@ module energy
             # Downward SW flux at TOA 
             atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact * cosd(atmos.zenith_degrees)
             
-            # SOCRATES requires this to be passed as two variables, since it needs to know 
-            #     the zenith angle of the direct beam.
+            # SOCRATES requires this to be passed as two variables, since it 
+            #     needs to know the angle of the direct beam.
             atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)   # Convert the zenith angles to secants.
             atmos.bound.solar_irrad[1] = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact
         end
@@ -123,7 +123,7 @@ module energy
         # set albedos 
         fill!(atmos.bound.rho_alb, 0.0)
         atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s_arr
-        atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_dir, :] .= atmos.albedo_s_arr
+        atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_dir,  :] .= atmos.albedo_s_arr
 
         ###################################################
         # Cloud information
@@ -280,6 +280,7 @@ module energy
         return nothing
     end
 
+
     # Calculate conductive fluxes 
     function conduct!(atmos::atmosphere.Atmos_t)
         # top layer 
@@ -294,8 +295,6 @@ module energy
         atmos.flux_cdct[end] = atmos.layer_kc[end] * (atmos.tmp[end]-atmos.tmp_surf)/atmos.z[end]
         return nothing
     end 
-
-
 
 
     """
