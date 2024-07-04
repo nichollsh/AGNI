@@ -2,7 +2,7 @@
 AGNI models a planetary atmosphere by treating it as a single column (1D) and splitting it up into levels of finite thickness. These levels are defined in pressure-space, and are arranged logarithmically between the surface and the top of the atmosphere. The atmosphere is assumed to be plane-parallel. Quantities such as pressure and temperature are calculated at level-centres and level-edges, while energy fluxes are calculated only at the edges, and thermodynamic properties (e.g. heat capacity) are calculated only at their centres.
 
 ## Radiative transfer
-Radiative transfer (RT) refers to the transport of radiation energy through a medium subject to the characteristics of the medium. Radiation passing through an atmosphere is absorbed, emitted, scattered, and reflected. In the context of planetary atmospheres, we also have to handle their surfaces, cloud formation, and radiation from the host star.
+Radiative transfer (RT) refers to the transport of radiation energy through a medium subject to the characteristics of the medium. Radiation passing through an atmosphere is absorbed, emitted, scattered, and reflected. In the context of planetary atmospheres, we also have to handle their surfaces, cloud formation, and radiation from the host star. 
    
 AGNI simulates RT using SOCRATES, a numerical code written by the UK Met Office which solves the RT equation using a two-stream solution. SOCRATES is accessed using a Julia interface originally written by Stuart Daines. The atmosphere is assumed to be hydrostatically supported and to behave as an ideal gas. Opacity is handle using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases. 
    
@@ -10,6 +10,7 @@ The model uses k-terms fitted to spectral absorption cross-section data from [DA
 ```@raw html
   <img src="assets/spectral_flowchart.svg" width=100% class="center"/> 
 ```
+Surface reflectivity is modelled either as a greybody or with a wavelength-depedent spectral albedo.
 
 ## Convection
 Convection is a turbulent process which occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it is typically parameterised inside 3D global circulation models as resolving convection is numerically expensive. AGNI uses mixing length theory (MLT) to parameterise convection. This is in contrast to convective adjustment, which forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat while ensuring that enthalpy is conserved. 
@@ -29,7 +30,7 @@ heating rate. This is then integrated (from the TOA downwards) to provide a late
 Latent heats are temperature-dependent, using values derived from Coker (2007) and Wagner & Pruß (2001).
 
 ## Solar flux
-A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, a grey planetary albedo, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
+A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, an artificial additional albedo factor, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
 
 ## Obtaining a solution
 

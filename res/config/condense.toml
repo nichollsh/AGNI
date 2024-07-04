@@ -6,7 +6,8 @@ title = "Condensation test"
     instellation    = 2500.0          
     albedo_b        = 0.0             
     s0_fact         = 0.375           
-    zenith_angle    = 48.19           
+    zenith_angle    = 48.19      
+    surface_material= "blackbody"            
     albedo_s        = 0.2             
     radius          = 6.37e6          
     gravity         = 9.81            
@@ -19,7 +20,7 @@ title = "Condensation test"
 
 [files]
     clean_output    = true
-    input_sf        = "res/spectral_files/nogit/Dayspring/16/Dayspring.sf"  
+    input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"  
     input_star      = "res/stellar_spectra/sun.txt"                         
     output_dir      = "out/"                                                
 

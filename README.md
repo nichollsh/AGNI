@@ -19,9 +19,11 @@ See the Getting Started page in the [documentation](https://nichollsh.github.io/
 ## Repository structure 
 * `agni.jl`         - AGNI executable
 * `LICENSE.txt`     - License for use and re-use
-* `doc/`            - Further documentation
-* `out/`            - Output files
-* `res/`            - Resources (configuration files, etc.)
+* `deps/`           - Package build scripts
+* `docs/`           - Documentation source files
+* `misc/`           - Miscellaneous files
+* `out/`            - Model output
+* `res/`            - Resources (configs, thermodynamic data, etc.)
 * `src/`            - Package source code
 * `test/`           - Package tests
 * `tutorials/`      - Notebooks and tutorials
