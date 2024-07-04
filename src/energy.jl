@@ -72,8 +72,6 @@ module energy
             atmos.bound.solar_irrad[1] = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact
         end
 
-        atmos.bound.rho_alb[:, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
-
         # Set the two-stream approximation to be used (-t f)
         if lw
             atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
@@ -122,11 +120,10 @@ module energy
         # IP_surface_char  = 51, file suffix 'surf'
         #####################################
 
-        if atmos.control.i_angular_integration == atmosphere.SOCRATES.rad_pcf.ip_two_stream
-            if !lw
-                atmos.bound.rho_alb[:, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_dir, :] .= atmos.bound.rho_alb[:, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_diff, :]
-            end
-        end
+        # set albedos 
+        fill!(atmos.bound.rho_alb, 0.0)
+        atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s_arr
+        atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_dir, :] .= atmos.albedo_s_arr
 
         ###################################################
         # Cloud information
@@ -182,6 +179,7 @@ module energy
                 # do not normalise MMRs to 1
             end
         end 
+
 
         # Do radiative transfer
         atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
