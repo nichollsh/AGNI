@@ -135,7 +135,6 @@ module dump
             var_tmax =      defVar(ds, "tceiling",      Float64, (), attrib = OrderedDict("units" => "K"))      # Maximum temperature
             var_plrad =     defVar(ds, "planet_radius", Float64, (), attrib = OrderedDict("units" => "m"))      # Value taken for planet radius
             var_gsurf =     defVar(ds, "surf_gravity",  Float64, (), attrib = OrderedDict("units" => "m s-2"))  # Surface gravity
-            var_albsurf =   defVar(ds, "surf_albedo",   Float64, ())                                            # Surface albedo
             var_fray =      defVar(ds, "flag_rayleigh", Char, ())                                               # Includes rayleigh scattering?
             var_fcon =      defVar(ds, "flag_continuum",Char, ())                                               # Includes continuum absorption?
             var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())                                               # Includes clouds?
@@ -161,7 +160,6 @@ module dump
             var_tmax[1] =       atmos.tmp_ceiling
             var_plrad[1]  =     atmos.rp
             var_gsurf[1] =      atmos.grav_surf
-            var_albsurf[1] =    atmos.albedo_s
 
             if atmos.control.l_rayleigh
                 var_fray[1] = 'y'
@@ -246,6 +244,7 @@ module dump
             var_bus =       defVar(ds, "ba_U_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
             var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
             var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c"))
+            var_albs =      defVar(ds, "albedo_s",  Float64, ("nbands",))  
 
             #     Store data
             var_p[:] =      atmos.p
@@ -275,8 +274,13 @@ module dump
                 end 
             end 
             
+            # Clouds 
             var_cldl[:] =   atmos.cloud_arr_l
 
+            # Kzz mixing
+            var_kzz[:] =    atmos.Kzz
+
+            # Bolometric fluxes
             var_fdl[:] =    atmos.flux_d_lw
             var_ful[:] =    atmos.flux_u_lw
             var_fnl[:] =    atmos.flux_n_lw
@@ -297,8 +301,7 @@ module dump
             var_hr[:] =     atmos.heating_rate
             var_fdiff[:] =  atmos.flux_dif
 
-            var_kzz[:] =    atmos.Kzz
-
+            # Spectral fluxes
             var_bmin[:] =   atmos.bands_min
             var_bmax[:] =   atmos.bands_max
 
@@ -318,6 +321,9 @@ module dump
                     var_cfn[ba, lc] = atmos.contfunc_norm[lc, ba]
                 end 
             end 
+
+            # Surface spectral albedo 
+            var_albs[:] = atmos.albedo_s_arr
 
             close(ds)
         end # suppress output 

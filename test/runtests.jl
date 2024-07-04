@@ -45,7 +45,7 @@ passing = true
 # -------------
 @info " "
 @info "Testing heat capacity functions"
-data_H2O::phys.Gas_t = phys.load_gas("res/thermo/", "H2O", true)
+data_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true)
 c_expt::Array{Float64, 1} = [4.975, 35.22, 41.27 , 51.20 , 55.74 , 59.40 ]     # Expected values of cp [J mol-1 K-1]
 t_test::Array{Float64, 1} = [10.0,  500.0, 1000.0, 2000.0, 3000.0, 5000.0]     # Tested values of temperature 
 cp_pass = true 
@@ -192,7 +192,7 @@ theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0),
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/Oak.sf")
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/318/Oak.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -290,7 +290,7 @@ theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0)
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/Oak.sf")
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/318/Oak.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
