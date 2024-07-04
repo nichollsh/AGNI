@@ -67,11 +67,15 @@ module atmosphere
         spectral_file::String           # Path to spectral file
         star_file::String               # Path to star spectrum
         albedo_b::Float64               # Enforced bond albedo 
-        albedo_s::Float64               # Surface albedo
         zenith_degrees::Float64         # Solar zenith angle [deg]
         toa_heating::Float64            # Derived downward shortwave radiation flux at topmost level [W m-2]
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (cronin+14)
+
+        surface_material::String        # Surface material file path 
+        albedo_s::Float64               # Grey surface albedo when surface=blackbody 
+        albedo_s_arr::Array{Float64,1}  # Spectral surface albedo passed to SOCRATES
+        
         tmp_surf::Float64               # Surface brightness temperature [K]
         tmp_int::Float64                # Effective temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
@@ -246,8 +250,9 @@ module atmosphere
     - `mf_path::String`                 path to file containing VMRs at each level. 
 
     Optional arguments:
-    - `condensates::Array{String,1}`    list of condensates (names)
-    - `albedo_s::Float64`               surface albedo.   
+    - `condensates::Array{String,1}`    list of condensates (gas names).
+    - `surface_material::String`        surface material (default is "blackbody", but can point to file instead).
+    - `albedo_s::Float64`               grey surface albedo used when `surface_material="blackbody"`.
     - `tmp_floor::Float64`              temperature floor [K].   
     - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].   
     - `U::Float64`                      surface wind speed [m s-1].   
@@ -279,6 +284,7 @@ module atmosphere
                     mf_dict::Dict{String, Float64}, mf_path::String;
 
                     condensates::Array{String,1} = String[],
+                    surface_material::String =  "blackbody",
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        2.0,
                     C_d::Float64 =              0.001,
@@ -324,7 +330,7 @@ module atmosphere
         # Set the parameters (and make sure that they're reasonable)
         atmos.ROOT_DIR =        abspath(ROOT_DIR)
         atmos.OUT_DIR =         abspath(OUT_DIR)
-        atmos.THERMO_DIR  =     joinpath(atmos.ROOT_DIR, "res", "thermo")
+        atmos.THERMO_DIR  =     joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
         atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
@@ -344,6 +350,7 @@ module atmosphere
         atmos.tmp_int =         tmp_int
         atmos.grav_surf =       max(1.0e-7, gravity)
         atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
+        atmos.surface_material= surface_material
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.instellation =    max(instellation, 0.0)
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
@@ -793,7 +800,7 @@ module atmosphere
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `boundary_scale::Float64=1.0e-4`  scale factor for the thickness of the bottom-most cell.
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-4)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-6)
 
         boundary_scale = max(min(boundary_scale, 1.0-1.0e-8), 1.0e-8)
 
@@ -977,18 +984,27 @@ module atmosphere
         atmos.dimen.nd_subcol_gen             = 1
         atmos.dimen.nd_subcol_req             = 1
         atmos.dimen.nd_aerosol_mode           = 1
+
+        # Set to true to enable custom surface emission through the 
+        #   variables `planck%flux_ground(l)` and `d_planck_flux_surface`.
+        # atmos.control.l_flux_ground = false
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
+        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
-        atmos.bound.rho_alb[:, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s   #   Set surface albedo.
+        # This defines the surface emission, once a custom value is enabled.
+        # fill!(atmos.bound.flux_ground, 100.0)
 
-        # atm sizes and coordinates 
-        atmos.atm.n_layer = npd_layer
-        atmos.atm.n_profile = 1
-        atmos.atm.lat[1] = 0.0
-        atmos.atm.lon[1] = 0.0
+
+        ###########################################
+        # Number of profiles, and profile coordinates
+        ###########################################
+        atmos.atm.n_layer =     npd_layer
+        atmos.atm.n_profile =   1
+        atmos.atm.lat[1] =      0.0
+        atmos.atm.lon[1] =      0.0
 
         ###########################################
         # Range of bands
@@ -1006,7 +1022,7 @@ module atmosphere
         end
 
         SOCRATES.allocate_control(atmos.control, atmos.spectrum)
-
+        
         if n_channel == 1
             atmos.control.map_channel[1:atmos.spectrum.Basic.n_band] .= 1
         elseif n_channel == atmos.spectrum.Basic.n_band
@@ -1112,8 +1128,8 @@ module atmosphere
         end 
  
 
-        # Calc layer properties using initial temperature profile 
-        #    Can generate weird issues since the TOA temperature can be large 
+        # Calc layer properties using initial temperature profile.
+        #    Can generate weird issues since the TOA temperature may be large 
         #    large but pressure small, which gives it a low density. With the 
         #    hydrostatic integrator, this can cause dz to blow up, especially 
         #    with a low MMW gas. Should be okay as long as the T(p) provided 
@@ -1161,7 +1177,6 @@ module atmosphere
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
 
-        SOCRATES.allocate_cld(  atmos.cld,    atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
 
         if atmos.control.l_cloud
@@ -1176,6 +1191,48 @@ module atmosphere
         end
 
         atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
+
+        ###########################################
+        # Surface properties 
+        ###########################################
+        atmos.albedo_s_arr = zeros(Float64, atmos.nbands)
+
+        if atmos.surface_material == "blackbody"
+            # grey albedo 
+            fill!(atmos.albedo_s_arr, atmos.albedo_s)       
+        
+        else 
+            # spectral albedo 
+
+            # try to find a matching file
+            atmos.surface_material = abspath(atmos.surface_material)
+            if !isfile(atmos.surface_material)
+                error("Could not find surface albedo file '$(atmos.surface_material)'")
+            end 
+
+            # read data from file
+            _alb_data::Array = readdlm(atmos.surface_material, Float64)
+            _alb_w::Array{Float64, 1} = _alb_data[:,1]     # wavelength [nm]
+            _alb_a::Array{Float64, 1} = _alb_data[:,2]     # albedo [dimensionless]
+
+            # extrapolate to 0 wavelength, with constant value
+            pushfirst!(_alb_w, 0.0)
+            pushfirst!(_alb_a, _alb_a[1])
+
+            # extrapolate to large wavelength, with constant value
+            push!(_alb_w, 1e10)
+            push!(_alb_a, _alb_a[end])
+
+            # create interpolator 
+            _alb_itp::Interpolator = Interpolator(_alb_w, _alb_a)
+            
+            # use interpolator to fill band values 
+            for i in 1:atmos.nbands
+                # evaluate at band centre, converting from m to nm
+                atmos.albedo_s_arr[i] = _alb_itp(0.5 * (atmos.bands_min[i] + atmos.bands_max[i]) * 1.0e9)
+            end 
+
+        end 
 
         #######################################
         # Output arrays
