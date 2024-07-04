@@ -9,11 +9,15 @@ of the repository.
 ## General execution
 The environment variable `RAD_DIR` must point to the SOCRATES installation 
 directory. This is required for AGNI to find the SOCRATES libraries, and can be 
-done by running `source path/to/set_rad_env` in your terminal.       
+done by running `source path/to/socrates/set_rad_env` in your terminal.       
   
 Then to use the model, simply run `./agni.jl [cfg]` where `[cfg]` is the path 
 to the required configuration file. If `[cfg]` is not passed, then the default 
 configuration will be used.
+
+To calculate equilibrium chemistry self-consistently with the climate, FastChem
+is coupled to AGNI. For AGNI to find FastChem, the environment variable `FC_DIR`
+must point to the FastChem installation directory.
 
 ## Configuration 
 AGNI configuration files are formatted using [TOML](https://toml.io/en/). There 
@@ -53,7 +57,7 @@ Some parameters:
   
     For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model.
 
-* `composition.chem_type` describes the type of chemistry to implement within the model. This is handled externally by FastChem. You must also provide the path to the FastChem installation directory `fastchem_path` in the `[files]` section. The allowed values (integers) are...
+* `composition.chem_type` describes the type of chemistry to implement within the model. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. The allowed values (integers) are...
      - 0 : Disabled 
      - 1 : Equilibrium, gas phase only
      - 2 : Equilibrium, with condensation (condensates retained)
