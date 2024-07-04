@@ -496,12 +496,13 @@ module plotting
             # x value - band centres [nm]
             x[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
             
-            # y value - spectral albedo [dimensionless]
+            # y value - spectral albedo [percentage]
             y[ba] = 100.0 * atmos.band_u_sw[1, ba]/atmos.band_d_sw[1, ba]
         end
 
         # Make plot
-        plt = plot(dpi=dpi)
+        ylims  = (0.0, 100.0)
+        plt = plot(dpi=dpi, ylims=ylims)
 
         plot!(plt, x, y, label="", color="black")
 
@@ -519,7 +520,7 @@ module plotting
     end
 
     """ 
-    Combined plot 
+    Combined plot used for tracking behaviour of the solver
     """
     function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String; dpi::Int=180, size_x::Int=800, size_y::Int=650)
 

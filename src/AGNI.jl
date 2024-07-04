@@ -205,17 +205,26 @@ module AGNI
         # Copy configuration file 
         cp(cfg_path, joinpath(output_dir, "agni.cfg"), force=true)
 
-        # Read REQUIRED configuration options from dict 
+        # Read configuration options from dict 
         @info "Using configuration '$(cfg["title"])'"
         #    planet stuff 
         tmp_surf::Float64      = cfg["planet"]["tmp_surf"]
         instellation::Float64  = cfg["planet"]["instellation"]
         albedo_b::Float64      = cfg["planet"]["albedo_b"]
-        albedo_s::Float64      = cfg["planet"]["albedo_s"]
         asf_sf::Float64        = cfg["planet"]["s0_fact"]
         radius::Float64        = cfg["planet"]["radius"]
         zenith::Float64        = cfg["planet"]["zenith_angle"]
         gravity::Float64       = cfg["planet"]["gravity"]
+
+        albedo_s::Float64      = 0.0
+        surface_mat::String    = cfg["planet"]["surface_material"]
+        if surface_mat == "blackbody"
+            if !haskey(cfg["planet"],"albedo_s")
+                @error "Misconfiguration: surface is blackbody , so `albedo_s` must be provided"
+                return false 
+            end 
+            albedo_s = cfg["planet"]["albedo_s"]
+        end 
         
         #    composition stuff 
         p_top::Float64                  = cfg["composition"]["p_top"]
@@ -235,7 +244,7 @@ module AGNI
                 mf_path = cfg["files"]["input_vmr"]
             else
                 @error "Misconfiguration: if providing p_surf, must also provide VMRs"
-                exit(1)
+                return false
             end 
             p_surf = cfg["composition"]["p_surf"]
 
@@ -251,12 +260,12 @@ module AGNI
 
         else
             @error "Misconfiguration: must provide either p_dict or p_surf+VMRs"
-            exit(1)
+            return false
         end 
         if chem_type in [1,2,3] 
             if length(condensates)>0
                 @error "Misconfiguration: FastChem coupling is incompatible with AGNI condensation scheme"
-                exit(1)
+                return false
             else
                 mkdir(dir_fastchem)
             end 
@@ -337,7 +346,9 @@ module AGNI
                                 overlap_method=overlap,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
-                                tmp_int=tmp_int, albedo_s=albedo_s,
+                                tmp_int=tmp_int, 
+                                surface_material=surface_mat,
+                                albedo_s=albedo_s,
                                 thermo_functions=thermo_funct,
                                 C_d=turb_coeff, U=wind_speed,
                                 use_all_gases=use_all_gases
@@ -489,7 +500,6 @@ module AGNI
 
         # Save plots
         @info "Plotting results"
-        plt_alb = plt_alb && (flag_cld || flag_ray)
 
         flag_cld && plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
 
