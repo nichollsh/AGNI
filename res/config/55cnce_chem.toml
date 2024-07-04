@@ -18,7 +18,6 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     input_sf        = "res/spectral_files/nogit/Dayspring/256/Dayspring.sf"   
     input_star      = "res/stellar_spectra/hd97658.txt"                       
     output_dir      = "out/"       
-    fastchem_path   = "/Users/nichollsh/Projects/FastChem/"
 
 [composition]
     p_top           = 1e-7    

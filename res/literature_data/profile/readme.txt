@@ -12,10 +12,5 @@ Their Seff = 1 corresponds to a value of 341.5 Wm−2, which comes from:
 This can be achieved by setting the following parameters in AGNI:
  - s0_fact = 0.6652   
  - zenith_angle = 60.0
- - albedo_b = 0.18
+ - albedo_b = 0.0, but rayleigh scattering enabled
  - instellation = 1366 * S_eff
-
-To solve for these profiles, we need to set the net flux boundary condition such
-that the same OLR is achieved. This may be done via:
-    F_int = sigma (T_int)^4 = OTR + F_UP_SW - F_DN_SW 
-
