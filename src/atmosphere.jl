@@ -984,57 +984,16 @@ module atmosphere
         atmos.dimen.nd_subcol_gen             = 1
         atmos.dimen.nd_subcol_req             = 1
         atmos.dimen.nd_aerosol_mode           = 1
+
+        # atmos.control.l_flux_ground = false
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
+        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
-        ###########################################
-        # Surface properties 
-        ###########################################
-        atmos.albedo_s_arr = zeros(Float64, atmos.nbands)
+        # fill!(atmos.bound.flux_ground, 100.0)
 
-        #    set array values 
-        if atmos.surface_material == "blackbody"
-            # grey albedo 
-            fill!(atmos.albedo_s_arr, atmos.albedo_s)       
-        
-        else 
-            # spectral albedo 
-
-            # try to find a matching file
-            atmos.surface_material = abspath(atmos.surface_material)
-            if !isfile(atmos.surface_material)
-                error("Could not find surface albedo file '$(atmos.surface_material)'")
-            end 
-
-            # read data from file
-            _alb_data::Array = readdlm(atmos.surface_material, Float64)
-            _alb_w::Array{Float64, 1} = _alb_data[:,1]     # wavelength [nm]
-            _alb_a::Array{Float64, 1} = _alb_data[:,2]     # albedo [dimensionless]
-
-            # extrapolate to 0 wavelength, with constant value
-            pushfirst!(_alb_w, 0.0)
-            pushfirst!(_alb_a, _alb_a[1])
-
-            # extrapolate to large wavelength, with constant value
-            push!(_alb_w, 1e10)
-            push!(_alb_a, _alb_a[end])
-
-            # create interpolator 
-            _alb_itp::Interpolator = Interpolator(_alb_w, _alb_a)
-            
-            # use interpolator to fill band values 
-            for i in 1:atmos.nbands
-                # evaluate at band centre, converting from m to nm
-                atmos.albedo_s_arr[i] = _alb_itp(0.5 * (atmos.bands_min[i] + atmos.bands_max[i]) * 1.0e9)
-            end 
-
-        end 
-
-        #    pass albedos to socrates 
-        fill!(atmos.bound.rho_alb, 0.0)
-        atmos.bound.rho_alb[1, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s_arr
 
         ###########################################
         # Number of profiles, and profile coordinates
@@ -1060,7 +1019,7 @@ module atmosphere
         end
 
         SOCRATES.allocate_control(atmos.control, atmos.spectrum)
-
+        
         if n_channel == 1
             atmos.control.map_channel[1:atmos.spectrum.Basic.n_band] .= 1
         elseif n_channel == atmos.spectrum.Basic.n_band
@@ -1215,7 +1174,6 @@ module atmosphere
             atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
         end
 
-        SOCRATES.allocate_cld(  atmos.cld,    atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
 
         if atmos.control.l_cloud
@@ -1230,6 +1188,55 @@ module atmosphere
         end
 
         atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
+
+        ###########################################
+        # Surface properties 
+        ###########################################
+        atmos.albedo_s_arr = zeros(Float64, atmos.nbands)
+
+        #    set array values 
+        if atmos.surface_material == "blackbody"
+            # grey albedo 
+            fill!(atmos.albedo_s_arr, atmos.albedo_s)       
+        
+        else 
+            # spectral albedo 
+
+            # try to find a matching file
+            atmos.surface_material = abspath(atmos.surface_material)
+            if !isfile(atmos.surface_material)
+                error("Could not find surface albedo file '$(atmos.surface_material)'")
+            end 
+
+            # read data from file
+            _alb_data::Array = readdlm(atmos.surface_material, Float64)
+            _alb_w::Array{Float64, 1} = _alb_data[:,1]     # wavelength [nm]
+            _alb_a::Array{Float64, 1} = _alb_data[:,2]     # albedo [dimensionless]
+
+            # extrapolate to 0 wavelength, with constant value
+            pushfirst!(_alb_w, 0.0)
+            pushfirst!(_alb_a, _alb_a[1])
+
+            # extrapolate to large wavelength, with constant value
+            push!(_alb_w, 1e10)
+            push!(_alb_a, _alb_a[end])
+
+            # create interpolator 
+            _alb_itp::Interpolator = Interpolator(_alb_w, _alb_a)
+            
+            # use interpolator to fill band values 
+            for i in 1:atmos.nbands
+                # evaluate at band centre, converting from m to nm
+                atmos.albedo_s_arr[i] = _alb_itp(0.5 * (atmos.bands_min[i] + atmos.bands_max[i]) * 1.0e9)
+            end 
+
+        end 
+
+        #    pass albedos to socrates 
+        fill!(atmos.bound.rho_alb, 0.0)
+        atmos.bound.rho_alb[1, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= 0.0
+        atmos.bound.rho_alb[1, SOCRATES.rad_pcf.ip_surf_alb_dir,  :] .= atmos.albedo_s_arr
+
 
         #######################################
         # Output arrays
