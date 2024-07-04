@@ -45,9 +45,10 @@ module atmosphere
         is_out_sw::Bool     # Contains data for SW calculation
 
         # Directories
-        ROOT_DIR::String
-        OUT_DIR::String
-        THERMO_DIR::String
+        ROOT_DIR::String        # path to AGNI root folder (containing agni.jl)
+        OUT_DIR::String         # path to output folder 
+        THERMO_DIR::String      # path to thermo data 
+        FC_DIR::String          # path to fastchem exec folder 
 
         # SOCRATES objects
         SOCRATES_VERSION::String
@@ -197,7 +198,6 @@ module atmosphere
 
         # FastChem stuff 
         fastchem_flag::Bool             # Fastchem enabled?
-        fastchem_path::String           # Path to fastchem installation folder (incl. executable)
         fastchem_work::String           # Path to fastchem dir inside AGNI output folder
         
         Atmos_t() = new()
@@ -264,7 +264,6 @@ module atmosphere
     - `flag_aerosol::Bool`              include aersols?   
     - `flag_cloud::Bool`                include clouds?   
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties   
-    - `fastchem_path::String`           path to FastChem folder (empty string => disabled)   
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
 
     Returns:
@@ -297,7 +296,6 @@ module atmosphere
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
                     thermo_functions::Bool =    true,
-                    fastchem_path::String =     "",
                     use_all_gases::Bool =       false
                     )
 
@@ -630,23 +628,28 @@ module atmosphere
 
         # Fastchem 
         atmos.fastchem_flag = false 
-        if !isempty(fastchem_path)
+        if ("FC_DIR" in keys(ENV))
+
+            @debug "FastChem env has been set" 
+                
             # check folder
-            atmos.fastchem_path = abspath(fastchem_path)
-            if !isdir(fastchem_path)
-                @error "Could not find fastchem folder at '$(fastchem_path)'"
+            atmos.FC_DIR = abspath(ENV["FC_DIR"])
+            if !isdir(atmos.FC_DIR)
+                @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
                 return 
             end 
-            atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
+            atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")  # working directory
             
             # check executable 
-            atmos.fastchem_flag = isfile(joinpath(fastchem_path,"fastchem")) 
+            atmos.fastchem_flag = isfile(joinpath(atmos.FC_DIR,"fastchem")) 
             if !atmos.fastchem_flag 
-                @error "Could not find fastchem executable inside '$(atmos.fastchem_path)' "
+                @error "Could not find fastchem executable inside '$(atmos.FC_DIR)' "
                 return 
             else 
                 @info "Found FastChem executable"
             end 
+        else
+            @debug "FastChem env variable not set" 
         end 
 
         # Record that the parameters are set
@@ -1262,7 +1265,7 @@ module atmosphere
         count_elem_nonzero::Int = 0
 
         # Paths
-        execpath::String = joinpath(atmos.fastchem_path,"fastchem")             # Executable file 
+        execpath::String = joinpath(atmos.FC_DIR,       "fastchem")             # Executable file 
         confpath::String = joinpath(atmos.fastchem_work,"config.input")         # Configuration by AGNI
         chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat")        # Chemistry by FastChem
 
@@ -1293,7 +1296,7 @@ module atmosphere
                 write(f,joinpath(atmos.fastchem_work,"elements.dat")*" \n\n")
 
                 write(f,"#Species data files    \n")
-                logK = joinpath(atmos.fastchem_path,"input/","logK/")
+                logK = joinpath(atmos.FC_DIR, "input/","logK/")
                 write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
 
                 write(f,"#Accuracy of chemistry iteration \n")

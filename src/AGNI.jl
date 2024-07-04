@@ -196,7 +196,7 @@ module AGNI
         # Hello
         @info "Hello"
 
-        # Temp folders
+        # Temp folders for OUTPUT
         dir_fastchem = joinpath(output_dir,"fastchem/")
         dir_frames   = joinpath(output_dir,"frames/")
         rm(dir_fastchem,force=true,recursive=true)
@@ -225,7 +225,6 @@ module AGNI
         mf_dict::Dict{String, Float64}  = Dict{String, Float64}()
         mf_path::String                 = ""
         use_all_gases::Bool             = cfg["composition"]["include_all"]
-        fastchem_path::String           = ""
         if haskey(cfg["composition"],"p_surf")
             # set composition using VMRs + Psurf
             if haskey(cfg["composition"],"vmr_dict")
@@ -259,7 +258,6 @@ module AGNI
                 @error "Misconfiguration: FastChem coupling is incompatible with AGNI condensation scheme"
                 exit(1)
             else
-                fastchem_path = cfg["files"]["fastchem_path"]
                 mkdir(dir_fastchem)
             end 
         end 
@@ -342,7 +340,6 @@ module AGNI
                                 tmp_int=tmp_int, albedo_s=albedo_s,
                                 thermo_functions=thermo_funct,
                                 C_d=turb_coeff, U=wind_speed,
-                                fastchem_path=fastchem_path,
                                 use_all_gases=use_all_gases
                         )
         atmosphere.allocate!(atmos,star_file)

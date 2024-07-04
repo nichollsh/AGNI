@@ -5,6 +5,10 @@ radiation_code.lock
 socrates 
 SOCRATES 
 
+# FastChem folder 
+fastchem
+FastChem 
+
 # Package 
 deps/*.log
 test/out/
