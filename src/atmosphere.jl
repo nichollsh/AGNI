@@ -985,6 +985,8 @@ module atmosphere
         atmos.dimen.nd_subcol_req             = 1
         atmos.dimen.nd_aerosol_mode           = 1
 
+        # Set to true to enable custom surface emission through the 
+        #   variables `planck%flux_ground(l)` and `d_planck_flux_surface`.
         # atmos.control.l_flux_ground = false
         
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
@@ -992,6 +994,7 @@ module atmosphere
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
+        # This defines the surface emission, once a custom value is enabled.
         # fill!(atmos.bound.flux_ground, 100.0)
 
 
