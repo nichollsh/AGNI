@@ -62,6 +62,7 @@ else
     @warn "Fail"
     passing = false
 end
+@info "--------------------------"
 
 
 
@@ -72,9 +73,9 @@ end
 @info " "
 @info "Testing composition"
 
-tmp_surf        = 200.0    # Surface temperature [kelvin]
-toa_heating     = 1000.00  # Instellation flux [W m-2]
-p_surf          = 50.0     # bar
+tmp_surf        = 200.0     # Surface temperature [kelvin]
+toa_heating     = 10000.00  # Instellation flux [W m-2]
+p_surf          = 1.0       # bar
 theta           = 65.0
 mf_dict         = Dict([
                         ("H2O" , 0.5),
@@ -112,7 +113,7 @@ else
     passing = false
 end
 atmosphere.deallocate!(atmos)
-
+@info "--------------------------"
 
 
 
@@ -123,7 +124,7 @@ atmosphere.deallocate!(atmos)
 @info " "
 @info "Testing instellation"
 
-tmp_surf           = 200.0    # Surface temperature [kelvin]
+tmp_surf        = 200.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00     # Instellation flux [W m-2]
 p_surf          = 50.0    # bar
 theta           = 65.0
@@ -178,6 +179,9 @@ else
     passing = false
 end
 atmosphere.deallocate!(atmos)
+@info "--------------------------"
+
+
 
 # -------------
 # Test greenhouse effect
@@ -206,16 +210,18 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
                          overlap_method=4, 
-                         condensates=["H2O"]
+                         condensates=["H2O"],
+                         surface_material="blackbody",
+                         albedo_s=0.5
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
 setpt.saturation!(atmos, "H2O")
 atmosphere.calc_layer_props!(atmos)
-energy.radtrans!(atmos, true)
+energy.radtrans!(atmos, true)   # LW only
 
-val_e = [270.0, 290.0]
+val_e = [270.0, 280.0]
 val_o = atmos.flux_u_lw[1]
 @info "Expected range = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
@@ -225,8 +231,29 @@ else
     @warn "Fail"
     passing = false
 end
-atmosphere.deallocate!(atmos)
+@info "--------------------------"
 
+
+# -------------
+# Test surface albedo
+# -------------
+@info " "
+@info "Testing surface albedo "
+
+energy.radtrans!(atmos, false)  # SW only
+
+val_e = [20.0, 40.0]   # known from previous tests
+val_o = atmos.flux_u_sw[end] # bottom level
+@info "Expected range = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
+if ( val_o > val_e[1]) && (val_o < val_e[2]) 
+    @info "Pass"
+else
+    @warn "Fail"
+    passing = false
+end
+atmosphere.deallocate!(atmos)
+@info "--------------------------"
 
 
 # -------------
@@ -273,8 +300,7 @@ else
     passing = false
 end
 atmosphere.deallocate!(atmos)
-
-
+@info "--------------------------"
 
 
 # -------------
@@ -283,7 +309,7 @@ atmosphere.deallocate!(atmos)
 @info " "
 @info "Testing heating rates"
 
-tmp_surf           = 2500.0    # Surface temperature [kelvin]
+tmp_surf        = 2500.0    # Surface temperature [kelvin]
 toa_heating     = 1000.0    # Instellation flux [W m-2]
 p_surf          = 5.0     # bar
 theta           = 45.0
@@ -325,6 +351,7 @@ else
     passing = false
 end
 atmosphere.deallocate!(atmos)
+@info "--------------------------"
 
 
 # -------------

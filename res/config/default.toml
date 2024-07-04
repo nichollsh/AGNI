@@ -11,7 +11,7 @@ title = "Default"                       # Name for this configuration file
     s0_fact         = 0.6652            # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13).
     zenith_angle    = 60.0              # Characteristic zenith angle for incoming stellar radiation [degrees].
     surface_material= "blackbody"       # Surface material (can be "blackbody" or path to data file).
-    albedo_s        = 0.12              # Grey surface albedo when material=blackbody.
+    albedo_s        = 0.3               # Grey surface albedo when material=blackbody.
     radius          = 6.37e6            # Planet radius at the surface [m].
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
     skin_d          = 0.01              # Conductive skin thickness [m]. Used when sol_type=2.

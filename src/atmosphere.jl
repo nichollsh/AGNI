@@ -1125,8 +1125,8 @@ module atmosphere
         end 
  
 
-        # Calc layer properties using initial temperature profile 
-        #    Can generate weird issues since the TOA temperature can be large 
+        # Calc layer properties using initial temperature profile.
+        #    Can generate weird issues since the TOA temperature may be large 
         #    large but pressure small, which gives it a low density. With the 
         #    hydrostatic integrator, this can cause dz to blow up, especially 
         #    with a low MMW gas. Should be okay as long as the T(p) provided 
@@ -1194,7 +1194,6 @@ module atmosphere
         ###########################################
         atmos.albedo_s_arr = zeros(Float64, atmos.nbands)
 
-        #    set array values 
         if atmos.surface_material == "blackbody"
             # grey albedo 
             fill!(atmos.albedo_s_arr, atmos.albedo_s)       
@@ -1231,12 +1230,6 @@ module atmosphere
             end 
 
         end 
-
-        #    pass albedos to socrates 
-        fill!(atmos.bound.rho_alb, 0.0)
-        atmos.bound.rho_alb[1, SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= 0.0
-        atmos.bound.rho_alb[1, SOCRATES.rad_pcf.ip_surf_alb_dir,  :] .= atmos.albedo_s_arr
-
 
         #######################################
         # Output arrays
