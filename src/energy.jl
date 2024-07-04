@@ -62,9 +62,14 @@ module energy
             if !Bool(atmos.spectrum.Basic.l_present[2])
                 error("The spectral file contains no solar spectral data.")
             end
+
+            # Downward SW flux at TOA 
+            atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact * cosd(atmos.zenith_degrees)
             
-            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)   #   Convert the zenith angles to secants.
-            atmos.bound.solar_irrad[1] = atmos.toa_heating / cosd(atmos.zenith_degrees)
+            # SOCRATES requires this to be passed as two variables, since it needs to know 
+            #     the zenith angle of the direct beam.
+            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)   # Convert the zenith angles to secants.
+            atmos.bound.solar_irrad[1] = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact
         end
 
         atmos.bound.rho_alb[:, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s
