@@ -23,11 +23,17 @@ module atmosphere
 
     
     # Solution types
-    SOL_TYPES::Array{String, 1} = [
+    const SOL_TYPES::Array{String, 1} = [
         "steadystate_ext",  # zero divergence at fixed tmp_surf, extrapolated tmpl[end]
         "cond_skin",        # set tmp_surf such that conductive skin conserves energy flux
         "flux_int",         # total flux at each level equal to flux_int
         "target_olr",       # OLR is equal to target_olr
+    ]
+
+    # Gases which are not allowed to participate in radiative transfer, although 
+    #    they are fully accounted-for elsewhere in the code.
+    const BLACKLIST_RT::Array{String, 1} = [
+        "O2"    # Disabled because its CIA pairing with N2 behaves strangely.
     ]
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -847,7 +853,7 @@ module atmosphere
 
         # Validate files
         if !isfile(atmos.spectral_file)
-            error("Source spectral file '$(atmos.spectral_file)' does not exist")
+            error("Spectral file '$(atmos.spectral_file)' does not exist")
         end
 
         spectral_file_run::String  = joinpath([atmos.OUT_DIR, "runtime.sf"])  
@@ -1112,7 +1118,7 @@ module atmosphere
         for i in 1:atmos.gas_num
             g = atmos.gas_names[i]
             gas_flags = ""
-            if !(g in atmos.gas_soc_names)  # flag as included in radtrans
+            if !(g in atmos.gas_soc_names) || (g in BLACKLIST_RT) # flag as not included in radtrans
                 gas_flags *= "NO_OPACITY "
             end
             if g in atmos.condensates       # flag as condensable 
