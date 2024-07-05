@@ -233,7 +233,7 @@ module phys
         # volatile elements 
         ("H"  , "#0000ff"),
         ("C"  , "#ff0000"),
-        ("O"  , "#00ff00"),
+        ("O"  , "#00dd00"),
         ("N"  , "#eeaa00"),
         ("S" ,  "#ff22ff"),
         ("P" ,  "#33ccff"),
