@@ -242,7 +242,7 @@ end
 
 energy.radtrans!(atmos, false)  # SW only
 
-val_e = [20.0, 40.0]   # known from previous tests
+val_e = [25.0, 35.0]   # known from previous tests
 val_o = atmos.flux_u_sw[end] # bottom level
 @info "Expected range = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
@@ -340,8 +340,8 @@ energy.radtrans!(atmos, true)
 energy.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 energy.calc_hrates!(atmos)
-val_e = [20.0, 70.0]  # tests have found ~54 K/day for this setup
-val_o = atmos.heating_rate[atmos.nlev_c-2]
+val_e = [5.6, 6.6]  # from previous tests
+val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected range = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"
 if ( val_o > val_e[1]) && (val_o < val_e[2]) 
