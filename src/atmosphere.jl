@@ -798,33 +798,41 @@ module atmosphere
     """
     **Generate pressure grid.**
 
-    Equally log-spaced between p_boa and p_boa. The bottommost layer has a 
-    bespoke relative thicknesses of 1-boundary_scale, in order to avoid 
-    numerical instabilities.
+    Almost-equally log-spaced between p_boa and p_boa. The near-surface layers 
+    are smaller than they would be on an equally log-spaced grid, to avoid 
+    numerical weirdness at the bottom boundary.
     
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `boundary_scale::Float64=1.0e-4`  scale factor for the thickness of the bottom-most cell.
+    - `atmos::Atmos_t`              the atmosphere struct instance to be used.
     """
-    function generate_pgrid!(atmos::atmosphere.Atmos_t; boundary_scale::Float64=1.0e-6)
+    function generate_pgrid!(atmos::atmosphere.Atmos_t)
 
-        boundary_scale = max(min(boundary_scale, 1.0-1.0e-8), 1.0e-8)
+        # Allocate arrays
+        atmos.p  = zeros(Float64, atmos.nlev_c)
+        atmos.pl = zeros(Float64, atmos.nlev_l)
 
-        # Allocate cell-edge pressure array 
-        atmos.pl           = zeros(Float64, atmos.nlev_l)
+        # First, assign log10'd values...
 
-        # Surface pressure 
-        atmos.pl[end]      = atmos.p_boa 
+        # Top and bottom boundaries  
+        atmos.pl[end] = log10(atmos.p_boa)
+        atmos.pl[1]   = log10(atmos.p_toa)
 
-        # Bottom layer
-        atmos.pl[end-1] = atmos.pl[end]*(1.0-boundary_scale)
+        # Almost-surface layer is VERY small
+        atmos.pl[end-1]  = atmos.pl[end]*(1.0-1e-4)
 
-        # Logarithmically-spaced levels
-        atmos.pl[1:end-1] .= 10 .^ range( log10(atmos.p_toa), stop=log10(atmos.pl[end-1]), length=atmos.nlev_l-1)
+        # Logarithmically-spaced levels above
+        atmos.pl[1:end-1] .= collect(Float64, range( start=atmos.pl[1], stop=atmos.pl[end-1], length=atmos.nlev_l-1))
 
-        # Set pressure cell-centre array using geometric mean
-        atmos.p = zeros(Float64, atmos.nlev_c)
-        atmos.p[1:end] .= sqrt.(atmos.pl[1:end-1].*atmos.pl[2:end])
+        # Shrink near-surface layers by stretching all layers above 
+        p_mid::Float64 = atmos.pl[end-1]*0.6 + atmos.pl[end-2]*0.4
+        atmos.pl[1:end-2] .= collect(Float64, range( start=atmos.pl[1], stop=p_mid, length=atmos.nlev_l-2))
+
+        # Set cell-centres at midpoint of cell-edges
+        atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
+
+        # Finally, convert arrays to 'real' pressure units
+        atmos.p[:]  .= 10.0 .^ atmos.p[:]
+        atmos.pl[:] .= 10.0 .^ atmos.pl[:]
 
         return nothing
     end
