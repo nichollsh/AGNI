@@ -129,7 +129,12 @@ module spectrum
         # Inputs to prep_spec
         prep_spec = joinpath(ENV["RAD_DIR"],"bin","prep_spec")
         @debug "Using prep_spec at: "*prep_spec
-        star_inputs = ["6","n","T","100 4000","1000",   "2","n",star_file,"y"]
+        star_inputs = [
+            "6","n","T",            # ask prep_spec to tabulate the thermal source function
+            "100 4000","1200",      # tmp_min, tmp_max, num_points
+            "2","n",star_file,      # ask prep_spec to insert this stellar spectrum
+            "y"                     # exit prep_spec
+            ]
 
         # Write executable 
         execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_insert_stellar.sh"

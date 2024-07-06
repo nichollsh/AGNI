@@ -1306,7 +1306,7 @@ module atmosphere
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function chemistry_eq!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=200.0)::Int
+    function chemistry_eqm!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=200.0)::Int
 
         @debug "Running equilibrium chemistry"
 
@@ -1315,7 +1315,7 @@ module atmosphere
 
         # Check fastchem enabled 
         if !atmos.fastchem_flag
-            @warn "Fastchem is not enabled but `chemistry_eq!` was called"
+            @warn "Fastchem is not enabled but `chemistry_eqm!` was called. Have you set FC_DIR?"
             return 1
         end 
 

@@ -203,7 +203,7 @@ module AGNI
         rm(dir_frames,force=true,recursive=true)
 
         # Copy configuration file 
-        cp(cfg_path, joinpath(output_dir, "agni.cfg"), force=true)
+        cp(cfg_path, joinpath(output_dir, "agni.toml"), force=true)
 
         # Read configuration options from dict 
         @info "Using configuration '$(cfg["title"])'"
@@ -426,7 +426,14 @@ module AGNI
         # Do chemistry on initial composition
         if chem_type in [1,2,3]
             @debug "Initial chemistry"
-            atmosphere.chemistry_eq!(atmos, chem_type, true)
+
+            # check we found fastchem 
+            if !atmos.fastchem_flag 
+                @error "Chemistry enabled but could not find FastChem. Have you set FC_DIR?"
+                return false
+            end 
+
+            atmosphere.chemistry_eqm!(atmos, chem_type, true)
         end 
 
         # Frame dir

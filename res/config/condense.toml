@@ -19,7 +19,6 @@ title = "Condensation test"
     tmp_magma       = 1700.0
 
 [files]
-    clean_output    = true
     input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"  
     input_star      = "res/stellar_spectra/sun.txt"                         
     output_dir      = "out/"                                                

@@ -489,7 +489,7 @@ module solver
             # Run chemistry scheme 
             if chem_type in [1,2,3]
                 @debug "        chemistry"
-                fc_retcode = atmosphere.chemistry_eq!(atmos, chem_type, false)
+                fc_retcode = atmosphere.chemistry_eqm!(atmos, chem_type, false)
                 if fc_retcode == 0
                     stepflags *= "Cs-"  # chemistry success 
                 else 
@@ -686,7 +686,7 @@ module solver
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
                 plot_step()
-                plotting.jacobian(b, path_jac, perturb=perturb)
+                # plotting.jacobian(b, path_jac, perturb=perturb)
             end 
                 
             # Inform user
