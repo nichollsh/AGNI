@@ -292,6 +292,7 @@ module AGNI
         conv_atol::Float64     = cfg["execution" ]["converge_atol"]
         conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
         max_steps::Int         = cfg["execution" ]["max_steps"]
+        max_runtime::Float64   = cfg["execution" ]["max_runtime"]
 
         #    plotting stuff 
         plt_run::Bool          = cfg["plots"     ]["at_runtime"]
@@ -484,7 +485,9 @@ module AGNI
                 solver_success = solver.solve_energy!(atmos, sol_type=sol_type, 
                                     conduct=incl_conduct,  chem_type=chem_type,
                                     convect=incl_convect, latent=incl_latent,
-                                    sens_heat=incl_sens, max_steps=max_steps, conv_atol=conv_atol,
+                                    sens_heat=incl_sens, max_steps=max_steps,
+                                    max_runtime=max_runtime, 
+                                    conv_atol=conv_atol,
                                     conv_rtol=conv_rtol, method=method_idx, 
                                     dx_max=dx_max, linesearch=linesearch,
                                     modplot=modplot,save_frames=plt_ani)

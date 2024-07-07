@@ -153,7 +153,7 @@ module solver
         ls_tau::Float64    =    0.5     # backtracking step size
         ls_increase::Float64 =  1.01    # factor by which cost can increase
         ls_max_steps::Int  =    10      # maximum steps 
-        ls_min_scale::Float64 = 1.0e-3  # minimum scale
+        ls_min_scale::Float64 = 3.0e-4  # minimum scale
 
         #    plateau 
         plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
@@ -609,7 +609,7 @@ module solver
 
             # Linesearch 
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
-            if linesearch && (step > 1)
+            if linesearch #&& (step > 1)
                 @debug "        linesearch"
 
                 # Reset
@@ -710,9 +710,6 @@ module solver
 
         end # end solver loop
         
-        rm(path_plt, force=true)
-        rm(path_jac, force=true)
-        
         # ----------------------------------------------------------
         # Extract solution
         # ---------------------------------------------------------- 
@@ -721,6 +718,8 @@ module solver
         if code == 0
             @info "    success in $step steps"
             atmos.is_converged = true
+            rm(path_plt, force=true)
+            rm(path_jac, force=true)
         elseif code == 1
             @error "    failure (maximum iterations)"
         elseif code == 2
