@@ -156,8 +156,8 @@ module solver
         ls_min_scale::Float64 = 3.0e-4  # minimum scale
 
         #    plateau 
-        plateau_n::Int =        5       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =   8000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
+        plateau_s::Float64 =   9000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
