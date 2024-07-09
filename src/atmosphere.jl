@@ -30,12 +30,6 @@ module atmosphere
         "target_olr",       # OLR is equal to target_olr
     ]
 
-    # Gases which are not allowed to participate in radiative transfer, although 
-    #    they are fully accounted-for elsewhere in the code.
-    const BLACKLIST_RT::Array{String, 1} = [
-        "O2"    # Disabled because its CIA pairing with N2 behaves strangely.
-    ]
-
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
 
@@ -98,7 +92,7 @@ module atmosphere
 
         p_boa::Float64      # Pressure at bottom [Pa]
         p_toa::Float64      # Pressure at top [Pa]
-        rp::Float64         # planet radius [m]
+        rp::Float64         # surface radius [m]
 
         tmp::Array{Float64,1}   # cc temperature [K]
         tmpl::Array{Float64,1}  # ce temperature
@@ -209,6 +203,14 @@ module atmosphere
         # FastChem stuff 
         fastchem_flag::Bool             # Fastchem enabled?
         fastchem_work::String           # Path to fastchem dir inside AGNI output folder
+
+        # Observing properties 
+        transspec_p::Float64            # (INPUT PARAMETER) pressure level probed in transmission [Pa]
+        transspec_r::Float64            # planet radius probed in transmission [m]
+        transspec_m::Float64            # mass [kg] enclosed by transspec_r 
+        transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
+        interior_rho::Float64           # interior density [kg m-3]
+        interior_mass::Float64          # interior mass [kg]
         
         Atmos_t() = new()
     end
@@ -382,6 +384,11 @@ module atmosphere
         atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
         atmos.p_boa =           p_surf * 1.0e+5
         atmos.rp =              max(1.0, radius)
+
+        # derived statistics 
+        atmos.interior_mass =   atmos.grav_surf * atmos.rp^2 / phys.G_grav
+        atmos.interior_rho  =   3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
+        atmos.transspec_p   =   1e2     # 1 mbar = 100 Pa
 
         # absorption contributors
         atmos.control.l_gas =           true
@@ -673,6 +680,43 @@ module atmosphere
         @debug "Setup complete"
         return nothing
     end # end function setup 
+
+    """
+    **Calculate observed radius and bulk density.**
+
+    This is done at the layer probed in transmission.
+
+    Arguments:
+        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+        Nothing
+    """
+    function calc_observed_rho!(atmos::atmosphere.Atmos_t)
+
+        # transspec_p::Float64            # (INPUT PARAMETER) pressure level probed in transmission [Pa]
+        # transspec_r::Float64            # planet radius probed in transmission [m]
+        # transspec_m::Float64            # mass [kg] enclosed by transspec_r 
+        # transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
+
+        # get the observed height
+        idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
+        atmos.transspec_r = atmos.z[idx] + atmos.rp
+
+        # get mass of whole atmosphere 
+        atmos.transspec_m = atmos.layer_mass[end] * 4 * pi * atmos.rp^2
+
+        # subtract all atmosphere mass ABOVE the observed layer
+        atmos.transspec_m -= atmos.layer_mass[idx-1] * 4 * pi * atmos.transspec_r^2
+
+        # add mass of the interior component 
+        atmos.transspec_m += atmos.interior_mass
+
+        # get density of all enclosed by observed layer 
+        atmos.transspec_rho = 3.0 * atmos.transspec_m / (4.0 * pi * atmos.transspec_r^3)
+
+        return nothing
+    end 
 
     """
     **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
@@ -1126,7 +1170,7 @@ module atmosphere
         for i in 1:atmos.gas_num
             g = atmos.gas_names[i]
             gas_flags = ""
-            if !(g in atmos.gas_soc_names) || (g in BLACKLIST_RT) # flag as not included in radtrans
+            if !(g in atmos.gas_soc_names) # flag as not included in radtrans
                 gas_flags *= "NO_OPACITY "
             end
             if g in atmos.condensates       # flag as condensable 

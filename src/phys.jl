@@ -44,6 +44,9 @@ module phys
     # 0 degrees celcius, in kelvin 
     const zero_celcius::Float64 = 273.15
 
+    # Newton's gravitational constant [m3 kg-1 s-2]
+    const G_grav::Float64 = 6.67430e-11 # NIST CODATA
+
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw = Dict{String, Float64}([
         # molecules

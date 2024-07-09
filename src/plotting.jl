@@ -384,7 +384,7 @@ module plotting
         plt = plot(dpi=dpi)
 
         if incl_surf
-            plot!(plt, xp, yp, label="Surface",  color="green") # surface planck function
+            plot!(plt, xp, yp, label=L"Blackbody @ $T_s$",  color="green") # surface planck function
         end
 
         plot!(plt, xe, ys, lw=0.9, label="SW spectrum", color="blue")  
