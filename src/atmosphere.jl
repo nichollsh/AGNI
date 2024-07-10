@@ -752,9 +752,9 @@ module atmosphere
 
         # Temporary values
         mmr::Float64 = 0.0
-        g1::Float64 = 0.0
-        g2::Float64 = 0.0
-        dzc::Float64= 0.0
+        g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
+        g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
+        dzc::Float64= 0.0; dzl::Float64 = 0.0
         GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
 
         # Reset arrays 
@@ -792,7 +792,9 @@ module atmosphere
 
             # Integrate from lower edge to centre
             g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2.0)
-            dzc = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g1 * atmos.p[i]) * (atmos.pl[i+1] - atmos.p[i]) 
+            p1 = 0.5 * (atmos.p[i] + atmos.pl[i+1])
+            t1 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i+1])
+            dzc = phys.R_gas * t1 / (atmos.layer_mmw[i] * g1 * p1) * (atmos.pl[i+1] - atmos.p[i]) 
             if !ignore_errors
                 if (dzc < 1e-20)
                     @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
@@ -807,7 +809,9 @@ module atmosphere
 
             # Integrate from centre to upper edge
             g2 = GMpl / ((atmos.rp + atmos.z[i])^2.0)
-            dzl = phys.R_gas * atmos.tmp[i] / (atmos.layer_mmw[i] * g2 * atmos.p[i]) * (atmos.p[i]- atmos.pl[i]) 
+            p2 = 0.5 * (atmos.p[i] + atmos.pl[i])
+            t2 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i])
+            dzl = phys.R_gas * t2 / (atmos.layer_mmw[i] * g2 * p2) * (atmos.p[i]- atmos.pl[i]) 
             if !ignore_errors 
                 if (dzl < 1e-20)
                     @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
@@ -1915,13 +1919,15 @@ module atmosphere
         return nothing
     end 
 
-    # Get interleaved cell-centre and cell-edge PT grid
-    function get_interleaved_pt(atmos::atmosphere.Atmos_t)
+    # Get interleaved cell-centre and cell-edge PTZ grid
+    function get_interleaved_ptz(atmos::atmosphere.Atmos_t)
+        arr_Z::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         arr_T::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         arr_P::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         idx::Int = 1
 
         # top
+        arr_Z[1] = atmos.zl[1]
         arr_T[1] = atmos.tmpl[1]
         arr_P[1] = atmos.pl[1]
 
@@ -1930,15 +1936,20 @@ module atmosphere
             idx = (i-1)*2
             arr_T[idx+1] = atmos.tmpl[i]
             arr_T[idx+2] = atmos.tmp[i]
+
             arr_P[idx+1] = atmos.pl[i]
             arr_P[idx+2] = atmos.p[i]
+
+            arr_Z[idx+1] = atmos.zl[i]
+            arr_Z[idx+2] = atmos.z[i]
         end 
 
         # bottom
+        arr_Z[end] = atmos.zl[end]
         arr_T[end] = atmos.tmpl[end]
         arr_P[end] = atmos.pl[end]
         
-        return arr_P, arr_T
+        return arr_P, arr_T, arr_Z
     end 
 
 end
