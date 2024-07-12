@@ -315,8 +315,8 @@ module plotting
         end
 
         # Labels 
-        annotate!(plt, xlims[1]/2.0, arr_P[end]*0.8, text("Downward", :black, :center, 9))
-        annotate!(plt, xlims[2]/2.0, arr_P[end]*0.8, text("Upward"  , :black, :center, 9))
+        annotate!(plt, xlims[1]/2.0, arr_P[1]/0.8, text("Downward", :black, :center, 9))
+        annotate!(plt, xlims[2]/2.0, arr_P[1]/0.8, text("Upward"  , :black, :center, 9))
 
         # Finalise + save
         xlabel!(plt, "log Unsigned Flux [W m⁻²]")

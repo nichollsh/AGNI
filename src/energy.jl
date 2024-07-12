@@ -353,7 +353,7 @@ module energy
         cmax::String = ""
 
         # Loop from bottom upwards (over cell-edges)
-        for i in range(start=atmos.nlev_l-1, step=-1, stop=3)
+        for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
             grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) ) / ( log(atmos.p[i-1]/atmos.p[i]) )
             moist=false
 
@@ -361,11 +361,6 @@ module energy
             if atmos.pl[i] < pmin
                 continue
             end
-
-            # Skip condensing regions
-            # if (atmos.mask_l[i] > 0)
-            #     continue
-            # end 
 
             m1 = atmos.layer_mass[i-1]
             m2 = atmos.layer_mass[i]
@@ -451,7 +446,7 @@ module energy
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
+                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * (l/H) * (grad_pr-grad_ad)
 
                 # Thermal eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
@@ -555,6 +550,7 @@ module energy
 
         # Parameter 
         timescale::Float64 = 1e5      # seconds
+        simple_evap::Bool  = true     # enable simple evaporation flux
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -605,6 +601,11 @@ module energy
             # condensation flux inside cell 
             if i < idx_con_bot 
                 atmos.flux_l[i+1] += df[i]
+                continue 
+            end 
+
+            # check if we are doing evaporation too
+            if !simple_evap
                 continue 
             end 
 

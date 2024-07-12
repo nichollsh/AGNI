@@ -1653,8 +1653,7 @@ module atmosphere
     **Adjust gas VMRs according to saturation and cold-trap requirements**
 
     Volatiles which are allowed to condense are rained-out at condensing levels
-    until the gas is exactly saturated, not supersaturated. Rain is then 
-    re-evaporated at lower levels without supersaturating them.
+    until the gas is exactly saturated, not supersaturated.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -1805,7 +1804,7 @@ module atmosphere
                         # ---------------------
                         # WARNING
                         # THIS IS NOT CORRECT. IT WILL LEAD TO sum(x_gas)>1
-                        # IN MANY CASES BECAUSE OF THE PREDEFINED PRESSURE GRID 
+                        # IN MANY CASES BECAUSE OF THE PREDEFINED PRESSURE GRID. 
                         # THIS NEEDS TO RE-ADJUST THE WHOLE PRESSURE GRID IN 
                         # ORDER TO CONSERVE MASS! 
                         # ----------------------

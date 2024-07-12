@@ -36,6 +36,8 @@ Broadly, the configuration files are broken up into four sections:
 * `[plots]` - which plots should be produced
 
 Some parameters:
+* `files.input_sf` is the file path to the "spectral file" containing opacity data. Several spectral files are packged with AGNI, but you can find more online via the [Open Science Framework](https://osf.io/vehxg/).
+
 * `execution.solution_type` tells the model which state to solve for. The allowed values (integers) are...
      - 1 : zero flux divergence at fixed `tmp_surf`
      - 2 : zero flux divergence, with `tmp_surf` set such that the conductive skin (CBL) conserves energy flux
