@@ -549,12 +549,12 @@ module energy
     Updates fluxes and mixing ratios.
 
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
         # Parameter 
-        timescale::Float64 = 7e6      # seconds
+        timescale::Float64 = 1e5      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
@@ -582,16 +582,43 @@ module energy
 
                     # set mask 
                     atmos.mask_l[i]   = atmos.mask_decay
-                    atmos.mask_l[i+1] = atmos.mask_decay
-                end
+                end 
             end 
 
         end # go to next level
 
+        # Find bottom of condensing region and top of dry region 
+        idx_con_bot::Int = atmos.nlev_c  
+        for i in 2:atmos.nlev_c
+            if (atmos.mask_l[i]==0) && (atmos.mask_l[i-1]>0)
+                idx_con_bot = i 
+            end 
+        end 
+
         # Convert divergence to cell-edge fluxes
         # Assuming zero condensation at TOA, integrating downwards
         for i in range(start=1, stop=atmos.nlev_c, step=1)
-            atmos.flux_l[i+1] = df[i] + atmos.flux_l[i]
+
+            # this much from top edge 
+            atmos.flux_l[i+1] = atmos.flux_l[i]
+            
+            # condensation flux inside cell 
+            if i < idx_con_bot 
+                atmos.flux_l[i+1] += df[i]
+                continue 
+            end 
+
+            # end of evaporation 
+            if atmos.flux_l[i+1] < 0.1 
+                atmos.flux_l[i+1:end] .= 0.0
+                break 
+            end 
+
+            # this cell is dry => evaporation occurs
+            if i >= idx_con_bot 
+                atmos.flux_l[i+1] *= 0.5
+                atmos.mask_l[i] = atmos.mask_decay
+            end 
         end 
 
         return nothing 
