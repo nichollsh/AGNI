@@ -362,20 +362,10 @@ module plotting
 
         # Get planck function values 
         if incl_surf
-            planck_tmp::Float64 = atmos.tmp_surf
-            nsamps::Int = 300
-            xp = 10 .^ range( log10(xe[1]), stop=log10(xe[end]), length=nsamps)
-            yp = zeros(Float64, nsamps)
-            for i in 1:nsamps 
-                lambda = xp[i] * 1.0e-9 # metres
-
-                # Calculate planck function value [W m-2 sr-1 m-1]
-                # http://spiff.rit.edu/classes/phys317/lectures/planck.html
-                yp[i] = 2.0 * phys.h_pl * phys.c_vac^2 / lambda^5.0   *   1.0 / ( exp(phys.h_pl * phys.c_vac / (lambda * phys.k_B * planck_tmp)) - 1.0)
-
-                # Integrate solid angle (hemisphere), scale by albedo, convert units
-                yp[i] = yp[i] * pi * 1.0e-9 # [W m-2 nm-1]
-                yp[i] = yp[i] * (1.0 - atmos.albedo_s)
+            yp = zeros(Float64, atmos.nbands)
+            for i in 1:atmos.nbands 
+                yp[i] = phys.evaluate_planck(xe[i], atmos.tmp_surf)
+                yp[i] = yp[i] * (1.0 - atmos.albedo_s_arr[i])  # consistent with SOCRATES diff_planck_source_mod.f90 
                 yp[i] = yp[i] * 1000.0 # [erg s-1 cm-2 nm-1]
             end 
         end 
@@ -384,7 +374,7 @@ module plotting
         plt = plot(dpi=dpi)
 
         if incl_surf
-            plot!(plt, xp, yp, label=L"Blackbody @ $T_s$",  color="green") # surface planck function
+            plot!(plt, xe, yp, label=L"Blackbody @ $T_s$",  color="green") # surface planck function
         end
 
         plot!(plt, xe, ys, lw=0.9, label="SW spectrum", color="blue")  

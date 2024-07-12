@@ -18,6 +18,7 @@ makedocs(
         "setup.md" ,
         "usage.md",
         "examples/index.md",
+        "troubleshooting.md",
         "manual/index.md"
     ]
 )
