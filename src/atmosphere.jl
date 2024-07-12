@@ -920,6 +920,7 @@ module atmosphere
         spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])  
 
         # Setup spectral file 
+        socstar::String = ""
         if !isempty(stellar_spectrum)
 
             if !isfile(stellar_spectrum)
@@ -973,6 +974,8 @@ module atmosphere
                                 l_all_gasses=false, kw_dict...)
         end 
 
+        # Remove temporary star file if it exists
+        rm(socstar, force=true)
 
         #########################################
         # diagnostics
