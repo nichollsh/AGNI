@@ -422,7 +422,7 @@ module AGNI
         @info prt_req[1:end-2]
 
         # Write initial state
-        dump.write_pt(atmos, joinpath(atmos.OUT_DIR,"pt_ini.csv"))
+        dump.write_ptz(atmos, joinpath(atmos.OUT_DIR,"ptz_ini.csv"))
 
         # Do chemistry on initial composition
         if chem_type in [1,2,3]
@@ -504,7 +504,7 @@ module AGNI
 
         # Write arrays
         @info "Writing results"
-        dump.write_pt(atmos,      joinpath(atmos.OUT_DIR,"pt.csv"))
+        dump.write_ptz(atmos,      joinpath(atmos.OUT_DIR,"ptz.csv"))
         dump.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
         dump.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 
