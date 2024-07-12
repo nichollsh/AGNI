@@ -18,11 +18,11 @@ module dump
     using Dates
 
     """
-    Write Pressure-Temperature profile to a CSV file 
+    Write Pressure vs Temperature & Height profile to a CSV file 
     """
-    function write_pt(atmos::atmosphere.Atmos_t, fname::String)
+    function write_ptz(atmos::atmosphere.Atmos_t, fname::String)
 
-        arr_P, arr_T = atmosphere.get_interleaved_pt(atmos)
+        arr_P, arr_T, arr_Z = atmosphere.get_interleaved_ptz(atmos)
 
         # Remove old file if exists
         rm(fname, force=true)
@@ -30,14 +30,15 @@ module dump
         @debug "Writing T(p) csv to $fname"
 
         open(fname, "w") do f
-            write(f, "# pressure  , temperature \n")
-            write(f, "# [Pa]      , [K] \n")
+            write(f, "# pressure  , temperature, height \n")
+            write(f, "# [Pa]      , [K]        , [m]  \n")
             for i in 1:atmos.nlev_l+atmos.nlev_c
-                @printf(f, "%1.5e , %1.5e \n", arr_P[i], arr_T[i])
+                @printf(f, "%1.5e , %1.5e , %1.5e \n", arr_P[i], arr_T[i], arr_Z[i])
             end
         end
         return nothing
     end
+
 
     """
     Write cell-edge energy fluxes to a CSV file 
