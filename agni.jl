@@ -1,4 +1,4 @@
-#!/usr/bin/env -S julia --color=yes --startup-file=no
+#!/usr/bin/env -S julia -O2 -t auto --color=yes --startup-file=no
 
 # Don't show plot windows
 ENV["GKSwstype"] = "100"

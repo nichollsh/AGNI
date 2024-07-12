@@ -30,4 +30,5 @@ Run `julia ./test/runtests.jl ` in your terminal. This will print information
 on whether tests passed or failed.   
 
 ## Using the code
-See [Running the model](@ref) for information on using the code.
+See [Running the model](@ref) for information on using the code.    
+See [Troubleshooting](@ref) for troubleshooting advice. 

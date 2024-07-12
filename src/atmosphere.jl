@@ -75,7 +75,10 @@ module atmosphere
         surface_material::String        # Surface material file path 
         albedo_s::Float64               # Grey surface albedo when surface=blackbody 
         albedo_s_arr::Array{Float64,1}  # Spectral surface albedo passed to SOCRATES
-        
+
+        emiss_s::Float64                # Grey surface emissivity (for all surface materials)
+        emiss_s_arr::Array{Float64,1}   # Spectral surface emissivity passed to SOCRATES
+
         tmp_surf::Float64               # Surface brightness temperature [K]
         tmp_int::Float64                # Effective temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
@@ -360,6 +363,7 @@ module atmosphere
         atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.surface_material= surface_material
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
+        atmos.emiss_s =         1.0
         atmos.instellation =    max(instellation, 0.0)
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
         atmos.s0_fact =         max(s0_fact,0.0)
@@ -1045,16 +1049,17 @@ module atmosphere
 
         # Set to true to enable custom surface emission through the 
         #   variables `planck%flux_ground(l)` and `d_planck_flux_surface`.
-        # atmos.control.l_flux_ground = false
+        atmos.control.l_flux_ground = true
         
+        # Allocate arrays, etc.
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
-        # This defines the surface emission, once a custom value is enabled.
-        # fill!(atmos.bound.flux_ground, 100.0)
-
+        # Fill with zeros - will be set inside of radtrans function at call time
+        atmos.bound.flux_ground[1, :] .= 0.0  
+        
 
         ###########################################
         # Number of profiles, and profile coordinates
@@ -1254,6 +1259,10 @@ module atmosphere
         # Surface properties 
         ###########################################
         atmos.albedo_s_arr = zeros(Float64, atmos.nbands)
+        atmos.emiss_s_arr = ones(Float64, atmos.nbands)
+
+        # grey emissivity 
+        fill!(atmos.emiss_s_arr, atmos.emiss_s)       
 
         if atmos.surface_material == "blackbody"
             # grey albedo 
