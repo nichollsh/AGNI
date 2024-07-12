@@ -115,12 +115,9 @@ module energy
         atmos.dimen.nd_max_order = 1
 
         #####################################
-        # surface properties
-        # see src/aux/assign_surface_char_cdf.f
-        # IP_surface_char  = 51, file suffix 'surf'
+        # Surface albedo
         #####################################
 
-        # set albedos 
         fill!(atmos.bound.rho_alb, 0.0)
         atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s_arr
         atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_dir,  :] .= atmos.albedo_s_arr
@@ -158,6 +155,26 @@ module energy
         if lw
             atmos.control.l_ir_source_quad = true
         end
+
+        # set surface emission
+        pl_w::Float64 = 0.0; pl_x::Float64 = 0.0
+        for i in 1:atmos.nbands
+            # get band width, midpoint 
+            pl_w = 1e9 * (atmos.bands_max[i] - atmos.bands_min[i])
+            pl_x = 1e9 * atmos.bands_min[i] + 0.5 * pl_w 
+
+            # Set flux in band 
+            #  Equal to integral of planck function over band width, which in 
+            #  this case is done by simply evaluating at the midpoint and 
+            #  multiplying by band width.
+            #  It is then scaled by the emissivity and 1-albedo. I'd argue
+            #  that the albedo term shouldn't be here, but it's to correct for 
+            #  it also (strangely) appearing inside diff_planck_source_mod.f90
+            #  on line 129. 
+            #  Having this 1-albedo term and using this low-order integration 
+            #  gives the correct results from my tests.  
+            atmos.bound.flux_ground[1,i] = phys.evaluate_planck(pl_x, atmos.tmp_surf) * pl_w * atmos.emiss_s_arr[i] * (1.0 - atmos.albedo_s_arr[i])
+        end 
 
         ######################################################
         # Run radiative transfer model

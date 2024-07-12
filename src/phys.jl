@@ -629,9 +629,37 @@ module phys
     - `kc::Float64`             thermal conductivity [W m-1 K-1]
     """
     function get_Kc(gas::Gas_t, t::Float64=-1.0)::Float64 
-
         return 0.0
-        
+    end 
+
+    """ 
+    **Evaluate the Planck function at a given wavelength and temperature.**
+
+    Integrated over a hemisphere.
+
+    Arguments:
+    - `wave::Float64`       Wavelength [nm]
+    - `tmp::Float64`        Temperature [K]
+
+    Returns:
+    - `flx::Float64`        Spectral flux density [W m-2 nm-1]
+    """
+    function evaluate_planck(wav::Float64, tmp::Float64)::Float64
+
+        # Output value 
+        flx::Float64 = 0.0
+
+        # Convert nm to m
+        wav = wav * 1.0e-9
+
+        # Calculate planck function value [W m-2 sr-1 m-1]
+        # http://spiff.rit.edu/classes/phys317/lectures/planck.html
+        flx = 2.0 * h_pl * c_vac * c_vac / wav^5.0   *   1.0 / ( exp(h_pl * c_vac / (wav * k_B * tmp)) - 1.0)
+
+        # Integrate solid angle (hemisphere), convert units
+        flx = flx * pi * 1.0e-9 # [W m-2 nm-1]
+
+        return flx
     end 
     
 end # end module 
