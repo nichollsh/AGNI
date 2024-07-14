@@ -421,9 +421,6 @@ module energy
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
-                if i <= atmos.nlev_c-1
-                    atmos.mask_c[i+1] = atmos.mask_decay
-                end
                 atmos.mask_c[i]   = atmos.mask_decay
                 atmos.mask_c[i-1] = atmos.mask_decay
                 
