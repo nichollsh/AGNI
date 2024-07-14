@@ -139,8 +139,8 @@ module solver
         # Execution parameters
         # --------------------
         #    convection 
-        convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
-        convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
+        convect_incr::Float64 = 3.0     # Factor to increase convect_sf when modulating convection
+        convect_sf::Float64 =   1.0e-5  # Convective flux scale factor 
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
@@ -153,7 +153,7 @@ module solver
         ls_tau::Float64    =    0.5     # backtracking step size
         ls_increase::Float64 =  1.01    # factor by which cost can increase
         ls_max_steps::Int  =    10      # maximum steps 
-        ls_min_scale::Float64 = 3.0e-4  # minimum scale
+        ls_min_scale::Float64 = 1.0e-3  # minimum scale
 
         #    plateau 
         plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
@@ -509,7 +509,7 @@ module solver
                 # Check if sf needs to be increased
                 if c_cur < max(100.0*conv_rtol, 10.0)
                     if convect_sf < 1.0 
-                        # increase sf - reduce modulation by 10x
+                        # increase sf => reduce modulation by convect_incr
                         stepflags *= "r"
                         convect_sf = min(1.0, convect_sf*convect_incr)
                         @debug "convect_sf = $convect_sf"
@@ -690,7 +690,7 @@ module solver
             end 
                 
             # Inform user
-            info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, c_cur, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
+            info_str *= @sprintf("%+.2e  %.3e  %.3e  %.3e  %.3e  %.3e  %-s", r_med, c_cur, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
             if (modprint>0) && (mod(step, modprint)==0)
                 if step_ok
                     @info info_str 

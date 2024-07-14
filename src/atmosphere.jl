@@ -1056,7 +1056,7 @@ module atmosphere
 
         # Set to true to enable custom surface emission through the 
         #   variables `planck%flux_ground(l)` and `d_planck_flux_surface`.
-        atmos.control.l_flux_ground = true
+        atmos.control.l_flux_ground = false
         
         # Allocate arrays, etc.
         SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
