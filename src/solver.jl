@@ -117,10 +117,6 @@ module solver
             @error "Invalid solution type ($sol_type)"
             return false
         end
-        # if detect_plateau && !linesearch
-        #     @warn "Plateau nudging enabled without linesearch - expect instability"
-        # end 
-        detect_plateau = detect_plateau && linesearch
 
         # Start timer 
         wct_start::Float64 = time()
@@ -149,16 +145,20 @@ module solver
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
-        ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
+        ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.5     # backtracking step size
         ls_increase::Float64 =  1.01    # factor by which cost can increase
         ls_max_steps::Int  =    10      # maximum steps 
-        ls_min_scale::Float64 = 1.0e-3  # minimum scale
+        ls_min_scale::Float64 = 2.0e-3  # minimum scale
 
         #    plateau 
-        plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
+        plateau_n::Int =        3       # Plateau declared when plateau_i > plateau_n
         plateau_s::Float64 =   9000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
-        plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
+        plateau_r::Float64 =    0.94    # Cost ratio for determining whether to increment plateau_i
+
+        if !linesearch
+            plateau_s = 50.0  # don't go crazy if linesearch is disabled
+        end 
 
         # --------------------
         # Execution variables
@@ -430,8 +430,9 @@ module solver
         for di in 1:arr_len 
             dtd[di,di] = 1.0
         end 
-        fill!(r_cur, 1.0e99)
-        fill!(r_old, 1.0e98)
+        fill!(r_cur, 1.0e99)            # reset residual arrays 
+        fill!(r_old, 1.0e98)            # ^
+        energy.reset_fluxes!(atmos)     # reset energy fluxes
 
         # Modulate convection?
         modulate_mlt = modulate_mlt && convect

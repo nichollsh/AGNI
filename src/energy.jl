@@ -330,14 +330,16 @@ module energy
     using MLT to parameterise convection, we can also calculate Kzz directly.
 
     The mixing length is set to asymptotically approach H (for z>>H) or z (for 
-    z<H) as per Blackadar (1962). Or alternatively it can be set equal to H.
+    z<H) as per Blackadar (1962). Alternatively, it can be set equal to H.
 
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `pmin::Float64=0.0`               pressure below which convection is disabled.
-    - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `pmin::Float64`           pressure [bar] below which convection is disabled
+    - `mltype::Int`             mixing length value (0: scale height, 1: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=0.0, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-3, mltype::Int=1)
+
+        pmin *= 1.0e5 # convert bar to Pa
 
         # Reset arrays
         fill!(atmos.flux_cdry, 0.0)
@@ -358,7 +360,7 @@ module energy
             moist=false
 
             # Optionally skip low pressures 
-            if atmos.pl[i] < pmin
+            if atmos.pl[i] <= pmin
                 continue
             end
 
@@ -623,6 +625,28 @@ module energy
     end 
 
     """
+    **Reset energy fluxes to zero.** 
+    """ 
+    function reset_fluxes!(atmos::atmosphere.Atmos_t)
+
+        atmos.flux_sens = 0.0
+        fill!(atmos.flux_cdct, 0.0)
+        fill!(atmos.flux_cdry, 0.0)
+        fill!(atmos.flux_u, 0.0)
+        fill!(atmos.flux_d, 0.0)
+        fill!(atmos.flux_n, 0.0)
+        fill!(atmos.flux_n_lw, 0.0)
+        fill!(atmos.flux_n_sw, 0.0)
+        fill!(atmos.flux_u_lw, 0.0)
+        fill!(atmos.flux_u_sw, 0.0)
+        fill!(atmos.flux_d_sw, 0.0)
+        fill!(atmos.flux_d_lw, 0.0)
+
+        fill!(atmos.flux_dif, 0.0)
+        fill!(atmos.flux_tot, 0.0)
+    end 
+
+    """
     **Calculate total flux at each level.**
 
     Arguments:
@@ -640,8 +664,7 @@ module energy
                           calc_cf::Bool=false)
 
         # Reset fluxes
-        fill!(atmos.flux_tot, 0.0)
-        fill!(atmos.flux_dif, 0.0)
+        reset_fluxes!(atmos)
 
         # +Condensation energy flux
         if latent || atmos.condense_any
