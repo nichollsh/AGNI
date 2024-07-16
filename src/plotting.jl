@@ -306,10 +306,10 @@ module plotting
         # Overplot convection and condensation mask
         #    by indicating it with scatter points of the corresponding colour
         for i in 1:atmos.nlev_c
-            if atmos.mask_c[i] > 0
+            if atmos.mask_c[i]
                 scatter!(plt, [-0.2], [arr_P[i]], opacity=0.9, markersize=2, msw=0.5, color=col_c, label="")
             end 
-            if atmos.mask_l[i] > 0
+            if atmos.mask_l[i]
                 scatter!(plt, [0.2], [arr_P[i]], opacity=0.9, markersize=2, msw=0.5, color=col_p, label="")
             end 
         end

@@ -229,8 +229,8 @@ module solver
         function _fev!(x::Array{Float64,1},resid::Array{Float64,1})
 
             # Reset masks
-            fill!(atmos.mask_c, 0.0)
-            fill!(atmos.mask_l, 0.0)
+            fill!(atmos.mask_c, false)
+            fill!(atmos.mask_l, false)
            
             # Set temperatures 
             _set_tmps!(x)
@@ -540,9 +540,10 @@ module solver
                 # Skip updating Jacobian where the residuals are small, so
                 #    that this column of J will be left with the last values
                 #    calculated by the finite-difference scheme. This is okay
-                #    as long as the jacobian is approx diagonally dominant.
+                #    as long as the jacobian is approx diagonally dominant, or
+                #    the layer is near convergence.
                 for i in 3:arr_len-2
-                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || (atmos.mask_l[i] > 0) || (atmos.mask_l[i] > 0)
+                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || atmos.mask_l[i]
                 end 
             end 
 
