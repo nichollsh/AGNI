@@ -171,8 +171,7 @@ module atmosphere
         flux_sens::Float64                  # Turbulent flux
 
         # Convection 
-        mask_c::Array{Int,1}                # Layers which are (or were recently) convective (value is set to >0)
-        mask_decay::Int                     # How long is 'recent'
+        mask_c::Array{Bool,1}               # Layers transporting convective flux
         flux_cdry::Array{Float64,1}         # Dry convective fluxes from MLT
         Kzz::Array{Float64,1}               # Eddy diffusion coefficient from MLT
 
@@ -181,7 +180,7 @@ module atmosphere
 
         # Phase change 
         flux_l::Array{Float64, 1}           # Latent heat energy flux [W m-2]
-        mask_l::Array{Int,1}                # Layers which are (or were recently) undergoing phase transition
+        mask_l::Array{Bool,1}               # Layers transporting latent heat
 
         # Clouds
         cond_alpha::Float64                 # Condensate retention fraction (i.e. how much goes into forming clouds vs rainout)
@@ -371,7 +370,6 @@ module atmosphere
         atmos.flux_int =        phys.sigma * (atmos.tmp_int)^4.0  
         atmos.target_olr =      max(1.0e-20,target_olr)
         
-        atmos.mask_decay =      15 
         atmos.C_d =             max(0,C_d)
         atmos.U =               max(0,U)
 
@@ -1314,8 +1312,8 @@ module atmosphere
 
         atmos.flux_sens =         0.0
 
-        atmos.mask_l =            zeros(Int, atmos.nlev_c)      # Phase change 
-        atmos.mask_c =            zeros(Int, atmos.nlev_c)      # Dry convection
+        atmos.mask_l =            falses(atmos.nlev_l)      # Phase change 
+        atmos.mask_c =            falses(atmos.nlev_l)      # Dry convection
 
         atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat / phase change 
         atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection 
