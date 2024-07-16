@@ -445,7 +445,7 @@ module solver
         end
 
         if modprint > 0
-            @info @sprintf("    step  resid_med    cost     flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
+            @info @sprintf("    step  resid_med    cost     flux_OLR    max(x)    max(|dx|)   flags")
         else
             @info "please wait..." 
         end 
@@ -693,7 +693,7 @@ module solver
             end 
                 
             # Inform user
-            info_str *= @sprintf("%+.2e  %.3e  %.3e  %.3e  %.3e  %.3e  %-s", r_med, c_cur, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
+            info_str *= @sprintf("%+.2e  %.3e  %.3e  %.3e  %.3e  %-s", r_med, c_cur, atmos.flux_u_lw[1], x_max, dx_stat, stepflags[1:end-1])
             if (modprint>0) && (mod(step, modprint)==0)
                 if step_ok
                     @info info_str 

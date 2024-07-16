@@ -470,6 +470,7 @@ module AGNI
             push!(solvers_cmd, "")
         end
 
+        @info " "
         for sol in solvers_cmd 
 
             sol = strip(lowercase(sol))
@@ -501,6 +502,7 @@ module AGNI
                                     dx_max=dx_max, linesearch=linesearch,
                                     modplot=modplot,save_frames=plt_ani)
                 return_success = return_success && solver_success
+                
             else 
                 @error "Invalid solver"
                 return_success = false 
