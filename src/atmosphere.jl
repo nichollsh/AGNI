@@ -311,7 +311,7 @@ module atmosphere
                     flag_cloud::Bool =          false,
                     thermo_functions::Bool =    true,
                     use_all_gases::Bool =       false
-                    )
+                    )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
             mkdir(OUT_DIR)
@@ -391,14 +391,14 @@ module atmosphere
         atmos.transspec_p   =   1e2     # 1 mbar = 100 Pa
 
         # absorption contributors
-        atmos.control.l_gas =           true
-        atmos.control.l_rayleigh =      flag_rayleigh
-        atmos.control.l_continuum =     flag_continuum
-        atmos.control.l_cont_gen =      flag_gcontinuum
-        atmos.control.l_aerosol =       flag_aerosol
-        atmos.control.l_cloud =         flag_cloud
-        atmos.control.l_drop =          flag_cloud
-        atmos.control.l_ice  =          false
+        atmos.control.l_gas::Bool =         true
+        atmos.control.l_rayleigh::Bool =    flag_rayleigh
+        atmos.control.l_continuum::Bool =   flag_continuum
+        atmos.control.l_cont_gen::Bool =    flag_gcontinuum
+        atmos.control.l_aerosol::Bool =     flag_aerosol
+        atmos.control.l_cloud::Bool =       flag_cloud
+        atmos.control.l_drop::Bool =        flag_cloud
+        atmos.control.l_ice::Bool  =        false
 
         # Initialise temperature grid 
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
@@ -485,10 +485,10 @@ module atmosphere
             @info "Composition set by file"
 
             # get header
-            mf_head = readline(abspath(mf_path))
-            mf_head = mf_head[2:end]  # remove comment symbol at start
-            mf_head = replace(mf_head, " " => "")  # remove whitespace
-            heads   = split(mf_head, ",")[4:end] # split by column and drop first three
+            mf_head::String =   readline(abspath(mf_path))
+            mf_head =           mf_head[2:end]  # remove comment symbol at start
+            mf_head =            replace(mf_head, " " => "")  # remove whitespace
+            heads::Array{String,1} = split(mf_head, ",")[4:end] # split by column and drop first three
 
             # create arrays 
             for h in heads
@@ -503,7 +503,7 @@ module atmosphere
             end 
 
             # get body
-            mf_body = readdlm(abspath(mf_path), ',', Float64; header=false, skipstart=2)
+            mf_body::Array{Float64,2} = readdlm(abspath(mf_path), ',', Float64; header=false, skipstart=2)
             mf_body = transpose(mf_body)
 
             # set composition by interpolating with pressure array 
@@ -513,8 +513,8 @@ module atmosphere
                 gidx += 1
 
                 # Arrays from file 
-                arr_p = mf_body[1,:]
-                arr_x = mf_body[li,:]
+                arr_p::Array{Float64,1} = mf_body[1,:]
+                arr_x::Array{Float64,1} = mf_body[li,:]
 
                 # Extend loaded profile to lower pressures (prevents domain error)
                 if arr_p[1] > atmos.p_toa
@@ -529,7 +529,7 @@ module atmosphere
                 end
                 
                 # Set up interpolator using file data 
-                itp = Interpolator(arr_p, arr_x)
+                itp::Interpolator = Interpolator(arr_p, arr_x)
                 
                 # Set values in atmos struct 
                 for i in 1:atmos.nlev_c
@@ -656,7 +656,7 @@ module atmosphere
             atmos.FC_DIR = abspath(ENV["FC_DIR"])
             if !isdir(atmos.FC_DIR)
                 @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
-                return 
+                return false
             end 
             atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")  # working directory
             
@@ -664,7 +664,7 @@ module atmosphere
             atmos.fastchem_flag = isfile(joinpath(atmos.FC_DIR,"fastchem")) 
             if !atmos.fastchem_flag 
                 @error "Could not find fastchem executable inside '$(atmos.FC_DIR)' "
-                return 
+                return false
             else 
                 @info "Found FastChem executable"
             end 
@@ -678,7 +678,7 @@ module atmosphere
         atmos.is_converged = false
 
         @debug "Setup complete"
-        return nothing
+        return true
     end # end function setup 
 
     """
@@ -827,9 +827,9 @@ module atmosphere
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
         end 
 
-        # Mass (technically area density [kg m-2]) and density [kg m-3]
+        # Mass (per unit area, kg m-2) and density (kg m-3)
         for i in 1:atmos.atm.n_layer
-            atmos.layer_mass[i] = (atmos.atm.p_level[1, i] - atmos.atm.p_level[1, i-1])/atmos.layer_grav[i]
+            atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
             atmos.atm.mass[1, i] = atmos.layer_mass[i]          # pass to SOCRATES
 
             atmos.layer_density[i] = ( atmos.p[i] * atmos.layer_mmw[i] )  / (phys.R_gas * atmos.tmp[i]) 
@@ -888,9 +888,8 @@ module atmosphere
     Arguments:
     - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
     - `stellar_spectrum::String`       path to stellar spectrum csv file (will not modify spectral file if this is left blank)
-    - `one_gas::String`                only include this gas in the RT (all gases used if blank)
     """
-    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String; one_gas::String="")
+    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String)
 
         @debug "Allocate atmosphere"
         if !atmos.is_param
@@ -926,7 +925,7 @@ module atmosphere
 
             # Write spectrum in required format 
             socstar = joinpath([atmos.OUT_DIR, "socstar.dat"])  
-            wl, fl = spectrum.load_from_file(atmos.star_file)
+            wl::Array{Float64,1}, fl::Array{Float64,1} = spectrum.load_from_file(atmos.star_file)
             spectrum.write_to_socrates_format(wl, fl, socstar)
 
             # Insert stellar spectrum and rayleigh scattering, if required
@@ -951,19 +950,9 @@ module atmosphere
         # Read-in spectral file to be used at runtime
         atmos.control.spectral_file = spectral_file_run
 
-        if isempty(one_gas)
-            SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
+        SOCRATES.set_spectrum(spectrum=atmos.spectrum, 
                                 spectral_file=atmos.control.spectral_file, 
                                 l_all_gasses=true)
-        else   
-            # set one to true 
-            kw_dict = Dict(eval(Meta.parse(":l_"*lowercase(one_gas))) => true)
-
-            # call set_spectrum
-            SOCRATES.set_spectrum(;spectrum=atmos.spectrum, 
-                                spectral_file=atmos.control.spectral_file, 
-                                l_all_gasses=false, kw_dict...)
-        end 
 
 
         #########################################
@@ -1269,7 +1258,7 @@ module atmosphere
             end 
 
             # read data from file
-            _alb_data::Array = readdlm(atmos.surface_material, Float64)
+            _alb_data::Array{Float64,2} = readdlm(atmos.surface_material, Float64)
             _alb_w::Array{Float64, 1} = _alb_data[:,1]     # wavelength [nm]
             _alb_a::Array{Float64, 1} = _alb_data[:,2]     # albedo [dimensionless]
 
