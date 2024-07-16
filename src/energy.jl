@@ -422,8 +422,7 @@ module energy
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
-                atmos.mask_c[i]   = atmos.mask_decay
-                atmos.mask_c[i-1] = atmos.mask_decay
+                atmos.mask_c[i] = true
                 
                 # Pressure scale height
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
@@ -476,11 +475,11 @@ module energy
         end 
 
         # Parameters
-        timescale::Float64 = 1e5      # seconds
+        timescale::Float64 = 1e4      # seconds
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
-        fill!(atmos.mask_l, 0)
+        fill!(atmos.mask_l, false)
 
         # Single-component case 
         single::Bool = (atmos.gas_num == 1)
@@ -526,7 +525,6 @@ module energy
                     df[i] = a*(atmos.gas_vmr[c_single][i]-qsat)*(atmos.pl[i+1]-atmos.pl[i])
 
                     # flag layer
-                    atmos.mask_l[i] = atmos.mask_decay
                     atmos.gas_sat[c_single][i] = true
                 
                 else
@@ -536,9 +534,6 @@ module energy
                     # Calculate latent heat release at this level from the contributions
                     #   of condensation (+) and evaporation (-), and a fixed timescale.
                     df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
-                    if abs(atmos.gas_yield[c][i]) > 1.0e-10
-                        atmos.mask_l[i] = atmos.mask_decay
-                    end 
 
                 end 
 
@@ -555,13 +550,16 @@ module energy
                 # check for where no phase change is occuring below this level
                 if maximum(abs.(df[i:end])) < 1.0e-5 
                     # if so, set all phase change fluxes to zero in that region
-                    fl[i:end] .= 0.0
+                    fl[i+1:end] .= 0.0
                     break
                 end  
             end 
 
             # add energy from this gas to total 
             atmos.flux_l[:] .+= fl[:]
+
+            # calculate mask 
+            atmos.mask_l[:] .= (abs.(atmos.flux_l[:]) .> 1.0e-10)
 
         end # go to next condensable 
 
