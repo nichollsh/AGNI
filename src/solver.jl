@@ -85,7 +85,7 @@ module solver
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `linesearch::Bool`                use a linesearch algorithm to determine the best step size
     - `modulate_mlt::Bool`              improve convergence with convection by introducing MLT gradually
-    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns as required
+    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
@@ -145,11 +145,11 @@ module solver
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
-        ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
+        ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.5     # backtracking step size
         ls_increase::Float64 =  1.01    # factor by which cost can increase
-        ls_max_steps::Int  =    10      # maximum steps 
-        ls_min_scale::Float64 = 2.0e-3  # minimum scale
+        ls_max_steps::Int  =    12      # maximum steps 
+        ls_min_scale::Float64 = 1.0e-3  # minimum scale
 
         #    plateau 
         plateau_n::Int =        3       # Plateau declared when plateau_i > plateau_n
@@ -189,12 +189,12 @@ module solver
         ls_cost::Float64         = 1.0e99               # linesearch cost 
 
         #     tracking
-        step::Int =         0       # Step number
-        code::Int =         -1      # Status code 
-        runtime::Float64  = 0.0     # Model runtime [s]
-        fc_retcode::Int  =  0       # Fastchem return code
-        step_ok::Bool =     true    # Current step was fine
-        plateau_i::Int =    0       # Number of iterations for which step was small 
+        step::Int =             0       # Step number
+        code::Int =             -1      # Status code 
+        runtime::Float64  =     0.0     # Model runtime [s]
+        fc_retcode::Int  =      0       # Fastchem return code
+        step_ok::Bool =         true    # Current step was fine
+        plateau_i::Int =        0       # Number of iterations for which step was small 
 
         #      statistics
         r_med::Float64 =        9.0     # Median residual
@@ -239,18 +239,17 @@ module solver
             atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout (but not energy release)
-            if !latent && atmos.condense_any
+            if atmos.condense_any
                 atmosphere.handle_saturation!(atmos)
             end
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
-                                latent,  convect, sens_heat, conduct, 
+                                latent, convect, sens_heat, conduct, 
                                 convect_sf=convect_sf)
 
-
-            # Additional energy input
-            atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
+            # Energy divergence term
+            atmos.flux_dif[:] .-= atmos.ediv_add[:] 
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
@@ -365,8 +364,8 @@ module solver
 
         # Cost function to minimise
         function _cost(_r::Array)
-            # return norm(_r)
-            return maximum(abs.(_r[:]))
+            return norm(_r)
+            # return maximum(abs.(_r[:]))
         end 
 
         # Plot current state

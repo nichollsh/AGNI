@@ -379,6 +379,11 @@ module AGNI
                 # isothermal stratosphere 
                 idx_req += 1
                 setpt.stratosphere!(atmos, parse(Float64, initial_req[idx_req]))
+
+            elseif str_req == "loglin"
+                # log-linear profile between T_surf and T_top
+                idx_req += 1
+                setpt.loglinear!(atmos, parse(Float64, initial_req[idx_req]))
                 
             elseif str_req == "iso"
                 # isothermal profile 
@@ -401,10 +406,6 @@ module AGNI
                 setpt.add!(atmos,parse(Float64, initial_req[idx_req]))
 
             elseif str_req == "sat"
-                # check surface supersaturation
-                setpt.prevent_surfsupersat!(atmos)
-            
-            elseif str_req == "con"
                 # condensing a volatile 
                 idx_req += 1
                 setpt.saturation!(atmos, initial_req[idx_req])

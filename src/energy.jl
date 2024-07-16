@@ -337,7 +337,7 @@ module energy
     - `pmin::Float64`           pressure [bar] below which convection is disabled
     - `mltype::Int`             mixing length value (0: scale height, 1: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-3, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=1)
 
         pmin *= 1.0e5 # convert bar to Pa
 
@@ -351,13 +351,14 @@ module energy
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
         grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0; grad_df::Float64 = 0.0
         beta::Float64 = 0.0; xv::Float64=0.0; xv_av::Float64=0.0
-        moist::Bool = false; inhib::Float64 = 0.0; condition::Bool = false
-        cmax::String = ""
+        inhib::Float64 = 0.0; condition::Bool = false
+        cmax::String = ""; do_moist::Bool = false
 
         # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
+
+            # Profile lapse rate: d(ln T)/d(ln P)
             grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) ) / ( log(atmos.p[i-1]/atmos.p[i]) )
-            moist=false
 
             # Optionally skip low pressures 
             if atmos.pl[i] <= pmin
@@ -374,6 +375,10 @@ module energy
             tmp = (atmos.tmp[i] * m2 + atmos.tmp[i-1] * m1)/mt
             
 
+            # Dry convection
+            grad_ad = (phys.R_gas / mu) / c_p
+            condition = (grad_pr > grad_ad)
+
             # Define moist elsewhere eventually, link to condensates
             # To do:
             #  - Find regions where we are condensing (pass from the condensation scheme)
@@ -383,43 +388,37 @@ module energy
             #  - Set the vapour contents to the new saturated value
             #  - Adjust the dry component to compensate
             
-
-            ## HII 13.05 - disabled the moist convection part of this code so that I can test
-            ##             condensation first!
             
-            # if length(condensing[i])>0
-            #     # Check which condensable species has the largest (L/RT)^2*x
-                
-            #     maxval = -1000
-            #     for c in condensing[i]
-            #         xv_av = (atmos.gas_vmr[c][i] * m2 + atmos.gas_vmr[c][i-1]*m1)/mt
-            #         # Make sure L is molar quantity
-            #         L = phys.lookup_safe("l_vap", c)*phys.lookup_safe("mmw", c)
-                    
-            #         if (L/phys.R_gas/tmp)^2 * xv_av > maxval
-            #             maxval = (L/phys.R_gas/tmp)^2 * xv_av
-            #             cmax = c
-            #         end
-            #     end
-            #     mmw_v = phys.lookup_safe("mmw",cmax)
-            #     xv = (atmos.gas_vmr[cmax][i]*m2 + atmos.gas_vmr[cmax][i-1]*m1)/mt
-            #     beta = phys.lookup_safe("l_vap", cmax)*mmw_v/tmp/phys.R_gas
+            if atmos.condense_any && do_moist
+                # Check which condensable species has the largest (L/RT)^2*x
 
-            #     grad_ad = (1 - xv + beta*xv) / (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
-            #     # Critical value (in vmr, NOT mmr form, only when mmw_v>mmw_d)
-            #     if mmw_v > (mu - xv*mmw_v)/(1-xv)
-            #         inhib = phys.R_gas * tmp/L * (1-xv)/(mmw_v/mu - 1)
-            #         condition = (grad_pr > grad_ad) && xv < inhib
-            #     else
-            #         condition = (grad_pr > grad_ad)
-            #     end
-            # else
-                grad_ad = (phys.R_gas / mu) / c_p
-                condition = (grad_pr > grad_ad)
-            # end
+                cmax = ""
+                for c in atmos.condensates
+                    if atmos.gas_yield[c][i] > 0.0
+                        cmax = c
+                        break
+                    end 
+                end
+
+                if !isempty(cmax)
+                    mmw_v = atmos.gas_dat[cmax].mmw
+                    xv = (atmos.gas_vmr[cmax][i]*m2 + atmos.gas_vmr[cmax][i-1]*m1)/mt
+                    beta = phys.get_Lv(atmos.gas_dat[cmax], tmp)*mmw_v/tmp/phys.R_gas
+
+                    grad_ad = (1 - xv + beta*xv) / (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
+                    # Critical value (in vmr, NOT mmr form, only when mmw_v>mmw_d)
+                    if mmw_v > (mu - xv*mmw_v)/(1-xv)
+                        inhib = phys.R_gas * tmp/L * (1-xv)/(mmw_v/mu - 1)
+                        condition = (grad_pr > grad_ad) && xv < inhib
+                    else
+                        condition = (grad_pr > grad_ad)
+                    end
+                end 
+
+            end
 
             # Check instability
-            if (condition)
+            if condition
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
@@ -447,7 +446,7 @@ module energy
                 # Dry convective flux
                 atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * (l/H) * (grad_pr-grad_ad)
 
-                # Thermal eddy diffusion coefficient
+                # Mixing eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
             
             end
@@ -457,169 +456,114 @@ module energy
     end # end of mlt
 
     """
-    **Analytical relaxation scheme for condensation fluxes.**
+    **Analytical diffusion scheme for condensation and evaporation energy.**
 
-    Calculates flux release by vertical latent heat transport using an heuristic 
-    function of the supersaturation amount pp-psat. Only valid when a single 
-    gas is included in the model, otherwise condense_diffuse should be used.
-
-    Updates fluxes. 
-    Does not update clouds or mixing ratios.
-
-    Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    """
-    function condense_relax!(atmos::atmosphere.Atmos_t)
-
-        # Check if empty
-        if !atmos.condense_any
-            return nothing 
-        end 
-        
-        # Get name 
-        c::String = atmos.condensates[1]
-
-        # Reset flux and mask 
-        fill!(atmos.flux_l, 0.0)
-        fill!(atmos.mask_l, 0)
-        fill!(atmos.gas_sat[c], false)
-
-        # Work variables
-        a::Float64 = 1.0 
-        pp::Float64 = 0.0
-        qsat::Float64 = 0.0
-        dif::Array = zeros(Float64, atmos.nlev_c)
-
-        # Calculate flux (negative) divergence due to latent heat release...
-        # For all levels 
-        for i in 1:atmos.nlev_c-1
-
-            # Check criticality 
-            if atmos.tmp[i] > atmos.gas_dat[c].T_crit
-                continue 
-            end 
-
-            # Get partial pressure 
-            pp = atmos.gas_vmr[c][i] * atmos.p[i]
-            if pp < 1.0e-10 
-                continue
-            end
-
-            # check saturation
-            qsat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i])/atmos.p[i]
-            if (atmos.gas_vmr[c][i] < qsat+1.0e-10)
-                continue 
-            end 
-
-            # relaxation function
-            dif[i] = a*(atmos.gas_vmr[c][i]-qsat)
-
-            # set mask 
-            atmos.mask_l[i]   = atmos.mask_decay
-            atmos.mask_l[i+1] = atmos.mask_decay
-            atmos.gas_sat[c][i] = true
-
-        end # end levels 
-
-        # Convert divergence to cell-edge fluxes
-        # Assuming zero condensation at surface
-        for i in range(start=1, stop=atmos.nlev_c, step=1)
-            atmos.flux_l[i+1] = dif[i]*(atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i]
-        end 
-
-        return nothing
-    end # end of condense_relax
-
-
-    """
-    **Analytical diffusion scheme for condensation and evaporation.**
-
-    Integrates from bottom of model upwards. Condensate mixing ratios are
-    reduced at each level to satisfy both cold-trapping and saturation 
-    constraints (via atmosphere.handle_saturation). Based on the amount of 
+    Integrates from bottom of model upwards. Based on the amount of 
     phase change at each level, a phase change flux is calculated by assuming 
     a fixed condensation timescale. 
     
     Updates fluxes and mixing ratios.
+    Requires atmosphere.handle_saturation to be called first.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
-        # Parameter 
+        # Check if there are no condensates enabled
+        if !atmos.condense_any
+            return nothing 
+        end 
+
+        # Parameters
         timescale::Float64 = 1e5      # seconds
-        simple_evap::Bool  = true     # enable simple evaporation flux
 
         # Reset flux and mask
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, 0)
 
-        # Check if empty
-        if !atmos.condense_any
-            return nothing 
-        end 
+        # Single-component case 
+        single::Bool = (atmos.gas_num == 1)
+        c_single::String = atmos.condensates[1]
+        a::Float64 = 1.0 
+        qsat::Float64 = 0.0
 
         # Work arrays 
-        df::Array = zeros(Float64, atmos.nlev_c)
+        df::Array{Float64,1} = zeros(Float64, atmos.nlev_c)    # flux difference
+        fl::Array{Float64,1} = zeros(Float64, atmos.nlev_l)    # edge fluxes
+        E_accum::Float64 = 0.0 # total energy from condensation
 
-        # Handle rainout
-        atmosphere.handle_saturation!(atmos)
+        # For each condensable
+        for c in atmos.condensates
 
-        # Loop from bottom to top 
-        for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
+            fill!(df, 0.0)
+            fill!(fl, 0.0)
 
-            # Calculate latent heat release at this level from the contributions
-            #   of condensation (+) and evaporation (-), and a fixed timescale.
-            for c in atmos.condensates
-                if atmos.gas_sat[c][i]
+            # Loop from bottom to top 
+            for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
+
+                if single
+                    # --------------------------------
+                    # Single-component scheme 
+
+                    # Check criticality 
+                    if atmos.tmp[i] > atmos.gas_dat[c_single].T_crit
+                        continue 
+                    end 
+
+                    # Get partial pressure 
+                    if atmos.gas_vmr[c_single][i] * atmos.p[i] < 1.0e-10 
+                        continue
+                    end
+
+                    # check saturation
+                    qsat = phys.get_Psat(atmos.gas_dat[c_single], atmos.tmp[i])/atmos.p[i]
+                    if (atmos.gas_vmr[c_single][i] < qsat+1.0e-10)
+                        continue 
+                    end 
+
+                    # relaxation function
+                    df[i] = a*(atmos.gas_vmr[c_single][i]-qsat)*(atmos.pl[i+1]-atmos.pl[i])
+
+                    # flag layer
+                    atmos.mask_l[i] = atmos.mask_decay
+                    atmos.gas_sat[c_single][i] = true
+                
+                else
+                    # --------------------------------
+                    # Multicomponent scheme
+
+                    # Calculate latent heat release at this level from the contributions
+                    #   of condensation (+) and evaporation (-), and a fixed timescale.
                     df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
+                    if abs(atmos.gas_yield[c][i]) > 1.0e-10
+                        atmos.mask_l[i] = atmos.mask_decay
+                    end 
 
-                    # set mask 
-                    atmos.mask_l[i]   = atmos.mask_decay
                 end 
+
+            end # go to next level
+
+            # Convert divergence to cell-edge fluxes.
+            #     Assuming zero condensation at TOA, integrating downwards
+            for i in 1:atmos.nlev_c
+                fl[i+1] = df[i] + fl[i]
             end 
 
-        end # go to next level
-
-        # Find bottom of condensing region and top of dry region 
-        idx_con_bot::Int = atmos.nlev_c  
-        for i in 2:atmos.nlev_c
-            if (atmos.mask_l[i]==0) && (atmos.mask_l[i-1]>0)
-                idx_con_bot = i 
-            end 
-        end 
-
-        # Convert divergence to cell-edge fluxes
-        # Assuming zero condensation at TOA, integrating downwards
-        for i in range(start=1, stop=atmos.nlev_c, step=1)
-
-            # this much from top edge 
-            atmos.flux_l[i+1] = atmos.flux_l[i]
-            
-            # condensation flux inside cell 
-            if i < idx_con_bot 
-                atmos.flux_l[i+1] += df[i]
-                continue 
+            # Ensure that flux is zero at bottom of dry region.
+            for i in 1:atmos.nlev_c
+                # check for where no phase change is occuring below this level
+                if maximum(abs.(df[i:end])) < 1.0e-5 
+                    # if so, set all phase change fluxes to zero in that region
+                    fl[i:end] .= 0.0
+                    break
+                end  
             end 
 
-            # check if we are doing evaporation too
-            if !simple_evap
-                continue 
-            end 
+            # add energy from this gas to total 
+            atmos.flux_l[:] .+= fl[:]
 
-            # end of evaporation 
-            if atmos.flux_l[i+1] < 0.1 
-                atmos.flux_l[i+1:end] .= 0.0
-                break 
-            end 
-
-            # this cell is dry => evaporation occurs
-            if i >= idx_con_bot 
-                atmos.flux_l[i+1] *= 0.5
-                atmos.mask_l[i] = atmos.mask_decay
-            end 
-        end 
+        end # go to next condensable 
 
         return nothing 
     end 
@@ -628,6 +572,8 @@ module energy
     **Reset energy fluxes to zero.** 
     """ 
     function reset_fluxes!(atmos::atmosphere.Atmos_t)
+
+        fill!(atmos.ediv_add, 0.0)
 
         atmos.flux_sens = 0.0
         fill!(atmos.flux_cdct, 0.0)
@@ -666,15 +612,10 @@ module energy
         # Reset fluxes
         reset_fluxes!(atmos)
 
-        # +Condensation energy flux
-        if latent || atmos.condense_any
-            if atmos.single_component
-                # does NOT modify VMRs
-                energy.condense_relax!(atmos)
-            else 
-                # DOES modify VMRs
-                energy.condense_diffuse!(atmos)
-            end 
+        # +Condensation and evaporation
+        if atmos.condense_any && latent 
+            # handle phase change impacts on energy flux
+            energy.condense_diffuse!(atmos)
             atmos.flux_tot += atmos.flux_l
         end 
 
