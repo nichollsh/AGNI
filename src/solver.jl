@@ -106,7 +106,7 @@ module solver
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
                             linesearch::Bool=true, modulate_mlt::Bool=false,
-                            detect_plateau::Bool=true, perturb_all::Bool=true,
+                            detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             modprint::Int=1,
                             conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
@@ -141,7 +141,7 @@ module solver
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
         perturb_conv::Float64 = 0.02    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
-        perturb_crit::Float64 = 1.0     # Require Jacobian update at level i when r_i>perturb_crit
+        perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
@@ -739,8 +739,8 @@ module solver
         # ----------------------------------------------------------
         # Print info
         # ---------------------------------------------------------- 
-        loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
-        loss_pct = 100.0*loss/maximum(atmos.flux_tot)
+        loss = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+        loss_pct = 100.0*loss/maximum(abs.(atmos.flux_tot))
         @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
         if (sol_type == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
@@ -748,7 +748,7 @@ module solver
         end
         @info @sprintf("    total flux at TOA  = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    total flux at BOA  = %+.2e W m-2     ", atmos.flux_tot[end])
-        @info @sprintf("    column max. loss   = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
+        @info @sprintf("    column max loss    = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
         @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
        

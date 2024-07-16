@@ -19,7 +19,8 @@ module setpt
 
         # Check file exists
         if !isfile(fpath)
-            error("The file '$fpath' does not exist")
+            @error "setpt: The file '$fpath' does not exist"
+            return 
         end 
 
         # Read file 
@@ -36,7 +37,8 @@ module setpt
 
         # Validate 
         if nlev_l < 3
-            error("Csv file contains too few levels (contains $nlev_l edge values)")
+            @error "setpt: CSV file contains too few levels (contains $nlev_l edge values)"
+            return 
         end
         nlev_c = nlev_l - 1
 
@@ -59,10 +61,12 @@ module setpt
 
             # Validate 
             if p_val <= 0.0
-                error("Negative pressure(s) in csv file")
+                @error "setpt: Negative pressure(s) in csv file"
+                return 
             end 
             if t_val <= 0.0
-                error("Negative temperature(s) in csv file")
+                @error "setpt: Negative temperature(s) in csv file"
+                return 
             end 
 
             # Store
@@ -82,7 +86,8 @@ module setpt
         # Check that pressure is monotonic
         for i in 1:nlev_c
             if pl[i] > pl[i+1]
-                error("Pressure is not monotonic in csv file")
+                @error "setpt: Pressure is not monotonic in csv file"
+                return 
             end
         end
 
@@ -109,7 +114,7 @@ module setpt
         atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
         atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
 
-        return nothing
+        return
     end
 
     """
@@ -119,7 +124,8 @@ module setpt
 
         # Check file exists
         if !isfile(fpath)
-            error("The file '$fpath' does not exist")
+            @error "setpt: The file '$fpath' does not exist"
+            return 
         end 
 
         # Open file 
@@ -161,24 +167,26 @@ module setpt
         # Close file 
         close(ds)
 
-        return nothing
+        return
     end # end load_ncdf
 
     # Set atmosphere to be isothermal at the given temperature
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
         if !atmos.is_param
-            error("Atmosphere parameters not set")
+            @error "setpt: Atmosphere parameters not set"
+            return
         end 
         atmos.tmpl[:] .= set_tmp 
         atmos.tmp[:]  .= set_tmp
 
-        return nothing
+        return
     end 
 
     # Set atmosphere to be isothermal at the given temperature
     function add!(atmos::atmosphere.Atmos_t, delta::Float64)
         if !atmos.is_param
-            error("Atmosphere parameters not set")
+            @error "setpt: Atmosphere parameters not set"
+            return 
         end 
         atmos.tmpl[:] .+= delta 
         atmos.tmp[:]  .+= delta
@@ -190,7 +198,8 @@ module setpt
     function dry_adiabat!(atmos::atmosphere.Atmos_t)
         # Validate input
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup or allocated")
+            @error "setpt: Atmosphere is not setup or allocated"
+            return 
         end 
 
         # Set surface 
@@ -279,7 +288,8 @@ module setpt
     # Ensure that the surface isn't supersaturated
     function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup or allocated")
+            @error "setpt: Atmosphere is not setup or allocated"
+            return 
         end 
 
         x::Float64 = 0.0
@@ -307,7 +317,7 @@ module setpt
 
                 # Check that p_boa is still reasonable 
                 if atmos.p_boa <= 10.0 * atmos.p_toa 
-                    error("Supersaturation check ($gas) resulted in an unreasonably small surface pressure")
+                    @error "setpt: Supersaturation check ($gas) resulted in an unreasonably small surface pressure"
                 end 
             end
         end 
@@ -336,7 +346,7 @@ module setpt
     function saturation!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup or allocated")
+            @error "setpt: Atmosphere is not setup or allocated"
         end 
 
         # gas is present?
