@@ -503,7 +503,7 @@ module energy
             # Convert divergence to cell-edge fluxes.
             #     Assuming zero condensation at TOA, integrating downwards
             for i in 1:atmos.nlev_c
-                fl[i+1] = df[i] + fl[i]
+                fl[i+1] = max(df[i] + fl[i], 0.0)
             end 
 
             # Ensure that flux is zero at bottom of dry region.
@@ -532,9 +532,14 @@ module energy
     """ 
     function reset_fluxes!(atmos::atmosphere.Atmos_t)
 
-        fill!(atmos.ediv_add, 0.0)
+        # masks 
+        fill!(atmos.mask_l, false)
+        fill!(atmos.mask_c, false)
 
+        # scalar fluxes 
         atmos.flux_sens = 0.0
+
+        # component fluxes 
         fill!(atmos.flux_cdct, 0.0)
         fill!(atmos.flux_cdry, 0.0)
         fill!(atmos.flux_u, 0.0)
@@ -547,6 +552,7 @@ module energy
         fill!(atmos.flux_d_sw, 0.0)
         fill!(atmos.flux_d_lw, 0.0)
 
+        # total fluxes
         fill!(atmos.flux_dif, 0.0)
         fill!(atmos.flux_tot, 0.0)
     end 
