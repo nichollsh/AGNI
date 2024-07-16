@@ -446,6 +446,8 @@ module solver
 
         if modprint > 0
             @info @sprintf("    step  resid_med    cost     flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
+        else
+            @info "please wait..." 
         end 
         info_str::String = ""
         stepflags::String = ""
