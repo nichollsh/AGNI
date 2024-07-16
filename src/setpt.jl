@@ -262,12 +262,11 @@ module setpt
 
         # Set surface and near-surface
         atmos.tmpl[end] = atmos.tmp_surf
-        atmos.tmpl[end-1] = atmos.tmp_surf 
 
-        # Loop upwards from bottom of model, assuming temperatures are log-spaced
-        dtdi = (top_tmp - atmos.tmp_surf)/(atmos.nlev_l-1)
-        for i in range(atmos.nlev_l-2,1,step=-1)
-            atmos.tmpl[i] = atmos.tmpl[i+1] + dtdi
+        # Loop upwards from bottom of atmosphere
+        dTdP::Float64 = (top_tmp - atmos.tmp_surf)/log10(atmos.pl[end]/atmos.pl[1])
+        for i in range(atmos.nlev_l-1,1,step=-1)
+            atmos.tmpl[i] = atmos.tmpl[i+1] + dTdP * log10(atmos.pl[i+1]/atmos.pl[i])
         end
 
         # Set cell-centres 
