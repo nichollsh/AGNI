@@ -173,6 +173,7 @@ module AGNI
         ROOT_DIR = dirname(abspath(PROGRAM_FILE))
         output_dir::String = ""
         clean_output::Bool = false
+        return_success::Bool = true
 
         # Open and validate config file 
         cfg_path::String = joinpath(ROOT_DIR, "res/config/default.toml")
@@ -336,7 +337,7 @@ module AGNI
         # Setup atmosphere
         @info "Setting up"
         atmos = atmosphere.Atmos_t()
-        atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+        return_success = atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                                 spfile_name,
                                 instellation, asf_sf, albedo_b, zenith,
                                 tmp_surf, 
@@ -357,7 +358,12 @@ module AGNI
                                 C_d=turb_coeff, U=wind_speed,
                                 use_all_gases=use_all_gases
                         )
-        atmosphere.allocate!(atmos,star_file)
+
+        return_success || return false 
+
+        # Allocate atmosphere 
+        return_success = atmosphere.allocate!(atmos,star_file)
+        return_success || return false 
 
         # Set PT profile by looping over requests
         # Each request may be a command, or an argument following a command
@@ -454,7 +460,6 @@ module AGNI
         incl_conduct::Bool = false
 
         # Loop over requested solvers 
-        return_success::Bool = true
         solver_success::Bool = true
         method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
         
@@ -546,7 +551,7 @@ module AGNI
 
         # Finish up
         runtime = round(time() - tbegin, digits=2)
-        @info "Model runtime: $runtime seconds"
+        @info @sprintf("Model runtime: %.2f seconds", runtime)
         @info "Goodbye"
 
         return return_success 

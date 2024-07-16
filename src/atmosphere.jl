@@ -576,13 +576,6 @@ module atmosphere
             push!(atmos.condensates, c)
         end 
 
-        # Cannot have n_gas==n_cond, because it will overspecify
-        #   the total pressure within condensing regions
-        if (length(atmos.condensates) == atmos.gas_num) && (atmos.gas_num > 1)
-            @error "There must be at least one non-condensable gas"
-            return false
-        end 
-
         # Validate condensate names 
         atmos.condense_any = false
         if length(condensates) > 0
@@ -593,6 +586,12 @@ module atmosphere
                 end 
             end
             atmos.condense_any = true
+        end 
+
+        # Must have >1 gas if condensation is enabled
+        if atmos.condense_any && (atmos.gas_num == 1)
+            @error "There must be at least one non-condensable gas"
+            return false
         end 
 
         # set condensation mask and yield values [kg]
@@ -885,14 +884,15 @@ module atmosphere
     - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
     - `stellar_spectrum::String`       path to stellar spectrum csv file (will not modify spectral file if this is left blank)
     """
-    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String)
+    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String)::Bool
 
         @debug "Allocate atmosphere"
         if !atmos.is_param
-            error("atmosphere parameters have not been set")
+            @error "Atmosphere parameters have not been set"
+            return false 
         end
 
-        atmos.atm.n_profile = 0
+        atmos.atm.n_profile = 1
 
         #########################################
         # spectral data
@@ -900,7 +900,8 @@ module atmosphere
 
         # Validate files
         if !isfile(atmos.spectral_file)
-            error("Spectral file '$(atmos.spectral_file)' does not exist")
+            @error "Spectral file '$(atmos.spectral_file)' does not exist"
+            return false 
         end
 
         spectral_file_run::String  = joinpath([atmos.OUT_DIR, "runtime.sf"])  
@@ -911,7 +912,8 @@ module atmosphere
         if !isempty(stellar_spectrum)
 
             if !isfile(stellar_spectrum)
-                error("Stellar spectrum file '$(stellar_spectrum)' does not exist")
+                @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
+                return false 
             end
 
             # File to be loaded
@@ -923,7 +925,7 @@ module atmosphere
             # Write spectrum in required format 
             socstar = joinpath([atmos.OUT_DIR, "socstar.dat"])  
             wl::Array{Float64,1}, fl::Array{Float64,1} = spectrum.load_from_file(atmos.star_file)
-            spectrum.write_to_socrates_format(wl, fl, socstar)
+            spectrum.write_to_socrates_format(wl, fl, socstar) || return false 
 
             # Insert stellar spectrum and rayleigh scattering, if required
             spectrum.insert_stellar_and_rscatter(atmos.spectral_file, socstar, spectral_file_run, atmos.control.l_rayleigh)
@@ -937,12 +939,14 @@ module atmosphere
         end
      
         # Validate files
-        if occursin("NaN", readchomp(spectral_file_runk))
-            error("Spectral_k file contains NaN values")
-        end 
-        if occursin("NaN", readchomp(spectral_file_run))
-            error("Spectral file contains NaN values")
-        end 
+        # if occursin("NaN", readchomp(spectral_file_runk))
+        #     @error "Spectral_k file contains NaN values"
+        #     return false 
+        # end 
+        # if occursin("NaN", readchomp(spectral_file_run))
+        #     @error "Spectral file contains NaN values"
+        #     return false 
+        # end 
 
         # Read-in spectral file to be used at runtime
         atmos.control.spectral_file = spectral_file_run
@@ -1075,7 +1079,8 @@ module atmosphere
         elseif n_channel == atmos.spectrum.Basic.n_band
             atmos.control.map_channel[1:atmos.spectrum.Basic.n_band] .= 1:n_channel
         else
-            error("n_channel $n_channel != 1 and != $n_band_active not supported ")
+            @error "n_channel $n_channel != 1 and != $n_band_active not supported "
+            return false 
         end
 
         # Calculate the weighting for the bands.
@@ -1093,28 +1098,38 @@ module atmosphere
         ############################################
 
         if atmos.control.l_rayleigh
-            Bool(atmos.spectrum.Basic.l_present[3]) ||
-                error("The spectral file contains no rayleigh scattering data.")
+            if !Bool(atmos.spectrum.Basic.l_present[3])
+                @error "The spectral file contains no rayleigh scattering data"
+                return false 
+            end 
         end
         
         if atmos.control.l_aerosol
-            Bool(atmos.spectrum.Basic.l_present[11]) ||
-                error("The spectral file contains no aerosol data.")
+            if !Bool(atmos.spectrum.Basic.l_present[11])
+                @error "The spectral file contains no aerosol data"
+                return false 
+            end 
         end
 
         if atmos.control.l_gas
-            Bool(atmos.spectrum.Basic.l_present[5]) ||
-                error("The spectral file contains no gaseous absorption data.")
+            if !Bool(atmos.spectrum.Basic.l_present[5])
+                @error "The spectral file contains no gaseous absorption data"
+                return false 
+            end 
         end
 
         if atmos.control.l_continuum
-            Bool(atmos.spectrum.Basic.l_present[9]) ||
-                error("The spectral file contains no continuum absorption data.")
+            if !Bool(atmos.spectrum.Basic.l_present[9])
+                @error "The spectral file contains no continuum absorption data" 
+                return false 
+            end 
         end
 
         if atmos.control.l_cont_gen
-            Bool(atmos.spectrum.Basic.l_present[19]) ||
-                error("The spectral file contains no generalised continuum absorption data.")
+            if !Bool(atmos.spectrum.Basic.l_present[19])
+                @error "The spectral file contains no generalised continuum absorption data"
+                return false 
+            end 
         end
 
 
@@ -1135,7 +1150,8 @@ module atmosphere
             atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random_resort_rebin
 
         else 
-            error("Invalid overlap method")
+            @error "Invalid overlap method"
+            return false
         end
 
         for j in atmos.control.first_band:atmos.control.last_band
@@ -1189,7 +1205,8 @@ module atmosphere
 
         SOCRATES.allocate_aer_prsc(atmos.aer, atmos.dimen, atmos.spectrum)
         if atmos.control.l_aerosol
-            error("Aerosols not implemented")
+            @error "Aerosols not implemented"
+            return false 
         else
             atmos.dimen.nd_profile_aerosol_prsc   = 1
             atmos.dimen.nd_opt_level_aerosol_prsc = 1
@@ -1258,7 +1275,8 @@ module atmosphere
             # try to find a matching file
             atmos.surface_material = abspath(atmos.surface_material)
             if !isfile(atmos.surface_material)
-                error("Could not find surface albedo file '$(atmos.surface_material)'")
+                @error "Could not find surface albedo file '$(atmos.surface_material)'"
+                return false
             end 
 
             # read data from file
@@ -1329,7 +1347,7 @@ module atmosphere
         atmos.is_alloc = true
         @debug "Allocate complete"
 
-        return nothing
+        return true
     end  # end of allocate
 
 
@@ -1636,11 +1654,6 @@ module atmosphere
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
     function handle_saturation!(atmos::atmosphere.Atmos_t)
-
-        # Scheme does not work if atmosphere is composed of a single gas 
-        if atmos.gas_num == 1
-            return 
-        end 
 
         # Parameters 
         evap_enabled::Bool =            true    # Enable re-vaporation of rain
