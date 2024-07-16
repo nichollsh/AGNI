@@ -169,8 +169,10 @@ module AGNI
         # Record start time 
         tbegin = time()
 
-        # Folder 
+        # Variables  
         ROOT_DIR = dirname(abspath(PROGRAM_FILE))
+        output_dir::String = ""
+        clean_output::Bool = false
 
         # Open and validate config file 
         cfg_path::String = joinpath(ROOT_DIR, "res/config/default.toml")
@@ -184,7 +186,8 @@ module AGNI
 
         # Output folder 
         output_dir = abspath(cfg["files"]["output_dir"])
-        if cfg["execution"]["clean_output"] || !(ispath(output_dir) && isdir(output_dir))
+        clean_output = Bool(cfg["execution"]["clean_output"])
+        if clean_output || !(ispath(output_dir) && isdir(output_dir))
             rm(output_dir,force=true,recursive=true)
             mkdir(output_dir)
         end 
@@ -272,27 +275,27 @@ module AGNI
         end 
 
         #    solver stuff 
-        spfile_name::String    = cfg["files" ]["input_sf"]
-        star_file::String      = cfg["files" ]["input_star"]
-        nlev_centre::Int       = cfg["execution"]["num_levels"]
-        flag_cnt::Bool         = cfg["execution" ]["continua"]
-        flag_ray::Bool         = cfg["execution" ]["rayleigh"]
-        flag_cld::Bool         = cfg["execution" ]["cloud"]
-        flag_aer::Bool         = cfg["execution" ]["aerosol"]
-        overlap::Int           = cfg["execution" ]["overlap_method"]
-        thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
-        conv_type::String      = cfg["execution" ]["convection_type"]
-        incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
-        incl_latent::Bool      = cfg["execution" ]["latent_heat"]
-        sol_type::Int          = cfg["execution" ]["solution_type"]
-        solvers_cmd::Array     = cfg["execution" ]["solvers"]
-        initial_req::Array     = cfg["execution" ]["initial_state"]
-        dx_max::Float64        = cfg["execution" ]["dx_max"]
-        linesearch::Bool       = cfg["execution" ]["linesearch"]
-        conv_atol::Float64     = cfg["execution" ]["converge_atol"]
-        conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
-        max_steps::Int         = cfg["execution" ]["max_steps"]
-        max_runtime::Float64   = cfg["execution" ]["max_runtime"]
+        spfile_name::String    =        cfg["files" ]["input_sf"]
+        star_file::String      =        cfg["files" ]["input_star"]
+        nlev_centre::Int       =        cfg["execution"]["num_levels"]
+        flag_cnt::Bool         =        cfg["execution" ]["continua"]
+        flag_ray::Bool         =        cfg["execution" ]["rayleigh"]
+        flag_cld::Bool         =        cfg["execution" ]["cloud"]
+        flag_aer::Bool         =        cfg["execution" ]["aerosol"]
+        overlap::Int           =        cfg["execution" ]["overlap_method"]
+        thermo_funct::Bool     =        cfg["execution" ]["thermo_funct"]
+        conv_type::String      =        cfg["execution" ]["convection_type"]
+        incl_sens::Bool        =        cfg["execution" ]["sensible_heat"]
+        incl_latent::Bool      =        cfg["execution" ]["latent_heat"]
+        sol_type::Int          =        cfg["execution" ]["solution_type"]
+        solvers_cmd::Array{String,1} =  cfg["execution" ]["solvers"]
+        initial_req::Array{String,1} =  cfg["execution" ]["initial_state"]
+        dx_max::Float64        =        cfg["execution" ]["dx_max"]
+        linesearch::Bool       =        cfg["execution" ]["linesearch"]
+        conv_atol::Float64     =        cfg["execution" ]["converge_atol"]
+        conv_rtol::Float64     =        cfg["execution" ]["converge_rtol"]
+        max_steps::Int         =        cfg["execution" ]["max_steps"]
+        max_runtime::Float64   =        cfg["execution" ]["max_runtime"]
 
         #    plotting stuff 
         plt_run::Bool          = cfg["plots"     ]["at_runtime"]
@@ -526,7 +529,7 @@ module AGNI
         atmosphere.deallocate!(atmos)
 
         # Temp folders
-        if cfg["execution"]["clean_output"]
+        if clean_output
             @debug "Cleaning output folder"
             # save fastchem outputs 
             if chem_type in [1,2,3]
