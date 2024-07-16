@@ -28,7 +28,7 @@ module spectrum
     - `wl::Array`           Wavelength array [nm]
     - `fl::Array`           Flux array [erg s-1 cm-2 nm-1]
     """
-    function load_from_file(path::String)::Tuple{Array, Array}
+    function load_from_file(path::String)::Tuple{Array{Float64,1}, Array{Float64,1}}
 
         if isfile(path)
             spec_data = readdlm(abspath(path), '\t', Float64; header=false, skipstart=2)
