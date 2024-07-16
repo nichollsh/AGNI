@@ -340,7 +340,8 @@ module plotting
 
         # Check that we have data 
         if !(atmos.is_out_lw && atmos.is_out_sw)
-            error("Cannot plot emission spectrum because radiances have not been calculated")
+            @error "Cannot plot emission spectrum because radiances have not been calculated"
+            return 
         end
 
         # Get emission spectrum data

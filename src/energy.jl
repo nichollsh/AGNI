@@ -481,16 +481,9 @@ module energy
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, false)
 
-        # Single-component case 
-        single::Bool = (atmos.gas_num == 1)
-        c_single::String = atmos.condensates[1]
-        a::Float64 = 1.0 
-        qsat::Float64 = 0.0
-
         # Work arrays 
         df::Array{Float64,1} = zeros(Float64, atmos.nlev_c)    # flux difference
         fl::Array{Float64,1} = zeros(Float64, atmos.nlev_l)    # edge fluxes
-        E_accum::Float64 = 0.0 # total energy from condensation
 
         # For each condensable
         for c in atmos.condensates
@@ -501,41 +494,9 @@ module energy
             # Loop from bottom to top 
             for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
-                if single
-                    # --------------------------------
-                    # Single-component scheme 
-
-                    # Check criticality 
-                    if atmos.tmp[i] > atmos.gas_dat[c_single].T_crit
-                        continue 
-                    end 
-
-                    # Get partial pressure 
-                    if atmos.gas_vmr[c_single][i] * atmos.p[i] < 1.0e-10 
-                        continue
-                    end
-
-                    # check saturation
-                    qsat = phys.get_Psat(atmos.gas_dat[c_single], atmos.tmp[i])/atmos.p[i]
-                    if (atmos.gas_vmr[c_single][i] < qsat+1.0e-10)
-                        continue 
-                    end 
-
-                    # relaxation function
-                    df[i] = a*(atmos.gas_vmr[c_single][i]-qsat)*(atmos.pl[i+1]-atmos.pl[i])
-
-                    # flag layer
-                    atmos.gas_sat[c_single][i] = true
-                
-                else
-                    # --------------------------------
-                    # Multicomponent scheme
-
-                    # Calculate latent heat release at this level from the contributions
-                    #   of condensation (+) and evaporation (-), and a fixed timescale.
-                    df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
-
-                end 
+                # Calculate latent heat release at this level from the contributions
+                #   of condensation (+) and evaporation (-), and a fixed timescale.
+                df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
 
             end # go to next level
 
@@ -612,7 +573,6 @@ module energy
 
         # +Condensation and evaporation
         if atmos.condense_any && latent 
-            # handle phase change impacts on energy flux
             energy.condense_diffuse!(atmos)
             atmos.flux_tot += atmos.flux_l
         end 

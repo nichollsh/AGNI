@@ -33,7 +33,8 @@ module spectrum
         if isfile(path)
             spec_data = readdlm(abspath(path), '\t', Float64; header=false, skipstart=2)
         else
-            error("Cannot find stellar spectrum at '$path'")
+            @error "Cannot find stellar spectrum at '$path'"
+            exit(1)
         end
 
         return spec_data[:,1], spec_data[:,2]
@@ -50,8 +51,11 @@ module spectrum
     - `fl::Array`           Flux array [erg s-1 cm-2 nm-1]
     - `star_file::String`   Path to output file
     - `nbins_max::Int`      Maximum number of points in the spectrum
+
+    Returns:
+    - `success::Bool`       function executed successfully
     """
-    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1}, star_file::String, nbins_max::Int=99900)
+    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1}, star_file::String, nbins_max::Int=99900)::Bool 
 
         len_wl::Int = length(wl)
         len_fl::Int = length(fl)
@@ -60,13 +64,15 @@ module spectrum
 
         # Validate
         if len_wl != len_fl
-            error("Stellar wavelength and flux arrays have different lengths")
+            @error "Stellar wavelength and flux arrays have different lengths"
+            return false 
         end 
         if len_wl < 500
             @warn "Loaded stellar spectrum is very short!"
         end
         if minimum(wl) < 1.0e-45
-            error("Minimum wavelength is too small")
+            @error "Minimum wavelength is too small"
+            return false 
         end
         clamp!(fl, 1.0e-45, 1.0e+45)  # Clamp values
 
@@ -109,7 +115,7 @@ module spectrum
             write(f, " ")
         end
 
-        return nothing
+        return true
     end
 
 
