@@ -85,7 +85,7 @@ mf_dict         = Dict([
                         ("N2"  , 0.1),
                         ("H2"  , 0.2)
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -134,7 +134,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.8),
                         ("CO2" , 0.2),
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -273,7 +273,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.6),
                         ("CO2" , 0.4),
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -335,7 +335,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=2,
                          thermo_functions=false
                  )
-atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/trappist-1.txt"))
+atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.isothermal!(atmos, 300.0)
 atmosphere.calc_layer_props!(atmos)
 atmos.flux_tot[:] .= 0.0
@@ -343,7 +343,7 @@ energy.radtrans!(atmos, true)
 energy.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 energy.calc_hrates!(atmos)
-val_e = [5.6, 6.6]  # from previous tests
+val_e = [6.0, 6.6]  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected range = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"
