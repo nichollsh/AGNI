@@ -97,6 +97,7 @@ case $1 in
         osf mabp2 $res/stellar_spectra trappist-1.txt
         osf rk7mj $res/stellar_spectra eps-eri.txt
         osf agsrq $res/stellar_spectra hd97658.txt
+        osf ehfsy $res/stellar_spectra gj1214.txt
         ;;
 
     *)
