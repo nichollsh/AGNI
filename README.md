@@ -14,19 +14,19 @@ GitHub: https://github.com/nichollsh/AGNI
 
 ## Installation and usage
 See the Getting Started page in the [documentation](https://nichollsh.github.io/AGNI/) for information on installing and using the model.
-
     
 ## Repository structure 
-* `agni.jl`         - AGNI executable
+* `agni.jl`         - The main AGNI executable
 * `LICENSE.txt`     - License for use and re-use
+* `get_fastchem.sh` - Download and setup FastChem
+* `get_socrates.sh` - Download and setup SOCRATES
+* `get_data.sh`     - Download input data files
 * `deps/`           - Package build scripts
 * `docs/`           - Documentation source files
 * `misc/`           - Miscellaneous files
-* `out/`            - Model output
+* `out/`            - Model output files
 * `res/`            - Resources (configs, thermodynamic data, etc.)
 * `src/`            - Package source code
 * `test/`           - Package tests
 * `tutorials/`      - Notebooks and tutorials
-* `.github/`        - GitHub workflows
-* `.vscode/`        - Visual Studio Code configuration 
 
