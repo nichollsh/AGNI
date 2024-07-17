@@ -10,7 +10,7 @@ fi
 
 # Root and resources folders 
 root=$(dirname $(realpath $0))
-res="$root/nogit_dl"
+res="$root/res/"
 
 # Make basic data folders 
 mkdir -p $res 
@@ -20,7 +20,7 @@ mkdir -p "$res/stellar_spectra"
 # Help strings
 help_basic="Get the basic data required to run the model"
 help_highres="Get a spectral file with many high-resolution opacities"
-help_steam="Get a pure-steam spectral files"
+help_steam="Get pure-steam spectral files"
 help_stellar="Get a collection of stellar spectra"
 help="\
 Helper script used to download and unpack data used to run the model.
@@ -37,7 +37,6 @@ Where [TARGET] can be any of the following:
         $help_steam
     stellar
         $help_stellar
-\
 "
 
 # Generic OSF downloader function 
