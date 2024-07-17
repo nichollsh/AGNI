@@ -88,7 +88,8 @@ module spectrum
     Returns:
     - `success::Bool`       function executed successfully
     """
-    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1}, star_file::String, nbins_max::Int=99900)::Bool 
+    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1}, 
+                                        star_file::String, nbins_max::Int=99900)::Bool 
 
         len_wl::Int = length(wl)
         len_fl::Int = length(fl)
@@ -160,11 +161,12 @@ module spectrum
 
     Arguments:
     - `orig_file::String`        Path to original spectral file.
-    - `star_file::String`        Path to file containing stellar spectrum written with this module.
+    - `star_file::String`        Path to file containing stellar spectrum in SOC format.
     - `outp_file::String`        Path to output spectral file.
     - `insert_rscatter::Bool`    Calculate Rayleigh scattering coefficients?
     """
-    function insert_stellar_and_rscatter(orig_file::String, star_file::String, outp_file::String, insert_rscatter::Bool)
+    function insert_stellar_and_rscatter(orig_file::String, star_file::String, 
+                                            outp_file::String, insert_rscatter::Bool)
 
         # Inputs to prep_spec
         prep_spec = joinpath(ENV["RAD_DIR"],"bin","prep_spec")

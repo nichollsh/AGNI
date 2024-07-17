@@ -19,14 +19,14 @@ title = "Condensation test"
     tmp_magma       = 1700.0
 
 [files]
-    input_sf        = "res/spectral_files/nogit/Dayspring48/Dayspring.sf"  
+    input_sf        = "res/spectral_files/nogit/Dayspring16/Dayspring.sf"  
     input_star      = "res/stellar_spectra/sun.txt"                         
     output_dir      = "out/"                                                
 
 [composition]
     p_surf          = 7000.0          
     p_top           = 1e-5            
-    vmr_dict        = { H2O=0.8, CO2=0.1, CH4=0.08, H2=0.02}    
+    vmr_dict        = { H2O=0.8}    
     include_all     = false
     chemistry       = 0                 
     condensates     = ["H2O"]    
@@ -48,8 +48,8 @@ title = "Condensation test"
     convection_type = "mlt"            
     solution_type   = 3                
     solvers         = ["newton"]       
-    dx_max          = 500.0            
-    initial_state   = ["loglin","1500"]   
+    dx_max          = 300.0            
+    initial_state   = ["loglin","800"]   
     linesearch      = true             
     converge_atol   = 0.1              
     converge_rtol   = 1.0e-3           
