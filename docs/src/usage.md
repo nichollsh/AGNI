@@ -2,6 +2,15 @@
 First, follow the [Getting started](@ref) instructions. Only read-on once you 
 have confirmed that the code is working.  
 
+## Input data files
+The minimal input data required to run the model will have been downloaded automatically. 
+If you require more data, such as additional stellar spectra or opacities, then these can
+also be easily obtained using the `get_data` script in the AGNI root directory. To see how
+to use this script, run it without arguments like so:
+```bash 
+./get_data 
+```
+
 ## Tutorials
 There are Jupyter notebooks containing tutorials in the `tutorials/` directory 
 of the repository.
