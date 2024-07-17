@@ -99,7 +99,8 @@ module AGNI
                 level = "ERROR"
             end 
             # Set color, set bold, print level, unset bold, unset color, message
-            @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",color, level, args.message)
+            @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",
+                                color, level, args.message)
         end;
 
         # Combine and set 
@@ -140,7 +141,7 @@ module AGNI
         end 
 
         # check that output dir is named  
-        if !haskey(cfg_dict["files"], "output_dir") || (cfg_dict["files"]["output_dir"] == "")
+        if !haskey(cfg_dict["files"],"output_dir") || (cfg_dict["files"]["output_dir"]=="")
             error("Output directory is missing from configuration file at '$cfg_path'")
         end 
         out_path = abspath(cfg_dict["files"]["output_dir"])
@@ -224,7 +225,7 @@ module AGNI
         surface_mat::String    = cfg["planet"]["surface_material"]
         if surface_mat == "blackbody"
             if !haskey(cfg["planet"],"albedo_s")
-                @error "Misconfiguration: surface is blackbody , so `albedo_s` must be provided"
+                @error "Misconfiguration: surface is blackbody, `albedo_s` must be provided"
                 return false 
             end 
             albedo_s = cfg["planet"]["albedo_s"]
@@ -268,7 +269,7 @@ module AGNI
         end 
         if chem_type in [1,2,3] 
             if length(condensates)>0
-                @error "Misconfiguration: FastChem coupling is incompatible with AGNI condensation scheme"
+                @error "Misconfiguration: FastChem coupling incompatible with condensation"
                 return false
             else
                 mkdir(dir_fastchem)
@@ -525,12 +526,12 @@ module AGNI
         flag_cld && plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
 
         plt_ani && plotting.animate(atmos)
-        plt_vmr && plotting.plot_vmr(atmos,        joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
-        plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
-        plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
-        plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
-        plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"plot_emission.png"))
-        plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
+        plt_vmr && plotting.plot_vmr(atmos,      joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
+        plt_cff && plotting.plot_contfunc(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
+        plt_tmp && plotting.plot_pt(atmos,       joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
+        plt_flx && plotting.plot_fluxes(atmos,   joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
+        plt_ems && plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
+        plt_alb && plotting.plot_albedo(atmos,   joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 
         # Deallocate atmosphere
         @info "Deallocating memory"
@@ -541,9 +542,13 @@ module AGNI
             @debug "Cleaning output folder"
             # save fastchem outputs 
             if chem_type in [1,2,3]
-                cp(joinpath(output_dir,"fastchem","chemistry.dat"),joinpath(output_dir,"fc_gas.dat"), force=true)
+
+                cp(joinpath(output_dir,"fastchem","chemistry.dat"),
+                   joinpath(output_dir,"fc_gas.dat"), force=true)
+
                 if chem_type in [2,3]
-                    cp(joinpath(output_dir,"fastchem","condensates.dat"),joinpath(output_dir,"fc_con.dat"), force=true)
+                    cp(joinpath(output_dir,"fastchem","condensates.dat"),
+                       joinpath(output_dir,"fc_con.dat"), force=true)
                 end 
             end 
             # remove folders

@@ -383,6 +383,11 @@ module energy
                 continue
             end
 
+            # Skip condensing regions 
+            # if atmos.mask_l[i]
+            #     continue 
+            # end 
+
             m1 = atmos.layer_mass[i-1]
             m2 = atmos.layer_mass[i]
             mt = m1+m2
@@ -482,7 +487,7 @@ module energy
     a fixed condensation timescale. 
     
     Updates fluxes and mixing ratios.
-    Requires atmosphere.handle_saturation to be called first.
+    Requires atmosphere.handle_saturation to be called first in the multi-component case.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -495,10 +500,10 @@ module energy
         end 
 
         # Parameters
-        timescale::Float64 = 1e4      # seconds
+        timescale::Float64 =    1e4     # seconds
+        relax_factor::Float64 = 1e3  
 
-        # Reset flux and mask
-        fill!(atmos.flux_l, 0.0)
+        # Reset mask
         fill!(atmos.mask_l, false)
 
         # Work arrays 
@@ -507,15 +512,18 @@ module energy
 
         # Single-gas relaxation case
         single::Bool = Bool(atmos.gas_num == 1)
+        E_accum::Float64 = 0.0
+        i_dry_top::Int = 1
 
         # For each condensable
         for c in atmos.condensates
 
+            # reset df,fl for this condensable
             fill!(df, 0.0)
             fill!(fl, 0.0)
 
             # Loop from bottom to top 
-            for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
+            for i in 1:atmos.nlev_c
 
                 if single
                     # --------------------------------
@@ -533,15 +541,16 @@ module energy
                     end 
 
                     # relaxation function
-                    df[i] = a*(atmos.gas_vmr[c][i]-qsat)*(atmos.pl[i+1]-atmos.pl[i])
+                    df[i] = (atmos.gas_vmr[c][i]-qsat)*atmos.layer_mass[i]/relax_factor
 
-                    # flag layer
-                    atmos.gas_sat[c][i] = true
-                
+                    # flag layer as set by saturation
+                    if df[i] > 1.0e-10
+                        atmos.gas_sat[c][i] = true
+                    end 
+
                 else
                     # --------------------------------
                     # Multicomponent diffusion scheme
-
 
                     # Calculate latent heat release at this level from the contributions
                     #   of condensation (+) and evaporation (-), and a fixed timescale.
@@ -551,6 +560,34 @@ module energy
                 end 
 
             end # go to next level
+
+            # Single gas 'evaporation' flux 
+            if single 
+                # find top of dry region
+                for i in 1:atmos.nlev_c
+                    if abs(df[i]) > 0
+                        i_dry_top=i+1
+                    end 
+                end 
+
+                E_accum = sum(df[1:i_dry_top])
+
+                # evaporative flux in dry region
+                for i in i_dry_top:atmos.nlev_c
+
+                    if E_accum > 1.0e-3
+                        # dissipate all of the flux
+                        df[i] = -E_accum
+                        E_accum = 0.0
+                        break
+                    else
+                        # dissipate some fraction of the accumuated flux 
+                        df[i] = -0.95*E_accum
+                        E_accum += df[i]
+                    end 
+                    
+                end 
+            end 
 
             # Convert divergence to cell-edge fluxes.
             #     Assuming zero condensation at TOA, integrating downwards
