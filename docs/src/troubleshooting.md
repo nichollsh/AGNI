@@ -11,11 +11,24 @@ following commands
 unset LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=""
 ```
+If this does not help, it's possible that you are using a Julia distribution provided by
+your system package manager. It's important that you only use Julia distributed from the 
+official website.
+
 
 ## Cannot find SOCRATES
 Check the installation instructions. Have you set `RAD_DIR`? Try running
 `l_run_cdf` in the terminal; if this fails, then SOCRATES has not compiled
 or you haven't added it to your `PATH`.
+
+
+## Spectral file does not exist
+Check the path in the configuration file. Download additional spectral files using the
+`get_data` script in the AGNI root directory. For example, for additional pure-steam 
+spectral files you would run
+```bash 
+./get_data.sh steam
+```
 
 
 ## Finally...
