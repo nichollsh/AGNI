@@ -1,4 +1,5 @@
 {
     "julia.environmentPath": "${workspaceFolder}/",
     "editor.tabSize": 4,
+    "editor.rulers": [ 92 ],
 }

@@ -239,7 +239,7 @@ module solver
             atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout (but not energy release)
-            if atmos.condense_any
+            if atmos.condense_any && (atmos.gas_num > 1)
                 atmosphere.handle_saturation!(atmos)
             end
 
@@ -447,7 +447,7 @@ module solver
         if modprint > 0
             @info @sprintf("    step  resid_med    cost     flux_OLR    max(x)    max(|dx|)   flags")
         else
-            @info "please wait..." 
+            @info "    please wait..." 
         end 
         info_str::String = ""
         stepflags::String = ""
@@ -544,8 +544,8 @@ module solver
                 #    calculated by the finite-difference scheme. This is okay
                 #    as long as the jacobian is approx diagonally dominant, or
                 #    the layer is near convergence.
-                for i in 3:arr_len-2
-                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || atmos.mask_l[i]
+                for i in 3:arr_len-3
+                    perturb[i] = (sum(abs.(r_cur[i-2:i+2])) > perturb_crit) || atmos.mask_l[i]
                 end 
             end 
 

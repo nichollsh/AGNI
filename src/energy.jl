@@ -51,7 +51,8 @@ module energy
         # Check files are acceptable and set instellation if doing SW flux
         if lw
             if !Bool(atmos.spectrum.Basic.l_present[6])
-                error("The spectral file contains no data for the Planck function. Check that the file contains a stellar spectrum.")
+                error("The spectral file contains no data for the Planck function. 
+                       Check that the file contains a stellar spectrum.")
             end
 
             if Bool(atmos.spectrum.Basic.l_present[2])
@@ -63,13 +64,19 @@ module energy
                 error("The spectral file contains no solar spectral data.")
             end
 
-            # Downward SW flux at TOA 
-            atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact * cosd(atmos.zenith_degrees)
-            
+            # Downward SW flux in atmosphere at TOA stored by AGNI 
+            atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) *
+                                    atmos.s0_fact * cosd(atmos.zenith_degrees)
+
             # SOCRATES requires this to be passed as two variables, since it 
             #     needs to know the angle of the direct beam.
-            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)   # Convert the zenith angles to secants.
-            atmos.bound.solar_irrad[1] = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact
+
+            # Convert the zenith angles to secants.
+            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)  
+
+            # Pass effective solar constant
+            atmos.bound.solar_irrad[1] = atmos.instellation * 
+                                            (1.0 - atmos.albedo_b) * atmos.s0_fact
         end
 
         # Set the two-stream approximation to be used (-t f)
@@ -173,7 +180,9 @@ module energy
             #  on line 129. 
             #  Having this 1-albedo term and using this low-order integration 
             #  gives the correct results from my tests.  
-            atmos.bound.flux_ground[1,i] = phys.evaluate_planck(pl_x, atmos.tmp_surf) * pl_w * atmos.emiss_s_arr[i] * (1.0 - atmos.albedo_s_arr[i])
+            atmos.bound.flux_ground[1,i] = phys.evaluate_planck(pl_x, atmos.tmp_surf)*pl_w*
+                                                atmos.emiss_s_arr[i] *
+                                                (1.0 - atmos.albedo_s_arr[i])
         end 
 
         ######################################################
@@ -189,7 +198,9 @@ module energy
                 # skip unspecified gases
                 if (s_gas in atmos.gas_names)
                     # convert VOLUME mixing ratio to MASS mixing ratio
-                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_vmr[s_gas][i] * atmos.gas_dat[s_gas].mmw / atmos.layer_mmw[i]
+                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_vmr[s_gas][i] *
+                                                            atmos.gas_dat[s_gas].mmw /
+                                                            atmos.layer_mmw[i]
                 else 
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0
                 end 
@@ -199,9 +210,10 @@ module energy
 
 
         # Do radiative transfer
-        atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
-                                atmos.atm, atmos.cld, atmos.aer, 
-                                atmos.bound, atmos.radout)
+        atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control, 
+                                                     atmos.dimen, atmos.spectrum, 
+                                                     atmos.atm, atmos.cld, atmos.aer, 
+                                                     atmos.bound, atmos.radout)
 
         # Check finite 
         if !all(isfinite, atmos.radout.flux_down)
@@ -249,7 +261,8 @@ module energy
                 cf_max::Float64 = maximum(atmos.radout.contrib_funcf_band[1,:,:])
                 for ba in 1:atmos.dimen.nd_channel
                     for lv in 1:atmos.nlev_c               
-                        atmos.contfunc_norm[lv,ba] = atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
+                        atmos.contfunc_norm[lv,ba] = 
+                                            atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
                     end 
                 end
             end
@@ -293,7 +306,10 @@ module energy
     function sensible!(atmos::atmosphere.Atmos_t)
         # TKE scheme for this 1D case
         # transports energy from the surface to the bottom node
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmp_surf-atmos.tmp[end])
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*
+                            atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * 
+                            atmos.C_d * atmos.U * 
+                            (atmos.tmp_surf-atmos.tmp[end])
         return nothing
     end
 
@@ -305,11 +321,13 @@ module energy
 
         # bulk layers
         for i in 2:atmos.nlev_l-1  
-            atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) * (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
+            atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) * 
+                                     (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
         end 
         
         # bottom layer 
-        atmos.flux_cdct[end] = atmos.layer_kc[end] * (atmos.tmp[end]-atmos.tmp_surf)/atmos.z[end]
+        atmos.flux_cdct[end] = atmos.layer_kc[end] *
+                                    (atmos.tmp[end]-atmos.tmp_surf) / atmos.z[end]
         return nothing
     end 
 
@@ -358,7 +376,7 @@ module energy
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
 
             # Profile lapse rate: d(ln T)/d(ln P)
-            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) ) / ( log(atmos.p[i-1]/atmos.p[i]) )
+            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
 
             # Optionally skip low pressures 
             if atmos.pl[i] <= pmin
@@ -405,7 +423,9 @@ module energy
                     xv = (atmos.gas_vmr[cmax][i]*m2 + atmos.gas_vmr[cmax][i-1]*m1)/mt
                     beta = phys.get_Lv(atmos.gas_dat[cmax], tmp)*mmw_v/tmp/phys.R_gas
 
-                    grad_ad = (1 - xv + beta*xv) / (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
+                    grad_ad = (1 - xv + beta*xv) /
+                                 (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
+
                     # Critical value (in vmr, NOT mmr form, only when mmw_v>mmw_d)
                     if mmw_v > (mu - xv*mmw_v)/(1-xv)
                         inhib = phys.R_gas * tmp/L * (1-xv)/(mmw_v/mu - 1)
@@ -439,11 +459,11 @@ module energy
                     error("Invalid mixing length type selected")
                 end
 
-                # Characteristic velocity (from Brunt-Vasalla frequency of parcel oscillations)
+                # Characteristic velocity (from Brunt-Vasalla frequency of parcel)
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * (l/H) * (grad_pr-grad_ad)
+                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (l/H)*(grad_pr-grad_ad)
 
                 # Mixing eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
@@ -485,6 +505,9 @@ module energy
         df::Array{Float64,1} = zeros(Float64, atmos.nlev_c)    # flux difference
         fl::Array{Float64,1} = zeros(Float64, atmos.nlev_l)    # edge fluxes
 
+        # Single-gas relaxation case
+        single::Bool = Bool(atmos.gas_num == 1)
+
         # For each condensable
         for c in atmos.condensates
 
@@ -494,9 +517,38 @@ module energy
             # Loop from bottom to top 
             for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
 
-                # Calculate latent heat release at this level from the contributions
-                #   of condensation (+) and evaporation (-), and a fixed timescale.
-                df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
+                if single
+                    # --------------------------------
+                    # Single-component relaxation scheme 
+
+                    # Check criticality 
+                    if atmos.tmp[i] > atmos.gas_dat[c].T_crit
+                        continue 
+                    end 
+
+                    # check saturation
+                    qsat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i])/atmos.p[i]
+                    if (atmos.gas_vmr[c][i] < qsat+1.0e-10)
+                        continue 
+                    end 
+
+                    # relaxation function
+                    df[i] = a*(atmos.gas_vmr[c][i]-qsat)*(atmos.pl[i+1]-atmos.pl[i])
+
+                    # flag layer
+                    atmos.gas_sat[c][i] = true
+                
+                else
+                    # --------------------------------
+                    # Multicomponent diffusion scheme
+
+
+                    # Calculate latent heat release at this level from the contributions
+                    #   of condensation (+) and evaporation (-), and a fixed timescale.
+                    df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * ( 
+                                atmos.gas_yield[c][i] / timescale)
+
+                end 
 
             end # go to next level
 
@@ -646,7 +698,7 @@ module energy
         return nothing
     end
 
-    # Dry convective adjustment (returning the temperature tendency without modifying the atmos struct)
+    # Dry convective adjustment (returning the temperature tendency)
     function adjust_dry(atmos::atmosphere.Atmos_t, nsteps::Int)
 
         tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
@@ -665,7 +717,8 @@ module energy
                 T2 = atmos.tmp[i]  # lower layer
                 p2 = atmos.p[i]
                 
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +  atmos.layer_cp[i] * atmos.layer_mmw[i])
+                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + 
+                             atmos.layer_cp[i] * atmos.layer_mmw[i])
                 pfact = (p1/p2)^(phys.R_gas / cp)
                 
                 # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
@@ -687,7 +740,8 @@ module energy
                 T2 = atmos.tmp[i]
                 p2 = atmos.p[i]
                 
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + atmos.layer_cp[i] * atmos.layer_mmw[i])
+                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + 
+                             atmos.layer_cp[i] * atmos.layer_mmw[i])
                 pfact = (p1/p2)^(phys.R_gas / cp)
 
                 if T1 < T2*pfact
