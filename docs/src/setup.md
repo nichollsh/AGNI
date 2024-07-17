@@ -10,6 +10,7 @@ GNU/Linux and MacOS (including ARM) are supported.
     Do not install Julia using your system package manager. Install only from julialang.org
 
 ## Installation
+Follow the steps below in order to setup the code.
 1. Install Julia: `curl -fsSL https://install.julialang.org | sh`
 2. Download AGNI: `git clone https://github.com/nichollsh/AGNI.git`
 3. Change directory: `cd AGNI`
@@ -26,8 +27,11 @@ directory. You should run the tests next.
     AGNI is being used.
 
 ## Testing
-Run `julia ./test/runtests.jl ` in your terminal. This will print information 
-on whether tests passed or failed.   
+Now try running the tests in your terminal. 
+```bash 
+julia ./test/runtests.jl
+```
+This will print information on whether tests passed or failed.   
 
 ## Using the code
 See [Running the model](@ref) for information on using the code.    

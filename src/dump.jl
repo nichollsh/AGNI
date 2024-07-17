@@ -48,7 +48,7 @@ module dump
         # Remove old file if exists
         rm(fname, force=true)
 
-        @debug "Writing fluxes csv to $fname"
+        @debug "Writing fluxes CSV to $fname"
 
         open(fname, "w") do f
             write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , convect     , latent      , tot      \n")

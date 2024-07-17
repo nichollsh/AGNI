@@ -17,6 +17,37 @@ module spectrum
     using LinearAlgebra
 
     """
+    **Validate spectral file.**
+
+    This function should probably calculate the file checksums, but for now it 
+        simply checks the files for NaN values.
+
+    Arguments:
+    - `path::String`        Path to .sf file 
+
+    Returns:
+    - `ok::Bool`            File is valid? (true/false)
+    """
+    function check_spfile_integrity(path::String)::Bool 
+
+        @debug "Checking integrity of spectral file"
+
+        spectral_file_run::String  = abspath(path) 
+        spectral_file_runk::String = spectral_file_run*"_k"
+
+        if occursin("NaN", readchomp(spectral_file_runk))
+            @error "Spectral_k file contains NaN values"
+            return false 
+        end 
+        if occursin("NaN", readchomp(spectral_file_run))
+            @error "Spectral file contains NaN values"
+            return false 
+        end 
+
+        return true 
+    end 
+
+    """
     **Load stellar spectrum from a text file.**
 
     The flux needs to be scaled to the top of the atmosphere.
@@ -29,6 +60,8 @@ module spectrum
     - `fl::Array`           Flux array [erg s-1 cm-2 nm-1]
     """
     function load_from_file(path::String)::Tuple{Array{Float64,1}, Array{Float64,1}}
+
+        @debug "Read stellar spectrum from file"
 
         if isfile(path)
             spec_data = readdlm(abspath(path), '\t', Float64; header=false, skipstart=2)
@@ -96,6 +129,7 @@ module spectrum
         ofl = ofl .* 1.0e6   # [erg s-1 cm-2 nm-1] -> [W m-3]
 
         # Write file
+        @debug "Writing stellar spectrum to SOCRATES format"
         len_new::Int = length(owl)
         open(star_file, "w") do f
 
