@@ -86,7 +86,7 @@ T_s
 ```
 where $T_s$ is the surface temperature. Cell-edge temperatures in the bulk atmosphere are interpolated using the [PCHIP algorithm](https://epubs.siam.org/doi/10.1137/0905021), which avoids Runge's phenomenon and overshooting. The bottom- and top-most cell edge temperatures are extrapolated by estimation of $dT/d \log p$. Cell properties (heat capacity, gravity, density, average molecular weight, etc.) are consistently updated at each evaluation of $\bm{r}$. Condensation/rainout are also handled at each evaluation of $\bm{r}$ in order to avoid supersaturation.
     
-The model converges when the cost function $c(\bm{x}) = \|\bm{r}\|$ satisfies the condition 
+The model converges when the cost function $c(\bm{x}) = \sqrt[6]{\sum_i |r_i|^6}$ satisfies the condition 
 ```math
 c(\bm{x}) < c_a + c_r \cdot \underset{i}{\max} \text{ } |F_i|
 ```

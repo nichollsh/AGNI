@@ -148,14 +148,14 @@ module solver
         #    linesearch 
         ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.5     # backtracking downscale size
-        ls_increase::Float64 =  2.0     # factor by which cost can increase
+        ls_increase::Float64 =  1.5     # factor by which cost can increase
         ls_max_steps::Int  =    15      # maximum steps 
         ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
         #    plateau 
         plateau_n::Int =        3       # Plateau declared when plateau_i > plateau_n
         plateau_s::Float64 =   9000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
-        plateau_r::Float64 =    0.94    # Cost ratio for determining whether to increment plateau_i
+        plateau_r::Float64 =    0.97    # Cost ratio for determining whether to increment plateau_i
 
         if !linesearch
             plateau_s = 50.0  # don't go crazy if linesearch is disabled
