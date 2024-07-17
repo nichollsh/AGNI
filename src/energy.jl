@@ -504,7 +504,7 @@ module energy
 
         # Timescales [s]
         timescale_mix::Float64 = 1e4 # mixture
-        timescale_sin::Float64 = 1e8 # single gas
+        timescale_sin::Float64 = 1e5 # single gas
 
         # Work arrays 
         df::Array{Float64,1} = zeros(Float64, atmos.nlev_c)    # flux difference
@@ -542,7 +542,7 @@ module energy
 
                     # relaxation function
                     df[i] = (atmos.gas_vmr[c][i]-qsat) * 
-                            (atmos.pl[i+1]-atmos.pl[i])*atmos.layer_thick[i]/timescale_sin
+                                atmos.p[i] * atmos.layer_thick[i]/timescale_sin
 
                     # flag layer as set by saturation
                     if df[i] > 1.0e-10
