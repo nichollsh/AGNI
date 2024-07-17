@@ -26,7 +26,7 @@ title = "Condensation test"
 [composition]
     p_surf          = 7000.0          
     p_top           = 1e-5            
-    vmr_dict        = { H2O=0.8}    
+    vmr_dict        = { H2O=0.8, CO2=0.19, N2=0.01}    
     include_all     = false
     chemistry       = 0                 
     condensates     = ["H2O"]    
@@ -48,7 +48,7 @@ title = "Condensation test"
     convection_type = "mlt"            
     solution_type   = 3                
     solvers         = ["newton"]       
-    dx_max          = 300.0            
+    dx_max          = 500.0            
     initial_state   = ["loglin","800"]   
     linesearch      = true             
     converge_atol   = 0.1              

@@ -1,5 +1,8 @@
 # Development manual
 
+## Contributing 
+If you are interested in contributing to the model, please contact the developers using the information on the main page.
+
 ## Coding style 
 - Indentation uses 4 spaces, no tabs.
 - Function names should be lowercase, with words separated by underscores .
@@ -10,7 +13,7 @@
 - Print statements should be made through the logger where possible.
 - The core package code should not contain global variables, except in the phys module.
 
-## This section contains the model API
+## Code reference
 
 *To be completed*.
 
