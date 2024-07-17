@@ -499,9 +499,9 @@ module energy
             return nothing 
         end 
 
-        # Parameters
-        timescale::Float64 =    1e4     # seconds
-        relax_factor::Float64 = 1e3  
+        # Timescales [s]
+        timescale_mix::Float64 = 1e4 # mixture
+        timescale_sin::Float64 = 1e8 # single gas
 
         # Reset mask
         fill!(atmos.mask_l, false)
@@ -541,7 +541,8 @@ module energy
                     end 
 
                     # relaxation function
-                    df[i] = (atmos.gas_vmr[c][i]-qsat)*atmos.layer_mass[i]/relax_factor
+                    df[i] = (atmos.gas_vmr[c][i]-qsat) * 
+                            (atmos.pl[i+1]-atmos.pl[i])*atmos.layer_thick[i]/timescale_sin
 
                     # flag layer as set by saturation
                     if df[i] > 1.0e-10
@@ -555,7 +556,7 @@ module energy
                     # Calculate latent heat release at this level from the contributions
                     #   of condensation (+) and evaporation (-), and a fixed timescale.
                     df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * ( 
-                                atmos.gas_yield[c][i] / timescale)
+                                atmos.gas_yield[c][i] / timescale_mix)
 
                 end 
 
@@ -575,14 +576,14 @@ module energy
                 # evaporative flux in dry region
                 for i in i_dry_top:atmos.nlev_c
 
-                    if E_accum > 1.0e-3
+                    if E_accum < 1.0e-2
                         # dissipate all of the flux
                         df[i] = -E_accum
                         E_accum = 0.0
                         break
                     else
                         # dissipate some fraction of the accumuated flux 
-                        df[i] = -0.95*E_accum
+                        df[i] = -0.9*E_accum
                         E_accum += df[i]
                     end 
                     
