@@ -486,8 +486,8 @@ module energy
     phase change at each level, a phase change flux is calculated by assuming 
     a fixed condensation timescale. 
     
-    Updates fluxes and mixing ratios.
-    Requires atmosphere.handle_saturation to be called first in the multi-component case.
+    Updates fluxes. Requires `atmosphere.handle_saturation`` to be called first in the 
+    multi-component case. 
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -499,12 +499,12 @@ module energy
             return nothing 
         end 
 
+        fill!(atmos.flux_l, 0.0)
+        fill!(atmos.mask_l, false)
+
         # Timescales [s]
         timescale_mix::Float64 = 1e4 # mixture
         timescale_sin::Float64 = 1e8 # single gas
-
-        # Reset mask
-        fill!(atmos.mask_l, false)
 
         # Work arrays 
         df::Array{Float64,1} = zeros(Float64, atmos.nlev_c)    # flux difference
@@ -635,6 +635,7 @@ module energy
         fill!(atmos.flux_u, 0.0)
         fill!(atmos.flux_d, 0.0)
         fill!(atmos.flux_n, 0.0)
+        fill!(atmos.flux_l, 0.0)
         fill!(atmos.flux_n_lw, 0.0)
         fill!(atmos.flux_n_sw, 0.0)
         fill!(atmos.flux_u_lw, 0.0)

@@ -146,9 +146,9 @@ module solver
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
-        ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
-        ls_tau::Float64    =    0.6     # backtracking downscale size
-        ls_increase::Float64 =  1.4     # factor by which cost can increase
+        ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
+        ls_tau::Float64    =    0.5     # backtracking downscale size
+        ls_increase::Float64 =  2.0     # factor by which cost can increase
         ls_max_steps::Int  =    15      # maximum steps 
         ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
@@ -670,6 +670,8 @@ module solver
                     code = 99
                     break
                 end 
+
+                ls_alpha = max(ls_alpha, ls_min_scale)
 
                 # Apply best scale from linesearch
                 x_dif[:] .*= ls_alpha
