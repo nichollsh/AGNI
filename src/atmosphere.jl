@@ -1745,7 +1745,8 @@ module atmosphere
                     # Set water cloud at this level
                     if c == "H2O"
                         # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
-                        atmos.cloud_arr_l[i] = (cond_kg["H2O"] * atmos.cond_alpha) / atmos.layer_mass[i]
+                        atmos.cloud_arr_l[i] = (cond_kg["H2O"] * atmos.cond_alpha) / 
+                                                    atmos.layer_mass[i]
 
                         if atmos.cloud_arr_l[i] > 1.0
                             @warn "Water cloud mass mixing ratio is greater than unity (level $i)"

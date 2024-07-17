@@ -39,7 +39,8 @@ module phys
     const fbig::Float64 = 1e90
 
     # List of elements included in the model 
-    const elements_list::Array{String,1} = ["H","C","N","O","S","P", "Fe","Mg","Si","Ca","Al"]
+    const elements_list::Array{String,1} = ["H","C","N","O","S","P", 
+                                            "Fe","Mg","Si","Ca","Al"]
 
     # 0 degrees celcius, in kelvin 
     const zero_celcius::Float64 = 273.15
@@ -654,7 +655,8 @@ module phys
 
         # Calculate planck function value [W m-2 sr-1 m-1]
         # http://spiff.rit.edu/classes/phys317/lectures/planck.html
-        flx = 2.0 * h_pl * c_vac * c_vac / wav^5.0   *   1.0 / ( exp(h_pl * c_vac / (wav * k_B * tmp)) - 1.0)
+        flx = 2.0 * h_pl * c_vac * (c_vac / wav^5.0) / 
+              ( exp(h_pl * c_vac / (wav * k_B * tmp)) - 1.0)
 
         # Integrate solid angle (hemisphere), convert units
         flx = flx * pi * 1.0e-9 # [W m-2 nm-1]
