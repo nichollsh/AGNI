@@ -8,9 +8,3 @@ For the solar cases:
  - OTR10000 was configured with Seff = 35.6 and Alb = 0.18.
 Their Seff = 1 corresponds to a value of 341.5 Wm−2, which comes from:
     F_inst = S0 / 4, where S0=1366 Wm-2 is the solar constant.
-
-This can be achieved by setting the following parameters in AGNI:
- - s0_fact = 0.6652   
- - zenith_angle = 60.0
- - albedo_b = 0.0, but rayleigh scattering enabled
- - instellation = 1366 * S_eff

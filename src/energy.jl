@@ -51,7 +51,8 @@ module energy
         # Check files are acceptable and set instellation if doing SW flux
         if lw
             if !Bool(atmos.spectrum.Basic.l_present[6])
-                error("The spectral file contains no data for the Planck function. Check that the file contains a stellar spectrum.")
+                error("The spectral file contains no data for the Planck function. 
+                       Check that the file contains a stellar spectrum.")
             end
 
             if Bool(atmos.spectrum.Basic.l_present[2])
@@ -63,13 +64,19 @@ module energy
                 error("The spectral file contains no solar spectral data.")
             end
 
-            # Downward SW flux at TOA 
-            atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact * cosd(atmos.zenith_degrees)
-            
+            # Downward SW flux in atmosphere at TOA stored by AGNI 
+            atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) *
+                                    atmos.s0_fact * cosd(atmos.zenith_degrees)
+
             # SOCRATES requires this to be passed as two variables, since it 
             #     needs to know the angle of the direct beam.
-            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)   # Convert the zenith angles to secants.
-            atmos.bound.solar_irrad[1] = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact
+
+            # Convert the zenith angles to secants.
+            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)  
+
+            # Pass effective solar constant
+            atmos.bound.solar_irrad[1] = atmos.instellation * 
+                                            (1.0 - atmos.albedo_b) * atmos.s0_fact
         end
 
         # Set the two-stream approximation to be used (-t f)
@@ -173,7 +180,9 @@ module energy
             #  on line 129. 
             #  Having this 1-albedo term and using this low-order integration 
             #  gives the correct results from my tests.  
-            atmos.bound.flux_ground[1,i] = phys.evaluate_planck(pl_x, atmos.tmp_surf) * pl_w * atmos.emiss_s_arr[i] * (1.0 - atmos.albedo_s_arr[i])
+            atmos.bound.flux_ground[1,i] = phys.evaluate_planck(pl_x, atmos.tmp_surf)*pl_w*
+                                                atmos.emiss_s_arr[i] *
+                                                (1.0 - atmos.albedo_s_arr[i])
         end 
 
         ######################################################
@@ -189,7 +198,9 @@ module energy
                 # skip unspecified gases
                 if (s_gas in atmos.gas_names)
                     # convert VOLUME mixing ratio to MASS mixing ratio
-                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_vmr[s_gas][i] * atmos.gas_dat[s_gas].mmw / atmos.layer_mmw[i]
+                    atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_vmr[s_gas][i] *
+                                                            atmos.gas_dat[s_gas].mmw /
+                                                            atmos.layer_mmw[i]
                 else 
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0
                 end 
@@ -199,9 +210,10 @@ module energy
 
 
         # Do radiative transfer
-        atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control, atmos.dimen, atmos.spectrum, 
-                                atmos.atm, atmos.cld, atmos.aer, 
-                                atmos.bound, atmos.radout)
+        atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control, 
+                                                     atmos.dimen, atmos.spectrum, 
+                                                     atmos.atm, atmos.cld, atmos.aer, 
+                                                     atmos.bound, atmos.radout)
 
         # Check finite 
         if !all(isfinite, atmos.radout.flux_down)
@@ -249,7 +261,8 @@ module energy
                 cf_max::Float64 = maximum(atmos.radout.contrib_funcf_band[1,:,:])
                 for ba in 1:atmos.dimen.nd_channel
                     for lv in 1:atmos.nlev_c               
-                        atmos.contfunc_norm[lv,ba] = atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
+                        atmos.contfunc_norm[lv,ba] = 
+                                            atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
                     end 
                 end
             end
@@ -293,7 +306,10 @@ module energy
     function sensible!(atmos::atmosphere.Atmos_t)
         # TKE scheme for this 1D case
         # transports energy from the surface to the bottom node
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * atmos.C_d * atmos.U * (atmos.tmp_surf-atmos.tmp[end])
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*
+                            atmos.p[end]/(phys.R_gas*atmos.tmp[end]) * 
+                            atmos.C_d * atmos.U * 
+                            (atmos.tmp_surf-atmos.tmp[end])
         return nothing
     end
 
@@ -305,11 +321,13 @@ module energy
 
         # bulk layers
         for i in 2:atmos.nlev_l-1  
-            atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) * (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
+            atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) * 
+                                     (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
         end 
         
         # bottom layer 
-        atmos.flux_cdct[end] = atmos.layer_kc[end] * (atmos.tmp[end]-atmos.tmp_surf)/atmos.z[end]
+        atmos.flux_cdct[end] = atmos.layer_kc[end] *
+                                    (atmos.tmp[end]-atmos.tmp_surf) / atmos.z[end]
         return nothing
     end 
 
@@ -330,14 +348,16 @@ module energy
     using MLT to parameterise convection, we can also calculate Kzz directly.
 
     The mixing length is set to asymptotically approach H (for z>>H) or z (for 
-    z<H) as per Blackadar (1962). Or alternatively it can be set equal to H.
+    z<H) as per Blackadar (1962). Alternatively, it can be set equal to H.
 
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `pmin::Float64=0.0`               pressure below which convection is disabled.
-    - `mltype::Int=1`                   mixing length (0: fixed, 1: asymptotic)
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `pmin::Float64`           pressure [bar] below which convection is disabled
+    - `mltype::Int`             mixing length value (0: scale height, 1: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=0.0, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=1)
+
+        pmin *= 1.0e5 # convert bar to Pa
 
         # Reset arrays
         fill!(atmos.flux_cdry, 0.0)
@@ -349,22 +369,23 @@ module energy
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
         grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0; grad_df::Float64 = 0.0
         beta::Float64 = 0.0; xv::Float64=0.0; xv_av::Float64=0.0
-        moist::Bool = false; inhib::Float64 = 0.0; condition::Bool = false
-        cmax::String = ""
+        inhib::Float64 = 0.0; condition::Bool = false
+        cmax::String = ""; do_moist::Bool = false
 
         # Loop from bottom upwards (over cell-edges)
-        for i in range(start=atmos.nlev_l-1, step=-1, stop=3)
-            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) ) / ( log(atmos.p[i-1]/atmos.p[i]) )
-            moist=false
+        for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
+
+            # Profile lapse rate: d(ln T)/d(ln P)
+            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
 
             # Optionally skip low pressures 
-            if atmos.pl[i] < pmin
+            if atmos.pl[i] <= pmin
                 continue
             end
 
-            # Skip condensing regions
-            # if (atmos.mask_l[i] > 0)
-            #     continue
+            # Skip condensing regions 
+            # if atmos.mask_l[i]
+            #     continue 
             # end 
 
             m1 = atmos.layer_mass[i-1]
@@ -377,6 +398,10 @@ module energy
             tmp = (atmos.tmp[i] * m2 + atmos.tmp[i-1] * m1)/mt
             
 
+            # Dry convection
+            grad_ad = (phys.R_gas / mu) / c_p
+            condition = (grad_pr > grad_ad)
+
             # Define moist elsewhere eventually, link to condensates
             # To do:
             #  - Find regions where we are condensing (pass from the condensation scheme)
@@ -386,51 +411,43 @@ module energy
             #  - Set the vapour contents to the new saturated value
             #  - Adjust the dry component to compensate
             
-
-            ## HII 13.05 - disabled the moist convection part of this code so that I can test
-            ##             condensation first!
             
-            # if length(condensing[i])>0
-            #     # Check which condensable species has the largest (L/RT)^2*x
-                
-            #     maxval = -1000
-            #     for c in condensing[i]
-            #         xv_av = (atmos.gas_vmr[c][i] * m2 + atmos.gas_vmr[c][i-1]*m1)/mt
-            #         # Make sure L is molar quantity
-            #         L = phys.lookup_safe("l_vap", c)*phys.lookup_safe("mmw", c)
-                    
-            #         if (L/phys.R_gas/tmp)^2 * xv_av > maxval
-            #             maxval = (L/phys.R_gas/tmp)^2 * xv_av
-            #             cmax = c
-            #         end
-            #     end
-            #     mmw_v = phys.lookup_safe("mmw",cmax)
-            #     xv = (atmos.gas_vmr[cmax][i]*m2 + atmos.gas_vmr[cmax][i-1]*m1)/mt
-            #     beta = phys.lookup_safe("l_vap", cmax)*mmw_v/tmp/phys.R_gas
+            if atmos.condense_any && do_moist
+                # Check which condensable species has the largest (L/RT)^2*x
 
-            #     grad_ad = (1 - xv + beta*xv) / (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
-            #     # Critical value (in vmr, NOT mmr form, only when mmw_v>mmw_d)
-            #     if mmw_v > (mu - xv*mmw_v)/(1-xv)
-            #         inhib = phys.R_gas * tmp/L * (1-xv)/(mmw_v/mu - 1)
-            #         condition = (grad_pr > grad_ad) && xv < inhib
-            #     else
-            #         condition = (grad_pr > grad_ad)
-            #     end
-            # else
-                grad_ad = (phys.R_gas / mu) / c_p
-                condition = (grad_pr > grad_ad)
-            # end
+                cmax = ""
+                for c in atmos.condensates
+                    if atmos.gas_yield[c][i] > 0.0
+                        cmax = c
+                        break
+                    end 
+                end
+
+                if !isempty(cmax)
+                    mmw_v = atmos.gas_dat[cmax].mmw
+                    xv = (atmos.gas_vmr[cmax][i]*m2 + atmos.gas_vmr[cmax][i-1]*m1)/mt
+                    beta = phys.get_Lv(atmos.gas_dat[cmax], tmp)*mmw_v/tmp/phys.R_gas
+
+                    grad_ad = (1 - xv + beta*xv) /
+                                 (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
+
+                    # Critical value (in vmr, NOT mmr form, only when mmw_v>mmw_d)
+                    if mmw_v > (mu - xv*mmw_v)/(1-xv)
+                        inhib = phys.R_gas * tmp/L * (1-xv)/(mmw_v/mu - 1)
+                        condition = (grad_pr > grad_ad) && xv < inhib
+                    else
+                        condition = (grad_pr > grad_ad)
+                    end
+                end 
+
+            end
 
             # Check instability
-            if (condition)
+            if condition
 
                 rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
 
-                if i <= atmos.nlev_c-1
-                    atmos.mask_c[i+1] = atmos.mask_decay
-                end
-                atmos.mask_c[i]   = atmos.mask_decay
-                atmos.mask_c[i-1] = atmos.mask_decay
+                atmos.mask_c[i] = true
                 
                 # Pressure scale height
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
@@ -447,13 +464,13 @@ module energy
                     error("Invalid mixing length type selected")
                 end
 
-                # Characteristic velocity (from Brunt-Vasalla frequency of parcel oscillations)
+                # Characteristic velocity (from Brunt-Vasalla frequency of parcel)
                 w = l * sqrt(grav/H * (grad_pr-grad_ad))
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5 * rho * c_p * w * atmos.tmpl[i] * l/H * (grad_pr-grad_ad)
+                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (l/H)*(grad_pr-grad_ad)
 
-                # Thermal eddy diffusion coefficient
+                # Mixing eddy diffusion coefficient
                 atmos.Kzz[i] = w * l
             
             end
@@ -463,138 +480,172 @@ module energy
     end # end of mlt
 
     """
-    **Analytical relaxation scheme for condensation fluxes.**
+    **Analytical diffusion scheme for condensation and evaporation energy.**
 
-    Calculates flux release by vertical latent heat transport using an heuristic 
-    function of the supersaturation amount pp-psat. Only valid when a single 
-    gas is included in the model, otherwise condense_diffuse should be used.
-
-    Updates fluxes. 
-    Does not update clouds or mixing ratios.
-
-    Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    """
-    function condense_relax!(atmos::atmosphere.Atmos_t)
-
-        # Check if empty
-        if !atmos.condense_any
-            return nothing 
-        end 
-        
-        # Get name 
-        c::String = atmos.condensates[1]
-
-        # Reset flux and mask 
-        fill!(atmos.flux_l, 0.0)
-        fill!(atmos.mask_l, 0)
-        fill!(atmos.gas_sat[c], false)
-
-        # Work variables
-        a::Float64 = 1.0 
-        pp::Float64 = 0.0
-        qsat::Float64 = 0.0
-        dif::Array = zeros(Float64, atmos.nlev_c)
-
-        # Calculate flux (negative) divergence due to latent heat release...
-        # For all levels 
-        for i in 1:atmos.nlev_c-1
-
-            # Check criticality 
-            if atmos.tmp[i] > atmos.gas_dat[c].T_crit
-                continue 
-            end 
-
-            # Get partial pressure 
-            pp = atmos.gas_vmr[c][i] * atmos.p[i]
-            if pp < 1.0e-10 
-                continue
-            end
-
-            # check saturation
-            qsat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i])/atmos.p[i]
-            if (atmos.gas_vmr[c][i] < qsat+1.0e-10)
-                continue 
-            end 
-
-            # relaxation function
-            dif[i] = a*(atmos.gas_vmr[c][i]-qsat)
-
-            # set mask 
-            atmos.mask_l[i]   = atmos.mask_decay
-            atmos.mask_l[i+1] = atmos.mask_decay
-            atmos.gas_sat[c][i] = true
-
-        end # end levels 
-
-        # Convert divergence to cell-edge fluxes
-        # Assuming zero condensation at surface
-        for i in range(start=1, stop=atmos.nlev_c, step=1)
-            atmos.flux_l[i+1] = dif[i]*(atmos.pl[i+1]-atmos.pl[i]) + atmos.flux_l[i]
-        end 
-
-        return nothing
-    end # end of condense_relax
-
-
-    """
-    **Analytical diffusion scheme for condensation and evaporation.**
-
-    Integrates from bottom of model upwards. Condensate mixing ratios are
-    reduced at each level to satisfy both cold-trapping and saturation 
-    constraints (via atmosphere.handle_saturation). Based on the amount of 
+    Integrates from bottom of model upwards. Based on the amount of 
     phase change at each level, a phase change flux is calculated by assuming 
     a fixed condensation timescale. 
     
-    Updates fluxes and mixing ratios.
+    Updates fluxes. Requires `atmosphere.handle_saturation`` to be called first in the 
+    multi-component case. 
 
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
     function condense_diffuse!(atmos::atmosphere.Atmos_t)
 
-        # Parameter 
-        timescale::Float64 = 7e6      # seconds
-
-        # Reset flux and mask
-        fill!(atmos.flux_l, 0.0)
-        fill!(atmos.mask_l, 0)
-
-        # Check if empty
+        # Check if there are no condensates enabled
         if !atmos.condense_any
             return nothing 
         end 
 
+        fill!(atmos.flux_l, 0.0)
+        fill!(atmos.mask_l, false)
+
+        # Timescales [s]
+        timescale_mix::Float64 = 1e4 # mixture
+        timescale_sin::Float64 = 1e5 # single gas
+
         # Work arrays 
-        df::Array = zeros(Float64, atmos.nlev_c)
+        df::Array{Float64,1} = zeros(Float64, atmos.nlev_c)    # flux difference
+        fl::Array{Float64,1} = zeros(Float64, atmos.nlev_l)    # edge fluxes
 
-        # Handle rainout
-        atmosphere.handle_saturation!(atmos)
+        # Single-gas relaxation case
+        single::Bool = Bool(atmos.gas_num == 1)
+        E_accum::Float64 = 0.0
+        i_dry_top::Int = 1
 
-        # Loop from bottom to top 
-        for i in range(start=atmos.nlev_c-1, stop=1, step=-1)
+        # For each condensable
+        for c in atmos.condensates
 
-            # Calculate latent heat release at this level from the contributions
-            #   of condensation (+) and evaporation (-), and a fixed timescale.
-            for c in atmos.condensates
-                if atmos.gas_sat[c][i]
-                    df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * atmos.gas_yield[c][i] / timescale
+            # reset df,fl for this condensable
+            fill!(df, 0.0)
+            fill!(fl, 0.0)
 
-                    # set mask 
-                    atmos.mask_l[i]   = atmos.mask_decay
-                    atmos.mask_l[i+1] = atmos.mask_decay
-                end
+            # Loop from bottom to top 
+            for i in 1:atmos.nlev_c
+
+                if single
+                    # --------------------------------
+                    # Single-component relaxation scheme 
+
+                    # Check criticality 
+                    if atmos.tmp[i] > atmos.gas_dat[c].T_crit
+                        continue 
+                    end 
+
+                    # check saturation
+                    qsat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i])/atmos.p[i]
+                    if (atmos.gas_vmr[c][i] < qsat+1.0e-10)
+                        continue 
+                    end 
+
+                    # relaxation function
+                    df[i] = (atmos.gas_vmr[c][i]-qsat) * 
+                                atmos.p[i] * atmos.layer_thick[i]/timescale_sin
+
+                    # flag layer as set by saturation
+                    if df[i] > 1.0e-10
+                        atmos.gas_sat[c][i] = true
+                    end 
+
+                else
+                    # --------------------------------
+                    # Multicomponent diffusion scheme
+
+                    # Calculate latent heat release at this level from the contributions
+                    #   of condensation (+) and evaporation (-), and a fixed timescale.
+                    df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * ( 
+                                atmos.gas_yield[c][i] / timescale_mix)
+
+                end 
+
+            end # go to next level
+
+            # Single gas 'evaporation' flux 
+            if single 
+                # find top of dry region
+                for i in 1:atmos.nlev_c
+                    if abs(df[i]) > 0
+                        i_dry_top=i+1
+                    end 
+                end 
+
+                E_accum = sum(df[1:i_dry_top])
+
+                # evaporative flux in dry region
+                for i in i_dry_top:atmos.nlev_c
+
+                    if E_accum < 1.0e-2
+                        # dissipate all of the flux
+                        df[i] = -E_accum
+                        E_accum = 0.0
+                        break
+                    else
+                        # dissipate some fraction of the accumuated flux 
+                        df[i] = -0.9*E_accum
+                        E_accum += df[i]
+                    end 
+                    
+                end 
             end 
 
-        end # go to next level
+            # Convert divergence to cell-edge fluxes.
+            #     Assuming zero condensation at TOA, integrating downwards
+            for i in 1:atmos.nlev_c
+                fl[i+1] = max(df[i] + fl[i], 0.0)
+            end 
 
-        # Convert divergence to cell-edge fluxes
-        # Assuming zero condensation at TOA, integrating downwards
-        for i in range(start=1, stop=atmos.nlev_c, step=1)
-            atmos.flux_l[i+1] = df[i] + atmos.flux_l[i]
-        end 
+            # Ensure that flux is zero at bottom of dry region.
+            for i in 1:atmos.nlev_c
+                # check for where no phase change is occuring below this level
+                if maximum(abs.(df[i:end])) < 1.0e-5 
+                    # if so, set all phase change fluxes to zero in that region
+                    fl[i+1:end] .= 0.0
+                    break
+                end  
+            end 
+
+            # add energy from this gas to total 
+            atmos.flux_l[:] .+= fl[:]
+
+            # calculate mask 
+            atmos.mask_l[:] .= (abs.(atmos.flux_l[:]) .> 1.0e-10)
+
+        end # go to next condensable 
 
         return nothing 
+    end 
+
+    """
+    **Reset energy fluxes to zero.** 
+    """ 
+    function reset_fluxes!(atmos::atmosphere.Atmos_t)
+
+        # masks 
+        fill!(atmos.mask_l, false)
+        fill!(atmos.mask_c, false)
+
+        # scalar fluxes 
+        atmos.flux_sens = 0.0
+
+        # component fluxes 
+        fill!(atmos.flux_cdct, 0.0)
+        fill!(atmos.flux_cdry, 0.0)
+        fill!(atmos.flux_u, 0.0)
+        fill!(atmos.flux_d, 0.0)
+        fill!(atmos.flux_n, 0.0)
+        fill!(atmos.flux_l, 0.0)
+        fill!(atmos.flux_n_lw, 0.0)
+        fill!(atmos.flux_n_sw, 0.0)
+        fill!(atmos.flux_u_lw, 0.0)
+        fill!(atmos.flux_u_sw, 0.0)
+        fill!(atmos.flux_d_sw, 0.0)
+        fill!(atmos.flux_d_lw, 0.0)
+
+        # total fluxes
+        fill!(atmos.flux_dif, 0.0)
+        fill!(atmos.flux_tot, 0.0)
     end 
 
     """
@@ -615,18 +666,11 @@ module energy
                           calc_cf::Bool=false)
 
         # Reset fluxes
-        fill!(atmos.flux_tot, 0.0)
-        fill!(atmos.flux_dif, 0.0)
+        reset_fluxes!(atmos)
 
-        # +Condensation energy flux
-        if latent || atmos.condense_any
-            if atmos.single_component
-                # does NOT modify VMRs
-                energy.condense_relax!(atmos)
-            else 
-                # DOES modify VMRs
-                energy.condense_diffuse!(atmos)
-            end 
+        # +Condensation and evaporation
+        if atmos.condense_any && latent 
+            energy.condense_diffuse!(atmos)
             atmos.flux_tot += atmos.flux_l
         end 
 
@@ -693,7 +737,7 @@ module energy
         return nothing
     end
 
-    # Dry convective adjustment (returning the temperature tendency without modifying the atmos struct)
+    # Dry convective adjustment (returning the temperature tendency)
     function adjust_dry(atmos::atmosphere.Atmos_t, nsteps::Int)
 
         tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
@@ -712,7 +756,8 @@ module energy
                 T2 = atmos.tmp[i]  # lower layer
                 p2 = atmos.p[i]
                 
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +  atmos.layer_cp[i] * atmos.layer_mmw[i])
+                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + 
+                             atmos.layer_cp[i] * atmos.layer_mmw[i])
                 pfact = (p1/p2)^(phys.R_gas / cp)
                 
                 # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
@@ -734,7 +779,8 @@ module energy
                 T2 = atmos.tmp[i]
                 p2 = atmos.p[i]
                 
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + atmos.layer_cp[i] * atmos.layer_mmw[i])
+                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] + 
+                             atmos.layer_cp[i] * atmos.layer_mmw[i])
                 pfact = (p1/p2)^(phys.R_gas / cp)
 
                 if T1 < T2*pfact

@@ -19,7 +19,8 @@ module setpt
 
         # Check file exists
         if !isfile(fpath)
-            error("The file '$fpath' does not exist")
+            @error "setpt: The file '$fpath' does not exist"
+            return 
         end 
 
         # Read file 
@@ -36,7 +37,8 @@ module setpt
 
         # Validate 
         if nlev_l < 3
-            error("Csv file contains too few levels (contains $nlev_l edge values)")
+            @error "setpt: CSV file contains too few levels (contains $nlev_l edge values)"
+            return 
         end
         nlev_c = nlev_l - 1
 
@@ -59,10 +61,12 @@ module setpt
 
             # Validate 
             if p_val <= 0.0
-                error("Negative pressure(s) in csv file")
+                @error "setpt: Negative pressure(s) in csv file"
+                return 
             end 
             if t_val <= 0.0
-                error("Negative temperature(s) in csv file")
+                @error "setpt: Negative temperature(s) in csv file"
+                return 
             end 
 
             # Store
@@ -82,7 +86,8 @@ module setpt
         # Check that pressure is monotonic
         for i in 1:nlev_c
             if pl[i] > pl[i+1]
-                error("Pressure is not monotonic in csv file")
+                @error "setpt: Pressure is not monotonic in csv file"
+                return 
             end
         end
 
@@ -109,7 +114,7 @@ module setpt
         atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
         atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
 
-        return nothing
+        return
     end
 
     """
@@ -119,7 +124,8 @@ module setpt
 
         # Check file exists
         if !isfile(fpath)
-            error("The file '$fpath' does not exist")
+            @error "setpt: The file '$fpath' does not exist"
+            return 
         end 
 
         # Open file 
@@ -134,7 +140,7 @@ module setpt
 
         # top
         arr_T[1] = ds["tmpl"][1]
-        arr_P[1] = min(ds["pl"][1],atmos.pl[1])         # extend to lower pressures if required
+        arr_P[1] = min(ds["pl"][1],atmos.pl[1])    # extend to lower pressures
 
         # middle 
         idx::Int = 0
@@ -148,7 +154,7 @@ module setpt
 
         # bottom
         arr_T[end] = ds["tmpl"][end]
-        arr_P[end] = max(ds["pl"][end], atmos.pl[end])      # extend to higher pressures if required 
+        arr_P[end] = max(ds["pl"][end], atmos.pl[end])  # extend to higher pressures 
 
         # interpolate 
         itp = Interpolator(log10.(arr_P), arr_T) 
@@ -161,24 +167,26 @@ module setpt
         # Close file 
         close(ds)
 
-        return nothing
+        return
     end # end load_ncdf
 
     # Set atmosphere to be isothermal at the given temperature
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
         if !atmos.is_param
-            error("Atmosphere parameters not set")
+            @error "setpt: Atmosphere parameters not set"
+            return
         end 
         atmos.tmpl[:] .= set_tmp 
         atmos.tmp[:]  .= set_tmp
 
-        return nothing
+        return
     end 
 
     # Set atmosphere to be isothermal at the given temperature
     function add!(atmos::atmosphere.Atmos_t, delta::Float64)
         if !atmos.is_param
-            error("Atmosphere parameters not set")
+            @error "setpt: Atmosphere parameters not set"
+            return 
         end 
         atmos.tmpl[:] .+= delta 
         atmos.tmp[:]  .+= delta
@@ -190,7 +198,8 @@ module setpt
     function dry_adiabat!(atmos::atmosphere.Atmos_t)
         # Validate input
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup or allocated")
+            @error "setpt: Atmosphere is not setup or allocated"
+            return 
         end 
 
         # Set surface 
@@ -209,16 +218,20 @@ module setpt
             end
             atmos.layer_cp[i] = 0.0
             for gas in atmos.gas_names
-                atmos.layer_cp[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw * phys.get_Cp(atmos.gas_dat[gas], tmp_eval) / atmos.layer_mmw[i]
+                atmos.layer_cp[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw * 
+                                            phys.get_Cp(atmos.gas_dat[gas], tmp_eval) / 
+                                            atmos.layer_mmw[i]
             end
 
             # Cell-edge to cell-centre 
-            grad = phys.R_gas * atmos.tmpl[i+1] / (atmos.pl[i+1] * atmos.layer_mmw[i] * atmos.layer_cp[i])
+            grad = phys.R_gas * atmos.tmpl[i+1] / 
+                        (atmos.pl[i+1] * atmos.layer_mmw[i] * atmos.layer_cp[i])
             atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
             atmos.tmp[i] = max(atmos.tmp[i], atmos.tmp_floor)
 
             # Cell-centre to cell-edge 
-            grad = phys.R_gas * atmos.tmp[i] / (atmos.p[i] * atmos.layer_mmw[i] * atmos.layer_cp[i])
+            grad = phys.R_gas * atmos.tmp[i] / 
+                        (atmos.p[i] * atmos.layer_mmw[i] * atmos.layer_cp[i])
             atmos.tmpl[i] = atmos.tmp[i] + grad * (atmos.pl[i]-atmos.p[i])
             atmos.tmpl[i] = max(atmos.tmpl[i], atmos.tmp_floor)
         end 
@@ -262,12 +275,11 @@ module setpt
 
         # Set surface and near-surface
         atmos.tmpl[end] = atmos.tmp_surf
-        atmos.tmpl[end-1] = atmos.tmp_surf 
 
-        # Loop upwards from bottom of model, assuming temperatures are log-spaced
-        dtdi = (top_tmp - atmos.tmp_surf)/(atmos.nlev_l-1)
-        for i in range(atmos.nlev_l-2,1,step=-1)
-            atmos.tmpl[i] = atmos.tmpl[i+1] + dtdi
+        # Loop upwards from bottom of atmosphere
+        dTdP::Float64 = (top_tmp - atmos.tmp_surf)/log10(atmos.pl[end]/atmos.pl[1])
+        for i in range(atmos.nlev_l-1,1,step=-1)
+            atmos.tmpl[i] = atmos.tmpl[i+1] + dTdP * log10(atmos.pl[i+1]/atmos.pl[i])
         end
 
         # Set cell-centres 
@@ -280,7 +292,8 @@ module setpt
     # Ensure that the surface isn't supersaturated
     function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup or allocated")
+            @error "setpt: Atmosphere is not setup or allocated"
+            return 
         end 
 
         x::Float64 = 0.0
@@ -308,7 +321,7 @@ module setpt
 
                 # Check that p_boa is still reasonable 
                 if atmos.p_boa <= 10.0 * atmos.p_toa 
-                    error("Supersaturation check ($gas) resulted in an unreasonably small surface pressure")
+                    @error "setpt: Supersaturation check ($gas) resulted in an unreasonably small surface pressure"
                 end 
             end
         end 
@@ -337,7 +350,7 @@ module setpt
     function saturation!(atmos::atmosphere.Atmos_t, gas::String)
 
         if !(atmos.is_alloc && atmos.is_param) 
-            error("Atmosphere is not setup or allocated")
+            @error "setpt: Atmosphere is not setup or allocated"
         end 
 
         # gas is present?

@@ -3,13 +3,16 @@ This page outlines requirements and installation steps for the code. Currently,
 GNU/Linux and MacOS (including ARM) are supported. 
 
 ## Requirements
-* [Julia](https://julialang.org/downloads/) 
-* [SOCRATES](https://github.com/nichollsh/SOCRATES) - see instructions below
+* gfortran 
+* NetCDF library for FORTRAN
+* make
+* curl
 
 !!! warning
     Do not install Julia using your system package manager. Install only from julialang.org
 
 ## Installation
+Follow the steps below in order to setup the code.
 1. Install Julia: `curl -fsSL https://install.julialang.org | sh`
 2. Download AGNI: `git clone https://github.com/nichollsh/AGNI.git`
 3. Change directory: `cd AGNI`
@@ -18,7 +21,7 @@ GNU/Linux and MacOS (including ARM) are supported.
     - Run `source get_socrates.sh`    
 5. `julia -e 'using Pkg; Pkg.activate("."); Pkg.build()'`
 AGNI is now installed as a package into a Julia environment in the AGNI
-directory. You should run the tests next.
+directory. This will also have downloaded some input data. You should run the tests next.
 
 !!! tip 
     The `get_socrates` script automatically adds the radiation code to your
@@ -26,8 +29,11 @@ directory. You should run the tests next.
     AGNI is being used.
 
 ## Testing
-Run `julia ./test/runtests.jl ` in your terminal. This will print information 
-on whether tests passed or failed.   
+Now try running the tests in your terminal. 
+```bash 
+julia ./test/runtests.jl
+```
+This will print information on whether tests passed or failed.   
 
 ## Using the code
 See [Running the model](@ref) for information on using the code.    

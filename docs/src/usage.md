@@ -2,6 +2,15 @@
 First, follow the [Getting started](@ref) instructions. Only read-on once you 
 have confirmed that the code is working.  
 
+## Input data files
+The minimal input data required to run the model will have been downloaded automatically. 
+If you require more data, such as additional stellar spectra or opacities, then these can
+also be easily obtained using the `get_data` script in the AGNI root directory. To see how
+to use this script, run it without arguments like so:
+```bash 
+./get_data 
+```
+
 ## Tutorials
 There are Jupyter notebooks containing tutorials in the `tutorials/` directory 
 of the repository.
@@ -36,6 +45,8 @@ Broadly, the configuration files are broken up into four sections:
 * `[plots]` - which plots should be produced
 
 Some parameters:
+* `files.input_sf` is the file path to the "spectral file" containing opacity data. Several spectral files are packged with AGNI, but you can find more online via the [Open Science Framework](https://osf.io/vehxg/).
+
 * `execution.solution_type` tells the model which state to solve for. The allowed values (integers) are...
      - 1 : zero flux divergence at fixed `tmp_surf`
      - 2 : zero flux divergence, with `tmp_surf` set such that the conductive skin (CBL) conserves energy flux
@@ -48,12 +59,13 @@ Some parameters:
      - `levenberg` : the Levenberg–Marquardt algorithm is used 
    
 * `execution.initial_state` describes the initial temperature profile applied to the atmosphere. This is a list of strings which are applied in the given order, which allows the user to describe a specific state as required. The descriptors are listed below, some of which take a single argument that needs to immediately follow the descriptor in the list order.
-     - `dry` : integrate the dry adiabatic lapse rate from the surface upwards
-     - `str`, `arg` : apply an isothermal stratosphere at `arg` kelvin
-     - `iso`, `arg` : set the whole atmosphere to be isothermal at `arg` kelvin
-     - `csv`, `arg` : set the temperature profile using the CSV file at the file path `arg`
-     - `con`, `arg` : apply Clausius-Clapeyron saturation curve for the gas `arg`
-     - `sat` : ensure that no supersaturation occurs at the surface by removing gases as required    
+     - `dry`              : integrate the dry adiabatic lapse rate from the surface upwards
+     - `str`,       `arg` : apply an isothermal stratosphere at `arg` kelvin
+     - `iso`,       `arg` : set the whole atmosphere to be isothermal at `arg` kelvin
+     - `csv`,       `arg` : set the temperature profile using the CSV file at the file path `arg`
+     - `sat`,       `arg` : apply Clausius-Clapeyron saturation curve for the gas `arg`
+     - `ncdf`,      `arg` : load profile from the NetCDF file located at `arg`
+     - `loglin`,    `arg` : log-linear profile between `tmp_surf` at the bottom and `arg` at the top
   
     For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model.
 
