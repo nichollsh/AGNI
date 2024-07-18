@@ -46,16 +46,18 @@ passing = true
 @info " "
 @info "Testing heat capacity functions"
 data_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true)
-c_expt::Array{Float64, 1} = [4.975, 35.22, 41.27 , 51.20 , 55.74 , 59.40 ]     # Expected values of cp [J mol-1 K-1]
-t_test::Array{Float64, 1} = [10.0,  500.0, 1000.0, 2000.0, 3000.0, 5000.0]     # Tested values of temperature 
+c_expt::Array{Float64, 1} = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
+t_test::Array{Float64, 1} = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature 
+c_obs::Array{Float64,1} = zeros(Float64, 5)
 cp_pass = true 
 for i in 1:5
-    c_this = phys.get_Cp(data_H2O, t_test[i]) * data_H2O.mmw # get value and convert units 
-    if abs(c_expt[i]-c_this)/c_expt[i] > 0.01  # error must be <1%
-        @warn "At tmp=$(t_test[i]) K \nModelled value = $c_this J K-1 mol-1 \nExpected value = $(c_expt[i]) J K-1 mol-1"
+    c_obs[i] = phys.get_Cp(data_H2O, t_test[i]) * data_H2O.mmw # get value and convert units 
+    if abs(c_expt[i]- c_obs[i])/c_expt[i] > 0.01  # error must be <1%
         global cp_pass = false 
     end 
 end 
+@info "Expected values = $(c_expt) J mol-1 K-1"
+@info "Modelled values = $(c_obs) J mol-1 K-1"
 if cp_pass
     @info "Pass"
 else
@@ -83,7 +85,7 @@ mf_dict         = Dict([
                         ("N2"  , 0.1),
                         ("H2"  , 0.2)
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -132,7 +134,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.8),
                         ("CO2" , 0.2),
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -195,6 +197,7 @@ p_surf          = 300.0    # bar
 theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0),
+                        ("N2"  , 1.0e-9)
                         ])
 spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/318/Oak.sf")
 
@@ -270,7 +273,7 @@ mf_dict         = Dict([
                         ("H2O" , 0.6),
                         ("CO2" , 0.4),
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/16/Dayspring.sf")
+spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
@@ -332,7 +335,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method=2,
                          thermo_functions=false
                  )
-atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/trappist-1.txt"))
+atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.isothermal!(atmos, 300.0)
 atmosphere.calc_layer_props!(atmos)
 atmos.flux_tot[:] .= 0.0
@@ -340,7 +343,7 @@ energy.radtrans!(atmos, true)
 energy.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 energy.calc_hrates!(atmos)
-val_e = [5.6, 6.6]  # from previous tests
+val_e = [6.0, 6.6]  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected range = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"

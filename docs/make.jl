@@ -19,7 +19,7 @@ makedocs(
         "usage.md",
         "examples/index.md",
         "troubleshooting.md",
-        "manual/index.md"
+        "Development" => "manual/index.md"
     ]
 )
 
