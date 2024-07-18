@@ -1,4 +1,5 @@
 #!/bin/bash
+# Download and compile fastchem
 
 # Download via HTTPS only
 fcpath="fastchem"

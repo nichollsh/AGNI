@@ -17,6 +17,37 @@ module spectrum
     using LinearAlgebra
 
     """
+    **Validate spectral file.**
+
+    This function should probably calculate the file checksums, but for now it 
+        simply checks the files for NaN values.
+
+    Arguments:
+    - `path::String`        Path to .sf file 
+
+    Returns:
+    - `ok::Bool`            File is valid? (true/false)
+    """
+    function check_spfile_integrity(path::String)::Bool 
+
+        @debug "Checking integrity of spectral file"
+
+        spectral_file_run::String  = abspath(path) 
+        spectral_file_runk::String = spectral_file_run*"_k"
+
+        if occursin("NaN", readchomp(spectral_file_runk))
+            @error "Spectral_k file contains NaN values"
+            return false 
+        end 
+        if occursin("NaN", readchomp(spectral_file_run))
+            @error "Spectral file contains NaN values"
+            return false 
+        end 
+
+        return true 
+    end 
+
+    """
     **Load stellar spectrum from a text file.**
 
     The flux needs to be scaled to the top of the atmosphere.
@@ -28,12 +59,15 @@ module spectrum
     - `wl::Array`           Wavelength array [nm]
     - `fl::Array`           Flux array [erg s-1 cm-2 nm-1]
     """
-    function load_from_file(path::String)::Tuple{Array, Array}
+    function load_from_file(path::String)::Tuple{Array{Float64,1}, Array{Float64,1}}
+
+        @debug "Read stellar spectrum from file"
 
         if isfile(path)
             spec_data = readdlm(abspath(path), '\t', Float64; header=false, skipstart=2)
         else
-            error("Cannot find stellar spectrum at '$path'")
+            @error "Cannot find stellar spectrum at '$path'"
+            exit(1)
         end
 
         return spec_data[:,1], spec_data[:,2]
@@ -50,8 +84,12 @@ module spectrum
     - `fl::Array`           Flux array [erg s-1 cm-2 nm-1]
     - `star_file::String`   Path to output file
     - `nbins_max::Int`      Maximum number of points in the spectrum
+
+    Returns:
+    - `success::Bool`       function executed successfully
     """
-    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1}, star_file::String, nbins_max::Int=99900)
+    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1}, 
+                                        star_file::String, nbins_max::Int=99900)::Bool 
 
         len_wl::Int = length(wl)
         len_fl::Int = length(fl)
@@ -60,13 +98,15 @@ module spectrum
 
         # Validate
         if len_wl != len_fl
-            error("Stellar wavelength and flux arrays have different lengths")
+            @error "Stellar wavelength and flux arrays have different lengths"
+            return false 
         end 
         if len_wl < 500
             @warn "Loaded stellar spectrum is very short!"
         end
         if minimum(wl) < 1.0e-45
-            error("Minimum wavelength is too small")
+            @error "Minimum wavelength is too small"
+            return false 
         end
         clamp!(fl, 1.0e-45, 1.0e+45)  # Clamp values
 
@@ -90,6 +130,7 @@ module spectrum
         ofl = ofl .* 1.0e6   # [erg s-1 cm-2 nm-1] -> [W m-3]
 
         # Write file
+        @debug "Writing stellar spectrum to SOCRATES format"
         len_new::Int = length(owl)
         open(star_file, "w") do f
 
@@ -109,7 +150,7 @@ module spectrum
             write(f, " ")
         end
 
-        return nothing
+        return true
     end
 
 
@@ -120,11 +161,12 @@ module spectrum
 
     Arguments:
     - `orig_file::String`        Path to original spectral file.
-    - `star_file::String`        Path to file containing stellar spectrum written with this module.
+    - `star_file::String`        Path to file containing stellar spectrum in SOC format.
     - `outp_file::String`        Path to output spectral file.
     - `insert_rscatter::Bool`    Calculate Rayleigh scattering coefficients?
     """
-    function insert_stellar_and_rscatter(orig_file::String, star_file::String, outp_file::String, insert_rscatter::Bool)
+    function insert_stellar_and_rscatter(orig_file::String, star_file::String, 
+                                            outp_file::String, insert_rscatter::Bool)
 
         # Inputs to prep_spec
         prep_spec = joinpath(ENV["RAD_DIR"],"bin","prep_spec")

@@ -1,4 +1,5 @@
 #!/bin/bash
+# Download and compile socrates
 
 # Check SSH access to GitHub
 ssh -T git@github.com

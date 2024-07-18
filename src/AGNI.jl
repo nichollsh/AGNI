@@ -99,7 +99,8 @@ module AGNI
                 level = "ERROR"
             end 
             # Set color, set bold, print level, unset bold, unset color, message
-            @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",color, level, args.message)
+            @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",
+                                color, level, args.message)
         end;
 
         # Combine and set 
@@ -140,7 +141,7 @@ module AGNI
         end 
 
         # check that output dir is named  
-        if !haskey(cfg_dict["files"], "output_dir") || (cfg_dict["files"]["output_dir"] == "")
+        if !haskey(cfg_dict["files"],"output_dir") || (cfg_dict["files"]["output_dir"]=="")
             error("Output directory is missing from configuration file at '$cfg_path'")
         end 
         out_path = abspath(cfg_dict["files"]["output_dir"])
@@ -169,8 +170,11 @@ module AGNI
         # Record start time 
         tbegin = time()
 
-        # Folder 
+        # Variables  
         ROOT_DIR = dirname(abspath(PROGRAM_FILE))
+        output_dir::String = ""
+        clean_output::Bool = false
+        return_success::Bool = true
 
         # Open and validate config file 
         cfg_path::String = joinpath(ROOT_DIR, "res/config/default.toml")
@@ -184,7 +188,8 @@ module AGNI
 
         # Output folder 
         output_dir = abspath(cfg["files"]["output_dir"])
-        if cfg["execution"]["clean_output"] || !(ispath(output_dir) && isdir(output_dir))
+        clean_output = Bool(cfg["execution"]["clean_output"])
+        if clean_output || !(ispath(output_dir) && isdir(output_dir))
             rm(output_dir,force=true,recursive=true)
             mkdir(output_dir)
         end 
@@ -220,7 +225,7 @@ module AGNI
         surface_mat::String    = cfg["planet"]["surface_material"]
         if surface_mat == "blackbody"
             if !haskey(cfg["planet"],"albedo_s")
-                @error "Misconfiguration: surface is blackbody , so `albedo_s` must be provided"
+                @error "Misconfiguration: surface is blackbody, `albedo_s` must be provided"
                 return false 
             end 
             albedo_s = cfg["planet"]["albedo_s"]
@@ -264,7 +269,7 @@ module AGNI
         end 
         if chem_type in [1,2,3] 
             if length(condensates)>0
-                @error "Misconfiguration: FastChem coupling is incompatible with AGNI condensation scheme"
+                @error "Misconfiguration: FastChem coupling incompatible with condensation"
                 return false
             else
                 mkdir(dir_fastchem)
@@ -272,27 +277,27 @@ module AGNI
         end 
 
         #    solver stuff 
-        spfile_name::String    = cfg["files" ]["input_sf"]
-        star_file::String      = cfg["files" ]["input_star"]
-        nlev_centre::Int       = cfg["execution"]["num_levels"]
-        flag_cnt::Bool         = cfg["execution" ]["continua"]
-        flag_ray::Bool         = cfg["execution" ]["rayleigh"]
-        flag_cld::Bool         = cfg["execution" ]["cloud"]
-        flag_aer::Bool         = cfg["execution" ]["aerosol"]
-        overlap::Int           = cfg["execution" ]["overlap_method"]
-        thermo_funct::Bool     = cfg["execution" ]["thermo_funct"]
-        conv_type::String      = cfg["execution" ]["convection_type"]
-        incl_sens::Bool        = cfg["execution" ]["sensible_heat"]
-        incl_latent::Bool      = cfg["execution" ]["latent_heat"]
-        sol_type::Int          = cfg["execution" ]["solution_type"]
-        solvers_cmd::Array     = cfg["execution" ]["solvers"]
-        initial_req::Array     = cfg["execution" ]["initial_state"]
-        dx_max::Float64        = cfg["execution" ]["dx_max"]
-        linesearch::Bool       = cfg["execution" ]["linesearch"]
-        conv_atol::Float64     = cfg["execution" ]["converge_atol"]
-        conv_rtol::Float64     = cfg["execution" ]["converge_rtol"]
-        max_steps::Int         = cfg["execution" ]["max_steps"]
-        max_runtime::Float64   = cfg["execution" ]["max_runtime"]
+        spfile_name::String    =        cfg["files" ]["input_sf"]
+        star_file::String      =        cfg["files" ]["input_star"]
+        nlev_centre::Int       =        cfg["execution"]["num_levels"]
+        flag_cnt::Bool         =        cfg["execution" ]["continua"]
+        flag_ray::Bool         =        cfg["execution" ]["rayleigh"]
+        flag_cld::Bool         =        cfg["execution" ]["cloud"]
+        flag_aer::Bool         =        cfg["execution" ]["aerosol"]
+        overlap::Int           =        cfg["execution" ]["overlap_method"]
+        thermo_funct::Bool     =        cfg["execution" ]["thermo_funct"]
+        conv_type::String      =        cfg["execution" ]["convection_type"]
+        incl_sens::Bool        =        cfg["execution" ]["sensible_heat"]
+        incl_latent::Bool      =        cfg["execution" ]["latent_heat"]
+        sol_type::Int          =        cfg["execution" ]["solution_type"]
+        solvers_cmd::Array{String,1} =  cfg["execution" ]["solvers"]
+        initial_req::Array{String,1} =  cfg["execution" ]["initial_state"]
+        dx_max::Float64        =        cfg["execution" ]["dx_max"]
+        linesearch::Bool       =        cfg["execution" ]["linesearch"]
+        conv_atol::Float64     =        cfg["execution" ]["converge_atol"]
+        conv_rtol::Float64     =        cfg["execution" ]["converge_rtol"]
+        max_steps::Int         =        cfg["execution" ]["max_steps"]
+        max_runtime::Float64   =        cfg["execution" ]["max_runtime"]
 
         #    plotting stuff 
         plt_run::Bool          = cfg["plots"     ]["at_runtime"]
@@ -333,7 +338,7 @@ module AGNI
         # Setup atmosphere
         @info "Setting up"
         atmos = atmosphere.Atmos_t()
-        atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+        return_success = atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                                 spfile_name,
                                 instellation, asf_sf, albedo_b, zenith,
                                 tmp_surf, 
@@ -354,7 +359,12 @@ module AGNI
                                 C_d=turb_coeff, U=wind_speed,
                                 use_all_gases=use_all_gases
                         )
-        atmosphere.allocate!(atmos,star_file)
+
+        return_success || return false 
+
+        # Allocate atmosphere 
+        return_success = atmosphere.allocate!(atmos,star_file)
+        return_success || return false 
 
         # Set PT profile by looping over requests
         # Each request may be a command, or an argument following a command
@@ -376,6 +386,11 @@ module AGNI
                 # isothermal stratosphere 
                 idx_req += 1
                 setpt.stratosphere!(atmos, parse(Float64, initial_req[idx_req]))
+
+            elseif str_req == "loglin"
+                # log-linear profile between T_surf and T_top
+                idx_req += 1
+                setpt.loglinear!(atmos, parse(Float64, initial_req[idx_req]))
                 
             elseif str_req == "iso"
                 # isothermal profile 
@@ -398,10 +413,6 @@ module AGNI
                 setpt.add!(atmos,parse(Float64, initial_req[idx_req]))
 
             elseif str_req == "sat"
-                # check surface supersaturation
-                setpt.prevent_surfsupersat!(atmos)
-            
-            elseif str_req == "con"
                 # condensing a volatile 
                 idx_req += 1
                 setpt.saturation!(atmos, initial_req[idx_req])
@@ -450,7 +461,6 @@ module AGNI
         incl_conduct::Bool = false
 
         # Loop over requested solvers 
-        return_success::Bool = true
         solver_success::Bool = true
         method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
         
@@ -461,6 +471,7 @@ module AGNI
             push!(solvers_cmd, "")
         end
 
+        @info " "
         for sol in solvers_cmd 
 
             sol = strip(lowercase(sol))
@@ -492,6 +503,7 @@ module AGNI
                                     dx_max=dx_max, linesearch=linesearch,
                                     modplot=modplot,save_frames=plt_ani)
                 return_success = return_success && solver_success
+                
             else 
                 @error "Invalid solver"
                 return_success = false 
@@ -514,25 +526,29 @@ module AGNI
         flag_cld && plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
 
         plt_ani && plotting.animate(atmos)
-        plt_vmr && plotting.plot_vmr(atmos,        joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
-        plt_cff && plotting.plot_contfunc(atmos,   joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
-        plt_tmp && plotting.plot_pt(atmos,         joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
-        plt_flx && plotting.plot_fluxes(atmos,     joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
-        plt_ems && plotting.plot_emission(atmos,   joinpath(atmos.OUT_DIR,"plot_emission.png"))
-        plt_alb && plotting.plot_albedo(atmos,     joinpath(atmos.OUT_DIR,"plot_albedo.png"))
+        plt_vmr && plotting.plot_vmr(atmos,      joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
+        plt_cff && plotting.plot_contfunc(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
+        plt_tmp && plotting.plot_pt(atmos,       joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
+        plt_flx && plotting.plot_fluxes(atmos,   joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
+        plt_ems && plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
+        plt_alb && plotting.plot_albedo(atmos,   joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 
         # Deallocate atmosphere
         @info "Deallocating memory"
         atmosphere.deallocate!(atmos)
 
         # Temp folders
-        if cfg["execution"]["clean_output"]
+        if clean_output
             @debug "Cleaning output folder"
             # save fastchem outputs 
             if chem_type in [1,2,3]
-                cp(joinpath(output_dir,"fastchem","chemistry.dat"),joinpath(output_dir,"fc_gas.dat"), force=true)
+
+                cp(joinpath(output_dir,"fastchem","chemistry.dat"),
+                   joinpath(output_dir,"fc_gas.dat"), force=true)
+
                 if chem_type in [2,3]
-                    cp(joinpath(output_dir,"fastchem","condensates.dat"),joinpath(output_dir,"fc_con.dat"), force=true)
+                    cp(joinpath(output_dir,"fastchem","condensates.dat"),
+                       joinpath(output_dir,"fc_con.dat"), force=true)
                 end 
             end 
             # remove folders
@@ -542,7 +558,7 @@ module AGNI
 
         # Finish up
         runtime = round(time() - tbegin, digits=2)
-        @info "Model runtime: $runtime seconds"
+        @info @sprintf("Model runtime: %.2f seconds", runtime)
         @info "Goodbye"
 
         return return_success 

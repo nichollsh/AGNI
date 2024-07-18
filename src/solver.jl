@@ -23,7 +23,8 @@ module solver
     
     Minimises a function `f` between the bounds `a` and `b`.
     """
-    function gs_search(f::Function,a::Float64,b::Float64,dxtol::Float64,max_steps::Int)::Float64
+    function gs_search(f::Function,a::Float64,b::Float64,
+                            dxtol::Float64,atol::Float64,max_steps::Int)::Float64
         c::Float64 = (-1+sqrt(5))/2
     
         x1::Float64 = c*a + (1-c)*b
@@ -50,8 +51,8 @@ module solver
             end
 
             best = 0.5*(a+b)
-    
-            if abs(b-a) < dxtol
+            
+            if (fx1 < atol) || (fx2 < atol) || (abs(b-a) < dxtol)
                 @debug "GS search succeeded after $(i+2) function evaluations (best = $best)"
                 break
             end
@@ -85,7 +86,7 @@ module solver
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `linesearch::Bool`                use a linesearch algorithm to determine the best step size
     - `modulate_mlt::Bool`              improve convergence with convection by introducing MLT gradually
-    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns as required
+    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
@@ -117,10 +118,6 @@ module solver
             @error "Invalid solution type ($sol_type)"
             return false
         end
-        # if detect_plateau && !linesearch
-        #     @warn "Plateau nudging enabled without linesearch - expect instability"
-        # end 
-        detect_plateau = detect_plateau && linesearch
 
         # Start timer 
         wct_start::Float64 = time()
@@ -139,26 +136,30 @@ module solver
         # Execution parameters
         # --------------------
         #    convection 
-        convect_incr::Float64 = 6.0     # Factor to increase convect_sf when modulating convection
-        convect_sf::Float64 =   5.0e-5  # Convective flux scale factor 
+        convect_incr::Float64 = 3.0     # Factor to increase convect_sf when modulating convection
+        convect_sf::Float64 =   1.0e-5  # Convective flux scale factor 
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
         perturb_conv::Float64 = 0.02    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
-        perturb_crit::Float64 = 1.0     # Require Jacobian update at level i when r_i>perturb_crit
+        perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
-        ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
-        ls_tau::Float64    =    0.5     # backtracking step size
-        ls_increase::Float64 =  1.01    # factor by which cost can increase
-        ls_max_steps::Int  =    10      # maximum steps 
-        ls_min_scale::Float64 = 3.0e-4  # minimum scale
+        ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
+        ls_tau::Float64    =    0.5     # backtracking downscale size
+        ls_increase::Float64 =  1.5     # factor by which cost can increase
+        ls_max_steps::Int  =    15      # maximum steps 
+        ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
         #    plateau 
-        plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
+        plateau_n::Int =        3       # Plateau declared when plateau_i > plateau_n
         plateau_s::Float64 =   9000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
-        plateau_r::Float64 =    0.95    # Cost ratio for determining whether to increment plateau_i
+        plateau_r::Float64 =    0.97    # Cost ratio for determining whether to increment plateau_i
+
+        if !linesearch
+            plateau_s = 50.0  # don't go crazy if linesearch is disabled
+        end 
 
         # --------------------
         # Execution variables
@@ -189,12 +190,12 @@ module solver
         ls_cost::Float64         = 1.0e99               # linesearch cost 
 
         #     tracking
-        step::Int =         0       # Step number
-        code::Int =         -1      # Status code 
-        runtime::Float64  = 0.0     # Model runtime [s]
-        fc_retcode::Int  =  0       # Fastchem return code
-        step_ok::Bool =     true    # Current step was fine
-        plateau_i::Int =    0       # Number of iterations for which step was small 
+        step::Int =             0       # Step number
+        code::Int =             99      # Status code 
+        runtime::Float64  =     0.0     # Model runtime [s]
+        fc_retcode::Int  =      0       # Fastchem return code
+        step_ok::Bool =         true    # Current step was fine
+        plateau_i::Int =        0       # Number of iterations for which step was small 
 
         #      statistics
         r_med::Float64 =        9.0     # Median residual
@@ -226,11 +227,11 @@ module solver
         end # end set_tmps
 
         # Objective function
-        function _fev!(x::Array{Float64,1},resid::Array{Float64,1})
+        function _fev!(x::Array{Float64,1},resid::Array{Float64,1})::Bool
 
             # Reset masks
-            fill!(atmos.mask_c, 0.0)
-            fill!(atmos.mask_l, 0.0)
+            fill!(atmos.mask_c, false)
+            fill!(atmos.mask_l, false)
            
             # Set temperatures 
             _set_tmps!(x)
@@ -239,18 +240,17 @@ module solver
             atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout (but not energy release)
-            if !latent && atmos.condense_any
+            if atmos.condense_any && (atmos.gas_num > 1)
                 atmosphere.handle_saturation!(atmos)
             end
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
-                                latent,  convect, sens_heat, conduct, 
+                                latent, convect, sens_heat, conduct, 
                                 convect_sf=convect_sf)
 
-
-            # Additional energy input
-            atmos.flux_dif[:] .+= atmos.ediv_add[:] .* atmos.layer_thick
+            # Energy divergence term
+            atmos.flux_dif[:] .-= atmos.ediv_add[:] 
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
@@ -261,7 +261,8 @@ module solver
                 # Zero loss 
                 resid[1:end-1] .= atmos.flux_dif[1:end]
                 # Conductive boundary layer
-                resid[end] = atmos.flux_tot[end] - (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k / atmos.skin_d
+                resid[end] = atmos.flux_tot[end] - 
+                             (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k/atmos.skin_d
 
             elseif (sol_type == 3)
                 # Zero loss
@@ -280,19 +281,23 @@ module solver
             # Check that residuals are real numbers
             if !all(isfinite, resid)
                 display(resid)
-                error("Residual array contains NaNs and/or Infs")
+                @error "Residual array contains NaNs and/or Infs"
+                code = 4
+                return false 
             end
 
-            return nothing
+            return true
         end  # end fev
 
-        # Calculate the jacobian and residuals at x using a 2nd order central-difference method
+        # Calculate the jacobian and residuals at x using a 2nd order central-difference 
         function _calc_jac_res!(x::Array{Float64, 1}, jacob::Array{Float64, 2}, 
                                     resid::Array{Float64 ,1}, central::Bool, order::Int,
-                                    which::Array{Bool,1})
+                                    which::Array{Bool,1})::Bool
+
+            ok::Bool = true
 
             # Evalulate residuals at x
-            _fev!(x, resid)
+            ok = ok && _fev!(x, resid)
 
             # For each level...
             for i in 1:arr_len 
@@ -314,24 +319,24 @@ module solver
 
                 # Forward part (1 step)
                 x_s[i] = x[i] + fd_s
-                _fev!(x_s, rf1)
+                ok = ok && _fev!(x_s, rf1)
 
                 # Forward part (2 step)
                 if order == 4
                     x_s[i] = x[i] + 2.0*fd_s
-                    _fev!(x_s, rf2)
+                    ok = ok && _fev!(x_s, rf2)
                 end 
 
                 # Backward part
                 if central
                     # (1 step)
                     x_s[i] = x[i] - fd_s
-                    _fev!(x_s, rb1)
+                    ok = ok && _fev!(x_s, rb1)
 
                     # (2 step)
                     if order == 4
                         x_s[i] = x[i] - 2.0*fd_s
-                        _fev!(x_s, rb2)
+                        ok = ok && _fev!(x_s, rb2)
                     end 
                 end
 
@@ -360,13 +365,12 @@ module solver
                 end # end residuals
             end # end levels
 
-            return nothing
+            return ok
         end # end jr_cd
 
         # Cost function to minimise
         function _cost(_r::Array)
-            # return norm(_r)
-            return maximum(abs.(_r[:]))
+            return norm(_r, 6)
         end 
 
         # Plot current state
@@ -430,8 +434,9 @@ module solver
         for di in 1:arr_len 
             dtd[di,di] = 1.0
         end 
-        fill!(r_cur, 1.0e99)
-        fill!(r_old, 1.0e98)
+        fill!(r_cur, 1.0e99)            # reset residual arrays 
+        fill!(r_old, 1.0e98)            # ^
+        energy.reset_fluxes!(atmos)     # reset energy fluxes
 
         # Modulate convection?
         modulate_mlt = modulate_mlt && convect
@@ -445,7 +450,9 @@ module solver
         end
 
         if modprint > 0
-            @info @sprintf("    step  resid_med    cost     flux_OLR   xvals_med  xvals_max  |dx|_max   flags")
+            @info @sprintf("    step  resid_med    cost     flux_OLR    max(x)    max(|dx|)   flags")
+        else
+            @info "    please wait..." 
         end 
         info_str::String = ""
         stepflags::String = ""
@@ -509,7 +516,7 @@ module solver
                 # Check if sf needs to be increased
                 if c_cur < max(100.0*conv_rtol, 10.0)
                     if convect_sf < 1.0 
-                        # increase sf - reduce modulation by 10x
+                        # increase sf => reduce modulation by convect_incr
                         stepflags *= "r"
                         convect_sf = min(1.0, convect_sf*convect_incr)
                         @debug "convect_sf = $convect_sf"
@@ -532,7 +539,9 @@ module solver
 
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
-            if (step == 1) || perturb_all || (c_cur*perturb_conv < conv_atol + conv_rtol * c_max) || mod(step,perturb_mod)==0
+            if (step == 1) || perturb_all || 
+                    (c_cur*perturb_conv < conv_atol + conv_rtol * c_max) || 
+                    mod(step,perturb_mod)==0
                 # Update whole matrix if:
                 #    on first step, was requested, or near global convergence
                 fill!(perturb, true)
@@ -540,9 +549,12 @@ module solver
                 # Skip updating Jacobian where the residuals are small, so
                 #    that this column of J will be left with the last values
                 #    calculated by the finite-difference scheme. This is okay
-                #    as long as the jacobian is approx diagonally dominant.
-                for i in 3:arr_len-2
-                    perturb[i] = (maximum(abs.(r_cur[i-1:i+1])) > perturb_crit) || (atmos.mask_l[i] > 0) || (atmos.mask_l[i] > 0)
+                #    as long as the jacobian is approx diagonally dominant, or
+                #    the layer is near convergence.
+                for i in 3:arr_len-3
+                    perturb[i] = (sum(abs.(r_cur[i-2:i+2])) > perturb_crit) ||
+                                    any(atmos.mask_l[i-1:i+1]) ||
+                                    any(atmos.mask_c[i-1:i+1])
                 end 
             end 
 
@@ -551,11 +563,17 @@ module solver
             if fdc || (step == 1) || (c_cur/c_old > fdr)
                 # use central difference if: 
                 #    requested, at the start, or insufficient cost decrease
-                _calc_jac_res!(x_cur, b, r_cur, true, fdo, perturb)
+                if !_calc_jac_res!(x_cur, b, r_cur, true, fdo, perturb)
+                    code = 99 
+                    break 
+                end 
                 stepflags *= "C$fdo-"
             else
                 # otherwise, use forward difference
-                _calc_jac_res!(x_cur, b, r_cur, false, fdo, perturb)
+                if !_calc_jac_res!(x_cur, b, r_cur, false, fdo, perturb)
+                    code = 99 
+                    break 
+                end 
                 stepflags *= "F$fdo-"
             end
 
@@ -614,7 +632,7 @@ module solver
 
                 # Reset
                 stepflags *= "Ls-"
-                ls_alpha = 1.0      # full step
+                ls_alpha = 1.0
                 ls_cost  = 1.0e99   # big number 
 
                 # Internal function minimised by GS search
@@ -626,14 +644,15 @@ module solver
 
                 if ls_method == 1
                     # Use golden-section minimisation to find best scale
-                    ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha, ls_min_scale, ls_max_steps)
+                    ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha, 
+                                            1.0e-9, ls_min_scale, ls_max_steps)
 
                 elseif ls_method == 2
                     # Use backtracking line search to find best scale
                     for il in 1:ls_max_steps
                         ls_cost = _ls_func(ls_alpha)
                         if ls_cost <= c_cur*ls_increase
-                            # this scale is good 
+                            # this scale is good enough
                             break
                         else 
                             # scale is not good - try shrinking it further 
@@ -647,8 +666,12 @@ module solver
                     end 
 
                 else 
-                    error("Invalid linesearch algorithm $ls_method")
+                    @error "Invalid linesearch algorithm $ls_method"
+                    code = 99
+                    break
                 end 
+
+                ls_alpha = max(ls_alpha, ls_min_scale)
 
                 # Apply best scale from linesearch
                 x_dif[:] .*= ls_alpha
@@ -690,7 +713,9 @@ module solver
             end 
                 
             # Inform user
-            info_str *= @sprintf("%+.2e  %.3e  %.3e  %+.2e  %+.2e  %.3e  %-s", r_med, c_cur, atmos.flux_u_lw[1], x_med, x_max, dx_stat, stepflags[1:end-1])
+            info_str *= @sprintf("%+.2e  %.3e  %.3e  %.3e  %.3e  %-s", 
+                                 r_med, c_cur, atmos.flux_u_lw[1], 
+                                 x_max, dx_stat, stepflags[1:end-1])
             if (modprint>0) && (mod(step, modprint)==0)
                 if step_ok
                     @info info_str 
@@ -727,9 +752,9 @@ module solver
         elseif code == 3
             @error "    failure (maximum time)"
         elseif code == 4
-            @error "    failure (NaN temperature)"
+            @error "    failure (NaN values)"
         else 
-            @error "    failure (unhandled)"
+            @error "    failure (other)"
         end
 
         _fev!(x_cur, zeros(Float64, arr_len))
@@ -738,8 +763,8 @@ module solver
         # ----------------------------------------------------------
         # Print info
         # ---------------------------------------------------------- 
-        loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
-        loss_pct = 100.0*loss/maximum(atmos.flux_tot)
+        loss = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+        loss_pct = 100.0*loss/maximum(abs.(atmos.flux_tot))
         @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
         if (sol_type == 2)
             F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
@@ -747,7 +772,7 @@ module solver
         end
         @info @sprintf("    total flux at TOA  = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    total flux at BOA  = %+.2e W m-2     ", atmos.flux_tot[end])
-        @info @sprintf("    column max. loss   = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
+        @info @sprintf("    column max loss    = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
         @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
        

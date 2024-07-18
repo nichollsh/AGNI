@@ -21,8 +21,11 @@ docs/build
 *.par 
 *.xsc
 *.bin
-res/spectral_files/*/4096
-res/spectral_files/Reach/
+
+# Model data
+res/spectral_files/*
+res/stellar_spectra/*
+!res/*/_readme.txt
 
 # Output files 
 out/*
