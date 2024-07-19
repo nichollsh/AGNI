@@ -21,7 +21,8 @@ Follow the steps below in order to setup the code.
     - Run `source get_socrates.sh`    
 5. `julia -e 'using Pkg; Pkg.activate("."); Pkg.build()'`
 AGNI is now installed as a package into a Julia environment in the AGNI
-directory. This will also have downloaded some input data. You should run the tests next.
+directory. This will also have downloaded some basic input data. 
+You should run the tests next.
 
 !!! tip 
     The `get_socrates` script automatically adds the radiation code to your
