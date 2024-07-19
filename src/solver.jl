@@ -85,7 +85,7 @@ module solver
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `linesearch::Bool`                use a linesearch algorithm to determine the best step size
-    - `modulate_mlt::Bool`              improve convergence with convection by introducing MLT gradually
+    - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `modplot::Int`                    iteration frequency at which to make plots
@@ -106,8 +106,8 @@ module solver
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
-                            linesearch::Bool=true, modulate_mlt::Bool=false,
-                            detect_plateau::Bool=true, perturb_all::Bool=true,
+                            linesearch::Bool=true, easy_start::Bool=true,
+                            detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             modprint::Int=1,
                             conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
@@ -136,8 +136,8 @@ module solver
         # Execution parameters
         # --------------------
         #    convection 
-        convect_incr::Float64 = 3.0     # Factor to increase convect_sf when modulating convection
-        convect_sf::Float64 =   1.0e-5  # Convective flux scale factor 
+        easy_incr::Float64 = 3.0        # Factor by which to increase easy_sf at each step
+        easy_sf::Float64 =   1.0e-5     # Convective & phase change flux scale factor 
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
@@ -146,11 +146,11 @@ module solver
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
-        ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
+        ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.5     # backtracking downscale size
         ls_increase::Float64 =  1.5     # factor by which cost can increase
         ls_max_steps::Int  =    15      # maximum steps 
-        ls_min_scale::Float64 = 1.0e-5  # minimum scale
+        ls_min_scale::Float64 = 4.0e-5  # minimum scale
 
         #    plateau 
         plateau_n::Int =        3       # Plateau declared when plateau_i > plateau_n
@@ -247,7 +247,7 @@ module solver
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
                                 latent, convect, sens_heat, conduct, 
-                                convect_sf=convect_sf)
+                                convect_sf=easy_sf, latent_sf=easy_sf)
 
             # Energy divergence term
             atmos.flux_dif[:] .-= atmos.ediv_add[:] 
@@ -438,10 +438,10 @@ module solver
         fill!(r_old, 1.0e98)            # ^
         energy.reset_fluxes!(atmos)     # reset energy fluxes
 
-        # Modulate convection?
-        modulate_mlt = modulate_mlt && convect
-        if !modulate_mlt
-            convect_sf = 1.0
+        # Modulate convection and phase change?
+        easy_start = easy_start && (convect || latent)
+        if !easy_start
+            easy_sf = 1.0
         end
 
         # Initial plot 
@@ -509,21 +509,21 @@ module solver
             step_ok = step_ok && atmosphere.calc_layer_props!(atmos)
 
             # Check convective modulation
-            if modulate_mlt 
+            if easy_start 
                 # We are modulating
                 stepflags *= "M"
                 
                 # Check if sf needs to be increased
                 if c_cur < max(100.0*conv_rtol, 10.0)
-                    if convect_sf < 1.0 
-                        # increase sf => reduce modulation by convect_incr
+                    if easy_sf < 1.0 
+                        # increase sf => reduce modulation by easy_incr
                         stepflags *= "r"
-                        convect_sf = min(1.0, convect_sf*convect_incr)
-                        @debug "convect_sf = $convect_sf"
-                        
+                        easy_sf = min(1.0, easy_sf*easy_incr)
+                        @debug "easy_sf = $easy_sf"
+
                         # done modulating 
-                        if convect_sf > 0.99
-                            modulate_mlt = false 
+                        if easy_sf > 0.99
+                            easy_start = false 
                         end
                     end 
                 end
@@ -534,7 +534,7 @@ module solver
                 stepflags *= "-"
             else
                 # No modulation at this point
-                convect_sf = 1.0 
+                easy_sf = 1.0 
             end 
 
             # Determine which parts of the Jacobian matrix need to be updated
@@ -728,7 +728,7 @@ module solver
 
             # Converged?
             @debug "        check convergence"
-            if (c_cur < conv_atol + conv_rtol * c_max) && !modulate_mlt
+            if (c_cur < conv_atol + conv_rtol * c_max) && !easy_start
                 code = 0
                 break
             end
