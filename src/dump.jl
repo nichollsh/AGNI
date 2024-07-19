@@ -85,8 +85,8 @@ module dump
         # into PROTEUS without compatibility issues.
 
         # Absorb output from these calls, because they spam the Debug logger
-        @debug "ALL OUTPUT SUPPRESSED"
-        with_logger(NullLogger()) do
+        @debug "ALL DEBUG SUPPRESSED"
+        with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
 
             ds = Dataset(fname,"c")
 
@@ -327,8 +327,9 @@ module dump
             var_albs[:] = atmos.albedo_s_arr
 
             close(ds)
+
         end # suppress output 
-        @debug "ALL OUTPUT RESTORED"
+        @debug "ALL DEBUG RESTORED"
 
         return nothing
     end # end write_ncdf
