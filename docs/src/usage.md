@@ -8,7 +8,7 @@ If you require more data, such as additional stellar spectra or opacities, then 
 also be easily obtained using the `get_data` script in the AGNI root directory. To see how
 to use this script, run it without arguments like so:
 ```bash 
-./get_data 
+./get_data.sh 
 ```
 
 ## Tutorials
