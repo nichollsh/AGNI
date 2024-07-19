@@ -169,7 +169,11 @@ module atmosphere
         # Conduction 
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
 
-        # Phase change 
+        # Phase change
+        phs_tau_mix::Float64                # Time scale (mixed composition)
+        phs_tau_sgl::Float64                # Time scale (single gas)
+        phs_wrk_df::Array{Float64,1}        # work array: flux difference
+        phs_wrk_fl::Array{Float64,1}        # work array: edge fluxes
         flux_l::Array{Float64, 1}           # Latent heat energy flux [W m-2]
         mask_l::Array{Bool,1}               # Layers transporting latent heat
 
@@ -310,7 +314,7 @@ module atmosphere
         end
 
         # Code versions 
-        atmos.AGNI_VERSION = "0.6.0"
+        atmos.AGNI_VERSION = "0.6.1"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -415,6 +419,10 @@ module atmosphere
         atmos.cloud_arr_r   = zeros(Float64, atmos.nlev_c) 
         atmos.cloud_arr_l   = zeros(Float64, atmos.nlev_c)
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c) 
+
+        # Phase change timescales [seconds]
+        atmos.phs_tau_mix = 1.0e4   # mixed composition case
+        atmos.phs_tau_sgl = 1.0e4   # single gas case
 
         # Hardcoded cloud properties 
         atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
@@ -1347,10 +1355,12 @@ module atmosphere
         atmos.mask_l =            falses(atmos.nlev_l)      # Phase change 
         atmos.mask_c =            falses(atmos.nlev_l)      # Dry convection
 
+        atmos.phs_wrk_df =        zeros(Float64, atmos.nlev_c)  # flux difference
+        atmos.phs_wrk_fl =        zeros(Float64, atmos.nlev_l)  # edge fluxes
         atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat / phase change 
         atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection 
         atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction 
-        atmos.Kzz =               zeros(Float64, atmos.nlev_l)
+        atmos.Kzz =               zeros(Float64, atmos.nlev_l)  # eddy diffusion coeff.
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)

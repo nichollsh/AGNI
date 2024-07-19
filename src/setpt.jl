@@ -13,6 +13,7 @@ module setpt
 
     using PCHIPInterpolation
     using NCDatasets
+    using LoggingExtras
 
     # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
@@ -130,42 +131,48 @@ module setpt
 
         # Open file 
         fpath = abspath(fpath)
-        ds = Dataset(fpath,"r")
+        @debug "Setting PT from NetCDF file "
+        @debug "ALL DEBUG SUPPRESSED"
+        with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
+            ds = Dataset(fpath,"r")
 
-        # Allocate interleaved temperature profile 
-        nlev_c::Int = length(ds["p"][:])
-        arr_n::Int = nlev_c + nlev_c + 1
-        arr_T::Array{Float64, 1} = zeros(Float64, arr_n)
-        arr_P::Array{Float64, 1} = zeros(Float64, arr_n)
+            # Allocate interleaved temperature profile 
+            nlev_c::Int = length(ds["p"][:])
+            arr_n::Int = nlev_c + nlev_c + 1
+            arr_T::Array{Float64, 1} = zeros(Float64, arr_n)
+            arr_P::Array{Float64, 1} = zeros(Float64, arr_n)
 
-        # top
-        arr_T[1] = ds["tmpl"][1]
-        arr_P[1] = min(ds["pl"][1],atmos.pl[1])    # extend to lower pressures
+            # top
+            arr_T[1] = ds["tmpl"][1]
+            arr_P[1] = min(ds["pl"][1],atmos.pl[1])    # extend to lower pressures
 
-        # middle 
-        idx::Int = 0
-        for i in 1:nlev_c
-            idx = (i-1)*2
-            arr_T[idx+1] = ds["tmpl"][i]
-            arr_T[idx+2] = ds["tmp"][i]
-            arr_P[idx+1] = ds["pl"][i]
-            arr_P[idx+2] = ds["p"][i]
-        end 
+            # middle 
+            idx::Int = 0
+            for i in 1:nlev_c
+                idx = (i-1)*2
+                arr_T[idx+1] = ds["tmpl"][i]
+                arr_T[idx+2] = ds["tmp"][i]
+                arr_P[idx+1] = ds["pl"][i]
+                arr_P[idx+2] = ds["p"][i]
+            end 
 
-        # bottom
-        arr_T[end] = ds["tmpl"][end]
-        arr_P[end] = max(ds["pl"][end], atmos.pl[end])  # extend to higher pressures 
+            # bottom
+            arr_T[end] = ds["tmpl"][end]
+            arr_P[end] = max(ds["pl"][end], atmos.pl[end])  # extend to higher pressures 
 
-        # interpolate 
-        itp = Interpolator(log10.(arr_P), arr_T) 
-        atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
-        atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
+            # properties 
+            atmos.tmp_surf = ds["tmp_surf"][1]
 
-        # properties 
-        atmos.tmp_surf = ds["tmp_surf"][1]
+            # Close file 
+            close(ds)
 
-        # Close file 
-        close(ds)
+            # interpolate 
+            itp = Interpolator(log10.(arr_P), arr_T) 
+            atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
+            atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
+                   
+        end
+        @debug "ALL DEBUG RESTORED"
 
         return
     end # end load_ncdf
