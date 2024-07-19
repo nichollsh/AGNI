@@ -473,14 +473,14 @@ module energy
 
         # Check for spurious shallow convection in condensing regions 
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.
-        # for i in 2:atmos.nlev_l-1
-        #     if any(atmos.mask_l[i:end])
-        #         if atmos.mask_c[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1]
-        #             atmos.mask_c[i] = false 
-        #             atmos.flux_cdry[i] = 0.0
-        #         end 
-        #     end 
-        # end 
+        for i in 2:atmos.nlev_l-1
+            if atmos.mask_l[i]
+                if atmos.mask_c[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1]
+                    atmos.mask_c[i] = false 
+                    atmos.flux_cdry[i] = 0.0
+                end 
+            end 
+        end 
 
         return nothing
     end # end of mlt
@@ -539,8 +539,8 @@ module energy
                     end 
 
                     # relaxation function
-                    atmos.phs_wrk_df[i] = (atmos.gas_vmr[c][i]-qsat) * 
-                                atmos.p[i] * atmos.layer_thick[i]/atmos.phs_tau_sgl
+                    atmos.phs_wrk_df[i] = (atmos.gas_vmr[c][i]-qsat)* atmos.layer_thick[i]* 
+                                          (atmos.pl[i+1]-atmos.pl[i])/ atmos.phs_tau_sgl
 
                     # flag layer as set by saturation
                     if atmos.phs_wrk_df[i] > 1.0e-10
@@ -572,16 +572,16 @@ module energy
                 E_accum = sum(atmos.phs_wrk_df[1:i_dry_top])
 
                 # evaporative flux in dry region
-                for i in i_dry_top:atmos.nlev_c
+                for i in i_dry_top+1:atmos.nlev_c
 
-                    if E_accum < 1.0e-2
+                    if E_accum < 0.1
                         # dissipate all of the flux
                         atmos.phs_wrk_df[i] = -E_accum
                         E_accum = 0.0
                         break
                     else
                         # dissipate some fraction of the accumuated flux 
-                        atmos.phs_wrk_df[i] = -0.9*E_accum
+                        atmos.phs_wrk_df[i] = -0.8*E_accum
                         E_accum += atmos.phs_wrk_df[i]
                     end 
                     
