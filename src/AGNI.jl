@@ -286,7 +286,7 @@ module AGNI
         flag_aer::Bool         =        cfg["execution" ]["aerosol"]
         overlap::Int           =        cfg["execution" ]["overlap_method"]
         thermo_funct::Bool     =        cfg["execution" ]["thermo_funct"]
-        conv_type::String      =        cfg["execution" ]["convection_type"]
+        incl_convect::Bool     =        cfg["execution" ]["convection"]
         incl_sens::Bool        =        cfg["execution" ]["sensible_heat"]
         incl_latent::Bool      =        cfg["execution" ]["latent_heat"]
         sol_type::Int          =        cfg["execution" ]["solution_type"]
@@ -294,6 +294,7 @@ module AGNI
         initial_req::Array{String,1} =  cfg["execution" ]["initial_state"]
         dx_max::Float64        =        cfg["execution" ]["dx_max"]
         linesearch::Bool       =        cfg["execution" ]["linesearch"]
+        easy_start::Bool       =        cfg["execution" ]["easy_start"]
         conv_atol::Float64     =        cfg["execution" ]["converge_atol"]
         conv_rtol::Float64     =        cfg["execution" ]["converge_rtol"]
         max_steps::Int         =        cfg["execution" ]["max_steps"]
@@ -455,8 +456,6 @@ module AGNI
         end 
 
         # Solver variables 
-        incl_convect::Bool= !isempty(conv_type)
-        use_mlt::Bool     = (conv_type == "mlt")
         modplot::Int      = 0
         incl_conduct::Bool = false
 
@@ -498,9 +497,10 @@ module AGNI
                                     convect=incl_convect, latent=incl_latent,
                                     sens_heat=incl_sens, max_steps=max_steps,
                                     max_runtime=max_runtime, 
-                                    conv_atol=conv_atol,
-                                    conv_rtol=conv_rtol, method=method_idx, 
+                                    conv_atol=conv_atol, conv_rtol=conv_rtol, 
+                                    method=method_idx, 
                                     dx_max=dx_max, linesearch=linesearch,
+                                    easy_start=easy_start,
                                     modplot=modplot,save_frames=plt_ani)
                 return_success = return_success && solver_success
                 
@@ -529,7 +529,7 @@ module AGNI
         plt_vmr && plotting.plot_vmr(atmos,      joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
         plt_cff && plotting.plot_contfunc(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc.png"))
         plt_tmp && plotting.plot_pt(atmos,       joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
-        plt_flx && plotting.plot_fluxes(atmos,   joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=use_mlt, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
+        plt_flx && plotting.plot_fluxes(atmos,   joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=incl_convect, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
         plt_ems && plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
         plt_alb && plotting.plot_albedo(atmos,   joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 

@@ -355,7 +355,7 @@ module energy
     - `pmin::Float64`           pressure [bar] below which convection is disabled
     - `mltype::Int`             mixing length value (0: scale height, 1: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-9, mltype::Int=1)
 
         pmin *= 1.0e5 # convert bar to Pa
 
@@ -382,11 +382,6 @@ module energy
             if atmos.pl[i] <= pmin
                 continue
             end
-
-            # Skip condensing regions 
-            # if atmos.mask_l[i]
-            #     continue 
-            # end 
 
             m1 = atmos.layer_mass[i-1]
             m2 = atmos.layer_mass[i]
@@ -476,6 +471,17 @@ module energy
             end
         end
 
+        # Check for spurious shallow convection in condensing regions 
+        #    If found, reset convective flux to zero AT THIS LAYER ONLY.
+        # for i in 2:atmos.nlev_l-1
+        #     if any(atmos.mask_l[i:end])
+        #         if atmos.mask_c[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1]
+        #             atmos.mask_c[i] = false 
+        #             atmos.flux_cdry[i] = 0.0
+        #         end 
+        #     end 
+        # end 
+
         return nothing
     end # end of mlt
 
@@ -502,14 +508,6 @@ module energy
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, false)
 
-        # Timescales [s]
-        timescale_mix::Float64 = 1e4 # mixture
-        timescale_sin::Float64 = 1e5 # single gas
-
-        # Work arrays 
-        df::Array{Float64,1} = zeros(Float64, atmos.nlev_c)    # flux difference
-        fl::Array{Float64,1} = zeros(Float64, atmos.nlev_l)    # edge fluxes
-
         # Single-gas relaxation case
         single::Bool = Bool(atmos.gas_num == 1)
         E_accum::Float64 = 0.0
@@ -519,8 +517,8 @@ module energy
         for c in atmos.condensates
 
             # reset df,fl for this condensable
-            fill!(df, 0.0)
-            fill!(fl, 0.0)
+            fill!(atmos.phs_wrk_df,0.0)
+            fill!(atmos.phs_wrk_fl,0.0)
 
             # Loop from bottom to top 
             for i in 1:atmos.nlev_c
@@ -541,11 +539,11 @@ module energy
                     end 
 
                     # relaxation function
-                    df[i] = (atmos.gas_vmr[c][i]-qsat) * 
-                                atmos.p[i] * atmos.layer_thick[i]/timescale_sin
+                    atmos.phs_wrk_df[i] = (atmos.gas_vmr[c][i]-qsat) * 
+                                atmos.p[i] * atmos.layer_thick[i]/atmos.phs_tau_sgl
 
                     # flag layer as set by saturation
-                    if df[i] > 1.0e-10
+                    if atmos.phs_wrk_df[i] > 1.0e-10
                         atmos.gas_sat[c][i] = true
                     end 
 
@@ -555,8 +553,8 @@ module energy
 
                     # Calculate latent heat release at this level from the contributions
                     #   of condensation (+) and evaporation (-), and a fixed timescale.
-                    df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * ( 
-                                atmos.gas_yield[c][i] / timescale_mix)
+                    atmos.phs_wrk_df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) * 
+                                        (atmos.gas_yield[c][i] / atmos.phs_tau_mix)
 
                 end 
 
@@ -566,25 +564,25 @@ module energy
             if single 
                 # find top of dry region
                 for i in 1:atmos.nlev_c
-                    if abs(df[i]) > 0
+                    if abs(atmos.phs_wrk_df[i]) > 0
                         i_dry_top=i+1
                     end 
                 end 
 
-                E_accum = sum(df[1:i_dry_top])
+                E_accum = sum(atmos.phs_wrk_df[1:i_dry_top])
 
                 # evaporative flux in dry region
                 for i in i_dry_top:atmos.nlev_c
 
                     if E_accum < 1.0e-2
                         # dissipate all of the flux
-                        df[i] = -E_accum
+                        atmos.phs_wrk_df[i] = -E_accum
                         E_accum = 0.0
                         break
                     else
                         # dissipate some fraction of the accumuated flux 
-                        df[i] = -0.9*E_accum
-                        E_accum += df[i]
+                        atmos.phs_wrk_df[i] = -0.9*E_accum
+                        E_accum += atmos.phs_wrk_df[i]
                     end 
                     
                 end 
@@ -593,21 +591,21 @@ module energy
             # Convert divergence to cell-edge fluxes.
             #     Assuming zero condensation at TOA, integrating downwards
             for i in 1:atmos.nlev_c
-                fl[i+1] = max(df[i] + fl[i], 0.0)
+                atmos.phs_wrk_fl[i+1] = max(atmos.phs_wrk_df[i] + atmos.phs_wrk_fl[i], 0.0)
             end 
 
             # Ensure that flux is zero at bottom of dry region.
             for i in 1:atmos.nlev_c
                 # check for where no phase change is occuring below this level
-                if maximum(abs.(df[i:end])) < 1.0e-5 
+                if maximum(abs.(atmos.phs_wrk_df[i:end])) < 1.0e-5 
                     # if so, set all phase change fluxes to zero in that region
-                    fl[i+1:end] .= 0.0
+                    atmos.phs_wrk_fl[i+1:end] .= 0.0
                     break
                 end  
             end 
 
             # add energy from this gas to total 
-            atmos.flux_l[:] .+= fl[:]
+            atmos.flux_l[:] .+= atmos.phs_wrk_fl[:]
 
             # calculate mask 
             atmos.mask_l[:] .= (abs.(atmos.flux_l[:]) .> 1.0e-10)
@@ -658,11 +656,12 @@ module energy
     - `sens_heat::Bool`                 include TKE sensible heat transport 
     - `conduct::Bool`                   include conductive heat transport
     - `convect_sf::Float64`             scale factor applied to convection fluxes
+    - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool=false`             calculate LW contribution function?
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t, 
                           latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
-                          convect_sf::Float64=1.0,
+                          convect_sf::Float64=1.0, latent_sf::Float64=1.0,
                           calc_cf::Bool=false)
 
         # Reset fluxes
@@ -670,7 +669,13 @@ module energy
 
         # +Condensation and evaporation
         if atmos.condense_any && latent 
+            # Calc flux
             energy.condense_diffuse!(atmos)
+
+            # Modulate?
+            atmos.flux_l *= latent_sf
+
+            # Add to total flux 
             atmos.flux_tot += atmos.flux_l
         end 
 

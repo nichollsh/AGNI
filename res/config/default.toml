@@ -49,12 +49,13 @@ title = "Default"                       # Name for this configuration file
     thermo_funct    = false                     # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     # Include heat release from phase change
-    convection_type = ""                        # Convection type (mlt = use mixing length theory).
+    convection      = true                      # Include heat transport by convection
     solution_type   = 0                         # Solution type (see wiki).
     solvers         = []                        # Ordered list of solvers to apply (see wiki).
     dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
     initial_state   = ["dry", "sat", "H2O"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     linesearch      = false                     # Use linesearch?
+    easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.   
     converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
 

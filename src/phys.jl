@@ -49,7 +49,7 @@ module phys
     const G_grav::Float64 = 6.67430e-11 # NIST CODATA
 
     # Molecule mean molecular weight, kg mol-1
-    const lookup_mmw = Dict{String, Float64}([
+    const lookup_mmw::Dict{String, Float64} = Dict{String, Float64}([
         # molecules
         ("H2O", 1.801530E-02 ), 
         ("CO2", 4.401000E-02 ), 
@@ -223,7 +223,7 @@ module phys
     end # end gas struct 
 
     # Pre-defined colors 
-    const lookup_color = Dict{String, String}([
+    const lookup_color::Dict{String, String} = Dict{String, String}([
         # common volatiles 
         ("H2O", "#027FB1" ),
         ("CO2", "#D24901" ),
@@ -465,29 +465,33 @@ module phys
         else
             # have data => load from file 
             @debug("    ncdf")
-            ds = Dataset(fpath,"r")
+            @debug "ALL DEBUG SUPPRESSED"
+            with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
+                ds = Dataset(fpath,"r")
 
-            # scalar properties  
-            gas.mmw = ds["mmw"][1]
-            gas.T_trip = ds["T_trip"][1]
-            gas.T_crit = ds["T_crit"][1]
-            gas.JANAF_name = String(ds["JANAF"][:])
+                # scalar properties  
+                gas.mmw = ds["mmw"][1]
+                gas.T_trip = ds["T_trip"][1]
+                gas.T_crit = ds["T_crit"][1]
+                gas.JANAF_name = String(ds["JANAF"][:])
 
-            # variable properties 
-            gas.cap_T = ds["cap_T"][:]
-            gas.cap_C = ds["cap_C"][:]
+                # variable properties 
+                gas.cap_T = ds["cap_T"][:]
+                gas.cap_C = ds["cap_C"][:]
 
-            gas.lat_T = ds["lat_T"][:]
-            gas.lat_H = ds["lat_H"][:]
+                gas.lat_T = ds["lat_T"][:]
+                gas.lat_H = ds["lat_H"][:]
 
-            gas.sat_T = ds["sat_T"][:]
-            gas.sat_P = ds["sat_P"][:]
-            if length(gas.sat_P) < 3
-                gas.no_sat = true
-            end 
+                gas.sat_T = ds["sat_T"][:]
+                gas.sat_P = ds["sat_P"][:]
+                if length(gas.sat_P) < 3
+                    gas.no_sat = true
+                end 
 
-            # close file 
-            close(ds)
+                # close file 
+                close(ds)
+            end
+            @debug "ALL DEBUG RESTORED"
 
             # setup interpolators 
             gas.cap_I = Interpolator(gas.cap_T, gas.cap_C)

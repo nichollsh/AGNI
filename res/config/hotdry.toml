@@ -44,12 +44,13 @@ title = "Hot and dry"
     thermo_funct    = true           
     sensible_heat   = true           
     latent_heat     = false
-    convection_type = "mlt"          
+    convection      = true         
     solution_type   = 3              
     solvers         = ["newton"]     
     dx_max          = 400.0          
     initial_state   = ["iso","2300"] 
-    linesearch      = false          
+    linesearch      = false   
+    easy_start      = false       
     converge_atol   = 1.0e-2         
     converge_rtol   = 1.0e-4         
 
