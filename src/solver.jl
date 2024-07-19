@@ -91,6 +91,7 @@ module solver
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
     - `modprint::Int`                   iteration frequency at which to print info
+    - `plot_jacobian::Bool`             plot jacobian too?
     - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
 
@@ -106,10 +107,10 @@ module solver
                             max_steps::Int=2000, max_runtime::Float64=600.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
-                            linesearch::Bool=true, easy_start::Bool=true,
+                            linesearch::Bool=true, easy_start::Bool=false,
                             detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
-                            modprint::Int=1,
+                            modprint::Int=1, plot_jacobian::Bool=true,
                             conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
                             )::Bool
 
@@ -135,20 +136,21 @@ module solver
         # --------------------
         # Execution parameters
         # --------------------
-        #    convection 
+        #    easy_start
         easy_incr::Float64 = 3.0        # Factor by which to increase easy_sf at each step
-        easy_sf::Float64 =   1.0e-5     # Convective & phase change flux scale factor 
+        easy_sf::Float64 =   2.0e-4     # Convective & phase change flux scale factor 
+        easy_trig::Float64 = 0.5        # Increase sf when cost*easy_trig satisfies convergence 
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        perturb_conv::Float64 = 0.02    # Require full Jacobian update when c_cur*peturb_conv satisfies convergence 
+        perturb_trig::Float64 = 0.1    # Require full Jacobian update when cost*peturb_trig satisfies convergence 
         perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
         ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.5     # backtracking downscale size
-        ls_increase::Float64 =  1.5     # factor by which cost can increase
+        ls_increase::Float64 =  2.0     # factor by which cost can increase
         ls_max_steps::Int  =    15      # maximum steps 
         ls_min_scale::Float64 = 4.0e-5  # minimum scale
 
@@ -195,6 +197,7 @@ module solver
         runtime::Float64  =     0.0     # Model runtime [s]
         fc_retcode::Int  =      0       # Fastchem return code
         step_ok::Bool =         true    # Current step was fine
+        easy_step::Bool =       false   # easy_start sf increased in this step
         plateau_i::Int =        0       # Number of iterations for which step was small 
 
         #      statistics
@@ -233,10 +236,10 @@ module solver
             fill!(atmos.mask_c, false)
             fill!(atmos.mask_l, false)
            
-            # Set temperatures 
+            # Set new temperatures 
             _set_tmps!(x)
 
-            # Calculate layer properties if required and haven't already
+            # Calculate layer properties
             atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout (but not energy release)
@@ -509,22 +512,26 @@ module solver
             step_ok = step_ok && atmosphere.calc_layer_props!(atmos)
 
             # Check convective modulation
+            easy_step = false
             if easy_start 
                 # We are modulating
                 stepflags *= "M"
                 
                 # Check if sf needs to be increased
-                if c_cur < max(100.0*conv_rtol, 10.0)
+                if c_cur*easy_trig < conv_atol + conv_rtol * c_max
                     if easy_sf < 1.0 
                         # increase sf => reduce modulation by easy_incr
                         stepflags *= "r"
                         easy_sf = min(1.0, easy_sf*easy_incr)
+                        easy_step = true
                         @debug "easy_sf = $easy_sf"
 
                         # done modulating 
                         if easy_sf > 0.99
                             easy_start = false 
                         end
+                    else 
+                        easy_sf = 1.0 
                     end 
                 end
 
@@ -539,8 +546,8 @@ module solver
 
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
-            if (step == 1) || perturb_all || 
-                    (c_cur*perturb_conv < conv_atol + conv_rtol * c_max) || 
+            if (step == 1) || perturb_all || easy_step ||
+                    (c_cur*perturb_trig < conv_atol + conv_rtol * c_max) || 
                     mod(step,perturb_mod)==0
                 # Update whole matrix if:
                 #    on first step, was requested, or near global convergence
@@ -613,9 +620,9 @@ module solver
                 stepflags *= "Lm-"
             end
 
-            # Extrapolate step if on plateau 
-            #    this acts to give the solver a 'nudge' in (hopefully) the 
-            #    right direction. Otherwise, this perturbation can still help.
+            # Extrapolate step if on plateau.
+            #    This acts to give the solver a 'nudge' in (hopefully) the right direction. 
+            #    Otherwise, this perturbation can still help.
             if plateau_i > plateau_n
                 x_dif[:] .*= plateau_s
                 plateau_i = 0
@@ -627,54 +634,64 @@ module solver
 
             # Linesearch 
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
-            if linesearch #&& (step > 1)
+            if linesearch
                 @debug "        linesearch"
 
                 # Reset
-                stepflags *= "Ls-"
                 ls_alpha = 1.0
                 ls_cost  = 1.0e99   # big number 
 
-                # Internal function minimised by GS search
+                # Internal function minimised by linesearch method
                 function _ls_func(scale::Float64)::Float64
                     x_cur[:] .= x_old[:] .+ scale .* x_dif[:]
                     _fev!(x_cur,r_tst)
                     return _cost(r_tst)
                 end 
 
-                if ls_method == 1
-                    # Use golden-section minimisation to find best scale
-                    ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha, 
-                                            1.0e-9, ls_min_scale, ls_max_steps)
+                # Do we need to do linesearch?
+                #    A small amount of cost increase is allowed.
+                #    Get the cost if we used the full step size.
+                ls_cost = _ls_func(ls_alpha)
+                if ls_cost > c_cur*ls_increase 
+                    
+                    # Yes, we do need to do linesearch...
+                    stepflags *= "Ls-"
+                    
+                    if ls_method == 1
+                        # Use golden-section search method
+                        ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha, 
+                                                1.0e-9, ls_min_scale, ls_max_steps)
 
-                elseif ls_method == 2
-                    # Use backtracking line search to find best scale
-                    for il in 1:ls_max_steps
-                        ls_cost = _ls_func(ls_alpha)
-                        if ls_cost <= c_cur*ls_increase
-                            # this scale is good enough
-                            break
-                        else 
-                            # scale is not good - try shrinking it further 
+                    elseif ls_method == 2
+                        # Use backtracking method
+
+                        for il in 1:ls_max_steps
+                            # try shrinking it further 
                             ls_alpha *= ls_tau
+
                             if ls_alpha < ls_min_scale
                                 # scale too small!
                                 ls_alpha = ls_min_scale
                                 break 
                             end 
+
+                            ls_cost = _ls_func(ls_alpha)
+                            if ls_cost <= c_cur*ls_increase
+                                # this scale is good enough
+                                break
+                            end 
                         end 
+
+                    else 
+                        @error "Invalid linesearch algorithm $ls_method"
+                        code = 99
+                        break
                     end 
-
-                else 
-                    @error "Invalid linesearch algorithm $ls_method"
-                    code = 99
-                    break
+                     
+                    # Apply best scale from linesearch
+                    ls_alpha = max(ls_alpha, ls_min_scale)
+                    x_dif[:] .*= ls_alpha
                 end 
-
-                ls_alpha = max(ls_alpha, ls_min_scale)
-
-                # Apply best scale from linesearch
-                x_dif[:] .*= ls_alpha
 
             end # end linesearch 
 
@@ -709,7 +726,9 @@ module solver
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
                 plot_step()
-                # plotting.jacobian(b, path_jac, perturb=perturb)
+                if plot_jacobian
+                    plotting.jacobian(b, path_jac, perturb=perturb)
+                end
             end 
                 
             # Inform user

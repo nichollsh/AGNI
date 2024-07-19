@@ -336,9 +336,12 @@ module AGNI
             target_olr = cfg["planet"]["target_olr"]
         end    
 
-        # Setup atmosphere
-        @info "Setting up"
+        # Create atmosphere structure
+        @debug "Instantiate atmosphere"
         atmos = atmosphere.Atmos_t()
+
+        # Setup atmosphere
+        @debug "Setup atmosphere "
         return_success = atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
                                 spfile_name,
                                 instellation, asf_sf, albedo_b, zenith,

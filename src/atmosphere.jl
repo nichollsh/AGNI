@@ -435,7 +435,6 @@ module atmosphere
             @error "VMRs provided twice"
             return false
         end
-
         if isempty(mf_path) && isempty(mf_dict)
             @error "VMRs not provided"
             return false
@@ -832,7 +831,8 @@ module atmosphere
         end 
 
         # Mass (per unit area, kg m-2) and density (kg m-3)
-        for i in 1:atmos.atm.n_layer
+        # Loop from top downards
+        for i in 1:atmos.nlev_c
             atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
             atmos.atm.mass[1, i] = atmos.layer_mass[i]          # pass to SOCRATES
 
@@ -875,7 +875,8 @@ module atmosphere
                                                       length=atmos.nlev_l-1))
 
         # Shrink near-surface layers by stretching all layers above 
-        p_mid::Float64 = atmos.pl[end-1]*0.6 + atmos.pl[end-2]*0.4
+        p_fact::Float64 = 0.6
+        p_mid::Float64 = atmos.pl[end-1]*p_fact + atmos.pl[end-2]*(1.0-p_fact)
         atmos.pl[1:end-2] .= collect(Float64, range( start=atmos.pl[1], 
                                                      stop=p_mid,
                                                      length=atmos.nlev_l-2))
