@@ -458,8 +458,8 @@ module phys
             gas.sat_P = [fbig, fbig]
             gas.no_sat = true
 
-            # critical set to large value (never supercritical)
-            gas.T_crit = fbig
+            # critical set to small value (always supercritical)
+            gas.T_crit = 0.0
             gas.T_trip = 0.0
 
         else
@@ -493,6 +493,11 @@ module phys
             end
             @debug "ALL DEBUG RESTORED"
 
+            # extrapolate to high temperatures 
+            push!(gas.cap_T, 9000.0); push!(gas.cap_C, gas.cap_C[end])
+            push!(gas.lat_T, 9000.0); push!(gas.lat_H, gas.lat_H[end])
+            push!(gas.sat_T, 9000.0); push!(gas.sat_P, gas.sat_P[end])
+
             # setup interpolators 
             gas.cap_I = Interpolator(gas.cap_T, gas.cap_C)
             gas.lat_I = Interpolator(gas.lat_T, gas.lat_H)
@@ -519,9 +524,12 @@ module phys
     """
     function get_Psat(gas::Gas_t, t::Float64)::Float64 
 
-        # Handle stub case 
+        # Handle stub cases 
         if gas.stub 
-            return gas.sat_P[1]
+            return fbig
+        end 
+        if gas.no_sat
+            return fbig 
         end 
 
         # Above critical point. In practice, a check for this should be made 

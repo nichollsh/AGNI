@@ -577,29 +577,6 @@ module atmosphere
             atmos.gas_ovmr[k][:] .= atmos.gas_vmr[k][:]
         end 
 
-        # store condensates 
-        for c in condensates
-            push!(atmos.condensates, c)
-        end 
-
-        # Validate condensate names 
-        atmos.condense_any = false
-        if length(condensates) > 0
-            for c in condensates
-                if !(c in atmos.gas_names)
-                    @error "Invalid condensate '$c'"
-                    return false
-                end 
-            end
-            atmos.condense_any = true
-        end 
-
-        # Except for single gas case, must have at least one non-condensable gas
-        if (length(condensates) == atmos.gas_num) && (atmos.gas_num > 1)
-            @error "There must be at least one non-condensable gas"
-            return false
-        end 
-
         # set condensation mask and yield values [kg]
         for g in atmos.gas_names 
             atmos.gas_sat[g]   = falses(atmos.nlev_c)
@@ -629,9 +606,31 @@ module atmosphere
         # Load gas thermodynamic data 
         for g in atmos.gas_names 
             atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g, atmos.thermo_funct)
-            if (g in atmos.condensates) && (atmos.gas_dat[g].stub)
-                @warn "No thermodynamic data found for condensable gas $g"
+        end 
+
+        # store condensates 
+        for c in condensates
+            if !atmos.gas_dat[c].stub && !atmos.gas_dat[c].no_sat
+                push!(atmos.condensates, c)
             end
+        end 
+
+        # Validate condensate names 
+        atmos.condense_any = false
+        if length(condensates) > 0
+            for c in condensates
+                if !(c in atmos.gas_names)
+                    @error "Invalid condensate '$c'"
+                    return false
+                end 
+            end
+            atmos.condense_any = true
+        end 
+
+        # Except for single gas case, must have at least one non-condensable gas
+        if (length(condensates) == atmos.gas_num) && (atmos.gas_num > 1)
+            @error "There must be at least one non-condensable gas"
+            return false
         end 
 
         # Set initial temperature profile to a small value which still keeps
