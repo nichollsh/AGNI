@@ -574,14 +574,14 @@ module energy
                 # evaporative flux in dry region
                 for i in i_dry_top+1:atmos.nlev_c
 
-                    if E_accum < 0.1
+                    if E_accum < 1.0e-4
                         # dissipate all of the flux
                         atmos.phs_wrk_df[i] = -E_accum
                         E_accum = 0.0
                         break
                     else
                         # dissipate some fraction of the accumuated flux 
-                        atmos.phs_wrk_df[i] = -0.8*E_accum
+                        atmos.phs_wrk_df[i] = -0.6*E_accum
                         E_accum += atmos.phs_wrk_df[i]
                     end 
                     
