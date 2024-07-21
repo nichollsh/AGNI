@@ -110,7 +110,7 @@ module solver
                             linesearch::Bool=true, easy_start::Bool=false,
                             detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
-                            modprint::Int=1, plot_jacobian::Bool=true,
+                            modprint::Int=1, plot_jacobian::Bool=false,
                             conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
                             )::Bool
 
@@ -150,7 +150,7 @@ module solver
         #    linesearch 
         ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.5     # backtracking downscale size
-        ls_increase::Float64 =  2.0     # factor by which cost can increase
+        ls_increase::Float64 =  1.05     # factor by which cost can increase
         ls_max_steps::Int  =    15      # maximum steps 
         ls_min_scale::Float64 = 4.0e-5  # minimum scale
 
@@ -636,6 +636,11 @@ module solver
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
             if linesearch
                 @debug "        linesearch"
+
+                # If model is struggling, do not allow cost to increase
+                if step > 0.8*max_steps
+                    ls_increase = 1.0
+                end 
 
                 # Reset
                 ls_alpha = 1.0
