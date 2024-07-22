@@ -1683,7 +1683,7 @@ module atmosphere
 
         # Parameters 
         evap_enabled::Bool =            true    # Enable re-vaporation of rain
-        evap_efficiency::Float64 =      0.8     # Evaporation efficiency
+        evap_efficiency::Float64 =      0.7     # Evaporation efficiency
 
         # Work arrays 
         maxvmr::Dict{String, Float64} = Dict{String, Float64}() # max running VMR for each condensable 
@@ -1818,7 +1818,7 @@ module atmosphere
                 end 
 
                 # evaporate rain in dry region 
-                for j in i_top_dry:i_bot_dry
+                for j in i_top_dry+1:i_bot_dry
 
                     # evaporate up to saturation
                     dp_sat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[j]) - 
@@ -1847,7 +1847,7 @@ module atmosphere
 
                     # add partial pressure from evaporation to pp at this level
                     dp_sat = dm_sat * atmos.layer_grav[j] * 
-                                        atmos.layer_mmw[j] / atmos.gas_dat[c].mmw 
+                                              atmos.layer_mmw[j] / atmos.gas_dat[c].mmw 
 
                     # convert extra pp to extra vmr
                     atmos.gas_vmr[c][j] += dp_sat / atmos.p[j]
