@@ -421,8 +421,8 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c) 
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 1.0e4   # mixed composition case
-        atmos.phs_tau_sgl = 1.0e4   # single gas case
+        atmos.phs_tau_mix = 3.0e4   # mixed composition case
+        atmos.phs_tau_sgl = 3.0e4   # single gas case
 
         # Hardcoded cloud properties 
         atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
@@ -1682,8 +1682,8 @@ module atmosphere
     function handle_saturation!(atmos::atmosphere.Atmos_t)
 
         # Parameters 
-        evap_enabled::Bool =            true    # Enable re-vaporation of rain
-        evap_efficiency::Float64 =      0.7     # Evaporation efficiency
+        evap_enabled::Bool =        true    # Enable re-vaporation of rain
+        evap_efficiency::Float64 =  0.8     # Evaporation efficiency
 
         # Work arrays 
         maxvmr::Dict{String, Float64} = Dict{String, Float64}() # max running VMR for each condensable 
@@ -1828,19 +1828,17 @@ module atmosphere
                     dm_sat = atmos.gas_dat[c].mmw * dp_sat/
                                             (atmos.layer_grav[j] * atmos.layer_mmw[j])
 
-                    # Evaporation efficiency factor 
-                    #   This fraction of the rain that *could* be evaporated
-                    #   at this layer *is* converted to vapour in this layer.
-                    dm_sat *= evap_efficiency
-                    
                     # can we evaporate all rain within this layer?
                     if total_rain < dm_sat 
                         # yes, so don't evaporate more rain than the total
                         dm_sat = total_rain
-                    else
-                        # no, so layer becomes saturated 
-                        atmos.gas_sat[c][j] = true  
                     end 
+                    atmos.gas_sat[c][j] = true 
+
+                    # Evaporation efficiency factor 
+                    #   This fraction of the rain that *could* be evaporated
+                    #   at this layer *is* converted to vapour in this layer.
+                    dm_sat *= evap_efficiency
 
                     # offset condensate yield at this level by the evaporation 
                     atmos.gas_yield[c][j] -= dm_sat
@@ -1857,7 +1855,6 @@ module atmosphere
 
                     # @printf("    %d: evaporating %.3e \n", j, dm_sat)
 
-                    # renormalise VMRs
                     # ---------------------
                     # WARNING
                     # THIS IS NOT CORRECT. IT WILL LEAD TO sum(x_gas)>1
@@ -1866,6 +1863,7 @@ module atmosphere
                     # ORDER TO CONSERVE MASS! 
                     # ----------------------
                     # normalise_vmrs!(atmos, j)
+                    #
 
                     # Recalculate layer mmw 
                     atmos.layer_mmw[j] = 0.0

@@ -471,14 +471,22 @@ module energy
             end
         end
 
-        # Check for spurious shallow convection in condensing regions 
+        # Check for spurious shallow convection occuring ABOVE condensing regions
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.
-        for i in 2:atmos.nlev_l-1
-            if atmos.mask_l[i]
-                if atmos.mask_c[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1]
-                    atmos.mask_c[i] = false 
-                    atmos.flux_cdry[i] = 0.0
-                end 
+        #    This is okay because this shouldn't physically happen, and will only occur 
+        #    because of weird numerical issues which only act to make solving difficult.
+        for i in 1:atmos.nlev_l-1
+            if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
+                atmos.mask_c[i] = false 
+                atmos.flux_cdry[i] = 0.0
+            end 
+        end 
+
+        # Do not allow single-layer convection
+        for i in 2:atmos.nlev_l-2
+            if atmos.mask_c[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1]
+                atmos.mask_c[i] = false 
+                atmos.flux_cdry[i] = 0.0
             end 
         end 
 
@@ -597,7 +605,7 @@ module energy
             # Ensure that flux is zero at bottom of dry region.
             for i in 1:atmos.nlev_c
                 # check for where no phase change is occuring below this level
-                if maximum(abs.(atmos.phs_wrk_df[i:end])) < 1.0e-5 
+                if maximum(abs.(atmos.phs_wrk_df[i:end])) < 1.0e-6 
                     # if so, set all phase change fluxes to zero in that region
                     atmos.phs_wrk_fl[i+1:end] .= 0.0
                     break
