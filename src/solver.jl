@@ -151,8 +151,8 @@ module solver
         ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.5     # backtracking downscale size
         ls_increase::Float64 =  1.05     # factor by which cost can increase
-        ls_max_steps::Int  =    15      # maximum steps 
-        ls_min_scale::Float64 = 4.0e-5  # minimum scale
+        ls_max_steps::Int  =    20      # maximum steps 
+        ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
         #    plateau 
         plateau_n::Int =        3       # Plateau declared when plateau_i > plateau_n
@@ -632,15 +632,16 @@ module solver
             # Limit step size, without changing direction of dx vector
             x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
+            # If model is struggling, do not allow cost to increase
+            if step > 0.8*max_steps
+                ls_increase = 1.0
+                perturb_all = true
+            end 
+
             # Linesearch 
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
             if linesearch
                 @debug "        linesearch"
-
-                # If model is struggling, do not allow cost to increase
-                if step > 0.8*max_steps
-                    ls_increase = 1.0
-                end 
 
                 # Reset
                 ls_alpha = 1.0
@@ -657,7 +658,7 @@ module solver
                 #    A small amount of cost increase is allowed.
                 #    Get the cost if we used the full step size.
                 ls_cost = _ls_func(ls_alpha)
-                if ls_cost > c_cur*ls_increase 
+                if (ls_cost > c_cur*ls_increase ) || (step == 1)
                     
                     # Yes, we do need to do linesearch...
                     stepflags *= "Ls-"
