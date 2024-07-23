@@ -144,7 +144,7 @@ module setpt
 
             # top
             arr_T[1] = ds["tmpl"][1]
-            arr_P[1] = min(ds["pl"][1],atmos.pl[1])    # extend to lower pressures
+            arr_P[1] = ds["pl"][1]   
 
             # middle 
             idx::Int = 0
@@ -158,7 +158,16 @@ module setpt
 
             # bottom
             arr_T[end] = ds["tmpl"][end]
-            arr_P[end] = max(ds["pl"][end], atmos.pl[end])  # extend to higher pressures 
+            arr_P[end] = ds["pl"][end] 
+
+            # extend with constant values to avoid issues with interpolator 
+            newtop = min(atmos.pl[1], arr_P[1])/2.0
+            pushfirst!(arr_P,newtop)
+            pushfirst!(arr_T, ds["tmpl"][1])
+
+            newbot = max(atmos.pl[end], arr_P[end])*2.0
+            push!(arr_P, newbot)
+            push!(arr_T, ds["tmpl"][end])
 
             # properties 
             atmos.tmp_surf = ds["tmp_surf"][1]
