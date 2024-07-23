@@ -482,14 +482,6 @@ module energy
             end 
         end 
 
-        # Do not allow single-layer convection
-        for i in 2:atmos.nlev_l-2
-            if atmos.mask_c[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1]
-                atmos.mask_c[i] = false 
-                atmos.flux_cdry[i] = 0.0
-            end 
-        end 
-
         return nothing
     end # end of mlt
 
@@ -500,7 +492,7 @@ module energy
     phase change at each level, a phase change flux is calculated by assuming 
     a fixed condensation timescale. 
     
-    Updates fluxes. Requires `atmosphere.handle_saturation`` to be called first in the 
+    Updates fluxes. Requires `atmosphere.handle_saturation` to be called first in the 
     multi-component case. 
 
     Arguments:
@@ -611,6 +603,7 @@ module energy
                     break
                 end  
             end 
+            atmos.phs_wrk_fl[end] = 0.0
 
             # add energy from this gas to total 
             atmos.flux_l[:] .+= atmos.phs_wrk_fl[:]
@@ -675,8 +668,15 @@ module energy
         # Reset fluxes
         reset_fluxes!(atmos)
 
+        atmosphere.calc_layer_props!(atmos)
+
         # +Condensation and evaporation
         if atmos.condense_any && latent 
+            # Handle rainout 
+            if atmos.gas_num > 1
+                atmosphere.handle_saturation!(atmos)
+            end
+
             # Calc flux
             energy.condense_diffuse!(atmos)
 
@@ -685,7 +685,14 @@ module energy
 
             # Add to total flux 
             atmos.flux_tot += atmos.flux_l
+
+            # Restore mixing ratios
+            for g in atmos.gas_names
+                atmos.gas_vmr[g][:] .=  atmos.gas_ovmr[g][:]
+            end 
         end 
+
+        atmosphere.calc_layer_props!(atmos)
 
         # +Radiation
         energy.radtrans!(atmos, true, calc_cf=calc_cf)
