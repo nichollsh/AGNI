@@ -104,7 +104,7 @@ module solver
                             convect::Bool=true, sens_heat::Bool=false,
                             conduct::Bool=false, latent::Bool=false,
                             dx_max::Float64=400.0,  
-                            max_steps::Int=2000, max_runtime::Float64=600.0,
+                            max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
                             linesearch::Bool=true, easy_start::Bool=false,
@@ -152,7 +152,7 @@ module solver
         #    linesearch 
         ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.6     # backtracking downscale size
-        ls_increase::Float64 =  1.2     # factor by which cost can increase
+        ls_increase::Float64 =  1.1     # factor by which cost can increase
         ls_max_steps::Int  =    20      # maximum steps 
         ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
@@ -558,7 +558,8 @@ module solver
                 #    calculated by the finite-difference scheme. This is okay
                 #    as long as the jacobian is approx diagonally dominant, or
                 #    the layer is near convergence.
-                for i in 3:arr_len-3
+                fill!(perturb, true)
+                for i in 3:arr_len-4
                     perturb[i] = (sum(abs.(r_cur[i-2:i+2])) > perturb_crit) ||
                                     any(atmos.mask_l[i-1:i+1]) ||
                                     any(atmos.mask_c[i-1:i+1])
@@ -634,7 +635,7 @@ module solver
             x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
             # If model is struggling, do not allow cost to increase
-            if step > 0.8*max_steps
+            if step > 0.7*max_steps
                 ls_increase = 1.0
                 perturb_all = true
             end 
