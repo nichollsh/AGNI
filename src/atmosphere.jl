@@ -421,8 +421,8 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c) 
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 2.0e4   # mixed composition case
-        atmos.phs_tau_sgl = 2.0e4   # single gas case
+        atmos.phs_tau_mix = 3.0e4   # mixed composition case
+        atmos.phs_tau_sgl = 3.0e4   # single gas case
 
         # Hardcoded cloud properties 
         atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
