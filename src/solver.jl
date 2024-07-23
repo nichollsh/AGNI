@@ -136,10 +136,12 @@ module solver
         # --------------------
         # Execution parameters
         # --------------------
+        #    padding 
+        tmp_pad::Float64 =  10.0        # do not allow the solver to get closer than this to tmp_floor
+
         #    easy_start
         easy_incr::Float64 = 3.0        # Factor by which to increase easy_sf at each step
-        easy_sf::Float64 =   2.0e-4     # Convective & phase change flux scale factor 
-        easy_trig::Float64 = 0.5        # Increase sf when cost*easy_trig satisfies convergence 
+        easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence 
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
@@ -148,20 +150,16 @@ module solver
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
-        ls_method::Int     =    1       # linesearch algorithm (1: golden, 2: backtracking)
-        ls_tau::Float64    =    0.5     # backtracking downscale size
-        ls_increase::Float64 =  1.05     # factor by which cost can increase
+        ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
+        ls_tau::Float64    =    0.6     # backtracking downscale size
+        ls_increase::Float64 =  1.2     # factor by which cost can increase
         ls_max_steps::Int  =    20      # maximum steps 
         ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
         #    plateau 
-        plateau_n::Int =        3       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =   9000.0   # Scale factor applied to x_dif when plateau_i > plateau_n
-        plateau_r::Float64 =    0.97    # Cost ratio for determining whether to increment plateau_i
-
-        if !linesearch
-            plateau_s = 50.0  # don't go crazy if linesearch is disabled
-        end 
+        plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
+        plateau_s::Float64 =    8.0     # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
         # Execution variables
@@ -190,6 +188,8 @@ module solver
         c_old::Float64           = Inf                  # old cost (i-1)
         ls_alpha::Float64        = 1.0                  # linesearch scale factor 
         ls_cost::Float64         = 1.0e99               # linesearch cost 
+        easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor 
+
 
         #     tracking
         step::Int =             0       # Step number
@@ -238,14 +238,6 @@ module solver
            
             # Set new temperatures 
             _set_tmps!(x)
-
-            # Calculate layer properties
-            atmosphere.calc_layer_props!(atmos)
-
-            # Handle rainout (but not energy release)
-            if atmos.condense_any && (atmos.gas_num > 1)
-                atmosphere.handle_saturation!(atmos)
-            end
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, 
@@ -493,7 +485,7 @@ module solver
                 code = 4 
                 break
             end 
-            clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
+            clamp!(x_cur, atmos.tmp_floor+tmp_pad, atmos.tmp_ceiling-tmp_pad)
             _set_tmps!(x_cur)
 
             # Run chemistry scheme 
@@ -522,6 +514,12 @@ module solver
                     if easy_sf < 1.0 
                         # increase sf => reduce modulation by easy_incr
                         stepflags *= "r"
+
+                        # starting from sf=0
+                        if easy_sf < 1.0e-10
+                            easy_sf = 1e-4
+                        end 
+
                         easy_sf = min(1.0, easy_sf*easy_incr)
                         easy_step = true
                         @debug "easy_sf = $easy_sf"
@@ -549,8 +547,10 @@ module solver
             if (step == 1) || perturb_all || easy_step ||
                     (c_cur*perturb_trig < conv_atol + conv_rtol * c_max) || 
                     mod(step,perturb_mod)==0
-                # Update whole matrix if:
-                #    on first step, was requested, or near global convergence
+                # Update whole matrix when any of these are true:
+                #    - first step
+                #    - it was requested by the user
+                #    - we are near global convergence
                 fill!(perturb, true)
             else 
                 # Skip updating Jacobian where the residuals are small, so
@@ -623,7 +623,8 @@ module solver
             # Extrapolate step if on plateau.
             #    This acts to give the solver a 'nudge' in (hopefully) the right direction. 
             #    Otherwise, this perturbation can still help.
-            if plateau_i > plateau_n
+            plateau_apply = (plateau_i > plateau_n)
+            if plateau_apply
                 x_dif[:] .*= plateau_s
                 plateau_i = 0
                 stepflags *= "X-"
@@ -640,7 +641,7 @@ module solver
 
             # Linesearch 
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
-            if linesearch
+            if linesearch && !plateau_apply
                 @debug "        linesearch"
 
                 # Reset
@@ -654,11 +655,15 @@ module solver
                     return _cost(r_tst)
                 end 
 
-                # Do we need to do linesearch?
-                #    A small amount of cost increase is allowed.
-                #    Get the cost if we used the full step size.
+                # Calculate the cost using the full step size
                 ls_cost = _ls_func(ls_alpha)
-                if (ls_cost > c_cur*ls_increase ) || (step == 1)
+
+                # Do we need to do linesearch? Triggers due to any of:
+                #    - Cost increase from full step is too large
+                #    - It is the first step 
+                #    - Temperature guess is reaching the minimum values allowed
+                if (ls_cost > c_cur*ls_increase ) || (step == 1) 
+                    #|| (minimum(x_cur+x_dif)<atmos.tmp_floor+tmp_pad+1.0)
                     
                     # Yes, we do need to do linesearch...
                     stepflags *= "Ls-"
