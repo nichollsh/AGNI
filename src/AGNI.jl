@@ -199,7 +199,7 @@ module AGNI
         setup_logging(joinpath(output_dir, "agni.log"), verbosity)
 
         # Hello
-        @info "Hello"
+        @debug "Hello"
 
         # Temp folders for OUTPUT
         dir_fastchem = joinpath(output_dir,"fastchem/")
@@ -562,7 +562,7 @@ module AGNI
         # Finish up
         runtime = round(time() - tbegin, digits=2)
         @info @sprintf("Model runtime: %.2f seconds", runtime)
-        @info "Goodbye"
+        @debug "Goodbye"
 
         return return_success 
     end 
