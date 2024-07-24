@@ -356,7 +356,6 @@ module atmosphere
         atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.surface_material= surface_material
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
-        atmos.emiss_s =         1.0
         atmos.instellation =    max(instellation, 0.0)
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
         atmos.s0_fact =         max(s0_fact,0.0)
@@ -1283,9 +1282,6 @@ module atmosphere
         atmos.albedo_s_arr = zeros(Float64, atmos.nbands)
         atmos.emiss_s_arr = ones(Float64, atmos.nbands)
 
-        # grey emissivity 
-        fill!(atmos.emiss_s_arr, atmos.emiss_s)       
-
         if atmos.surface_material == "blackbody"
             # grey albedo 
             fill!(atmos.albedo_s_arr, atmos.albedo_s)       
@@ -1322,8 +1318,11 @@ module atmosphere
                 atmos.albedo_s_arr[i] = _alb_itp(0.5 * 1.0e9 * 
                                                     (atmos.bands_min[i]+atmos.bands_max[i]))
             end 
-
         end 
+
+        # Kirchoff's law: set emissivity equal to 1-albedo (spectrally)
+        atmos.emiss_s_arr[:] .= 1.0 .- atmos.albedo_s_arr[:]
+
 
         #######################################
         # Output arrays

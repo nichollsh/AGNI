@@ -85,6 +85,7 @@ module solver
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `linesearch::Bool`                use a linesearch algorithm to determine the best step size
+    - `ls_method::Int`                  linesearch algorithm (1: golden, 2: backtracking)
     - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
@@ -107,7 +108,8 @@ module solver
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
-                            linesearch::Bool=true, easy_start::Bool=false,
+                            linesearch::Bool=true, ls_method::Int=1,
+                            easy_start::Bool=false,
                             detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             modprint::Int=1, plot_jacobian::Bool=false,
@@ -150,7 +152,6 @@ module solver
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
-        ls_method::Int     =    2       # linesearch algorithm (1: golden, 2: backtracking)
         ls_tau::Float64    =    0.6     # backtracking downscale size
         ls_increase::Float64 =  1.1     # factor by which cost can increase
         ls_max_steps::Int  =    20      # maximum steps 
