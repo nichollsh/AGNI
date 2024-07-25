@@ -293,7 +293,7 @@ module AGNI
         solvers_cmd::Array{String,1} =  cfg["execution" ]["solvers"]
         initial_req::Array{String,1} =  cfg["execution" ]["initial_state"]
         dx_max::Float64        =        cfg["execution" ]["dx_max"]
-        linesearch::Bool       =        cfg["execution" ]["linesearch"]
+        linesearch::Int        =        cfg["execution" ]["linesearch"]
         easy_start::Bool       =        cfg["execution" ]["easy_start"]
         conv_atol::Float64     =        cfg["execution" ]["converge_atol"]
         conv_rtol::Float64     =        cfg["execution" ]["converge_rtol"]
@@ -502,7 +502,7 @@ module AGNI
                                     max_runtime=max_runtime, 
                                     conv_atol=conv_atol, conv_rtol=conv_rtol, 
                                     method=method_idx, 
-                                    dx_max=dx_max, linesearch=linesearch,
+                                    dx_max=dx_max, ls_method=linesearch,
                                     easy_start=easy_start,
                                     modplot=modplot,save_frames=plt_ani)
                 return_success = return_success && solver_success

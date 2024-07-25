@@ -45,7 +45,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     solvers         = ["newton"]         
     dx_max          = 400.0              
     initial_state   = ["iso", "2700"]     
-    linesearch      = false     
+    linesearch      = 0     
     easy_start      = false         
     converge_atol   = 1.0e-2             
     converge_rtol   = 1.0e-3             
