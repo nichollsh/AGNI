@@ -3,7 +3,7 @@ title = "Condensation test"
 
 [planet]
     tmp_surf        = 2200.0          
-    instellation    = 2500.0          
+    instellation    = 2000.0          
     albedo_b        = 0.0             
     s0_fact         = 0.375           
     zenith_angle    = 48.19      

@@ -142,7 +142,7 @@ module solver
         tmp_pad::Float64 =  10.0        # do not allow the solver to get closer than this to tmp_floor
 
         #    easy_start
-        easy_incr::Float64 = 3.0        # Factor by which to increase easy_sf at each step
+        easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
         easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence 
 
         #    finite difference 
@@ -153,7 +153,7 @@ module solver
 
         #    linesearch 
         ls_tau::Float64    =    0.7     # backtracking downscale size
-        ls_increase::Float64 =  1.1     # factor by which cost can increase
+        ls_increase::Float64 =  1.1    # factor by which cost can increase
         ls_max_steps::Int  =    20      # maximum steps 
         ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
@@ -518,7 +518,7 @@ module solver
 
                         # starting from sf=0
                         if easy_sf < 1.0e-10
-                            easy_sf = 1e-4
+                            easy_sf = 3e-4
                         end 
 
                         easy_sf = min(1.0, easy_sf*easy_incr)
@@ -647,7 +647,7 @@ module solver
                 @debug "        linesearch"
 
                 # Reset
-                ls_alpha = 2.0      # Greater than 1 => search beyond NL method step
+                ls_alpha = 1.0      # Greater than 1 => search beyond NL method step
                 ls_cost  = 1.0e99   # big number 
 
                 # Internal function minimised by linesearch method
