@@ -147,19 +147,19 @@ module solver
 
         #    finite difference 
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        perturb_trig::Float64 = 0.1    # Require full Jacobian update when cost*peturb_trig satisfies convergence 
+        perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence 
         perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
         perturb_mod::Int =      10      # Do full jacobian at least this frequently
 
         #    linesearch 
-        ls_tau::Float64    =    0.6     # backtracking downscale size
+        ls_tau::Float64    =    0.7     # backtracking downscale size
         ls_increase::Float64 =  1.1     # factor by which cost can increase
         ls_max_steps::Int  =    20      # maximum steps 
         ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
         #    plateau 
         plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    8.0     # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =    2.0     # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -175,14 +175,14 @@ module solver
         drdx::Float64            = 0.0                      # Jacobian element dr/dx
 
         #     solver
-        b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))    # Approximate jacobian (i)
-        x_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Current best solution (i)
-        x_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Previous best solution (i-1)
-        x_dif::Array{Float64,1}  = zeros(Float64, arr_len)               # Change in x (i-1 to i)
-        r_cur::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i)
-        r_old::Array{Float64,1}  = zeros(Float64, arr_len)               # Residuals (i-1)
-        r_tst::Array{Float64,1}  = zeros(Float64, arr_len)               # Test for rejection residuals
-        dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))     # Damping matrix for LM method
+        b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))   # Approximate jacobian (i)
+        x_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Current best solution (i)
+        x_old::Array{Float64,1}  = zeros(Float64, arr_len)              # Previous best solution (i-1)
+        x_dif::Array{Float64,1}  = zeros(Float64, arr_len)              # Change in x (i-1 to i)
+        r_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i)
+        r_old::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i-1)
+        r_tst::Array{Float64,1}  = zeros(Float64, arr_len)              # Test for rejection residuals
+        dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))    # Damping matrix for LM method
         perturb::Array{Bool,1}   = falses(arr_len)      # Mask for levels which should be perturbed
         lml::Float64             = 2.0                  # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
@@ -190,7 +190,7 @@ module solver
         ls_alpha::Float64        = 1.0                  # linesearch scale factor 
         ls_cost::Float64         = 1.0e99               # linesearch cost 
         easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor 
-
+        plateau_apply::Bool      = false                # Plateau declared in this iteration?
 
         #     tracking
         step::Int =             0       # Step number
@@ -647,7 +647,7 @@ module solver
                 @debug "        linesearch"
 
                 # Reset
-                ls_alpha = 1.0
+                ls_alpha = 2.0      # Greater than 1 => search beyond NL method step
                 ls_cost  = 1.0e99   # big number 
 
                 # Internal function minimised by linesearch method
@@ -658,7 +658,7 @@ module solver
                 end 
 
                 # Calculate the cost using the full step size
-                ls_cost = _ls_func(ls_alpha)
+                ls_cost = _ls_func(1.0)
 
                 # Do we need to do linesearch? Triggers due to any of:
                 #    - Cost increase from full step is too large
