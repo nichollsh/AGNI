@@ -420,8 +420,8 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c) 
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 1.0e5   # mixed composition case
-        atmos.phs_tau_sgl = 1.0e5   # single gas case
+        atmos.phs_tau_mix = 1.0e4   # mixed composition case
+        atmos.phs_tau_sgl = 1.0e4   # single gas case
 
         # Hardcoded cloud properties 
         atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
@@ -1673,7 +1673,9 @@ module atmosphere
     **Adjust gas VMRs according to saturation and cold-trap requirements**
 
     Volatiles which are allowed to condense are rained-out at condensing levels
-    until the gas is exactly saturated, not supersaturated.
+    until the gas is exactly saturated, not supersaturated. If evaporation is enabled here, 
+    it will lead to enhanced mixing ratios at deeper levels as rain is converted back 
+    into gas from a liquid state.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -1686,7 +1688,7 @@ module atmosphere
         end 
 
         # Parameters 
-        evap_enabled::Bool =        false    # Enable re-vaporation of rain
+        evap_enabled::Bool =        false   # Enable re-vaporation of rain
         evap_efficiency::Float64 =  0.5     # Evaporation efficiency
 
         # Work arrays 
