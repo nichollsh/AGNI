@@ -108,7 +108,7 @@ module solver
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, 
-                            linesearch::Bool=true, ls_method::Int=1,
+                            linesearch::Bool=true, ls_method::Int=2,
                             easy_start::Bool=false,
                             detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
@@ -142,7 +142,7 @@ module solver
         tmp_pad::Float64 =  10.0        # do not allow the solver to get closer than this to tmp_floor
 
         #    easy_start
-        easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
+        easy_incr::Float64 = 1.7        # Factor by which to increase easy_sf at each step
         easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence 
 
         #    finite difference 
@@ -153,7 +153,7 @@ module solver
 
         #    linesearch 
         ls_tau::Float64    =    0.7     # backtracking downscale size
-        ls_increase::Float64 =  1.1    # factor by which cost can increase
+        ls_increase::Float64 =  1.2    # factor by which cost can increase
         ls_max_steps::Int  =    20      # maximum steps 
         ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
@@ -635,12 +635,6 @@ module solver
             # Limit step size, without changing direction of dx vector
             x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
-            # If model is struggling, do not allow cost to increase
-            if step > 0.7*max_steps
-                ls_increase = 1.0
-                perturb_all = true
-            end 
-
             # Linesearch 
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
             if linesearch && !plateau_apply
@@ -658,14 +652,12 @@ module solver
                 end 
 
                 # Calculate the cost using the full step size
-                ls_cost = _ls_func(1.0)
+                ls_cost = _ls_func(ls_alpha)
 
                 # Do we need to do linesearch? Triggers due to any of:
                 #    - Cost increase from full step is too large
                 #    - It is the first step 
-                #    - Temperature guess is reaching the minimum values allowed
                 if (ls_cost > c_cur*ls_increase ) || (step == 1) 
-                    #|| (minimum(x_cur+x_dif)<atmos.tmp_floor+tmp_pad+1.0)
                     
                     # Yes, we do need to do linesearch...
                     stepflags *= "Ls-"
