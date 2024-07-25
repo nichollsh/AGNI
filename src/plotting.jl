@@ -204,7 +204,7 @@ module plotting
             min_x = min(min_x, minimum(arr_x))
         end
 
-        xlims  = (max(min_x, minmin_x)-0.1, 0.2)
+        xlims  = (max(min_x, minmin_x)-0.1, 0.1)
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties

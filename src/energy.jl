@@ -353,9 +353,9 @@ module energy
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `pmin::Float64`           pressure [bar] below which convection is disabled
-    - `mltype::Int`             mixing length value (0: scale height, 1: asymptotic)
+    - `mltype::Int`             mixing length value (1: scale height, 2: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-9, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-9, mltype::Int=2)
 
         pmin *= 1.0e5 # convert bar to Pa
 
@@ -448,10 +448,10 @@ module energy
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
 
                 # Mixing length
-                if mltype == 0
+                if mltype == 1
                     # Fixed
                     l = H
-                elseif mltype == 1
+                elseif mltype == 2
                     # Asymptotic 
                     l = phys.k_vk * atmos.zl[i] / (1 + phys.k_vk * atmos.zl[i]/H)
                 else 
@@ -510,8 +510,13 @@ module energy
 
         # Single-gas relaxation case
         single::Bool = Bool(atmos.gas_num == 1)
-        E_accum::Float64 = 0.0
-        i_dry_top::Int = 1
+
+        # Variables for tracking phase change energy
+        evap_eff::Float64 =  0.1    # evaporation efficiency [dimensionless]
+        evap_scl::Float64 =  1.0e-3 # relative increase in evap_eff w/ pressure [K-1]
+        E_accum::Float64 =   0.0    # accumulated condensational energy [J]
+        i_dry_top::Int =     1      # deepest point at which condensation occurs
+        i_dry_bot::Int =     2      # deepest point at which criticality occurs 
 
         # For each condensable
         for c in atmos.condensates
@@ -560,32 +565,52 @@ module energy
 
             end # go to next level
 
-            # Single gas 'evaporation' flux 
-            if single 
-                # find top of dry region
-                for i in 1:atmos.nlev_c
-                    if abs(atmos.phs_wrk_df[i]) > 0
-                        i_dry_top=i+1
+            # Evaporation flux ...
+
+            # find top of dry region
+            for i in 1:atmos.nlev_c
+                if abs(atmos.phs_wrk_df[i]) > 0
+                    i_dry_top=i+2
+                end 
+            end 
+
+            # find bottom of dry region 
+            i_dry_bot = i_dry_top + 1
+            for i in i_dry_top+1:atmos.nlev_c 
+                for c in atmos.condensates
+                    if atmos.tmp[i] < atmos.gas_dat[c].T_crit 
+                        # this layer is not supercritical for this gas, so 
+                        # evaporative flux can be dissipated here
+                        i_dry_bot = i
+                        break # go to next layer (below)
                     end 
                 end 
+            end 
 
-                E_accum = sum(atmos.phs_wrk_df[1:i_dry_top])
+            i_dry_bot = atmos.nlev_c
+            
+            # accumulated condensational energy
+            E_accum = sum(atmos.phs_wrk_df[1:i_dry_top])
 
-                # evaporative flux in dry region
-                for i in i_dry_top+1:atmos.nlev_c
+            # dissipate E_accum by evaporation in the dry region
+            for i in i_dry_top+1:i_dry_bot
 
-                    if E_accum < 1.0e-4
-                        # dissipate all of the flux
-                        atmos.phs_wrk_df[i] = -E_accum
-                        E_accum = 0.0
-                        break
-                    else
-                        # dissipate some fraction of the accumuated flux 
-                        atmos.phs_wrk_df[i] = -0.6*E_accum
-                        E_accum += atmos.phs_wrk_df[i]
-                    end 
-                    
+                if E_accum < 1.0e-7
+                    # dissipate all of the flux
+                    atmos.phs_wrk_df[i] = -E_accum
+                    E_accum = 0.0
+                    break
+                else
+                    # dissipate some fraction of the accumuated flux 
+                    atmos.phs_wrk_df[i] = -1.0 * evap_eff *E_accum
+
+                    # update total energy budget
+                    E_accum += atmos.phs_wrk_df[i]
+
+                    # evaporation becomes increasingly efficient at hotter levels 
+                    evap_eff = min(1.0, evap_eff * (1 + evap_scl * atmos.tmp[i]))
                 end 
+                
             end 
 
             # Convert divergence to cell-edge fluxes.
@@ -597,7 +622,7 @@ module energy
             # Ensure that flux is zero at bottom of dry region.
             for i in 1:atmos.nlev_c
                 # check for where no phase change is occuring below this level
-                if maximum(abs.(atmos.phs_wrk_df[i:end])) < 1.0e-6 
+                if maximum(abs.(atmos.phs_wrk_df[i:end])) < 1.0e-3 
                     # if so, set all phase change fluxes to zero in that region
                     atmos.phs_wrk_fl[i+1:end] .= 0.0
                     break
@@ -668,16 +693,15 @@ module energy
         # Reset fluxes
         reset_fluxes!(atmos)
 
-        atmosphere.calc_layer_props!(atmos)
-
         # +Condensation and evaporation
         if atmos.condense_any && latent 
-            # Handle rainout 
-            if atmos.gas_num > 1
-                atmosphere.handle_saturation!(atmos)
-            end
 
-            # Calc flux
+            atmosphere.calc_layer_props!(atmos)
+
+            # Handle rainout 
+            atmosphere.handle_saturation!(atmos)
+
+            # Calculate latent heat flux
             energy.condense_diffuse!(atmos)
 
             # Modulate?
@@ -692,6 +716,7 @@ module energy
             end 
         end 
 
+        # Calculate layer properties
         atmosphere.calc_layer_props!(atmos)
 
         # +Radiation

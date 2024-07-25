@@ -3,7 +3,7 @@ title = "Condensation test"
 
 [planet]
     tmp_surf        = 2200.0          
-    instellation    = 3000.0          
+    instellation    = 2000.0          
     albedo_b        = 0.0             
     s0_fact         = 0.375           
     zenith_angle    = 48.19      
@@ -19,7 +19,7 @@ title = "Condensation test"
     tmp_magma       = 1700.0
 
 [files]
-    input_sf        = "res/spectral_files/nogit/Dayspring16/Dayspring.sf"  
+    input_sf        = "res/spectral_files/nogit/Dayspring48/Dayspring.sf"  
     input_star      = "res/stellar_spectra/sun.txt"                         
     output_dir      = "out/"                                                
 
@@ -36,7 +36,7 @@ title = "Condensation test"
     verbosity       = 1
     max_steps       = 300              
     max_runtime     = 400              
-    num_levels      = 38               
+    num_levels      = 35              
     continua        = true             
     rayleigh        = false            
     cloud           = false            
