@@ -512,8 +512,9 @@ module energy
         single::Bool = Bool(atmos.gas_num == 1)
 
         # Variables for tracking phase change energy
-        evap_eff::Float64 =  0.1    # evaporation efficiency
-        E_accum::Float64 =   0.0    # accumulated condensational energy 
+        evap_eff::Float64 =  0.1    # evaporation efficiency [dimensionless]
+        evap_scl::Float64 =  1.0e-3 # relative increase in evap_eff w/ pressure [K-1]
+        E_accum::Float64 =   0.0    # accumulated condensational energy [J]
         i_dry_top::Int =     1      # deepest point at which condensation occurs
         i_dry_bot::Int =     2      # deepest point at which criticality occurs 
 
@@ -607,7 +608,7 @@ module energy
                     E_accum += atmos.phs_wrk_df[i]
 
                     # evaporation becomes increasingly efficient at hotter levels 
-                    evap_eff = min(1.0, evap_eff * 2.0)
+                    evap_eff = min(1.0, evap_eff * (1 + evap_scl * atmos.tmp[i]))
                 end 
                 
             end 
