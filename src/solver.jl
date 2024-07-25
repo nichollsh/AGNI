@@ -84,8 +84,7 @@ module solver
     - `fdc::Bool`                       finite difference: ALWAYS use central difference? 
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
-    - `linesearch::Bool`                use a linesearch algorithm to determine the best step size
-    - `ls_method::Int`                  linesearch algorithm (1: golden, 2: backtracking)
+    - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
     - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
@@ -107,9 +106,7 @@ module solver
                             dx_max::Float64=400.0,  
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
-                            method::Int=1, 
-                            linesearch::Bool=true, ls_method::Int=2,
-                            easy_start::Bool=false,
+                            method::Int=1, ls_method::Int=1, easy_start::Bool=false,
                             detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             modprint::Int=1, plot_jacobian::Bool=false,
@@ -187,6 +184,7 @@ module solver
         lml::Float64             = 2.0                  # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
+        linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor 
         ls_cost::Float64         = 1.0e99               # linesearch cost 
         easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor 
