@@ -353,9 +353,9 @@ module energy
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `pmin::Float64`           pressure [bar] below which convection is disabled
-    - `mltype::Int`             mixing length value (0: scale height, 1: asymptotic)
+    - `mltype::Int`             mixing length value (1: scale height, 2: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-9, mltype::Int=1)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-9, mltype::Int=2)
 
         pmin *= 1.0e5 # convert bar to Pa
 
@@ -448,10 +448,10 @@ module energy
                 H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
 
                 # Mixing length
-                if mltype == 0
+                if mltype == 1
                     # Fixed
                     l = H
-                elseif mltype == 1
+                elseif mltype == 2
                     # Asymptotic 
                     l = phys.k_vk * atmos.zl[i] / (1 + phys.k_vk * atmos.zl[i]/H)
                 else 
@@ -561,7 +561,7 @@ module energy
             end # go to next level
 
             # Single gas 'evaporation' flux 
-            if single 
+            # if single 
                 # find top of dry region
                 for i in 1:atmos.nlev_c
                     if abs(atmos.phs_wrk_df[i]) > 0
@@ -586,7 +586,7 @@ module energy
                     end 
                     
                 end 
-            end 
+            # end 
 
             # Convert divergence to cell-edge fluxes.
             #     Assuming zero condensation at TOA, integrating downwards
@@ -597,7 +597,7 @@ module energy
             # Ensure that flux is zero at bottom of dry region.
             for i in 1:atmos.nlev_c
                 # check for where no phase change is occuring below this level
-                if maximum(abs.(atmos.phs_wrk_df[i:end])) < 1.0e-6 
+                if maximum(abs.(atmos.phs_wrk_df[i:end])) < 1.0e-7 
                     # if so, set all phase change fluxes to zero in that region
                     atmos.phs_wrk_fl[i+1:end] .= 0.0
                     break
@@ -668,16 +668,15 @@ module energy
         # Reset fluxes
         reset_fluxes!(atmos)
 
-        atmosphere.calc_layer_props!(atmos)
-
         # +Condensation and evaporation
         if atmos.condense_any && latent 
-            # Handle rainout 
-            if atmos.gas_num > 1
-                atmosphere.handle_saturation!(atmos)
-            end
 
-            # Calc flux
+            atmosphere.calc_layer_props!(atmos)
+
+            # Handle rainout 
+            atmosphere.handle_saturation!(atmos)
+
+            # Calculate latent heat flux
             energy.condense_diffuse!(atmos)
 
             # Modulate?
@@ -692,6 +691,7 @@ module energy
             end 
         end 
 
+        # Calculate layer properties
         atmosphere.calc_layer_props!(atmos)
 
         # +Radiation
