@@ -254,7 +254,7 @@ module atmosphere
     - `mf_path::String`                 path to file containing VMRs at each level. 
 
     Optional arguments:
-    - `condensates::Array{String,1}`    list of condensates (gas names).
+    - `condensates`                     list of condensates (gas names).
     - `surface_material::String`        surface material (default is "blackbody", but can point to file instead).
     - `albedo_s::Float64`               grey surface albedo used when `surface_material="blackbody"`.
     - `tmp_floor::Float64`              temperature floor [K].   
@@ -285,9 +285,9 @@ module atmosphere
                     zenith_degrees::Float64, tmp_surf::Float64,
                     gravity::Float64, radius::Float64,
                     nlev_centre::Int, p_surf::Float64, p_top::Float64,
-                    mf_dict::Dict{String, Float64}, mf_path::String;
+                    mf_dict, mf_path::String;
 
-                    condensates::Array{String,1} = String[],
+                    condensates =               String[],
                     surface_material::String =  "blackbody",
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        2.0,
@@ -925,6 +925,7 @@ module atmosphere
         # Setup spectral file 
         socstar::String = ""
         if !isempty(stellar_spectrum)
+            @debug "Inserting stellar spectrum"
 
             if !isfile(stellar_spectrum)
                 @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
