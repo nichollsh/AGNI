@@ -87,6 +87,7 @@ module solver
     - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
     - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
+    - `ls_increase::Bool`               factor by which the cost can increase from last step before triggering linesearch
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
@@ -107,6 +108,7 @@ module solver
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, ls_method::Int=1, easy_start::Bool=false,
+                            ls_increase::Float64=1.08,
                             detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true, 
                             modprint::Int=1, plot_jacobian::Bool=false,
@@ -139,7 +141,7 @@ module solver
         tmp_pad::Float64 =  10.0        # do not allow the solver to get closer than this to tmp_floor
 
         #    easy_start
-        easy_incr::Float64 = 1.7        # Factor by which to increase easy_sf at each step
+        easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
         easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence 
 
         #    finite difference 
@@ -150,7 +152,6 @@ module solver
 
         #    linesearch 
         ls_tau::Float64    =    0.7     # backtracking downscale size
-        ls_increase::Float64 =  1.2    # factor by which cost can increase
         ls_max_steps::Int  =    20      # maximum steps 
         ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
@@ -560,8 +561,8 @@ module solver
                 fill!(perturb, true)
                 for i in 3:arr_len-4
                     perturb[i] = (sum(abs.(r_cur[i-2:i+2])) > perturb_crit) ||
-                                    any(atmos.mask_l[i-1:i+1]) ||
-                                    any(atmos.mask_c[i-1:i+1])
+                                    any(atmos.mask_l[i-2:i+2]) ||
+                                    any(atmos.mask_c[i-2:i+2])
                 end 
             end 
 
@@ -659,8 +660,8 @@ module solver
                     
                     # Yes, we do need to do linesearch...
                     stepflags *= "Ls-"
-                    
-                    if ls_method == 1
+
+                    if (ls_method == 1) || (ls_cost*0.1 < conv_atol + conv_rtol * c_max)
                         # Use golden-section search method
                         ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha, 
                                                 1.0e-9, ls_min_scale, ls_max_steps)

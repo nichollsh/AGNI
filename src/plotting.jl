@@ -271,21 +271,21 @@ module plotting
 
         # LW component
         if atmos.is_out_lw
-            plot!(plt, _symlog.(-1.0*atmos.flux_d_lw), arr_P, lw=w, lc=col_r, ls=:dash, linealpha=alpha)
-            plot!(plt, _symlog.(     atmos.flux_u_lw), arr_P, lw=w, lc=col_r, ls=:dash, linealpha=alpha)
+            plot!(plt, _symlog.(-1.0*atmos.flux_d_lw), arr_P, lw=w, lc=col_r, ls=:dash,  linealpha=alpha)
+            plot!(plt, _symlog.(     atmos.flux_u_lw), arr_P, lw=w, lc=col_r, ls=:dash,  linealpha=alpha)
         end
 
         # SW component
         if atmos.is_out_sw
-            plot!(plt, _symlog.(-1.0.*atmos.flux_d_sw), arr_P, lw=w, lc=col_r, ls=:dot, linealpha=alpha)
-            plot!(plt, _symlog.(      atmos.flux_u_sw), arr_P, lw=w, lc=col_r, ls=:dot, linealpha=alpha)
+            plot!(plt, _symlog.(-1.0.*atmos.flux_d_sw), arr_P, lw=w, lc=col_r, ls=:dot,  linealpha=alpha)
+            plot!(plt, _symlog.(      atmos.flux_u_sw), arr_P, lw=w, lc=col_r, ls=:dot,  linealpha=alpha)
         end 
 
         # Net radiative fluxes
         if atmos.is_out_lw && atmos.is_out_sw
-            plot!(plt, _symlog.(      atmos.flux_u), arr_P, lw=w, lc=col_r, ls=:solid, linealpha=alpha)
-            plot!(plt, _symlog.(-1.0.*atmos.flux_d), arr_P, lw=w, lc=col_r, ls=:solid, linealpha=alpha)
-            plot!(plt, _symlog.(      atmos.flux_n), arr_P, lw=w, lc=col_n, ls=:solid, linealpha=alpha)
+            plot!(plt, _symlog.(      atmos.flux_u), arr_P, lw=w, lc=col_r, ls=:solid,  linealpha=alpha)
+            plot!(plt, _symlog.(-1.0.*atmos.flux_d), arr_P, lw=w, lc=col_r, ls=:solid,  linealpha=alpha)
+            plot!(plt, _symlog.(      atmos.flux_n), arr_P, lw=w, lc=col_n, ls=:solid,  linealpha=alpha)
         end 
 
         # Convective flux (MLT)
