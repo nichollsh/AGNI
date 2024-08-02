@@ -68,7 +68,7 @@ module AGNI
 
         # Setup file logger
         if to_file
-            logger_file = FormatLogger(outpath; append=true) do io, args
+            logger_file = FormatLogger(outpath; append=false) do io, args
                 if args.level == LoggingExtras.Info
                     level = "INFO"
                 elseif args.level == LoggingExtras.Warn

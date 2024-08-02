@@ -355,7 +355,7 @@ module energy
     - `pmin::Float64`           pressure [bar] below which convection is disabled
     - `mltype::Int`             mixing length value (1: scale height, 2: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-9, mltype::Int=2)
+    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=2)
 
         pmin *= 1.0e5 # convert bar to Pa
 
