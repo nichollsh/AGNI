@@ -198,7 +198,7 @@ module atmosphere
 
         # FastChem stuff 
         fastchem_flag::Bool             # Fastchem enabled?
-        fastchem_work::String           # Path to fastchem dir inside AGNI output folder
+        fastchem_work::String           # Path to fastchem working directory
 
         # Observing properties 
         transspec_p::Float64            # (INPUT PARAMETER) pressure level probed in transmission [Pa]
@@ -306,7 +306,8 @@ module atmosphere
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
                     thermo_functions::Bool =    true,
-                    use_all_gases::Bool =       false
+                    use_all_gases::Bool =       false,
+                    fastchem_work::String =     ""
                     )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -653,7 +654,11 @@ module atmosphere
                 @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
                 return false
             end 
-            atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")  # working directory
+            if isempty(fastchem_work)
+                atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")  # working directory
+            else
+                atmos.fastchem_work = abspath(fastchem_work)
+            end 
             
             # check executable 
             atmos.fastchem_flag = isfile(joinpath(atmos.FC_DIR,"fastchem")) 
@@ -846,7 +851,7 @@ module atmosphere
     **Generate pressure grid.**
 
     Almost-equally log-spaced between p_boa and p_boa. The near-surface layers 
-    are smaller than they would be on an equally log-spaced grid, to avoid 
+    are smaller than they would be on an equally log-spaced grid, to avoid f
     numerical weirdness at the bottom boundary.
     
     Arguments:
@@ -1418,7 +1423,11 @@ module atmosphere
         # Paths
         execpath::String = joinpath(atmos.FC_DIR,       "fastchem")             # Executable file 
         confpath::String = joinpath(atmos.fastchem_work,"config.input")         # Configuration by AGNI
+        elempath::String = joinpath(atmos.fastchem_work,"elements.dat")         # Elements by AGNI
         chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat")        # Chemistry by FastChem
+
+        # Check file exists 
+        write_cfg = write_cfg || !isfile(confpath) || !isfile(elempath)
 
         # Write config, elements 
         if write_cfg
@@ -1485,7 +1494,7 @@ module atmosphere
             end 
 
             # Write elemental abundances 
-            open(joinpath(atmos.fastchem_work,"elements.dat"),"w") do f
+            open(elempath,"w") do f
                 write(f,"# Elemental abundances derived from AGNI volatiles \n")
                 for (i,e) in enumerate(phys.elements_list)
                     if N_t[i] > 1.0e-30
