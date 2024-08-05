@@ -157,7 +157,7 @@ module solver
 
         #    plateau 
         plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    2.0     # Scale factor applied to x_dif when plateau_i > plateau_n
+        plateau_s::Float64 =    3.0     # Scale factor applied to x_dif when plateau_i > plateau_n
         plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
@@ -257,7 +257,7 @@ module solver
                 resid[1:end-1] .= atmos.flux_dif[1:end]
                 # Conductive boundary layer
                 resid[end] = atmos.flux_tot[end] - 
-                             (atmos.tmp_magma - atmos.tmpl[end]) * atmos.skin_k/atmos.skin_d
+                             (atmos.tmp_magma - atmos.tmp_surf) * atmos.skin_k/atmos.skin_d
 
             elseif (sol_type == 3)
                 # Zero loss
