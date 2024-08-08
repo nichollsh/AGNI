@@ -231,8 +231,9 @@ module phys
         ("CH4", "#C720DD" ),
         ("CO" , "#D1AC02" ),
         ("N2" , "#870036" ),
-        ("O2" , "#00008B" ),
         ("NH3", "#675200" ),
+        ("S2" : "#FF8FA1" ),
+        ("SO2": "#00008B" ),
 
         # volatile elements 
         ("H"  , "#0000ff"),
@@ -241,6 +242,7 @@ module phys
         ("N"  , "#eeaa00"),
         ("S" ,  "#ff22ff"),
         ("P" ,  "#33ccff"),
+        ("He" : "#30FF71" ),
 
         # refractory elements 
         ("Fe" , "#888888"),
