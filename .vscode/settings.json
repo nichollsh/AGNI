@@ -2,4 +2,6 @@
     "julia.environmentPath": "${workspaceFolder}/",
     "editor.tabSize": 4,
     "editor.rulers": [ 92 ],
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true
 }
