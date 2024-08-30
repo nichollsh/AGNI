@@ -4,7 +4,7 @@
 if (abspath(PROGRAM_FILE) == @__FILE__)
     thisfile = @__FILE__
     error("The file '$thisfile' is not for direct execution")
-end 
+end
 
 module AGNI
 
@@ -28,11 +28,11 @@ module AGNI
     import .atmosphere
     import .setpt
     import .dump
-    import .plotting 
+    import .plotting
     import .energy
-    import .solver 
+    import .solver
 
-    # Export 
+    # Export
     # export atmosphere
     # export solver
     # export plotting
@@ -50,16 +50,16 @@ module AGNI
         # File logging?
         to_file::Bool = !isempty(outpath)
 
-        # Remove old file 
+        # Remove old file
         if to_file
             rm(outpath, force=true)
         end
 
-        # If silent 
-        if verbosity==0 
+        # If silent
+        if verbosity==0
             global_logger(MinLevelLogger(current_logger(), Logging.Error))
             return nothing
-        end 
+        end
 
         # Formatting
         color::Int = 39
@@ -75,14 +75,14 @@ module AGNI
                     level = "WARN"
                 elseif args.level == LoggingExtras.Debug
                     level = "DEBUG"
-                elseif args.level == LoggingExtras.Error 
+                elseif args.level == LoggingExtras.Error
                     level = "ERROR"
-                end 
+                end
                 @printf(io, "[ %-5s ] %s \n", level, args.message)
             end;
         end
 
-        # Setup terminal logger 
+        # Setup terminal logger
         logger_term = FormatLogger() do io, args
             if args.level == LoggingExtras.Info
                 color = 32
@@ -93,30 +93,30 @@ module AGNI
             elseif args.level == LoggingExtras.Debug
                 color = 96
                 level = "DEBUG"
-            elseif args.level == LoggingExtras.Error 
+            elseif args.level == LoggingExtras.Error
                 color = 91
                 term_io = stderr
                 level = "ERROR"
-            end 
+            end
             # Set color, set bold, print level, unset bold, unset color, message
             @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",
                                 color, level, args.message)
         end;
 
-        # Combine and set 
+        # Combine and set
         if to_file
             logger_both = TeeLogger(logger_file, logger_term);
         else
-            logger_both = logger_term 
-        end 
+            logger_both = logger_term
+        end
         global_logger(logger_both)
 
         if verbosity == 1
             disable_logging(Logging.Debug) # disable debug; info only
-        end 
+        end
 
-        return nothing 
-    end 
+        return nothing
+    end
 
     """
     **Open and validate config file.**
@@ -129,72 +129,72 @@ module AGNI
     """
     function open_config(cfg_path::String)::Dict
 
-        # open file 
+        # open file
         cfg_dict = TOML.parsefile(cfg_path)
 
-        # check headers 
+        # check headers
         headers = ["plots", "planet", "files", "execution", "title"]
-        for h in headers 
+        for h in headers
             if !haskey(cfg_dict, h)
                 error("Key $h is missing from configuration file at '$cfg_path'")
-            end 
-        end 
+            end
+        end
 
-        # check that output dir is named  
+        # check that output dir is named
         if !haskey(cfg_dict["files"],"output_dir") || (cfg_dict["files"]["output_dir"]=="")
             error("Output directory is missing from configuration file at '$cfg_path'")
-        end 
+        end
         out_path = abspath(cfg_dict["files"]["output_dir"])
-        
+
         # check if this is a dangerous path
         if ispath(joinpath(out_path, ".git")) || (joinpath(out_path) == pwd())
             error("Output directory is unsafe")
-        end 
+        end
 
         # looks good
-        return cfg_dict 
-    end 
+        return cfg_dict
+    end
 
     """
     **Main function to be called by executable file.**
 
-    This function parses the cfg file provided by the call arguments, and runs 
-    AGNI according to these requirements. It will also save and plot the 
+    This function parses the cfg file provided by the call arguments, and runs
+    AGNI according to these requirements. It will also save and plot the
     output as requested by the cfg file.
-    
+
     Returns:
     - `return_success::Bool`        flag for model success
     """
     function main()::Bool
 
-        # Record start time 
+        # Record start time
         tbegin = time()
 
-        # Variables  
+        # Variables
         ROOT_DIR = dirname(abspath(PROGRAM_FILE))
         output_dir::String = ""
         clean_output::Bool = false
         return_success::Bool = true
 
-        # Open and validate config file 
+        # Open and validate config file
         cfg_path::String = joinpath(ROOT_DIR, "res/config/default.toml")
         if length(ARGS)>0
             cfg_path = ARGS[1]
         end
         if !ispath(cfg_path)
             error("Cannot find configuration file at '$cfg_path'")
-        end 
+        end
         cfg = open_config(cfg_path)
 
-        # Output folder 
+        # Output folder
         output_dir = abspath(cfg["files"]["output_dir"])
         clean_output = Bool(cfg["execution"]["clean_output"])
         if clean_output || !(ispath(output_dir) && isdir(output_dir))
             rm(output_dir,force=true,recursive=true)
             mkdir(output_dir)
-        end 
+        end
 
-        # Logging 
+        # Logging
         verbosity::Int = cfg["execution"]["verbosity"]
         setup_logging(joinpath(output_dir, "agni.log"), verbosity)
 
@@ -207,12 +207,12 @@ module AGNI
         rm(dir_fastchem,force=true,recursive=true)
         rm(dir_frames,force=true,recursive=true)
 
-        # Copy configuration file 
+        # Copy configuration file
         cp(cfg_path, joinpath(output_dir, "agni.toml"), force=true)
 
-        # Read configuration options from dict 
+        # Read configuration options from dict
         @info "Using configuration '$(cfg["title"])'"
-        #    planet stuff 
+        #    planet stuff
         tmp_surf::Float64      = cfg["planet"]["tmp_surf"]
         instellation::Float64  = cfg["planet"]["instellation"]
         albedo_b::Float64      = cfg["planet"]["albedo_b"]
@@ -226,12 +226,12 @@ module AGNI
         if surface_mat == "blackbody"
             if !haskey(cfg["planet"],"albedo_s")
                 @error "Misconfiguration: surface is blackbody, `albedo_s` must be provided"
-                return false 
-            end 
+                return false
+            end
             albedo_s = cfg["planet"]["albedo_s"]
-        end 
-        
-        #    composition stuff 
+        end
+
+        #    composition stuff
         p_top::Float64                  = cfg["composition"]["p_top"]
         condensates::Array{String,1}    = cfg["composition"]["condensates"]
         chem_type::Int                  = cfg["composition"]["chemistry"]
@@ -242,15 +242,15 @@ module AGNI
         if haskey(cfg["composition"],"p_surf")
             # set composition using VMRs + Psurf
             if haskey(cfg["composition"],"vmr_dict")
-                # from dict in cfg file 
+                # from dict in cfg file
                 mf_dict = cfg["composition"]["vmr_dict"]
-            elseif haskey(cfg["composition"], "vmr_path") 
+            elseif haskey(cfg["composition"], "vmr_path")
                 # from csv file to be read-in
                 mf_path = cfg["files"]["input_vmr"]
             else
                 @error "Misconfiguration: if providing p_surf, must also provide VMRs"
                 return false
-            end 
+            end
             p_surf = cfg["composition"]["p_surf"]
 
         elseif haskey(cfg["composition"], "p_dict")
@@ -258,25 +258,25 @@ module AGNI
             pp_dict::Dict{String, Float64} = cfg["composition"]["p_dict"]
             for k in keys(pp_dict)
                 p_surf += pp_dict[k]
-            end 
+            end
             for k in keys(pp_dict)
                 mf_dict[k] = pp_dict[k]/p_surf
-            end 
+            end
 
         else
             @error "Misconfiguration: must provide either p_dict or p_surf+VMRs"
             return false
-        end 
-        if chem_type in [1,2,3] 
+        end
+        if chem_type in [1,2,3]
             if length(condensates)>0
                 @error "Misconfiguration: FastChem coupling incompatible with condensation"
                 return false
             else
                 mkdir(dir_fastchem)
-            end 
-        end 
+            end
+        end
 
-        #    solver stuff 
+        #    solver stuff
         spfile_name::String    =        cfg["files" ]["input_sf"]
         star_file::String      =        cfg["files" ]["input_star"]
         nlev_centre::Int       =        cfg["execution"]["num_levels"]
@@ -300,7 +300,7 @@ module AGNI
         max_steps::Int         =        cfg["execution" ]["max_steps"]
         max_runtime::Float64   =        cfg["execution" ]["max_runtime"]
 
-        #    plotting stuff 
+        #    plotting stuff
         plt_run::Bool          = cfg["plots"     ]["at_runtime"]
         plt_tmp::Bool          = cfg["plots"     ]["temperature"]
         plt_flx::Bool          = cfg["plots"     ]["fluxes"]
@@ -312,29 +312,29 @@ module AGNI
         plt_ani = plt_ani && plt_tmp
 
         # Read OPTIONAL configuration options from dict
-        #     sensible heat at the surface 
+        #     sensible heat at the surface
         turb_coeff::Float64 = 0.0; wind_speed::Float64 = 0.0
         if incl_sens
             turb_coeff = cfg["planet"]["turb_coeff"]
             wind_speed = cfg["planet"]["wind_speed"]
-        end 
-        #     conductive skin case 
+        end
+        #     conductive skin case
         skin_k::Float64=0.0; skin_d::Float64=0.0; tmp_magma::Float64=0.0
         if sol_type == 2
             skin_k      = cfg["planet"]["skin_k"]
             skin_d      = cfg["planet"]["skin_d"]
             tmp_magma   = cfg["planet"]["tmp_magma"]
-        end 
-        #     effective temperature case 
+        end
+        #     effective temperature case
         tmp_int::Float64 = 0.0
         if sol_type == 3
             tmp_int = cfg["planet"]["tmp_int"]
-        end 
-        #     target OLR case 
+        end
+        #     target OLR case
         target_olr::Float64 = 0.0
         if sol_type == 4
             target_olr = cfg["planet"]["target_olr"]
-        end    
+        end
 
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
@@ -342,21 +342,21 @@ module AGNI
 
         # Setup atmosphere
         @debug "Setup atmosphere "
-        return_success = atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+        return_success = atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                                 spfile_name,
                                 instellation, asf_sf, albedo_b, zenith,
-                                tmp_surf, 
+                                tmp_surf,
                                 gravity, radius,
                                 nlev_centre, p_surf, p_top,
-                                mf_dict, mf_path, 
-                                
+                                mf_dict, mf_path,
+
                                 condensates=condensates,
                                 flag_gcontinuum=flag_cnt, flag_rayleigh=flag_ray,
                                 flag_cloud=flag_cld, flag_aerosol=flag_aer,
                                 overlap_method=overlap,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
-                                tmp_int=tmp_int, 
+                                tmp_int=tmp_int,
                                 surface_material=surface_mat,
                                 albedo_s=albedo_s,
                                 thermo_functions=thermo_funct,
@@ -364,11 +364,11 @@ module AGNI
                                 use_all_gases=use_all_gases
                         )
 
-        return_success || return false 
+        return_success || return false
 
-        # Allocate atmosphere 
+        # Allocate atmosphere
         return_success = atmosphere.allocate!(atmos,star_file)
-        return_success || return false 
+        return_success || return false
 
         # Set PT profile by looping over requests
         # Each request may be a command, or an argument following a command
@@ -377,17 +377,17 @@ module AGNI
         str_req::String = "_unset"              # String of current request
         prt_req::String = "Setting initial T(p): "
         while idx_req <= num_req
-            # get command 
+            # get command
             str_req = strip(lowercase(initial_req[idx_req]))
             prt_req *= str_req*", "
 
-            # handle requests  
+            # handle requests
             if str_req == "dry"
                 # dry adiabat from surface
                 setpt.dry_adiabat!(atmos)
 
             elseif str_req == "str"
-                # isothermal stratosphere 
+                # isothermal stratosphere
                 idx_req += 1
                 setpt.stratosphere!(atmos, parse(Float64, initial_req[idx_req]))
 
@@ -395,45 +395,45 @@ module AGNI
                 # log-linear profile between T_surf and T_top
                 idx_req += 1
                 setpt.loglinear!(atmos, parse(Float64, initial_req[idx_req]))
-                
+
             elseif str_req == "iso"
-                # isothermal profile 
+                # isothermal profile
                 idx_req += 1
                 setpt.isothermal!(atmos, parse(Float64, initial_req[idx_req]))
-            
+
             elseif str_req == "csv"
-                # set from csv file 
+                # set from csv file
                 idx_req += 1
                 setpt.fromcsv!(atmos,initial_req[idx_req])
 
             elseif str_req == "ncdf"
-                # set from NetCDF file 
+                # set from NetCDF file
                 idx_req += 1
                 setpt.fromncdf!(atmos,initial_req[idx_req])
-            
+
             elseif str_req == "add"
                 # add X kelvin from the currently stored T(p)
                 idx_req += 1
                 setpt.add!(atmos,parse(Float64, initial_req[idx_req]))
 
             elseif str_req == "sat"
-                # condensing a volatile 
+                # condensing a volatile
                 idx_req += 1
                 setpt.saturation!(atmos, initial_req[idx_req])
                 if flag_cld
                     atmosphere.water_cloud!(atmos)
                 end
 
-            else 
+            else
                 @error "Invalid initial state '$str_req'"
                 return false
-            end 
+            end
 
             atmosphere.calc_layer_props!(atmos, ignore_errors=true)
-            
+
             # iterate
             idx_req += 1
-        end 
+        end
         @info prt_req[1:end-2]
 
         # Write initial state
@@ -443,77 +443,77 @@ module AGNI
         if chem_type in [1,2,3]
             @debug "Initial chemistry"
 
-            # check we found fastchem 
-            if !atmos.fastchem_flag 
+            # check we found fastchem
+            if !atmos.fastchem_flag
                 @error "Chemistry enabled but could not find FastChem. Have you set FC_DIR?"
                 return false
-            end 
+            end
 
             atmosphere.chemistry_eqm!(atmos, chem_type, true)
-        end 
+        end
 
         # Frame dir
         if plt_ani
             @debug "Will animate"
             mkdir(dir_frames)
-        end 
+        end
 
-        # Solver variables 
+        # Solver variables
         modplot::Int      = 0
         incl_conduct::Bool = false
 
-        # Loop over requested solvers 
+        # Loop over requested solvers
         solver_success::Bool = true
         method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
-        
-        if length(solvers_cmd) == 0  # is empty 
+
+        if length(solvers_cmd) == 0  # is empty
             solvers_cmd = [""]
-        end 
+        end
         if !isempty(solvers_cmd[end])  # append "no solve" case to end, for calculating cff
             push!(solvers_cmd, "")
         end
 
         @info " "
-        for sol in solvers_cmd 
+        for sol in solvers_cmd
 
             sol = strip(lowercase(sol))
             if isempty(sol)
                 sol = "none"
-            end 
+            end
             @info "Solving with '$sol'"
 
             # No solve - just calc fluxes at the end
             if sol == "none"
-                energy.calc_fluxes!(atmos, incl_latent,  
-                                    incl_convect, incl_sens, incl_conduct, 
+                energy.calc_fluxes!(atmos, incl_latent,
+                                    incl_convect, incl_sens, incl_conduct,
                                     calc_cf=plt_cff)
                 @info "    done"
-            
+
             # Nonlinear solver
-            elseif (sol in method_map) 
-                if plt_run 
+            elseif (sol in method_map)
+                if plt_run
                     modplot = 1
                 end
-                method_idx = findfirst(==(sol), method_map)            
-                solver_success = solver.solve_energy!(atmos, sol_type=sol_type, 
+                method_idx = findfirst(==(sol), method_map)
+                solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
                                     conduct=incl_conduct,  chem_type=chem_type,
                                     convect=incl_convect, latent=incl_latent,
                                     sens_heat=incl_sens, max_steps=max_steps,
-                                    max_runtime=max_runtime, 
-                                    conv_atol=conv_atol, conv_rtol=conv_rtol, 
-                                    method=method_idx, 
+                                    max_runtime=max_runtime,
+                                    conv_atol=conv_atol, conv_rtol=conv_rtol,
+                                    method=method_idx,
                                     dx_max=dx_max, ls_method=linesearch,
                                     easy_start=easy_start,
                                     modplot=modplot,save_frames=plt_ani)
                 return_success = return_success && solver_success
-                
-            else 
+
+            else
                 @error "Invalid solver"
-                return_success = false 
+                return_success = false
                 break
-            end 
+            end
             @info " "
-        end 
+        end
 
         @info "Total RT evalulations: $(atmos.num_rt_eval)"
 
@@ -543,7 +543,7 @@ module AGNI
         # Temp folders
         if clean_output
             @debug "Cleaning output folder"
-            # save fastchem outputs 
+            # save fastchem outputs
             if chem_type in [1,2,3]
 
                 cp(joinpath(output_dir,"fastchem","chemistry.dat"),
@@ -552,8 +552,8 @@ module AGNI
                 if chem_type in [2,3]
                     cp(joinpath(output_dir,"fastchem","condensates.dat"),
                        joinpath(output_dir,"fc_con.dat"), force=true)
-                end 
-            end 
+                end
+            end
             # remove folders
             rm(dir_fastchem,force=true,recursive=true)
             rm(dir_frames,force=true,recursive=true)
@@ -564,8 +564,8 @@ module AGNI
         @info @sprintf("Model runtime: %.2f seconds", runtime)
         @debug "Goodbye"
 
-        return return_success 
-    end 
+        return return_success
+    end
 
-end 
+end
 
