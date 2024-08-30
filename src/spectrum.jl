@@ -1,14 +1,14 @@
-# Contains the spectrum module, for updating the SOCRATES spectral file at 
+# Contains the spectrum module, for updating the SOCRATES spectral file at
 # runtime with the solar flux / thermal source function, and scattering.
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
     thisfile = @__FILE__
     error("The file '$thisfile' is not for direct execution")
-end 
+end
 
 
-module spectrum 
+module spectrum
 
     using LoggingExtras
     using Printf
@@ -19,33 +19,33 @@ module spectrum
     """
     **Validate spectral file.**
 
-    This function should probably calculate the file checksums, but for now it 
+    This function should probably calculate the file checksums, but for now it
         simply checks the files for NaN values.
 
     Arguments:
-    - `path::String`        Path to .sf file 
+    - `path::String`        Path to .sf file
 
     Returns:
     - `ok::Bool`            File is valid? (true/false)
     """
-    function check_spfile_integrity(path::String)::Bool 
+    function check_spfile_integrity(path::String)::Bool
 
         @debug "Checking integrity of spectral file"
 
-        spectral_file_run::String  = abspath(path) 
+        spectral_file_run::String  = abspath(path)
         spectral_file_runk::String = spectral_file_run*"_k"
 
         if occursin("NaN", readchomp(spectral_file_runk))
             @error "Spectral_k file contains NaN values"
-            return false 
-        end 
+            return false
+        end
         if occursin("NaN", readchomp(spectral_file_run))
             @error "Spectral file contains NaN values"
-            return false 
-        end 
+            return false
+        end
 
-        return true 
-    end 
+        return true
+    end
 
     """
     **Load stellar spectrum from a text file.**
@@ -71,7 +71,7 @@ module spectrum
         end
 
         return spec_data[:,1], spec_data[:,2]
-    end 
+    end
 
 
     """
@@ -88,8 +88,8 @@ module spectrum
     Returns:
     - `success::Bool`       function executed successfully
     """
-    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1}, 
-                                        star_file::String, nbins_max::Int=99900)::Bool 
+    function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1},
+                                        star_file::String, nbins_max::Int=99900)::Bool
 
         len_wl::Int = length(wl)
         len_fl::Int = length(fl)
@@ -99,20 +99,20 @@ module spectrum
         # Validate
         if len_wl != len_fl
             @error "Stellar wavelength and flux arrays have different lengths"
-            return false 
-        end 
+            return false
+        end
         if len_wl < 500
             @warn "Loaded stellar spectrum is very short!"
         end
         if minimum(wl) < 1.0e-45
             @error "Minimum wavelength is too small"
-            return false 
+            return false
         end
         clamp!(fl, 1.0e-45, 1.0e+45)  # Clamp values
 
         # Bin data to required number of bins...
 
-        # Log data first 
+        # Log data first
         lfl = log10.(fl)
         lwl = log10.(wl)
 
@@ -139,13 +139,13 @@ module spectrum
             write(f, "      WAVELENGTH        IRRADIANCE\n")
             write(f, "          (m)               (W/m3)\n")
             write(f, "*BEGIN_DATA\n")
-            
+
             # Body
             for i in 1:len_new
                 @printf(f, "      %1.7e      %1.7e\n", owl[i],ofl[i])
             end
 
-            # Footer 
+            # Footer
             write(f, "*END\n")
             write(f, " ")
         end
@@ -157,7 +157,7 @@ module spectrum
     """
     **Insert a stellar spectrum and Rayleigh coeffs into a SOCRATES spectral file.**
 
-    Will not overwrite the original file. 
+    Will not overwrite the original file.
 
     Arguments:
     - `orig_file::String`        Path to original spectral file.
@@ -165,7 +165,7 @@ module spectrum
     - `outp_file::String`        Path to output spectral file.
     - `insert_rscatter::Bool`    Calculate Rayleigh scattering coefficients?
     """
-    function insert_stellar_and_rscatter(orig_file::String, star_file::String, 
+    function insert_stellar_and_rscatter(orig_file::String, star_file::String,
                                             outp_file::String, insert_rscatter::Bool)
 
         # Inputs to prep_spec
@@ -178,12 +178,12 @@ module spectrum
             "y"                     # exit prep_spec
             ]
 
-        # Write executable 
+        # Write executable
         execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_insert_stellar.sh"
         rm(execpath, force=true)
         open(execpath, "w") do f
-            
-            # exec prep_spec 
+
+            # exec prep_spec
             write(f, prep_spec*" <<-EOF\n")
 
             # paths
@@ -192,21 +192,21 @@ module spectrum
             write(f, outp_file*" \n")
 
             # write thermal source function + stellar spectrum
-            for inp in star_inputs 
+            for inp in star_inputs
                 write(f, inp*" \n")
-            end 
+            end
 
             # write rayleigh coefficients
             if insert_rscatter
-                @info "Inserting stellar spectrum and Rayleigh coefficients" 
+                @info "Inserting stellar spectrum and Rayleigh coefficients"
                 write(f, "3 \n")       #  block 3, please
                 write(f, "c \n")       #  custom composition
                 write(f, "a \n")       #  all gases
-            else 
+            else
                 @info "Inserting stellar spectrum"
-            end 
+            end
 
-            # exit prep_spec 
+            # exit prep_spec
             write(f, "-1 \n")
             write(f, "EOF\n")
             write(f, " ")
@@ -216,10 +216,10 @@ module spectrum
         @debug "Running prep_spec now"
         run(pipeline(`bash $execpath`, stdout=devnull))
 
-        # Delete executable 
+        # Delete executable
         rm(execpath)
 
-        return nothing 
-    end 
+        return nothing
+    end
 
 end # end module spectrum
