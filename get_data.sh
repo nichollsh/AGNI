@@ -3,20 +3,20 @@
 # All files can be found on OSF at https://osf.io/8dumn/
 
 # Exit script if any of the commands fail
-set -e 
+set -e
 
-# Check that curl is installed 
+# Check that curl is installed
 if ! [ -x "$(command -v curl)" ]; then
   echo 'ERROR: curl is not installed.' >&2
   exit 1
 fi
 
-# Root and resources folders 
+# Root and resources folders
 root=$(dirname $(realpath $0))
 res="$root/res/"
 
-# Make basic data folders 
-mkdir -p $res 
+# Make basic data folders
+mkdir -p $res
 mkdir -p "$res/spectral_files"
 mkdir -p "$res/stellar_spectra"
 
@@ -32,7 +32,7 @@ Call structure:
     ./get_data [TARGET]
 
 Where [TARGET] can be any of the following:
-    basic 
+    basic
         $help_basic
     highres
         $help_highres
@@ -42,21 +42,21 @@ Where [TARGET] can be any of the following:
         $help_stellar
 "
 
-# Generic OSF downloader function 
+# Generic OSF downloader function
 function osf {
     # $1 = OSF identifier
-    # $2 = target folder 
+    # $2 = target folder
     # $3 = target filename
 
     # target file path
     tgt="$2/$3"
-    
+
     # exists?
     if [[ -f "$tgt" ]]; then
         echo "    $1 > file already exists"
         return 0
     fi
-    
+
     # get data
     echo "    $1 > $tgt"
     mkdir -p $2
@@ -65,12 +65,12 @@ function osf {
     return 0
 }
 
-# Handle request for downloading a group of data 
+# Handle request for downloading a group of data
 function handle_request {
     case $1 in
         "basic")
             echo $help_basic
-            
+
             osf qmp4e $res/spectral_files/Oak/318/ Oak.sf
             osf 5fxr7 $res/spectral_files/Oak/318/ Oak.sf_k
 
@@ -104,7 +104,7 @@ function handle_request {
             ;;
 
         "stellar")
-            echo $help_stellar 
+            echo $help_stellar
             osf mabp2 $res/stellar_spectra trappist-1.txt
             osf rk7mj $res/stellar_spectra eps-eri.txt
             osf agsrq $res/stellar_spectra hd97658.txt

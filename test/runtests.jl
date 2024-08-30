@@ -27,8 +27,8 @@ import .energy
 
 # Prepare
 output_dir    = "out/"
-p_top           = 1e-8  
-nlev_centre     = 100  
+p_top           = 1e-8
+nlev_centre     = 100
 radius          = 1.0e7    # metres
 gravity         = 10.0      # m s-2
 
@@ -47,15 +47,15 @@ passing = true
 @info "Testing heat capacity functions"
 data_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true)
 c_expt::Array{Float64, 1} = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
-t_test::Array{Float64, 1} = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature 
+t_test::Array{Float64, 1} = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
 c_obs::Array{Float64,1} = zeros(Float64, 5)
-cp_pass = true 
+cp_pass = true
 for i in 1:5
-    c_obs[i] = phys.get_Cp(data_H2O, t_test[i]) * data_H2O.mmw # get value and convert units 
+    c_obs[i] = phys.get_Cp(data_H2O, t_test[i]) * data_H2O.mmw # get value and convert units
     if abs(c_expt[i]- c_obs[i])/c_expt[i] > 0.01  # error must be <1%
-        global cp_pass = false 
-    end 
-end 
+        global cp_pass = false
+    end
+end
 @info "Expected values = $(c_expt) J mol-1 K-1"
 @info "Modelled values = $(c_obs) J mol-1 K-1"
 if cp_pass
@@ -89,7 +89,7 @@ spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -138,7 +138,7 @@ spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -203,7 +203,7 @@ spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/318/Oak.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -212,7 +212,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict,"",
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
-                         overlap_method=4, 
+                         overlap_method=4,
                          condensates=["H2O"],
                          surface_material="blackbody",
                          albedo_s=0.5
@@ -228,7 +228,7 @@ val_e = [270.0, 280.0]
 val_o = atmos.flux_u_lw[1]
 @info "Expected range = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
-if ( val_o > val_e[1]) && (val_o < val_e[2]) 
+if ( val_o > val_e[1]) && (val_o < val_e[2])
     @info "Pass"
 else
     @warn "Fail"
@@ -249,7 +249,7 @@ val_e = [25.0, 35.0]   # known from previous tests
 val_o = atmos.flux_u_sw[end] # bottom level
 @info "Expected range = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
-if ( val_o > val_e[1]) && (val_o < val_e[2]) 
+if ( val_o > val_e[1]) && (val_o < val_e[2])
     @info "Pass"
 else
     @warn "Fail"
@@ -277,7 +277,7 @@ spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -296,7 +296,7 @@ val_e = [1.0e-4, 1e9]
 val_o = atmos.flux_u_sw[20]
 @info "Expected range = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
-if ( val_o > val_e[1]) && (val_o < val_e[2]) 
+if ( val_o > val_e[1]) && (val_o < val_e[2])
     @info "Pass"
 else
     @warn "Fail"
@@ -323,7 +323,7 @@ spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/318/Oak.sf")
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir, 
+atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -347,7 +347,7 @@ val_e = [6.0, 6.6]  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected range = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"
-if ( val_o > val_e[1]) && (val_o < val_e[2]) 
+if ( val_o > val_e[1]) && (val_o < val_e[2])
     @info "Pass"
 else
     @warn "Fail"
@@ -364,7 +364,7 @@ atmosphere.deallocate!(atmos)
 if passing
     @info "All tests passed"
     exit(0)
-else 
+else
     @warn "Some tests failed"
     exit(1)
 end

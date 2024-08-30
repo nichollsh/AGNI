@@ -4,9 +4,9 @@
 if (abspath(PROGRAM_FILE) == @__FILE__)
     thisfile = @__FILE__
     error("The file '$thisfile' is not for direct execution")
-end 
+end
 
-module phys 
+module phys
 
     using NCDatasets
     using PCHIPInterpolation
@@ -29,20 +29,20 @@ module phys
     # Planck's constant, J s
     const h_pl::Float64 = 6.62607015e-34  # NIST CODATA
 
-    # Boltzmann constant, J K-1 
+    # Boltzmann constant, J K-1
     const k_B::Float64 = 1.380649e-23 # NIST CODATA
 
     # Speed of light, m s-1
     const c_vac::Float64 = 299792458.0 # NIST CODATA
 
-    # A large floating point number 
+    # A large floating point number
     const fbig::Float64 = 1e90
 
-    # List of elements included in the model 
-    const elements_list::Array{String,1} = ["H","C","N","O","S","P", 
+    # List of elements included in the model
+    const elements_list::Array{String,1} = ["H","C","N","O","S","P",
                                             "Fe","Mg","Si","Ca","Al"]
 
-    # 0 degrees celcius, in kelvin 
+    # 0 degrees celcius, in kelvin
     const zero_celcius::Float64 = 273.15
 
     # Newton's gravitational constant [m3 kg-1 s-2]
@@ -51,40 +51,40 @@ module phys
     # Molecule mean molecular weight, kg mol-1
     const lookup_mmw::Dict{String, Float64} = Dict{String, Float64}([
         # molecules
-        ("H2O", 1.801530E-02 ), 
-        ("CO2", 4.401000E-02 ), 
-        ("O3", 4.799820E-02 ), 
-        ("N2O", 4.401280E-02 ), 
-        ("CO", 2.801060E-02 ), 
-        ("CH4", 1.604300E-02 ), 
-        ("O2", 3.199880E-02 ), 
-        ("NO", 3.000610E-02 ), 
-        ("SO2", 6.406280E-02 ), 
-        ("NO2", 4.600550E-02 ), 
-        ("NH3", 1.703060E-02 ), 
-        ("HNO3", 6.301290E-02 ), 
-        ("N2", 2.801340E-02 ), 
-        ("TiO", 6.386600E-02 ), 
-        ("VO", 6.694090E-02 ), 
-        ("H2", 2.015880E-03 ), 
-        ("OCS", 6.007500E-02 ), 
-        ("FeH", 5.685300E-02 ), 
-        ("CrH", 5.300400E-02 ), 
-        ("PH3", 3.399758E-02 ), 
-        ("C2H2", 2.603730E-02 ), 
-        ("HCN", 2.702530E-02 ), 
-        ("H2S", 3.408100E-02 ), 
-        ("NO3", 6.301280E-02 ), 
-        ("N2O5", 1.080104E-01 ), 
-        ("HONO", 4.701340E-02 ), 
-        ("HO2NO2", 7.901220E-02 ), 
-        ("H2O2", 3.401470E-02 ), 
-        ("C2H6", 3.006900E-02 ), 
-        ("CH3", 1.503450E-02 ), 
-        ("H2CO", 3.002600E-02 ), 
-        ("HO2", 3.300670E-02 ), 
-        ("HDO", 1.902140E-02 ), 
-        ("HCl", 3.646100E-02 ), 
+        ("H2O", 1.801530E-02 ),
+        ("CO2", 4.401000E-02 ),
+        ("O3", 4.799820E-02 ),
+        ("N2O", 4.401280E-02 ),
+        ("CO", 2.801060E-02 ),
+        ("CH4", 1.604300E-02 ),
+        ("O2", 3.199880E-02 ),
+        ("NO", 3.000610E-02 ),
+        ("SO2", 6.406280E-02 ),
+        ("NO2", 4.600550E-02 ),
+        ("NH3", 1.703060E-02 ),
+        ("HNO3", 6.301290E-02 ),
+        ("N2", 2.801340E-02 ),
+        ("TiO", 6.386600E-02 ),
+        ("VO", 6.694090E-02 ),
+        ("H2", 2.015880E-03 ),
+        ("OCS", 6.007500E-02 ),
+        ("FeH", 5.685300E-02 ),
+        ("CrH", 5.300400E-02 ),
+        ("PH3", 3.399758E-02 ),
+        ("C2H2", 2.603730E-02 ),
+        ("HCN", 2.702530E-02 ),
+        ("H2S", 3.408100E-02 ),
+        ("NO3", 6.301280E-02 ),
+        ("N2O5", 1.080104E-01 ),
+        ("HONO", 4.701340E-02 ),
+        ("HO2NO2", 7.901220E-02 ),
+        ("H2O2", 3.401470E-02 ),
+        ("C2H6", 3.006900E-02 ),
+        ("CH3", 1.503450E-02 ),
+        ("H2CO", 3.002600E-02 ),
+        ("HO2", 3.300670E-02 ),
+        ("HDO", 1.902140E-02 ),
+        ("HCl", 3.646100E-02 ),
         ("HF", 2.000689E-02 ),
 
         # elements from https://iupac.qmul.ac.uk/AtWt/
@@ -175,11 +175,11 @@ module phys
     ])
 
     # Structure containing data for a single gas
-    mutable struct Gas_t 
+    mutable struct Gas_t
 
-        # Names 
+        # Names
         formula::String         # Formula used by SOCRATES
-        JANAF_name::String      # JANAF name 
+        JANAF_name::String      # JANAF name
         fastchem_name::String   # FastChem name (to be determined from FC output file)
 
         # Is this a stub?
@@ -196,10 +196,10 @@ module phys
         mmw::Float64
 
         # Triple and critical points [K]
-        T_trip::Float64 
-        T_crit::Float64 
+        T_trip::Float64
+        T_crit::Float64
 
-        # Saturation curve 
+        # Saturation curve
         no_sat::Bool                # No saturation data
         sat_T::Array{Float64,1}     # Reference temperatures [K]
         sat_P::Array{Float64,1}     # Corresponding saturation pressures [Pa]
@@ -216,15 +216,15 @@ module phys
         cap_I::Interpolator         # Interpolator struct
 
         # Plotting colour (hex code) and label
-        plot_color::String 
-        plot_label::String 
+        plot_color::String
+        plot_label::String
 
         Gas_t() = new()
-    end # end gas struct 
+    end # end gas struct
 
-    # Pre-defined colors 
+    # Pre-defined colors
     const lookup_color::Dict{String, String} = Dict{String, String}([
-        # common volatiles 
+        # common volatiles
         ("H2O", "#027FB1" ),
         ("CO2", "#D24901" ),
         ("H2" , "#008C01" ),
@@ -235,7 +235,7 @@ module phys
         ("S2" , "#FF8FA1" ),
         ("SO2", "#00008B" ),
 
-        # volatile elements 
+        # volatile elements
         ("H"  , "#0000ff"),
         ("C"  , "#ff0000"),
         ("O"  , "#00dd00"),
@@ -244,7 +244,7 @@ module phys
         ("P" ,  "#33ccff"),
         ("He" , "#30FF71" ),
 
-        # refractory elements 
+        # refractory elements
         ("Fe" , "#888888"),
         ("Si" , "#aa2277"),
         ("Mg" , "#996633"),
@@ -254,83 +254,83 @@ module phys
     Get number of atoms from formula, returning a dictionary
     """
     function count_atoms(m::String)::Dict
-        # Setup 
+        # Setup
         out = Dict()
         nchar::Int = length(m)
-        i::Int = 1 
+        i::Int = 1
         elem::String = ""
         count::Int=-1
-        last::Bool=false 
+        last::Bool=false
 
         # Loop through string
-        while i <= nchar 
+        while i <= nchar
             last = (i == nchar)
 
-            # new element 
+            # new element
             if isuppercase(m[i])
                 count = 0
                 elem = string(m[i])
-                if !last && islowercase(m[i+1])  # two letter element name 
+                if !last && islowercase(m[i+1])  # two letter element name
                     elem = elem*string(m[i+1])
                     i += 1
                 end
-            end 
+            end
 
             last = (i == nchar)
 
-            # get count 
-            if count == 0   # expecting number 
-                # number of atoms 
+            # get count
+            if count == 0   # expecting number
+                # number of atoms
                 if last || isletter(m[i+1]) # got letter => count=1
                     count = 1
                 else
-                    count = parse(Int, m[i+1]) 
-                end 
-                # repeated element 
+                    count = parse(Int, m[i+1])
+                end
+                # repeated element
                 if elem in keys(out)
-                    out[elem] += count 
-                else 
-                    out[elem] = count 
-                end 
-                # reset 
+                    out[elem] += count
+                else
+                    out[elem] = count
+                end
+                # reset
                 elem = ""
-                count = -1 
-            end 
+                count = -1
+            end
             i += 1
-        end 
-        
-        return out 
-    end 
+        end
+
+        return out
+    end
 
     """
     Check if two gas atom dicts are equivalent
     """
-    function same_atoms(d1::Dict, d2::Dict)::Bool  
+    function same_atoms(d1::Dict, d2::Dict)::Bool
 
         # check if have same atoms at all
         for k in keys(d1)
             if !(k in keys(d2))
-                return false 
-            end 
-        end 
+                return false
+            end
+        end
 
         # ^^ reverse combination
         for k in keys(d2)
             if !(k in keys(d1))
-                return false 
-            end 
-        end 
+                return false
+            end
+        end
 
         # check counts
         for k in keys(d1)
             if d1[k] != d2[k]
-                return false  
-            end 
-        end 
-        
+                return false
+            end
+        end
+
         # if we haven't returned false so far, then it must be true
-        return true 
-    end 
+        return true
+    end
 
     """
     Calculate species mean molecular weight [kg mol-1] from formula or use known value
@@ -340,12 +340,12 @@ module phys
         # already defined?
         if m in keys(lookup_mmw)
            return lookup_mmw[m]
-        end 
+        end
 
-        # get atoms 
+        # get atoms
         atoms::Dict{String, Int} = count_atoms(m)
 
-        # add up atoms 
+        # add up atoms
         mmw::Float64 = 0.0
         for k in keys(atoms)
             mmw += lookup_mmw[k]*atoms[k]
@@ -355,31 +355,31 @@ module phys
     end
 
     """
-    Convert formula to pretty unicode string 
+    Convert formula to pretty unicode string
     """
-    function pretty_name(gas::String)::String 
+    function pretty_name(gas::String)::String
         out::String = ""
-        for c in gas 
+        for c in gas
             if isnumeric(c)
                 d = parse(Int, c)
                 out *= Char(parse(Int,"208$d", base=16))
             else
-                out *= c 
-            end 
-        end 
-        return out 
-    end 
+                out *= c
+            end
+        end
+        return out
+    end
 
     """
-    Generate a colour hex code from a molecular formula 
+    Generate a colour hex code from a molecular formula
     """
-    function pretty_color(gas::String)::String 
-        # Defined 
+    function pretty_color(gas::String)::String
+        # Defined
         if gas in keys(lookup_color)
             return lookup_color[gas]
-        end 
+        end
 
-        # Else, generate colour from atoms 
+        # Else, generate colour from atoms
         atoms = count_atoms(gas)
         r::Float64 = 0.0
         g::Float64 = 0.0
@@ -388,13 +388,13 @@ module phys
             r += parse(Int,lookup_color[e][2:3],base=16)*atoms[e]
             g += parse(Int,lookup_color[e][4:5],base=16)*atoms[e]
             b += parse(Int,lookup_color[e][6:7],base=16)*atoms[e]
-        end 
+        end
         m::Float64 = max(r,g,b)
 
-        # prevents the colour getting too close to white 
+        # prevents the colour getting too close to white
         if r+g+b > 705
-            m *= 255.0/235.0 
-        end 
+            m *= 255.0/235.0
+        end
 
         # convert to hex code
         out::String = "#"
@@ -402,10 +402,10 @@ module phys
         out *= string(floor(Int,255 * g/m),base=16,pad=2)
         out *= string(floor(Int,255 * b/m),base=16,pad=2)
         return out
-    end 
+    end
 
     """
-    Load gas data into a new struct  
+    Load gas data into a new struct
     """
     function load_gas(thermo_dir::String, formula::String, tmp_dep::Bool)::Gas_t
 
@@ -415,29 +415,29 @@ module phys
         formula = String(strip(formula))
         fpath = joinpath(thermo_dir, "$formula.nc" )
 
-        # Initialise struct 
+        # Initialise struct
         gas = Gas_t()
-        gas.formula = formula 
+        gas.formula = formula
         gas.tmp_dep = tmp_dep
 
-        # Count atoms 
+        # Count atoms
         gas.atoms = count_atoms(formula)
         for e in keys(gas.atoms)
             if !(e in elements_list)
                 error("Gas '$formula' contains unsupported element '$e'")
-            end 
-        end 
+            end
+        end
 
         # Fastchem name (to be learned later)
         gas.fastchem_name = "_unknown"
-        
-        # Set plotting color and label 
+
+        # Set plotting color and label
         gas.plot_color = pretty_color(formula)
         gas.plot_label = pretty_name(formula)
 
         get_mmw(formula)
 
-        # Check if we have data from file 
+        # Check if we have data from file
         gas.stub = !isfile(fpath)
         gas.no_sat = false
         if gas.stub
@@ -451,7 +451,7 @@ module phys
             gas.cap_T = [0.0, fbig]
             gas.cap_C = [0.0, 0.0]
 
-            # latent heat set to zero 
+            # latent heat set to zero
             gas.lat_T = [0.0, fbig]
             gas.lat_H = [0.0, 0.0]
 
@@ -465,19 +465,19 @@ module phys
             gas.T_trip = 0.0
 
         else
-            # have data => load from file 
+            # have data => load from file
             @debug("    ncdf")
             @debug "ALL DEBUG SUPPRESSED"
             with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
                 ds = Dataset(fpath,"r")
 
-                # scalar properties  
+                # scalar properties
                 gas.mmw = ds["mmw"][1]
                 gas.T_trip = ds["T_trip"][1]
                 gas.T_crit = ds["T_crit"][1]
                 gas.JANAF_name = String(ds["JANAF"][:])
 
-                # variable properties 
+                # variable properties
                 gas.cap_T = ds["cap_T"][:]
                 gas.cap_C = ds["cap_C"][:]
 
@@ -488,33 +488,33 @@ module phys
                 gas.sat_P = ds["sat_P"][:]
                 if length(gas.sat_P) < 3
                     gas.no_sat = true
-                end 
+                end
 
-                # close file 
+                # close file
                 close(ds)
             end
             @debug "ALL DEBUG RESTORED"
 
-            # extrapolate to high temperatures 
+            # extrapolate to high temperatures
             push!(gas.cap_T, 9000.0); push!(gas.cap_C, gas.cap_C[end])
             push!(gas.lat_T, 9000.0); push!(gas.lat_H, gas.lat_H[end])
             push!(gas.sat_T, 9000.0); push!(gas.sat_P, gas.sat_P[end])
 
-            # setup interpolators 
+            # setup interpolators
             gas.cap_I = Interpolator(gas.cap_T, gas.cap_C)
             gas.lat_I = Interpolator(gas.lat_T, gas.lat_H)
             gas.sat_I = Interpolator(gas.sat_T, gas.sat_P)
 
-        end 
+        end
 
         @debug("    done")
         return gas
-    end # end load_gas 
+    end # end load_gas
 
     """
     **Get gas saturation pressure for a given temperature.**
 
-    If the temperature is above the critical point, then a large value 
+    If the temperature is above the critical point, then a large value
     is returned.
 
     Arguments:
@@ -524,25 +524,25 @@ module phys
     Returns:
     - `p::Float64`              saturation pressure [Pa]
     """
-    function get_Psat(gas::Gas_t, t::Float64)::Float64 
+    function get_Psat(gas::Gas_t, t::Float64)::Float64
 
-        # Handle stub cases 
-        if gas.stub 
+        # Handle stub cases
+        if gas.stub
             return fbig
-        end 
+        end
         if gas.no_sat
-            return fbig 
-        end 
+            return fbig
+        end
 
-        # Above critical point. In practice, a check for this should be made 
+        # Above critical point. In practice, a check for this should be made
         #    before any attempt to evaluate this function.
         if t > gas.T_crit + 1.0e-5
-            return fbig 
-        end 
+            return fbig
+        end
 
         # Get value from interpolator
         return gas.sat_I(t)
-    end 
+    end
 
     """
     **Approximate the dew point temperature without interpolation**
@@ -556,22 +556,22 @@ module phys
     Returns:
     - `t::Float64`              dew point temperature [K]
     """
-    function get_Tdew(gas::Gas_t, p::Float64)::Float64 
+    function get_Tdew(gas::Gas_t, p::Float64)::Float64
 
-        # Handle stub case 
-        if gas.stub 
+        # Handle stub case
+        if gas.stub
             return 0.0
-        end 
+        end
 
-        # Find closest value in array 
+        # Find closest value in array
         i::Int = argmin(abs.(gas.sat_P .- p))
         return min(gas.sat_T[i], gas.T_crit)
-    end 
+    end
 
     """
     **Get gas enthalpy (latent heat) of phase change.**
 
-    If the temperature is above the critical point, then a zero value 
+    If the temperature is above the critical point, then a zero value
     is returned. Evaluates at 0 Celcius if `gas.tmp_dep=false`.
 
     Arguments:
@@ -581,26 +581,26 @@ module phys
     Returns:
     - `h::Float64`              enthalpy of phase change [J kg-1]
     """
-    function get_Lv(gas::Gas_t, t::Float64)::Float64 
+    function get_Lv(gas::Gas_t, t::Float64)::Float64
 
-        # Handle stub case 
-        if gas.stub 
+        # Handle stub case
+        if gas.stub
             return gas.lat_H[1]
-        end 
+        end
 
         # Above critical point
         if t > gas.T_crit
             return 0.0
-        end 
+        end
 
         # Constant value
         if !gas.tmp_dep
             t = zero_celcius
-        end 
+        end
 
         # Get value from interpolator
         return gas.lat_I(t)
-    end 
+    end
 
     """
     **Get gas heat capacity for a given temperature.**
@@ -614,24 +614,24 @@ module phys
     Returns:
     - `cp::Float64`             heat capacity of gas [J K-1 kg-1]
     """
-    function get_Cp(gas::Gas_t, t::Float64)::Float64 
+    function get_Cp(gas::Gas_t, t::Float64)::Float64
 
-        # Handle stub case 
-        if gas.stub 
+        # Handle stub case
+        if gas.stub
             return gas.cap_C[1]
-        end 
+        end
 
         # Constant value
         if !gas.tmp_dep
             t = zero_celcius
-        end 
+        end
 
         # Temperature floor, since we can get weird behaviour as Cp -> 0.
         t = max(t, 0.5)
 
         # Get value from interpolator
         return gas.cap_I(t)
-    end 
+    end
 
     """
     **Get gas thermal conductivity at a given temperature.**
@@ -643,11 +643,11 @@ module phys
     Returns:
     - `kc::Float64`             thermal conductivity [W m-1 K-1]
     """
-    function get_Kc(gas::Gas_t, t::Float64=-1.0)::Float64 
+    function get_Kc(gas::Gas_t, t::Float64=-1.0)::Float64
         return 0.0
-    end 
+    end
 
-    """ 
+    """
     **Evaluate the Planck function at a given wavelength and temperature.**
 
     Integrated over a hemisphere.
@@ -661,7 +661,7 @@ module phys
     """
     function evaluate_planck(wav::Float64, tmp::Float64)::Float64
 
-        # Output value 
+        # Output value
         flx::Float64 = 0.0
 
         # Convert nm to m
@@ -669,13 +669,13 @@ module phys
 
         # Calculate planck function value [W m-2 sr-1 m-1]
         # http://spiff.rit.edu/classes/phys317/lectures/planck.html
-        flx = 2.0 * h_pl * c_vac * (c_vac / wav^5.0) / 
+        flx = 2.0 * h_pl * c_vac * (c_vac / wav^5.0) /
               ( exp(h_pl * c_vac / (wav * k_B * tmp)) - 1.0)
 
         # Integrate solid angle (hemisphere), convert units
         flx = flx * pi * 1.0e-9 # [W m-2 nm-1]
 
         return flx
-    end 
-    
-end # end module 
+    end
+
+end # end module

@@ -1,10 +1,10 @@
-# Contains functions for plotting/diagnosing the atmosphere 
+# Contains functions for plotting/diagnosing the atmosphere
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
     thisfile = @__FILE__
     error("The file '$thisfile' is not for direct execution")
-end 
+end
 
 module plotting
 
@@ -19,39 +19,39 @@ module plotting
     import ..phys
 
     # Default plotting configuration
-    default(fontfamily="sans-serif", framestyle=:box, label=nothing, grid=true, 
+    default(fontfamily="sans-serif", framestyle=:box, label=nothing, grid=true,
             guidefontsize=9, titlefontsize=9)
 
     # Symmetric log
     function _symlog(v::Float64)::Float64
         if abs(v) < 1.0
             return 0.0
-        end 
+        end
         return sign(v)*max(log10(abs(v)), 0.0)
-    end 
+    end
 
-    # Int to string 
+    # Int to string
     function _intstr(v::Int)::String
         return @sprintf("%d",v)
-    end 
+    end
 
     """
     Plot the temperature-pressure profile.
     """
-    function plot_pt(atmos::atmosphere.Atmos_t, fname::String; 
+    function plot_pt(atmos::atmosphere.Atmos_t, fname::String;
                             dpi::Int=250,
                             size_x::Int=500, size_y::Int=400,
-                            incl_magma::Bool=false, 
+                            incl_magma::Bool=false,
                             title::String="")
-        
+
         ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright, 
+        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
                         dpi=dpi, size=(size_x,size_y))
 
-        # Plot phase boundary 
+        # Plot phase boundary
         if atmos.condense_any
             sat_n::Int = 100
             sat_p::Array{Float64,1} = zeros(Float64, sat_n)
@@ -59,30 +59,30 @@ module plotting
             for c in atmos.condensates
 
                 if atmos.gas_dat[c].no_sat
-                    continue 
-                end 
+                    continue
+                end
 
-                for i in 1:sat_n 
+                for i in 1:sat_n
                     sat_t[i] = atmos.gas_dat[c].T_crit * i/sat_n
                     sat_p[i] = phys.get_Psat(atmos.gas_dat[c], sat_t[i]) * 1e-5
-                end 
+                end
 
                 # plot phase boundary for this condensate
-                plot!(plt, sat_t, sat_p, lc=atmos.gas_dat[c].plot_color, ls=:dot, 
+                plot!(plt, sat_t, sat_p, lc=atmos.gas_dat[c].plot_color, ls=:dot,
                             label=atmos.gas_dat[c].plot_label)
-            end 
+            end
         end
 
-        # Plot tmp_magma 
+        # Plot tmp_magma
         if incl_magma
-            scatter!(plt, [atmos.tmp_magma], [atmos.pl[end]*1e-5], 
-                        color="cornflowerblue", label=L"T_m") 
+            scatter!(plt, [atmos.tmp_magma], [atmos.pl[end]*1e-5],
+                        color="cornflowerblue", label=L"T_m")
         end
 
-        # Plot tmp_surf 
+        # Plot tmp_surf
         scatter!(plt, [atmos.tmp_surf], [atmos.pl[end]*1e-5], color="brown3", label=L"T_s")
 
-        # Plot profile 
+        # Plot profile
         plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=2, label=L"T(p)")
 
         # Decorate
@@ -92,22 +92,22 @@ module plotting
         yaxis!(plt, yscale=:log10)
         if !isempty(title)
             title!(plt, title)
-        end 
+        end
 
         if !isempty(fname)
             savefig(plt, fname)
         end
-        return plt 
+        return plt
     end
 
     """
     Plot the cloud mass mixing ratio and area fraction.
     """
-    function plot_cloud(atmos::atmosphere.Atmos_t, fname::String; 
+    function plot_cloud(atmos::atmosphere.Atmos_t, fname::String;
                             dpi::Int=250,
                             size_x::Int=500, size_y::Int=400,
                             title::String="")
-        
+
         xlims = (-1, 101)
         xticks = collect(range(start=0.0, stop=100.0, step=10.0))
 
@@ -116,13 +116,13 @@ module plotting
 
         # Create plot
         plt = plot( xlims=xlims, xticks=xticks,
-                    ylims=ylims, yticks=yticks, 
-                    legend=:outertopright, dpi=dpi, 
+                    ylims=ylims, yticks=yticks,
+                    legend=:outertopright, dpi=dpi,
                     size=(size_x,size_y))
 
         # Temperature profile for reference
         tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
-        plot!(plt, tmp_nrm*100.0, atmos.p*1e-5, lc="black", 
+        plot!(plt, tmp_nrm*100.0, atmos.p*1e-5, lc="black",
                         linealpha=0.3, label=L"\hat{T}(p)")
 
         # Plot cloud profiles
@@ -136,18 +136,18 @@ module plotting
         yaxis!(plt, yscale=:log10)
         if !isempty(title)
             title!(plt, title)
-        end 
+        end
 
         if !isempty(fname)
             savefig(plt, fname)
         end
-        return plt 
+        return plt
     end
 
     """
     Plot the VMRs of the atmosphere at each cell-centre location.
     """
-    function plot_vmr(atmos::atmosphere.Atmos_t, fname::String; 
+    function plot_vmr(atmos::atmosphere.Atmos_t, fname::String;
                             dpi::Int=250,
                             size_x::Int=500, size_y::Int=400)
 
@@ -157,15 +157,15 @@ module plotting
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-        
+
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, dpi=dpi, 
+        plt = plot(ylims=ylims, yticks=yticks, dpi=dpi,
                     legend=:outertopright, size=(size_x,size_y))
 
         # Plot log10 VMRs for each gas
         gas_xsurf::Array = zeros(Float64, atmos.gas_num)
         gas::String = ""
-        for i in 1:atmos.gas_num 
+        for i in 1:atmos.gas_num
             gas = atmos.gas_names[i]
 
             # store surface value
@@ -176,26 +176,26 @@ module plotting
         arr_x::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
         min_x::Float64 = -3
         for i in reverse(sortperm(gas_xsurf))
-            # Plot gases in order of descending abundance, so that the legend 
+            # Plot gases in order of descending abundance, so that the legend
             #    shows the most interesting gases at the top of the list.
 
             # Avoid plotting too many gases, since this makes it unreadable
             if num_plotted > 20
-                break 
-            end 
+                break
+            end
 
             # Get data
             gas = atmos.gas_names[i]
             arr_x[:] .= atmos.gas_vmr[gas][:]
-            if minimum(arr_x) < 1e-90 
-                continue 
-            end 
+            if minimum(arr_x) < 1e-90
+                continue
+            end
             arr_x[:] .= log10.(arr_x[:])
 
-            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label, 
+            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label,
                     lw=2.5, linealpha=0.7, color=atmos.gas_dat[gas].plot_color)
 
-            scatter!([log10(atmos.gas_ovmr[gas][end])], [arr_P[end]], 
+            scatter!([log10(atmos.gas_ovmr[gas][end])], [arr_P[end]],
                         opacity=0.9, markersize=2, msw=0.5,
                         color=atmos.gas_dat[gas].plot_color)
 
@@ -214,19 +214,19 @@ module plotting
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
-                
+
         if !isempty(fname)
             savefig(plt, fname)
         end
-        return plt 
+        return plt
     end
 
     """
     Plot the fluxes at each pressure level
     """
-    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String; 
+    function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String;
                             dpi::Int=250, size_x::Int=550, size_y::Int=400,
-                            incl_eff::Bool=false, incl_mlt::Bool=true, 
+                            incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
                             title::String=""
                         )
@@ -241,8 +241,8 @@ module plotting
         xlims = (-xticks_pos[end], xticks_pos[end])
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
-        plt = plot(legend=:outertopright, ylims=ylims, yticks=yticks, 
-                    xticks=(xticks, xticklabels), xlims=xlims, 
+        plt = plot(legend=:outertopright, ylims=ylims, yticks=yticks,
+                    xticks=(xticks, xticklabels), xlims=xlims,
                     dpi=dpi, size=(size_x,size_y))
 
         col_r::String = "#c0c0c0"
@@ -261,7 +261,7 @@ module plotting
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=w, lc=col_r, label="LW+SW")
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=w, lc=col_n, label="UP-DN")
 
-        # Zero line 
+        # Zero line
         plot!(plt, [0.0, 0.0], [arr_P[1], arr_P[end]], lw=0.4, lc="black")
 
         # Intrinsic/interior flux
@@ -279,26 +279,26 @@ module plotting
         if atmos.is_out_sw
             plot!(plt, _symlog.(-1.0.*atmos.flux_d_sw), arr_P, lw=w, lc=col_r, ls=:dot,  linealpha=alpha)
             plot!(plt, _symlog.(      atmos.flux_u_sw), arr_P, lw=w, lc=col_r, ls=:dot,  linealpha=alpha)
-        end 
+        end
 
         # Net radiative fluxes
         if atmos.is_out_lw && atmos.is_out_sw
             plot!(plt, _symlog.(      atmos.flux_u), arr_P, lw=w, lc=col_r, ls=:solid,  linealpha=alpha)
             plot!(plt, _symlog.(-1.0.*atmos.flux_d), arr_P, lw=w, lc=col_r, ls=:solid,  linealpha=alpha)
             plot!(plt, _symlog.(      atmos.flux_n), arr_P, lw=w, lc=col_n, ls=:solid,  linealpha=alpha)
-        end 
+        end
 
         # Convective flux (MLT)
         if incl_mlt
             plot!(plt, _symlog.(atmos.flux_cdry), arr_P, label="Convect", lw=w*1.2, lc=col_c, ls=:solid, linealpha=alpha)
-        end 
+        end
 
-        # Conduction 
+        # Conduction
         if incl_cdct
             plot!(plt, _symlog.(atmos.flux_cdct), arr_P, label="Conduct", lw=w*1.2, lc=col_o, ls=:solid, linealpha=alpha)
-        end 
+        end
 
-        # Condensation 
+        # Condensation
         if incl_latent
             plot!(plt, _symlog.(atmos.flux_l), arr_P, label="Latent", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
         end
@@ -314,13 +314,13 @@ module plotting
         for i in 1:atmos.nlev_c
             if atmos.mask_c[i]
                 scatter!(plt, [-0.2], [arr_P[i]], opacity=0.9, markersize=2, msw=0.5, color=col_c)
-            end 
+            end
             if atmos.mask_l[i]
                 scatter!(plt, [0.2], [arr_P[i]], opacity=0.9, markersize=2, msw=0.5, color=col_p)
-            end 
+            end
         end
 
-        # Labels 
+        # Labels
         annotate!(plt, xlims[1]/2.0, arr_P[1]/0.8, text("Downward", :black, :center, 9))
         annotate!(plt, xlims[2]/2.0, arr_P[1]/0.8, text("Upward"  , :black, :center, 9))
 
@@ -336,19 +336,19 @@ module plotting
         if !isempty(fname)
             savefig(plt, fname)
         end
-        return plt 
-    end 
+        return plt
+    end
 
     """
     Plot emission spectrum at the TOA
     """
-    function plot_emission(atmos::atmosphere.Atmos_t, fname::String; 
+    function plot_emission(atmos::atmosphere.Atmos_t, fname::String;
                                 dpi::Int=250, incl_surf::Bool=true)
 
-        # Check that we have data 
+        # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
             @error "Cannot plot emission spectrum because radiances have not been calculated"
-            return 
+            return
         end
 
         # Get emission spectrum data
@@ -359,7 +359,7 @@ module plotting
         for ba in 1:atmos.nbands
             # x value - band centres [nm]
             xe[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
-            
+
             # y value - spectral flux [erg s-1 cm-2 nm-1]
             w  = (atmos.bands_max[ba] - atmos.bands_min[ba]) * 1.0e9 # band width in nm
             yl[ba] = atmos.band_u_lw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
@@ -368,30 +368,30 @@ module plotting
 
         end
 
-        # Get planck function values 
+        # Get planck function values
         if incl_surf
             yp = zeros(Float64, atmos.nbands)
-            for i in 1:atmos.nbands 
+            for i in 1:atmos.nbands
                 yp[i] = phys.evaluate_planck(xe[i], atmos.tmp_surf)
 
-                # consistent with SOCRATES diff_planck_source_mod.f90 
-                yp[i] = yp[i] * (1.0 - atmos.albedo_s_arr[i])  
+                # consistent with SOCRATES diff_planck_source_mod.f90
+                yp[i] = yp[i] * (1.0 - atmos.albedo_s_arr[i])
 
                 # convert to [erg s-1 cm-2 nm-1]
-                yp[i] = yp[i] * 1000.0 
-            end 
-        end 
+                yp[i] = yp[i] * 1000.0
+            end
+        end
 
         # Make plot
         plt = plot(dpi=dpi)
 
         if incl_surf
-            plot!(plt, xe, yp, label=L"Blackbody @ $T_s$",  color="green") # surface 
+            plot!(plt, xe, yp, label=L"Blackbody @ $T_s$",  color="green") # surface
         end
 
-        plot!(plt, xe, ys, lw=0.9, label="SW spectrum", color="blue")  
-        plot!(plt, xe, yl, lw=0.9, label="LW spectrum", color="red" ) 
-        plot!(plt, xe, yt, lw=0.5, label="Total spectrum", color="black")  # emission 
+        plot!(plt, xe, ys, lw=0.9, label="SW spectrum", color="blue")
+        plot!(plt, xe, yl, lw=0.9, label="LW spectrum", color="red" )
+        plot!(plt, xe, yt, lw=0.5, label="Total spectrum", color="black")  # emission
 
         xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 70000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
@@ -407,18 +407,18 @@ module plotting
         if !isempty(fname)
             savefig(plt, fname)
         end
-        return plt 
-    end 
+        return plt
+    end
 
     """
     Plot contribution function (per band)
     """
     function plot_contfunc(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
 
-        # Check that we have data 
+        # Check that we have data
         if !atmos.is_out_lw
             @error "Cannot plot cont func because radiances have not been calculated"
-            return 
+            return
         end
 
         # Get data
@@ -433,29 +433,29 @@ module plotting
         for ba in 1:atmos.nbands
             if reversed
                 br = atmos.nbands - ba + 1
-            else 
-                br = ba 
+            else
+                br = ba
             end
             x[br] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
         end
 
         # y value - pressures [bar]
-        for i in 1:atmos.nlev_c 
+        for i in 1:atmos.nlev_c
             y[i] = atmos.p[i] * 1.0e-5
-        end 
+        end
 
-        # z value - log'd and normalised contribution function 
+        # z value - log'd and normalised contribution function
         cf_min = 1.0e-9
         for ba in 1:atmos.nbands
             if reversed
                 br = atmos.nbands - ba + 1
-            else 
-                br = ba 
+            else
+                br = ba
             end
-            for i in 1:atmos.nlev_c 
+            for i in 1:atmos.nlev_c
                 z[i,br] = log10(max(atmos.contfunc_norm[i,ba],cf_min))
-            end 
-        end 
+            end
+        end
 
         # Make plot
         plt = plot(dpi=dpi, colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
@@ -476,18 +476,18 @@ module plotting
         if !isempty(fname)
             savefig(plt, fname)
         end
-        return plt 
-    end 
+        return plt
+    end
 
     """
     Plot spectral albedo (ratio of SW_UP to SW_DN)
     """
     function plot_albedo(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
 
-        # Check that we have data 
+        # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
             @error "Cannot plot spectral albedo because radiances have not been calculated"
-            return 
+            return
         end
 
         # Get data
@@ -497,7 +497,7 @@ module plotting
         for ba in 1:atmos.nbands
             # x value - band centres [nm]
             x[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
-            
+
             # y value - spectral albedo [percentage]
             y[ba] = 100.0 * atmos.band_u_sw[1, ba]/atmos.band_d_sw[1, ba]
         end
@@ -518,26 +518,26 @@ module plotting
         if !isempty(fname)
             savefig(plt, fname)
         end
-        return plt 
+        return plt
     end
 
-    """ 
+    """
     Combined plot used for tracking behaviour of the solver
     """
-    function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String; 
+    function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String;
                         dpi::Int=180, size_x::Int=800, size_y::Int=650)
 
         plt_info = plot(legend=false, showaxis=false, grid=false)
         annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
 
-        plt = plot(plt_pt, plt_fl, plt_mr, plt_info, dpi=dpi, 
+        plt = plot(plt_pt, plt_fl, plt_mr, plt_info, dpi=dpi,
                         layout=(2,2), size=(size_x, size_y))
 
         if !isempty(fname)
             savefig(plt, fname)
         end
-        return plt 
-    end 
+        return plt
+    end
 
     """
     Animate output frames from solver, using ffmpeg
@@ -552,7 +552,7 @@ module plotting
         # Create animation
         if nframes < 1
             @warn "Cannot animate solver because no output frames were found"
-        else 
+        else
             fps::Float64 = nframes/duration*1.0
             @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/animation.mp4`)
         end
@@ -561,12 +561,12 @@ module plotting
     end
 
     """
-    Plot jacobian matrix 
+    Plot jacobian matrix
     """
-    function jacobian(b::Array{Float64,2}, fname::String; 
+    function jacobian(b::Array{Float64,2}, fname::String;
                             perturb::Array{Bool,1}=Bool[],
                             dpi::Int=200, size_x::Int=600, size_y::Int=500)
-        
+
         lim::Float64 = maximum(abs.(b))     # colourbar limits
         l::Int = length(perturb)            # show perturbed levels?
 
@@ -574,14 +574,14 @@ module plotting
                     title="∂r/∂x [W m⁻² K⁻¹]",
                     clim=(-lim,lim), yflip=true)
 
-        # show jacobian 
+        # show jacobian
         heatmap!(plt, b, color=:RdBu)
 
-        # show perturbed levels 
+        # show perturbed levels
         if l > 0
             scatter!(plt, collect(1:l)[perturb], ones(Float64, l)[perturb]*(l+1),
                         color=:black,markershape=:utriangle)
-        end 
+        end
 
         xlabel!(plt, "Cell-centre index")
         ylabel!(plt, "Cell-centre index")
@@ -590,8 +590,8 @@ module plotting
             savefig(plt, fname)
         end
 
-        return plt 
-    end 
+        return plt
+    end
 
 end # end module plotting
 

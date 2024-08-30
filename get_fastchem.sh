@@ -10,7 +10,7 @@ git clone https://github.com/NewStrangeWorlds/FastChem.git "$fcpath"
 # Compile FastChem
 cd "$fcpath"
 mkdir build
-cd build 
+cd build
 
 cmake ".."
 make

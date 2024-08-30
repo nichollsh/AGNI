@@ -4,7 +4,7 @@
 if (abspath(PROGRAM_FILE) == @__FILE__)
     thisfile = @__FILE__
     error("The file '$thisfile' is not for direct execution")
-end 
+end
 
 module setpt
 
@@ -21,29 +21,29 @@ module setpt
         # Check file exists
         if !isfile(fpath)
             @error "setpt: The file '$fpath' does not exist"
-            return 
-        end 
+            return
+        end
 
-        # Read file 
+        # Read file
         content = readlines(fpath)
 
-        # Parse file once, to get number of level edges 
-        nlev_l = 0  
+        # Parse file once, to get number of level edges
+        nlev_l = 0
         for l in content
             if isempty(l) || (l[1] == '#') || (l[1] == '\n')
-                continue 
+                continue
             end
             nlev_l += 1
         end
 
-        # Validate 
+        # Validate
         if nlev_l < 3
             @error "setpt: CSV file contains too few levels (contains $nlev_l edge values)"
-            return 
+            return
         end
         nlev_c = nlev_l - 1
 
-        # Allocate temporary T and P arrays 
+        # Allocate temporary T and P arrays
         tmpl = zeros(Float64,nlev_l)
         pl   = zeros(Float64,nlev_l)
 
@@ -52,7 +52,7 @@ module setpt
         for l in content
             # Skip
             if isempty(l) || (l[1] == '#') || (l[1] == '\n')
-                continue 
+                continue
             end
 
             # Read
@@ -60,35 +60,35 @@ module setpt
             p_val = parse(Float64,lsplit[1])  # Pressure [Pa]
             t_val = parse(Float64,lsplit[2])  # Temperature [K]
 
-            # Validate 
+            # Validate
             if p_val <= 0.0
                 @error "setpt: Negative pressure(s) in csv file"
-                return 
-            end 
+                return
+            end
             if t_val <= 0.0
                 @error "setpt: Negative temperature(s) in csv file"
-                return 
-            end 
+                return
+            end
 
             # Store
-            pl[idx] = p_val 
+            pl[idx] = p_val
             tmpl[idx] = t_val
 
-            # Iterate 
+            # Iterate
             idx += 1
-        end 
+        end
 
-        # Check if arrays are flipped 
-        if pl[1] > pl[2]  
+        # Check if arrays are flipped
+        if pl[1] > pl[2]
             pl = reverse(pl)
             tmpl = reverse(tmpl)
-        end 
+        end
 
         # Check that pressure is monotonic
         for i in 1:nlev_c
             if pl[i] > pl[i+1]
                 @error "setpt: Pressure is not monotonic in csv file"
-                return 
+                return
             end
         end
 
@@ -100,7 +100,7 @@ module setpt
             pushfirst!(tmpl, t_ext)
         end
 
-        # Extrapolate loaded grid to higher pressures 
+        # Extrapolate loaded grid to higher pressures
         if (atmos.pl[end] > pl[end])
             p_ext = atmos.pl[end]*1.1
             t_ext = (tmpl[end] - tmpl[end-2])/(pl[end] - pl[end-2]) * (p_ext - pl[end])
@@ -109,11 +109,11 @@ module setpt
         end
 
         # Interpolate from the loaded grid to the required one
-        #   This uses log-pressures in order to make the interpolation behave 
+        #   This uses log-pressures in order to make the interpolation behave
         #   reasonably across the entire grid.
-        itp = Interpolator(log10.(pl), tmpl) 
-        atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
-        atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
+        itp = Interpolator(log10.(pl), tmpl)
+        atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges
+        atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres
 
         return
     end
@@ -126,17 +126,17 @@ module setpt
         # Check file exists
         if !isfile(fpath)
             @error "setpt: The file '$fpath' does not exist"
-            return 
-        end 
+            return
+        end
 
-        # Open file 
+        # Open file
         fpath = abspath(fpath)
         @debug "Setting PT from NetCDF file "
         @debug "ALL DEBUG SUPPRESSED"
         with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
             ds = Dataset(fpath,"r")
 
-            # Allocate interleaved temperature profile 
+            # Allocate interleaved temperature profile
             nlev_c::Int = length(ds["p"][:])
             arr_n::Int = nlev_c + nlev_c + 1
             arr_T::Array{Float64, 1} = zeros(Float64, arr_n)
@@ -144,9 +144,9 @@ module setpt
 
             # top
             arr_T[1] = ds["tmpl"][1]
-            arr_P[1] = ds["pl"][1]   
+            arr_P[1] = ds["pl"][1]
 
-            # middle 
+            # middle
             idx::Int = 0
             for i in 1:nlev_c
                 idx = (i-1)*2
@@ -154,13 +154,13 @@ module setpt
                 arr_T[idx+2] = ds["tmp"][i]
                 arr_P[idx+1] = ds["pl"][i]
                 arr_P[idx+2] = ds["p"][i]
-            end 
+            end
 
             # bottom
             arr_T[end] = ds["tmpl"][end]
-            arr_P[end] = ds["pl"][end] 
+            arr_P[end] = ds["pl"][end]
 
-            # extend with constant values to avoid issues with interpolator 
+            # extend with constant values to avoid issues with interpolator
             newtop = min(atmos.pl[1], arr_P[1])/2.0
             pushfirst!(arr_P,newtop)
             pushfirst!(arr_T, ds["tmpl"][1])
@@ -169,17 +169,17 @@ module setpt
             push!(arr_P, newbot)
             push!(arr_T, ds["tmpl"][end])
 
-            # properties 
+            # properties
             atmos.tmp_surf = ds["tmp_surf"][1]
 
-            # Close file 
+            # Close file
             close(ds)
 
-            # interpolate 
-            itp = Interpolator(log10.(arr_P), arr_T) 
-            atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges 
-            atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres 
-                   
+            # interpolate
+            itp = Interpolator(log10.(arr_P), arr_T)
+            atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges
+            atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres
+
         end
         @debug "ALL DEBUG RESTORED"
 
@@ -191,70 +191,70 @@ module setpt
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
             return
-        end 
-        atmos.tmpl[:] .= set_tmp 
+        end
+        atmos.tmpl[:] .= set_tmp
         atmos.tmp[:]  .= set_tmp
 
         return
-    end 
+    end
 
     # Set atmosphere to be isothermal at the given temperature
     function add!(atmos::atmosphere.Atmos_t, delta::Float64)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
-            return 
-        end 
-        atmos.tmpl[:] .+= delta 
+            return
+        end
+        atmos.tmpl[:] .+= delta
         atmos.tmp[:]  .+= delta
 
         return nothing
-    end 
+    end
 
     # Set atmosphere to dry adiabat
     function dry_adiabat!(atmos::atmosphere.Atmos_t)
         # Validate input
-        if !(atmos.is_alloc && atmos.is_param) 
+        if !(atmos.is_alloc && atmos.is_param)
             @error "setpt: Atmosphere is not setup or allocated"
-            return 
-        end 
+            return
+        end
 
-        # Set surface 
+        # Set surface
         atmos.tmpl[end] = atmos.tmp_surf
 
-        # Lapse rate dT/dp 
+        # Lapse rate dT/dp
         grad::Float64 = 0.0
 
-        # Calculate values 
+        # Calculate values
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
             # Set cp based on temperature at the level below this one
-            tmp_eval = atmos.tmp_surf 
-            if i < atmos.nlev_c 
+            tmp_eval = atmos.tmp_surf
+            if i < atmos.nlev_c
                 tmp_eval = atmos.tmp[i+1]
             end
             atmos.layer_cp[i] = 0.0
             for gas in atmos.gas_names
-                atmos.layer_cp[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw * 
-                                            phys.get_Cp(atmos.gas_dat[gas], tmp_eval) / 
+                atmos.layer_cp[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw *
+                                            phys.get_Cp(atmos.gas_dat[gas], tmp_eval) /
                                             atmos.layer_mmw[i]
             end
 
-            # Cell-edge to cell-centre 
-            grad = phys.R_gas * atmos.tmpl[i+1] / 
+            # Cell-edge to cell-centre
+            grad = phys.R_gas * atmos.tmpl[i+1] /
                         (atmos.pl[i+1] * atmos.layer_mmw[i] * atmos.layer_cp[i])
             atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
             atmos.tmp[i] = max(atmos.tmp[i], atmos.tmp_floor)
 
-            # Cell-centre to cell-edge 
-            grad = phys.R_gas * atmos.tmp[i] / 
+            # Cell-centre to cell-edge
+            grad = phys.R_gas * atmos.tmp[i] /
                         (atmos.p[i] * atmos.layer_mmw[i] * atmos.layer_cp[i])
             atmos.tmpl[i] = atmos.tmp[i] + grad * (atmos.pl[i]-atmos.p[i])
             atmos.tmpl[i] = max(atmos.tmpl[i], atmos.tmp_floor)
-        end 
+        end
 
 
         return nothing
-    end 
+    end
 
     # Set atmosphere to have an isothermal stratosphere
     function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp::Float64)
@@ -265,19 +265,19 @@ module setpt
         # Loop upwards from bottom of model
         strat = false
         for i in range(atmos.nlev_c,1,step=-1)
-            # Find tropopause 
-            strat = strat || (atmos.tmp[i] < strat_tmp) || (atmos.tmpl[i+1] < strat_tmp) 
-            
+            # Find tropopause
+            strat = strat || (atmos.tmp[i] < strat_tmp) || (atmos.tmpl[i+1] < strat_tmp)
+
             # Apply stratosphere to this level if required
             if strat
-                atmos.tmp[i]    = strat_tmp 
-                atmos.tmpl[i+1] = strat_tmp 
+                atmos.tmp[i]    = strat_tmp
+                atmos.tmpl[i+1] = strat_tmp
             end
         end
 
-        # Handle topmost level 
+        # Handle topmost level
         if strat
-            atmos.tmpl[1] = strat_tmp 
+            atmos.tmpl[1] = strat_tmp
         end
 
         return nothing
@@ -298,7 +298,7 @@ module setpt
             atmos.tmpl[i] = atmos.tmpl[i+1] + dTdP * log10(atmos.pl[i+1]/atmos.pl[i])
         end
 
-        # Set cell-centres 
+        # Set cell-centres
         atmos.tmp[1:end] .= 0.5 .* (atmos.tmpl[1:end-1] + atmos.tmpl[2:end])
 
         return nothing
@@ -307,10 +307,10 @@ module setpt
 
     # Ensure that the surface isn't supersaturated
     function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)
-        if !(atmos.is_alloc && atmos.is_param) 
+        if !(atmos.is_alloc && atmos.is_param)
             @error "setpt: Atmosphere is not setup or allocated"
-            return 
-        end 
+            return
+        end
 
         x::Float64 = 0.0
         psat::Float64 = 0.0
@@ -320,40 +320,40 @@ module setpt
             # Get VMR at surface
             x = atmos.gas_vmr[gas][atmos.nlev_c]
             if x < 1.0e-10
-                continue 
+                continue
             end
 
-            # Check criticality 
+            # Check criticality
             if (atmos.tmp_surf > atmos.gas_dat[gas].T_crit)
-                continue 
-            end 
+                continue
+            end
 
             # Check surface pressure (should not be supersaturated)
             psat = phys.get_Psat(atmos.gas_dat[gas], atmos.tmp_surf)
             if x*atmos.pl[end] > psat
-                # Reduce amount of volatile until reaches phase curve 
+                # Reduce amount of volatile until reaches phase curve
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.gas_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa  
+                atmos.gas_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa
 
-                # Check that p_boa is still reasonable 
-                if atmos.p_boa <= 10.0 * atmos.p_toa 
+                # Check that p_boa is still reasonable
+                if atmos.p_boa <= 10.0 * atmos.p_toa
                     @error "setpt: Supersaturation check ($gas) resulted in an unreasonably small surface pressure"
-                end 
+                end
             end
-        end 
+        end
 
         # Renormalise VMRs
         tot_vmr = 0.0
         for g in atmos.gas_names
             tot_vmr += atmos.gas_vmr[g][atmos.nlev_c]
-        end 
+        end
         for g in atmos.gas_names
             atmos.gas_vmr[g][atmos.nlev_c] /= tot_vmr
-        end 
+        end
 
-        # Generate new pressure grid 
+        # Generate new pressure grid
         atmosphere.generate_pgrid!(atmos)
-        
+
         return nothing
     end
 
@@ -365,9 +365,9 @@ module setpt
     """
     function saturation!(atmos::atmosphere.Atmos_t, gas::String)
 
-        if !(atmos.is_alloc && atmos.is_param) 
+        if !(atmos.is_alloc && atmos.is_param)
             @error "setpt: Atmosphere is not setup or allocated"
-        end 
+        end
 
         # gas is present?
         if !(gas in atmos.gas_names)
@@ -381,18 +381,18 @@ module setpt
         for i in 1:atmos.nlev_c
 
             x = atmos.gas_vmr[gas][i]
-            if x < 1.0e-10 
+            if x < 1.0e-10
                 continue
             end
 
             # Set cell-centre temperatures
             Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i])
-            if atmos.tmp[i] < Tdew 
-                atmos.tmp[i] = Tdew 
+            if atmos.tmp[i] < Tdew
+                atmos.tmp[i] = Tdew
                 atmos.gas_sat[gas][i] = true
-            end 
+            end
         end
-        
+
         # Set cell-edge temperatures
         atmosphere.set_tmpl_from_tmp!(atmos)
 

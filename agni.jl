@@ -3,10 +3,10 @@
 # Don't show plot windows
 ENV["GKSwstype"] = "100"
 
-# Check RAD_DIR 
+# Check RAD_DIR
 if !("RAD_DIR" in keys(ENV))
     error("Cannot find SOCRATES! Have you set RAD_DIR?")
-end 
+end
 
 # Activate environment
 import Pkg
@@ -14,10 +14,10 @@ Pkg.activate(dirname(abspath(@__FILE__)))
 
 # Include AGNI
 include("src/AGNI.jl")
-import .AGNI 
+import .AGNI
 
 # Run
 if AGNI.main()
     exit(0)
-end 
+end
 exit(1)

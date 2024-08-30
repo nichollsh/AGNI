@@ -13,11 +13,11 @@ include(wrap)
 
 # Build libSOCRATES
 println("Build libSOCRATES")
-cd(joinpath(RAD_DIR,"julia/lib/")) do 
+cd(joinpath(RAD_DIR,"julia/lib/")) do
     run(`make`)
-end 
+end
 
-# Download basic data 
+# Download basic data
 println("Get data")
 get_data = joinpath(ROOT_DIR,"get_data.sh")
 run(`bash $get_data basic`)
