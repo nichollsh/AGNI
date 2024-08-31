@@ -643,7 +643,14 @@ module atmosphere
         end
 
         # Fastchem
+        # enabled?
         atmos.fastchem_flag = false
+        # path to fc working directory
+        if isempty(fastchem_work)
+            atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
+        else
+            atmos.fastchem_work = abspath(fastchem_work)
+        end
         if ("FC_DIR" in keys(ENV))
 
             @debug "FastChem env has been set"
@@ -653,11 +660,6 @@ module atmosphere
             if !isdir(atmos.FC_DIR)
                 @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
                 return false
-            end
-            if isempty(fastchem_work)
-                atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")  # working directory
-            else
-                atmos.fastchem_work = abspath(fastchem_work)
             end
 
             # check executable
