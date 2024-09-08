@@ -86,7 +86,7 @@ T_s
 ```
 where $T_s$ is the surface temperature. Cell-edge temperatures in the bulk atmosphere are interpolated using the [PCHIP algorithm](https://epubs.siam.org/doi/10.1137/0905021), which avoids Runge's phenomenon and overshooting. The bottom- and top-most cell edge temperatures are extrapolated by estimation of $dT/d \log p$. Cell properties (heat capacity, gravity, density, average molecular weight, etc.) are consistently updated at each evaluation of $\bm{r}$. Condensation/rainout are also handled at each evaluation of $\bm{r}$ in order to avoid supersaturation.
 
-The model converges when the cost function $c(\bm{x}) = \sqrt[6]{\sum_i |r_i|^6}$ satisfies the condition
+The model converges when the cost function $c(\bm{x}) = \sqrt{\sum_i |r_i|}$ satisfies the condition
 ```math
 c(\bm{x}) < c_a + c_r \cdot \underset{i}{\max} \text{ } |F_i|
 ```
@@ -113,7 +113,7 @@ With a Jacobian constructed, we can calculate an update $\bm{d}$ to the solution
 ```
 but can alternatively be performed via the Gauss-Newton and Levenberg–Marquardt methods.
 
-It is possible for the model to become stuck on a plateau or in a local minimum, leading to very small values of $|\bm{d}|$. This is identified when $c(\bm{x})$ has seen little change over the last few iterations. When this occurs, the model is 'nudged' by scaling the update via
+It is possible for the model to become stuck in a local minimum, leading to very small values of $|\bm{d}|$. This is identified when $c(\bm{x})$ has seen little change over the last few iterations. When this occurs, the model is 'nudged' by scaling the update via
 ```math
 \bm{d} \rightarrow 3 \bm{d}
 ```
@@ -132,4 +132,4 @@ on $\alpha$. This is applied if the full step $\bm{d}$ would increase the cost b
 AGNI can calculate emission spectra, provided with T(p) and the volume mixing ratios of the gases. This is performed using the same RT as the RCE calculations, so is limited in resolution by the choice of correlated-k bands. Similarly, the longwave contribution function can also be calculated.
 
 ## Julia and Fortran
-AGNI is primarily written in Julia, while SOCRATES itself is written in Fortran. Julia was chosen because it allows the SOCRATES binaries to be included in the precompiled code, which significantly improves performance. 
+AGNI is primarily written in Julia, while SOCRATES itself is written in Fortran. Julia was chosen because it allows the SOCRATES binaries to be included in the precompiled code, which significantly improves performance.
