@@ -126,8 +126,8 @@ module energy
         #####################################
 
         fill!(atmos.bound.rho_alb, 0.0)
-        atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.albedo_s_arr
-        atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_dir,  :] .= atmos.albedo_s_arr
+        atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_diff, :] .= atmos.surf_r_arr
+        atmos.bound.rho_alb[1, atmosphere.SOCRATES.rad_pcf.ip_surf_alb_dir,  :] .= atmos.surf_r_arr
 
         ###################################################
         # Cloud information
@@ -181,8 +181,8 @@ module energy
             #  Having this 1-albedo term and using this low-order integration
             #  gives the correct results from my tests.
             atmos.bound.flux_ground[1,i] = phys.evaluate_planck(pl_x, atmos.tmp_surf)*pl_w*
-                                                atmos.emiss_s_arr[i] *
-                                                (1.0 - atmos.albedo_s_arr[i])
+                                                atmos.surf_e_arr[i] *
+                                                (1.0 - atmos.surf_r_arr[i])
         end
 
         ######################################################
