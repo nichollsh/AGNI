@@ -14,17 +14,22 @@ fi
 # Root and resources folders
 root=$(dirname $(realpath $0))
 res="$root/res/"
+spfiles=$res/spectral_files
+stellar=$res/stellar_spectra
+surface=$res/surface_albedos
 
 # Make basic data folders
 mkdir -p $res
-mkdir -p "$res/spectral_files"
-mkdir -p "$res/stellar_spectra"
+mkdir -p $spfiles
+mkdir -p $stellar
+mkdir -p $surface
 
 # Help strings
 help_basic="Get the basic data required to run the model"
 help_highres="Get a spectral file with many high-resolution opacities"
 help_steam="Get pure-steam spectral files"
 help_stellar="Get a collection of stellar spectra"
+help_surfaces="Get a collection of surface single-scattering albedos"
 help="\
 Helper script used to download and unpack data used to run the model.
 
@@ -40,6 +45,8 @@ Where [TARGET] can be any of the following:
         $help_steam
     stellar
         $help_stellar
+    surfaces
+        $help_surfaces
 "
 
 # Generic OSF downloader function
@@ -71,14 +78,14 @@ function handle_request {
         "basic")
             echo $help_basic
 
-            osf qmp4e $res/spectral_files/Oak/318/ Oak.sf
-            osf 5fxr7 $res/spectral_files/Oak/318/ Oak.sf_k
+            osf qmp4e $spfiles/Oak/318/ Oak.sf
+            osf 5fxr7 $spfiles/Oak/318/ Oak.sf_k
 
-            osf heuza $res/spectral_files/Dayspring/48/ Dayspring.sf
-            osf c5jv3 $res/spectral_files/Dayspring/48/ Dayspring.sf_k
+            osf heuza $spfiles/Dayspring/48/ Dayspring.sf
+            osf c5jv3 $spfiles/Dayspring/48/ Dayspring.sf_k
 
-            osf b5gsh $res/spectral_files/Dayspring/256/ Dayspring.sf
-            osf dn6wh $res/spectral_files/Dayspring/256/ Dayspring.sf_k
+            osf b5gsh $spfiles/Dayspring/256/ Dayspring.sf
+            osf dn6wh $spfiles/Dayspring/256/ Dayspring.sf_k
 
             osf 2qdu8 $res/stellar_spectra sun.txt
             ;;
@@ -86,30 +93,54 @@ function handle_request {
         "highres")
             echo $help_highres
 
-            osf p672d $res/spectral_files/Honeyside/4096/ Honeyside.sf
-            osf ujb4z $res/spectral_files/Honeyside/4096/ Honeyside.sf_k
+            osf p672d $spfiles/Honeyside/4096/ Honeyside.sf
+            osf ujb4z $spfiles/Honeyside/4096/ Honeyside.sf_k
             ;;
 
         "steam")
             echo $help_steam
 
-            osf 6rvfe $res/spectral_files/Frostflow/16/ Frostflow.sf
-            osf kxve8 $res/spectral_files/Frostflow/16/ Frostflow.sf_k
+            osf 6rvfe $spfiles/Frostflow/16/ Frostflow.sf
+            osf kxve8 $spfiles/Frostflow/16/ Frostflow.sf_k
 
-            osf 9n6mw $res/spectral_files/Frostflow/48/ Frostflow.sf
-            osf xfap8 $res/spectral_files/Frostflow/48/ Frostflow.sf_k
+            osf 9n6mw $spfiles/Frostflow/48/ Frostflow.sf
+            osf xfap8 $spfiles/Frostflow/48/ Frostflow.sf_k
 
-            osf mnvyq $res/spectral_files/Frostflow/256/ Frostflow.sf
-            osf tzsgc $res/spectral_files/Frostflow/256/ Frostflow.sf_k
+            osf mnvyq $spfiles/Frostflow/256/ Frostflow.sf
+            osf tzsgc $spfiles/Frostflow/256/ Frostflow.sf_k
             ;;
 
         "stellar")
             echo $help_stellar
-            osf mabp2 $res/stellar_spectra trappist-1.txt
-            osf rk7mj $res/stellar_spectra eps-eri.txt
-            osf agsrq $res/stellar_spectra hd97658.txt
-            osf ehfsy $res/stellar_spectra gj1214.txt
-            osf 2qdu8 $res/stellar_spectra sun.txt
+
+            osf mabp2 $stellar trappist-1.txt
+            osf rk7mj $stellar eps-eri.txt
+            osf agsrq $stellar hd97658.txt
+            osf ehfsy $stellar gj1214.txt
+            osf 2qdu8 $stellar sun.txt
+            ;;
+
+        "surfaces")
+            echo $help_surfaces
+            osf 3af8u $surface andesite.dat
+            osf mgae7 $surface basalt_glass.dat
+            osf d92wk $surface basalt_tuff.dat
+            osf pz54b $surface diorite.dat
+            osf bz5jy $surface gabbro.dat
+            osf hyqv5 $surface granite.dat
+            osf hwkby $surface harzburgite.dat
+            osf 2xpmb $surface hematite.dat
+            osf 6ga5d $surface lherzolite.dat
+            osf bdcte $surface lunar_anorthosite.dat
+            osf 5x4fy $surface lunar_marebasalt.dat
+            osf 8r3x2 $surface mars_basalticshergottite.dat
+            osf 97zsh $surface mars_breccia.dat
+            osf y6knb $surface norite.dat
+            osf wqz48 $surface phonolite.dat
+            osf qsntg $surface pyrite.dat
+            osf q6ujb $surface rhyolite.dat
+            osf usj7w $surface tephrite.dat
+            osf aj6us $surface tholeiitic_basalt.dat
             ;;
 
         *)
