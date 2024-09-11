@@ -26,7 +26,6 @@ docs/build
 res/spectral_files/*
 res/stellar_spectra/*
 res/surface_albedos/*
-!res/surface_albedos/c9mb29.dat
 !res/*/_readme.txt
 
 # Output files
