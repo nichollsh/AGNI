@@ -4,7 +4,7 @@
 # Already setup?
 if [ -n "$RAD_DIR" ]; then
     echo "WARNING: You already have SOCRATES installed"
-    echo "         $RAD_DIR"
+    echo "         RAD_DIR=$RAD_DIR"
     exit 1
 fi
 
