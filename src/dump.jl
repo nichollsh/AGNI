@@ -1,13 +1,13 @@
-# Contains save/load module 
+# Contains save/load module
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)
     thisfile = @__FILE__
     error("The file '$thisfile' is not for direct execution")
-end 
+end
 
 
-module dump 
+module dump
 
     import ..atmosphere
 
@@ -18,7 +18,7 @@ module dump
     using Dates
 
     """
-    Write Pressure vs Temperature & Height profile to a CSV file 
+    Write Pressure vs Temperature & Height profile to a CSV file
     """
     function write_ptz(atmos::atmosphere.Atmos_t, fname::String)
 
@@ -41,7 +41,7 @@ module dump
 
 
     """
-    Write cell-edge energy fluxes to a CSV file 
+    Write cell-edge energy fluxes to a CSV file
     """
     function write_fluxes(atmos::atmosphere.Atmos_t, fname::String)
 
@@ -54,8 +54,8 @@ module dump
             write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , convect     , latent      , tot      \n")
             write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
             for i in 1:atmos.nlev_l
-                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n", 
-                          atmos.pl[i], 
+                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n",
+                          atmos.pl[i],
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
@@ -81,7 +81,7 @@ module dump
         # https://github.com/Alexander-Barth/NCDatasets.jl#create-a-netcdf-file
 
         # Note that the content of the NetCDF file is designed to be compatible
-        # with what JANUS writes. As a result, they can both be integrated 
+        # with what JANUS writes. As a result, they can both be integrated
         # into PROTEUS without compatibility issues.
 
         # Absorb output from these calls, because they spam the Debug logger
@@ -107,7 +107,7 @@ module dump
                 plat = "Linux"
             end
             ds.attrib["platform"] = plat
-            
+
             # ----------------------
             # Create dimensions
             nlev_c = Int(atmos.nlev_c)
@@ -123,7 +123,7 @@ module dump
             defDim(ds, "nchannels", atmos.dimen.nd_channel)  # Number of spectral channels used for calculations
 
             # ----------------------
-            # Scalar quantities  
+            # Scalar quantities
             #    Create variables
             var_tmp_surf =  defVar(ds, "tmp_surf",      Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
             var_tmp_int =   defVar(ds, "tmp_int",       Float64, (), attrib = OrderedDict("units" => "K"))      # Effective temperature [K]
@@ -149,8 +149,8 @@ module dump
             var_starfile =  defVar(ds, "starfile"      ,String, ())     # Path to star file when read
 
             #     Store data
-            var_tmp_surf[1] =   atmos.tmp_surf 
-            var_tmp_int[1] =    atmos.tmp_int 
+            var_tmp_surf[1] =   atmos.tmp_surf
+            var_tmp_int[1] =    atmos.tmp_int
             var_inst[1] =       atmos.instellation
             var_s0fact[1] =     atmos.s0_fact
             var_albbond[1] =    atmos.albedo_b
@@ -166,35 +166,35 @@ module dump
                 var_fray[1] = 'y'
             else
                 var_fray[1] = 'n'
-            end 
+            end
 
             if atmos.control.l_cont_gen
                 var_fcon[1] = 'y'
             else
                 var_fcon[1] = 'n'
-            end 
+            end
 
             if atmos.control.l_cloud
                 var_fcld[1] = 'y'
             else
                 var_fcld[1] = 'n'
-            end 
+            end
 
             if atmos.thermo_funct
                 var_tfun[1] = 'y'
             else
                 var_tfun[1] = 'n'
-            end 
+            end
 
             if atmos.is_solved
                 var_ssol[1] = 'y'
-            else 
+            else
                 var_ssol[1] = 'n'
             end
 
             if atmos.is_converged
                 var_scon[1] = 'y'
-            else 
+            else
                 var_scon[1] = 'n'
             end
 
@@ -226,7 +226,7 @@ module dump
             var_fds =       defVar(ds, "fl_D_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_fus =       defVar(ds, "fl_U_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_fns =       defVar(ds, "fl_N_SW",   Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
-            var_fd =        defVar(ds , "fl_D",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
+            var_fd =        defVar(ds ,"fl_D",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_fu =        defVar(ds, "fl_U",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_fn =        defVar(ds, "fl_N",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
             var_fcd =       defVar(ds, "fl_cnvct",  Float64, ("nlev_l",), attrib = OrderedDict("units" => "W m-2"))
@@ -245,7 +245,8 @@ module dump
             var_bus =       defVar(ds, "ba_U_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
             var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l"), attrib = OrderedDict("units" => "W m-2"))
             var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c"))
-            var_albs =      defVar(ds, "albedo_s",  Float64, ("nbands",))  
+            var_albr =      defVar(ds, "albedo_r",  Float64, ("nbands",))
+            var_albe =      defVar(ds, "albedo_e",  Float64, ("nbands",))
 
             #     Store data
             var_p[:] =      atmos.p
@@ -262,20 +263,20 @@ module dump
             # Composition
             for (i_gas,gas) in enumerate(atmos.gas_names)
                 # Fill gas names
-                for i_char in 1:nchars 
+                for i_char in 1:nchars
                     var_gases[i_char, i_gas] = ' '
-                end 
+                end
                 for i_char in 1:length(atmos.gas_names[i_gas])
                     var_gases[i_char,i_gas] = atmos.gas_names[i_gas][i_char]
-                end 
+                end
 
                 # Fill VMR
                 for i_lvl in 1:nlev_c
                     var_x[i_gas, i_lvl] = atmos.gas_vmr[gas][i_lvl]
-                end 
-            end 
-            
-            # Clouds 
+                end
+            end
+
+            # Clouds
             var_cldl[:] =   atmos.cloud_arr_l
 
             # Kzz mixing
@@ -289,7 +290,7 @@ module dump
             var_fds[:] =    atmos.flux_d_sw
             var_fus[:] =    atmos.flux_u_sw
             var_fns[:] =    atmos.flux_n_sw
-            
+
             var_fd[:] =     atmos.flux_d
             var_fu[:] =     atmos.flux_u
             var_fn[:] =     atmos.flux_n
@@ -306,7 +307,7 @@ module dump
             var_bmin[:] =   atmos.bands_min
             var_bmax[:] =   atmos.bands_max
 
-            for lv in 1:atmos.nlev_l 
+            for lv in 1:atmos.nlev_l
                 for ba in 1:atmos.nbands
                     var_bul[ba, lv] = atmos.band_u_lw[lv, ba]
                     var_bdl[ba, lv] = atmos.band_d_lw[lv, ba]
@@ -314,25 +315,26 @@ module dump
                     var_bus[ba, lv] = atmos.band_u_sw[lv, ba]
                     var_bds[ba, lv] = atmos.band_d_sw[lv, ba]
                     var_bns[ba, lv] = atmos.band_n_sw[lv, ba]
-                end 
-            end 
+                end
+            end
 
             for lc in 1:atmos.nlev_c
                 for ba in 1:atmos.nbands
                     var_cfn[ba, lc] = atmos.contfunc_norm[lc, ba]
-                end 
-            end 
+                end
+            end
 
-            # Surface spectral albedo 
-            var_albs[:] = atmos.albedo_s_arr
+            # Surface spectral albedo
+            var_albr[:] = atmos.surf_r_arr
+            var_albe[:] = atmos.surf_e_arr
 
             close(ds)
 
-        end # suppress output 
+        end # suppress output
         @debug "ALL DEBUG RESTORED"
 
         return nothing
     end # end write_ncdf
 
 
-end 
+end

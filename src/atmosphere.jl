@@ -65,10 +65,8 @@ module atmosphere
 
         surface_material::String        # Surface material file path
         albedo_s::Float64               # Grey surface albedo when surface=blackbody
-        albedo_s_arr::Array{Float64,1}  # Spectral surface albedo passed to SOCRATES
-
-        emiss_s::Float64                # Grey surface emissivity (for all surface materials)
-        emiss_s_arr::Array{Float64,1}   # Spectral surface emissivity passed to SOCRATES
+        surf_r_arr::Array{Float64,1}    # Spectral surface reflectance
+        surf_e_arr::Array{Float64,1}    # Spectral surface emissivity
 
         tmp_surf::Float64               # Surface brightness temperature [K]
         tmp_int::Float64                # Effective temperature of the planet [K]
@@ -315,7 +313,7 @@ module atmosphere
         end
 
         # Code versions
-        atmos.AGNI_VERSION = "0.6.2"
+        atmos.AGNI_VERSION = "0.7.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -1287,15 +1285,20 @@ module atmosphere
         ###########################################
         # Surface properties
         ###########################################
-        atmos.albedo_s_arr = zeros(Float64, atmos.nbands)
-        atmos.emiss_s_arr = ones(Float64, atmos.nbands)
+        # allocate reflectance and emissivity arrays
+        atmos.surf_r_arr = zeros(Float64, atmos.nbands) # directional-hemispheric reflect.
+        atmos.surf_e_arr = ones(Float64, atmos.nbands)  # emissivity
 
         if atmos.surface_material == "blackbody"
             # grey albedo
-            fill!(atmos.albedo_s_arr, atmos.albedo_s)
+            fill!(atmos.surf_r_arr, atmos.albedo_s)
+            # Kirchoff's law: set emissivity equal to 1-albedo (spectrally)
+            fill!(atmos.surf_e_arr, 1.0-atmos.albedo_s)
 
         else
-            # spectral albedo
+            # spectral albedo and emissivity
+            # Hapke2012: https://doi.org/10.1017/CBO9781139025683
+            # Hammond2024: https://arxiv.org/abs/2409.04386
 
             # try to find a matching file
             atmos.surface_material = abspath(atmos.surface_material)
@@ -1304,34 +1307,39 @@ module atmosphere
                 return false
             end
 
-            # read data from file
+            # read single-scattering albedo data from file
             _alb_data::Array{Float64,2} = readdlm(atmos.surface_material, Float64)
             _alb_w::Array{Float64, 1} = _alb_data[:,1]     # wavelength [nm]
-            _alb_a::Array{Float64, 1} = _alb_data[:,2]     # albedo [dimensionless]
+            _alb_s::Array{Float64, 1} = _alb_data[:,2]     # ss albedo [dimensionless]
 
             # extrapolate to 0 wavelength, with constant value
             pushfirst!(_alb_w, 0.0)
-            pushfirst!(_alb_a, _alb_a[1])
+            pushfirst!(_alb_s, _alb_s[1])
 
             # extrapolate to large wavelength, with constant value
             push!(_alb_w, 1e10)
-            push!(_alb_a, _alb_a[end])
+            push!(_alb_s, _alb_s[end])
 
-            # create interpolator
-            _alb_itp::Interpolator = Interpolator(_alb_w, _alb_a)
+            # convert ss albedo to gamma values (eq 14.3 from Hapke 2012)
+            _alb_s[:] .= sqrt.(1 .- _alb_s[:]) # operating in place
+
+            # create interpolator on gamma
+            _gamma::Interpolator = Interpolator(_alb_w, _alb_s)
 
             # use interpolator to fill band values
+            ga::Float64 = 0.0
+            mu::Float64 = cosd(atmos.zenith_degrees)
             for i in 1:atmos.nbands
-                # evaluate at band centre, converting from m to nm
-                atmos.albedo_s_arr[i] = _alb_itp(0.5 * 1.0e9 *
-                                                    (atmos.bands_min[i]+atmos.bands_max[i]))
+                # evaluate gamma at band centre, converting from m to nm
+                ga = _gamma(0.5 * 1.0e9 * (atmos.bands_min[i]+atmos.bands_max[i]))
+
+                # calculate dh reflectance (eq 3 from Hammond24)
+                atmos.surf_r_arr[i] = (1-ga) / (1+2*ga*mu)
+
+                # calculate emissivity (eq 4 from Hammond24 and eq 15.29 from Hapke 2012)
+                atmos.surf_e_arr[i] = 1.0 - ((1-ga)/(1+ga)) * (1- ga/(3*(1+ga)))
             end
         end
-
-        # Kirchoff's law: set emissivity equal to 1-albedo (spectrally)
-        # Section 15.4 of Hapke (2012) textbook: https://doi.org/10.1017/CBO9781139025683
-        atmos.emiss_s_arr[:] .= 1.0 .- atmos.albedo_s_arr[:]
-
 
         #######################################
         # Output arrays
