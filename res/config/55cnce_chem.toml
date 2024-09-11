@@ -1,62 +1,62 @@
-# AGNI configuration file 
-title = "Roughly 55 Cancri e @ fO2=IW"                   
+# AGNI configuration file
+title = "Roughly 55 Cancri e @ fO2=IW"
 
 [planet]
-    tmp_surf        = 2700.0  
+    tmp_surf        = 2700.0
     instellation    = 3.3231e6
-    albedo_b        = 0.0            
-    s0_fact         = 0.6652         
-    zenith_angle    = 60.0    
-    surface_material= "res/surface_albedo/c9mb29.tab"              
-    radius          = 1.1959e7 
-    gravity         = 22.304  
+    albedo_b        = 0.0
+    s0_fact         = 0.6652
+    zenith_angle    = 60.0
+    surface_material= "res/surface_albedos/c9mb29.dat"
+    radius          = 1.1959e7
+    gravity         = 22.304
     tmp_int         = 0.0
-    turb_coeff      = 0.001           
-    wind_speed      = 2.0      
-           
+    turb_coeff      = 0.001
+    wind_speed      = 2.0
+
 [files]
-    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"   
-    input_star      = "res/stellar_spectra/hd97658.txt"                       
-    output_dir      = "out/"       
+    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"
+    input_star      = "res/stellar_spectra/hd97658.txt"
+    output_dir      = "out/"
 
 [composition]
-    p_top           = 1e-7    
+    p_top           = 1e-7
     p_dict          = {H2O = 0.308,CO2 = 15.516,N2  = 16.065,H2  = 0.691,CO  = 231.415    }
-    include_all     = true 
-    chemistry       = 1                  
-    condensates     = []               
+    include_all     = true
+    chemistry       = 1
+    condensates     = []
 
 [execution]
     clean_output    = true
-    verbosity       = 1                  
-    max_steps       = 20000              
-    max_runtime     = 400                
-    num_levels      = 45                 
-    continua        = true               
-    rayleigh        = true               
-    cloud           = false              
-    aerosol         = false              
-    overlap_method  = 4                  
-    thermo_funct    = true               
-    sensible_heat   = false               
-    latent_heat     = true               
-    convection      = true     
-    solution_type   = 3                  
-    solvers         = ["newton"]         
-    dx_max          = 400.0              
-    initial_state   = ["iso", "2700"]     
-    linesearch      = 0     
-    easy_start      = false         
-    converge_atol   = 1.0e-2             
-    converge_rtol   = 1.0e-3             
+    verbosity       = 1
+    max_steps       = 20000
+    max_runtime     = 400
+    num_levels      = 45
+    continua        = true
+    rayleigh        = true
+    cloud           = false
+    aerosol         = false
+    overlap_method  = 4
+    thermo_funct    = true
+    sensible_heat   = false
+    latent_heat     = true
+    convection      = true
+    solution_type   = 3
+    solvers         = ["newton"]
+    dx_max          = 400.0
+    initial_state   = ["iso", "2700"]
+    linesearch      = 0
+    easy_start      = false
+    converge_atol   = 1.0e-2
+    converge_rtol   = 1.0e-3
 
 [plots]
-    at_runtime      = true         
-    temperature     = true         
-    fluxes          = true         
-    contribution    = true         
-    emission        = true         
-    albedo          = true         
-    mixing_ratios   = true         
-    animate         = true        
+    at_runtime      = true
+    temperature     = true
+    fluxes          = true
+    contribution    = true
+    emission        = true
+    albedo          = true
+    mixing_ratios   = true
+    animate         = true
 
