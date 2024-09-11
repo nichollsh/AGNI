@@ -1297,6 +1297,8 @@ module atmosphere
 
         else
             # spectral albedo and emissivity
+            # Hapke2012: https://doi.org/10.1017/CBO9781139025683
+            # Hammond2024: https://arxiv.org/abs/2409.04386
 
             # try to find a matching file
             atmos.surface_material = abspath(atmos.surface_material)
