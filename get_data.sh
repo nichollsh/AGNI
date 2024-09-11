@@ -59,10 +59,10 @@ function osf {
     tgt="$2/$3"
 
     # exists?
-    if [[ -f "$tgt" ]]; then
-        echo "    $1 > file already exists"
-        return 0
-    fi
+    # if [[ -f "$tgt" ]]; then
+    #     echo "    $1 > file already exists"
+    #     return 0
+    # fi
 
     # get data
     echo "    $1 > $tgt"
