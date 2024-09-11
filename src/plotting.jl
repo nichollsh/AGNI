@@ -361,12 +361,14 @@ module plotting
             # x value - band centres [nm]
             xe[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
 
-            # y value - spectral flux [erg s-1 cm-2 nm-1]
+            # TOA upward spectral flux [erg s-1 cm-2 nm-1]
             w  = (atmos.bands_max[ba] - atmos.bands_min[ba]) * 1.0e9 # band width in nm
             yl[ba] = atmos.band_u_lw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
             ys[ba] = atmos.band_u_sw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
             yt[ba] = yl[ba] + ys[ba]
-            ye[ba] = atmos.band_u_lw[end, ba] / w * 1000.0 # surface emission
+
+            # surface upward spectral flux
+            ye[ba] = (atmos.band_u_lw[end, ba] + atmos.band_u_sw[end, ba]) / w * 1000.0
         end
 
         # Get planck function values
@@ -387,13 +389,13 @@ module plotting
         plt = plot(dpi=dpi)
 
         if incl_surf
-            plot!(plt, xe, yp, label=L"Blackbody @ $T_s$",  color="green")
-            plot!(plt, xe, ye, label="Surface emission",    color="green", ls=:dash)
+            plot!(plt, xe, yp, label=L"Planck @ $T_s$",  color="green")
+            plot!(plt, xe, ye, label="Surface LW+SW",    color="green", ls=:dash)
         end
 
-        plot!(plt, xe, ys, lw=0.9, label="SW spectrum", color="blue")
-        plot!(plt, xe, yl, lw=0.9, label="LW spectrum", color="red" )
-        plot!(plt, xe, yt, lw=0.5, label="Total spectrum", color="black")  # emission
+        plot!(plt, xe, ys, lw=0.9, label="Planetary SW",    color="blue")
+        plot!(plt, xe, yl, lw=0.9, label="Planetary LW",    color="red" )
+        plot!(plt, xe, yt, lw=0.5, label="Planetary LW+SW", color="black")
 
         xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 70000.0))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
