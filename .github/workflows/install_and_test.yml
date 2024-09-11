@@ -35,7 +35,7 @@ jobs:
           repository: 'nichollsh/SOCRATES'
           path: 'SOCRATES'
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache-socrates
         with:
           path: |
@@ -57,7 +57,7 @@ jobs:
       - name: Build AGNI
         run: |
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
-          source $RAD_DIR/set_rad_env
+          export RAD_BIN="$RAD_DIR/bin/"
           export LD_LIBRARY_PATH=""
           julia --project=. -e 'using Pkg; Pkg.build()'
 
