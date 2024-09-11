@@ -10,7 +10,7 @@ The model uses k-terms fitted to spectral absorption cross-section data from [DA
 ```@raw html
   <img src="assets/spectral_flowchart.svg" width=100% class="center"/>
 ```
-Surface reflectivity is modelled either as a greybody or with a wavelength-depedent spectral albedo.
+Surface reflectivity can be modelled as a greybody with an albedo from 0 to 1. Alternatively, it can be modelled from empirical single-scattering data which varies with zenith angle and wavelength.
 
 ## Convection
 Convection is a turbulent process which occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it is typically parameterised inside 3D global circulation models as resolving convection is numerically expensive. AGNI uses mixing length theory (MLT) to parameterise convection. This is in contrast to convective adjustment, which forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat while ensuring that enthalpy is conserved.
