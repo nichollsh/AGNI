@@ -57,6 +57,7 @@ jobs:
       - name: Build AGNI
         run: |
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_BIN="$RAD_DIR/bin/"
           export LD_LIBRARY_PATH=""
           julia --project=. -e 'using Pkg; Pkg.build()'
 
