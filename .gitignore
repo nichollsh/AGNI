@@ -2,35 +2,36 @@
 *.mod
 *.o
 radiation_code.lock
-socrates 
-SOCRATES 
+socrates
+SOCRATES
 
-# FastChem folder 
+# FastChem folder
 fastchem
-FastChem 
+FastChem
 
-# Package 
+# Package
 deps/*.log
 test/out/
 Manifest.toml
 
-# Docs 
+# Docs
 docs/build
 
-# Spectral data 
-*.par 
+# Spectral data
+*.par
 *.xsc
 *.bin
 
 # Model data
 res/spectral_files/*
 res/stellar_spectra/*
+res/surface_albedos/*
 !res/*/_readme.txt
 
-# Output files 
+# Output files
 out/*
 runtime.sf
-runtime.sf_k 
+runtime.sf_k
 socstar.dat
 
 # Misc files
