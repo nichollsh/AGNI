@@ -33,35 +33,36 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: 'nichollsh/SOCRATES'
-          path: 'socrates'
+          path: 'SOCRATES'
 
       - uses: actions/cache@v3
         id: cache-socrates
         with:
           path: |
-            socrates/bin
-            socrates/sbin
-            socrates/set_rad_env
+            SOCRATES/bin
+            SOCRATES/sbin
+            SOCRATES/set_rad_env
           key: socrates-${{ hashFiles('SOCRATES/version') }}
 
       - name: Build SOCRATES
         if: steps.cache-socrates.outputs.cache-hit != 'true'
         run: |
           export LD_LIBRARY_PATH=""
-          cd socrates
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          cd $RAD_DIR
           ./configure
           ./build_code
           cd ..
 
       - name: Build AGNI
         run: |
-          export RAD_DIR="socrates"
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export LD_LIBRARY_PATH=""
           julia --project=. -e 'using Pkg; Pkg.build()'
 
       - name: Test AGNI
         run: |
-          export RAD_DIR="socrates"
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export LD_LIBRARY_PATH=""
           ./test/runtests.jl
 
