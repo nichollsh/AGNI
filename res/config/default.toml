@@ -1,5 +1,5 @@
 # This is the default configuration file - it does not solve for RCE
-# The variables are explained below. If you want to model your own conditions, 
+# The variables are explained below. If you want to model your own conditions,
 # try making a copy of this file and then modifying it.
 
 title = "Default"                       # Name for this configuration file
@@ -33,7 +33,7 @@ title = "Default"                       # Name for this configuration file
     vmr_path        = ""                        # Path to input volume mixing ratios. Not required if planet.vmr is passed.
     include_all     = false                     # Track extra gases, even when their mixing ratio is zero.
     chemistry       = 0                         # Chemistry type (see wiki).
-    condensates     = []                        # List of volatiles which are allowed to condense.    
+    condensates     = []                        # List of volatiles which are allowed to condense.
 
 [execution]
     clean_output    = true                      # Clean the output folder at model startup.
@@ -55,7 +55,7 @@ title = "Default"                       # Name for this configuration file
     dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
     initial_state   = ["dry", "sat", "H2O"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     linesearch      = 0                         # Linesearch method to be used (0: None, 1: Golden, 2: Backtracking)
-    easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.   
+    easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.
     converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
 
