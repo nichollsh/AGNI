@@ -1,6 +1,13 @@
 #!/bin/bash
 # Download and compile socrates
 
+# Already setup?
+if [ -n "$RAD_DIR" ]; then
+    echo "WARNING: You already have SOCRATES installed"
+    echo "         $RAD_DIR"
+    exit 1
+fi
+
 # Check SSH access to GitHub
 ssh -T git@github.com
 if [ $? -eq 1 ]; then
@@ -24,7 +31,11 @@ cd "$socpath"
 ./build_code
 
 # Environment
-source ./set_rad_env
-export LD_LIBRARY_PATH=""
+export RAD_DIR=$socpath
 cd ..
 
+# Inform user
+echo "SOCRATES has been installed"
+echo "It is recommended that you add the following line to your shell rc file"
+echo "export RAD_DIR='$socpath'"
+exit 0
