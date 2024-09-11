@@ -696,18 +696,15 @@ module atmosphere
 
         # transspec_p::Float64            # (INPUT) level probed in transmission [Pa]
         # transspec_r::Float64            # planet radius probed in transmission [m]
-        # transspec_m::Float64            # mass [kg] enclosed by transspec_r
+        # transspec_m::Float64            # mass [kg] of atmosphere + interior
         # transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
 
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
         atmos.transspec_r = atmos.z[idx] + atmos.rp
 
-        # get mass of whole atmosphere
-        atmos.transspec_m = atmos.layer_mass[end] * 4 * pi * atmos.rp^2
-
-        # subtract all atmosphere mass ABOVE the observed layer
-        atmos.transspec_m -= atmos.layer_mass[idx-1] * 4 * pi * atmos.transspec_r^2
+        # get mass of whole atmosphere, assuming hydrostatic
+        atmos.transspec_m = atmos.p_boa * 4 * pi * atmos.rp^2 / atmos.grav_surf
 
         # add mass of the interior component
         atmos.transspec_m += atmos.interior_mass
