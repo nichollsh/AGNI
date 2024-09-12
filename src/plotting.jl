@@ -63,7 +63,9 @@ module plotting
                 end
 
                 sat_t = collect(Float64, 1:sat_n) * atmos.gas_dat[c].T_crit / sat_n
-                @. sat_p = phys.get_Psat(atmos.gas_dat[c], sat_t) * 1e-5
+                for i in 1:sat_n
+                    sat_p[i] = phys.get_Psat(atmos.gas_dat[c], sat_t[i]) .* 1e-5
+                end
 
                 # plot phase boundary for this condensate
                 plot!(plt, sat_t, sat_p, lc=atmos.gas_dat[c].plot_color, ls=:dot,
