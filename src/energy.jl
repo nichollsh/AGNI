@@ -13,6 +13,7 @@ module energy
     using Printf
     using LinearAlgebra
     using Logging
+    using LoopVectorization
 
     # Local files
     import ..atmosphere
@@ -171,7 +172,7 @@ module energy
         #     for it also (strangely) appearing inside diff_planck_source_mod.f90 on
         #     line 129. Having this 1-albedo term (and using this low-order integration)
         #     gives the correct results from my tests versus SOCRATES's native function.
-        for i in 1:atmos.nbands
+        @inbounds for i in 1:atmos.nbands
             atmos.bound.flux_ground[1,i] = atmos.surf_flux[i] * (1.0 - atmos.surf_r_arr[i])
         end
 
@@ -226,7 +227,7 @@ module energy
         if lw
             # LW case
             for lv in 1:atmos.nlev_l      # sum over levels
-                for ba in 1:atmos.dimen.nd_channel  # sum over bands
+                @inbounds for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
                     atmos.band_d_lw[lv,ba] = max(0.0, atmos.radout.flux_down[idx])
                     atmos.band_u_lw[lv,ba] = max(0.0, atmos.radout.flux_up[idx])
@@ -241,7 +242,7 @@ module energy
             fill!(atmos.contfunc_norm,0.0)
             if calc_cf
                 cf_max::Float64 = maximum(atmos.radout.contrib_funcf_band[1,:,:])
-                for ba in 1:atmos.dimen.nd_channel
+                @inbounds for ba in 1:atmos.dimen.nd_channel
                     for lv in 1:atmos.nlev_c
                         atmos.contfunc_norm[lv,ba] =
                                             atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
@@ -253,7 +254,7 @@ module energy
         else
             # SW case
             for lv in 1:atmos.nlev_l                # sum over levels
-                for ba in 1:atmos.dimen.nd_channel  # sum over bands
+                @inbounds for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
                     atmos.band_d_sw[lv,ba] = max(0.0,atmos.radout.flux_down[idx])
                     atmos.band_u_sw[lv,ba] = max(0.0,atmos.radout.flux_up[idx])
@@ -295,7 +296,7 @@ module energy
         atmos.flux_cdct[1] = 0.0
 
         # bulk layers
-        for i in 2:atmos.nlev_l-1
+        @inbounds for i in 2:atmos.nlev_l-1
             atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) *
                                      (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
         end
@@ -348,7 +349,7 @@ module energy
         cmax::String = ""; do_moist::Bool = false
 
         # Loop from bottom upwards (over cell-edges)
-        for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
+        @inbounds for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
 
             # Profile lapse rate: d(ln T)/d(ln P)
             grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
@@ -450,7 +451,7 @@ module energy
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.
         #    This is okay because this shouldn't physically happen, and will only occur
         #    because of weird numerical issues which only act to make solving difficult.
-        for i in 1:atmos.nlev_l-1
+        @inbounds for i in 1:atmos.nlev_l-1
             if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
                 atmos.mask_c[i] = false
                 atmos.flux_cdry[i] = 0.0
@@ -606,7 +607,7 @@ module energy
             atmos.phs_wrk_fl[end] = 0.0
 
             # add energy from this gas to total
-            @. atmos.flux_l += atmos.phs_wrk_fl
+            @turbo @. atmos.flux_l += atmos.phs_wrk_fl
 
             # calculate mask
             @. atmos.mask_l = (abs(atmos.flux_l) > 1.0e-10)
@@ -695,11 +696,11 @@ module energy
             atmos.flux_l *= latent_sf
 
             # Add to total flux
-            @. atmos.flux_tot += atmos.flux_l
+            @turbo @. atmos.flux_tot += atmos.flux_l
 
             # Restore mixing ratios
             for g in atmos.gas_names
-                @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+                @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
             end
         end
 
@@ -709,7 +710,7 @@ module energy
         # +Radiation
         energy.radtrans!(atmos, true, calc_cf=calc_cf)
         energy.radtrans!(atmos, false)
-        @. atmos.flux_tot += atmos.flux_n
+        @turbo @. atmos.flux_tot += atmos.flux_n
 
         # +Dry convection
         if convect
@@ -720,7 +721,7 @@ module energy
             atmos.flux_cdry *= convect_sf
 
             # Add to total flux
-            @. atmos.flux_tot += atmos.flux_cdry
+            @turbo @. atmos.flux_tot += atmos.flux_cdry
         end
 
         # +Surface turbulence
@@ -732,7 +733,7 @@ module energy
         # +Conduction
         if conduct
             energy.conduct!(atmos)
-            @. atmos.flux_tot += atmos.flux_cdct
+            @turbo @. atmos.flux_tot += atmos.flux_cdct
         end
 
         # Flux difference across each level
