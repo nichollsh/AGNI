@@ -112,8 +112,8 @@ module setpt
         #   This uses log-pressures in order to make the interpolation behave
         #   reasonably across the entire grid.
         itp = Interpolator(log10.(pl), tmpl)
-        atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges
-        atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres
+        @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
+        @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
 
         return
     end
@@ -177,8 +177,8 @@ module setpt
 
             # interpolate
             itp = Interpolator(log10.(arr_P), arr_T)
-            atmos.tmpl[:] .= itp.(log10.(atmos.pl[:]))  # Cell edges
-            atmos.tmp[:]  .= itp.(log10.(atmos.p[:]))   # Cell centres
+            @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
+            @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
 
         end
         @debug "ALL DEBUG RESTORED"
@@ -192,8 +192,8 @@ module setpt
             @error "setpt: Atmosphere parameters not set"
             return
         end
-        atmos.tmpl[:] .= set_tmp
-        atmos.tmp[:]  .= set_tmp
+        fill!(atmos.tmpl, set_tmp)
+        fill!(atmos.tmp , set_tmp)
 
         return
     end
@@ -204,8 +204,8 @@ module setpt
             @error "setpt: Atmosphere parameters not set"
             return
         end
-        atmos.tmpl[:] .+= delta
-        atmos.tmp[:]  .+= delta
+        @. atmos.tmpl += delta
+        @. atmos.tmp  += delta
 
         return nothing
     end
