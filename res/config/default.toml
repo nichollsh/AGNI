@@ -10,7 +10,7 @@ title = "Default"                       # Name for this configuration file
     albedo_b        = 0.18              # Pseudo bond-albedo which downscales the stellar flux by 1-this_value.
     s0_fact         = 0.6652            # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13).
     zenith_angle    = 60.0              # Characteristic zenith angle for incoming stellar radiation [degrees].
-    surface_material= "res/surface_albedos/andesite.dat"       # Surface material (can be "blackbody" or path to data file).
+    surface_material= "blackbody"       # Surface material (can be "blackbody" or path to data file).
     albedo_s        = 0.3               # Grey surface albedo when material=blackbody.
     radius          = 6.37e6            # Planet radius at the surface [m].
     gravity         = 9.81              # Gravitational acceleration at the surface [m s-2]
