@@ -236,10 +236,10 @@ module phys
         ("SO2", "#00008B" ),
 
         # volatile elements
-        ("H"  , "#0000ff"),
+        ("H"  , "#0000aa"),
         ("C"  , "#ff0000"),
         ("O"  , "#00dd00"),
-        ("N"  , "#eeaa00"),
+        ("N"  , "#ffaa00"),
         ("S" ,  "#ff22ff"),
         ("P" ,  "#33ccff"),
         ("He" , "#30FF71" ),
