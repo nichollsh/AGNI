@@ -1722,9 +1722,9 @@ module atmosphere
         # Reset phase change flags
         # Reset condensation yield values
         for g in atmos.gas_names
-           fill!(atmo.gas_vmr[g][1:end-1, gas_vmr[g][end]])
-           fill!(atmos.gas_sat[g],        false)
-           fill!(atmos.gas_yield[g],      0.0)
+           fill!(atmos.gas_vmr[g][1:end-1], atmos.gas_vmr[g][end])
+           fill!(atmos.gas_sat[g],          false)
+           fill!(atmos.gas_yield[g],        0.0)
         end
 
         # Reset water cloud
