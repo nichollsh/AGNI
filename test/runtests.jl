@@ -238,6 +238,25 @@ end
 
 
 # -------------
+# Test hydrostatic integrator
+# -------------
+@info " "
+@info "Testing hydrostatic integration"
+
+val_e = 430952.2816064652  # known from previous tests
+val_o = atmos.z[1] # top level
+@info "Expected value = $(val_e) m"
+@info "Modelled value = $(val_o) m"
+if abs(val_o - val_e) < 0.1
+    @info "Pass"
+else
+    @warn "Fail"
+    passing = false
+end
+@info "--------------------------"
+
+
+# -------------
 # Test surface albedo
 # -------------
 @info " "
@@ -245,11 +264,11 @@ end
 
 energy.radtrans!(atmos, false)  # SW only
 
-val_e = [25.0, 35.0]   # known from previous tests
+val_e = 30.31364083727528  # known from previous tests
 val_o = atmos.flux_u_sw[end] # bottom level
-@info "Expected range = $(val_e) W m-2"
+@info "Expected value = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
-if ( val_o > val_e[1]) && (val_o < val_e[2])
+if abs(val_o - val_e) < 1e-6
     @info "Pass"
 else
     @warn "Fail"
@@ -265,7 +284,7 @@ atmosphere.deallocate!(atmos)
 @info " "
 @info "Testing Rayleigh scattering"
 
-tmp_surf           = 400.0    # Surface temperature [kelvin]
+tmp_surf        = 400.0    # Surface temperature [kelvin]
 toa_heating     = 1000.00    # Instellation flux [W m-2]
 p_surf          = 10.0    # bar
 theta           = 75.0
@@ -343,11 +362,12 @@ energy.radtrans!(atmos, true)
 energy.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 energy.calc_hrates!(atmos)
-val_e = [6.0, 6.6]  # from previous tests
+
+val_e = 6.366831453838685  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
-@info "Expected range = $(val_e) K/day"
+@info "Expected value = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"
-if ( val_o > val_e[1]) && (val_o < val_e[2])
+if abs(val_o - val_e) < 1e-6
     @info "Pass"
 else
     @warn "Fail"
