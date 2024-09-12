@@ -737,32 +737,6 @@ module atmosphere
             error("Atmosphere parameters have not been set")
         end
 
-        ok::Bool = true
-        dz_max::Float64 = 1e9
-
-        # Set MMW at each level
-        fill!(atmos.layer_mmw, 0.0)
-        for gas in atmos.gas_names
-            @. atmos.layer_mmw += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
-        end
-
-        # Set cp, kc at each level
-        fill!(atmos.layer_cp, 0.0)
-        fill!(atmos.layer_kc, 0.0)
-        for i in 1:atmos.nlev_c
-            for gas in atmos.gas_names
-                mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
-                atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
-                atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
-            end
-        end
-
-        # Temporary values
-        g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
-        g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
-        dzc::Float64= 0.0; dzl::Float64 = 0.0
-        GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
-
         # Reset arrays
         fill!(atmos.z         ,  0.0)
         fill!(atmos.zl        ,  0.0)
@@ -770,6 +744,32 @@ module atmosphere
         fill!(atmos.layer_thick, 0.0)
         fill!(atmos.layer_density,0.0)
         fill!(atmos.layer_mass   ,0.0)
+        fill!(atmos.layer_cp, 0.0)
+        fill!(atmos.layer_kc, 0.0)
+        fill!(atmos.layer_mmw, 0.0)
+
+        # Temporary values
+        g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
+        g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
+        dzc::Float64= 0.0; dzl::Float64 = 0.0
+        GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
+        mmr::Float64 = 0.0
+        ok::Bool = true
+        dz_max::Float64 = 1e8
+
+        # Set MMW at each level
+        for gas in atmos.gas_names
+            @. atmos.layer_mmw += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
+        end
+
+        # Set cp, kc at each level
+        for gas in atmos.gas_names
+            for i in 1:atmos.nlev_c
+                mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
+                atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
+                atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
+            end
+        end
 
         # Integrate from bottom upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
