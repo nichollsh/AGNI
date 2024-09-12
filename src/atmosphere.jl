@@ -15,6 +15,7 @@ module atmosphere
     using LinearAlgebra
     using Statistics
     using Logging
+    using LoopVectorization
 
     # Local files
     include(joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl"))
@@ -577,7 +578,7 @@ module atmosphere
         # backup mixing ratios from current state
         for k in keys(atmos.gas_vmr)
             atmos.gas_ovmr[k] = zeros(Float64, atmos.nlev_c)
-            @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
+            @turbo @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
         end
 
         # set condensation mask and yield values [kg]
@@ -759,12 +760,12 @@ module atmosphere
 
         # Set MMW at each level
         for gas in atmos.gas_names
-            @. atmos.layer_mmw += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
+            @turbo @. atmos.layer_mmw += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
         end
 
         # Set cp, kc at each level
         for gas in atmos.gas_names
-            for i in 1:atmos.nlev_c
+            @inbounds for i in 1:atmos.nlev_c
                 mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
                 atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
                 atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
@@ -823,7 +824,7 @@ module atmosphere
 
         # Mass (per unit area, kg m-2) and density (kg m-3)
         # Loop from top downards
-        for i in 1:atmos.nlev_c
+        @inbounds for i in 1:atmos.nlev_c
             atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
             atmos.atm.mass[1, i] = atmos.layer_mass[i]          # pass to SOCRATES
 
@@ -876,8 +877,8 @@ module atmosphere
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
         # Finally, convert arrays to 'real' pressure units
-        @. atmos.p  = 10.0 ^ atmos.p
-        @. atmos.pl = 10.0 ^ atmos.pl
+        @turbo @. atmos.p  = 10.0 ^ atmos.p
+        @turbo @. atmos.pl = 10.0 ^ atmos.pl
 
         return nothing
     end
@@ -990,8 +991,8 @@ module atmosphere
             atmos.bands_min[i] = atmos.spectrum.Basic.wavelength_short[i]
             atmos.bands_max[i] = atmos.spectrum.Basic.wavelength_long[i]
         end
-        @. atmos.bands_cen = 0.5 * (atmos.bands_max + atmos.bands_min)
-        @. atmos.bands_wid = abs(atmos.bands_max - atmos.bands_min)
+        @turbo @. atmos.bands_cen = 0.5 * (atmos.bands_max + atmos.bands_min)
+        @turbo @. atmos.bands_wid = abs(atmos.bands_max - atmos.bands_min)
 
         # modules_gen/dimensions_field_cdf_ucf.f90
         npd_direction = 1                   # Maximum number of directions for radiances
@@ -1313,7 +1314,7 @@ module atmosphere
             push!(_alb_s, _alb_s[end])
 
             # convert ss albedo to gamma values (eq 14.3 from Hapke 2012)
-            @. _alb_s = sqrt(1.0 - _alb_s) # operating in place
+            @turbo @. _alb_s = sqrt(1.0 - _alb_s) # operating in place
 
             # create interpolator on gamma
             _gamma::Interpolator = Interpolator(_alb_w, _alb_s)
@@ -1321,7 +1322,7 @@ module atmosphere
             # use interpolator to fill band values
             ga::Float64 = 0.0
             mu::Float64 = cosd(atmos.zenith_degrees)
-            for i in 1:atmos.nbands
+            @inbounds for i in 1:atmos.nbands
                 # evaluate gamma at band centre, converting from m to nm
                 ga = _gamma(1.0e9 * atmos.bands_cen[i])
 
