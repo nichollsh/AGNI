@@ -13,6 +13,7 @@ module energy
     using Printf
     using LinearAlgebra
     using Logging
+    using LoopVectorization
 
     # Local files
     import ..atmosphere
@@ -42,10 +43,15 @@ module energy
         atmos.num_rt_eval += 1
 
         # Longwave or shortwave calculation?
+        # Set the two-stream approximation to be used (-t f)
         if lw
             atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_infra_red
+            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
+            # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
         else
             atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_solar
+            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
+            # Practical improved flux method (original form of 1980)
         end
 
         # Check files are acceptable and set instellation if doing SW flux
@@ -77,15 +83,6 @@ module energy
             # Pass effective solar constant
             atmos.bound.solar_irrad[1] = atmos.instellation *
                                             (1.0 - atmos.albedo_b) * atmos.s0_fact
-        end
-
-        # Set the two-stream approximation to be used (-t f)
-        if lw
-            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
-            # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
-        else
-            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
-            # Practical improved flux method (original form of 1980)
         end
 
         #####################################
@@ -163,26 +160,20 @@ module energy
             atmos.control.l_ir_source_quad = true
         end
 
-        # set surface emission
-        pl_w::Float64 = 0.0; pl_x::Float64 = 0.0
-        for i in 1:atmos.nbands
-            # get band width, midpoint
-            pl_w = 1e9 * (atmos.bands_max[i] - atmos.bands_min[i])
-            pl_x = 1e9 * atmos.bands_min[i] + 0.5 * pl_w
+        # Set flux in surface emission, by band
+        #     Equal to integral of planck function over band width, which in
+        #     this case is done by simply evaluating at the midpoint and
+        #     multiplying by band width. Scaled by the emissivity.
+        @. atmos.surf_flux = phys.evaluate_planck(atmos.bands_cen, atmos.tmp_surf) *
+                                atmos.bands_wid * 1e9 * atmos.surf_e_arr
 
-            # Set flux in band
-            #  Equal to integral of planck function over band width, which in
-            #  this case is done by simply evaluating at the midpoint and
-            #  multiplying by band width.
-            #  It is then scaled by the emissivity and 1-albedo. I'd argue
-            #  that the albedo term shouldn't be here, but it's to correct for
-            #  it also (strangely) appearing inside diff_planck_source_mod.f90
-            #  on line 129.
-            #  Having this 1-albedo term and using this low-order integration
-            #  gives the correct results from my tests.
-            atmos.bound.flux_ground[1,i] = phys.evaluate_planck(pl_x, atmos.tmp_surf)*pl_w*
-                                                atmos.surf_e_arr[i] *
-                                                (1.0 - atmos.surf_r_arr[i])
+        # Pass to socrates array
+        #     I would argue that the 1-albedo term shouldn't be here, but it is to correct
+        #     for it also (strangely) appearing inside diff_planck_source_mod.f90 on
+        #     line 129. Having this 1-albedo term (and using this low-order integration)
+        #     gives the correct results from my tests versus SOCRATES's native function.
+        @inbounds for i in 1:atmos.nbands
+            atmos.bound.flux_ground[1,i] = atmos.surf_flux[i] * (1.0 - atmos.surf_r_arr[i])
         end
 
         ######################################################
@@ -235,31 +226,23 @@ module energy
         idx::Int = 1
         if lw
             # LW case
-            fill!(atmos.flux_u_lw, 0.0)
-            fill!(atmos.flux_d_lw, 0.0)
-            fill!(atmos.flux_n_lw, 0.0)
-            fill!(atmos.band_u_lw, 0.0)
-            fill!(atmos.band_d_lw, 0.0)
-            fill!(atmos.band_n_lw, 0.0)
             for lv in 1:atmos.nlev_l      # sum over levels
-                for ba in 1:atmos.dimen.nd_channel  # sum over bands
+                @inbounds for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
-
                     atmos.band_d_lw[lv,ba] = max(0.0, atmos.radout.flux_down[idx])
                     atmos.band_u_lw[lv,ba] = max(0.0, atmos.radout.flux_up[idx])
-                    atmos.band_n_lw[lv,ba] = atmos.band_u_lw[lv,ba] - atmos.band_d_lw[lv,ba]
-
-                    atmos.flux_d_lw[lv] += max(0.0, atmos.radout.flux_down[idx])
-                    atmos.flux_u_lw[lv] += max(0.0, atmos.radout.flux_up[idx])
                 end
-                atmos.flux_n_lw[lv] = atmos.flux_u_lw[lv] - atmos.flux_d_lw[lv]
+                atmos.flux_d_lw[lv] = sum(atmos.band_d_lw[lv,:])
+                atmos.flux_u_lw[lv] = sum(atmos.band_u_lw[lv,:])
             end
+            atmos.band_n_lw = atmos.band_u_lw - atmos.band_d_lw
+            atmos.flux_n_lw = atmos.flux_u_lw - atmos.flux_d_lw
 
             # Normalised contribution function (only LW stream contributes)
             fill!(atmos.contfunc_norm,0.0)
             if calc_cf
                 cf_max::Float64 = maximum(atmos.radout.contrib_funcf_band[1,:,:])
-                for ba in 1:atmos.dimen.nd_channel
+                @inbounds for ba in 1:atmos.dimen.nd_channel
                     for lv in 1:atmos.nlev_c
                         atmos.contfunc_norm[lv,ba] =
                                             atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
@@ -267,35 +250,28 @@ module energy
                 end
             end
             atmos.is_out_lw = true
+
         else
             # SW case
-            fill!(atmos.flux_u_sw, 0.0)
-            fill!(atmos.flux_d_sw, 0.0)
-            fill!(atmos.flux_n_sw, 0.0)
-            fill!(atmos.band_u_sw, 0.0)
-            fill!(atmos.band_d_sw, 0.0)
-            fill!(atmos.band_n_sw, 0.0)
             for lv in 1:atmos.nlev_l                # sum over levels
-                for ba in 1:atmos.dimen.nd_channel  # sum over bands
+                @inbounds for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
-
                     atmos.band_d_sw[lv,ba] = max(0.0,atmos.radout.flux_down[idx])
                     atmos.band_u_sw[lv,ba] = max(0.0,atmos.radout.flux_up[idx])
-                    atmos.band_n_sw[lv,ba] = atmos.band_u_sw[lv,ba] - atmos.band_d_sw[lv,ba]
-
-                    atmos.flux_d_sw[lv] += max(0.0, atmos.radout.flux_down[idx])
-                    atmos.flux_u_sw[lv] += max(0.0, atmos.radout.flux_up[idx])
                 end
-                atmos.flux_n_sw[lv] = atmos.flux_u_sw[lv] - atmos.flux_d_sw[lv]
+                atmos.flux_d_sw[lv] = sum(atmos.band_d_sw[lv,:])
+                atmos.flux_u_sw[lv] = sum(atmos.band_u_sw[lv,:])
             end
+            atmos.band_n_sw = atmos.band_u_sw - atmos.band_d_sw
+            atmos.flux_n_sw = atmos.flux_u_sw - atmos.flux_d_sw
             atmos.is_out_sw = true
         end
 
         # Store net fluxes when we have both SW and LW components
-        if (atmos.is_out_lw && atmos.is_out_sw)
-            atmos.flux_d = atmos.flux_d_lw .+ atmos.flux_d_sw
-            atmos.flux_u = atmos.flux_u_lw .+ atmos.flux_u_sw
-            atmos.flux_n = atmos.flux_n_lw .+ atmos.flux_n_sw
+        if atmos.is_out_lw && atmos.is_out_sw
+            atmos.flux_d = atmos.flux_d_lw + atmos.flux_d_sw
+            atmos.flux_u = atmos.flux_u_lw + atmos.flux_u_sw
+            atmos.flux_n = atmos.flux_n_lw + atmos.flux_n_sw
         end
 
         return nothing
@@ -320,7 +296,7 @@ module energy
         atmos.flux_cdct[1] = 0.0
 
         # bulk layers
-        for i in 2:atmos.nlev_l-1
+        @inbounds for i in 2:atmos.nlev_l-1
             atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) *
                                      (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
         end
@@ -373,7 +349,7 @@ module energy
         cmax::String = ""; do_moist::Bool = false
 
         # Loop from bottom upwards (over cell-edges)
-        for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
+        @inbounds for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
 
             # Profile lapse rate: d(ln T)/d(ln P)
             grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
@@ -475,7 +451,7 @@ module energy
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.
         #    This is okay because this shouldn't physically happen, and will only occur
         #    because of weird numerical issues which only act to make solving difficult.
-        for i in 1:atmos.nlev_l-1
+        @inbounds for i in 1:atmos.nlev_l-1
             if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
                 atmos.mask_c[i] = false
                 atmos.flux_cdry[i] = 0.0
@@ -631,10 +607,10 @@ module energy
             atmos.phs_wrk_fl[end] = 0.0
 
             # add energy from this gas to total
-            atmos.flux_l[:] .+= atmos.phs_wrk_fl[:]
+            @turbo @. atmos.flux_l += atmos.phs_wrk_fl
 
             # calculate mask
-            atmos.mask_l[:] .= (abs.(atmos.flux_l[:]) .> 1.0e-10)
+            @. atmos.mask_l = (abs(atmos.flux_l) > 1.0e-10)
 
         end # go to next condensable
 
@@ -653,9 +629,13 @@ module energy
         # scalar fluxes
         atmos.flux_sens = 0.0
 
-        # component fluxes
+        # conduct
         fill!(atmos.flux_cdct, 0.0)
+
+        # convect
         fill!(atmos.flux_cdry, 0.0)
+
+        # radiative grey
         fill!(atmos.flux_u, 0.0)
         fill!(atmos.flux_d, 0.0)
         fill!(atmos.flux_n, 0.0)
@@ -666,6 +646,14 @@ module energy
         fill!(atmos.flux_u_sw, 0.0)
         fill!(atmos.flux_d_sw, 0.0)
         fill!(atmos.flux_d_lw, 0.0)
+
+        # radiative band
+        fill!(atmos.band_u_lw, 0.0)
+        fill!(atmos.band_d_lw, 0.0)
+        fill!(atmos.band_n_lw, 0.0)
+        fill!(atmos.band_u_sw, 0.0)
+        fill!(atmos.band_d_sw, 0.0)
+        fill!(atmos.band_n_sw, 0.0)
 
         # total fluxes
         fill!(atmos.flux_dif, 0.0)
@@ -708,11 +696,11 @@ module energy
             atmos.flux_l *= latent_sf
 
             # Add to total flux
-            atmos.flux_tot += atmos.flux_l
+            @turbo @. atmos.flux_tot += atmos.flux_l
 
             # Restore mixing ratios
             for g in atmos.gas_names
-                atmos.gas_vmr[g][:] .=  atmos.gas_ovmr[g][:]
+                @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
             end
         end
 
@@ -722,7 +710,7 @@ module energy
         # +Radiation
         energy.radtrans!(atmos, true, calc_cf=calc_cf)
         energy.radtrans!(atmos, false)
-        atmos.flux_tot += atmos.flux_n
+        @turbo @. atmos.flux_tot += atmos.flux_n
 
         # +Dry convection
         if convect
@@ -733,7 +721,7 @@ module energy
             atmos.flux_cdry *= convect_sf
 
             # Add to total flux
-            atmos.flux_tot += atmos.flux_cdry
+            @turbo @. atmos.flux_tot += atmos.flux_cdry
         end
 
         # +Surface turbulence
@@ -745,7 +733,7 @@ module energy
         # +Conduction
         if conduct
             energy.conduct!(atmos)
-            atmos.flux_tot += atmos.flux_cdct
+            @turbo @. atmos.flux_tot += atmos.flux_cdct
         end
 
         # Flux difference across each level
@@ -769,7 +757,7 @@ module energy
         dF::Float64 = 0.0
         dp::Float64 = 0.0
 
-        atmos.heating_rate[:] .= 0.0
+        fill!(atmos.heating_rate, 0.0)
 
         for i in 1:atmos.nlev_c
             dF = atmos.flux_tot[i+1] - atmos.flux_tot[i]
@@ -788,7 +776,7 @@ module energy
         tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
         tmp_tnd = zeros(Float64, atmos.nlev_c)  # temperature tendency
 
-        tmp_old[:] .+= atmos.tmp[:]
+        @. tmp_old +=  atmos.tmp
 
         for i in 1:nsteps
 
@@ -839,10 +827,10 @@ module energy
         end
 
         # Calculate tendency
-        tmp_tnd[:] .= atmos.tmp[:] .- tmp_old[:]
+        @. tmp_tnd = atmos.tmp - tmp_old
 
         # Restore temperature array
-        atmos.tmp[:] .= tmp_old[:]
+        @. atmos.tmp = tmp_old
 
         return tmp_tnd
     end

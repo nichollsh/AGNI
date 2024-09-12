@@ -62,9 +62,9 @@ module plotting
                     continue
                 end
 
+                sat_t = collect(Float64, 1:sat_n) * atmos.gas_dat[c].T_crit / sat_n
                 for i in 1:sat_n
-                    sat_t[i] = atmos.gas_dat[c].T_crit * i/sat_n
-                    sat_p[i] = phys.get_Psat(atmos.gas_dat[c], sat_t[i]) * 1e-5
+                    sat_p[i] = phys.get_Psat(atmos.gas_dat[c], sat_t[i]) .* 1e-5
                 end
 
                 # plot phase boundary for this condensate
@@ -186,11 +186,11 @@ module plotting
 
             # Get data
             gas = atmos.gas_names[i]
-            arr_x[:] .= atmos.gas_vmr[gas][:]
+            @. arr_x = atmos.gas_vmr[gas]
             if minimum(arr_x) < 1e-90
                 continue
             end
-            arr_x[:] .= log10.(arr_x[:])
+            @. arr_x = log10(arr_x)
 
             plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label,
                     lw=2.5, linealpha=0.7, color=atmos.gas_dat[gas].plot_color)
@@ -277,14 +277,14 @@ module plotting
 
         # SW component
         if atmos.is_out_sw
-            plot!(plt, _symlog.(-1.0.*atmos.flux_d_sw), arr_P, lw=w, lc=col_r, ls=:dot,  linealpha=alpha)
+            plot!(plt, _symlog.(-1.0*atmos.flux_d_sw),  arr_P, lw=w, lc=col_r, ls=:dot,  linealpha=alpha)
             plot!(plt, _symlog.(      atmos.flux_u_sw), arr_P, lw=w, lc=col_r, ls=:dot,  linealpha=alpha)
         end
 
         # Net radiative fluxes
         if atmos.is_out_lw && atmos.is_out_sw
             plot!(plt, _symlog.(      atmos.flux_u), arr_P, lw=w, lc=col_r, ls=:solid,  linealpha=alpha)
-            plot!(plt, _symlog.(-1.0.*atmos.flux_d), arr_P, lw=w, lc=col_r, ls=:solid,  linealpha=alpha)
+            plot!(plt, _symlog.(-1.0*atmos.flux_d),  arr_P, lw=w, lc=col_r, ls=:solid,  linealpha=alpha)
             plot!(plt, _symlog.(      atmos.flux_n), arr_P, lw=w, lc=col_n, ls=:solid,  linealpha=alpha)
         end
 
@@ -342,8 +342,7 @@ module plotting
     """
     Plot emission spectrum at the TOA
     """
-    function plot_emission(atmos::atmosphere.Atmos_t, fname::String;
-                                dpi::Int=250, incl_surf::Bool=true)
+    function plot_emission(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -357,41 +356,31 @@ module plotting
         yl::Array{Float64, 1} = zeros(Float64, atmos.nbands)
         ys::Array{Float64, 1} = zeros(Float64, atmos.nbands)
         ye::Array{Float64, 1} = zeros(Float64, atmos.nbands)
-        for ba in 1:atmos.nbands
-            # x value - band centres [nm]
-            xe[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
+        wd::Array{Float64, 1} = zeros(Float64, atmos.nbands)
+        yp::Array{Float64, 1} = zeros(Float64, atmos.nbands)
 
-            # TOA upward spectral flux [erg s-1 cm-2 nm-1]
-            w  = (atmos.bands_max[ba] - atmos.bands_min[ba]) * 1.0e9 # band width in nm
-            yl[ba] = atmos.band_u_lw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
-            ys[ba] = atmos.band_u_sw[1, ba] / w * 1000.0 # converted to erg s-1 cm-2 nm-1
-            yt[ba] = yl[ba] + ys[ba]
+        # band widths
+        wd = atmos.bands_wid * 1e9 # convert to nm
 
-            # surface upward spectral flux
-            ye[ba] = (atmos.band_u_lw[end, ba] + atmos.band_u_sw[end, ba]) / w * 1000.0
-        end
+        # band centres
+        xe = atmos.bands_cen * 1e9 # convert to nm
+
+        # TOA upward spectral flux [erg s-1 cm-2 nm-1]
+        @. yl = atmos.band_u_lw[1, :] / wd * 1000.0 # converted to erg s-1 cm-2 nm-1
+        @. ys = atmos.band_u_sw[1, :] / wd * 1000.0 # converted to erg s-1 cm-2 nm-1
+        @. yt = yl + ys
+
+        # surface upward spectral flux
+        @. ye = (atmos.band_u_lw[end, :] + atmos.band_u_sw[end, :]) / wd * 1000.0
 
         # Get planck function values
-        if incl_surf
-            yp = zeros(Float64, atmos.nbands)
-            for i in 1:atmos.nbands
-                yp[i] = phys.evaluate_planck(xe[i], atmos.tmp_surf)
-
-                # consistent with SOCRATES diff_planck_source_mod.f90
-                yp[i] = yp[i]
-
-                # convert to [erg s-1 cm-2 nm-1]
-                yp[i] = yp[i] * 1000.0
-            end
-        end
+        @. yp = phys.evaluate_planck(xe, atmos.tmp_surf) * 1000.0
 
         # Make plot
         plt = plot(dpi=dpi)
 
-        if incl_surf
-            plot!(plt, xe, yp, label=L"Planck @ $T_s$",  color="green")
-            plot!(plt, xe, ye, label="Surface LW+SW",    color="green", ls=:dash)
-        end
+        plot!(plt, xe, yp, label=L"Planck @ $T_s$",  color="green")
+        plot!(plt, xe, ye, label="Surface LW+SW",    color="green", ls=:dash)
 
         plot!(plt, xe, ys, lw=0.9, label="Planetary SW",    color="blue")
         plot!(plt, xe, yl, lw=0.9, label="Planetary LW",    color="red" )
@@ -421,7 +410,7 @@ module plotting
 
         # Check that we have data
         if !atmos.is_out_lw
-            @error "Cannot plot cont func because radiances have not been calculated"
+            @error "Cannot plot contribution func because radiances have not been calculated"
             return
         end
 
@@ -494,23 +483,15 @@ module plotting
             return
         end
 
-        # Get data
-        x::Array{Float64, 1} = zeros(Float64, atmos.nbands)
+        # spectral albedo [percentage]
         y::Array{Float64, 1} = zeros(Float64, atmos.nbands)
-
-        for ba in 1:atmos.nbands
-            # x value - band centres [nm]
-            x[ba] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
-
-            # y value - spectral albedo [percentage]
-            y[ba] = 100.0 * atmos.band_u_sw[1, ba]/atmos.band_d_sw[1, ba]
-        end
+        @. y = 100.0 * atmos.band_u_sw[1, :]/atmos.band_d_sw[1, :]
 
         # Make plot
         ylims  = (0.0, 100.0)
         plt = plot(dpi=dpi, ylims=ylims)
 
-        plot!(plt, x, y, color="black")
+        plot!(plt, atmos.bands_cen*1e9, y, color="black")
 
         xlims  = (200.0, 1000.0)
         xticks = range( xlims[1], xlims[2], step=100.0)

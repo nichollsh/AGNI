@@ -236,10 +236,10 @@ module phys
         ("SO2", "#00008B" ),
 
         # volatile elements
-        ("H"  , "#0000ff"),
+        ("H"  , "#0000aa"),
         ("C"  , "#ff0000"),
         ("O"  , "#00dd00"),
-        ("N"  , "#eeaa00"),
+        ("N"  , "#ffaa00"),
         ("S" ,  "#ff22ff"),
         ("P" ,  "#33ccff"),
         ("He" , "#30FF71" ),
@@ -667,10 +667,13 @@ module phys
         # Convert nm to m
         wav = wav * 1.0e-9
 
+        # Optimisation variables
+        wav5::Float64 = wav*wav*wav*wav*wav
+        hc::Float64   = h_pl * c_vac
+
         # Calculate planck function value [W m-2 sr-1 m-1]
         # http://spiff.rit.edu/classes/phys317/lectures/planck.html
-        flx = 2.0 * h_pl * c_vac * (c_vac / wav^5.0) /
-              ( exp(h_pl * c_vac / (wav * k_B * tmp)) - 1.0)
+        flx = 2.0 * hc * (c_vac / wav5) / ( exp(hc / (wav * k_B * tmp)) - 1.0)
 
         # Integrate solid angle (hemisphere), convert units
         flx = flx * pi * 1.0e-9 # [W m-2 nm-1]

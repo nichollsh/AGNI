@@ -15,6 +15,7 @@ module atmosphere
     using LinearAlgebra
     using Statistics
     using Logging
+    using LoopVectorization
 
     # Local files
     include(joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl"))
@@ -73,10 +74,12 @@ module atmosphere
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
 
-        # Band edges
+        # Spectral bands
         nbands::Int
         bands_min::Array{Float64,1}    # Lower wavelength [m]
         bands_max::Array{Float64,1}    # Upper wavelength [m]
+        bands_cen::Array{Float64,1}    # Midpoint [m]
+        bands_wid::Array{Float64,1}    # Width [m]
 
         # Pressure-temperature grid (with i=1 at the top of the model)
         nlev_c::Int         # Cell centre (count)
@@ -150,6 +153,9 @@ module atmosphere
         band_d_sw::Array{Float64,2}         # down component, sw
         band_u_sw::Array{Float64,2}         # up component, sw
         band_n_sw::Array{Float64,2}         # net upward, sw
+
+        # Surface planck emission (incl. emissivity)
+        surf_flux::Array{Float64, 1}
 
         # Contribution function (to outgoing flux) per-band
         contfunc_norm::Array{Float64,2}     # LW only, and normalised by maximum value
@@ -313,7 +319,7 @@ module atmosphere
         end
 
         # Code versions
-        atmos.AGNI_VERSION = "0.7.0"
+        atmos.AGNI_VERSION = "0.8.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -572,7 +578,7 @@ module atmosphere
         # backup mixing ratios from current state
         for k in keys(atmos.gas_vmr)
             atmos.gas_ovmr[k] = zeros(Float64, atmos.nlev_c)
-            atmos.gas_ovmr[k][:] .= atmos.gas_vmr[k][:]
+            @turbo @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
         end
 
         # set condensation mask and yield values [kg]
@@ -729,30 +735,8 @@ module atmosphere
     """
     function calc_layer_props!(atmos::atmosphere.Atmos_t; ignore_errors::Bool=false)::Bool
         if !atmos.is_param
-            error("atmosphere parameters have not been set")
+            error("Atmosphere parameters have not been set")
         end
-
-        ok::Bool = true
-        dz_max::Float64 = 1e9
-
-        # Set pressure arrays in SOCRATES
-        atmos.atm.p[1, :] .= atmos.p[:]
-        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-
-        # Set MMW at each level
-        fill!(atmos.layer_mmw, 0.0)
-        for i in 1:atmos.nlev_c
-            for gas in atmos.gas_names
-                atmos.layer_mmw[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw
-            end
-        end
-
-        # Temporary values
-        mmr::Float64 = 0.0
-        g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
-        g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
-        dzc::Float64= 0.0; dzl::Float64 = 0.0
-        GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
 
         # Reset arrays
         fill!(atmos.z         ,  0.0)
@@ -760,28 +744,36 @@ module atmosphere
         fill!(atmos.layer_grav,  0.0)
         fill!(atmos.layer_thick, 0.0)
         fill!(atmos.layer_density,0.0)
-        fill!(atmos.layer_cp     ,0.0)
-        fill!(atmos.layer_kc     ,0.0)
         fill!(atmos.layer_mass   ,0.0)
+        fill!(atmos.layer_cp, 0.0)
+        fill!(atmos.layer_kc, 0.0)
+        fill!(atmos.layer_mmw, 0.0)
 
-        # Integrate from bottom upwards
-        for i in range(start=atmos.nlev_c, stop=1, step=-1)
+        # Temporary values
+        g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
+        g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
+        dzc::Float64= 0.0; dzl::Float64 = 0.0
+        GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
+        mmr::Float64 = 0.0
+        ok::Bool = true
+        dz_max::Float64 = 1e8
 
-            # Set cp, kc at this level
-            atmos.layer_cp[i] = 0.0
-            atmos.layer_kc[i] = 0.0
-            for gas in atmos.gas_names
+        # Set MMW at each level
+        for gas in atmos.gas_names
+            @turbo @. atmos.layer_mmw += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
+        end
+
+        # Set cp, kc at each level
+        for gas in atmos.gas_names
+            @inbounds for i in 1:atmos.nlev_c
                 mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
                 atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
                 atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
             end
+        end
 
-            # Temporarily copy this cp, kc to the level above
-            #     since they are needed for doing the hydrostatic integration
-            if i > 1
-                atmos.layer_cp[i-1] = atmos.layer_cp[i]
-                atmos.layer_kc[i-1] = atmos.layer_kc[i]
-            end
+        # Integrate from bottom upwards
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
             # Technically, g and z should be integrated as coupled equations,
             # but here they are not. This loose integration has been found to
@@ -832,7 +824,7 @@ module atmosphere
 
         # Mass (per unit area, kg m-2) and density (kg m-3)
         # Loop from top downards
-        for i in 1:atmos.nlev_c
+        @inbounds for i in 1:atmos.nlev_c
             atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
             atmos.atm.mass[1, i] = atmos.layer_mass[i]          # pass to SOCRATES
 
@@ -885,8 +877,8 @@ module atmosphere
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
         # Finally, convert arrays to 'real' pressure units
-        atmos.p[:]  .= 10.0 .^ atmos.p[:]
-        atmos.pl[:] .= 10.0 .^ atmos.pl[:]
+        @turbo @. atmos.p  = 10.0 ^ atmos.p
+        @turbo @. atmos.pl = 10.0 ^ atmos.pl
 
         return nothing
     end
@@ -990,13 +982,17 @@ module atmosphere
         end
 
         atmos.nbands = atmos.spectrum.Basic.n_band
-        atmos.bands_max = zeros(Float64, atmos.spectrum.Basic.n_band)
-        atmos.bands_min = zeros(Float64, atmos.spectrum.Basic.n_band)
+        atmos.bands_max = zeros(Float64, atmos.nbands)
+        atmos.bands_min = zeros(Float64, atmos.nbands)
+        atmos.bands_cen = zeros(Float64, atmos.nbands)
+        atmos.bands_wid = zeros(Float64, atmos.nbands)
 
         for i in 1:atmos.nbands
             atmos.bands_min[i] = atmos.spectrum.Basic.wavelength_short[i]
             atmos.bands_max[i] = atmos.spectrum.Basic.wavelength_long[i]
         end
+        @turbo @. atmos.bands_cen = 0.5 * (atmos.bands_max + atmos.bands_min)
+        @turbo @. atmos.bands_wid = abs(atmos.bands_max - atmos.bands_min)
 
         # modules_gen/dimensions_field_cdf_ucf.f90
         npd_direction = 1                   # Maximum number of directions for radiances
@@ -1065,7 +1061,7 @@ module atmosphere
         SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
 
         # Fill with zeros - will be set inside of radtrans function at call time
-        atmos.bound.flux_ground[1, :] .= 0.0
+        fill!(atmos.bound.flux_ground, 0.0)
 
 
         ###########################################
@@ -1103,7 +1099,7 @@ module atmosphere
         end
 
         # Calculate the weighting for the bands.
-        atmos.control.weight_band .= 1.0
+        fill!(atmos.control.weight_band, 1.0)
 
         # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
         # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
@@ -1318,7 +1314,7 @@ module atmosphere
             push!(_alb_s, _alb_s[end])
 
             # convert ss albedo to gamma values (eq 14.3 from Hapke 2012)
-            _alb_s[:] .= sqrt.(1 .- _alb_s[:]) # operating in place
+            @turbo @. _alb_s = sqrt(1.0 - _alb_s) # operating in place
 
             # create interpolator on gamma
             _gamma::Interpolator = Interpolator(_alb_w, _alb_s)
@@ -1326,9 +1322,9 @@ module atmosphere
             # use interpolator to fill band values
             ga::Float64 = 0.0
             mu::Float64 = cosd(atmos.zenith_degrees)
-            for i in 1:atmos.nbands
+            @inbounds for i in 1:atmos.nbands
                 # evaluate gamma at band centre, converting from m to nm
-                ga = _gamma(0.5 * 1.0e9 * (atmos.bands_min[i]+atmos.bands_max[i]))
+                ga = _gamma(1.0e9 * atmos.bands_cen[i])
 
                 # calculate dh reflectance (eq 3 from Hammond24)
                 atmos.surf_r_arr[i] = (1-ga) / (1+2*ga*mu)
@@ -1360,6 +1356,8 @@ module atmosphere
         atmos.band_d_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
         atmos.band_u_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
         atmos.band_n_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
+
+        atmos.surf_flux =         zeros(Float64, atmos.nbands)
 
         atmos.contfunc_norm =     zeros(Float64, (atmos.nlev_c,atmos.nbands))
 
@@ -1614,7 +1612,7 @@ module atmosphere
             # matched?
             if match
                 N_g = data[i,:]  # number densities for this gas
-                atmos.gas_vmr[g_in][:] .+= N_g[:] ./ N_t[:]    # VMR for this gas
+                @. atmos.gas_vmr[g_in] += N_g / N_t    # VMR for this gas
             end
         end
 
@@ -1724,9 +1722,9 @@ module atmosphere
         # Reset phase change flags
         # Reset condensation yield values
         for g in atmos.gas_names
-           atmos.gas_vmr[g][1:end-1] .= atmos.gas_vmr[g][end]
-           atmos.gas_sat[g][:] .= false
-           atmos.gas_yield[g][:] .= 0.0
+           fill!(atmos.gas_vmr[g][1:end-1], atmos.gas_vmr[g][end])
+           fill!(atmos.gas_sat[g],          false)
+           fill!(atmos.gas_yield[g],        0.0)
         end
 
         # Reset water cloud
@@ -1990,7 +1988,7 @@ module atmosphere
         if back_interp
             clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
             itp = Interpolator(log.(atmos.pl), atmos.tmpl)
-            atmos.tmp[:] .= itp.(log.(atmos.p[:]))
+            @. atmos.tmp = itp(log(atmos.p))
         end
 
         return nothing
