@@ -186,11 +186,11 @@ module plotting
 
             # Get data
             gas = atmos.gas_names[i]
-            arr_x[:] .= atmos.gas_vmr[gas][:]
+            @. arr_x = atmos.gas_vmr[gas]
             if minimum(arr_x) < 1e-90
                 continue
             end
-            arr_x[:] .= log10.(arr_x[:])
+            @. arr_x = log10(arr_x)
 
             plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label,
                     lw=2.5, linealpha=0.7, color=atmos.gas_dat[gas].plot_color)

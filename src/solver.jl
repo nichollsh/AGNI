@@ -245,7 +245,7 @@ module solver
                                 convect_sf=easy_sf, latent_sf=easy_sf)
 
             # Energy divergence term
-            atmos.flux_dif[:] .-= atmos.ediv_add[:]
+            @. atmos.flux_dif -= atmos.ediv_add
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
@@ -301,7 +301,7 @@ module solver
                 end
 
                 # Reset all levels
-                x_s[:] .= x[:]
+                @. x_s = x
 
                 # Reset residuals
                 fill!(rf1, 0.0)
@@ -425,7 +425,7 @@ module solver
         end
 
         # Final setup
-        x_cur[:] .= x_ini[:]
+        @. x_cur = x_ini
         for di in 1:arr_len
             dtd[di,di] = 1.0
         end
@@ -567,7 +567,7 @@ module solver
             end
 
             # Evaluate residuals and estimate Jacobian matrix where required
-            r_old[:] .= r_cur[:]
+            @. r_old = r_cur
             if fdc || (step == 1) || (c_cur/c_old > fdr)
                 # use central difference if:
                 #    requested, at the start, or insufficient cost decrease

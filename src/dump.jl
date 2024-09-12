@@ -1,4 +1,4 @@
-# Contains save/load module
+# Write atmosphere to NetCDF or CSV file
 
 # Not for direct execution
 if (abspath(PROGRAM_FILE) == @__FILE__)

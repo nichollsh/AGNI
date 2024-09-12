@@ -163,26 +163,20 @@ module energy
             atmos.control.l_ir_source_quad = true
         end
 
-        # set surface emission
-        pl_w::Float64 = 0.0; pl_x::Float64 = 0.0
-        for i in 1:atmos.nbands
-            # get band width, midpoint
-            pl_w = 1e9 * (atmos.bands_max[i] - atmos.bands_min[i])
-            pl_x = 1e9 * atmos.bands_min[i] + 0.5 * pl_w
+        # Set flux in surface emission, by band
+        #     Equal to integral of planck function over band width, which in
+        #     this case is done by simply evaluating at the midpoint and
+        #     multiplying by band width. Scaled by the emissivity.
+        @. atmos.surf_flux = phys.evaluate_planck(atmos.bands_cen, atmos.tmp_surf) *
+                                atmos.bands_wid * 1e9 * atmos.surf_e_arr
 
-            # Set flux in band
-            #  Equal to integral of planck function over band width, which in
-            #  this case is done by simply evaluating at the midpoint and
-            #  multiplying by band width.
-            #  It is then scaled by the emissivity and 1-albedo. I'd argue
-            #  that the albedo term shouldn't be here, but it's to correct for
-            #  it also (strangely) appearing inside diff_planck_source_mod.f90
-            #  on line 129.
-            #  Having this 1-albedo term and using this low-order integration
-            #  gives the correct results from my tests.
-            atmos.bound.flux_ground[1,i] = phys.evaluate_planck(pl_x, atmos.tmp_surf)*pl_w*
-                                                atmos.surf_e_arr[i] *
-                                                (1.0 - atmos.surf_r_arr[i])
+        # Pass to socrates array
+        #     I would argue that the 1-albedo term shouldn't be here, but it is to correct
+        #     for it also (strangely) appearing inside diff_planck_source_mod.f90 on
+        #     line 129. Having this 1-albedo term (and using this low-order integration)
+        #     gives the correct results from my tests versus SOCRATES's native function.
+        for i in 1:atmos.nbands
+            atmos.bound.flux_ground[1,i] = atmos.surf_flux[i] * (1.0 - atmos.surf_r_arr[i])
         end
 
         ######################################################
@@ -249,11 +243,11 @@ module energy
                     atmos.band_u_lw[lv,ba] = max(0.0, atmos.radout.flux_up[idx])
                     atmos.band_n_lw[lv,ba] = atmos.band_u_lw[lv,ba] - atmos.band_d_lw[lv,ba]
 
-                    atmos.flux_d_lw[lv] += max(0.0, atmos.radout.flux_down[idx])
-                    atmos.flux_u_lw[lv] += max(0.0, atmos.radout.flux_up[idx])
+                    atmos.flux_d_lw[lv] += atmos.band_d_lw[lv,ba]
+                    atmos.flux_u_lw[lv] += atmos.band_u_lw[lv,ba]
                 end
-                atmos.flux_n_lw[lv] = atmos.flux_u_lw[lv] - atmos.flux_d_lw[lv]
             end
+            @. atmos.flux_n_lw = atmos.flux_u_lw - atmos.flux_d_lw
 
             # Normalised contribution function (only LW stream contributes)
             fill!(atmos.contfunc_norm,0.0)
@@ -267,6 +261,7 @@ module energy
                 end
             end
             atmos.is_out_lw = true
+
         else
             # SW case
             fill!(atmos.flux_u_sw, 0.0)
@@ -283,11 +278,11 @@ module energy
                     atmos.band_u_sw[lv,ba] = max(0.0,atmos.radout.flux_up[idx])
                     atmos.band_n_sw[lv,ba] = atmos.band_u_sw[lv,ba] - atmos.band_d_sw[lv,ba]
 
-                    atmos.flux_d_sw[lv] += max(0.0, atmos.radout.flux_down[idx])
-                    atmos.flux_u_sw[lv] += max(0.0, atmos.radout.flux_up[idx])
+                    atmos.flux_d_sw[lv] += atmos.band_d_sw[lv,ba]
+                    atmos.flux_u_sw[lv] += atmos.band_u_sw[lv,ba]
                 end
-                atmos.flux_n_sw[lv] = atmos.flux_u_sw[lv] - atmos.flux_d_sw[lv]
             end
+            @. atmos.flux_n_sw = atmos.flux_u_sw - atmos.flux_d_sw
             atmos.is_out_sw = true
         end
 
@@ -631,10 +626,10 @@ module energy
             atmos.phs_wrk_fl[end] = 0.0
 
             # add energy from this gas to total
-            atmos.flux_l[:] .+= atmos.phs_wrk_fl[:]
+            @. atmos.flux_l += atmos.phs_wrk_fl
 
             # calculate mask
-            atmos.mask_l[:] .= (abs.(atmos.flux_l[:]) .> 1.0e-10)
+            @. atmos.mask_l = (abs(atmos.flux_l) > 1.0e-10)
 
         end # go to next condensable
 
@@ -708,11 +703,11 @@ module energy
             atmos.flux_l *= latent_sf
 
             # Add to total flux
-            atmos.flux_tot += atmos.flux_l
+            @. atmos.flux_tot += atmos.flux_l
 
             # Restore mixing ratios
             for g in atmos.gas_names
-                atmos.gas_vmr[g][:] .=  atmos.gas_ovmr[g][:]
+                @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
             end
         end
 
@@ -722,7 +717,7 @@ module energy
         # +Radiation
         energy.radtrans!(atmos, true, calc_cf=calc_cf)
         energy.radtrans!(atmos, false)
-        atmos.flux_tot += atmos.flux_n
+        @. atmos.flux_tot += atmos.flux_n
 
         # +Dry convection
         if convect
@@ -733,7 +728,7 @@ module energy
             atmos.flux_cdry *= convect_sf
 
             # Add to total flux
-            atmos.flux_tot += atmos.flux_cdry
+            @. atmos.flux_tot += atmos.flux_cdry
         end
 
         # +Surface turbulence
@@ -745,7 +740,7 @@ module energy
         # +Conduction
         if conduct
             energy.conduct!(atmos)
-            atmos.flux_tot += atmos.flux_cdct
+            @. atmos.flux_tot += atmos.flux_cdct
         end
 
         # Flux difference across each level
@@ -769,7 +764,7 @@ module energy
         dF::Float64 = 0.0
         dp::Float64 = 0.0
 
-        atmos.heating_rate[:] .= 0.0
+        fill!(atmos.heating_rate, 0.0)
 
         for i in 1:atmos.nlev_c
             dF = atmos.flux_tot[i+1] - atmos.flux_tot[i]
@@ -788,7 +783,7 @@ module energy
         tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
         tmp_tnd = zeros(Float64, atmos.nlev_c)  # temperature tendency
 
-        tmp_old[:] .+= atmos.tmp[:]
+        @. tmp_old +=  atmos.tmp
 
         for i in 1:nsteps
 
@@ -839,10 +834,10 @@ module energy
         end
 
         # Calculate tendency
-        tmp_tnd[:] .= atmos.tmp[:] .- tmp_old[:]
+        @. tmp_tnd = atmos.tmp - tmp_old
 
         # Restore temperature array
-        atmos.tmp[:] .= tmp_old[:]
+        @. atmos.tmp = tmp_old
 
         return tmp_tnd
     end
