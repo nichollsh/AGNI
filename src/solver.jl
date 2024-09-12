@@ -12,6 +12,7 @@ module solver
     using LoggingExtras
     using Statistics
     using LinearAlgebra
+    using LoopVectorization
 
     import ..atmosphere
     import ..energy
@@ -245,7 +246,7 @@ module solver
                                 convect_sf=easy_sf, latent_sf=easy_sf)
 
             # Energy divergence term
-            atmos.flux_dif[:] .-= atmos.ediv_add[:]
+            @turbo @. atmos.flux_dif -= atmos.ediv_add
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
@@ -301,7 +302,7 @@ module solver
                 end
 
                 # Reset all levels
-                x_s[:] .= x[:]
+                @turbo @. x_s = x
 
                 # Reset residuals
                 fill!(rf1, 0.0)
@@ -338,26 +339,23 @@ module solver
                 # Set jacobian
                 # https://www.dam.brown.edu/people/alcyew/handouts/numdiff.pdf
                 # https://en.wikipedia.org/wiki/Finite_difference_coefficient
-                for j in 1:arr_len  # for each residual
-                    jacob[j,i] = drdx
-                    if central
-                        if order == 4
-                            # 4th order central difference
-                            jacob[j,i] = (-rf2[j] + 8.0*rf1[j] - 8.0*rb1[j] + rb2[j])/(12.0*fd_s)
-                        else
-                            # 2nd order central difference
-                            jacob[j,i] = (rf1[j] - rb1[j])/(2.0*fd_s)
-                        end
+                if central
+                    if order == 4
+                        # 4th order central difference
+                        @turbo @. jacob[:,i] = (-rf2 + 8.0*rf1 - 8.0*rb1 + rb2)/(12.0*fd_s)
                     else
-                        if order == 4
-                            # 4th order forward difference
-                            jacob[j,i] = (-rf2[j] + 4.0*rf1[j] - 3.0*resid[j])/(2.0*fd_s)
-                        else
-                            # 2nd order forward difference
-                            jacob[j,i] = (rf1[j] - resid[j])/fd_s
-                        end
-                    end # end central/forward
-                end # end residuals
+                        # 2nd order central difference
+                        @turbo @. jacob[:,i] = (rf1 - rb1)/(2.0*fd_s)
+                    end
+                else
+                    if order == 4
+                        # 4th order forward difference
+                        @turbo @. jacob[:,i] = (-rf2 + 4.0*rf1 - 3.0*resid)/(2.0*fd_s)
+                    else
+                        # 2nd order forward difference
+                        @turbo @. jacob[:,i] = (rf1 - resid)/fd_s
+                    end
+                end # end central/forward
             end # end levels
 
             return ok
@@ -425,7 +423,7 @@ module solver
         end
 
         # Final setup
-        x_cur[:] .= x_ini[:]
+        @. x_cur = x_ini
         for di in 1:arr_len
             dtd[di,di] = 1.0
         end
@@ -567,7 +565,7 @@ module solver
             end
 
             # Evaluate residuals and estimate Jacobian matrix where required
-            r_old[:] .= r_cur[:]
+            @turbo @. r_old = r_cur
             if fdc || (step == 1) || (c_cur/c_old > fdr)
                 # use central difference if:
                 #    requested, at the start, or insufficient cost decrease
@@ -593,7 +591,7 @@ module solver
             end
 
             # Model step
-            x_old[:] = x_cur[:]
+            @turbo @. x_old = x_cur
             if (method == 1)
                 # Newton-Raphson step
                 @debug "        NR step"
@@ -626,13 +624,13 @@ module solver
             #    Otherwise, this perturbation can still help.
             plateau_apply = (plateau_i > plateau_n)
             if plateau_apply
-                x_dif[:] .*= plateau_s
+                @turbo @. x_dif *= plateau_s
                 plateau_i = 0
                 stepflags *= "X-"
             end
 
             # Limit step size, without changing direction of dx vector
-            x_dif[:] .*= min(1.0, dx_max / maximum(abs.(x_dif[:])))
+            x_dif *= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
             # Linesearch
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
@@ -645,7 +643,7 @@ module solver
 
                 # Internal function minimised by linesearch method
                 function _ls_func(scale::Float64)::Float64
-                    x_cur[:] .= x_old[:] .+ scale .* x_dif[:]
+                    @turbo @. x_cur = x_old + scale * x_dif
                     _fev!(x_cur,r_tst)
                     return _cost(r_tst)
                 end
@@ -694,13 +692,13 @@ module solver
 
                     # Apply best scale from linesearch
                     ls_alpha = max(ls_alpha, ls_min_scale)
-                    x_dif[:] .*= ls_alpha
+                    x_dif *= ls_alpha
                 end
 
             end # end linesearch
 
             # Take the step
-            x_cur[:] .= x_old[:] .+ x_dif[:]
+            @turbo @. x_cur = x_old + x_dif
             clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
             _fev!(x_cur, r_cur)
 

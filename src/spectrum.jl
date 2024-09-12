@@ -120,14 +120,17 @@ module spectrum
         itp = Interpolator(lwl, lfl)
         bin_c = collect(range(start=lwl[1],  stop=lwl[end], length=tgt_bins))
         bin_v = zeros(Float64, tgt_bins)
-        bin_v[:] .= itp.(bin_c[:])
+        @. bin_v = itp(bin_c)
 
-        owl = 10.0 .^ Array(bin_c[:])
-        ofl = 10.0 .^ Array(bin_v[:])
+        # new arrrays
+        owl = zeros(Float64, tgt_bins)
+        ofl = zeros(Float64, tgt_bins)
+        @. owl = 10.0 .^ bin_c
+        @. ofl = 10.0 .^ bin_v
 
         # Convert units
-        owl = owl .* 1.0e-9  # [nm] -> [m]
-        ofl = ofl .* 1.0e6   # [erg s-1 cm-2 nm-1] -> [W m-3]
+        owl *= 1.0e-9  # [nm] -> [m]
+        ofl *= 1.0e6   # [erg s-1 cm-2 nm-1] -> [W m-3]
 
         # Write file
         @debug "Writing stellar spectrum to SOCRATES format"
