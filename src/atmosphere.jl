@@ -734,15 +734,11 @@ module atmosphere
     """
     function calc_layer_props!(atmos::atmosphere.Atmos_t; ignore_errors::Bool=false)::Bool
         if !atmos.is_param
-            error("atmosphere parameters have not been set")
+            error("Atmosphere parameters have not been set")
         end
 
         ok::Bool = true
         dz_max::Float64 = 1e9
-
-        # Set pressure arrays in SOCRATES
-        atmos.atm.p[1, :] .= atmos.p[:]
-        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
 
         # Set MMW at each level
         fill!(atmos.layer_mmw, 0.0)
@@ -750,8 +746,18 @@ module atmosphere
             @. atmos.layer_mmw += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
         end
 
+        # Set cp, kc at each level
+        fill!(atmos.layer_cp, 0.0)
+        fill!(atmos.layer_kc, 0.0)
+        for i in 1:atmos.nlev_c
+            for gas in atmos.gas_names
+                mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
+                atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
+                atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
+            end
+        end
+
         # Temporary values
-        mmr::Float64 = 0.0
         g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
         g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
         dzc::Float64= 0.0; dzl::Float64 = 0.0
@@ -763,28 +769,10 @@ module atmosphere
         fill!(atmos.layer_grav,  0.0)
         fill!(atmos.layer_thick, 0.0)
         fill!(atmos.layer_density,0.0)
-        fill!(atmos.layer_cp     ,0.0)
-        fill!(atmos.layer_kc     ,0.0)
         fill!(atmos.layer_mass   ,0.0)
 
         # Integrate from bottom upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
-
-            # Set cp, kc at this level
-            atmos.layer_cp[i] = 0.0
-            atmos.layer_kc[i] = 0.0
-            for gas in atmos.gas_names
-                mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
-                atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
-                atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
-            end
-
-            # Temporarily copy this cp, kc to the level above
-            #     since they are needed for doing the hydrostatic integration
-            if i > 1
-                atmos.layer_cp[i-1] = atmos.layer_cp[i]
-                atmos.layer_kc[i-1] = atmos.layer_kc[i]
-            end
 
             # Technically, g and z should be integrated as coupled equations,
             # but here they are not. This loose integration has been found to
