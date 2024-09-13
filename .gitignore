@@ -40,3 +40,6 @@ __pycache__
 debug/
 nogit*
 .osfcli.config
+
+# Paper
+paper/main.pdf
