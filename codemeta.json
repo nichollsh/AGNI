@@ -7,7 +7,7 @@
       "@type": "Person",
       "email": "harrison.nicholls@physics.ox.ac.uk",
       "name": "Harrison Nicholls",
-      "affiliation": "University of Oxford"
+      "affiliation": "Department of Physics, University of Oxford, Parks Road, Oxford OX1 3PU, UK"
     }
   ],
   "identifier": "",
@@ -15,7 +15,7 @@
   "datePublished": "2024-09-13",
   "dateModified": "2024-09-13",
   "dateCreated": "2024-09-13",
-  "description": "A radiative-convective model for the atmospheres of terrestrial planets",
+  "description": "A radiative-convective model for the atmospheres of rocky planets",
   "keywords": "fortran, julia, physics, radiative-transfer, exoplanets, astronomy, convection, radiation, planets, atmospheres",
   "license": "GPL v3.0",
   "title": "AGNI",
