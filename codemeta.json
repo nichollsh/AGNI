@@ -19,5 +19,5 @@
   "keywords": "fortran, julia, physics, radiative-transfer, exoplanets, convection, radiation, planetary-science, atmosphere-model",
   "license": "GPL v3.0",
   "title": "AGNI",
-  "version": "v0.8.0"
+  "version": "0.8.1"
 }
