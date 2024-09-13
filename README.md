@@ -1,7 +1,7 @@
 # AGNI
 Radiative-convective solver designed for integration into a coupled atmosphere-interior code.
 
-AGNI relies on SOCRATES for calculating radiances. The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption. Mixing length theory is used to parametrise convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile.
+AGNI relies on [SOCRATES](https://github.com/nichollsh/SOCRATES) for calculating radiances. The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption. Mixing length theory is used to parametrise convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile.
 
 Consult the [AGNI documentation](https://nichollsh.github.io/AGNI/) for information about the model.
 
