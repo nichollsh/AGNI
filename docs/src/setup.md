@@ -17,7 +17,7 @@ Follow the steps below in order to setup the code.
 2. Download AGNI: `git clone https://github.com/nichollsh/AGNI.git`
 3. Change directory: `cd AGNI`
 4. Setup SOCRATES by doing either **ONE** of the following...
-    - Follow the instructions on the SOCRATES GitHub page
+    - Follow the instructions on the [SOCRATES GitHub](https://github.com/nichollsh/SOCRATES) page
     - Run `source get_socrates.sh`
 5. `julia -e 'using Pkg; Pkg.activate("."); Pkg.build()'`
 AGNI is now installed as a package into a Julia environment in the AGNI
