@@ -1,0 +1,23 @@
+{
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@type": "Code",
+  "author": [
+    {
+      "@id": "https://orcid.org/0000-0002-8368-4641",
+      "@type": "Person",
+      "email": "harrison.nicholls@physics.ox.ac.uk",
+      "name": "Harrison Nicholls",
+      "affiliation": "University of Oxford"
+    }
+  ],
+  "identifier": "",
+  "codeRepository": "https://github.com/nichollsh/AGNI",
+  "datePublished": "2024-09-13",
+  "dateModified": "2024-09-13",
+  "dateCreated": "2024-09-13",
+  "description": "A 1D radiative-convective model for the atmospheres of hot terrestrial planets.",
+  "keywords": "fortran, julia, physics, radiative-transfer, exoplanets, convection, radiation, planetary-science, atmosphere-model",
+  "license": "GPL v3.0",
+  "title": "AGNI",
+  "version": "v0.8.0"
+}
