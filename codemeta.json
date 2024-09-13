@@ -15,8 +15,8 @@
   "datePublished": "2024-09-13",
   "dateModified": "2024-09-13",
   "dateCreated": "2024-09-13",
-  "description": "A 1D radiative-convective model for the atmospheres of hot terrestrial planets.",
-  "keywords": "fortran, julia, physics, radiative-transfer, exoplanets, convection, radiation, planetary-science, atmosphere-model",
+  "description": "A radiative-convective model for the atmospheres of terrestrial planets",
+  "keywords": "fortran, julia, physics, radiative-transfer, exoplanets, astronomy, convection, radiation, planets, atmospheres",
   "license": "GPL v3.0",
   "title": "AGNI",
   "version": "0.8.1"
