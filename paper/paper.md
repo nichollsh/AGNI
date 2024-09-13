@@ -1,5 +1,5 @@
 ---
-title: 'AGNI: A radiative-convective model for the atmospheres of terrestrial planets'
+title: 'AGNI: A radiative-convective model for the atmospheres of rocky planets'
 tags:
   - Julia
   - Fortran
@@ -16,7 +16,7 @@ authors:
     orcid: 0000-0002-8368-4641
     affiliation: 1
 affiliations:
- - name: University of Oxford
+ - name: Department of Physics, University of Oxford, Parks Road, Oxford OX1 3PU, UK
    index: 1
 date: 13 September 2024
 bibliography: paper.bib
@@ -25,33 +25,18 @@ bibliography: paper.bib
 
 # Summary
 
-The forces on stars, galaxies, and dark matter under external gravitational
-fields lead to the dynamical evolution of structures in the universe. The orbits
-of these bodies are therefore key to understanding the formation, history, and
-future state of galaxies. The field of "galactic dynamics," which aims to model
-the gravitating components of galaxies to study their structure and evolution,
-is now well-established, commonly taught, and frequently used in astronomy.
-Aside from toy problems and demonstrations, the majority of problems require
-efficient numerical tools, many of which require the same base code (e.g., for
-performing numerical orbit integration).
+It is thought that all rocky planets go through a "magma ocean" stage, where their mantles are fully molten. This is because they are initially very hot. This stage allows for rapid exchange of energy and material between their atmospheres and interiors. Since this phase is likely common to many planets -- including Earth -- it is important that we understand the physical processes involved, and how these processes interact with each other. It is thought that atmospheric blanketing is key to setting the behaviour in this stage: where the opacity of the atmosphere prevents the planet from cooling down, by absorbing energy emitted from the surface and re-radiating it back downwards. Accurate atmosphere models also allow us to connect theoretical models of these young planets to telescope observations of exoplanets, since it is primarily through their atmospheric properties that were are able to characterise these planets.
+
+AGNI is a Julia program designed to solve for the temperature, composition, and radiation environment within the atmospheres of these planets, with the view of being coupled to an interior model through the PROTEUS framework[^proteus].
+
+[^proteus] The PROTEUS framework can be found on GitHub [here](https://github.com/FormingWorlds/PROTEUS).
 
 # Statement of need
 
-`Gala` is an Astropy-affiliated Python package for galactic dynamics. Python
-enables wrapping low-level languages (e.g., C) for speed without losing
-flexibility or ease-of-use in the user-interface. The API for `Gala` was
-designed to provide a class-based and user-friendly interface to fast (C or
-Cython-optimized) implementations of common operations such as gravitational
-potential and force evaluation, orbit integration, dynamical transformations,
-and chaos indicators for nonlinear dynamics. `Gala` also relies heavily on and
-interfaces well with the implementations of physical units and astronomical
-coordinate systems in the `Astropy` package [@IAPWS95] (`astropy.units` and
-`astropy.coordinates`).
-
+Hi
 
 # Acknowledgements
 
-We acknowledge contributions from Brigitta Sipocz, Syrtis Major, and Semyeong
-Oh, and support from Kathryn Johnston during the genesis of this project.
+Harrison Nicholls is supported by the Clarendon Fund and the MT Scholarship Trust.
 
 # References
