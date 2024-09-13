@@ -343,8 +343,8 @@ module energy
         H::Float64 = 0.0; l::Float64 = 0.0; w::Float64 = 0.0
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
-        grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0; grad_df::Float64 = 0.0
-        beta::Float64 = 0.0; xv::Float64=0.0; xv_av::Float64=0.0
+        grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0
+        beta::Float64 = 0.0; xv::Float64=0.0
         inhib::Float64 = 0.0; condition::Bool = false
         cmax::String = ""; do_moist::Bool = false
 
@@ -366,22 +366,12 @@ module energy
             grav = (atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1)/mt
             mu   = (atmos.layer_mmw[i]  * m2 + atmos.layer_mmw[i-1]  * m1)/mt
             c_p  = (atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1)/mt
-            tmp = (atmos.tmp[i] * m2 + atmos.tmp[i-1] * m1)/mt
+            tmp  = (atmos.tmp[i]        * m2 + atmos.tmp[i-1]        * m1)/mt
 
 
             # Dry convection
             grad_ad = (phys.R_gas / mu) / c_p
             condition = (grad_pr > grad_ad)
-
-            # Define moist elsewhere eventually, link to condensates
-            # To do:
-            #  - Find regions where we are condensing (pass from the condensation scheme)
-            #  - Find the condensable with the largest value of (L/RT)^2*x
-            #  - Calculate the adiabatic lapse rate
-            #  - Calculate stabilisation w.r.t. the adiabat using criterion
-            #  - Set the vapour contents to the new saturated value
-            #  - Adjust the dry component to compensate
-
 
             if atmos.condense_any && do_moist
                 # Check which condensable species has the largest (L/RT)^2*x
@@ -703,7 +693,6 @@ module energy
                 @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
             end
         end
-
         # Calculate layer properties
         atmosphere.calc_layer_props!(atmos)
 
