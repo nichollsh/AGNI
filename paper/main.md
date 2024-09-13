@@ -19,7 +19,7 @@ affiliations:
  - name: University of Oxford
    index: 1
 date: 13 September 2024
-bibliography: refs.bib
+bibliography: paper/refs.bib
 
 ---
 
