@@ -1,8 +1,6 @@
 ---
 title: 'AGNI: A radiative-convective model for the atmospheres of rocky planets'
 tags:
-  - Julia
-  - Fortran
   - astronomy
   - physics,
   - radiative transfer
@@ -39,5 +37,7 @@ Hi
 # Acknowledgements
 
 Harrison Nicholls is supported by the Clarendon Fund and the MT Scholarship Trust.
+The author is grateful for the continuing hard work of the Julia developers and those of its many libraries [@julialang].
+Additionally, the author thanks James Manners, and others at the Met Office, who have continued to support and develop SOCRATES over the last three decades.
 
 # References
