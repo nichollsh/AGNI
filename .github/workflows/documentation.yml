@@ -6,6 +6,11 @@ name: Documentation
 on:
   push:
     branches: [main]
+    paths:
+      - docs/**
+      - !docs/paper/**
+      - .github/workflows/documentation.yml
+
 
 jobs:
   build:
