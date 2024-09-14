@@ -45,6 +45,7 @@ HELIOS[^4] [@malik_helios_2017] is a hydrostatic atmosphere model written in Pyt
 # Comparison with other codes
 
 AGNI is a new radiative-convective atmosphere model developed with the view of being coupled into the PROTEUS framework[^2], alongside other physical models. In solving the aforementioned problems, it is able to:
+
 * be coupled to an interior model with an appropriate surface boundary condition,
 * account for atmospheres of mixed gaseous composition with realistic opacities,
 * solve for a temperature structure which conserves energy and allows for convective stability,
