@@ -23,7 +23,9 @@ bibliography: paper.bib
 
 # Summary
 
-AGNI[^1] is a Julia program designed to solve for the temperature, and radiation environment within the atmospheres of rocky (exo)planets. Given basic physical parameters such as planetary radius, atmospheric composition, and the incoming stellar radiation.
+It is important that we are able to accurately model the atmospheres of (exo)planets. This is because their atmospheres play a crucial role in setting the environment and conditions on the planet, including how the planet evolves over astronomical timescales. Additionally, it is primarily by observation of their atmospheres that we are able to characterise exoplanets. There is demand for accurate atmosphere models in the context of lava worlds: planets with permanent or fleeting magma oceans.
+
+AGNI[^1] is a Julia program designed to solve for the temperature and radiation environment within the atmospheres of rocky (exo)planets. It leverages a well established FORTRAN code to calculate radiative fluxes from a given atmospheric temperature structure and composition, which -- alongside models of convection and other processes -- enables an energy-conserving numerical solution for the atmospheric conditions. In contrast to most other numerical atmosphere codes, AGNI uses an Newton-Raphson optimisation method to obtain this solution, which enables good performance and scalability. AGNI was specifically developed for use alongside planetary interior models within a coupled framework, although it can also be easily applied to scientific problems as a standalone code.
 
 [^1]: AGNI can be found on GitHub [here](https://github.com/nichollsh/AGNI).
 
@@ -39,7 +41,7 @@ HELIOS [@malik_helios_2017] is a hydrostatic atmosphere model written in Python 
 
 # Comparison with other codes
 
-AGNI is a new radiative-convective atmosphere model developed with the view of being coupled into the PROTEUS framework[^2]. In solving the aforementioned problems, it is able to:
+AGNI is a new radiative-convective atmosphere model developed with the view of being coupled into the PROTEUS framework[^2], alongside other physical models. In solving the aforementioned problems, it is able to:
 * be coupled to an interior model with an appropriate surface boundary condition,
 * account for atmospheres of mixed gaseous composition with realistic opacities,
 * solve for a temperature structure which conserves energy and allows for convective stability,
