@@ -59,7 +59,7 @@ Alongside the problem of interior-atmosphere coupling, it is useful to be able t
 
 # Acknowledgements
 
-Harrison Nicholls is supported by the Clarendon Fund and the MT Scholarship Trust.
+The author is supported by the Clarendon Fund and the MT Scholarship Trust.
 The author is grateful for the continuing hard work of the Julia developers and those of its many libraries [@julialang].
 Additionally, the author thanks James Manners, and others at the Met Office, who have continued to support and develop SOCRATES over the last three decades.
 
