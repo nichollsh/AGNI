@@ -37,7 +37,10 @@ Several theoretical studies have modelled the atmospheres and evolution of these
 
 Ensuring sufficient spectral resolution is important in modelling the blanketing effect of these atmospheres, as resolving the opacity (and transparency) of their many gases is known to be key in setting the rate at which these planets can cool by radiation to space [@pierrehumbert_book_2010; @boukrouche_beyond_2021]. It is also important that we are able to run grids of models which explore the range of possible (and as-yet poorly constrained) conditions that these planets could exhibit, which demands efficient modelling given finite computational resources. Performance is paramount.
 
-HELIOS [@malik_helios_2017] is a hydrostatic atmosphere model written in Python and CUDA. HELIOS assumes that the "interior temperature" $T_{\text{int}}$ of a model planet is a known quantity, but coupled time-evolved evolution with an interior model requires that this quantity be an output variable, instead requiring a fixed surface temperature (or something equivalent). It is therefore not possible to apply HELIOS to this problem. The same also applies to Exo_k [@selsis_cool_2023].
+HELIOS[^4] [@malik_helios_2017] is a hydrostatic atmosphere model written in Python and CUDA. HELIOS assumes that the "interior temperature" $T_{\text{int}}$ of a model planet is a known quantity, but coupled time-evolved evolution with an interior model requires that this quantity be an output variable, instead requiring a fixed surface temperature (or something equivalent). It is therefore not possible to apply HELIOS to this problem. The same also applies to Exo_k[5^] [@selsis_cool_2023].
+
+[^4]: HELIOS can be found on GitHub [here](https://github.com/exoclime/HELIOS).
+[^5]: Exo_k can be found online [here](https://forge.oasu.u-bordeaux.fr/jleconte/exo_k-public).
 
 # Comparison with other codes
 
@@ -54,7 +57,7 @@ In AGNI, radiative transfer is performed under the correlated-k and two-stream a
 Alongside the problem of interior-atmosphere coupling, it is useful to be able to leverage SOCRATES through an interactive interface -- in this case thanks to Julia. This was applied in the recent paper by @hammond_photometric_2024.
 
 [^2]: The PROTEUS framework can be found on GitHub [here](https://github.com/FormingWorlds/PROTEUS).
-[^3]: Despite SOCRATES being developed under the BSD 3-Clause license, its [main development repository](https://code.metoffice.gov.uk/trac/socrates) is not publically accessible. The code has been re-hosted on GitHub, with additional tools, under the same open-source license [here](https://github.com/nichollsh/SOCRATES).
+[^3]: Despite SOCRATES being developed under the BSD 3-Clause license, its [main development repository](https://code.metoffice.gov.uk/trac/socrates) is not publically accessible. The code has been re-hosted on GitHub, with additional tools, under the same open-source license [here](https://github.com/nichollsh/SOCRATES). It has also been deposited on Zenodo: @nicholls_socrates_2024.
 
 
 # Acknowledgements
