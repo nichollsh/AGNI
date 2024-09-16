@@ -13,10 +13,18 @@ authors:
   - name: Harrison Nicholls
     orcid: 0000-0002-8368-4641
     affiliation: 1
+  - name: Raymond Pierrehumbert
+    orcid: 0000-0002-5887-1197
+    affiliation: 1
+  - name: Tim Lichtenberg
+    orcid: 0000-0002-3286-7683
+    affiliation: 2
 affiliations:
  - name: Department of Physics, University of Oxford, Parks Road, Oxford OX1 3PU, UK
    index: 1
-date: 13 September 2024
+ - name: Kapteyn Astronomical Institute, University of Groningen, P.O. Box 800, 9700 AV Groningen, The Netherlands
+   index: 2
+date: 16 September 2024
 bibliography: paper.bib
 
 ---
