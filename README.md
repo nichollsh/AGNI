@@ -17,7 +17,9 @@
   </a>
 </p>
 
-<center><b>A radiative-convective solver designed for integration into a coupled atmosphere-interior code.</b></center>
+<p align="center">
+  <b>A radiative-convective atmosphere model designed for interior coupling.</b>
+</p>
 
 
 ## Overview
