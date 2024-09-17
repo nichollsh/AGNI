@@ -1,0 +1,63 @@
+# AGNI configuration file
+title = "L 98-59 d"
+
+[planet]
+    tmp_surf        = 2700.0
+    instellation    = 81690.0
+    albedo_b        = 0.0
+    s0_fact         = 0.25
+    zenith_angle    = 54.74
+    surface_material= "res/surface_albedos/lunar_marebasalt.dat"
+    radius          = 6.59051e6
+    gravity         = 16.73
+    tmp_int         = 0.0
+    turb_coeff      = 0.001
+    wind_speed      = 2.0
+
+[files]
+    input_sf        = "res/spectral_files/Honeyside/256/Honeyside.sf"
+    input_star      = "res/stellar_spectra/l-98-59.txt"
+    output_dir      = "out/"
+
+[composition]
+    p_top           = 1e-6
+    p_surf          = 215.82518354535077e3
+    vmr_dict        = {H2S= 0.23988329190194904, SO2= 0.0044668359215096305, N2= 5.623413251903491e-6, H2= 0.7093907341517219}
+    include_all     = true
+    chemistry       = 1
+    condensates     = []
+
+[execution]
+    clean_output    = true
+    verbosity       = 1
+    max_steps       = 20000
+    max_runtime     = 400
+    num_levels      = 60
+    continua        = true
+    rayleigh        = true
+    cloud           = false
+    aerosol         = false
+    overlap_method  = 4
+    thermo_funct    = true
+    sensible_heat   = false
+    latent_heat     = true
+    convection      = true
+    solution_type   = 3
+    solvers         = ["newton"]
+    dx_max          = 400.0
+    initial_state   = ["loglin", "700"]
+    linesearch      = 0
+    easy_start      = false
+    converge_atol   = 1.0e-2
+    converge_rtol   = 1.0e-3
+
+[plots]
+    at_runtime      = true
+    temperature     = true
+    fluxes          = true
+    contribution    = true
+    emission        = true
+    albedo          = true
+    mixing_ratios   = true
+    animate         = true
+
