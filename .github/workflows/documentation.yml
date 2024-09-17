@@ -1,7 +1,7 @@
 # This job updates the documentation and pushes it to GitHub pages
 # This occurs when a PR to main is merged
 
-name: Documentation
+name: Docs
 
 on:
   push:
