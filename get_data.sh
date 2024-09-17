@@ -17,12 +17,14 @@ res="$root/res/"
 spfiles=$res/spectral_files
 stellar=$res/stellar_spectra
 surface=$res/surface_albedos
+realgas=$res/realgas
 
 # Make basic data folders
 mkdir -p $res
 mkdir -p $spfiles
 mkdir -p $stellar
 mkdir -p $surface
+mkdir -p $realgas
 
 # Help strings
 help_basic="Get the basic data required to run the model"
@@ -30,6 +32,7 @@ help_highres="Get a spectral file with many high-resolution opacities"
 help_steam="Get pure-steam spectral files"
 help_stellar="Get a collection of stellar spectra"
 help_surfaces="Get a collection of surface single-scattering albedos"
+help_realgas="Get a real-gas EOS coefficients and lookup tables"
 help="\
 Helper script used to download and unpack data used to run the model.
 
@@ -47,6 +50,8 @@ Where [TARGET] can be any of the following:
         $help_stellar
     surfaces
         $help_surfaces
+    realgas
+        $help_realgas
 "
 
 # Generic OSF downloader function
@@ -118,6 +123,7 @@ function handle_request {
             osf agsrq $stellar hd97658.txt
             osf ehfsy $stellar gj1214.txt
             osf 2qdu8 $stellar sun.txt
+            osf 45cjx $stellar l-98-59.txt
             ;;
 
         "surfaces")
@@ -141,6 +147,17 @@ function handle_request {
             osf q6ujb $surface rhyolite.dat
             osf usj7w $surface tephrite.dat
             osf aj6us $surface tholeiitic_basalt.dat
+            ;;
+
+        "realgas")
+            echo $help_realgas
+
+            # AQUA PT lookup
+            zipfile=".aqua_temp.zip"
+            osf uqrdx $realgas $zipfile
+            unzip -oq $realgas/$zipfile -d $realgas
+            rm $realgas/$zipfile
+
             ;;
 
         *)

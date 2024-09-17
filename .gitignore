@@ -26,6 +26,7 @@ docs/build
 res/spectral_files/*
 res/stellar_spectra/*
 res/surface_albedos/*
+res/realgas/*
 !res/*/_readme.txt
 
 # Output files
