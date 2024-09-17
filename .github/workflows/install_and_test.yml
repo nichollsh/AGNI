@@ -1,7 +1,7 @@
 # This job installs AGNI and SOCRATES, and tests AGNI
 # This occurs when a PR to main is created
 
-name: AGNI_main_tests
+name: Tests
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ on:
 jobs:
   install:
     runs-on: ubuntu-latest
-    name: AGNI_main_tests
+    name: install_and_test
     steps:
       - uses: actions/checkout@v4
 

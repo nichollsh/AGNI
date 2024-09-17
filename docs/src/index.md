@@ -1,5 +1,5 @@
 # AGNI
-A numerical model for the atmospheres of hot terrestrial (exo)planets. AGNI's
+A numerical model for the atmospheres of hot rocky (exo)planets. AGNI's
 primary purpose is to simulate the evolving atmospheres of magma ocean planets, while
 ensuring that radiative-convective equilibrium is sufficiently maintained.
 
