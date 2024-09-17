@@ -22,6 +22,7 @@ module AGNI
     include("plotting.jl")
     include("energy.jl")
     include("solver.jl")
+    include("realgas.jl")
 
     # Import src files
     import .phys
@@ -31,6 +32,7 @@ module AGNI
     import .plotting
     import .energy
     import .solver
+    import .realgas 
 
     # Export
     # export atmosphere
