@@ -21,8 +21,8 @@ module realgas
         npts_p::Int
 
         # Array limits
-        lim_prs::Array{Float64,2}
-        lim_tmp::Array{Float64,2}
+        lim_prs::Array{Float64}
+        lim_tmp::Array{Float64}
 
         # Interpolators
         itp_rho::Spline2D       # Interpolator for density [kg/m^3]
