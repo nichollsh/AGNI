@@ -10,7 +10,7 @@ module realgas
 
     import ..phys
 
-    using Dierckx           # 2D spline interpolation
+    using ScatteredInterpolation  # 2D interpolation
     using LoggingExtras
     using DelimitedFiles
 
@@ -25,9 +25,9 @@ module realgas
         lim_tmp::Array{Float64}
 
         # Interpolators
-        itp_rho::Spline2D       # Interpolator for density [kg/m^3]
-        itp_gad::Spline2D       # Interpolator for adiabatic gradient (dlog(T)/dlog(P))_S
-        itp_mmw::Spline2D       # Interpolator for mmw [kg/mol]
+        itp_rho       # Interpolator for density [kg/m^3]
+        itp_gad       # Interpolator for adiabatic gradient (dlog(T)/dlog(P))_S
+        itp_mmw       # Interpolator for mmw [kg/mol]
 
         # Struct
         Aqua_t() = new()
@@ -60,21 +60,15 @@ module realgas
             @error "AQUA lookup table has invalid dimensions"
         end
 
-        # Reshape arrays
-        evl_prs::Array{Float64}     = arr_prs[1:aqua.npts_t:end]
-        evl_tmp::Array{Float64}     = arr_tmp[1:1:aqua.npts_t]
-        evl_rho::Array{Float64,2}   = reshape(arr_rho, (aqua.npts_p,aqua.npts_t))
-        evl_gad::Array{Float64,2}   = reshape(arr_gad, (aqua.npts_p,aqua.npts_t))
-        evl_mmw::Array{Float64,2}   = reshape(arr_mmw, (aqua.npts_p,aqua.npts_t))
-
         # Limits
-        aqua.lim_prs = [minimum(evl_prs), maximum(evl_prs)]
-        aqua.lim_tmp = [minimum(evl_tmp), maximum(evl_tmp)]
+        aqua.lim_prs = [minimum(arr_prs), maximum(arr_prs)]
+        aqua.lim_tmp = [minimum(arr_tmp), maximum(arr_tmp)]
 
         # Create interpolators
-        aqua.itp_rho = Spline2D(evl_prs, evl_tmp, evl_rho)
-        aqua.itp_gad = Spline2D(evl_prs, evl_tmp, evl_gad)
-        aqua.itp_mmw = Spline2D(evl_prs, evl_tmp, evl_mmw)
+        eval_pts = vcat(arr_prs', arr_tmp')
+        aqua.itp_rho = interpolate(NearestNeighbor(), eval_pts, arr_rho)
+        aqua.itp_gad = interpolate(NearestNeighbor(), eval_pts, arr_gad)
+        aqua.itp_mmw = interpolate(NearestNeighbor(), eval_pts, arr_mmw)
 
         return aqua
     end
