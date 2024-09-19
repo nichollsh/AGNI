@@ -1326,12 +1326,12 @@ module atmosphere
                 # evaluate gamma at band centre, converting from m to nm
                 ga = _gamma(1.0e9 * atmos.bands_cen[i])
 
-                # calculate dh reflectance (eq 3 from Hammond24)
-                atmos.surf_r_arr[i] = (1-ga) / (1+2*ga*mu)
-
-                # calculate emissivity (eq 4 from Hammond24 and eq 15.29 from Hapke 2012)
-                atmos.surf_e_arr[i] = 1.0 - ((1-ga)/(1+ga)) * (1- ga/(3*(1+ga)))
+                # calculate spherical reflectance (eq 4 from Hammond24)
+                atmos.surf_r_arr[i] = (1-ga)/(1+ga) * (1- ga/(3*(1+ga)))
             end
+
+            # calculate emissivity (eq 4 from Hammond24 and eq 15.29 from Hapke 2012)
+            @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
         end
 
         #######################################
