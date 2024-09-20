@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <b>A radiative-convective atmosphere model designed for interior coupling.</b>
+  <b>A radiative-convective model for lava planet atmospheres.</b>
 </p>
 
 

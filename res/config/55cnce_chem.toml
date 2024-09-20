@@ -10,7 +10,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     surface_material= "res/surface_albedos/basalt_tuff.dat"
     radius          = 1.1959e7
     gravity         = 22.304
-    tmp_int         = 0.0
+    flux_int        = 0.0
     turb_coeff      = 0.001
     wind_speed      = 2.0
 

@@ -15,9 +15,9 @@
   "datePublished": "2024-09-13",
   "dateModified": "2024-09-13",
   "dateCreated": "2024-09-13",
-  "description": "A radiative-convective model for the atmospheres of rocky planets",
+  "description": "A radiative-convective model for lava planet atmospheres.",
   "keywords": "physics, radiative transfer, exoplanets, astronomy, convection, radiation, planets, atmospheres",
   "license": "GPL v3.0",
   "title": "AGNI",
-  "version": "0.8.2"
+  "version": "0.8.3"
 }

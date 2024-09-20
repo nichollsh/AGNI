@@ -73,7 +73,7 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: tmp_int | 4: tgt_olr
+    - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
     - `chem_type::Int`                  chemistry type (see wiki)
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating
@@ -263,7 +263,6 @@ module solver
             elseif (sol_type == 3)
                 # Zero loss
                 resid[2:end] .= atmos.flux_dif[1:end]
-                # Total flux at TOA is equal to sigma*tmp_int^4
                 resid[1] = atmos.flux_tot[1] - atmos.flux_int
 
             elseif (sol_type == 4)
@@ -401,8 +400,7 @@ module solver
             @info @sprintf("    skin_d   = %.2f m",         atmos.skin_d)
             @info @sprintf("    skin_k   = %.2f W K-1 m-1", atmos.skin_k)
         elseif (sol_type == 3)
-            @info @sprintf("    tmp_int  = %.2f K",     atmos.tmp_int)
-            @info @sprintf("    f_int    = %.2f W m-2", atmos.flux_int)
+            @info @sprintf("    flux_int = %.2f W m-2", atmos.flux_int)
         elseif (sol_type == 4)
             @info @sprintf("    tgt_olr  = %.2f W m-2", atmos.target_olr)
         end

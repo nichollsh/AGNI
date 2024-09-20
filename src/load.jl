@@ -59,7 +59,7 @@ module load
             # ----------------------
             # Load scalar quantities
             atmos.tmp_surf =        ds["tmp_surf"][]        # Surface brightness temperature [K]
-            atmos.tmp_int  =        ds["tmp_int"][]         # Effective temperature [K]
+            atmos.flux_int  =       ds["flux_int"][]        # Internal flux [W m-2]
             atmos.instellation =    ds["instellation"][]    # Solar flux
             atmos.s0_fact =         ds["inst_factor"][]     # Scale factor applied to instellation
             atmos.albedo_b =        ds["bond_albedo"][]     # Bond albedo used to scale-down instellation

@@ -70,7 +70,6 @@ module atmosphere
         surf_e_arr::Array{Float64,1}    # Spectral surface emissivity
 
         tmp_surf::Float64               # Surface brightness temperature [K]
-        tmp_int::Float64                # Effective temperature of the planet [K]
         grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::Int             # Absorber overlap method to be used
 
@@ -269,7 +268,7 @@ module atmosphere
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].
     - `overlap_method::Int`             gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
     - `target_olr::Float64`             target OLR [W m-2] for sol_type==4.
-    - `tmp_int::Float64`                planet's effective (or internal) brightness temperature [K] for sol_type==3.
+    - `flux_int::Float64`               planet's internal flux for sol_type==3.
     - `all_channels::Bool`              use all channels available for RT?
     - `flag_rayleigh::Bool`             include rayleigh scattering?
     - `flag_gcontinuum::Bool`           include generalised continuum absorption?
@@ -302,7 +301,7 @@ module atmosphere
                     skin_k::Float64 =           2.0,
                     overlap_method::Int =       4,
                     target_olr::Float64 =       0.0,
-                    tmp_int::Float64 =          0.0,
+                    flux_int::Float64 =         0.0,
                     all_channels::Bool  =       true,
                     flag_rayleigh::Bool =       false,
                     flag_gcontinuum::Bool =     false,
@@ -319,7 +318,7 @@ module atmosphere
         end
 
         # Code versions
-        atmos.AGNI_VERSION = "0.8.2"
+        atmos.AGNI_VERSION = "0.8.3"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -356,7 +355,6 @@ module atmosphere
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
         atmos.tmp_surf =        max(tmp_surf, atmos.tmp_floor)
-        atmos.tmp_int =         tmp_int
         atmos.grav_surf =       max(1.0e-7, gravity)
         atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.surface_material= surface_material
@@ -367,7 +365,7 @@ module atmosphere
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) *
                                     s0_fact * cosd(atmos.zenith_degrees)
 
-        atmos.flux_int =        phys.sigma * (atmos.tmp_int)^4.0
+        atmos.flux_int =        flux_int
         atmos.target_olr =      max(1.0e-20,target_olr)
 
         atmos.C_d =             max(0,C_d)
@@ -425,8 +423,8 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 1.0e4   # mixed composition case
-        atmos.phs_tau_sgl = 1.0e4   # single gas case
+        atmos.phs_tau_mix = 1.0e5   # mixed composition case
+        atmos.phs_tau_sgl = 1.0e5   # single gas case
 
         # Hardcoded cloud properties
         atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
