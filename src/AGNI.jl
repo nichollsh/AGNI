@@ -32,7 +32,7 @@ module AGNI
     import .plotting
     import .energy
     import .solver
-    import .realgas 
+    import .realgas
 
     # Export
     # export atmosphere
@@ -328,9 +328,9 @@ module AGNI
             tmp_magma   = cfg["planet"]["tmp_magma"]
         end
         #     effective temperature case
-        tmp_int::Float64 = 0.0
+        flux_int::Float64 = 0.0
         if sol_type == 3
-            tmp_int = cfg["planet"]["tmp_int"]
+            flux_int = cfg["planet"]["flux_int"]
         end
         #     target OLR case
         target_olr::Float64 = 0.0
@@ -358,7 +358,7 @@ module AGNI
                                 overlap_method=overlap,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
-                                tmp_int=tmp_int,
+                                flux_int=flux_int,
                                 surface_material=surface_mat,
                                 albedo_s=albedo_s,
                                 thermo_functions=thermo_funct,
