@@ -1,5 +1,5 @@
 ---
-title: 'AGNI: A radiative-convective model for the atmospheres of rocky planets'
+title: 'AGNI: A radiative-convective model for lava planet atmospheres.'
 tags:
   - astronomy
   - physics,
@@ -24,7 +24,7 @@ affiliations:
    index: 1
  - name: Kapteyn Astronomical Institute, University of Groningen, P.O. Box 800, 9700 AV Groningen, The Netherlands
    index: 2
-date: 16 September 2024
+date: 20 September 2024
 bibliography: paper.bib
 
 ---

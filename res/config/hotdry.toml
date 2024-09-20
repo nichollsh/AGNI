@@ -11,7 +11,7 @@ title = "Hot and dry"
     albedo_s        = 0.0
     radius          = 6.37e6
     gravity         = 9.81
-    tmp_int         = 0.0
+    flux_int        = 0.0
     turb_coeff      = 1.0e-2
     wind_speed      = 10.0
 
