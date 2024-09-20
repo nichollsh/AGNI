@@ -61,20 +61,19 @@ AGNI is a new radiative-convective atmosphere model developed with the view of b
 * solve for an atmospheric temperature structure which conserves energy and allows for convective stability,
 * operate with sufficient speed that it may be participate in a wide parameter space.
 
-This is possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport. Rather than time-stepping each model level according to radiative heating and applying convective adjustment (cf. HELIOS, Exo_k, and various global circulation models), AGNI uses the Newton-Raphson method to find the state which conserves energy fluxes through the column to a required tolerence. This is similar to the method applied by @drummond_effects_2016 and @goyal_library_2020, although with several optimisations. This allows the model to take tens or hundereds of iterations to obtain a solution, in comparison to thousands or tens of thousands with a time-stepping scheme.
+This is possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport. Rather than time-stepping each model level according to radiative heating and applying convective adjustment (cf. HELIOS, Exo_k, and various global circulation models), AGNI uses the Newton-Raphson method to conserve energy fluxes through the column to a required tolerence. This is similar to the method applied by @drummond_effects_2016 and @goyal_library_2020, although with several optimisations. This allows the model to take tens or hundereds of iterations to obtain a solution, in comparison to thousands or tens of thousands.
 
-In AGNI, radiative transfer is performed under the correlated-k and two-stream approximations with up to 4096 spectral bands distributed between 1 and 35000 cm$^{-1}$ [@lacis_corrk_1991; @stamnes_radiative_2017]. This is done by using SOCRATES[^3], a well established FORTRAN code developed by the UK Met Office [@manners_socrates_2024; @amundsen_treatment_2017; @amundsen_radiation_2014]. Convection is parameterised using mixing length theory [@joyce_mlt_2023]. Condensation and sensible heat transport are also modelled.
+Radiative transfer is performed under the correlated-k and two-stream approximations using SOCRATES[^3], a well established FORTRAN code developed by the UK Met Office [@manners_socrates_2024; @amundsen_treatment_2017; @amundsen_radiation_2014]. Convection, condensation, and sensible heat transport are also modelled.
 
-Alongside the problem of interior-atmosphere coupling, it is useful to be able to leverage SOCRATES through an interactive interface -- in this case thanks to Julia. This was applied in the recent paper by @hammond_photometric_2024.
+AGNI was used in @hammond_photometric_2024.
 
 [^2]: The PROTEUS framework can be found on GitHub [here](https://github.com/FormingWorlds/PROTEUS).
-[^3]: Despite SOCRATES being developed under the BSD 3-Clause license, its [main development repository](https://code.metoffice.gov.uk/trac/socrates) is not publically accessible. The code has been re-hosted on GitHub, with additional tools, under the same open-source license [here](https://github.com/nichollsh/SOCRATES). It has also been deposited on Zenodo: @nicholls_socrates_2024.
+[^3]: SOCRATES is mirrored on GitHub, with additional tools, under its original open-source license [here](https://github.com/nichollsh/SOCRATES).
 
 
 # Acknowledgements
 
-The author is supported by the Clarendon Fund and the MT Scholarship Trust.
-The author is grateful for the continuing hard work of the Julia developers and those of its many libraries [@julialang].
-Additionally, the author thanks James Manners, and others at the Met Office, who have continued to support and develop SOCRATES over the last three decades.
+HN is supported by the Clarendon Fund and the MT Scholarship Trust.
+We acknowledge the continuing hard work of the Julia developers and those of its many libraries [@julialang].
 
 # References
