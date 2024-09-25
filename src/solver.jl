@@ -76,8 +76,9 @@ module solver
     - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
     - `chem_type::Int`                  chemistry type (see wiki)
     - `convect::Bool`                   include convection
-    - `sens_heat::Bool`                 include sensible heating
+    - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
+    - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
     - `dx_max::Float64`                 maximum step size [K]
     - `max_steps::Int`                  maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
@@ -103,8 +104,8 @@ module solver
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1,
                             chem_type::Int=0,
-                            convect::Bool=true, sens_heat::Bool=false,
-                            conduct::Bool=false, latent::Bool=false,
+                            convect::Bool=true, sens_heat::Bool=true,
+                            conduct::Bool=true, latent::Bool=true,
                             dx_max::Float64=400.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,

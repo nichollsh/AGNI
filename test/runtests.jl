@@ -19,10 +19,12 @@ include("../src/spectrum.jl")
 include("../src/atmosphere.jl")
 include("../src/setpt.jl")
 include("../src/energy.jl")
+include("../src/plotting.jl")
 import .phys
 import .atmosphere
 import .setpt
 import .energy
+import .plotting
 
 
 # Prepare
@@ -162,6 +164,7 @@ else
     @warn "Fail"
     passing = false
 end
+@info "--------------------------"
 
 
 # -------------
@@ -222,7 +225,8 @@ setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
 setpt.saturation!(atmos, "H2O")
 atmosphere.calc_layer_props!(atmos)
-energy.radtrans!(atmos, true)   # LW only
+energy.radtrans!(atmos, true)
+energy.radtrans!(atmos, false)
 
 val_e = [270.0, 280.0]
 val_o = atmos.flux_u_lw[1]
@@ -243,7 +247,7 @@ end
 @info " "
 @info "Testing hydrostatic integration"
 
-val_e = 430952.2816064652  # known from previous tests
+val_e = 431792.0902977038  # known from previous tests
 val_o = atmos.z[1] # top level
 @info "Expected value = $(val_e) m"
 @info "Modelled value = $(val_o) m"
@@ -257,13 +261,68 @@ end
 
 
 # -------------
+# Test plot T(p)
+# -------------
+@info " "
+@info "Testing plot temperatures"
+plt_path::String = "/tmp/agni_plot_tmp.png"
+rm(plt_path, force=true)
+plotting.plot_pt(atmos, plt_path)
+@info "Expecting file at $plt_path"
+if isfile(plt_path)
+    @info "Found file at $plt_path"
+    @info "Pass"
+    rm(plt_path, force=true)
+else
+    @warn "Fail"
+    passing = false
+end
+@info "--------------------------"
+
+
+# -------------
+# Test plot height
+# -------------
+@info " "
+@info "Testing plot height"
+plt_path = "/tmp/agni_plot_hei.png"
+plotting.plot_height(atmos, plt_path)
+@info "Expecting file at $plt_path"
+if isfile(plt_path)
+    @info "Found file at $plt_path"
+    @info "Pass"
+    rm(plt_path, force=true)
+else
+    @warn "Fail"
+    passing = false
+end
+@info "--------------------------"
+
+
+# -------------
+# Test plot albedo
+# -------------
+@info " "
+@info "Testing plot albedo"
+plt_path = "/tmp/agni_plot_alb.png"
+plotting.plot_albedo(atmos, plt_path)
+@info "Expecting file at $plt_path"
+if isfile(plt_path)
+    @info "Found file at $plt_path"
+    @info "Pass"
+    rm(plt_path, force=true)
+else
+    @warn "Fail"
+    passing = false
+end
+@info "--------------------------"
+
+
+# -------------
 # Test surface albedo
 # -------------
 @info " "
 @info "Testing surface albedo "
-
-energy.radtrans!(atmos, false)  # SW only
-
 val_e = 30.31364083727528  # known from previous tests
 val_o = atmos.flux_u_sw[end] # bottom level
 @info "Expected value = $(val_e) W m-2"

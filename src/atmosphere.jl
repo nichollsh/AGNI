@@ -318,7 +318,7 @@ module atmosphere
         end
 
         # Code versions
-        atmos.AGNI_VERSION = "0.8.3"
+        atmos.AGNI_VERSION = "0.8.4"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -423,8 +423,8 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 1.0e5   # mixed composition case
-        atmos.phs_tau_sgl = 1.0e5   # single gas case
+        atmos.phs_tau_mix = 3.0e4   # mixed composition case
+        atmos.phs_tau_sgl = 3.0e4   # single gas case
 
         # Hardcoded cloud properties
         atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
@@ -612,7 +612,7 @@ module atmosphere
 
         # store condensates
         for c in condensates
-            if !atmos.gas_dat[c].stub && !atmos.gas_dat[c].no_sat
+            if !atmos.gas_dat[c].stub && !atmos.gas_dat[c].no_sat && !(c == "H2")
                 push!(atmos.condensates, c)
             end
         end
@@ -850,8 +850,6 @@ module atmosphere
         atmos.p  = zeros(Float64, atmos.nlev_c)
         atmos.pl = zeros(Float64, atmos.nlev_l)
 
-        # First, assign log10'd values...
-
         # Top and bottom boundaries
         atmos.pl[end] = log10(atmos.p_boa)
         atmos.pl[1]   = log10(atmos.p_toa)
@@ -874,7 +872,11 @@ module atmosphere
         # Set cell-centres at midpoint of cell-edges
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
-        # Finally, convert arrays to 'real' pressure units
+        # Shrink top-most layer to avoid doing too much extrapolation
+        p_fact = 0.8
+        atmos.p[1] = atmos.pl[1]*p_fact + atmos.p[1]*(1-p_fact)
+
+        # Finally, convert arrays to actual pressure units [Pa]
         @turbo @. atmos.p  = 10.0 ^ atmos.p
         @turbo @. atmos.pl = 10.0 ^ atmos.pl
 

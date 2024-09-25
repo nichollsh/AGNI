@@ -64,4 +64,4 @@ title = "Hot and dry"
     albedo          = true
     mixing_ratios   = true
     animate         = true
-
+    height          = true

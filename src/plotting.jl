@@ -101,6 +101,44 @@ module plotting
     end
 
     """
+    Plot the height vs pressure profile.
+    """
+    function plot_height(atmos::atmosphere.Atmos_t, fname::String;
+                                dpi::Int=250,
+                                size_x::Int=500, size_y::Int=400,
+                                incl_magma::Bool=false,
+                                title::String="")
+
+        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
+        # Create plot
+        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
+                        dpi=dpi, size=(size_x,size_y))
+
+        # Plot surface
+        scatter!(plt, [0.0], [atmos.pl[end]*1e-5], color="brown3", label=L"P_s")
+
+        # Plot cell-centres and cell-edges
+        scatter!(plt, atmos.z*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Centres")
+        scatter!(plt, atmos.zl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Edges")
+
+        # Decorate
+        xlabel!(plt, "Height [km]")
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10)
+        if !isempty(title)
+            title!(plt, title)
+        end
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt
+    end
+
+    """
     Plot the cloud mass mixing ratio and area fraction.
     """
     function plot_cloud(atmos::atmosphere.Atmos_t, fname::String;
