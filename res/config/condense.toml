@@ -65,4 +65,4 @@ title = "Condensation test"
     albedo          = true
     mixing_ratios   = true
     animate         = true
-
+    height          = true
