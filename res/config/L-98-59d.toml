@@ -60,4 +60,4 @@ title = "L 98-59 d"
     albedo          = true
     mixing_ratios   = true
     animate         = true
-
+    height          = true

@@ -108,7 +108,17 @@ module spectrum
             @error "Minimum wavelength is too small"
             return false
         end
+        if wl[2] < wl[1]
+            @error "Stellar wavelength array must be strictly ascending"
+            return false
+        end
         clamp!(fl, 1.0e-45, 1.0e+45)  # Clamp values
+
+        # Ensure that wl array has no duplicates
+        # https://discourse.julialang.org/t/unique-indices-method-similar-to-matlab/34446/3
+        unique_mask::Array{Int} = unique(z -> wl[z], 1:length(wl))
+        wl = wl[unique_mask]
+        fl = fl[unique_mask]
 
         # Bin data to required number of bins...
 

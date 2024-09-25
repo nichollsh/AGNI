@@ -282,35 +282,36 @@ module AGNI
         spfile_name::String    =        cfg["files" ]["input_sf"]
         star_file::String      =        cfg["files" ]["input_star"]
         nlev_centre::Int       =        cfg["execution"]["num_levels"]
-        flag_cnt::Bool         =        cfg["execution" ]["continua"]
-        flag_ray::Bool         =        cfg["execution" ]["rayleigh"]
-        flag_cld::Bool         =        cfg["execution" ]["cloud"]
-        flag_aer::Bool         =        cfg["execution" ]["aerosol"]
-        overlap::Int           =        cfg["execution" ]["overlap_method"]
-        thermo_funct::Bool     =        cfg["execution" ]["thermo_funct"]
-        incl_convect::Bool     =        cfg["execution" ]["convection"]
-        incl_sens::Bool        =        cfg["execution" ]["sensible_heat"]
-        incl_latent::Bool      =        cfg["execution" ]["latent_heat"]
-        sol_type::Int          =        cfg["execution" ]["solution_type"]
-        solvers_cmd::Array{String,1} =  cfg["execution" ]["solvers"]
-        initial_req::Array{String,1} =  cfg["execution" ]["initial_state"]
-        dx_max::Float64        =        cfg["execution" ]["dx_max"]
-        linesearch::Int        =        cfg["execution" ]["linesearch"]
-        easy_start::Bool       =        cfg["execution" ]["easy_start"]
-        conv_atol::Float64     =        cfg["execution" ]["converge_atol"]
-        conv_rtol::Float64     =        cfg["execution" ]["converge_rtol"]
-        max_steps::Int         =        cfg["execution" ]["max_steps"]
-        max_runtime::Float64   =        cfg["execution" ]["max_runtime"]
+        flag_cnt::Bool         =        cfg["execution"]["continua"]
+        flag_ray::Bool         =        cfg["execution"]["rayleigh"]
+        flag_cld::Bool         =        cfg["execution"]["cloud"]
+        flag_aer::Bool         =        cfg["execution"]["aerosol"]
+        overlap::Int           =        cfg["execution"]["overlap_method"]
+        thermo_funct::Bool     =        cfg["execution"]["thermo_funct"]
+        incl_convect::Bool     =        cfg["execution"]["convection"]
+        incl_sens::Bool        =        cfg["execution"]["sensible_heat"]
+        incl_latent::Bool      =        cfg["execution"]["latent_heat"]
+        sol_type::Int          =        cfg["execution"]["solution_type"]
+        solvers_cmd::Array{String,1} =  cfg["execution"]["solvers"]
+        initial_req::Array{String,1} =  cfg["execution"]["initial_state"]
+        dx_max::Float64        =        cfg["execution"]["dx_max"]
+        linesearch::Int        =        cfg["execution"]["linesearch"]
+        easy_start::Bool       =        cfg["execution"]["easy_start"]
+        conv_atol::Float64     =        cfg["execution"]["converge_atol"]
+        conv_rtol::Float64     =        cfg["execution"]["converge_rtol"]
+        max_steps::Int         =        cfg["execution"]["max_steps"]
+        max_runtime::Float64   =        cfg["execution"]["max_runtime"]
 
         #    plotting stuff
-        plt_run::Bool          = cfg["plots"     ]["at_runtime"]
-        plt_tmp::Bool          = cfg["plots"     ]["temperature"]
-        plt_flx::Bool          = cfg["plots"     ]["fluxes"]
-        plt_cff::Bool          = cfg["plots"     ]["contribution"]
-        plt_ems::Bool          = cfg["plots"     ]["emission"]
-        plt_alb::Bool          = cfg["plots"     ]["albedo"]
-        plt_vmr::Bool          = cfg["plots"     ]["mixing_ratios"]
-        plt_ani::Bool          = cfg["plots"     ]["animate"]
+        plt_run::Bool          = cfg["plots"]["at_runtime"]
+        plt_tmp::Bool          = cfg["plots"]["temperature"]
+        plt_flx::Bool          = cfg["plots"]["fluxes"]
+        plt_cff::Bool          = cfg["plots"]["contribution"]
+        plt_ems::Bool          = cfg["plots"]["emission"]
+        plt_alb::Bool          = cfg["plots"]["albedo"]
+        plt_vmr::Bool          = cfg["plots"]["mixing_ratios"]
+        plt_hei::Bool          = cfg["plots"]["height"]
+        plt_ani::Bool          = cfg["plots"]["animate"]
         plt_ani = plt_ani && plt_tmp
 
         # Read OPTIONAL configuration options from dict
@@ -537,6 +538,7 @@ module AGNI
         plt_flx && plotting.plot_fluxes(atmos,   joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=incl_convect, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
         plt_ems && plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
         plt_alb && plotting.plot_albedo(atmos,   joinpath(atmos.OUT_DIR,"plot_albedo.png"))
+        plt_hei && plotting.plot_height(atmos,   joinpath(atmos.OUT_DIR,"plot_height.png"))
 
         # Deallocate atmosphere
         @info "Deallocating memory"

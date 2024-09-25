@@ -68,4 +68,4 @@ title = "Default"                       # Name for this configuration file
     albedo          = true                      # Plot spectral albedo?
     mixing_ratios   = true                      # Plot mixing ratios?
     animate         = false                     # Make animation from runtime plots?
-
+    height          = true                      # Plot hydrostatic solution for height?

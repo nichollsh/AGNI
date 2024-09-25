@@ -227,7 +227,7 @@ module energy
         if lw
             # LW case
             for lv in 1:atmos.nlev_l      # sum over levels
-                @inbounds for ba in 1:atmos.dimen.nd_channel  # sum over bands
+                for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
                     atmos.band_d_lw[lv,ba] = max(0.0, atmos.radout.flux_down[idx])
                     atmos.band_u_lw[lv,ba] = max(0.0, atmos.radout.flux_up[idx])
@@ -242,7 +242,7 @@ module energy
             fill!(atmos.contfunc_norm,0.0)
             if calc_cf
                 cf_max::Float64 = maximum(atmos.radout.contrib_funcf_band[1,:,:])
-                @inbounds for ba in 1:atmos.dimen.nd_channel
+                for ba in 1:atmos.dimen.nd_channel
                     for lv in 1:atmos.nlev_c
                         atmos.contfunc_norm[lv,ba] =
                                             atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
@@ -254,7 +254,7 @@ module energy
         else
             # SW case
             for lv in 1:atmos.nlev_l                # sum over levels
-                @inbounds for ba in 1:atmos.dimen.nd_channel  # sum over bands
+                for ba in 1:atmos.dimen.nd_channel  # sum over bands
                     idx = lv+(ba-1)*atmos.nlev_l
                     atmos.band_d_sw[lv,ba] = max(0.0,atmos.radout.flux_down[idx])
                     atmos.band_u_sw[lv,ba] = max(0.0,atmos.radout.flux_up[idx])
@@ -661,12 +661,13 @@ module energy
     - `conduct::Bool`                   include conductive heat transport
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
-    - `calc_cf::Bool=false`             calculate LW contribution function?
+    - `calc_cf::Bool`                   calculate LW contribution function?
+    - `reset_vmrs::Bool`                reset VMRs to dry values before radtrans and MLT
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t,
                           latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
-                          calc_cf::Bool=false)
+                          calc_cf::Bool=false, reset_vmrs::Bool=true)
 
         # Reset fluxes
         reset_fluxes!(atmos)
@@ -689,9 +690,11 @@ module energy
             @turbo @. atmos.flux_tot += atmos.flux_l
 
             # Restore mixing ratios
-            for g in atmos.gas_names
-                @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
-            end
+            if reset_vmrs
+                for g in atmos.gas_names
+                    @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+                end
+            end 
         end
         # Calculate layer properties
         atmosphere.calc_layer_props!(atmos)
