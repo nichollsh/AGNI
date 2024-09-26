@@ -337,7 +337,7 @@ module energy
 
         # Reset arrays
         fill!(atmos.flux_cdry, 0.0)
-        fill!(atmos.Kzz,    0.0)
+        fill!(atmos.Kzz,       atmos.Kzzcst)
 
         # Work variables
         H::Float64 = 0.0; l::Float64 = 0.0; w::Float64 = 0.0
@@ -349,7 +349,7 @@ module energy
         cmax::String = ""; do_moist::Bool = false
 
         # Loop from bottom upwards (over cell-edges)
-        @inbounds for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
+        for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
 
             # Profile lapse rate: d(ln T)/d(ln P)
             grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
@@ -694,7 +694,7 @@ module energy
                 for g in atmos.gas_names
                     @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
                 end
-            end 
+            end
         end
         # Calculate layer properties
         atmosphere.calc_layer_props!(atmos)
