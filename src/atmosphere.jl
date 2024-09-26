@@ -168,6 +168,7 @@ module atmosphere
         mask_c::Array{Bool,1}               # Layers transporting convective flux
         flux_cdry::Array{Float64,1}         # Dry convective fluxes from MLT
         Kzz::Array{Float64,1}               # Eddy diffusion coefficient from MLT
+        Kzzcst::Float64                     # Constant value for Kzz in stable regions
 
         # Conduction
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
@@ -263,6 +264,7 @@ module atmosphere
     - `tmp_floor::Float64`              temperature floor [K].
     - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].
     - `U::Float64`                      surface wind speed [m s-1].
+    - `Kzzcst::Float64`                 eddy diffusion coefficient in stable layers [m2 s-1]
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
     - `skin_d::Float64`                 skin thickness [m].
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].
@@ -296,6 +298,7 @@ module atmosphere
                     tmp_floor::Float64 =        2.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
+                    Kzzcst::Float64 =           1e6,
                     tmp_magma::Float64 =        3000.0,
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
@@ -366,22 +369,23 @@ module atmosphere
                                     s0_fact * cosd(atmos.zenith_degrees)
 
         atmos.flux_int =        flux_int
-        atmos.target_olr =      max(1.0e-20,target_olr)
+        atmos.target_olr =      max(1.0e-20, target_olr)
 
-        atmos.C_d =             max(0,C_d)
-        atmos.U =               max(0,U)
+        atmos.C_d =             max(0.0, C_d)
+        atmos.U =               max(0.0, U)
+        atmos.Kzzcst =          max(0.0, Kzzcst)
 
         atmos.tmp_magma =       max(atmos.tmp_floor, tmp_magma)
-        atmos.skin_d =          max(1.0e-6,skin_d)
-        atmos.skin_k =          max(1.0e-6,skin_k)
+        atmos.skin_d =          max(1.0e-9, skin_d)
+        atmos.skin_k =          max(1.0e-9, skin_k)
 
         if p_top > p_surf
             @error "p_top must be less than p_surf"
             return false
         end
 
-        atmos.p_toa =           p_top * 1.0e+5 # Convert bar -> Pa
-        atmos.p_boa =           p_surf * 1.0e+5
+        atmos.p_toa =           p_top * 1.0e5 # Convert bar -> Pa
+        atmos.p_boa =           p_surf * 1.0e5
         atmos.rp =              max(1.0, radius)
 
         # derived statistics
@@ -1371,7 +1375,7 @@ module atmosphere
         atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat / phase change
         atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection
         atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction
-        atmos.Kzz =               zeros(Float64, atmos.nlev_l)  # eddy diffusion coeff.
+        atmos.Kzz =               zeros(Float64, atmos.nlev_l)  # eddy diffusion coeff [m2 s-1]
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
