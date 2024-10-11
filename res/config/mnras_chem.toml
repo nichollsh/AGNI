@@ -1,28 +1,31 @@
 # AGNI configuration file
-title = "L 98-59 d"
+title = "ltt3780b_v5/case_00021"
 
 [planet]
     tmp_surf        = 2700.0
-    instellation    = 81690.0
+    instellation    = 1.777080e+5
     albedo_b        = 0.0
     s0_fact         = 0.25
     zenith_angle    = 54.74
-    surface_material= "res/surface_albedos/lunar_marebasalt.dat"
-    radius          = 6.59051e6
-    gravity         = 16.73
+    surface_material= "blackbody"
+    albedo_s        = 0.3
+    radius          = 8.552843e+6
+    gravity         = 1.275026e+1
     flux_int        = 0.0
     turb_coeff      = 0.001
     wind_speed      = 2.0
+    skin_k          = 2.0
+    skin_d          = 0.01
+    tmp_magma       = 1724.947
 
 [files]
     input_sf        = "res/spectral_files/Honeyside/256/Honeyside.sf"
-    input_star      = "res/stellar_spectra/l-98-59.txt"
+    input_star      = "res/config/nogit_mnras.sflux"
     output_dir      = "out/"
 
 [composition]
-    p_top           = 1e-6
-    p_surf          = 215.82518354535077e3
-    vmr_dict        = {H2S= 0.23988329190194904, SO2= 0.0044668359215096305, N2= 5.623413251903491e-6, H2= 0.7093907341517219}
+    p_top           = 1e-5
+    p_dict          = {H2O = 648.09,CO2 = 498.27,H2  = 2.40  ,CH4 = 0.00  ,CO  = 6.51  ,N2  = 3.84  ,S2  = 73.69 ,SO2 = 223.93}
     include_all     = true
     chemistry       = 1
     condensates     = []
@@ -39,10 +42,10 @@ title = "L 98-59 d"
     aerosol         = false
     overlap_method  = 4
     thermo_funct    = true
-    sensible_heat   = false
+    sensible_heat   = true
     latent_heat     = true
     convection      = true
-    solution_type   = 3
+    solution_type   = 2
     solvers         = ["newton"]
     dx_max          = 400.0
     initial_state   = ["loglin", "700"]
