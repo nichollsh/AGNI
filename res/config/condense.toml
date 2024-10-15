@@ -43,6 +43,7 @@ title = "Condensation test"
     aerosol         = false
     overlap_method  = 4
     thermo_funct    = true
+    gravity_funct   = true
     sensible_heat   = true
     latent_heat     = true
     convection      = true

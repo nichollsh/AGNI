@@ -13,6 +13,7 @@ FastChem
 deps/*.log
 test/out/
 Manifest.toml
+*.cov
 
 # Docs
 docs/build

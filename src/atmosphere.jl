@@ -120,6 +120,7 @@ module atmosphere
 
         # Layers' average properties
         thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
+        gravity_funct::Bool                 # use height-dependent gravity calculation (otherwise, use surface value throughout)
         layer_density::Array{Float64,1}     # density [kg m-3]
         layer_mmw::Array{Float64,1}         # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
@@ -278,6 +279,7 @@ module atmosphere
     - `flag_aerosol::Bool`              include aersols?
     - `flag_cloud::Bool`                include clouds?
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
+    - `gravity_functions::Bool`         use height-dependent gravity calculation
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
 
     Returns:
@@ -312,6 +314,7 @@ module atmosphere
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
                     thermo_functions::Bool =    true,
+                    gravity_functions::Bool =   true,
                     use_all_gases::Bool =       false,
                     fastchem_work::String =     ""
                     )::Bool
@@ -321,7 +324,7 @@ module atmosphere
         end
 
         # Code versions
-        atmos.AGNI_VERSION = "0.8.4"
+        atmos.AGNI_VERSION = "0.8.5"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -346,7 +349,8 @@ module atmosphere
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
 
-        atmos.thermo_funct  = thermo_functions
+        atmos.thermo_funct  =   thermo_functions
+        atmos.gravity_funct =   gravity_functions
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     2.0e4
@@ -782,7 +786,11 @@ module atmosphere
             # be reasonable in all of my tests.
 
             # Integrate from lower edge to centre
-            g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2.0)
+            if atmos.gravity_funct
+                g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2.0)
+            else
+                g1 = atmos.grav_surf
+            end
             p1 = 0.5 * (atmos.p[i] + atmos.pl[i+1])
             t1 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i+1])
             dzc = phys.R_gas * t1 /
@@ -800,7 +808,11 @@ module atmosphere
             atmos.z[i] = atmos.zl[i+1] + min(dzc,dz_max)
 
             # Integrate from centre to upper edge
-            g2 = GMpl / ((atmos.rp + atmos.z[i])^2.0)
+            if atmos.gravity_funct
+                g2 = GMpl / ((atmos.rp + atmos.z[i])^2.0)
+            else
+                g2 = atmos.grav_surf
+            end
             p2 = 0.5 * (atmos.p[i] + atmos.pl[i])
             t2 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i])
             dzl = phys.R_gas * t2 / (
@@ -817,8 +829,8 @@ module atmosphere
             end
             atmos.zl[i] = atmos.z[i] + min(dzl,dz_max)
 
-            # Layer average gravity [m s-2]
-            atmos.layer_grav[i] = GMpl / ((atmos.rp + atmos.z[i])^2.0)
+            # Layer-centre gravity [m s-2]
+            atmos.layer_grav[i] = g2
 
             # Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]

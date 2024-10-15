@@ -288,6 +288,7 @@ module AGNI
         flag_aer::Bool         =        cfg["execution"]["aerosol"]
         overlap::Int           =        cfg["execution"]["overlap_method"]
         thermo_funct::Bool     =        cfg["execution"]["thermo_funct"]
+        gravity_funct::Bool    =        cfg["execution"]["gravity_funct"]
         incl_convect::Bool     =        cfg["execution"]["convection"]
         incl_sens::Bool        =        cfg["execution"]["sensible_heat"]
         incl_latent::Bool      =        cfg["execution"]["latent_heat"]
@@ -363,6 +364,7 @@ module AGNI
                                 surface_material=surface_mat,
                                 albedo_s=albedo_s,
                                 thermo_functions=thermo_funct,
+                                gravity_functions=gravity_funct,
                                 C_d=turb_coeff, U=wind_speed,
                                 use_all_gases=use_all_gases
                         )
