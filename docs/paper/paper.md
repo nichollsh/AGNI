@@ -54,9 +54,10 @@ AGNI is a new radiative-convective atmosphere model developed with the view of b
 * be coupled to an interior model with an appropriate surface boundary condition,
 * account for atmospheres of mixed gaseous composition with realistic opacities,
 * solve for an atmospheric temperature structure which conserves energy and allows for convective stability,
-* operate with sufficient speed that it may be participate in a wide parameter space.
+* operate with sufficient speed that it may be participate in a wide parameter space,
+* constrain convective mass diffusivity using mixing length theory.
 
-This is possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport. Rather than time-stepping each model level according to radiative heating and applying convective adjustment (e.g. @malik_helios_2017, @selsis_cool_2023, @pierrehumbert_book_2010), AGNI uses the Newton-Raphson method to conserve energy fluxes through the column to a required tolerence. This is similar to the method applied by @drummond_effects_2016 and @goyal_library_2020, although with several optimisations. This allows the model to take tens or hundereds of iterations to obtain a solution, in comparison to thousands or tens of thousands.
+This is possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport. Rather than time-stepping each model level according to radiative heating and applying convective adjustment (e.g. @malik_helios_2017, @selsis_cool_2023, @pierrehumbert_book_2010), AGNI uses the Newton-Raphson method to conserve energy fluxes through the column to a required tolerence. This is similar to the method applied by @drummond_effects_2016 and @goyal_library_2020. This means that the model takes tens or hundereds of iterations to obtain a solution, in comparison to thousands or tens of thousands.
 
 Radiative transfer is performed under the correlated-k and two-stream approximations using SOCRATES[^3], a well established FORTRAN code developed by the UK Met Office [@manners_socrates_2024; @sergeev_socrates_2023; @amundsen_treatment_2017; @amundsen_radiation_2014]. Convection, condensation, and sensible heat transport are also modelled.
 
