@@ -2,51 +2,52 @@
 title = "petitRADTRANS validation tests"
 
 [planet]
-    tmp_surf        = 3000.0
+    tmp_surf        = 1400.0
     instellation    = 0.0
     albedo_b        = 0.0
-    s0_fact         = 0.25
-    zenith_angle    = 54.74
+    s0_fact         = 1.0
+    zenith_angle    = 0.0
     surface_material= "blackbody"
     albedo_s        = 0.0
-    radius          = 6.37e6
+    radius          = 6.6e6
     gravity         = 9.81
     flux_int        = 0.0
     turb_coeff      = 0.0
     wind_speed      = 2.0
 
 [files]
-    input_sf        = "res/spectral_files/Honeyside/4096/Honeyside.sf"
-    input_star      = "res/stellar_spectra/sun.txt"
+    input_sf        = "out/runtime.sf"
+    input_star      = ""
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 10.0
-    p_top           = 1e-2
+    p_surf          = 270.0
+    p_top           = 1e-5
     vmr_dict        = { H2O = 1.0 }
     include_all     = false
     chemistry       = 0
     condensates     = []
 
 [execution]
-    clean_output    = true
+    clean_output    = false
     verbosity       = 1
     max_steps       = 20000
     max_runtime     = 400
-    num_levels      = 150
+    num_levels      = 170
     continua        = true
     rayleigh        = false
     cloud           = false
     aerosol         = false
     overlap_method  = 2
-    thermo_funct    = false
+    thermo_funct    = true
+    gravity_funct   = false
     sensible_heat   = false
     latent_heat     = false
     convection      = false
     solution_type   = 1
     solvers         = []
     dx_max          = 400.0
-    initial_state   = ["isothermal", "500"]
+    initial_state   = ["dry", "sat", "H2O"]
     linesearch      = 0
     easy_start      = false
     converge_atol   = 1.0e-2
