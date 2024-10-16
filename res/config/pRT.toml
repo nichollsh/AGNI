@@ -2,7 +2,7 @@
 title = "petitRADTRANS validation tests"
 
 [planet]
-    tmp_surf        = 1400.0
+    tmp_surf        = 600.0
     instellation    = 0.0
     albedo_b        = 0.0
     s0_fact         = 1.0
@@ -10,19 +10,21 @@ title = "petitRADTRANS validation tests"
     surface_material= "blackbody"
     albedo_s        = 0.0
     radius          = 6.6e6
-    gravity         = 9.81
+    gravity         = 20
     flux_int        = 0.0
     turb_coeff      = 0.0
     wind_speed      = 2.0
 
 [files]
+    # input_sf        = "res/spectral_files/Honeyside/4096/Honeyside.sf"
+    # input_star      = "res/stellar_spectra/sun.txt"
     input_sf        = "out/runtime.sf"
     input_star      = ""
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 270.0
-    p_top           = 1e-5
+    p_surf          = 123.0
+    p_top           = 1e-6
     vmr_dict        = { H2O = 1.0 }
     include_all     = false
     chemistry       = 0
@@ -33,13 +35,13 @@ title = "petitRADTRANS validation tests"
     verbosity       = 1
     max_steps       = 20000
     max_runtime     = 400
-    num_levels      = 170
+    num_levels      = 200
     continua        = true
     rayleigh        = false
     cloud           = false
     aerosol         = false
     overlap_method  = 2
-    thermo_funct    = true
+    thermo_funct    = false
     gravity_funct   = false
     sensible_heat   = false
     latent_heat     = false
