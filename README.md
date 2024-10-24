@@ -1,7 +1,6 @@
 <h1 align="center">
     <div>
-        <img src="docs/src/assets/logo.svg" style="vertical-align: middle;" width="100px"/>
-        <span style="vertical-align: middle;">AGNI</span>
+        <img src="docs/src/assets/logo_title.svg" style="vertical-align: middle;" width="22%"/>
     </div>
 </h1>
 
@@ -18,13 +17,15 @@
 </p>
 
 <p align="center">
-  <b>A radiative-convective model for lava planet atmospheres.</b>
+  <b>A radiative-convective model for lava planet atmospheres</b>
 </p>
 
 
 ## Overview
 
-AGNI relies on [SOCRATES](https://github.com/nichollsh/SOCRATES) for calculating radiances. The radiative transfer includes shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and continuum absorption. Mixing length theory is used to parametrise convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile.
+A numerical model for the atmospheres of hot rocky (exo)planets. AGNI's primary purpose is to simulate the evolving atmospheres of magma ocean planets, while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere.
+
+AGNI models correlated-k radiative transfer including shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and CIA. Mixing length theory is used to model convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile.
 
 Consult the [AGNI documentation](https://nichollsh.github.io/AGNI/) for information about the model.
 
@@ -34,7 +35,7 @@ GitHub: https://github.com/nichollsh/AGNI
 
 
 ## Installation and usage
-See the Getting Started page in the [documentation](https://nichollsh.github.io/AGNI/) for information on installing and using the model.
+See the [Getting Started](https://nichollsh.github.io/AGNI/dev/setup/) page in the documentation for information on installing and using the model.
 
 ## Repository structure
 * `agni.jl`         - The main AGNI executable
@@ -47,8 +48,8 @@ See the Getting Started page in the [documentation](https://nichollsh.github.io/
 * `misc/`           - Miscellaneous files
 * `out/`            - Model output files
 * `res/`            - Resources (configs, thermodynamic data, etc.)
-* `src/`            - Package source code
-* `test/`           - Package tests
+* `src/`            - Source code
+* `test/`           - Tests for the code
 * `tutorials/`      - Notebooks and tutorials
 
-Copyright (C) 2024 Harrison Nicholls
+This software is available under the GPLv3. Copyright (C) 2024 Harrison Nicholls.
