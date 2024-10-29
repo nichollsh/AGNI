@@ -225,9 +225,9 @@ module AGNI
 
         albedo_s::Float64      = 0.0
         surface_mat::String    = cfg["planet"]["surface_material"]
-        if surface_mat == "blackbody"
+        if surface_mat == "greybody"
             if !haskey(cfg["planet"],"albedo_s")
-                @error "Misconfiguration: surface is blackbody, `albedo_s` must be provided"
+                @error "Misconfiguration: surface is greybody, `albedo_s` must be provided"
                 return false
             end
             albedo_s = cfg["planet"]["albedo_s"]

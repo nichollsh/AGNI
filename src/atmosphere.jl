@@ -65,7 +65,7 @@ module atmosphere
         s0_fact::Float64                # Scale factor to instellation (cronin+14)
 
         surface_material::String        # Surface material file path
-        albedo_s::Float64               # Grey surface albedo when surface=blackbody
+        albedo_s::Float64               # Grey surface albedo when surface=greybody
         surf_r_arr::Array{Float64,1}    # Spectral surface reflectance
         surf_e_arr::Array{Float64,1}    # Spectral surface emissivity
 
@@ -260,8 +260,8 @@ module atmosphere
 
     Optional arguments:
     - `condensates`                     list of condensates (gas names).
-    - `surface_material::String`        surface material (default is "blackbody", but can point to file instead).
-    - `albedo_s::Float64`               grey surface albedo used when `surface_material="blackbody"`.
+    - `surface_material::String`        surface material (default is "greybody", but can point to file instead).
+    - `albedo_s::Float64`               grey surface albedo used when `surface_material="greybody"`.
     - `tmp_floor::Float64`              temperature floor [K].
     - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].
     - `U::Float64`                      surface wind speed [m s-1].
@@ -295,7 +295,7 @@ module atmosphere
                     mf_dict, mf_path::String;
 
                     condensates =               String[],
-                    surface_material::String =  "blackbody",
+                    surface_material::String =  "greybody",
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        2.0,
                     C_d::Float64 =              0.001,
@@ -1298,7 +1298,7 @@ module atmosphere
         atmos.surf_r_arr = zeros(Float64, atmos.nbands) # directional-hemispheric reflect.
         atmos.surf_e_arr = ones(Float64, atmos.nbands)  # emissivity
 
-        if atmos.surface_material == "blackbody"
+        if atmos.surface_material == "greybody"
             # grey albedo
             fill!(atmos.surf_r_arr, atmos.albedo_s)
             # Kirchoff's law: set emissivity equal to 1-albedo (spectrally)
