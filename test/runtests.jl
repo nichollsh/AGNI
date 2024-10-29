@@ -217,7 +217,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_rayleigh=false,
                          overlap_method=4,
                          condensates=["H2O"],
-                         surface_material="blackbody",
+                         surface_material="greybody",
                          albedo_s=0.5
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
