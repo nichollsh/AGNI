@@ -241,13 +241,15 @@ module energy
             # Normalised contribution function (only LW stream contributes)
             fill!(atmos.contfunc_norm,0.0)
             if calc_cf
-                cf_max::Float64 = maximum(atmos.radout.contrib_funcf_band[1,:,:])
+                bw_nm::Float64 = 0.0
                 for ba in 1:atmos.dimen.nd_channel
+                    bw_nm = atmos.bands_wid[ba] * 1e9
                     for lv in 1:atmos.nlev_c
                         atmos.contfunc_norm[lv,ba] =
-                                            atmos.radout.contrib_funcf_band[1,lv,ba]/cf_max
+                                            atmos.radout.contrib_funcf_band[1,lv,ba]/bw_nm
                     end
                 end
+                atmos.contfunc_norm /= maximum(atmos.contfunc_norm)
             end
             atmos.is_out_lw = true
 

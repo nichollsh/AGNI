@@ -19,20 +19,26 @@ official website.
 ## Cannot find SOCRATES
 Check the installation instructions. Have you set `RAD_DIR`? Try running
 `l_run_cdf` in the terminal; if this fails, then SOCRATES has not compiled
-or you haven't added it to your `PATH`.
+or you haven't added it to your `PATH`. It is necessary to set the `RAD_DIR` variable
+for the environment in which you are running AGNI, so it is best to add it to your shell's
+rc file permanently.
 
 
 ## Spectral file does not exist
 Check the path in the configuration file. Download additional spectral files using the
-`get_data` script in the AGNI root directory. For example, for additional pure-steam
-spectral files you would run
+`get_data` script. For example, for additional pure-steam spectral files you would run
 ```bash
 ./src/get_data.sh steam
 ```
 
+## Cannot find FastChem
+You need to install FastChem. This can be done by running the command:
+```bash
+./src/get_fastchem.sh
+```
+and then adding `FC_DIR` to your shell rc file.
 
 ## Finally...
 If you are still stuck, or feel that there is a problem with the code, then
 you can contact the authors using the information on the main page.
-
 

@@ -10,12 +10,12 @@ module atmosphere
 
     # System libraries
     using Printf
-    using DelimitedFiles
-    using PCHIPInterpolation
     using LinearAlgebra
-    using Statistics
     using Logging
     using LoopVectorization
+    # import Statistics
+    import PCHIPInterpolation:Interpolator
+    import DelimitedFiles:readdlm
 
     # Local files
     include(joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl"))
@@ -323,6 +323,8 @@ module atmosphere
             mkdir(OUT_DIR)
         end
 
+        @info "Setting-up a new atmosphere struct"
+
         # Code versions
         atmos.AGNI_VERSION = "0.10.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
@@ -467,7 +469,7 @@ module atmosphere
 
         # Dict input case
         if mf_source == 0
-            @info "Composition set by dict"
+            @debug "Composition set by dict"
             for (key, value) in mf_dict  # store as arrays
                 gas_valid = strip(key, [' ','\t','\n'])
 
@@ -492,7 +494,7 @@ module atmosphere
                 @error "Could not read VMR file '$mf_path'"
                 return false
             end
-            @info "Composition set by file"
+            @debug "Composition set by file"
 
             # get header
             mf_head::String =   readline(abspath(mf_path))
@@ -669,13 +671,15 @@ module atmosphere
             atmos.FC_DIR = abspath(ENV["FC_DIR"])
             if !isdir(atmos.FC_DIR)
                 @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
+                @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             end
 
             # check executable
             atmos.fastchem_flag = isfile(joinpath(atmos.FC_DIR,"fastchem"))
             if !atmos.fastchem_flag
-                @error "Could not find fastchem executable inside '$(atmos.FC_DIR)' "
+                @error "Could not find fastchem executable inside '$(atmos.FC_DIR)'"
+                @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             else
                 @info "Found FastChem executable"
@@ -926,6 +930,7 @@ module atmosphere
         # Validate files
         if !isfile(atmos.spectral_file)
             @error "Spectral file '$(atmos.spectral_file)' does not exist"
+            @error "Try running `\$ ./src/get_data.sh`"
             return false
         end
 
@@ -939,6 +944,7 @@ module atmosphere
 
             if !isfile(stellar_spectrum)
                 @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
+                @error "Try running `\$ ./src/get_data.sh stellar`"
                 return false
             end
 
@@ -1201,7 +1207,7 @@ module atmosphere
         # For now, they are just stored inside the atmos struct
 
         # Print info on the gases
-        @info "Allocated atmosphere with composition:"
+        @info "Allocating atmosphere with composition:"
         gas_flags::String = ""
         g::String = ""
         for i in 1:atmos.gas_num
@@ -1313,6 +1319,7 @@ module atmosphere
             atmos.surface_material = abspath(atmos.surface_material)
             if !isfile(atmos.surface_material)
                 @error "Could not find surface albedo file '$(atmos.surface_material)'"
+                @error "Get these data with `\$ ./src/get_data.sh surfaces`"
                 return false
             end
 

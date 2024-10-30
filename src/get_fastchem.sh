@@ -18,5 +18,10 @@ cd build
 cmake ".."
 make
 
-cd ..
-export FC_DIR="$(realpath $fcpath)"
+cd $root
+export FC_DIR=$fcpath
+
+echo "FastChem has been installed"
+echo "It is recommended that you add the following line to your shell rc file"
+echo "export FC_DIR='$fcpath'"
+exit 0
