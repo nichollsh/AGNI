@@ -669,13 +669,15 @@ module atmosphere
             atmos.FC_DIR = abspath(ENV["FC_DIR"])
             if !isdir(atmos.FC_DIR)
                 @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
+                @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             end
 
             # check executable
             atmos.fastchem_flag = isfile(joinpath(atmos.FC_DIR,"fastchem"))
             if !atmos.fastchem_flag
-                @error "Could not find fastchem executable inside '$(atmos.FC_DIR)' "
+                @error "Could not find fastchem executable inside '$(atmos.FC_DIR)'"
+                @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             else
                 @info "Found FastChem executable"
@@ -926,6 +928,7 @@ module atmosphere
         # Validate files
         if !isfile(atmos.spectral_file)
             @error "Spectral file '$(atmos.spectral_file)' does not exist"
+            @error "Try running `\$ ./src/get_data.sh`"
             return false
         end
 
@@ -1313,6 +1316,7 @@ module atmosphere
             atmos.surface_material = abspath(atmos.surface_material)
             if !isfile(atmos.surface_material)
                 @error "Could not find surface albedo file '$(atmos.surface_material)'"
+                @error "Get these data with `\$ ./src/get_data.sh surfaces`"
                 return false
             end
 
