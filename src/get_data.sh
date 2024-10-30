@@ -13,11 +13,13 @@ fi
 
 # Root and resources folders
 root=$(dirname $(realpath $0))
-res="$root/res/"
+root=$(realpath "$root/..")
+res="$root/res"
 spfiles=$res/spectral_files
 stellar=$res/stellar_spectra
 surface=$res/surface_albedos
 realgas=$res/realgas
+thermo=$res/thermodynamics
 
 # Make basic data folders
 mkdir -p $res
@@ -25,6 +27,7 @@ mkdir -p $spfiles
 mkdir -p $stellar
 mkdir -p $surface
 mkdir -p $realgas
+mkdir -p $thermo
 
 # Help strings
 help_basic="Get the basic data required to run the model"
@@ -33,6 +36,7 @@ help_steam="Get pure-steam spectral files"
 help_stellar="Get a collection of stellar spectra"
 help_surfaces="Get a collection of surface single-scattering albedos"
 help_realgas="Get a real-gas EOS coefficients and lookup tables"
+help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
 help="\
 Helper script used to download and unpack data used to run the model.
 
@@ -52,6 +56,8 @@ Where [TARGET] can be any of the following:
         $help_surfaces
     realgas
         $help_realgas
+    thermodynamics
+        $help_thermo
 "
 
 # Generic OSF downloader function
@@ -77,6 +83,17 @@ function osf {
     return 0
 }
 
+# Get zip file
+function get_zip {
+    # $1 = OSF identifier
+    # $2 = target folder
+
+    zipfile=".temp.zip"
+    osf $1 $2 $zipfile
+    unzip -oq $2/$zipfile -d $2
+    rm $2/$zipfile
+}
+
 # Handle request for downloading a group of data
 function handle_request {
     case $1 in
@@ -92,7 +109,9 @@ function handle_request {
             osf b5gsh $spfiles/Dayspring/256/ Dayspring.sf
             osf dn6wh $spfiles/Dayspring/256/ Dayspring.sf_k
 
-            osf 2qdu8 $res/stellar_spectra sun.txt
+            osf 2qdu8 $stellar sun.txt
+
+            get_zip 4m5x8 $thermo
             ;;
 
         "highres")
@@ -153,10 +172,15 @@ function handle_request {
             echo $help_realgas
 
             # AQUA PT lookup
-            zipfile=".aqua_temp.zip"
-            osf uqrdx $realgas $zipfile
-            unzip -oq $realgas/$zipfile -d $realgas
-            rm $realgas/$zipfile
+            get_zip uqrdx $realgas
+
+            ;;
+
+        "thermodynamics")
+            echo $help_thermo
+
+            # NetCDF files from OSF
+            get_zip 4m5x8 $thermo
 
             ;;
 
