@@ -25,7 +25,7 @@ directory. This will also have downloaded some basic input data.
 You should run the tests next.
 
 !!! tip
-    The `get_socrates.sh` script automatically adds the radiation code to your
+    The `src/get_socrates.sh` script automatically adds the radiation code to your
     environment with the variable `RAD_DIR`, which points to the SOCRATES installation.
     This variable must be set whenever AGNI is being used.
 
