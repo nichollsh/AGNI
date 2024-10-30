@@ -18,7 +18,7 @@ Follow the steps below in order to setup the code.
 3. Change directory: `cd AGNI`
 4. Setup SOCRATES by doing either **ONE** of the following...
     - Follow the instructions on the [SOCRATES GitHub](https://github.com/nichollsh/SOCRATES) page
-    - Run `source get_socrates.sh`
+    - Run `source src/get_socrates.sh`
 5. `julia -e 'using Pkg; Pkg.activate("."); Pkg.build()'`
 AGNI is now installed as a package into a Julia environment in the AGNI
 directory. This will also have downloaded some basic input data.
@@ -35,6 +35,11 @@ Now try running the tests in your terminal.
 julia ./test/runtests.jl
 ```
 This will print information on whether tests passed or failed.
+
+## Coupling with FastChem
+This can be enabled using the configuration file parameter `composition.chem_type`. Of
+course, it is first necessary to setup FastChem, which can be done by running
+`source src/get_fastchem.sh` and then setting the `FC_DIR` environment variable.
 
 ## Using the code
 See [Running the model](@ref) for information on using the code.
