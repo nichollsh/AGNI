@@ -324,7 +324,7 @@ module atmosphere
         end
 
         # Code versions
-        atmos.AGNI_VERSION = "0.9.0"
+        atmos.AGNI_VERSION = "0.10.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
