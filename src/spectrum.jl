@@ -12,9 +12,9 @@ module spectrum
 
     using LoggingExtras
     using Printf
-    using PCHIPInterpolation
-    using DelimitedFiles
     using LinearAlgebra
+    import PCHIPInterpolation:Interpolator
+    import DelimitedFiles:readdlm
 
     """
     **Validate spectral file.**
