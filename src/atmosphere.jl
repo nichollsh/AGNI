@@ -944,6 +944,7 @@ module atmosphere
 
             if !isfile(stellar_spectrum)
                 @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
+                @error "Try running `\$ ./src/get_data.sh stellar`"
                 return false
             end
 
