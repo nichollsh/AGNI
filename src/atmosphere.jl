@@ -323,6 +323,8 @@ module atmosphere
             mkdir(OUT_DIR)
         end
 
+        @info "Setting-up a new atmosphere struct"
+
         # Code versions
         atmos.AGNI_VERSION = "0.10.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
@@ -467,7 +469,7 @@ module atmosphere
 
         # Dict input case
         if mf_source == 0
-            @info "Composition set by dict"
+            @debug "Composition set by dict"
             for (key, value) in mf_dict  # store as arrays
                 gas_valid = strip(key, [' ','\t','\n'])
 
@@ -492,7 +494,7 @@ module atmosphere
                 @error "Could not read VMR file '$mf_path'"
                 return false
             end
-            @info "Composition set by file"
+            @debug "Composition set by file"
 
             # get header
             mf_head::String =   readline(abspath(mf_path))
@@ -1204,7 +1206,7 @@ module atmosphere
         # For now, they are just stored inside the atmos struct
 
         # Print info on the gases
-        @info "Allocated atmosphere with composition:"
+        @info "Allocating atmosphere with composition:"
         gas_flags::String = ""
         g::String = ""
         for i in 1:atmos.gas_num
