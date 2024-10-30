@@ -40,9 +40,6 @@ See the [Getting Started](https://nichollsh.github.io/AGNI/dev/setup/) page in t
 ## Repository structure
 * `agni.jl`         - The main AGNI executable
 * `LICENSE.txt`     - License for use and re-use
-* `get_fastchem.sh` - Download and setup FastChem
-* `get_socrates.sh` - Download and setup SOCRATES
-* `get_data.sh`     - Download input data files
 * `deps/`           - Package build scripts
 * `docs/`           - Documentation source files
 * `misc/`           - Miscellaneous files
