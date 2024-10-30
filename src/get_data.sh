@@ -38,10 +38,10 @@ help_surfaces="Get a collection of surface single-scattering albedos"
 help_realgas="Get a real-gas EOS coefficients and lookup tables"
 help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
 help="\
-Helper script used to download and unpack data used to run the model.
+Download and unpack data used to run the model.
 
 Call structure:
-    ./get_data [TARGET]
+    $ get_data.sh [TARGET]
 
 Where [TARGET] can be any of the following:
     basic
@@ -57,7 +57,7 @@ Where [TARGET] can be any of the following:
     realgas
         $help_realgas
     thermodynamics
-        $help_thermo
+        $help_thermo\
 "
 
 # Generic OSF downloader function
@@ -193,7 +193,5 @@ function handle_request {
 }
 
 handle_request $1
-
-echo "Done!"
 
 exit 0

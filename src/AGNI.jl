@@ -11,7 +11,7 @@ module AGNI
     # Include system libraries
     using LoggingExtras
     using Printf
-    using TOML
+    import TOML:parsefile
 
     # Include local jl files (order matters)
     include("phys.jl")
@@ -132,7 +132,7 @@ module AGNI
     function open_config(cfg_path::String)::Dict
 
         # open file
-        cfg_dict = TOML.parsefile(cfg_path)
+        cfg_dict = parsefile(cfg_path)
 
         # check headers
         headers = ["plots", "planet", "files", "execution", "title"]

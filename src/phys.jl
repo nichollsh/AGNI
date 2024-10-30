@@ -9,8 +9,8 @@ end
 module phys
 
     using NCDatasets
-    using PCHIPInterpolation
     using LoggingExtras
+    import PCHIPInterpolation:Interpolator
 
     # Sources:
     # - Pierrehumbert (2010)

@@ -12,7 +12,7 @@ module realgas
 
     using ScatteredInterpolation  # 2D interpolation
     using LoggingExtras
-    using DelimitedFiles
+    import DelimitedFiles:readdlm
 
     mutable struct Aqua_t
 
