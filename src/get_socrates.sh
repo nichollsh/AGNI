@@ -36,7 +36,7 @@ cd "$socpath"
 
 # Environment
 export RAD_DIR=$socpath
-cd ..
+cd $root
 
 # Inform user
 echo "SOCRATES has been installed"

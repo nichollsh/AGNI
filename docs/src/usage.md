@@ -8,7 +8,7 @@ If you require more data, such as additional stellar spectra or opacities, then 
 also be easily obtained using the `get_data` script in the AGNI root directory. To see how
 to use this script, run it without arguments like so:
 ```bash
-./get_data.sh
+./src/get_data.sh
 ```
 
 ## Tutorials
@@ -17,8 +17,8 @@ of the repository.
 
 ## General execution
 The environment variable `RAD_DIR` must point to the SOCRATES installation
-directory. This is required for AGNI to find the SOCRATES libraries, and can be
-done by running `source path/to/socrates/set_rad_env` in your terminal.
+directory. This is required for AGNI to find the SOCRATES libraries. The best way to do
+this is to add `RAD_DIR=path/to/socrates/folder/` to your shell rc file (e.g. `~/.bashrc`).
 
 Then to use the model, simply run `./agni.jl [cfg]` where `[cfg]` is the path
 to the required configuration file. If `[cfg]` is not passed, then the default
