@@ -5,7 +5,9 @@
 if [ -n "$RAD_DIR" ]; then
     echo "WARNING: You already have SOCRATES installed"
     echo "         RAD_DIR=$RAD_DIR"
-    exit 1
+    echo "Continuing..."
+    echo ""
+    sleep 5
 fi
 
 # Check SSH access to GitHub
@@ -17,7 +19,9 @@ else
 fi
 
 # Download (using SSH if possible)
-socpath="$(realpath .)/socrates"
+root=$(dirname $(realpath $0))
+root=$(realpath "$root/..")
+socpath=$(realpath "$root/socrates")
 rm -rf "$socpath"
 if [ "$use_ssh" = true ]; then
     git clone git@github.com:nichollsh/SOCRATES.git "$socpath"
