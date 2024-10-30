@@ -11,9 +11,9 @@ module setpt
     import ..phys
     import ..atmosphere
 
-    using PCHIPInterpolation
     using NCDatasets
     using LoggingExtras
+    import PCHIPInterpolation:Interpolator
 
     # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)

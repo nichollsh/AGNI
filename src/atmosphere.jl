@@ -10,12 +10,12 @@ module atmosphere
 
     # System libraries
     using Printf
-    using DelimitedFiles
-    using PCHIPInterpolation
     using LinearAlgebra
-    using Statistics
     using Logging
     using LoopVectorization
+    # import Statistics
+    import PCHIPInterpolation:Interpolator
+    import DelimitedFiles:readdlm
 
     # Local files
     include(joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl"))

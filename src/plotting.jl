@@ -11,9 +11,9 @@ module plotting
     # Import stuff
     using Plots
     using LaTeXStrings
-    using Glob
     using Printf
     using FFMPEG
+    import Glob:glob
 
     import ..atmosphere
     import ..phys
