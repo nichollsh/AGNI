@@ -1,8 +1,11 @@
 #!/bin/bash
 # Download and compile fastchem
 
+root=$(dirname $(realpath $0))
+root=$(realpath "$root/..")
+
 # Download via HTTPS only
-fcpath="fastchem"
+fcpath=$(realpath "$root/fastchem")
 rm -rf "$fcpath"
 
 git clone https://github.com/NewStrangeWorlds/FastChem.git "$fcpath"
