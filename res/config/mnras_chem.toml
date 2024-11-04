@@ -1,16 +1,16 @@
 # AGNI configuration file
-title = "ltt3780b_v5/case_00021"
+title = "HD 63433 d (IW+0) at PROTEUS radiative-equilibrium termination"
 
 [planet]
-    tmp_surf        = 2700.0
-    instellation    = 1.777080e+5
+    tmp_surf        = 2189.153
+    instellation    = 379703.8
     albedo_b        = 0.0
     s0_fact         = 0.25
     zenith_angle    = 54.74
     surface_material= "greybody"
     albedo_s        = 0.3
-    radius          = 8.552843e+6
-    gravity         = 1.275026e+1
+    radius          = 6797926.0
+    gravity         = 8.625243
     flux_int        = 0.0
     turb_coeff      = 0.001
     wind_speed      = 2.0
@@ -19,13 +19,13 @@ title = "ltt3780b_v5/case_00021"
     tmp_magma       = 1724.947
 
 [files]
-    input_sf        = "res/spectral_files/Honeyside/256/Honeyside.sf"
-    input_star      = "res/config/nogit_mnras.sflux"
+    input_sf        = "/network/group/aopp/planetary/RTP035_NICHOLLS_PROTEUS/fwl_data/spectral_files/Honeyside/256/Honeyside.sf"
+    input_star      = "/network/group/aopp/planetary/RTP035_NICHOLLS_PROTEUS/article_data/mnras_proteus_agni/hd63433d_oxfu/case_00005/data/0.sflux"
     output_dir      = "out/"
 
 [composition]
     p_top           = 1e-5
-    p_dict          = {H2O = 648.09,CO2 = 498.27,H2  = 2.40  ,CH4 = 0.00  ,CO  = 6.51  ,N2  = 3.84  ,S2  = 73.69 ,SO2 = 223.93}
+    p_dict          = {H2O = 4.32e-2, CO2 = 9.22e-2, H2  = 7.23e-2, CH4 = 2.82e-5, CO  = 7.89e-1, N2  = 3.26e-3, S2  = 1.54e-7, SO2 = 3.09e-6}
     include_all     = true
     chemistry       = 1
     condensates     = []
