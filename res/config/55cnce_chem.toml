@@ -36,7 +36,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     rayleigh        = true
     cloud           = false
     aerosol         = false
-    overlap_method  = 4
+    overlap_method  = "ee"
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = false
