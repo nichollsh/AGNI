@@ -71,7 +71,7 @@ module atmosphere
 
         tmp_surf::Float64               # Surface brightness temperature [K]
         grav_surf::Float64              # Surface gravity [m s-2]
-        overlap_method::Int             # Absorber overlap method to be used
+        overlap_method::String          # Absorber overlap method to be used
 
         # Spectral bands
         nbands::Int
@@ -269,7 +269,7 @@ module atmosphere
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
     - `skin_d::Float64`                 skin thickness [m].
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].
-    - `overlap_method::Int`             gaseous overlap scheme (2: rand overlap, 4: equiv extinct, 8: ro+resort+rebin).
+    - `overlap_method::String`          gaseous overlap scheme (ro: rand overlap, ee: equiv extinct, rorr: ro+resort+rebin).
     - `target_olr::Float64`             target OLR [W m-2] for sol_type==4.
     - `flux_int::Float64`               planet's internal flux for sol_type==3.
     - `all_channels::Bool`              use all channels available for RT?
@@ -304,7 +304,7 @@ module atmosphere
                     tmp_magma::Float64 =        3000.0,
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
-                    overlap_method::Int =       4,
+                    overlap_method::String =    "ee",
                     target_olr::Float64 =       0.0,
                     flux_int::Float64 =         0.0,
                     all_channels::Bool  =       true,
@@ -1174,20 +1174,20 @@ module atmosphere
         # Gaseous absorption
         #################################
 
-        if atmos.overlap_method == 2
+        if atmos.overlap_method == "ro"
             # random overlap
             atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random
 
-        elseif atmos.overlap_method == 4
+        elseif atmos.overlap_method == "ee"
             # equivalent extinction with correct scaling
             atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_k_eqv_scl
 
-        elseif atmos.overlap_method == 8
+        elseif atmos.overlap_method == "rorr"
             # random overlap with resorting and rebinning
             atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random_resort_rebin
 
         else
-            @error "Invalid overlap method"
+            @error "Invalid overlap method $(atmos.overlap_method)"
             return false
         end
 
