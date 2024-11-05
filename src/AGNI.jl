@@ -286,7 +286,7 @@ module AGNI
         flag_ray::Bool         =        cfg["execution"]["rayleigh"]
         flag_cld::Bool         =        cfg["execution"]["cloud"]
         flag_aer::Bool         =        cfg["execution"]["aerosol"]
-        overlap::Int           =        cfg["execution"]["overlap_method"]
+        overlap::String        =        cfg["execution"]["overlap_method"]
         thermo_funct::Bool     =        cfg["execution"]["thermo_funct"]
         gravity_funct::Bool    =        cfg["execution"]["gravity_funct"]
         incl_convect::Bool     =        cfg["execution"]["convection"]
