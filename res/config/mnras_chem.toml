@@ -1,31 +1,31 @@
 # AGNI configuration file
-title = "ltt3780b_v5/case_00021"
+title = "TRAPPIST-1 c (IW+5) at PROTEUS solidification"
 
 [planet]
-    tmp_surf        = 2700.0
-    instellation    = 1.777080e+5
+    tmp_surf        = 1676.62
+    instellation    = 10766.43
     albedo_b        = 0.0
     s0_fact         = 0.25
     zenith_angle    = 54.74
     surface_material= "greybody"
     albedo_s        = 0.3
-    radius          = 8.552843e+6
-    gravity         = 1.275026e+1
+    radius          = 6949977.0
+    gravity         = 10.79357
     flux_int        = 0.0
     turb_coeff      = 0.001
     wind_speed      = 2.0
     skin_k          = 2.0
     skin_d          = 0.01
-    tmp_magma       = 1724.947
+    tmp_magma       = 1676.62
 
 [files]
-    input_sf        = "res/spectral_files/Honeyside/256/Honeyside.sf"
-    input_star      = "res/config/nogit_mnras.sflux"
+    input_sf        = "/network/group/aopp/planetary/RTP035_NICHOLLS_PROTEUS/fwl_data/spectral_files/Honeyside/256/Honeyside.sf"
+    input_star      = "/network/group/aopp/planetary/RTP035_NICHOLLS_PROTEUS/article_data/mnras_proteus_agni/trappist1c_oxfu/case_00021/data/88265567.sflux"
     output_dir      = "out/"
 
 [composition]
     p_top           = 1e-5
-    p_dict          = {H2O = 648.09,CO2 = 498.27,H2  = 2.40  ,CH4 = 0.00  ,CO  = 6.51  ,N2  = 3.84  ,S2  = 73.69 ,SO2 = 223.93}
+    p_dict          = {H2O=2015.61, CO2=459.33 , H2 =7.14   , CH4=0.00   , CO =5.46   , N2 =1.80   , S2 =33.96  , SO2=137.77}
     include_all     = true
     chemistry       = 1
     condensates     = []
@@ -40,7 +40,7 @@ title = "ltt3780b_v5/case_00021"
     rayleigh        = true
     cloud           = false
     aerosol         = false
-    overlap_method  = 4
+    overlap_method  = "ee"
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = true
@@ -50,7 +50,7 @@ title = "ltt3780b_v5/case_00021"
     solvers         = ["newton"]
     dx_max          = 400.0
     initial_state   = ["loglin", "700"]
-    linesearch      = 0
+    linesearch      = 1
     easy_start      = false
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3

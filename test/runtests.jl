@@ -149,7 +149,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict,"",
                          flag_gcontinuum=false,
                          flag_rayleigh=false,
-                         overlap_method=2
+                         overlap_method="ro"
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 energy.radtrans!(atmos, false)
@@ -215,7 +215,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict,"",
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
-                         overlap_method=4,
+                         overlap_method="ee",
                          condensates=["H2O"],
                          surface_material="greybody",
                          albedo_s=0.5
@@ -364,7 +364,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict, "",
                          flag_gcontinuum=true,
                          flag_rayleigh=true,
-                         overlap_method=2
+                         overlap_method="ro"
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 energy.radtrans!(atmos, true)
@@ -410,7 +410,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict, "",
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
-                         overlap_method=2,
+                         overlap_method="ro",
                          thermo_functions=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
