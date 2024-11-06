@@ -8,12 +8,14 @@ if !("RAD_DIR" in keys(ENV))
     error("Cannot find SOCRATES! Have you set RAD_DIR?")
 end
 
+AGNI_DIR = dirname(abspath(@__FILE__))
+
 # Activate environment
 import Pkg
-Pkg.activate(dirname(abspath(@__FILE__)))
+Pkg.activate(AGNI_DIR)
 
 # Include AGNI
-include("src/AGNI.jl")
+include(joinpath([AGNI_DIR,"src","AGNI.jl"]))
 import .AGNI
 
 # Run
