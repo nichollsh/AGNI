@@ -69,8 +69,6 @@ module solver
     divergence, minimising flux loss across a cell by iterating the temperature
     profile.
 
-    Not compatible with convective adjustment; MLT must be used.
-
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
@@ -79,6 +77,7 @@ module solver
     - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
+    - `reset_vmrs::Bool`                reset atmosphere to a well-mixed composition after the phase change calculation
     - `dx_max::Float64`                 maximum step size [K]
     - `max_steps::Int`                  maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
@@ -106,6 +105,7 @@ module solver
                             chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=true,
                             conduct::Bool=true, latent::Bool=true,
+                            reset_vmrs::Bool=true,
                             dx_max::Float64=400.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
@@ -172,7 +172,6 @@ module solver
         rb2::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (-2 dx)
         x_s::Array{Float64,1}    = zeros(Float64, arr_len)  # Perturbed row, for jacobian
         fd_s::Float64            = 0.0                      # Row perturbation amount
-        drdx::Float64            = 0.0                      # Jacobian element dr/dx
 
         #     solver
         b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))   # Approximate jacobian (i)
@@ -244,7 +243,8 @@ module solver
             # Calculate fluxes
             energy.calc_fluxes!(atmos,
                                 latent, convect, sens_heat, conduct,
-                                convect_sf=easy_sf, latent_sf=easy_sf)
+                                convect_sf=easy_sf, latent_sf=easy_sf,
+                                reset_vmrs=reset_vmrs)
 
             # Energy divergence term
             @turbo @. atmos.flux_dif -= atmos.ediv_add
