@@ -323,7 +323,7 @@ module atmosphere
             mkdir(OUT_DIR)
         end
 
-        @info "Setting-up a new atmosphere struct"
+        @info  "Setting-up a new atmosphere struct"
 
         # Code versions
         atmos.AGNI_VERSION = "0.10.1"
