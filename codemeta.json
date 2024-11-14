@@ -12,12 +12,12 @@
   ],
   "identifier": "",
   "codeRepository": "https://github.com/nichollsh/AGNI",
-  "datePublished": "2024-09-13",
-  "dateModified": "2024-09-13",
+  "datePublished": "2024-11-14",
+  "dateModified": "2024-11-14",
   "dateCreated": "2024-09-13",
   "description": "A radiative-convective model for lava planet atmospheres.",
   "keywords": "physics, radiative transfer, exoplanets, astronomy, convection, radiation, planets, atmospheres",
   "license": "GPL v3.0",
   "title": "AGNI",
-  "version": "0.10.0"
+  "version": "0.10.1"
 }
