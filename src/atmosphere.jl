@@ -328,9 +328,17 @@ module atmosphere
         # Code versions
         atmos.AGNI_VERSION = "0.10.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
-        @debug "AGNI VERSION = $(atmos.AGNI_VERSION)"
+        @debug "AGNI VERSION = "*atmos.AGNI_VERSION
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
-        @debug "SOCRATES VERSION = $(atmos.SOCRATES_VERSION)"
+        @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
+
+        # Check SOCRATES version is valid
+        SOCVER_minimum = 2407.2
+        if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
+            @error "SOCRATES is out of date and cannot be used!"
+            @error "    found at $(ENV["RAD_DIR"])"
+            @error "    version is "*atmos.SOCRATES_VERSION
+
 
         atmos.num_rt_eval = 0
 
