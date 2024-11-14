@@ -326,7 +326,7 @@ module atmosphere
         @info "Setting-up a new atmosphere struct"
 
         # Code versions
-        atmos.AGNI_VERSION = "0.10.0"
+        atmos.AGNI_VERSION = "0.10.1"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = "*atmos.AGNI_VERSION
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -338,6 +338,7 @@ module atmosphere
             @error "SOCRATES is out of date and cannot be used!"
             @error "    found at $(ENV["RAD_DIR"])"
             @error "    version is "*atmos.SOCRATES_VERSION
+        end
 
 
         atmos.num_rt_eval = 0
