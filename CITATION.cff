@@ -5,7 +5,7 @@ authors:
   given-names: "Harrison"
   orcid: "https://orcid.org/0000-0002-8368-4641"
 title: "AGNI"
-version: 0.10.0
+version: 0.10.1
 doi: 10.xx/xx.xx
 date-released: 2024-09-20
 url: "https://github.com/nichollsh/AGNI"
