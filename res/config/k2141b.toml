@@ -1,41 +1,41 @@
 # AGNI configuration file
-title = "Hot and dry"
+title = "K2-141 b (IW+4)"
 
 [planet]
-    tmp_surf        = 2000.0
-    instellation    = 44000.0
-    albedo_b        = 0.18
-    s0_fact         = 0.6652
-    zenith_angle    = 60.0
+    tmp_surf        = 3000.0
+    instellation    = 3949800
+    albedo_b        = 0.0
+    s0_fact         = 0.25
+    zenith_angle    = 54.74
     surface_material= "res/surface_albedos/lunar_marebasalt.dat"
-    albedo_s        = 0.0
-    radius          = 6.37e6
-    gravity         = 9.81
+    albedo_s        = 0.3
+    radius          = 9.57e+6
+    gravity         = 22.125
     flux_int        = 0.0
-    turb_coeff      = 1.0e-2
-    wind_speed      = 10.0
+    turb_coeff      = 0.001
+    wind_speed      = 2.0
+    skin_k          = 2.0
+    skin_d          = 0.01
+    tmp_magma       = 3000
 
 [files]
-    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"
-    input_star      = "res/stellar_spectra/sun.txt"
+    input_sf        = "/network/group/aopp/planetary/RTP035_NICHOLLS_PROTEUS/fwl_data/spectral_files/Honeyside/256/Honeyside.sf"
+    input_star      = "/network/group/aopp/planetary/RTP035_NICHOLLS_PROTEUS/fwl_data/stellar_spectra/Named/hd85512.txt"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 270.0
     p_top           = 1e-5
-    vmr_dict        = { H2O = 1.0}
-    vmr_path        = ""
+    p_dict          = {H2O = 1.248 , CO2 = 314.959 , N2  = 21.342 , H2  = 0.035 , CO  = 70.207 , CH4 = 0.000 , S2  = 0.958 , SO2 = 32.921}
     include_all     = false
     chemistry       = 0
     condensates     = []
 
-
 [execution]
     clean_output    = true
     verbosity       = 1
-    max_steps       = 200
+    max_steps       = 20000
     max_runtime     = 400
-    num_levels      = 35
+    num_levels      = 50
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -44,18 +44,17 @@ title = "Hot and dry"
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = true
-    latent_heat     = false
+    latent_heat     = true
     convection      = true
     rainout         = false
     solution_type   = 3
     solvers         = ["newton"]
     dx_max          = 400.0
-    initial_state   = ["iso","2300"]
-    linesearch      = 0
+    initial_state   = ["loglin", "1800"]
+    linesearch      = 1
     easy_start      = false
     converge_atol   = 1.0e-2
-    converge_rtol   = 1.0e-4
-
+    converge_rtol   = 1.0e-3
 
 [plots]
     at_runtime      = true

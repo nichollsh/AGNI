@@ -46,6 +46,7 @@ title = "TRAPPIST-1 c (IW+5) at PROTEUS solidification"
     sensible_heat   = true
     latent_heat     = true
     convection      = true
+    rainout         = false
     solution_type   = 2
     solvers         = ["newton"]
     dx_max          = 400.0
