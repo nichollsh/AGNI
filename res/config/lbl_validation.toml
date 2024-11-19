@@ -46,6 +46,7 @@ title = "Line-by-line validation tests"
     sensible_heat   = false
     latent_heat     = false
     convection      = false
+    rainout         = false
     solution_type   = 1
     solvers         = []
     dx_max          = 400.0

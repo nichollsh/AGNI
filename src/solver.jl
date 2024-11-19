@@ -77,7 +77,7 @@ module solver
     - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
-    - `reset_vmrs::Bool`                reset atmosphere to a well-mixed composition after the phase change calculation
+    - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
     - `dx_max::Float64`                 maximum step size [K]
     - `max_steps::Int`                  maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
@@ -104,8 +104,7 @@ module solver
                             sol_type::Int=1,
                             chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=true,
-                            conduct::Bool=true, latent::Bool=true,
-                            reset_vmrs::Bool=true,
+                            conduct::Bool=true, latent::Bool=true, rainout::Bool=true,
                             dx_max::Float64=400.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
@@ -244,7 +243,7 @@ module solver
             energy.calc_fluxes!(atmos,
                                 latent, convect, sens_heat, conduct,
                                 convect_sf=easy_sf, latent_sf=easy_sf,
-                                reset_vmrs=reset_vmrs)
+                                rainout=rainout)
 
             # Energy divergence term
             @turbo @. atmos.flux_dif -= atmos.ediv_add

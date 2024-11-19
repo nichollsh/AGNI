@@ -51,6 +51,7 @@ title = "Default"                       # Name for this configuration file
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     # Include heat release from phase change
     convection      = true                      # Include heat transport by convection
+    rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
     solution_type   = 0                         # Solution type (see wiki).
     solvers         = []                        # Ordered list of solvers to apply (see wiki).
     dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
