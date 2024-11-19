@@ -333,7 +333,7 @@ module energy
     - `pmin::Float64`           pressure [bar] below which convection is disabled
     - `mltype::Int`             mixing length value (1: scale height, 2: asymptotic)
     """
-    function mlt!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=2)
+    function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=2)
 
         pmin *= 1.0e5 # convert bar to Pa
 
@@ -602,7 +602,7 @@ module energy
             @turbo @. atmos.flux_l += atmos.phs_wrk_fl
 
             # calculate mask
-            @. atmos.mask_l = (abs(atmos.flux_l) > 1.0e-10)
+            @. atmos.mask_l = (abs(atmos.flux_l) > 1.0e-30)
 
         end # go to next condensable
 
@@ -653,6 +653,15 @@ module energy
     end
 
     """
+    **Reset mixing ratios to their original values**
+    """
+    function restore_composition!(atmos::atmosphere.Atmos_t)
+        for g in atmos.gas_names
+            @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+        end
+    end
+
+    """
     **Calculate total flux at each level.**
 
     Arguments:
@@ -664,12 +673,12 @@ module energy
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
-    - `reset_vmrs::Bool`                reset VMRs to dry values before radtrans and MLT
+    - `rainout::Bool`                   allow rainout ( do not reset VMRs to dry values )
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t,
                           latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
-                          calc_cf::Bool=false, reset_vmrs::Bool=true)
+                          calc_cf::Bool=false, rainout::Bool=true)
 
         # Reset fluxes
         reset_fluxes!(atmos)
@@ -677,13 +686,15 @@ module energy
         # +Condensation and evaporation
         if atmos.condense_any && latent
 
+            # Restore mixing ratios
+            restore_composition!(atmos)
             atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout
             atmosphere.handle_saturation!(atmos)
 
             # Calculate latent heat flux
-            energy.condense_diffuse!(atmos)
+            condense_diffuse!(atmos)
 
             # Modulate?
             atmos.flux_l *= latent_sf
@@ -691,25 +702,23 @@ module energy
             # Add to total flux
             @turbo @. atmos.flux_tot += atmos.flux_l
 
-            # Restore mixing ratios
-            if reset_vmrs
-                for g in atmos.gas_names
-                    @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
-                end
+            # Restore mixing ratios - do not allow rainout
+            if !rainout
+                restore_composition!(atmos)
             end
         end
         # Calculate layer properties
         atmosphere.calc_layer_props!(atmos)
 
         # +Radiation
-        energy.radtrans!(atmos, true, calc_cf=calc_cf)
-        energy.radtrans!(atmos, false)
+        radtrans!(atmos, true, calc_cf=calc_cf)
+        radtrans!(atmos, false)
         @turbo @. atmos.flux_tot += atmos.flux_n
 
         # +Dry convection
         if convect
             # Calc flux
-            energy.mlt!(atmos)
+            convection!(atmos)
 
             # Modulate?
             atmos.flux_cdry *= convect_sf
@@ -720,13 +729,13 @@ module energy
 
         # +Surface turbulence
         if sens_heat
-            energy.sensible!(atmos)
+            sensible!(atmos)
             atmos.flux_tot[end] += atmos.flux_sens
         end
 
         # +Conduction
         if conduct
-            energy.conduct!(atmos)
+            conduct!(atmos)
             @turbo @. atmos.flux_tot += atmos.flux_cdct
         end
 
