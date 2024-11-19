@@ -271,7 +271,7 @@ module AGNI
         end
         if chem_type in [1,2,3]
             if length(condensates)>0
-                @error "Misconfiguration: FastChem coupling incompatible with condensation"
+                @error "Misconfiguration: chemistry coupling is incompatible with condensation"
                 return false
             else
                 mkdir(dir_fastchem)
@@ -302,6 +302,7 @@ module AGNI
         conv_rtol::Float64     =        cfg["execution"]["converge_rtol"]
         max_steps::Int         =        cfg["execution"]["max_steps"]
         max_runtime::Float64   =        cfg["execution"]["max_runtime"]
+        rainout::Bool          =        cfg["execution"]["rainout"]
 
         #    plotting stuff
         plt_run::Bool          = cfg["plots"]["at_runtime"]
@@ -491,7 +492,7 @@ module AGNI
             if sol == "none"
                 energy.calc_fluxes!(atmos, incl_latent,
                                     incl_convect, incl_sens, incl_conduct,
-                                    calc_cf=plt_cff)
+                                    calc_cf=plt_cff, rainout=rainout)
                 @info "    done"
 
             # Nonlinear solver
@@ -506,7 +507,7 @@ module AGNI
                                     sens_heat=incl_sens, max_steps=max_steps,
                                     max_runtime=max_runtime,
                                     conv_atol=conv_atol, conv_rtol=conv_rtol,
-                                    method=method_idx,
+                                    method=method_idx, rainout=rainout,
                                     dx_max=dx_max, ls_method=linesearch,
                                     easy_start=easy_start,
                                     modplot=modplot,save_frames=plt_ani)

@@ -42,6 +42,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     sensible_heat   = false
     latent_heat     = true
     convection      = true
+    rainout         = false
     solution_type   = 3
     solvers         = ["newton"]
     dx_max          = 400.0
