@@ -442,9 +442,60 @@ module plotting
     end
 
     """
-    Plot contribution function (per band)
+    Plot normalised contribution function (bolometric)
     """
-    function plot_contfunc(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
+    function plot_contfunc1(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
+
+        # Check that we have data
+        if !atmos.is_out_lw
+            @error "Cannot plot contribution func because radiances have not been calculated"
+            return
+        end
+
+        # Define arrays
+        x::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
+        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
+        w::Array{Float64, 1} = zeros(Float64, atmos.nbands)
+
+        # band widths
+        for ba in 1:atmos.nbands
+            w[ba] = abs(atmos.bands_min[ba] - atmos.bands_max[ba])
+        end
+
+        # store contribution
+        cf_min = 1.0e-9
+        for i in 1:atmos.nlev_c
+            x[i] = max(sum(atmos.contfunc_band[i,:] .* w[:]),cf_min)
+            y[i] = atmos.p[i] * 1.0e-5
+        end
+
+        # normalise contribution
+        x /= maximum(x)
+
+        # Make plot
+        plt = plot(dpi=dpi, colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
+
+        plot!(plt, x,y, c=:black)
+
+        xlabel!(plt, "Normalised bolometric contribution")
+        xaxis!(plt, xscale=:log10, minorgrid=true)
+
+        ylims  = (y[1], y[end])
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt
+    end
+
+    """
+    Plot normalised contribution function (per band)
+    """
+    function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
 
         # Check that we have data
         if !atmos.is_out_lw
@@ -475,7 +526,7 @@ module plotting
             y[i] = atmos.p[i] * 1.0e-5
         end
 
-        # z value - log'd and normalised contribution function
+        # z value - log contribution function, normalised
         cf_min = 1.0e-9
         for ba in 1:atmos.nbands
             if reversed
@@ -484,9 +535,11 @@ module plotting
                 br = ba
             end
             for i in 1:atmos.nlev_c
-                z[i,br] = log10(max(atmos.contfunc_norm[i,ba],cf_min))
+                z[i,br] = max(atmos.contfunc_band[i,ba],cf_min)
             end
         end
+        z /= maximum(z)
+        z[:] = log10.(z[:])
 
         # Make plot
         plt = plot(dpi=dpi, colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
