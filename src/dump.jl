@@ -320,7 +320,7 @@ module dump
 
             for lc in 1:atmos.nlev_c
                 for ba in 1:atmos.nbands
-                    var_cfn[ba, lc] = atmos.contfunc_norm[lc, ba]
+                    var_cfn[ba, lc] = atmos.contfunc_band[lc, ba]
                 end
             end
 
