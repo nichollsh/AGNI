@@ -238,21 +238,16 @@ module energy
             atmos.band_n_lw = atmos.band_u_lw - atmos.band_d_lw
             atmos.flux_n_lw = atmos.flux_u_lw - atmos.flux_d_lw
 
-            # Normalised contribution function (only LW stream contributes)
-            fill!(atmos.contfunc_norm,0.0)
+            # Contribution function (only LW stream contributes)
+            fill!(atmos.contfunc_band,0.0)
             if calc_cf
-                bw_nm::Float64 = 0.0
                 for ba in 1:atmos.dimen.nd_channel
-                    bw_nm = atmos.bands_wid[ba] * 1e9
                     for lv in 1:atmos.nlev_c
-                        atmos.contfunc_norm[lv,ba] =
-                                            atmos.radout.contrib_funcf_band[1,lv,ba]/bw_nm
+                        atmos.contfunc_band[lv,ba] = atmos.radout.contrib_funcf_band[1,lv,ba]
                     end
                 end
-                atmos.contfunc_norm /= maximum(atmos.contfunc_norm)
             end
             atmos.is_out_lw = true
-
         else
             # SW case
             for lv in 1:atmos.nlev_l                # sum over levels
