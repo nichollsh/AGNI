@@ -158,7 +158,7 @@ module atmosphere
         surf_flux::Array{Float64, 1}
 
         # Contribution function (to outgoing flux) per-band
-        contfunc_norm::Array{Float64,2}     # LW only, and normalised by maximum value
+        contfunc_band::Array{Float64,2}     # LW only, not normalised
 
         # Sensible heating
         C_d::Float64                        # Turbulent exchange coefficient [dimensionless]
@@ -201,7 +201,10 @@ module atmosphere
         # Heating rate felt at each level [K/day]
         heating_rate::Array{Float64,1}
 
-        # FastChem stuff
+        # Chemistry stuff
+        fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
+        fastchem_maxiter::Int           # Maximum FC iterations
+        fastchem_xtol::Float64          # FC solver tolerance
         fastchem_flag::Bool             # Fastchem enabled?
         fastchem_work::String           # Path to fastchem working directory
 
@@ -315,8 +318,12 @@ module atmosphere
                     flag_cloud::Bool =          false,
                     thermo_functions::Bool =    true,
                     gravity_functions::Bool =   true,
+
                     use_all_gases::Bool =       false,
-                    fastchem_work::String =     ""
+                    fastchem_work::String =     "",
+                    fastchem_floor::Float64 =   273.0,
+                    fastchem_maxiter::Float64 = 240.0,
+                    fastchem_xtol::Float64 =    1.0e-4,
                     )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -326,7 +333,7 @@ module atmosphere
         @info  "Setting-up a new atmosphere struct"
 
         # Code versions
-        atmos.AGNI_VERSION = "0.11.0"
+        atmos.AGNI_VERSION = "0.11.1"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = "*atmos.AGNI_VERSION
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -696,6 +703,10 @@ module atmosphere
         else
             @debug "FastChem env variable not set"
         end
+        # other parameters for FC
+        atmos.fastchem_maxiter = fastchem_maxiter
+        atmos.fastchem_floor   = fastchem_floor
+        atmos.fastchem_xtol    = fastchem_xtol
 
         # Record that the parameters are set
         atmos.is_param = true
@@ -709,20 +720,24 @@ module atmosphere
     """
     **Calculate observed radius and bulk density.**
 
-    This is done at the layer probed in transmission.
+    This is done at the layer probed in transmission, which is set at a fixed pressure.
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+        - `p_ref::Float64`          observed pressure level [Pa]
 
     Returns:
-        Nothing
+        - `transspec_rho::Float64`  the bulk density observed in transmission
     """
-    function calc_observed_rho!(atmos::atmosphere.Atmos_t)
+    function calc_observed_rho!(atmos::atmosphere.Atmos_t, p_ref::Float64=100.0)::Float64
 
         # transspec_p::Float64            # (INPUT) level probed in transmission [Pa]
         # transspec_r::Float64            # planet radius probed in transmission [m]
         # transspec_m::Float64            # mass [kg] of atmosphere + interior
         # transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
+
+        # Store reference pressure in atmos struct
+        atmos.transspec_p = p_ref
 
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
@@ -735,9 +750,11 @@ module atmosphere
         atmos.transspec_m += atmos.interior_mass
 
         # get density of all enclosed by observed layer
+        # store this in the atmosphere struct
         atmos.transspec_rho = 3.0 * atmos.transspec_m / (4.0 * pi * atmos.transspec_r^3)
 
-        return nothing
+        # also return the value
+        return atmos.transspec_rho
     end
 
     """
@@ -758,15 +775,15 @@ module atmosphere
         end
 
         # Reset arrays
-        fill!(atmos.z         ,  0.0)
-        fill!(atmos.zl        ,  0.0)
-        fill!(atmos.layer_grav,  0.0)
-        fill!(atmos.layer_thick, 0.0)
-        fill!(atmos.layer_density,0.0)
-        fill!(atmos.layer_mass   ,0.0)
-        fill!(atmos.layer_cp, 0.0)
-        fill!(atmos.layer_kc, 0.0)
-        fill!(atmos.layer_mmw, 0.0)
+        fill!(atmos.z         ,     0.0)
+        fill!(atmos.zl        ,     0.0)
+        fill!(atmos.layer_grav,     0.0)
+        fill!(atmos.layer_thick,    0.0)
+        fill!(atmos.layer_density,  0.0)
+        fill!(atmos.layer_mass   ,  0.0)
+        fill!(atmos.layer_cp,       0.0)
+        fill!(atmos.layer_kc,       0.0)
+        fill!(atmos.layer_mmw,      0.0)
 
         # Temporary values
         g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
@@ -1391,7 +1408,7 @@ module atmosphere
 
         atmos.surf_flux =         zeros(Float64, atmos.nbands)
 
-        atmos.contfunc_norm =     zeros(Float64, (atmos.nlev_c,atmos.nbands))
+        atmos.contfunc_band =     zeros(Float64, (atmos.nlev_c,atmos.nbands))
 
         atmos.flux_sens =         0.0
 
@@ -1432,12 +1449,11 @@ module atmosphere
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `chem_type::Int`                  chemistry type (see wiki)
     - `write_cfg::Bool`                 write config and elements
-    - `tmp_floor::Float64`              temperature floor for T(p) provided to FastChem
 
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function chemistry_eqm!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool; tmp_floor::Float64=200.0)::Int
+    function chemistry_eqm!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool)::Int
 
         @debug "Running equilibrium chemistry"
 
@@ -1451,7 +1467,7 @@ module atmosphere
         end
 
         # Check minimum temperature
-        if maximum(atmos.tmpl) < tmp_floor
+        if maximum(atmos.tmpl) < atmos.fastchem_floor
             @warn "Temperature profile is entirely too cold for FastChem. Not doing chemistry."
             return 1
         end
@@ -1498,16 +1514,16 @@ module atmosphere
                 write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
 
                 write(f,"#Accuracy of chemistry iteration \n")
-                write(f,"1.0e-4 \n\n")
+                write(f,@sprintf("%.3e \n\n", atmos.fastchem_xtol))
 
                 write(f,"#Accuracy of element conservation \n")
-                write(f,"1.0e-4 \n\n")
+                write(f,@sprintf("%.3e \n\n", atmos.fastchem_xtol))
 
                 write(f,"#Max number of chemistry iterations  \n")
-                write(f,"50000 \n\n")
+                write(f,@sprintf("%d \n\n", atmos.fastchem_maxiter*2.5))
 
                 write(f,"#Max number internal solver iterations  \n")
-                write(f,"20000 \n\n")
+                write(f,@sprintf("%d \n\n", atmos.fastchem_maxiter))
             end
 
             # Calculate elemental abundances
@@ -1550,7 +1566,12 @@ module atmosphere
             write(f,"# AGNI temperature structure \n")
             write(f,"# bar, kelvin \n")
             for i in 1:atmos.nlev_c
-                write(f,@sprintf("%.6e    %.6e \n", atmos.p[i]*1e-5, max(tmp_floor,atmos.tmp[i]) ))
+                write(  f,
+                        @sprintf("%.6e    %.6e \n",
+                            atmos.p[i]*1e-5,
+                            max(atmos.fastchem_floor,atmos.tmp[i])
+                            )
+                     )
             end
         end
 
@@ -1654,7 +1675,7 @@ module atmosphere
         # Find where we truncated the temperature profile,
         #      and make sure that regions above that use the same x_gas values
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
-            if atmos.tmp[i] < tmp_floor
+            if atmos.tmp[i] < atmos.fastchem_floor
                 for g in atmos.gas_names
                     atmos.gas_vmr[g][1:i] .= atmos.gas_vmr[g][i+1]
                 end
