@@ -791,8 +791,9 @@ module atmosphere
         dzc::Float64= 0.0; dzl::Float64 = 0.0
         GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
         mmr::Float64 = 0.0
-        ok::Bool = true
-        dz_max::Float64 = 1e8
+        code::Int64 = 0 # 0: ok, 1: blew up, 2: collapsed
+        dz_max::Float64 = 6e8
+        dz_min::Float64 = 1e-20
 
         # Set MMW at each level
         for gas in atmos.gas_names
@@ -826,13 +827,10 @@ module atmosphere
             dzc = phys.R_gas * t1 /
                         (atmos.layer_mmw[i] * g1 * p1) * (atmos.pl[i+1] - atmos.p[i])
             if !ignore_errors
-                if (dzc < 1e-20)
-                    @error "Height integration resulted in dz <= 0 at level $i (l -> c)"
-                    ok = false
-                end
-                if  (dzc > dz_max)
-                    @error "Height integration blew up at level $i (l -> c)"
-                    ok = false
+                if (dzc < dz_min)
+                    ok = 2
+                elseif  (dzc > dz_max)
+                    ok = 1
                 end
             end
             atmos.z[i] = atmos.zl[i+1] + min(dzc,dz_max)
@@ -848,13 +846,10 @@ module atmosphere
             dzl = phys.R_gas * t2 / (
                         atmos.layer_mmw[i] * g2 * p2) * (atmos.p[i]- atmos.pl[i])
             if !ignore_errors
-                if (dzl < 1e-20)
-                    @error "Height integration resulted in dz <= 0 at level $i (c -> l)"
-                    ok = false
-                end
-                if (dzl > 1e9)
-                    @error "Height integration blew up at level $i (c -> l)"
-                    ok = false
+                if (dzl < dz_min)
+                    ok = 2
+                elseif (dzl > dz_max)
+                    ok = 1
                 end
             end
             atmos.zl[i] = atmos.z[i] + min(dzl,dz_max)
@@ -864,6 +859,12 @@ module atmosphere
 
             # Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
+        end
+
+        if code == 2
+            @error "Height integration failure: collapse, dz <= $dz_min"
+        elseif code == 1
+            @error "Height integration failure: blew up, dz >= $dz_max"
         end
 
         # Mass (per unit area, kg m-2) and density (kg m-3)
@@ -877,7 +878,7 @@ module atmosphere
             atmos.atm.density[1,i] = atmos.layer_density[i]     # pass to SOCRATES
         end
 
-        return ok
+        return Bool(code==0)
     end
 
     """
