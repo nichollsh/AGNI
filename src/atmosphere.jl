@@ -322,7 +322,7 @@ module atmosphere
                     use_all_gases::Bool =       false,
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
-                    fastchem_maxiter::Float64 = 240.0,
+                    fastchem_maxiter::Float64 = 2e4,
                     fastchem_xtol::Float64 =    1.0e-4,
                     )::Bool
 
