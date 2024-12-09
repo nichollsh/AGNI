@@ -13,7 +13,7 @@ module atmosphere
     using LinearAlgebra
     using Logging
     using LoopVectorization
-    # import Statistics
+    import Statistics
     import PCHIPInterpolation:Interpolator
     import DelimitedFiles:readdlm
 
@@ -209,7 +209,7 @@ module atmosphere
         fastchem_work::String           # Path to fastchem working directory
 
         # Observing properties
-        transspec_p::Float64            # (INPUT PARAMETER) pressure level probed in transmission [Pa]
+        transspec_p::Float64            # Pressure level probed in transmission [Pa]
         transspec_r::Float64            # planet radius probed in transmission [m]
         transspec_m::Float64            # mass [kg] enclosed by transspec_r
         transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
@@ -717,10 +717,64 @@ module atmosphere
         return true
     end # end function setup
 
+
+    """
+    **Estimate photosphere.**
+
+    Estimates the location of the photosphere by finding the median of the contribution
+    function in each band (0.2 um to 150 um), and then finding the pressure level at which
+    these median values are maximised.
+
+    Arguments:
+        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+        - `p_ref::Float64`          pressure level of photosphere [Pa]
+    """
+    function estimate_photosphere!(atmos::atmosphere.Atmos_t)::Float64
+
+        # Params
+        wl_min::Float64  = 0.2 * 1e-6 # 200 nm
+        wl_max::Float64  = 150 * 1e-6 # 150 um
+        p_min::Float64   = 10.0 # 1e-4 bar
+
+        # tracking
+        cff_max::Float64 = 0.0
+        cff_try::Float64 = 0.0
+        atmos.transspec_p = p_min
+
+        # get band indices
+        wl_imin = findmin(abs.(atmos.bands_cen .- wl_min))[2]
+        wl_imax = findmin(abs.(atmos.bands_cen .- wl_max))[2]
+
+        # reversed?
+        if wl_imin > wl_imax
+            wl_imin, wl_imax = wl_imax, wl_imin
+        end
+
+        # loop over levels
+        for i in 1:atmos.nlev_c
+            if atmos.p[i] < p_min
+                continue
+            end
+
+            # maximum contfunc in this band
+            cff_try = Statistics.median(atmos.contfunc_band[i,wl_imin:wl_imax])
+
+            # is this more than the existing maximum?
+            if cff_try > cff_max
+                cff_max = cff_try
+                atmos.transspec_p = atmos.p[i]
+            end
+        end
+
+        return atmos.transspec_p
+    end
+
     """
     **Calculate observed radius and bulk density.**
 
-    This is done at the layer probed in transmission, which is set at a fixed pressure.
+    This is done at the layer probed in transmission, which is set to a fixed pressure.
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -729,15 +783,14 @@ module atmosphere
     Returns:
         - `transspec_rho::Float64`  the bulk density observed in transmission
     """
-    function calc_observed_rho!(atmos::atmosphere.Atmos_t, p_ref::Float64=100.0)::Float64
+    function calc_observed_rho!(atmos::atmosphere.Atmos_t)::Float64
 
-        # transspec_p::Float64            # (INPUT) level probed in transmission [Pa]
         # transspec_r::Float64            # planet radius probed in transmission [m]
         # transspec_m::Float64            # mass [kg] of atmosphere + interior
         # transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
 
         # Store reference pressure in atmos struct
-        atmos.transspec_p = p_ref
+        estimate_photosphere!(atmos)
 
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]

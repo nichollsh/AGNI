@@ -125,6 +125,7 @@ module dump
             # ----------------------
             # Scalar quantities
             #    Create variables
+            var_max_cff_p = defVar(ds, "max_cff_p",     Float64, (), attrib = OrderedDict("units" => "Pa"))     # Pressure level at which CFF is max [Pa]
             var_tmp_surf =  defVar(ds, "tmp_surf",      Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
             var_flux_int =  defVar(ds, "flux_int",      Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Internal flux [W m-2]
             var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
@@ -149,6 +150,7 @@ module dump
             var_starfile =  defVar(ds, "starfile"      ,String, ())     # Path to star file when read
 
             #     Store data
+            var_max_cff_p[1] =  atmos.transspec_p
             var_tmp_surf[1] =   atmos.tmp_surf
             var_flux_int[1] =   atmos.flux_int
             var_inst[1] =       atmos.instellation
