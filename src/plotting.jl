@@ -13,6 +13,7 @@ module plotting
     using LaTeXStrings
     using Printf
     using FFMPEG
+    using Statistics
     import Glob:glob
 
     import ..atmosphere
@@ -20,7 +21,7 @@ module plotting
 
     # Default plotting configuration
     default(fontfamily="sans-serif", framestyle=:box, label=nothing, grid=true,
-            guidefontsize=9, titlefontsize=9)
+            guidefontsize=9, titlefontsize=9, dpi=280)
 
     # Symmetric log
     function _symlog(v::Float64)::Float64
@@ -39,7 +40,6 @@ module plotting
     Plot the temperature-pressure profile.
     """
     function plot_pt(atmos::atmosphere.Atmos_t, fname::String;
-                            dpi::Int=250,
                             size_x::Int=500, size_y::Int=400,
                             incl_magma::Bool=false,
                             title::String="")
@@ -48,8 +48,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
-                        dpi=dpi, size=(size_x,size_y))
+        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright, size=(size_x,size_y))
 
         # Plot phase boundary
         if atmos.condense_any
@@ -104,17 +103,14 @@ module plotting
     Plot the height vs pressure profile.
     """
     function plot_height(atmos::atmosphere.Atmos_t, fname::String;
-                                dpi::Int=250,
                                 size_x::Int=500, size_y::Int=400,
-                                incl_magma::Bool=false,
                                 title::String="")
 
         ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
-                        dpi=dpi, size=(size_x,size_y))
+        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright, size=(size_x,size_y))
 
         # Plot surface
         scatter!(plt, [0.0], [atmos.pl[end]*1e-5], color="brown3", label=L"P_s")
@@ -142,7 +138,6 @@ module plotting
     Plot the cloud mass mixing ratio and area fraction.
     """
     function plot_cloud(atmos::atmosphere.Atmos_t, fname::String;
-                            dpi::Int=250,
                             size_x::Int=500, size_y::Int=400,
                             title::String="")
 
@@ -155,7 +150,7 @@ module plotting
         # Create plot
         plt = plot( xlims=xlims, xticks=xticks,
                     ylims=ylims, yticks=yticks,
-                    legend=:outertopright, dpi=dpi,
+                    legend=:outertopright,
                     size=(size_x,size_y))
 
         # Temperature profile for reference
@@ -186,7 +181,6 @@ module plotting
     Plot the VMRs of the atmosphere at each cell-centre location.
     """
     function plot_vmr(atmos::atmosphere.Atmos_t, fname::String;
-                            dpi::Int=250,
                             size_x::Int=500, size_y::Int=400)
 
         # X-axis minimum allowed left-hand-side limit (log units)
@@ -197,8 +191,7 @@ module plotting
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, dpi=dpi,
-                    legend=:outertopright, size=(size_x,size_y))
+        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright, size=(size_x,size_y))
 
         # Plot log10 VMRs for each gas
         gas_xsurf::Array = zeros(Float64, atmos.gas_num)
@@ -246,7 +239,7 @@ module plotting
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
         # Set figure properties
-        xlabel!(plt, "log Volume Mixing Ratio")
+        xlabel!(plt, "log₁₀ Volume Mixing Ratio")
         xaxis!(plt, xlims=xlims, xticks=xticks)
 
         ylabel!(plt, "Pressure [bar]")
@@ -263,7 +256,7 @@ module plotting
     Plot the fluxes at each pressure level
     """
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String;
-                            dpi::Int=250, size_x::Int=550, size_y::Int=400,
+                            size_x::Int=550, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
                             title::String=""
@@ -280,8 +273,7 @@ module plotting
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
         plt = plot(legend=:outertopright, ylims=ylims, yticks=yticks,
-                    xticks=(xticks, xticklabels), xlims=xlims,
-                    dpi=dpi, size=(size_x,size_y))
+                    xticks=(xticks, xticklabels), xlims=xlims, size=(size_x,size_y))
 
         col_r::String = "#c0c0c0"
         col_n::String = "#000000"
@@ -380,7 +372,7 @@ module plotting
     """
     Plot emission spectrum at the TOA
     """
-    function plot_emission(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
+    function plot_emission(atmos::atmosphere.Atmos_t, fname::String)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -415,7 +407,7 @@ module plotting
         @. yp = phys.evaluate_planck(xe, atmos.tmp_surf) * 1000.0
 
         # Make plot
-        plt = plot(dpi=dpi)
+        plt = plot()
 
         plot!(plt, xe, yp, label=L"Planck @ $T_s$",  color="green")
         plot!(plt, xe, ye, label="Surface LW+SW",    color="green", ls=:dash)
@@ -442,45 +434,76 @@ module plotting
     end
 
     """
-    Plot normalised contribution function (bolometric)
+    Plot contribution function at different bands.
     """
-    function plot_contfunc1(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
+    function plot_contfunc1(atmos::atmosphere.Atmos_t, fname::String;
+                                    size_x::Int=500, size_y::Int=400,
+                                    cf_min::Float64=1e-6)
 
         # Check that we have data
         if !atmos.is_out_lw
-            @error "Cannot plot contribution func because radiances have not been calculated"
+            @error "Cannot plot contrib func because radiances have not been calculated"
             return
         end
 
-        # Define arrays
-        x::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
-        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
-        w::Array{Float64, 1} = zeros(Float64, atmos.nbands)
-
-        # band widths
-        for ba in 1:atmos.nbands
-            w[ba] = abs(atmos.bands_min[ba] - atmos.bands_max[ba])
-        end
-
-        # store contribution
-        cf_min = 1.0e-9
-        for i in 1:atmos.nlev_c
-            x[i] = max(sum(atmos.contfunc_band[i,:] .* w[:]),cf_min)
-            y[i] = atmos.p[i] * 1.0e-5
-        end
-
-        # normalise contribution
-        x /= maximum(x)
-
         # Make plot
-        plt = plot(dpi=dpi, colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
+        plt = plot(legend=:bottomright, size=(size_x, size_y))
+        x_min::Float64 = log10(cf_min)
+        x_max::Float64 = x_min + 0.5
 
-        plot!(plt, x,y, c=:black)
+        # Define arrays
+        cff::Array{Float64, 1} = zeros(Float64, atmos.nlev_c) # log10 cont func
+        prs::Array{Float64, 1} = zeros(Float64, atmos.nlev_c) # pressure [bar]
+        @. prs = atmos.p * 1.0e-5
 
-        xlabel!(plt, "Normalised bolometric contribution")
-        xaxis!(plt, xscale=:log10, minorgrid=true)
+        # Band limits
+        wl_min  = 0.1 * 1e-6 # 100 nm
+        wl_imin = findmin(abs.(atmos.bands_cen .- wl_min))[2]
+        wl_max  = 150 * 1e-6 # 150 um
+        wl_imax = findmin(abs.(atmos.bands_cen .- wl_max))[2]
 
-        ylims  = (y[1], y[end])
+        # reversed?
+        if wl_imin > wl_imax
+            wl_imin, wl_imax = wl_imax, wl_imin
+        end
+
+        # plot statistical contributions at each level, from bands in given range
+        for i in 1:atmos.nlev_c
+            cff[i] = log10(max(maximum(atmos.contfunc_band[i,wl_imin:wl_imax]), cf_min))
+        end
+        x_max = max(x_max, maximum(cff))
+        plot!(plt, cff, prs, c=:black, label="Maximum", ls=:solid)
+
+        for i in 1:atmos.nlev_c
+            cff[i] = log10(max(mean(atmos.contfunc_band[i,wl_imin:wl_imax]), cf_min))
+        end
+        plot!(plt, cff, prs, c=:black, label="Mean", ls=:dash)
+
+        for i in 1:atmos.nlev_c
+            cff[i] = log10(max(median(atmos.contfunc_band[i,wl_imin:wl_imax]), cf_min))
+        end
+        plot!(plt, cff, prs, c=:black, label="Median", ls=:dot)
+
+        # plot per-band contributions [um] as their own lines
+        for wl_tgt in Float64[1.0, 5.0, 10.0, 15.0]
+            # find nearest band
+            wl_tgt *= 1e-6
+            iband = findmin(abs.(atmos.bands_cen .- wl_tgt))[2]
+            wl_i = atmos.bands_cen[iband] * 1e6
+
+            # get contribution function
+            for i in 1:atmos.nlev_c
+                cff[i] = log10(max(atmos.contfunc_band[i,iband], cf_min))
+            end
+
+            # plot
+            plot!(plt, cff, prs, label=@sprintf("%.1f μm",wl_i))
+        end
+
+        xlabel!(plt, "log₁₀ Contribution function")
+        xaxis!(plt, xlims=(x_min+0.05, x_max+0.1))
+
+        ylims  = (prs[1], prs[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
@@ -494,14 +517,19 @@ module plotting
 
     """
     Plot normalised contribution function (per band)
+
+    The data displayed in this plot are fine, but the x-axis ticks are labelled
+    incorrectly by the plotting library. I don't know why this is.
     """
-    function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
+    function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String)
 
         # Check that we have data
         if !atmos.is_out_lw
             @error "Cannot plot contribution func because radiances have not been calculated"
             return
         end
+
+        @warn "Contribution func 2D colormesh x-axis is incorrect!"
 
         # Get data
         x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
@@ -542,7 +570,7 @@ module plotting
         z[:] = log10.(z[:])
 
         # Make plot
-        plt = plot(dpi=dpi, colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
+        plt = plot(colorbar_title="log " * L"\widehat {cf}(\lambda, p)")
 
         heatmap!(plt, x,y,z, c=:devon)
 
@@ -566,7 +594,7 @@ module plotting
     """
     Plot spectral albedo (ratio of SW_UP to SW_DN)
     """
-    function plot_albedo(atmos::atmosphere.Atmos_t, fname::String; dpi::Int=250)
+    function plot_albedo(atmos::atmosphere.Atmos_t, fname::String)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -580,7 +608,7 @@ module plotting
 
         # Make plot
         ylims  = (0.0, 100.0)
-        plt = plot(dpi=dpi, ylims=ylims)
+        plt = plot(ylims=ylims)
 
         plot!(plt, atmos.bands_cen*1e9, y, color="black")
 
@@ -640,13 +668,12 @@ module plotting
     Plot jacobian matrix
     """
     function jacobian(b::Array{Float64,2}, fname::String;
-                            perturb::Array{Bool,1}=Bool[],
-                            dpi::Int=200, size_x::Int=600, size_y::Int=500)
+                            perturb::Array{Bool,1}=Bool[], size_x::Int=600, size_y::Int=500)
 
         lim::Float64 = maximum(abs.(b))     # colourbar limits
         l::Int = length(perturb)            # show perturbed levels?
 
-        plt = plot(dpi=dpi, size=(size_x, size_y),
+        plt = plot(size=(size_x, size_y),
                     title="∂r/∂x [W m⁻² K⁻¹]",
                     clim=(-lim,lim), yflip=true)
 
