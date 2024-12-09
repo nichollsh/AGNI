@@ -443,7 +443,7 @@ module AGNI
         @info prt_req[1:end-2]
 
         # Write initial state
-        dump.write_ptz(atmos, joinpath(atmos.OUT_DIR,"ptz_ini.csv"))
+        dump.write_ptz(atmos, joinpath(atmos.OUT_DIR,"ptz_initial.csv"))
 
         # Do chemistry on initial composition
         if chem_type in [1,2,3]
@@ -525,8 +525,8 @@ module AGNI
 
         # Write arrays
         @info "Writing results"
-        dump.write_ptz(atmos,      joinpath(atmos.OUT_DIR,"ptz.csv"))
-        dump.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
+        # dump.write_ptz(atmos,     joinpath(atmos.OUT_DIR,"ptz.csv"))
+        # dump.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
         dump.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 
         # Save plots
@@ -537,7 +537,6 @@ module AGNI
         plt_ani && plotting.animate(atmos)
         plt_vmr && plotting.plot_vmr(atmos,       joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
         plt_cff && plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.png"))
-        plt_cff && plotting.plot_contfunc2(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc2.png"))
         plt_tmp && plotting.plot_pt(atmos,        joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
         plt_flx && plotting.plot_fluxes(atmos,    joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=incl_convect, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
         plt_ems && plotting.plot_emission(atmos,  joinpath(atmos.OUT_DIR,"plot_emission.png"))

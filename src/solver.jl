@@ -149,7 +149,7 @@ module solver
         fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
         perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
         perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
-        perturb_mod::Int =      10      # Do full jacobian at least this frequently
+        perturb_mod::Int =      5       # Do full jacobian at least this frequently
 
         #    linesearch
         ls_tau::Float64    =    0.7     # backtracking downscale size
@@ -540,7 +540,7 @@ module solver
 
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
-            if (step == 1) || perturb_all || easy_step ||
+            if (step <= 2) || perturb_all || easy_step ||
                     (c_cur*perturb_trig < conv_atol + conv_rtol * c_max) ||
                     mod(step,perturb_mod)==0
                 # Update whole matrix when any of these are true:
@@ -778,6 +778,8 @@ module solver
 
         _fev!(x_cur, zeros(Float64, arr_len))
         energy.calc_hrates!(atmos)
+        energy.radtrans!(atmos, true, calc_cf=true)       # calculate LW radtrans with contfunc
+        atmosphere.calc_observed_rho!(atmos)
 
         # ----------------------------------------------------------
         # Print info
