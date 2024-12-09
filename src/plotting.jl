@@ -447,7 +447,7 @@ module plotting
         end
 
         # Make plot
-        plt = plot(legend=:bottomright, size=(size_x, size_y))
+        plt = plot(legend=:bottomleft, size=(size_x, size_y))
         x_min::Float64 = log10(cf_min)
         x_max::Float64 = x_min + 0.5
 
