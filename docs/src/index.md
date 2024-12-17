@@ -18,7 +18,7 @@ Contact: `harrison[dot]nicholls[at]physics.ox.ac.uk`
 GitHub: [https://github.com/nichollsh/AGNI](https://github.com/nichollsh/AGNI)
 
 If you use AGNI, please cite the following papers:
-* Nicholls et al., (2024) - https://doi.org/10.1093/mnras/stae2772
+* Nicholls et al., (2024) - [DOI 10.1093/mnras/stae2772](https://doi.org/10.1093/mnras/stae2772)
 * Nicholls et al., (2025) - submitted to JOSS
 
 This software is available under the GPLv3. Copyright (C) 2025 Harrison Nicholls.
