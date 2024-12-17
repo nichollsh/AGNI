@@ -14,6 +14,9 @@
   <a href="LICENSE.txt">
     <img src="https://img.shields.io/github/license/nichollsh/AGNI?label=License">
   </a>
+  <a href="https://doi.org/10.1093/mnras/stae2772">
+    <img src="https://img.shields.io/badge/DOI-10.1093%2Fmnras%2Fstae2772-blue">
+  </a>
 </p>
 
 <p align="center">
@@ -22,7 +25,6 @@
 
 
 ## Overview
-
 A numerical model for the atmospheres of hot rocky (exo)planets. AGNI's primary purpose is to simulate the evolving atmospheres of magma ocean planets, while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere.
 
 AGNI models correlated-k radiative transfer including shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and CIA. Mixing length theory is used to model convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile.
@@ -31,11 +33,13 @@ Consult the [AGNI documentation](https://nichollsh.github.io/AGNI/) for informat
 
 Contact: `harrison[dot]nicholls[at]physics.ox.ac.uk`
 
-GitHub: https://github.com/nichollsh/AGNI
-
-
 ## Installation and usage
 See the [Getting Started](https://nichollsh.github.io/AGNI/dev/setup/) page in the documentation for information on installing and using the model.
+
+## Citation
+If you use AGNI, please cite the following papers:
+* Nicholls et al., (2024) - https://doi.org/10.1093/mnras/stae2772
+* Nicholls et al., (2025) - submitted to JOSS
 
 ## Repository structure
 * `agni.jl`         - The main AGNI executable
@@ -49,4 +53,4 @@ See the [Getting Started](https://nichollsh.github.io/AGNI/dev/setup/) page in t
 * `test/`           - Tests for the code
 * `tutorials/`      - Notebooks and tutorials
 
-This software is available under the GPLv3. Copyright (C) 2024 Harrison Nicholls.
+This software is available under GPLv3. Copyright (C) 2025 Harrison Nicholls.
