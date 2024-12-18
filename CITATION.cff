@@ -4,8 +4,8 @@ authors:
 - family-names: "Nicholls"
   given-names: "Harrison"
   orcid: "https://orcid.org/0000-0002-8368-4641"
-title: "AGNI"
-version: 1.0.0
+title: "Convective shutdown in the atmospheres of lava worlds"
+version: 1.0.1
 doi: 10.1093/mnras/stae2772
-date-released: 2024-12-17
-url: "https://github.com/nichollsh/AGNI"
+date-released: 2024-12-18
+url: "https://doi.org/10.1093/mnras/stae2772"
