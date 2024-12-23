@@ -131,6 +131,7 @@ module energy
         ###################################################
 
         atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]
+        atmos.cld.frac_cloud[1,:,1]          .= 1.0
         atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]
         atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]
 

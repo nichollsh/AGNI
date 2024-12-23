@@ -386,7 +386,7 @@ module setpt
             end
 
             # Set cell-centre temperatures
-            Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i])
+            Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i] * x)
             if atmos.tmp[i] < Tdew
                 atmos.tmp[i] = Tdew
                 atmos.gas_sat[gas][i] = true

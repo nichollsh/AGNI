@@ -427,6 +427,7 @@ module AGNI
                 idx_req += 1
                 setpt.saturation!(atmos, initial_req[idx_req])
                 if flag_cld
+                    @debug "Applying clouds to initial state"
                     atmosphere.water_cloud!(atmos)
                 end
 
