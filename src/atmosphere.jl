@@ -333,7 +333,7 @@ module atmosphere
         @info  "Setting-up a new atmosphere struct"
 
         # Code versions
-        atmos.AGNI_VERSION = "1.0.1"
+        atmos.AGNI_VERSION = "1.0.2"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = "*atmos.AGNI_VERSION
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -2012,7 +2012,15 @@ module atmosphere
         return nothing
     end
 
-    # Set cloud properties within condensing regions.
+    """
+    **Manually set water cloud properties at saturated levels.**
+
+    Uses the default mass mixing ratio, area fraction, and droplet sizes.
+    This function is redundant if condensation is done via `handle_saturation!()`.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    """
     function water_cloud!(atmos::atmosphere.Atmos_t)
 
         # Reset
@@ -2020,22 +2028,13 @@ module atmosphere
         fill!(atmos.cloud_arr_l, 0.0)
         fill!(atmos.cloud_arr_f, 0.0)
 
-        # Get index of water
+        # Check that atmosphere can contain water
         if !("H2O" in atmos.gas_names)
             return nothing
         end
 
-        # Set level-by-level
-        x::Float64      = 0.0
+        # Set at each level
         for i in 1:atmos.nlev_c-1
-
-            # Water VMR
-            x = atmos.gas_vmr["H2O"][i]
-            if x < 1.0e-10
-                continue
-            end
-
-            # Use mask from atmos struct
             if atmos.gas_sat["H2O"][i]
                 atmos.cloud_arr_r[i] = atmos.cloud_val_r
                 atmos.cloud_arr_l[i] = atmos.cloud_val_l
