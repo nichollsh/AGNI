@@ -1,41 +1,41 @@
 # AGNI configuration file
-title = "K2-141 b (IW+4)"
+title = "TOI-561 b, pure CO2"
 
 [planet]
-    tmp_surf        = 3000.0
-    instellation    = 3949800
+    tmp_surf        = 2000.0
+    instellation    = 6.569e6 # from SMA of Polanski+24
     albedo_b        = 0.0
-    s0_fact         = 0.25
-    zenith_angle    = 54.74
+    s0_fact         = 1.0
+    zenith_angle    = 0.0
     surface_material= "res/surface_albedos/lunar_marebasalt.dat"
-    albedo_s        = 0.3
-    radius          = 9.57e+6
-    gravity         = 22.125
+    albedo_s        = 0.0
+    radius          = 9.287e6
+    gravity         = 13.9 # Polanski+24
     flux_int        = 0.0
-    turb_coeff      = 0.001
-    wind_speed      = 2.0
-    skin_k          = 2.0
-    skin_d          = 0.01
-    tmp_magma       = 3000
+    turb_coeff      = 1.0e-2
+    wind_speed      = 10.0
 
 [files]
-    input_sf        = "/network/group/aopp/planetary/RTP035_NICHOLLS_PROTEUS/fwl_data/spectral_files/Honeyside/256/Honeyside.sf"
-    input_star      = "/network/group/aopp/planetary/RTP035_NICHOLLS_PROTEUS/fwl_data/stellar_spectra/Named/hd85512.txt"
+    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"
+    input_star      = "res/stellar_spectra/sun.txt"
     output_dir      = "out/"
 
 [composition]
-    p_top           = 1e-5
-    p_dict          = {H2O = 1.248 , CO2 = 314.959 , N2  = 21.342 , H2  = 0.035 , CO  = 70.207 , CH4 = 0.000 , S2  = 0.958 , SO2 = 32.921}
+    p_surf          = 1e2
+    p_top           = 1e-4
+    vmr_dict        = { CO2 = 1.0}
+    vmr_path        = ""
     include_all     = false
     chemistry       = 0
     condensates     = []
 
+
 [execution]
     clean_output    = true
     verbosity       = 1
-    max_steps       = 20000
+    max_steps       = 200
     max_runtime     = 400
-    num_levels      = 50
+    num_levels      = 35
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -44,17 +44,18 @@ title = "K2-141 b (IW+4)"
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = true
-    latent_heat     = true
+    latent_heat     = false
     convection      = true
     rainout         = false
     solution_type   = 3
     solvers         = ["newton"]
     dx_max          = 400.0
-    initial_state   = ["loglin", "1800"]
-    linesearch      = 1
+    initial_state   = ["iso","2300"]
+    linesearch      = 2
     easy_start      = false
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3
+
 
 [plots]
     at_runtime      = true
