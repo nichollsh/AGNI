@@ -48,69 +48,69 @@ module phys
     # Newton's gravitational constant [m3 kg-1 s-2]
     const G_grav::Float64 = 6.67430e-11 # NIST CODATA
 
-    # Molecule mean molecular weight, kg mol-1
-    const lookup_mmw::Dict{String, Float64} = Dict{String, Float64}([
+    # Table of gas molecule mean molecular weights, kg mol-1
+    const _lookup_mmw::Dict{String, Float64} = Dict([
         # molecules
-        ("H2O", 1.801530E-02 ),
-        ("CO2", 4.401000E-02 ),
-        ("O3", 4.799820E-02 ),
-        ("N2O", 4.401280E-02 ),
-        ("CO", 2.801060E-02 ),
-        ("CH4", 1.604300E-02 ),
-        ("O2", 3.199880E-02 ),
-        ("NO", 3.000610E-02 ),
-        ("SO2", 6.406280E-02 ),
-        ("NO2", 4.600550E-02 ),
-        ("NH3", 1.703060E-02 ),
-        ("HNO3", 6.301290E-02 ),
-        ("N2", 2.801340E-02 ),
-        ("TiO", 6.386600E-02 ),
-        ("VO", 6.694090E-02 ),
-        ("H2", 2.015880E-03 ),
-        ("OCS", 6.007500E-02 ),
-        ("FeH", 5.685300E-02 ),
-        ("CrH", 5.300400E-02 ),
-        ("PH3", 3.399758E-02 ),
-        ("C2H2", 2.603730E-02 ),
-        ("HCN", 2.702530E-02 ),
-        ("H2S", 3.408100E-02 ),
-        ("NO3", 6.301280E-02 ),
-        ("N2O5", 1.080104E-01 ),
-        ("HONO", 4.701340E-02 ),
-        ("HO2NO2", 7.901220E-02 ),
-        ("H2O2", 3.401470E-02 ),
-        ("C2H6", 3.006900E-02 ),
-        ("CH3", 1.503450E-02 ),
-        ("H2CO", 3.002600E-02 ),
-        ("HO2", 3.300670E-02 ),
-        ("HDO", 1.902140E-02 ),
-        ("HCl", 3.646100E-02 ),
-        ("HF", 2.000689E-02 ),
+        ("H2O",     1.801530E-02 ),
+        ("CO2",     4.401000E-02 ),
+        ("O3",      4.799820E-02 ),
+        ("N2O",     4.401280E-02 ),
+        ("CO",      2.801060E-02 ),
+        ("CH4",     1.604300E-02 ),
+        ("O2",      3.199880E-02 ),
+        ("NO",      3.000610E-02 ),
+        ("SO2",     6.406280E-02 ),
+        ("NO2",     4.600550E-02 ),
+        ("NH3",     1.703060E-02 ),
+        ("HNO3",    6.301290E-02 ),
+        ("N2",      2.801340E-02 ),
+        ("TiO",     6.386600E-02 ),
+        ("VO",      6.694090E-02 ),
+        ("H2",      2.015880E-03 ),
+        ("OCS",     6.007500E-02 ),
+        ("FeH",     5.685300E-02 ),
+        ("CrH",     5.300400E-02 ),
+        ("PH3",     3.399758E-02 ),
+        ("C2H2",    2.603730E-02 ),
+        ("HCN",     2.702530E-02 ),
+        ("H2S",     3.408100E-02 ),
+        ("NO3",     6.301280E-02 ),
+        ("N2O5",    1.080104E-01 ),
+        ("HONO",    4.701340E-02 ),
+        ("HO2NO2",  7.901220E-02 ),
+        ("H2O2",    3.401470E-02 ),
+        ("C2H6",    3.006900E-02 ),
+        ("CH3",     1.503450E-02 ),
+        ("H2CO",    3.002600E-02 ),
+        ("HO2",     3.300670E-02 ),
+        ("HDO",     1.902140E-02 ),
+        ("HCl",     3.646100E-02 ),
+        ("HF",      2.000689E-02 ),
 
         # elements from https://iupac.qmul.ac.uk/AtWt/
-        ("H",  1.008000000e-03 ),
+        ("H",   1.008000000e-03 ),
         ("He",  4.002000000e-03 ),
         ("Li",  6.940000000e-03 ),
         ("Be",  9.012000000e-03 ),
-        ("B",  1.081000000e-02 ),
-        ("C",  1.201100000e-02 ),
-        ("N",  1.400700000e-02 ),
-        ("O",  1.599900000e-02 ),
-        ("F",  1.899800000e-02 ),
+        ("B",   1.081000000e-02 ),
+        ("C",   1.201100000e-02 ),
+        ("N",   1.400700000e-02 ),
+        ("O",   1.599900000e-02 ),
+        ("F",   1.899800000e-02 ),
         ("Ne",  2.017970000e-02 ),
         ("Na",  2.298900000e-02 ),
         ("Mg",  2.430500000e-02 ),
         ("Al",  2.698100000e-02 ),
         ("Si",  2.808500000e-02 ),
-        ("P",  3.097300000e-02 ),
-        ("S",  3.206000000e-02 ),
+        ("P",   3.097300000e-02 ),
+        ("S",   3.206000000e-02 ),
         ("Cl",  3.545000000e-02 ),
         ("Ar",  3.995000000e-02 ),
-        ("K",  3.909830000e-02 ),
+        ("K",   3.909830000e-02 ),
         ("Ca",  4.007800000e-02 ),
         ("Sc",  4.495500000e-02 ),
         ("Ti",  4.786700000e-02 ),
-        ("V",  5.094150000e-02 ),
+        ("V",   5.094150000e-02 ),
         ("Cr",  5.199610000e-02 ),
         ("Mn",  5.493800000e-02 ),
         ("Fe",  5.584500000e-02 ),
@@ -126,7 +126,7 @@ module phys
         ("Kr",  8.379800000e-02 ),
         ("Rb",  8.546780000e-02 ),
         ("Sr",  8.762000000e-02 ),
-        ("Y",  8.890500000e-02 ),
+        ("Y",   8.890500000e-02 ),
         ("Zr",  9.122400000e-02 ),
         ("Nb",  9.290600000e-02 ),
         ("Mo",  9.595000000e-02 ),
@@ -139,7 +139,7 @@ module phys
         ("Sn",  1.187100000e-01 ),
         ("Sb",  1.217600000e-01 ),
         ("Te",  1.276000000e-01 ),
-        ("I",  1.269040000e-01 ),
+        ("I",   1.269040000e-01 ),
         ("Xe",  1.312930000e-01 ),
         ("Cs",  1.329050000e-01 ),
         ("Ba",  1.373270000e-01 ),
@@ -159,7 +159,7 @@ module phys
         ("Lu",  1.749668000e-01 ),
         ("Hf",  1.784860000e-01 ),
         ("Ta",  1.809470000e-01 ),
-        ("W",  1.838400000e-01 ),
+        ("W",   1.838400000e-01 ),
         ("Re",  1.862070000e-01 ),
         ("Os",  1.902300000e-01 ),
         ("Ir",  1.922170000e-01 ),
@@ -171,8 +171,92 @@ module phys
         ("Bi",  2.089800000e-01 ),
         ("Th",  2.320377000e-01 ),
         ("Pa",  2.310350000e-01 ),
-        ("U",  2.380280000e-01),
+        ("U",   2.380280000e-01),
     ])
+
+    # Table of Van der Waals coefficients
+    const _lookup_vdw::Dict{String,Tuple{Float64,Float64}} = Dict([
+        ("C2H2"  , (4.516   ,  0.0522   )),
+        ("NH3"   , (4.225   ,  0.0371   )),
+        ("Ar"    , (1.355   ,  0.03201  )),
+        ("C4H10" , (14.66   ,  0.1226   )),
+        ("CO2"   , (3.640   ,  0.04267  )),
+        ("CS2"   , (11.77   ,  0.07685  )),
+        ("CO"    , (1.505   ,  0.03985  )),
+        ("CCl4"  , (19.748  ,  0.1281   )),
+        ("Cl"    , (6.579   ,  0.05622  )),
+        ("CH3Cl" , (7.570   ,  0.06483  )),
+        ("C2N2"  , (7.769   ,  0.06901  )),
+        ("C10H22", (52.74   ,  0.3043   )),
+        ("C2H6"  , (5.562   ,  0.0638   )),
+        ("C2H5OH", (12.18   ,  0.08407  )),
+        ("Fl"    , (1.171   ,  0.0290   )),
+        ("He"    , (0.0346  ,  0.0238   )),
+        ("C7H16" , (31.06   ,  0.2049   )),
+        ("C6H14" , (24.71   ,  0.1735   )),
+        ("N2H4"  , (8.46    ,  0.0462   )),
+        ("H2"    , (0.2476  ,  0.02661  )),
+        ("HBr"   , (4.510   ,  0.04431  )),
+        ("HCl"   , (3.716   ,  0.04081  )),
+        ("HCN"   , (11.29   ,  0.0881   )),
+        ("HF"    , (9.565   ,  0.0739   )),
+        ("HI"    , (6.309   ,  0.0530   )),
+        ("H2Se"  , (5.338   ,  0.04637  )),
+        ("H2S"   , (4.490   ,  0.04287  )),
+        ("Kr"    , (2.349   ,  0.03978  )),
+        ("Hg"    , (8.200   ,  0.01696  )),
+        ("CH4"   , (2.253   ,  0.04278  )),
+        ("CH4O"  , (9.649   ,  0.06702  )),
+        ("Ne"    , (0.2135  ,  0.01709  )),
+        ("NO"    , (1.358   ,  0.02789  )),
+        ("N2"    , (1.370   ,  0.0387   )),
+        ("NO2"   , (5.354   ,  0.04424  )),
+        ("NF3"   , (3.58    ,  0.0545   )),
+        ("N2O"   , (3.832   ,  0.04415  )),
+        ("O2"    , (1.382   ,  0.03186  )),
+        ("O3"    , (3.570   ,  0.0487   )),
+        ("C5H12" , (19.26   ,  0.146    )),
+        ("C6H6O" , (22.93   ,  0.1177   )),
+        ("PH3"   , (4.692   ,  0.05156  )),
+        ("SiH4"  , (4.377   ,  0.05786  )),
+        ("SO2"   , (6.803   ,  0.05636  )),
+        ("SF6"   , (7.857   ,  0.0879   )),
+        ("CCl4"  , (20.01   ,  0.1281   )),
+        ("H2O"   , (5.536   ,  0.03049  )),
+        ("Xe"    , (4.250    , 0.05105  ))
+    ])
+
+    # Table of pre-defined colors for plotting
+    const _lookup_color::Dict{String, String} = Dict([
+        # common volatiles
+        ("H2O", "#027FB1" ),
+        ("CO2", "#D24901" ),
+        ("H2" , "#008C01" ),
+        ("CH4", "#C720DD" ),
+        ("CO" , "#D1AC02" ),
+        ("N2" , "#870036" ),
+        ("NH3", "#675200" ),
+        ("S2" , "#FF8FA1" ),
+        ("SO2", "#00008B" ),
+
+        # volatile elements
+        ("H"  , "#0000aa"),
+        ("C"  , "#ff0000"),
+        ("O"  , "#00cc00"),
+        ("N"  , "#ffaa00"),
+        ("S" ,  "#ff22ff"),
+        ("P" ,  "#33ccff"),
+        ("He" , "#30FF71" ),
+
+        # refractory elements
+        ("Fe" , "#888888"),
+        ("Si" , "#aa2277"),
+        ("Mg" , "#996633"),
+        ("Na" , "#1144ff")
+    ])
+
+    # Enumerate potential equations of state
+    @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3
 
     # Structure containing data for a single gas
     mutable struct Gas_t
@@ -215,41 +299,140 @@ module phys
         cap_C::Array{Float64,1}     # Corresponding Cp values [J K-1 kg-1]
         cap_I::Interpolator         # Interpolator struct
 
+        # Thermal conductivity
+        kc::Float64                 # Constant conductivity [J K-1 kg-1]
+
         # Plotting colour (hex code) and label
         plot_color::String
         plot_label::String
 
+        # Van der Waals coefficients
+        vdw_a::Float64              # Intermolecular forces
+        vdw_b::Float64              # Volume of particles
+
+        # Which equation of state should be used for this gas?
+        eos::EOS
+
         Gas_t() = new()
     end # end gas struct
 
-    # Pre-defined colors
-    const lookup_color::Dict{String, String} = Dict{String, String}([
-        # common volatiles
-        ("H2O", "#027FB1" ),
-        ("CO2", "#D24901" ),
-        ("H2" , "#008C01" ),
-        ("CH4", "#C720DD" ),
-        ("CO" , "#D1AC02" ),
-        ("N2" , "#870036" ),
-        ("NH3", "#675200" ),
-        ("S2" , "#FF8FA1" ),
-        ("SO2", "#00008B" ),
+    """
+    Load gas data into a new struct
+    """
+    function load_gas(thermo_dir::String, formula::String, tmp_dep::Bool)::Gas_t
 
-        # volatile elements
-        ("H"  , "#0000aa"),
-        ("C"  , "#ff0000"),
-        ("O"  , "#00cc00"),
-        ("N"  , "#ffaa00"),
-        ("S" ,  "#ff22ff"),
-        ("P" ,  "#33ccff"),
-        ("He" , "#30FF71" ),
+        @debug ("Loading data for gas $formula")
 
-        # refractory elements
-        ("Fe" , "#888888"),
-        ("Si" , "#aa2277"),
-        ("Mg" , "#996633"),
-        ("Na" , "#1144ff")
-    ])
+        # Clean input and get file path
+        formula = String(strip(formula))
+        fpath = joinpath(thermo_dir, "$formula.nc" )
+
+        # Initialise struct
+        gas = Gas_t()
+        gas.formula = formula
+        gas.tmp_dep = tmp_dep
+        gas.eos = EOS_IDEAL
+
+        # Count atoms
+        gas.atoms = count_atoms(formula)
+        for e in keys(gas.atoms)
+            if !(e in elements_list)
+                error("Gas '$formula' contains unsupported element '$e'")
+            end
+        end
+
+        # Thermal conductivity
+        gas.kc = 0.0
+
+        # Fastchem name (to be learned later)
+        gas.fastchem_name = "_unknown"
+
+        # Set plotting color and label
+        gas.plot_color = _pretty_color(formula)
+        gas.plot_label = _pretty_name(formula)
+
+        # Check if we have data from file
+        gas.stub = !isfile(fpath)
+        gas.no_sat = false
+        if gas.stub
+            # no data => generate stub
+            @debug("    stub")
+
+            gas.mmw = _get_mmw(formula)
+            gas.JANAF_name = "_unknown"
+
+            # heat capacity set to zero
+            gas.cap_T = [0.0, fbig]
+            gas.cap_C = [0.0, 0.0]
+
+            # latent heat set to zero
+            gas.lat_T = [0.0, fbig]
+            gas.lat_H = [0.0, 0.0]
+
+            # saturation pressure set to large value (ensures always gas phase)
+            gas.sat_T = [0.0, fbig]
+            gas.sat_P = [fbig, fbig]
+            gas.no_sat = true
+
+            # critical set to small value (always supercritical)
+            gas.T_crit = 0.0
+            gas.T_trip = 0.0
+
+        else
+            # have data => load from file
+            @debug("    ncdf")
+            @debug "ALL DEBUG SUPPRESSED"
+            with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
+                ds = Dataset(fpath,"r")
+
+                # scalar properties
+                gas.mmw = ds["mmw"][1]
+                gas.T_trip = ds["T_trip"][1]
+                gas.T_crit = ds["T_crit"][1]
+                gas.JANAF_name = String(ds["JANAF"][:])
+
+                # variable properties
+                gas.cap_T = ds["cap_T"][:]
+                gas.cap_C = ds["cap_C"][:]
+
+                gas.lat_T = ds["lat_T"][:]
+                gas.lat_H = ds["lat_H"][:]
+
+                gas.sat_T = ds["sat_T"][:]
+                gas.sat_P = ds["sat_P"][:]
+                if length(gas.sat_P) < 3
+                    gas.no_sat = true
+                end
+
+                # close file
+                close(ds)
+            end
+            @debug "ALL DEBUG RESTORED"
+
+            # extrapolate to high temperatures
+            push!(gas.cap_T, 9000.0); push!(gas.cap_C, gas.cap_C[end])
+            push!(gas.lat_T, 9000.0); push!(gas.lat_H, gas.lat_H[end])
+            push!(gas.sat_T, 9000.0); push!(gas.sat_P, gas.sat_P[end])
+
+            # setup interpolators
+            gas.cap_I = Interpolator(gas.cap_T, gas.cap_C)
+            gas.lat_I = Interpolator(gas.lat_T, gas.lat_H)
+            gas.sat_I = Interpolator(gas.sat_T, gas.sat_P)
+
+        end
+
+        # Van der Waals coefficients
+        vdwa, vdwb, has_vdw = _get_vdw(formula)
+        if has_vdw
+            gas.eos = EOS_VDW
+            gas.vdw_a = 1e5 * vdwa / (gas.mmw*1e3)^2
+            gas.vdw_b = vdwb / (gas.mmw*1e3)
+        end
+
+        @debug("    done")
+        return gas
+    end # end load_gas
+
 
     """
     Get number of atoms from formula, returning a dictionary
@@ -336,11 +519,11 @@ module phys
     """
     Calculate species mean molecular weight [kg mol-1] from formula or use known value
     """
-    function get_mmw(m::String)::Float64
+    function _get_mmw(m::String)::Float64
 
         # already defined?
-        if m in keys(lookup_mmw)
-           return lookup_mmw[m]
+        if m in keys(_lookup_mmw)
+           return _lookup_mmw[m]
         end
 
         # get atoms
@@ -349,16 +532,26 @@ module phys
         # add up atoms
         mmw::Float64 = 0.0
         for k in keys(atoms)
-            mmw += lookup_mmw[k]*atoms[k]
+            mmw += _lookup_mmw[k]*atoms[k]
         end
 
         return mmw
     end
 
     """
+    Get the Van der Waals coefficients if available, otherwise return values of zero.
+    """
+    function _get_vdw(m::String)::Tuple{Float64,Float64,Bool}
+        if m in keys(_lookup_vdw)
+           return (_lookup_vdw[m]..., true)
+        end
+        return (0.0, 0.0, false)
+    end
+
+    """
     Convert formula to pretty unicode string
     """
-    function pretty_name(gas::String)::String
+    function _pretty_name(gas::String)::String
         out::String = ""
         for c in gas
             if isnumeric(c)
@@ -374,10 +567,10 @@ module phys
     """
     Generate a colour hex code from a molecular formula
     """
-    function pretty_color(gas::String)::String
+    function _pretty_color(gas::String)::String
         # Defined
-        if gas in keys(lookup_color)
-            return lookup_color[gas]
+        if gas in keys(_lookup_color)
+            return _lookup_color[gas]
         end
 
         # Else, generate colour from atoms
@@ -386,9 +579,9 @@ module phys
         g::Float64 = 0.0
         b::Float64 = 0.0
         for e in keys(atoms)
-            r += parse(Int,lookup_color[e][2:3],base=16)*atoms[e]
-            g += parse(Int,lookup_color[e][4:5],base=16)*atoms[e]
-            b += parse(Int,lookup_color[e][6:7],base=16)*atoms[e]
+            r += parse(Int,_lookup_color[e][2:3],base=16)*atoms[e]
+            g += parse(Int,_lookup_color[e][4:5],base=16)*atoms[e]
+            b += parse(Int,_lookup_color[e][6:7],base=16)*atoms[e]
         end
         m::Float64 = max(r,g,b)
 
@@ -404,113 +597,6 @@ module phys
         out *= string(floor(Int,255 * b/m),base=16,pad=2)
         return out
     end
-
-    """
-    Load gas data into a new struct
-    """
-    function load_gas(thermo_dir::String, formula::String, tmp_dep::Bool)::Gas_t
-
-        @debug ("Loading data for gas $formula")
-
-        # Clean input and get file path
-        formula = String(strip(formula))
-        fpath = joinpath(thermo_dir, "$formula.nc" )
-
-        # Initialise struct
-        gas = Gas_t()
-        gas.formula = formula
-        gas.tmp_dep = tmp_dep
-
-        # Count atoms
-        gas.atoms = count_atoms(formula)
-        for e in keys(gas.atoms)
-            if !(e in elements_list)
-                error("Gas '$formula' contains unsupported element '$e'")
-            end
-        end
-
-        # Fastchem name (to be learned later)
-        gas.fastchem_name = "_unknown"
-
-        # Set plotting color and label
-        gas.plot_color = pretty_color(formula)
-        gas.plot_label = pretty_name(formula)
-
-        get_mmw(formula)
-
-        # Check if we have data from file
-        gas.stub = !isfile(fpath)
-        gas.no_sat = false
-        if gas.stub
-            # no data => generate stub
-            @debug("    stub")
-
-            gas.mmw = get_mmw(formula)
-            gas.JANAF_name = "_unknown"
-
-            # heat capacity set to zero
-            gas.cap_T = [0.0, fbig]
-            gas.cap_C = [0.0, 0.0]
-
-            # latent heat set to zero
-            gas.lat_T = [0.0, fbig]
-            gas.lat_H = [0.0, 0.0]
-
-            # saturation pressure set to large value (ensures always gas phase)
-            gas.sat_T = [0.0, fbig]
-            gas.sat_P = [fbig, fbig]
-            gas.no_sat = true
-
-            # critical set to small value (always supercritical)
-            gas.T_crit = 0.0
-            gas.T_trip = 0.0
-
-        else
-            # have data => load from file
-            @debug("    ncdf")
-            @debug "ALL DEBUG SUPPRESSED"
-            with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
-                ds = Dataset(fpath,"r")
-
-                # scalar properties
-                gas.mmw = ds["mmw"][1]
-                gas.T_trip = ds["T_trip"][1]
-                gas.T_crit = ds["T_crit"][1]
-                gas.JANAF_name = String(ds["JANAF"][:])
-
-                # variable properties
-                gas.cap_T = ds["cap_T"][:]
-                gas.cap_C = ds["cap_C"][:]
-
-                gas.lat_T = ds["lat_T"][:]
-                gas.lat_H = ds["lat_H"][:]
-
-                gas.sat_T = ds["sat_T"][:]
-                gas.sat_P = ds["sat_P"][:]
-                if length(gas.sat_P) < 3
-                    gas.no_sat = true
-                end
-
-                # close file
-                close(ds)
-            end
-            @debug "ALL DEBUG RESTORED"
-
-            # extrapolate to high temperatures
-            push!(gas.cap_T, 9000.0); push!(gas.cap_C, gas.cap_C[end])
-            push!(gas.lat_T, 9000.0); push!(gas.lat_H, gas.lat_H[end])
-            push!(gas.sat_T, 9000.0); push!(gas.sat_P, gas.sat_P[end])
-
-            # setup interpolators
-            gas.cap_I = Interpolator(gas.cap_T, gas.cap_C)
-            gas.lat_I = Interpolator(gas.lat_T, gas.lat_H)
-            gas.sat_I = Interpolator(gas.sat_T, gas.sat_P)
-
-        end
-
-        @debug("    done")
-        return gas
-    end # end load_gas
 
     """
     **Get gas saturation pressure for a given temperature.**
@@ -637,6 +723,8 @@ module phys
     """
     **Get gas thermal conductivity at a given temperature.**
 
+    This is always set to zero - not yet implemented.
+
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
     - `t::Float64`              temperature [K]
@@ -645,7 +733,105 @@ module phys
     - `kc::Float64`             thermal conductivity [W m-1 K-1]
     """
     function get_Kc(gas::Gas_t, t::Float64=-1.0)::Float64
-        return 0.0
+        return gas.kc
+    end
+
+    """
+    **Calculate the density of a mixture of gases using Amagat's law.**
+
+    Arguments:
+    - `gas::Array{Gas_t,1}`     array of gases
+    - `vmr::Array{Float64,1}`   array of volume mixing ratios
+    - `tmp::Float64`            temperature [K]
+    - `prs::Float64`            pressure [Pa]
+
+    Returns:
+    - `rho::Float64`            mass density [kg m-3]
+    """
+    function calc_rho_mix(gas::Array{Gas_t,1}, vmr::Array{Float64,1},
+                            tmp::Float64, prs::Float64, mmw::Float64)::Float64
+
+        # validate lengths
+        ngas::Int = length(gas)
+        if ngas != length(vmr)
+            @error "The number of gases and the number of mixing ratios are different"
+            exit(1)
+        end
+
+        # calculate the density (and mass-mixing ratio) of each gas
+        rho::Array{Float64, 1} = zeros(Float64, ngas)
+        mmr::Array{Float64, 1} = zeros(Float64, ngas)
+        for i in 1:ngas
+            rho[i] = calc_rho_gas(gas[i], tmp, prs)
+            mmr[i] = vmr[i] * gas[i].mmw / mmw
+        end
+
+        # add them together, assuming ideal additive volumes (inverse density)
+        return 1.0 / sum(mmr[:] ./ rho[:])
+    end
+
+    """
+    **Calculate the density of a gas using the most appropriate equation of state.**
+
+    Arguments:
+    - `gas::Gas_t`          the gas struct to be used
+    - `tmp::Float64`        temperature [K]
+    - `prs::Float64`        pressure [Pa]
+
+    Returns:
+    - `rho::Float64`        mass density [kg m-3]
+    """
+    function calc_rho_gas(gas::Gas_t, tmp::Float64, prs::Float64)::Float64
+        if gas.eos == EOS_IDEAL
+            return _rho_ideal(tmp, prs, gas.mmw)
+        elseif gas.eos == EOS_VDW
+            return _rho_vdw(tmp, prs, gas.mmw, gas.vdw_a, gas.vdw_b)
+        end
+    end
+
+
+    """
+    **Evaluate the density of a single gas using the ideal gas EOS.**
+
+    Arguments:
+    - `tmp::Float64`        temperature [K]
+    - `prs::Float64`        pressure [Pa]
+    - `mmw::Float64`        mean molecular weight [kg mol-1]
+
+    Returns:
+    - `rho::Float64`        mass density [kg m-3]
+    """
+    function _rho_ideal(tmp::Float64, prs::Float64, mmw::Float64)::Float64
+        return prs * gas.mmw / (tmp * R_gas)
+    end
+
+    """
+    **Evaluate the density of a single gas using the Van der Waals EOS.**
+
+    This formula was generated by Claire using Sympy.
+
+    Arguments:
+    - `T::Float64`          temperature [K]
+    - `p::Float64`          pressure [Pa]
+    - `mmw::Float64`        mean molecular weight [kg mol-1]
+    - `a::Float64`          VDW coefficient 'a'
+    - `b::Float64`          VDW coefficient 'b'
+
+    Returns:
+    - `rho::Float64`        mass density [kg m-3]
+    """
+    function _rho_vdw(T::Float64, p::Float64,
+                        mmw::Float64, a::Float64, b::Float64)::Float64
+        R::Float64 = R_gas / mmw
+        return  -(b ^ (-2) - 3 * (b * p + R * T) / (a * b)) / (3 * (sqrt(
+                -4 * (b ^ (-2) - 3 * (b * p + R * T) / (a * b)) ^ 3 + (
+                -2 / b ^ 3 - 27 * p / (a * b) + 9 * (b * p + R * T)
+                / (a * b ^ 2)) ^ 2) / 2 - 1 / b ^ 3 - 27 * p / (2 * a * b)
+                + 9 * (b * p + R * T) / ( 2 * a * b ^ 2)) ^ (1 / 3)) - (sqrt(
+                -4 * (b ^ (-2) - 3 * (b * p + R * T) / (a * b)) ^ 3 +
+                (-2 / b ^ 3 - 27 * p / (a * b) + 9 * (b * p + R * T) /
+                (a * b ^ 2)) ^ 2) / 2 - 1 / b ^ 3 - 27 * p / (2 * a * b) +
+                9 * (b * p + R * T) / (2 * a * b ^ 2)) ^ (1 / 3) / 3 + 1 / (3 * b)
     end
 
     """
