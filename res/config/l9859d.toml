@@ -1,29 +1,31 @@
 # AGNI configuration file
-title = "TOI-561 b, pure CO2"
+title = "L 98-59 d"
 
 [planet]
-    tmp_surf        = 2000.0
-    instellation    = 6.569e6 # from SMA of Polanski+24
+    tmp_surf        = 2500.0
+    instellation    = 6818.61
     albedo_b        = 0.0
-    s0_fact         = 1.0
-    zenith_angle    = 0.0
+    s0_fact         = 0.25
+    zenith_angle    =  54.74
     surface_material= "res/surface_albedos/lunar_marebasalt.dat"
     albedo_s        = 0.0
-    radius          = 9.287e6
-    gravity         = 13.9 # Polanski+24
-    flux_int        = 0.0
+    radius          = 8.091e6
+    gravity         = 12.7
+    flux_int        = 0.1
     turb_coeff      = 1.0e-2
     wind_speed      = 10.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"
-    input_star      = "res/stellar_spectra/sun.txt"
-    output_dir      = "out/"
+    # input_sf        = "res/spectral_files/nogit_shared/Honeyside/256/Honeyside.sf"
+    # input_star      = "res/stellar_spectra/l-98-59.txt"
+    input_sf        = "out/l98.sf"
+    input_star      = ""
+    output_dir      = "out/l98d_SO2_F0.1"
 
 [composition]
-    p_surf          = 1e2
+    p_surf          = 32.89e3
     p_top           = 1e-4
-    vmr_dict        = { CO2 = 1.0}
+    vmr_dict        = { SO2=1.0 }
     vmr_path        = ""
     include_all     = false
     chemistry       = 0
@@ -35,7 +37,7 @@ title = "TOI-561 b, pure CO2"
     verbosity       = 1
     max_steps       = 200
     max_runtime     = 400
-    num_levels      = 35
+    num_levels      = 50
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -44,16 +46,16 @@ title = "TOI-561 b, pure CO2"
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = true
-    latent_heat     = false
+    latent_heat     = true
     convection      = true
     rainout         = false
     solution_type   = 3
     solvers         = ["newton"]
-    dx_max          = 400.0
-    initial_state   = ["iso","2300"]
-    linesearch      = 2
+    dx_max          = 200.0
+    initial_state   = ["loglin","600"]
+    linesearch      = 0
     easy_start      = false
-    converge_atol   = 1.0e-2
+    converge_atol   = 1e-1
     converge_rtol   = 1.0e-3
 
 
@@ -65,5 +67,5 @@ title = "TOI-561 b, pure CO2"
     emission        = true
     albedo          = true
     mixing_ratios   = true
-    animate         = true
-    height          = true
+    animate         = false
+    height          = false
