@@ -813,7 +813,7 @@ module atmosphere
     """
     **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
 
-    Assumes that the atmosphere may be treated as an ideal gas.
+    Assumes that the atmosphere is hydrostatically supported.
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
