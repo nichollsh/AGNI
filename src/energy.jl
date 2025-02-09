@@ -193,7 +193,7 @@ module energy
                     # convert VOLUME mixing ratio to MASS mixing ratio
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_vmr[s_gas][i] *
                                                             atmos.gas_dat[s_gas].mmw /
-                                                            atmos.layer_mmw[i]
+                                                            atmos.layer_μ[i]
                 else
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0
                 end
@@ -281,7 +281,7 @@ module energy
     function sensible!(atmos::atmosphere.Atmos_t)
         # TKE scheme for this 1D case
         # transports energy from the surface to the bottom node
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_μ[end]*
                             atmos.p[end]/(phys.R_gas*atmos.tmp[end]) *
                             atmos.C_d * atmos.U *
                             (atmos.tmp_surf-atmos.tmp[end])
@@ -363,7 +363,7 @@ module energy
             mt = m1+m2
 
             grav = (atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1)/mt
-            mu   = (atmos.layer_mmw[i]  * m2 + atmos.layer_mmw[i-1]  * m1)/mt
+            mu   = (atmos.layer_μ[i]  * m2 + atmos.layer_μ[i-1]  * m1)/mt
             c_p  = (atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1)/mt
             tmp  = (atmos.tmp[i]        * m2 + atmos.tmp[i-1]        * m1)/mt
 
@@ -789,8 +789,8 @@ module energy
                 T2 = atmos.tmp[i]  # lower layer
                 p2 = atmos.p[i]
 
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +
-                             atmos.layer_cp[i] * atmos.layer_mmw[i])
+                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_μ[i-1] +
+                             atmos.layer_cp[i] * atmos.layer_μ[i])
                 pfact = (p1/p2)^(phys.R_gas / cp)
 
                 # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
@@ -812,8 +812,8 @@ module energy
                 T2 = atmos.tmp[i]
                 p2 = atmos.p[i]
 
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +
-                             atmos.layer_cp[i] * atmos.layer_mmw[i])
+                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_μ[i-1] +
+                             atmos.layer_cp[i] * atmos.layer_μ[i])
                 pfact = (p1/p2)^(phys.R_gas / cp)
 
                 if T1 < T2*pfact

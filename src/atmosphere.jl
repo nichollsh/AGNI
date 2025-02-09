@@ -122,7 +122,7 @@ module atmosphere
         thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
         gravity_funct::Bool                 # use height-dependent gravity calculation (otherwise, use surface value throughout)
         layer_density::Array{Float64,1}     # density [kg m-3]
-        layer_mmw::Array{Float64,1}         # mean molecular weight [kg mol-1]
+        layer_μ::Array{Float64,1}                 # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
         layer_kc::Array{Float64,1}          # thermal conductivity at const-p [W m-1 K-1]
         layer_grav::Array{Float64,1}        # gravity [m s-2]
@@ -333,7 +333,7 @@ module atmosphere
         @info  "Setting-up a new atmosphere struct"
 
         # Code versions
-        atmos.AGNI_VERSION = "1.0.3"
+        atmos.AGNI_VERSION = "1.1.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = "*atmos.AGNI_VERSION
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -436,7 +436,7 @@ module atmosphere
         atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
 
         # Initialise thermodynamics
-        atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
+        atmos.layer_μ     = zeros(Float64, atmos.nlev_c)
         atmos.layer_density = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         atmos.layer_kc      = zeros(Float64, atmos.nlev_c)
@@ -836,7 +836,7 @@ module atmosphere
         fill!(atmos.layer_mass   ,  0.0)
         fill!(atmos.layer_cp,       0.0)
         fill!(atmos.layer_kc,       0.0)
-        fill!(atmos.layer_mmw,      0.0)
+        fill!(atmos.layer_μ,      0.0)
 
         # Temporary values
         g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
@@ -850,16 +850,26 @@ module atmosphere
 
         # Set MMW at each level
         for gas in atmos.gas_names
-            @turbo @. atmos.layer_mmw += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
+            @turbo @. atmos.layer_μ += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
         end
 
         # Set cp, kc at each level
         for gas in atmos.gas_names
             @inbounds for i in 1:atmos.nlev_c
-                mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
+                mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_μ[i]
                 atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
                 atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
             end
+        end
+
+        # Set density at each level
+        gas_arr = [atmos.gas_dat[gas] for gas in atmos.gas_names]
+        @inbounds for i in 1:atmos.nlev_c
+            vmr_arr = [atmos.gas_vmr[gas][i] for gas in atmos.gas_names]
+            atmos.layer_density[i] = phys.calc_rho_mix(
+                                                    gas_arr, vmr_arr,
+                                                    atmos.tmp[i], atmos.p[i],
+                                                    atmos.layer_μ[i])
         end
 
         # Integrate from bottom upwards
@@ -877,8 +887,7 @@ module atmosphere
             end
             p1 = 0.5 * (atmos.p[i] + atmos.pl[i+1])
             t1 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i+1])
-            dzc = phys.R_gas * t1 /
-                        (atmos.layer_mmw[i] * g1 * p1) * (atmos.pl[i+1] - atmos.p[i])
+            dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_density[i] * g1)
             if !ignore_errors
                 if (dzc < dz_min)
                     ok = 2
@@ -896,8 +905,7 @@ module atmosphere
             end
             p2 = 0.5 * (atmos.p[i] + atmos.pl[i])
             t2 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i])
-            dzl = phys.R_gas * t2 / (
-                        atmos.layer_mmw[i] * g2 * p2) * (atmos.p[i]- atmos.pl[i])
+            dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_density[i] * g2)
             if !ignore_errors
                 if (dzl < dz_min)
                     ok = 2
@@ -910,6 +918,9 @@ module atmosphere
             # Layer-centre gravity [m s-2]
             atmos.layer_grav[i] = g2
 
+            # Layer-centre mass per unit area [kg m-2]
+            atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
+
             # Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
         end
@@ -920,16 +931,13 @@ module atmosphere
             @error "Height integration failure: blew up, dz >= $dz_max"
         end
 
-        # Mass (per unit area, kg m-2) and density (kg m-3)
-        # Loop from top downards
-        @inbounds for i in 1:atmos.nlev_c
-            atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
-            atmos.atm.mass[1, i] = atmos.layer_mass[i]          # pass to SOCRATES
-
-            atmos.layer_density[i] = ( atmos.p[i] * atmos.layer_mmw[i] ) /
-                                                        (phys.R_gas * atmos.tmp[i])
-            atmos.atm.density[1,i] = atmos.layer_density[i]     # pass to SOCRATES
-        end
+        # Pass arrays to SOCRATES
+        atmos.atm.p[1, :]           .= atmos.p[:]
+        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+        # atmos.atm.r_layer[1,:]      .= atmos.z[:]  .+ atmos.rp
+        # atmos.atm.r_level[1,0:end]  .= atmos.zl[:] .+ atmos.rp
+        atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
+        atmos.atm.density[1,:]      .= atmos.layer_density[:]
 
         return Bool(code==0)
     end
@@ -1727,7 +1735,7 @@ module atmosphere
         # If we are missing gases then that's okay.
 
         # Find where we truncated the temperature profile,
-        #      and make sure that regions above that use the same x_gas values
+        #      and make sure that regions above that use the same gas_vmr values
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
             if atmos.tmp[i] < atmos.fastchem_floor
                 for g in atmos.gas_names
@@ -1866,7 +1874,7 @@ module atmosphere
                     # set rainout kg/m2
                     cond_kg[c] = atmos.gas_dat[c].mmw*atmos.p[i]*
                                             (atmos.gas_vmr[c][i] - x_sat)/
-                                            (atmos.layer_grav[i] * atmos.layer_mmw[i])
+                                            (atmos.layer_grav[i] * atmos.layer_μ[i])
 
                     # condensation yield at this level
                     atmos.gas_yield[c][i] += cond_kg[c]
@@ -1955,7 +1963,7 @@ module atmosphere
 
                     # Calculate kg/m2 of gas that would saturate layer j
                     dm_sat = atmos.gas_dat[c].mmw * dp_sat/
-                                            (atmos.layer_grav[j] * atmos.layer_mmw[j])
+                                            (atmos.layer_grav[j] * atmos.layer_μ[j])
 
                     # can we evaporate all rain within this layer?
                     if total_rain < dm_sat
@@ -1974,7 +1982,7 @@ module atmosphere
 
                     # add partial pressure from evaporation to pp at this level
                     dp_sat = dm_sat * atmos.layer_grav[j] *
-                                              atmos.layer_mmw[j] / atmos.gas_dat[c].mmw
+                                              atmos.layer_μ[j] / atmos.gas_dat[c].mmw
 
                     # convert extra pp to extra vmr
                     atmos.gas_vmr[c][j] += dp_sat / atmos.p[j]
@@ -1986,7 +1994,7 @@ module atmosphere
 
                     # ---------------------
                     # WARNING
-                    # THIS IS NOT CORRECT. IT WILL LEAD TO sum(x_gas)>1
+                    # THIS IS NOT CORRECT. IT WILL LEAD TO sum(gas_vmr)>1
                     # IN MANY CASES BECAUSE OF THE PREDEFINED PRESSURE GRID.
                     # THIS NEEDS TO RE-ADJUST THE WHOLE PRESSURE GRID IN
                     # ORDER TO CONSERVE MASS!
@@ -1995,9 +2003,9 @@ module atmosphere
                     #
 
                     # Recalculate layer mmw
-                    atmos.layer_mmw[j] = 0.0
+                    atmos.layer_μ[j] = 0.0
                     for g in atmos.gas_names
-                        atmos.layer_mmw[j] += atmos.gas_vmr[g][j] * atmos.gas_dat[g].mmw
+                        atmos.layer_μ[j] += atmos.gas_vmr[g][j] * atmos.gas_dat[g].mmw
                     end
 
                 end # go to next j level (below)

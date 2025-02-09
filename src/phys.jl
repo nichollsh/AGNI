@@ -10,7 +10,8 @@ module phys
 
     using NCDatasets
     using LoggingExtras
-    import PCHIPInterpolation:Interpolator
+    import PCHIPInterpolation:Interpolator # for 1D interpolation
+    import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
     # Sources:
     # - Pierrehumbert (2010)
@@ -174,58 +175,6 @@ module phys
         ("U",   2.380280000e-01),
     ])
 
-    # Table of Van der Waals coefficients
-    const _lookup_vdw::Dict{String,Tuple{Float64,Float64}} = Dict([
-        ("C2H2"  , (4.516   ,  0.0522   )),
-        ("NH3"   , (4.225   ,  0.0371   )),
-        ("Ar"    , (1.355   ,  0.03201  )),
-        ("C4H10" , (14.66   ,  0.1226   )),
-        ("CO2"   , (3.640   ,  0.04267  )),
-        ("CS2"   , (11.77   ,  0.07685  )),
-        ("CO"    , (1.505   ,  0.03985  )),
-        ("CCl4"  , (19.748  ,  0.1281   )),
-        ("Cl"    , (6.579   ,  0.05622  )),
-        ("CH3Cl" , (7.570   ,  0.06483  )),
-        ("C2N2"  , (7.769   ,  0.06901  )),
-        ("C10H22", (52.74   ,  0.3043   )),
-        ("C2H6"  , (5.562   ,  0.0638   )),
-        ("C2H5OH", (12.18   ,  0.08407  )),
-        ("Fl"    , (1.171   ,  0.0290   )),
-        ("He"    , (0.0346  ,  0.0238   )),
-        ("C7H16" , (31.06   ,  0.2049   )),
-        ("C6H14" , (24.71   ,  0.1735   )),
-        ("N2H4"  , (8.46    ,  0.0462   )),
-        ("H2"    , (0.2476  ,  0.02661  )),
-        ("HBr"   , (4.510   ,  0.04431  )),
-        ("HCl"   , (3.716   ,  0.04081  )),
-        ("HCN"   , (11.29   ,  0.0881   )),
-        ("HF"    , (9.565   ,  0.0739   )),
-        ("HI"    , (6.309   ,  0.0530   )),
-        ("H2Se"  , (5.338   ,  0.04637  )),
-        ("H2S"   , (4.490   ,  0.04287  )),
-        ("Kr"    , (2.349   ,  0.03978  )),
-        ("Hg"    , (8.200   ,  0.01696  )),
-        ("CH4"   , (2.253   ,  0.04278  )),
-        ("CH4O"  , (9.649   ,  0.06702  )),
-        ("Ne"    , (0.2135  ,  0.01709  )),
-        ("NO"    , (1.358   ,  0.02789  )),
-        ("N2"    , (1.370   ,  0.0387   )),
-        ("NO2"   , (5.354   ,  0.04424  )),
-        ("NF3"   , (3.58    ,  0.0545   )),
-        ("N2O"   , (3.832   ,  0.04415  )),
-        ("O2"    , (1.382   ,  0.03186  )),
-        ("O3"    , (3.570   ,  0.0487   )),
-        ("C5H12" , (19.26   ,  0.146    )),
-        ("C6H6O" , (22.93   ,  0.1177   )),
-        ("PH3"   , (4.692   ,  0.05156  )),
-        ("SiH4"  , (4.377   ,  0.05786  )),
-        ("SO2"   , (6.803   ,  0.05636  )),
-        ("SF6"   , (7.857   ,  0.0879   )),
-        ("CCl4"  , (20.01   ,  0.1281   )),
-        ("H2O"   , (5.536   ,  0.03049  )),
-        ("Xe"    , (4.250    , 0.05105  ))
-    ])
-
     # Table of pre-defined colors for plotting
     const _lookup_color::Dict{String, String} = Dict([
         # common volatiles
@@ -287,17 +236,17 @@ module phys
         no_sat::Bool                # No saturation data
         sat_T::Array{Float64,1}     # Reference temperatures [K]
         sat_P::Array{Float64,1}     # Corresponding saturation pressures [Pa]
-        sat_I::Interpolator         # Interpolator struct
+        sat_I::Interpolator         # PCHIP Interpolator
 
         # Latent heat (enthalpy) of phase change
         lat_T::Array{Float64,1}     # Reference temperatures [K]
         lat_H::Array{Float64,1}     # Corresponding heats [J kg-1]
-        lat_I::Interpolator         # Interpolator struct
+        lat_I::Interpolator         # PCHIP Interpolator
 
         # Specific heat capacity
         cap_T::Array{Float64,1}     # Reference temperatures [K]
         cap_C::Array{Float64,1}     # Corresponding Cp values [J K-1 kg-1]
-        cap_I::Interpolator         # Interpolator struct
+        cap_I::Interpolator         # PCHIP Interpolator
 
         # Thermal conductivity
         kc::Float64                 # Constant conductivity [J K-1 kg-1]
@@ -306,12 +255,16 @@ module phys
         plot_color::String
         plot_label::String
 
-        # Van der Waals coefficients
-        vdw_a::Float64              # Intermolecular forces
-        vdw_b::Float64              # Volume of particles
-
         # Which equation of state should be used for this gas?
         eos::EOS
+
+        # EOS original grid axes
+        eos_T::Array{Float64,1}     # temperature [K]
+        eos_P::Array{Float64,1}     # pressure [log10 Pa]
+        eos_V::Array{Float64,2}     # density [kg m-3]
+
+        # EOS interpolator with constant-value extrapolation
+        eos_I::Extrapolation
 
         Gas_t() = new()
     end # end gas struct
@@ -331,7 +284,6 @@ module phys
         gas = Gas_t()
         gas.formula = formula
         gas.tmp_dep = tmp_dep
-        gas.eos = EOS_IDEAL
 
         # Count atoms
         gas.atoms = count_atoms(formula)
@@ -354,6 +306,7 @@ module phys
         # Check if we have data from file
         gas.stub = !isfile(fpath)
         gas.no_sat = false
+        eos_name = "ideal gas"
         if gas.stub
             # no data => generate stub
             @debug("    stub")
@@ -378,11 +331,13 @@ module phys
             gas.T_crit = 0.0
             gas.T_trip = 0.0
 
+            # set EOS to ideal gas
+            gas.eos = EOS_IDEAL
+
         else
             # have data => load from file
             @debug("    ncdf")
-            @debug "ALL DEBUG SUPPRESSED"
-            with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
+            with_logger(MinLevelLogger(current_logger(), Logging.Info)) do
                 ds = Dataset(fpath,"r")
 
                 # scalar properties
@@ -391,44 +346,96 @@ module phys
                 gas.T_crit = ds["T_crit"][1]
                 gas.JANAF_name = String(ds["JANAF"][:])
 
-                # variable properties
+                # heat capacity
                 gas.cap_T = ds["cap_T"][:]
                 gas.cap_C = ds["cap_C"][:]
 
+                # latent heat of phase change
                 gas.lat_T = ds["lat_T"][:]
                 gas.lat_H = ds["lat_H"][:]
 
+                # saturation pressure
                 gas.sat_T = ds["sat_T"][:]
                 gas.sat_P = ds["sat_P"][:]
                 if length(gas.sat_P) < 3
                     gas.no_sat = true
                 end
 
+                # work out which is the best available equation of state
+                #     ideal gas is the base case
+                gas.eos = EOS_IDEAL
+                #     next, try to use van der waals if the data are available
+                if haskey(ds, "vdw_T") && haskey(ds, "vdw_P") && haskey(ds, "vdw_V")
+                    gas.eos = EOS_VDW
+                end
+                #     try to use aqua data for water
+                if formula == "H2O"
+                    if haskey(ds, "aqua_T") && haskey(ds, "aqua_P") && haskey(ds, "aqua_V")
+                        gas.eos = EOS_AQUA  # aqua data found -  this is preferred
+                    else
+                        @warn("Could not find AQUA table for H2O equation of state")
+                        # this means we will use vdw if available, or otherwise ideal gas
+                    end
+                end
+
+                # prepare eos data if necessary
+                if gas.eos != EOS_IDEAL
+                    # load data
+                    if gas.eos == EOS_VDW
+                        eos_name = "Van der Waals"
+                        gas.eos_P = ds["vdw_P"][:]
+                        gas.eos_T = ds["vdw_P"][:]
+                        gas.eos_V = ds["vdw_V"][:]
+                    elseif gas.eos == EOS_AQUA
+                        eos_name = "AQUA"
+                        gas.eos_P = ds["aqua_P"][:]
+                        gas.eos_T = ds["aqua_P"][:]
+                        gas.eos_V = ds["aqua_V"][:]
+                    end
+
+                    # check shape
+                    if size(gas.eos_V) != (length(gas.eos_T), length(gas.eos_P))
+                        @error("Could not parse $formula EOS data from file")
+                        @error("    tmp length = $(length(gas.eos_T))")
+                        @error("    prs length = $(length(gas.eos_P))")
+                        @error("    rho length = $(size(gas.eos_V)))")
+                    end
+
+                    # check ascending
+                    if !issorted(gas.eos_T)
+                        @error("Could not parse $formula EOS data from file")
+                        @error("    Temperature array must be strictly ascending")
+                    end
+                    if !issorted(gas.eos_P)
+                        @error("Could not parse $formula EOS data from file")
+                        @error("    Pressure array must be strictly ascending")
+                    end
+
+                    # interpolate to 2D grid
+                    gas.eos_I = extrapolate(interpolate(
+                                                        (gas.eos_T,gas.eos_P), z,  # input
+                                                        Gridded(Linear())), # linear interp.
+                                            Flat()) # constant-value extrap.
+                end # /EOS
+
                 # close file
                 close(ds)
-            end
-            @debug "ALL DEBUG RESTORED"
 
-            # extrapolate to high temperatures
+            end # /NetCDF
+
+            # Extrapolate univariate quantities to high temperatures
             push!(gas.cap_T, 9000.0); push!(gas.cap_C, gas.cap_C[end])
             push!(gas.lat_T, 9000.0); push!(gas.lat_H, gas.lat_H[end])
             push!(gas.sat_T, 9000.0); push!(gas.sat_P, gas.sat_P[end])
 
-            # setup interpolators
+            # Setup 1D interpolators for Cp, Lv, and Psat
             gas.cap_I = Interpolator(gas.cap_T, gas.cap_C)
             gas.lat_I = Interpolator(gas.lat_T, gas.lat_H)
             gas.sat_I = Interpolator(gas.sat_T, gas.sat_P)
 
         end
 
-        # Van der Waals coefficients
-        vdwa, vdwb, has_vdw = _get_vdw(formula)
-        if has_vdw
-            gas.eos = EOS_VDW
-            gas.vdw_a = 1e5 * vdwa / (gas.mmw*1e3)^2
-            gas.vdw_b = vdwb / (gas.mmw*1e3)
-        end
-
+        @debug("    using '$eos_name' equation of state")
         @debug("    done")
         return gas
     end # end load_gas
@@ -536,16 +543,6 @@ module phys
         end
 
         return mmw
-    end
-
-    """
-    Get the Van der Waals coefficients if available, otherwise return values of zero.
-    """
-    function _get_vdw(m::String)::Tuple{Float64,Float64,Bool}
-        if m in keys(_lookup_vdw)
-           return (_lookup_vdw[m]..., true)
-        end
-        return (0.0, 0.0, false)
     end
 
     """
@@ -762,7 +759,7 @@ module phys
         rho::Array{Float64, 1} = zeros(Float64, ngas)
         mmr::Array{Float64, 1} = zeros(Float64, ngas)
         for i in 1:ngas
-            rho[i] = calc_rho_gas(gas[i], tmp, prs)
+            rho[i] = calc_rho_gas(tmp, prs, gas[i])
             mmr[i] = vmr[i] * gas[i].mmw / mmw
         end
 
@@ -774,21 +771,22 @@ module phys
     **Calculate the density of a gas using the most appropriate equation of state.**
 
     Arguments:
-    - `gas::Gas_t`          the gas struct to be used
     - `tmp::Float64`        temperature [K]
     - `prs::Float64`        pressure [Pa]
+    - `gas::Gas_t`          the gas struct to be used
 
     Returns:
     - `rho::Float64`        mass density [kg m-3]
     """
-    function calc_rho_gas(gas::Gas_t, tmp::Float64, prs::Float64)::Float64
+    function calc_rho_gas(tmp::Float64, prs::Float64, gas::Gas_t)::Float64
         if gas.eos == EOS_IDEAL
+            # analytical form of ideal gas equation of state
             return _rho_ideal(tmp, prs, gas.mmw)
-        elseif gas.eos == EOS_VDW
-            return _rho_vdw(tmp, prs, gas.mmw, gas.vdw_a, gas.vdw_b)
+        else
+            # otherwise, will use interpolated VDW or AQUA equation of state
+            return gas.eos_I(tmp, log10(prs))
         end
     end
-
 
     """
     **Evaluate the density of a single gas using the ideal gas EOS.**
@@ -802,36 +800,7 @@ module phys
     - `rho::Float64`        mass density [kg m-3]
     """
     function _rho_ideal(tmp::Float64, prs::Float64, mmw::Float64)::Float64
-        return prs * gas.mmw / (tmp * R_gas)
-    end
-
-    """
-    **Evaluate the density of a single gas using the Van der Waals EOS.**
-
-    This formula was generated by Claire using Sympy.
-
-    Arguments:
-    - `T::Float64`          temperature [K]
-    - `p::Float64`          pressure [Pa]
-    - `mmw::Float64`        mean molecular weight [kg mol-1]
-    - `a::Float64`          VDW coefficient 'a'
-    - `b::Float64`          VDW coefficient 'b'
-
-    Returns:
-    - `rho::Float64`        mass density [kg m-3]
-    """
-    function _rho_vdw(T::Float64, p::Float64,
-                        mmw::Float64, a::Float64, b::Float64)::Float64
-        R::Float64 = R_gas / mmw
-        return  -(b ^ (-2) - 3 * (b * p + R * T) / (a * b)) / (3 * (sqrt(
-                -4 * (b ^ (-2) - 3 * (b * p + R * T) / (a * b)) ^ 3 + (
-                -2 / b ^ 3 - 27 * p / (a * b) + 9 * (b * p + R * T)
-                / (a * b ^ 2)) ^ 2) / 2 - 1 / b ^ 3 - 27 * p / (2 * a * b)
-                + 9 * (b * p + R * T) / ( 2 * a * b ^ 2)) ^ (1 / 3)) - (sqrt(
-                -4 * (b ^ (-2) - 3 * (b * p + R * T) / (a * b)) ^ 3 +
-                (-2 / b ^ 3 - 27 * p / (a * b) + 9 * (b * p + R * T) /
-                (a * b ^ 2)) ^ 2) / 2 - 1 / b ^ 3 - 27 * p / (2 * a * b) +
-                9 * (b * p + R * T) / (2 * a * b ^ 2)) ^ (1 / 3) / 3 + 1 / (3 * b)
+        return prs * mmw / (tmp * R_gas)
     end
 
     """
