@@ -247,7 +247,7 @@ end
 @info " "
 @info "Testing hydrostatic integration"
 
-val_e = 431792.0902977038  # known from previous tests
+val_e = 433642.9593174118   # known from previous tests
 val_o = atmos.z[1] # top level
 @info "Expected value = $(val_e) m"
 @info "Modelled value = $(val_o) m"
@@ -323,7 +323,7 @@ end
 # -------------
 @info " "
 @info "Testing surface albedo "
-val_e = 30.31364083727528  # known from previous tests
+val_e = 30.313221153795453  # known from previous tests
 val_o = atmos.flux_u_sw[end] # bottom level
 @info "Expected value = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
@@ -422,7 +422,7 @@ energy.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 energy.calc_hrates!(atmos)
 
-val_e = 6.366831453838685  # from previous tests
+val_e = 6.366642235738698  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected value = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"

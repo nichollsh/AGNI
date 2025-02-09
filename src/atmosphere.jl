@@ -934,8 +934,8 @@ module atmosphere
         # Pass arrays to SOCRATES
         atmos.atm.p[1, :]           .= atmos.p[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-        # atmos.atm.r_layer[1,:]      .= atmos.z[:]  .+ atmos.rp
-        # atmos.atm.r_level[1,0:end]  .= atmos.zl[:] .+ atmos.rp
+        atmos.atm.r_layer[1,:]      .= atmos.z[:]  .+ atmos.rp
+        atmos.atm.r_level[1,0:end]  .= atmos.zl[:] .+ atmos.rp
         atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
         atmos.atm.density[1,:]      .= atmos.layer_density[:]
 
