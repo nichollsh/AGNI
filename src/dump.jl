@@ -85,7 +85,6 @@ module dump
         # into PROTEUS without compatibility issues.
 
         # Absorb output from these calls, because they spam the Debug logger
-        @debug "ALL DEBUG SUPPRESSED"
         with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
 
             ds = Dataset(fname,"c")
@@ -257,7 +256,7 @@ module dump
             var_tmpl[:] =   atmos.tmpl
             var_z[:]    =   atmos.z
             var_zl[:]   =   atmos.zl
-            var_mmw[:]  =   atmos.layer_mmw
+            var_mmw[:]  =   atmos.layer_μ
             var_cp[:]  =    atmos.layer_cp
             var_grav[:]  =  atmos.layer_grav
             var_thick[:]  = atmos.layer_thick
@@ -333,7 +332,6 @@ module dump
             close(ds)
 
         end # suppress output
-        @debug "ALL DEBUG RESTORED"
 
         return nothing
     end # end write_ncdf

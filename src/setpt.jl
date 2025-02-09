@@ -236,18 +236,18 @@ module setpt
             for gas in atmos.gas_names
                 atmos.layer_cp[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw *
                                             phys.get_Cp(atmos.gas_dat[gas], tmp_eval) /
-                                            atmos.layer_mmw[i]
+                                            atmos.layer_μ[i]
             end
 
             # Cell-edge to cell-centre
             grad = phys.R_gas * atmos.tmpl[i+1] /
-                        (atmos.pl[i+1] * atmos.layer_mmw[i] * atmos.layer_cp[i])
+                        (atmos.pl[i+1] * atmos.layer_μ[i] * atmos.layer_cp[i])
             atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
             atmos.tmp[i] = max(atmos.tmp[i], atmos.tmp_floor)
 
             # Cell-centre to cell-edge
             grad = phys.R_gas * atmos.tmp[i] /
-                        (atmos.p[i] * atmos.layer_mmw[i] * atmos.layer_cp[i])
+                        (atmos.p[i] * atmos.layer_μ[i] * atmos.layer_cp[i])
             atmos.tmpl[i] = atmos.tmp[i] + grad * (atmos.pl[i]-atmos.p[i])
             atmos.tmpl[i] = max(atmos.tmpl[i], atmos.tmp_floor)
         end
