@@ -212,14 +212,24 @@ module AGNI
 
         # Read configuration options from dict
         @info "Using configuration '$(cfg["title"])'"
-        #    planet stuff
-        tmp_surf::Float64      = cfg["planet"]["tmp_surf"]
-        instellation::Float64  = cfg["planet"]["instellation"]
-        albedo_b::Float64      = cfg["planet"]["albedo_b"]
-        asf_sf::Float64        = cfg["planet"]["s0_fact"]
+
+        #    planet structure
         radius::Float64        = cfg["planet"]["radius"]
-        zenith::Float64        = cfg["planet"]["zenith_angle"]
-        gravity::Float64       = cfg["planet"]["gravity"]
+        gravity::Float64       = 0.0
+        mass::Float64          = 0.0
+        if haskey(cfg["planet"],"gravity")
+            gravity = cfg["planet"]["gravity"]
+        end
+        if haskey(cfg["planet"],"mass")
+            mass = cfg["planet"]["gravity"]
+            if gravity > 0.0
+                # overspecified
+                @error "Misconfiguration: provide `mass` OR `gravity`, not both"
+                return false
+            end
+            # convert mass to gravity
+            gravity = phys.grav_accel(mass, radius)
+        end
 
         albedo_s::Float64      = 0.0
         surface_mat::String    = cfg["planet"]["surface_material"]
@@ -232,13 +242,11 @@ module AGNI
         end
 
         #    composition stuff
-        p_top::Float64                  = cfg["composition"]["p_top"]
         condensates::Array{String,1}    = cfg["composition"]["condensates"]
         chem_type::Int                  = cfg["composition"]["chemistry"]
         p_surf::Float64                 = 0.0
         mf_dict::Dict{String, Float64}  = Dict{String, Float64}()
         mf_path::String                 = ""
-        use_all_gases::Bool             = cfg["composition"]["include_all"]
         if haskey(cfg["composition"],"p_surf")
             # set composition using VMRs + Psurf
             if haskey(cfg["composition"],"vmr_dict")
@@ -277,23 +285,12 @@ module AGNI
         end
 
         #    solver stuff
-        spfile_name::String    =        cfg["files" ]["input_sf"]
         star_file::String      =        cfg["files" ]["input_star"]
-        nlev_centre::Int       =        cfg["execution"]["num_levels"]
-        flag_cnt::Bool         =        cfg["execution"]["continua"]
-        flag_ray::Bool         =        cfg["execution"]["rayleigh"]
-        flag_cld::Bool         =        cfg["execution"]["cloud"]
-        flag_aer::Bool         =        cfg["execution"]["aerosol"]
-        overlap::String        =        cfg["execution"]["overlap_method"]
-        real_gas::Bool         =        cfg["execution"]["real_gas"]
-        thermo_funct::Bool     =        cfg["execution"]["thermo_funct"]
-        gravity_funct::Bool    =        cfg["execution"]["gravity_funct"]
         incl_convect::Bool     =        cfg["execution"]["convection"]
         incl_sens::Bool        =        cfg["execution"]["sensible_heat"]
         incl_latent::Bool      =        cfg["execution"]["latent_heat"]
         sol_type::Int          =        cfg["execution"]["solution_type"]
         solvers_cmd::Array{String,1} =  cfg["execution"]["solvers"]
-        initial_req::Array{String,1} =  cfg["execution"]["initial_state"]
         dx_max::Float64        =        cfg["execution"]["dx_max"]
         linesearch::Int        =        cfg["execution"]["linesearch"]
         easy_start::Bool       =        cfg["execution"]["easy_start"]
@@ -304,14 +301,7 @@ module AGNI
         rainout::Bool          =        cfg["execution"]["rainout"]
 
         #    plotting stuff
-        plt_run::Bool          = cfg["plots"]["at_runtime"]
         plt_tmp::Bool          = cfg["plots"]["temperature"]
-        plt_flx::Bool          = cfg["plots"]["fluxes"]
-        plt_cff::Bool          = cfg["plots"]["contribution"]
-        plt_ems::Bool          = cfg["plots"]["emission"]
-        plt_alb::Bool          = cfg["plots"]["albedo"]
-        plt_vmr::Bool          = cfg["plots"]["mixing_ratios"]
-        plt_hei::Bool          = cfg["plots"]["height"]
         plt_ani::Bool          = cfg["plots"]["animate"]
         plt_ani = plt_ani && plt_tmp
 
@@ -346,102 +336,43 @@ module AGNI
 
         # Setup atmosphere
         @debug "Setup atmosphere "
-        return_success = atmosphere.setup!(atmos, ROOT_DIR, output_dir,
-                                spfile_name,
-                                instellation, asf_sf, albedo_b, zenith,
-                                tmp_surf,
+        return_success = atmosphere.setup!(atmos, ROOT_DIR,output_dir,
+                                cfg["files" ]["input_sf"],
+                                cfg["planet"]["instellation"],
+                                cfg["planet"]["s0_fact"],
+                                cfg["planet"]["albedo_b"],
+                                cfg["planet"]["zenith_angle"],
+                                cfg["planet"]["tmp_surf"],
                                 gravity, radius,
-                                nlev_centre, p_surf, p_top,
+                                cfg["execution"]["num_levels"],
+                                p_surf,
+                                cfg["composition"]["p_top"],
                                 mf_dict, mf_path,
 
                                 condensates=condensates,
-                                flag_gcontinuum=flag_cnt, flag_rayleigh=flag_ray,
-                                flag_cloud=flag_cld, flag_aerosol=flag_aer,
-                                overlap_method=overlap,
+                                flag_gcontinuum   = cfg["execution"]["continua"],
+                                flag_rayleigh     = cfg["execution"]["rayleigh"],
+                                flag_cloud        = cfg["execution"]["cloud"],
+                                flag_aerosol      = cfg["execution"]["aerosol"],
+                                overlap_method    = cfg["execution"]["overlap_method"],
+                                real_gas          = cfg["execution"]["real_gas"],
+                                thermo_functions  = cfg["execution"]["thermo_funct"],
+                                gravity_functions = cfg["execution"]["gravity_funct"],
+                                use_all_gases     = cfg["composition"]["include_all"],
+                                C_d=turb_coeff, U=wind_speed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
                                 flux_int=flux_int,
                                 surface_material=surface_mat,
                                 albedo_s=albedo_s,
-                                real_gas=real_gas,
-                                thermo_functions=thermo_funct,
-                                gravity_functions=gravity_funct,
-                                C_d=turb_coeff, U=wind_speed,
-                                use_all_gases=use_all_gases
-                        )
-
-        return_success || return false
+                        ) || return false
 
         # Allocate atmosphere
-        return_success = atmosphere.allocate!(atmos,star_file)
-        return_success || return false
+        return_success = atmosphere.allocate!(atmos,star_file) || return false
 
-        # Set PT profile by looping over requests
+        # Set T(p) by looping over requests
         # Each request may be a command, or an argument following a command
-        num_req::Int = length(initial_req)      # Number of requests
-        idx_req::Int = 1                        # Index of current request
-        str_req::String = "_unset"              # String of current request
-        prt_req::String = "Setting initial T(p): "
-        while idx_req <= num_req
-            # get command
-            str_req = strip(lowercase(initial_req[idx_req]))
-            prt_req *= str_req*", "
-
-            # handle requests
-            if str_req == "dry"
-                # dry adiabat from surface
-                setpt.dry_adiabat!(atmos)
-
-            elseif str_req == "str"
-                # isothermal stratosphere
-                idx_req += 1
-                setpt.stratosphere!(atmos, parse(Float64, initial_req[idx_req]))
-
-            elseif str_req == "loglin"
-                # log-linear profile between T_surf and T_top
-                idx_req += 1
-                setpt.loglinear!(atmos, parse(Float64, initial_req[idx_req]))
-
-            elseif str_req == "iso"
-                # isothermal profile
-                idx_req += 1
-                setpt.isothermal!(atmos, parse(Float64, initial_req[idx_req]))
-
-            elseif str_req == "csv"
-                # set from csv file
-                idx_req += 1
-                setpt.fromcsv!(atmos,initial_req[idx_req])
-
-            elseif str_req == "ncdf"
-                # set from NetCDF file
-                idx_req += 1
-                setpt.fromncdf!(atmos,initial_req[idx_req])
-
-            elseif str_req == "add"
-                # add X kelvin from the currently stored T(p)
-                idx_req += 1
-                setpt.add!(atmos,parse(Float64, initial_req[idx_req]))
-
-            elseif str_req == "sat"
-                # condensing a volatile
-                idx_req += 1
-                setpt.saturation!(atmos, initial_req[idx_req])
-                if flag_cld
-                    @debug "Applying clouds to initial state"
-                    atmosphere.water_cloud!(atmos)
-                end
-
-            else
-                @error "Invalid initial state '$str_req'"
-                return false
-            end
-
-            atmosphere.calc_layer_props!(atmos, ignore_errors=true)
-
-            # iterate
-            idx_req += 1
-        end
-        @info prt_req[1:end-2]
+        setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
 
         # Write initial state
         dump.write_ptz(atmos, joinpath(atmos.OUT_DIR,"ptz_initial.csv"))
@@ -493,12 +424,12 @@ module AGNI
             if sol == "none"
                 energy.calc_fluxes!(atmos, incl_latent,
                                     incl_convect, incl_sens, incl_conduct,
-                                    calc_cf=plt_cff, rainout=rainout)
+                                    calc_cf=cfg["plots"]["contribution"], rainout=rainout)
                 @info "    done"
 
             # Nonlinear solver
             elseif (sol in method_map)
-                if plt_run
+                if cfg["plots"]["at_runtime"]
                     modplot = 1
                 end
                 method_idx = findfirst(==(sol), method_map)
@@ -533,16 +464,22 @@ module AGNI
         # Save plots
         @info "Plotting results"
 
-        flag_cld && plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
-
         plt_ani && plotting.animate(atmos)
-        plt_vmr && plotting.plot_vmr(atmos,       joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
-        plt_cff && plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.png"))
         plt_tmp && plotting.plot_pt(atmos,        joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
-        plt_flx && plotting.plot_fluxes(atmos,    joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=incl_convect, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
-        plt_ems && plotting.plot_emission(atmos,  joinpath(atmos.OUT_DIR,"plot_emission.png"))
-        plt_alb && plotting.plot_albedo(atmos,    joinpath(atmos.OUT_DIR,"plot_albedo.png"))
-        plt_hei && plotting.plot_height(atmos,    joinpath(atmos.OUT_DIR,"plot_height.png"))
+        atmos.control.l_cloud && \
+            plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
+        cfg["plots"]["mixing_ratios"] && \
+            plotting.plot_vmr(atmos, joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
+        cfg["plots"]["contribution"]  && \
+            plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.png"))
+        cfg["plots"]["fluxes"] && \
+            plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=incl_convect, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
+        cfg["plots"]["emission"] && \
+            plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
+        cfg["plots"]["albedo"] && \
+            plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.png"))
+        cfg["plots"]["height"] && \
+            plotting.plot_height(atmos, joinpath(atmos.OUT_DIR,"plot_height.png"))
 
         # Deallocate atmosphere
         @info "Deallocating memory"

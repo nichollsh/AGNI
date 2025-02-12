@@ -25,7 +25,7 @@ module energy
     **Calculate radiative fluxes using SOCRATES.**
 
     Uses the configuration inside the atmos struct. Can either do LW or SW
-    calculation, as required. Imports SOCRATES wrapper from the atmosphere
+    calculation as required. Imports SOCRATES wrapper from the atmosphere
     module, rather than loading it twice.
 
     Arguments:
