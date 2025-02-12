@@ -43,24 +43,77 @@ passing = true
 
 
 # -------------
-# Test shomate
+# Test heat capacity lookup tables
 # -------------
 @info " "
 @info "Testing heat capacity functions"
-data_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, false)
-c_expt::Array{Float64, 1} = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
-t_test::Array{Float64, 1} = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
-c_obs::Array{Float64,1} = zeros(Float64, 5)
+ideal_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, false)
+t_test  = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
+v_expt  = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
+v_obs   = zero(t_test)
 cp_pass = true
 for i in 1:5
-    c_obs[i] = phys.get_Cp(data_H2O, t_test[i]) * data_H2O.mmw # get value and convert units
-    if abs(c_expt[i]- c_obs[i])/c_expt[i] > 0.01  # error must be <1%
+    v_obs[i] = phys.get_Cp(ideal_H2O, t_test[i]) * ideal_H2O.mmw # get value and convert units
+    if abs(v_expt[i]- v_obs[i])/v_expt[i] > 0.01  # error must be <1%
         global cp_pass = false
     end
 end
-@info "Expected values = $(c_expt) J mol-1 K-1"
-@info "Modelled values = $(c_obs) J mol-1 K-1"
+@info "Expected values = $(v_expt) J mol-1 K-1"
+@info "Modelled values = $(v_obs) J mol-1 K-1"
 if cp_pass
+    @info "Pass"
+else
+    @warn "Fail"
+    passing = false
+end
+@info "--------------------------"
+
+
+# -------------
+# Test ideal gas equation of state
+# -------------
+@info " "
+@info "Testing ideal gas equation of state"
+t_test = [30.0,  200.0, 373.0,  1273.0,  1000.0] # Tested values of temperature [K]
+p_test = [1e0,   1e3,   1e5,     1e7,    1e8]    # Tested values of pressure [Pa]
+v_expt = [7.22235e-5, 1.08335e-2, 5.80886e-1, 1.70204e1, 2.16670e2]  # Expected rho [kg m-3]
+v_obs  = zero(p_test)
+eos_pass = true
+for i in 1:5
+    v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], ideal_H2O)
+    if abs(v_expt[i] - v_obs[i])/v_expt[i] > 0.01  # error must be <1%
+        global eos_pass = false
+    end
+end
+@info "Expected values = $(v_expt) kg m-3"
+@info "Modelled values = $(v_obs) kg m-3"
+if eos_pass
+    @info "Pass"
+else
+    @warn "Fail"
+    passing = false
+end
+@info "--------------------------"
+
+
+# -------------
+# Test AQUA equation of state
+# -------------
+@info " "
+@info "Testing AQUA equation of state"
+aqua_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, true)
+v_expt = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]  # Expected rho [kg m-3]
+v_obs  = zero(p_test)
+eos_pass = true
+for i in 1:5
+    v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], aqua_H2O)
+    if abs(v_expt[i] - v_obs[i])/v_expt[i] > 0.01  # error must be <1%
+        global eos_pass = false
+    end
+end
+@info "Expected values = $(v_expt) kg m-3"
+@info "Modelled values = $(v_obs) kg m-3"
+if eos_pass
     @info "Pass"
 else
     @warn "Fail"
