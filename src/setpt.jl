@@ -12,8 +12,78 @@ module setpt
     import ..atmosphere
 
     using NCDatasets
+    using Printf
     using LoggingExtras
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
+
+    # Process a series of requests describing T(p)
+    function request!(atmos::atmosphere.Atmos_t, request::Array{String,1})::Bool
+        num_req::Int = length(request)          # Number of requests
+        idx_req::Int = 1                        # Index of current request
+        str_req::String = "_unset"              # String of current request
+        prt_req::String = "Setting T(p): "
+        while idx_req <= num_req
+            # get command
+            str_req = strip(lowercase(request[idx_req]))
+            prt_req *= str_req*", "
+
+            # handle requests
+            if str_req == "dry"
+                # dry adiabat from surface
+                setpt.dry_adiabat!(atmos)
+
+            elseif str_req == "str"
+                # isothermal stratosphere
+                idx_req += 1
+                setpt.stratosphere!(atmos, parse(Float64, request[idx_req]))
+
+            elseif str_req == "loglin"
+                # log-linear profile between T_surf and T_top
+                idx_req += 1
+                setpt.loglinear!(atmos, parse(Float64, request[idx_req]))
+
+            elseif str_req == "iso"
+                # isothermal profile
+                idx_req += 1
+                setpt.isothermal!(atmos, parse(Float64, request[idx_req]))
+
+            elseif str_req == "csv"
+                # set from csv file
+                idx_req += 1
+                setpt.fromcsv!(atmos,request[idx_req])
+
+            elseif str_req == "ncdf"
+                # set from NetCDF file
+                idx_req += 1
+                setpt.fromncdf!(atmos,request[idx_req])
+
+            elseif str_req == "add"
+                # add X kelvin from the currently stored T(p)
+                idx_req += 1
+                setpt.add!(atmos,parse(Float64, request[idx_req]))
+
+            elseif str_req == "sat"
+                # condensing a volatile
+                idx_req += 1
+                setpt.saturation!(atmos, request[idx_req])
+                if atmos.control.l_cloud
+                    @debug "Applying clouds to initial state"
+                    atmosphere.water_cloud!(atmos)
+                end
+
+            else
+                @error "Invalid initial state '$str_req'"
+                return false
+            end
+
+            atmosphere.calc_layer_props!(atmos, ignore_errors=true)
+
+            # iterate
+            idx_req += 1
+        end
+        @info prt_req[1:end-2]
+        return true
+    end
 
     # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)

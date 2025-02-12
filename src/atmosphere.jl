@@ -282,6 +282,7 @@ module atmosphere
     - `flag_continuum::Bool`            include continuum absorption?
     - `flag_aerosol::Bool`              include aersols?
     - `flag_cloud::Bool`                include clouds?
+    - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `gravity_functions::Bool`         use height-dependent gravity calculation
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
@@ -579,22 +580,8 @@ module atmosphere
 
         # add extra gases if required
         if use_all_gases
-
-            # for each gas in the file
-            open(joinpath(atmos.THERMO_DIR, "standard.txt"), "r") do hdl
-                for gas in readlines(hdl)
-                    # comment line
-                    if isempty(gas) || occursin("#",gas)
-                        continue
-                    end
-                    gas = strip(gas)
-
-                    # duplicate
-                    if gas in atmos.gas_names
-                        continue
-                    end
-
-                    # add gas
+            for gas in phys.gases_standard
+                if !(gas in atmos.gas_names)
                     atmos.gas_vmr[gas] = zeros(Float64, atmos.nlev_c)
                     push!(atmos.gas_names, gas)
                     atmos.gas_num += 1
@@ -1673,12 +1660,12 @@ module atmosphere
             # number densities normalised relative to hydrogen
             # for each element X, value = log10(N_X/N_H) + 12
             # N = X(P/(K*T) , where X is the VMR and K is boltz-const
-            N_t = zeros(Float64, length(phys.elements_list))      # total atoms in all gases
-            N_g = zeros(Float64, length(phys.elements_list))      # atoms in current gas
+            N_t = zeros(Float64, length(phys.elems_standard))      # total atoms in all gases
+            N_g = zeros(Float64, length(phys.elems_standard))      # atoms in current gas
             for gas in atmos.gas_names
                 d = phys.count_atoms(gas)
                 fill!(N_g, 0.0)
-                for (i,e) in enumerate(phys.elements_list)
+                for (i,e) in enumerate(phys.elems_standard)
                     if e in keys(d)
                         N_g[i] += d[e]
                     end
@@ -1693,7 +1680,7 @@ module atmosphere
             # Write elemental abundances
             open(elempath,"w") do f
                 write(f,"# Elemental abundances derived from AGNI volatiles \n")
-                for (i,e) in enumerate(phys.elements_list)
+                for (i,e) in enumerate(phys.elems_standard)
                     if N_t[i] > 1.0e-30
                         # skip this element if its abundance is too small
                         # normalise relative to hydrogen
@@ -2070,18 +2057,6 @@ module atmosphere
 
                     # reduce total rain correspondingly
                     total_rain -= dm_sat
-
-                    # @printf("    %d: evaporating %.3e \n", j, dm_sat)
-
-                    # ---------------------
-                    # WARNING
-                    # THIS IS NOT CORRECT. IT WILL LEAD TO sum(gas_vmr)>1
-                    # IN MANY CASES BECAUSE OF THE PREDEFINED PRESSURE GRID.
-                    # THIS NEEDS TO RE-ADJUST THE WHOLE PRESSURE GRID IN
-                    # ORDER TO CONSERVE MASS!
-                    # ----------------------
-                    # normalise_vmrs!(atmos, j)
-                    #
 
                     # Recalculate layer mmw
                     atmos.layer_μ[j] = 0.0
