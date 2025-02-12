@@ -22,7 +22,6 @@ module AGNI
     include("plotting.jl")
     include("energy.jl")
     include("solver.jl")
-    # include("realgas.jl")
 
     # Import src files
     import .phys
@@ -32,7 +31,6 @@ module AGNI
     import .plotting
     import .energy
     import .solver
-    # import .realgas
 
     # Export
     # export atmosphere
@@ -287,6 +285,7 @@ module AGNI
         flag_cld::Bool         =        cfg["execution"]["cloud"]
         flag_aer::Bool         =        cfg["execution"]["aerosol"]
         overlap::String        =        cfg["execution"]["overlap_method"]
+        real_gas::Bool         =        cfg["execution"]["real_gas"]
         thermo_funct::Bool     =        cfg["execution"]["thermo_funct"]
         gravity_funct::Bool    =        cfg["execution"]["gravity_funct"]
         incl_convect::Bool     =        cfg["execution"]["convection"]
@@ -364,6 +363,7 @@ module AGNI
                                 flux_int=flux_int,
                                 surface_material=surface_mat,
                                 albedo_s=albedo_s,
+                                real_gas=real_gas,
                                 thermo_functions=thermo_funct,
                                 gravity_functions=gravity_funct,
                                 C_d=turb_coeff, U=wind_speed,
