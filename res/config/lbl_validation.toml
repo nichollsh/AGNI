@@ -41,6 +41,7 @@ title = "Line-by-line validation tests"
     cloud           = false
     aerosol         = false
     overlap_method  = "ro"
+    real_gas        = false
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = false

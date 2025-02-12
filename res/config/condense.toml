@@ -42,6 +42,7 @@ title = "Condensation test"
     cloud           = false
     aerosol         = false
     overlap_method  = "ee"
+    real_gas        = true 
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = true

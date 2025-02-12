@@ -80,7 +80,7 @@ T_N     \\
 T_s
 \end{pmatrix}
 ```
-where $T_s$ is the surface temperature. Cell-edge temperatures in the bulk atmosphere are interpolated using the [PCHIP algorithm](https://epubs.siam.org/doi/10.1137/0905021), which avoids Runge's phenomenon and overshooting. The bottom- and top-most cell edge temperatures are extrapolated by estimation of $dT/d \log p$. Cell properties (heat capacity, gravity, density, average molecular weight, etc.) are consistently updated at each evaluation of $\bm{r}$. Condensation/rainout are also handled at each evaluation of $\bm{r}$ in order to avoid supersaturation.
+where $T_s$ is the surface temperature. Cell-edge temperatures in the bulk atmosphere are interpolated from cell-centres. The bottom- and top-most cell edge temperatures are extrapolated by estimation of $dT/d \log p$. Cell properties (heat capacity, gravity, density, average molecular weight, etc.) are consistently updated at each evaluation of $\bm{r}$. Condensation/rainout are also handled at each evaluation of $\bm{r}$ in order to avoid supersaturation.
 
 The model converges when the cost function $c(\bm{x}) = \sqrt{\sum_i |r_i|}$ satisfies the condition
 ```math

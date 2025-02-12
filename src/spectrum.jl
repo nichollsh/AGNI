@@ -13,7 +13,7 @@ module spectrum
     using LoggingExtras
     using Printf
     using LinearAlgebra
-    import PCHIPInterpolation:Interpolator
+    import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
     """
@@ -127,7 +127,7 @@ module spectrum
         lwl = log10.(wl)
 
         # Downsample spectrum onto N=tgt_bins, logwavelength space
-        itp = Interpolator(lwl, lfl)
+        itp = extrapolate(interpolate((lwl,),lfl, Gridded(Linear())), Flat())
         bin_c = collect(range(start=lwl[1],  stop=lwl[end], length=tgt_bins))
         bin_v = zeros(Float64, tgt_bins)
         @. bin_v = itp(bin_c)

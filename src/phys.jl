@@ -10,7 +10,6 @@ module phys
 
     using NCDatasets
     using LoggingExtras
-    import PCHIPInterpolation:Interpolator # for 1D interpolation
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
     # Sources:
@@ -236,17 +235,17 @@ module phys
         no_sat::Bool                # No saturation data
         sat_T::Array{Float64,1}     # Reference temperatures [K]
         sat_P::Array{Float64,1}     # Corresponding saturation pressures [Pa]
-        sat_I::Interpolator         # PCHIP Interpolator
+        sat_I::Extrapolation        # 1D linear interpolator-extrapolator
 
         # Latent heat (enthalpy) of phase change
         lat_T::Array{Float64,1}     # Reference temperatures [K]
         lat_H::Array{Float64,1}     # Corresponding heats [J kg-1]
-        lat_I::Interpolator         # PCHIP Interpolator
+        lat_I::Extrapolation        # 1D linear interpolator-extrapolator
 
         # Specific heat capacity
         cap_T::Array{Float64,1}     # Reference temperatures [K]
         cap_C::Array{Float64,1}     # Corresponding Cp values [J K-1 kg-1]
-        cap_I::Interpolator         # PCHIP Interpolator
+        cap_I::Extrapolation        # 1D linear interpolator-extrapolator
 
         # Thermal conductivity
         kc::Float64                 # Constant conductivity [J K-1 kg-1]
@@ -258,13 +257,13 @@ module phys
         # Which equation of state should be used for this gas?
         eos::EOS
 
-        # EOS original grid axes
+        # EOS original grid (flattened 2D arrays)
         eos_T::Array{Float64,1}     # temperature [K]
-        eos_P::Array{Float64,1}     # pressure [log10 Pa]
-        eos_V::Array{Float64,2}     # density [kg m-3]
+        eos_P::Array{Float64,1}     # log pressure [log10 Pa]
+        eos_ρ::Array{Float64,1}     # density [kg m-3]
 
         # EOS interpolator with constant-value extrapolation
-        eos_I::Extrapolation
+        eos_I::Extrapolation        # 2D linear interpolator-extrapolator
 
         Gas_t() = new()
     end # end gas struct
@@ -272,7 +271,8 @@ module phys
     """
     Load gas data into a new struct
     """
-    function load_gas(thermo_dir::String, formula::String, tmp_dep::Bool)::Gas_t
+    function load_gas(thermo_dir::String, formula::String,
+                            tmp_dep::Bool, real_gas::Bool)::Gas_t
 
         @debug ("Loading data for gas $formula")
 
@@ -293,127 +293,144 @@ module phys
             end
         end
 
+        # Set plotting color and label
+        gas.plot_color = _pretty_color(formula)
+        gas.plot_label = _pretty_name(formula)
+
         # Thermal conductivity
         gas.kc = 0.0
 
         # Fastchem name (to be learned later)
         gas.fastchem_name = "_unknown"
 
-        # Set plotting color and label
-        gas.plot_color = _pretty_color(formula)
-        gas.plot_label = _pretty_name(formula)
+        # Default parameters, assuming we have no data...
+        gas.mmw = _get_mmw(formula)
+        gas.JANAF_name = "_unknown"
+
+        # heat capacity set to zero
+        gas.cap_T = [0.0, fbig]
+        gas.cap_C = [0.0, 0.0]
+
+        # latent heat set to zero
+        gas.lat_T = [0.0, fbig]
+        gas.lat_H = [0.0, 0.0]
+
+        # saturation pressure set to large value (ensures always gas phase)
+        gas.sat_T = [0.0, fbig]
+        gas.sat_P = [fbig, fbig]
+        gas.no_sat = true
+
+        # critical set to small value (always supercritical)
+        gas.T_crit = 0.0
+        gas.T_trip = 0.0
+
+        # set EOS to ideal gas
+        gas.eos = EOS_IDEAL
+        eos_name = "ideal gas"
 
         # Check if we have data from file
         gas.stub = !isfile(fpath)
-        gas.no_sat = false
-        eos_name = "ideal gas"
         if gas.stub
-            # no data => generate stub
+            # no data
             @debug("    stub")
-
-            gas.mmw = _get_mmw(formula)
-            gas.JANAF_name = "_unknown"
-
-            # heat capacity set to zero
-            gas.cap_T = [0.0, fbig]
-            gas.cap_C = [0.0, 0.0]
-
-            # latent heat set to zero
-            gas.lat_T = [0.0, fbig]
-            gas.lat_H = [0.0, 0.0]
-
-            # saturation pressure set to large value (ensures always gas phase)
-            gas.sat_T = [0.0, fbig]
-            gas.sat_P = [fbig, fbig]
-            gas.no_sat = true
-
-            # critical set to small value (always supercritical)
-            gas.T_crit = 0.0
-            gas.T_trip = 0.0
-
-            # set EOS to ideal gas
-            gas.eos = EOS_IDEAL
-
         else
-            # have data => load from file
+            # have data => load what we can find inside the file
             @debug("    ncdf")
             with_logger(MinLevelLogger(current_logger(), Logging.Info)) do
                 ds = Dataset(fpath,"r")
 
-                # scalar properties
+                # we always have these
                 gas.mmw = ds["mmw"][1]
-                gas.T_trip = ds["T_trip"][1]
-                gas.T_crit = ds["T_crit"][1]
                 gas.JANAF_name = String(ds["JANAF"][:])
 
+                # triple point and critical point
+                if haskey(ds, "T_trip")
+                    gas.T_trip = ds["T_trip"][1]
+                end
+                if haskey(ds, "T_crit")
+                    gas.T_crit = ds["T_crit"][1]
+                end
+
                 # heat capacity
-                gas.cap_T = ds["cap_T"][:]
-                gas.cap_C = ds["cap_C"][:]
+                if haskey(ds, "cap_T")
+                    gas.cap_T = ds["cap_T"][:]
+                    gas.cap_C = ds["cap_C"][:]
+                end
 
                 # latent heat of phase change
-                gas.lat_T = ds["lat_T"][:]
-                gas.lat_H = ds["lat_H"][:]
+                if haskey(ds, "lat_T")
+                    gas.lat_T = ds["lat_T"][:]
+                    gas.lat_H = ds["lat_H"][:]
+                end
 
                 # saturation pressure
-                gas.sat_T = ds["sat_T"][:]
-                gas.sat_P = ds["sat_P"][:]
-                if length(gas.sat_P) < 3
-                    gas.no_sat = true
+                if haskey(ds, "sat_T")
+                    gas.sat_T = ds["sat_T"][:]
+                    gas.sat_P = ds["sat_P"][:]
+                    gas.no_sat = false
                 end
 
                 # work out which is the best available equation of state
-                #     ideal gas is the base case
-                gas.eos = EOS_IDEAL
-                #     next, try to use van der waals if the data are available
-                if haskey(ds, "vdw_T") && haskey(ds, "vdw_P") && haskey(ds, "vdw_V")
-                    gas.eos = EOS_VDW
-                end
-                #     try to use aqua data for water
-                if formula == "H2O"
-                    if haskey(ds, "aqua_T") && haskey(ds, "aqua_P") && haskey(ds, "aqua_V")
-                        gas.eos = EOS_AQUA  # aqua data found -  this is preferred
-                    else
-                        @warn("Could not find AQUA table for H2O equation of state")
-                        # this means we will use vdw if available, or otherwise ideal gas
+                if real_gas
+                    # try to use van der waals EOS
+                    if haskey(ds, "vdw_T")
+                        gas.eos = EOS_VDW
+                    end
+                    #  try to use aqua EOS for water
+                    if formula == "H2O"
+                        if haskey(ds, "aqua_T")
+                            gas.eos = EOS_AQUA
+                            # aqua data found -  this is preferred
+                        else
+                            @warn("Could not find AQUA table for H2O equation of state")
+                            # this means we will use vdw if available
+                        end
                     end
                 end
 
                 # prepare eos data if necessary
                 if gas.eos != EOS_IDEAL
-                    # load data
+                    # load data (these are flattened into 1D arrays)
                     if gas.eos == EOS_VDW
                         eos_name = "Van der Waals"
-                        gas.eos_P = ds["vdw_P"][:]
-                        gas.eos_T = ds["vdw_P"][:]
-                        gas.eos_V = ds["vdw_V"][:]
+                        gas.eos_P = ds["vdw_P"][:]      # log Pa
+                        gas.eos_T = ds["vdw_T"][:]      # K
+                        gas.eos_ρ = ds["vdw_rho"][:]    # log kg m-3
                     elseif gas.eos == EOS_AQUA
                         eos_name = "AQUA"
                         gas.eos_P = ds["aqua_P"][:]
-                        gas.eos_T = ds["aqua_P"][:]
-                        gas.eos_V = ds["aqua_V"][:]
+                        gas.eos_T = ds["aqua_T"][:]
+                        gas.eos_ρ = ds["aqua_rho"][:]
                     end
 
                     # check shape
-                    if size(gas.eos_V) != (length(gas.eos_T), length(gas.eos_P))
+                    if !(length(gas.eos_ρ) == length(gas.eos_P) == length(gas.eos_T))
                         @error("Could not parse $formula EOS data from file")
-                        @error("    tmp length = $(length(gas.eos_T))")
-                        @error("    prs length = $(length(gas.eos_P))")
-                        @error("    rho length = $(size(gas.eos_V)))")
+                        @error("    temp. length = $(length(gas.eos_T))")
+                        @error("    pres. length = $(length(gas.eos_P))")
+                        @error("    dens. length = $(length(gas.eos_ρ))")
+                        return gas
                     end
 
+                    # reshape arrays into 2D
+                    newshape = (length(unique(gas.eos_T)), length(unique(gas.eos_P)))
+                    eos_T_1d = reshape(gas.eos_T, newshape)[:,1]    # K
+                    eos_P_1d = reshape(gas.eos_P, newshape)[1,:]    # log Pa
+                    eos_ρ_2d = 10.0 .^ reshape(gas.eos_ρ, newshape) # kg m-3
+
                     # check ascending
-                    if !issorted(gas.eos_T)
-                        @error("Could not parse $formula EOS data from file")
-                        @error("    Temperature array must be strictly ascending")
-                    end
-                    if !issorted(gas.eos_P)
+                    if !issorted(eos_P_1d)
                         @error("Could not parse $formula EOS data from file")
                         @error("    Pressure array must be strictly ascending")
+                    end
+                    if !issorted(eos_T_1d)
+                        @error("Could not parse $formula EOS data from file")
+                        @error("    Temperature array must be strictly ascending")
                     end
 
                     # interpolate to 2D grid
                     gas.eos_I = extrapolate(interpolate(
-                                                        (gas.eos_T,gas.eos_P), z,  # input
+                                                        (eos_T_1d,eos_P_1d), eos_ρ_2d,
                                                         Gridded(Linear())), # linear interp.
                                             Flat()) # constant-value extrap.
                 end # /EOS
@@ -423,16 +440,10 @@ module phys
 
             end # /NetCDF
 
-            # Extrapolate univariate quantities to high temperatures
-            push!(gas.cap_T, 9000.0); push!(gas.cap_C, gas.cap_C[end])
-            push!(gas.lat_T, 9000.0); push!(gas.lat_H, gas.lat_H[end])
-            push!(gas.sat_T, 9000.0); push!(gas.sat_P, gas.sat_P[end])
-
             # Setup 1D interpolators for Cp, Lv, and Psat
-            gas.cap_I = Interpolator(gas.cap_T, gas.cap_C)
-            gas.lat_I = Interpolator(gas.lat_T, gas.lat_H)
-            gas.sat_I = Interpolator(gas.sat_T, gas.sat_P)
-
+            gas.cap_I = extrapolate(interpolate((gas.cap_T,), gas.cap_C, Gridded(Linear())), Flat())
+            gas.lat_I = extrapolate(interpolate((gas.lat_T,), gas.lat_H, Gridded(Linear())), Flat())
+            gas.sat_I = extrapolate(interpolate((gas.sat_T,), gas.sat_P, Gridded(Linear())), Flat())
         end
 
         @debug("    using '$eos_name' equation of state")
@@ -753,6 +764,11 @@ module phys
         if ngas != length(vmr)
             @error "The number of gases and the number of mixing ratios are different"
             exit(1)
+        end
+
+        # single gas case
+        if ngas == 1
+            return calc_rho_gas(tmp, prs, gas[1])
         end
 
         # calculate the density (and mass-mixing ratio) of each gas

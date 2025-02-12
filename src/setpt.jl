@@ -13,7 +13,7 @@ module setpt
 
     using NCDatasets
     using LoggingExtras
-    import PCHIPInterpolation:Interpolator
+    import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
     # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
@@ -111,7 +111,7 @@ module setpt
         # Interpolate from the loaded grid to the required one
         #   This uses log-pressures in order to make the interpolation behave
         #   reasonably across the entire grid.
-        itp = Interpolator(log10.(pl), tmpl)
+        itp::Extrapolation = extrapolate(interpolate((log10.(pl),),tmpl, Gridded(Linear())), Flat())
         @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
         @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
 
@@ -176,7 +176,7 @@ module setpt
             close(ds)
 
             # interpolate
-            itp = Interpolator(log10.(arr_P), arr_T)
+            itp = extrapolate(interpolate((log10.(arr_P),),arr_T,Gridded(Linear())),Flat())
             @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
             @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
 
@@ -221,33 +221,31 @@ module setpt
         # Set surface
         atmos.tmpl[end] = atmos.tmp_surf
 
+        # Set mmw
+        atmosphere.calc_profile_mmw!(atmos)
+
         # Lapse rate dT/dp
         grad::Float64 = 0.0
 
         # Calculate values
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
-            # Set cp based on temperature at the level below this one
-            tmp_eval = atmos.tmp_surf
+            # Set cp and rho based on temperature of the level below this one
+            atmos.tmp[i] = atmos.tmp_surf
             if i < atmos.nlev_c
-                tmp_eval = atmos.tmp[i+1]
+                atmos.tmp[i] = atmos.tmp[i+1]
             end
-            atmos.layer_cp[i] = 0.0
-            for gas in atmos.gas_names
-                atmos.layer_cp[i] += atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw *
-                                            phys.get_Cp(atmos.gas_dat[gas], tmp_eval) /
-                                            atmos.layer_μ[i]
-            end
+            atmosphere.calc_single_cpkc!(atmos, i)
+            atmosphere.calc_single_density!(atmos, i)
+
+            # Evaluate lapse rate dT/dp
+            grad = 1 / (atmos.layer_density[i] * atmos.layer_cp[i])
 
             # Cell-edge to cell-centre
-            grad = phys.R_gas * atmos.tmpl[i+1] /
-                        (atmos.pl[i+1] * atmos.layer_μ[i] * atmos.layer_cp[i])
             atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
             atmos.tmp[i] = max(atmos.tmp[i], atmos.tmp_floor)
 
             # Cell-centre to cell-edge
-            grad = phys.R_gas * atmos.tmp[i] /
-                        (atmos.p[i] * atmos.layer_μ[i] * atmos.layer_cp[i])
             atmos.tmpl[i] = atmos.tmp[i] + grad * (atmos.pl[i]-atmos.p[i])
             atmos.tmpl[i] = max(atmos.tmpl[i], atmos.tmp_floor)
         end
