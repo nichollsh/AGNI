@@ -122,7 +122,7 @@ module atmosphere
         real_gas::Bool                      # use real-gas equations of state where possible
         thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
         gravity_funct::Bool                 # use height-dependent gravity calculation (otherwise, use surface value throughout)
-        layer_density::Array{Float64,1}     # density [kg m-3]
+        layer_ρ::Array{Float64,1}           # mass density [kg m-3]
         layer_μ::Array{Float64,1}           # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
         layer_kc::Array{Float64,1}          # thermal conductivity at const-p [W m-1 K-1]
@@ -441,7 +441,7 @@ module atmosphere
 
         # Initialise thermodynamics
         atmos.layer_μ     = zeros(Float64, atmos.nlev_c)
-        atmos.layer_density = zeros(Float64, atmos.nlev_c)
+        atmos.layer_ρ = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         atmos.layer_kc      = zeros(Float64, atmos.nlev_c)
         atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
@@ -858,7 +858,7 @@ module atmosphere
             end
             p1 = 0.5 * (atmos.p[i] + atmos.pl[i+1])
             t1 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i+1])
-            dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_density[i] * g1)
+            dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * g1)
             if !ignore_errors
                 if (dzc < dz_min)
                     ok = 2
@@ -876,7 +876,7 @@ module atmosphere
             end
             p2 = 0.5 * (atmos.p[i] + atmos.pl[i])
             t2 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i])
-            dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_density[i] * g2)
+            dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * g2)
             if !ignore_errors
                 if (dzl < dz_min)
                     ok = 2
@@ -908,7 +908,7 @@ module atmosphere
         atmos.atm.r_layer[1,:]      .= atmos.z[:]  .+ atmos.rp
         atmos.atm.r_level[1,0:end]  .= atmos.zl[:] .+ atmos.rp
         atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
-        atmos.atm.density[1,:]      .= atmos.layer_density[:]
+        atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
 
         return Bool(code==0)
     end
@@ -1001,7 +1001,7 @@ module atmosphere
         vmr_arr = [atmos.gas_vmr[gas][idx] for gas in atmos.gas_names]
 
         # Evaluate density
-        atmos.layer_density[idx] = phys.calc_rho_mix(
+        atmos.layer_ρ[idx] = phys.calc_rho_mix(
                                                     gas_arr, vmr_arr,
                                                     atmos.tmp[idx], atmos.p[idx],
                                                     atmos.layer_μ[idx]

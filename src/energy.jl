@@ -343,14 +343,11 @@ module energy
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
         grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0
-        beta::Float64 = 0.0; xv::Float64=0.0
-        inhib::Float64 = 0.0; condition::Bool = false
-        cmax::String = ""; do_moist::Bool = false
 
         # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
 
-            # Profile lapse rate: d(ln T)/d(ln P)
+            # Profile lapse rate: d(ln T)/d(ln P) = (P/T)*(dT/dP)
             grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
 
             # Optionally skip low pressures
@@ -358,59 +355,37 @@ module energy
                 continue
             end
 
+            # Mass weights
             m1 = atmos.layer_mass[i-1]
             m2 = atmos.layer_mass[i]
             mt = m1+m2
 
-            grav = (atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1)/mt
-            mu   = (atmos.layer_μ[i]  * m2 + atmos.layer_μ[i-1]  * m1)/mt
-            c_p  = (atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1)/mt
-            tmp  = (atmos.tmp[i]        * m2 + atmos.tmp[i-1]        * m1)/mt
+            # Normalise
+            m1 = m1/mt
+            m2 = m2/mt
 
+            grav = atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1
+            mu   = atmos.layer_μ[i]    * m2 + atmos.layer_μ[i-1]    * m1
+            c_p  = atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1
+            rho  = atmos.layer_ρ[i]    * m2 + atmos.layer_ρ[i-1]    * m1
 
-            # Dry convection
-            grad_ad = (phys.R_gas / mu) / c_p
-            condition = (grad_pr > grad_ad)
-
-            if atmos.condense_any && do_moist
-                # Check which condensable species has the largest (L/RT)^2*x
-
-                cmax = ""
-                for c in atmos.condensates
-                    if atmos.gas_yield[c][i] > 0.0
-                        cmax = c
-                        break
-                    end
-                end
-
-                if !isempty(cmax)
-                    mmw_v = atmos.gas_dat[cmax].mmw
-                    xv = (atmos.gas_vmr[cmax][i]*m2 + atmos.gas_vmr[cmax][i-1]*m1)/mt
-                    beta = phys.get_Lv(atmos.gas_dat[cmax], tmp)*mmw_v/tmp/phys.R_gas
-
-                    grad_ad = (1 - xv + beta*xv) /
-                                 (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
-
-                    # Critical value (in vmr, NOT mmr form, only when mmw_v>mmw_d)
-                    if mmw_v > (mu - xv*mmw_v)/(1-xv)
-                        inhib = phys.R_gas * tmp/L * (1-xv)/(mmw_v/mu - 1)
-                        condition = (grad_pr > grad_ad) && xv < inhib
-                    else
-                        condition = (grad_pr > grad_ad)
-                    end
-                end
-
+            # Dry convective lapse rate
+            if atmos.real_gas
+                # general solution
+                grad_ad = atmos.pl[i] / (atmos.tmpl[i] * rho * c_p)
+            else
+                # ideal gas solution
+                grad_ad = (phys.R_gas / mu) / c_p
             end
 
             # Check instability
-            if condition
-
-                rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
+            if grad_pr > grad_ad
 
                 atmos.mask_c[i] = true
 
                 # Pressure scale height
-                H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
+                # H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
+                H = atmos.pl[i] / (rho * grav)
 
                 # Mixing length
                 if mltype == 1

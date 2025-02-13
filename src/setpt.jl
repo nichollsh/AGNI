@@ -309,7 +309,7 @@ module setpt
             atmosphere.calc_single_density!(atmos, i)
 
             # Evaluate lapse rate dT/dp
-            grad = 1 / (atmos.layer_density[i] * atmos.layer_cp[i])
+            grad = 1 / (atmos.layer_ρ[i] * atmos.layer_cp[i])
 
             # Cell-edge to cell-centre
             atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
