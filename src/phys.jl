@@ -252,9 +252,6 @@ module phys
                                             Flat()) # constant-value extrap.
                 end # /EOS
 
-                # close file
-                close(ds)
-
             end # /NetCDF
             end # /MinLevelLogger
 
