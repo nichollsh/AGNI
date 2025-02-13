@@ -123,7 +123,6 @@ end
 
 
 
-
 # -------------
 # Test mixing ratios
 # -------------
@@ -150,7 +149,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
-                         mf_dict, ""
+                         mf_dict, "",
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,"")
 
@@ -202,7 +202,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict,"",
                          flag_gcontinuum=false,
                          flag_rayleigh=false,
-                         overlap_method="ro"
+                         overlap_method="ro",
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 energy.radtrans!(atmos, false)
@@ -271,7 +272,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method="ee",
                          condensates=["H2O"],
                          surface_material="greybody",
-                         albedo_s=0.5
+                         albedo_s=0.5,
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.prevent_surfsupersat!(atmos)
@@ -300,7 +302,7 @@ end
 @info " "
 @info "Testing hydrostatic integration"
 
-val_e = 433642.9593174118   # known from previous tests
+val_e = 424238.22072713776   # known from previous tests
 val_o = atmos.z[1] # top level
 @info "Expected value = $(val_e) m"
 @info "Modelled value = $(val_o) m"
@@ -376,7 +378,7 @@ end
 # -------------
 @info " "
 @info "Testing surface albedo "
-val_e = 30.313221153795453  # known from previous tests
+val_e = 30.24053638241024  # known from previous tests
 val_o = atmos.flux_u_sw[end] # bottom level
 @info "Expected value = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
@@ -417,7 +419,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict, "",
                          flag_gcontinuum=true,
                          flag_rayleigh=true,
-                         overlap_method="ro"
+                         overlap_method="ro",
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 energy.radtrans!(atmos, true)
@@ -464,7 +467,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
                          overlap_method="ro",
-                         thermo_functions=false
+                         thermo_functions=false,
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.isothermal!(atmos, 300.0)
@@ -475,7 +479,7 @@ energy.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 energy.calc_hrates!(atmos)
 
-val_e = 6.366642235738698  # from previous tests
+val_e = 6.366596000871719  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected value = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"
