@@ -155,7 +155,7 @@ module phys
             # have data => load what we can find inside the file
             @debug("    ncdf")
             with_logger(MinLevelLogger(current_logger(), Logging.Info)) do
-                ds = Dataset(fpath,"r")
+            Dataset(fpath,"r") do ds
 
                 # we always have these
                 gas.mmw = ds["mmw"][1]
@@ -256,6 +256,7 @@ module phys
                 close(ds)
 
             end # /NetCDF
+            end # /MinLevelLogger
 
             # Setup 1D interpolators for Cp, Lv, and Psat
             gas.cap_I = extrapolate(interpolate((gas.cap_T,), gas.cap_C, Gridded(Linear())), Flat())
