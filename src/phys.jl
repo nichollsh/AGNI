@@ -78,7 +78,7 @@ module phys
         # EOS original grid (flattened 2D arrays)
         eos_T::Array{Float64,1}     # temperature [K]
         eos_P::Array{Float64,1}     # log pressure [log10 Pa]
-        eos_ρ::Array{Float64,1}     # density [kg m-3]
+        eos_ρ::Array{Float64,2}     # log density [kg m-3]
 
         # EOS interpolator with constant-value extrapolation
         eos_I::Extrapolation        # 2D linear interpolator-extrapolator
@@ -208,47 +208,46 @@ module phys
 
                 # prepare eos data if necessary
                 if gas.eos != EOS_IDEAL
-                    # load data (these are flattened into 1D arrays)
+                    # load data (T and P are 1d, rho is 2d)
                     if gas.eos == EOS_VDW
                         eos_name = "Van der Waals"
                         gas.eos_P = ds["vdw_P"][:]      # log Pa
                         gas.eos_T = ds["vdw_T"][:]      # K
-                        gas.eos_ρ = ds["vdw_rho"][:]    # log kg m-3
+                        gas.eos_ρ = ds["vdw_rho"][:,:]    # log kg m-3
                     elseif gas.eos == EOS_AQUA
                         eos_name = "AQUA"
                         gas.eos_P = ds["aqua_P"][:]
                         gas.eos_T = ds["aqua_T"][:]
-                        gas.eos_ρ = ds["aqua_rho"][:]
+                        gas.eos_ρ = ds["aqua_rho"][:,:]
                     end
 
                     # check shape
-                    if !(length(gas.eos_ρ) == length(gas.eos_P) == length(gas.eos_T))
+                    if !(length(gas.eos_ρ) == length(gas.eos_P) * length(gas.eos_T))
                         @error("Could not parse $formula EOS data from file")
                         @error("    temp. length = $(length(gas.eos_T))")
                         @error("    pres. length = $(length(gas.eos_P))")
                         @error("    dens. length = $(length(gas.eos_ρ))")
+                        close(ds)
                         return gas
                     end
 
-                    # reshape arrays into 2D
-                    newshape = (length(unique(gas.eos_T)), length(unique(gas.eos_P)))
-                    eos_T_1d = reshape(gas.eos_T, newshape)[:,1]    # K
-                    eos_P_1d = reshape(gas.eos_P, newshape)[1,:]    # log Pa
-                    eos_ρ_2d = 10.0 .^ reshape(gas.eos_ρ, newshape) # kg m-3
-
                     # check ascending
-                    if !issorted(eos_P_1d)
+                    if !issorted(gas.eos_P)
                         @error("Could not parse $formula EOS data from file")
                         @error("    Pressure array must be strictly ascending")
+                        close(ds)
+                        return gas
                     end
-                    if !issorted(eos_T_1d)
+                    if !issorted(gas.eos_T)
                         @error("Could not parse $formula EOS data from file")
                         @error("    Temperature array must be strictly ascending")
+                        close(ds)
+                        return gas
                     end
 
                     # interpolate to 2D grid
                     gas.eos_I = extrapolate(interpolate(
-                                                        (eos_T_1d,eos_P_1d), eos_ρ_2d,
+                                                        (gas.eos_T,gas.eos_P), gas.eos_ρ,
                                                         Gridded(Linear())), # linear interp.
                                             Flat()) # constant-value extrap.
                 end # /EOS
@@ -618,7 +617,7 @@ module phys
             return _rho_ideal(tmp, prs, gas.mmw)
         else
             # otherwise, will use interpolated VDW or AQUA equation of state
-            return gas.eos_I(tmp, log10(prs))
+            return 10^gas.eos_I(tmp, log10(prs))
         end
     end
 
