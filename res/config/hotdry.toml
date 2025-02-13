@@ -21,7 +21,7 @@ title = "Hot and dry"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 270.0
+    p_surf          = 2700.0
     p_top           = 1e-5
     vmr_dict        = { H2O = 1.0}
     vmr_path        = ""
@@ -41,7 +41,7 @@ title = "Hot and dry"
     cloud           = false
     aerosol         = false
     overlap_method  = "ee"
-    real_gas        = true
+    real_gas        = false
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = true
