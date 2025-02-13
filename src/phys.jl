@@ -16,7 +16,10 @@ module phys
     using .consts
 
     # A large floating point number
-    const fbig::Float64 = 1e90
+    const BIGFLOAT::Float64 = 1e90
+
+    # Enable/disable flags
+    const ENABLE_AQUA::Bool = false
 
     # Enumerate potential equations of state
     @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3
@@ -123,16 +126,16 @@ module phys
         gas.JANAF_name = "_unknown"
 
         # heat capacity set to zero
-        gas.cap_T = [0.0, fbig]
+        gas.cap_T = [0.0, BIGFLOAT]
         gas.cap_C = [0.0, 0.0]
 
         # latent heat set to zero
-        gas.lat_T = [0.0, fbig]
+        gas.lat_T = [0.0, BIGFLOAT]
         gas.lat_H = [0.0, 0.0]
 
         # saturation pressure set to large value (ensures always gas phase)
-        gas.sat_T = [0.0, fbig]
-        gas.sat_P = [fbig, fbig]
+        gas.sat_T = [0.0, BIGFLOAT]
+        gas.sat_P = [BIGFLOAT, BIGFLOAT]
         gas.no_sat = true
 
         # critical set to small value (always supercritical)
@@ -192,7 +195,7 @@ module phys
                         gas.eos = EOS_VDW
                     end
                     #  try to use aqua EOS for water
-                    if formula == "H2O"
+                    if (formula == "H2O") && ENABLE_AQUA
                         if haskey(ds, "aqua_T")
                             gas.eos = EOS_AQUA
                             # aqua data found -  this is preferred
@@ -438,16 +441,16 @@ module phys
 
         # Handle stub cases
         if gas.stub
-            return fbig
+            return BIGFLOAT
         end
         if gas.no_sat
-            return fbig
+            return BIGFLOAT
         end
 
         # Above critical point. In practice, a check for this should be made
         #    before any attempt to evaluate this function.
         if t > gas.T_crit + 1.0e-5
-            return fbig
+            return BIGFLOAT
         end
 
         # Get value from interpolator

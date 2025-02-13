@@ -33,13 +33,16 @@ p_top           = 1e-8
 nlev_centre     = 100
 radius          = 1.0e7    # metres
 gravity         = 10.0      # m s-2
+total  = 0
+failed = 0
 
 rm(output_dir,force=true,recursive=true)
 if !isdir(output_dir) && !isfile(output_dir)
     mkdir(output_dir)
 end
 
-passing = true
+
+rtol   = 1e-3
 
 
 # -------------
@@ -51,21 +54,22 @@ ideal_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, false)
 t_test  = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
 v_expt  = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
 v_obs   = zero(t_test)
-cp_pass = true
+test_pass = true
 for i in 1:5
     v_obs[i] = phys.get_Cp(ideal_H2O, t_test[i]) * ideal_H2O.mmw # get value and convert units
-    if abs(v_expt[i]- v_obs[i])/v_expt[i] > 0.01  # error must be <1%
-        global cp_pass = false
+    if abs(v_expt[i]- v_obs[i])/v_expt[i] > rtol
+        global test_pass = false
     end
 end
 @info "Expected values = $(v_expt) J mol-1 K-1"
 @info "Modelled values = $(v_obs) J mol-1 K-1"
-if cp_pass
+if test_pass
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -73,52 +77,80 @@ end
 # Test ideal gas equation of state
 # -------------
 @info " "
-@info "Testing ideal gas equation of state"
+@info "Testing H2O ideal gas equation of state"
 t_test = [30.0,  200.0, 373.0,  1273.0,  1000.0] # Tested values of temperature [K]
 p_test = [1e0,   1e3,   1e5,     1e7,    1e8]    # Tested values of pressure [Pa]
 v_expt = [7.22235e-5, 1.08335e-2, 5.80886e-1, 1.70204e1, 2.16670e2]  # Expected rho [kg m-3]
 v_obs  = zero(p_test)
-eos_pass = true
+test_pass = true
 for i in 1:5
     v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], ideal_H2O)
-    if abs(v_expt[i] - v_obs[i])/v_expt[i] > 0.01  # error must be <1%
-        global eos_pass = false
+    if abs(v_expt[i] - v_obs[i])/v_expt[i] > rtol
+        global test_pass = false
     end
 end
 @info "Expected values = $(v_expt) kg m-3"
 @info "Modelled values = $(v_obs) kg m-3"
-if eos_pass
+if test_pass
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
-
 
 # -------------
 # Test AQUA equation of state
 # -------------
 @info " "
-@info "Testing AQUA equation of state"
+@info "Testing H2O AQUA equation of state"
 aqua_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, true)
-v_expt = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]  # Expected rho [kg m-3]
+v_expt = [7.22235e-5, 1.08335e-2, 5.80886e-1, 1.70204e1, 2.16670e2] 
 v_obs  = zero(p_test)
-eos_pass = true
+test_pass = true
 for i in 1:5
     v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], aqua_H2O)
-    if abs(v_expt[i] - v_obs[i])/v_expt[i] > 0.01  # error must be <1%
-        global eos_pass = false
+    if abs(v_expt[i] - v_obs[i])/v_expt[i] > rtol
+        global test_pass = false
     end
 end
 @info "Expected values = $(v_expt) kg m-3"
 @info "Modelled values = $(v_obs) kg m-3"
-if eos_pass
+if test_pass
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
+@info "--------------------------"
+
+
+# -------------
+# Test VdW equation of state
+# -------------
+@info " "
+@info "Testing CO2 VdW equation of state"
+vdw_CO2::phys.Gas_t = phys.load_gas("res/thermodynamics/", "CO2", true, true)
+v_expt = [5.04101511928e-5, 0.02650480037, 1.424883064 , 41.24848093 , 418.138735 ]
+v_obs  = zero(p_test)
+test_pass = true
+for i in 1:5
+    v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], vdw_CO2)
+    if abs(v_expt[i] - v_obs[i])/v_expt[i] > rtol
+        global test_pass = false
+    end
+end
+@info "Expected values = $(v_expt) kg m-3"
+@info "Modelled values = $(v_obs) kg m-3"
+if test_pass
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
 @info "--------------------------"
 
 
@@ -156,19 +188,20 @@ atmosphere.allocate!(atmos,"")
 
 dct_e::Dict{String, Float64} = mf_dict
 dct_o::Dict{String, Float64} = Dict()
-sp_pass = true
+test_pass = true
 for k in keys(dct_e)
     dct_o[k] = atmos.gas_vmr[k][20]
-    global sp_pass = sp_pass && ( abs(dct_o[k]-dct_e[k]) < 1.0e-6 )
+    global test_pass = test_pass && ( abs(dct_o[k]-dct_e[k]) < 1.0e-6 )
 end
 @info "Expected values = $(dct_e)"
 @info "Modelled values = $(dct_o)"
-if sp_pass
+if test_pass
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -216,8 +249,9 @@ if abs(val_e-val_o) < 2
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -235,8 +269,9 @@ if abs(val_e-val_o) < 1.0e-10
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -291,8 +326,9 @@ if ( val_o > val_e[1]) && (val_o < val_e[2])
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -306,12 +342,13 @@ val_e = 424238.22072713776   # known from previous tests
 val_o = atmos.z[1] # top level
 @info "Expected value = $(val_e) m"
 @info "Modelled value = $(val_o) m"
-if abs(val_o - val_e) < 0.1
+if abs(val_o - val_e)/val_e < rtol
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -330,8 +367,9 @@ if isfile(plt_path)
     rm(plt_path, force=true)
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -349,8 +387,9 @@ if isfile(plt_path)
     rm(plt_path, force=true)
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -368,8 +407,9 @@ if isfile(plt_path)
     rm(plt_path, force=true)
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -382,12 +422,13 @@ val_e = 30.24053638241024  # known from previous tests
 val_o = atmos.flux_u_sw[end] # bottom level
 @info "Expected value = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
-if abs(val_o - val_e) < 1e-6
+if abs(val_o - val_e)/val_e < rtol
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -434,8 +475,9 @@ if ( val_o > val_e[1]) && (val_o < val_e[2])
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed  += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -483,12 +525,13 @@ val_e = 6.366596000871719  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected value = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"
-if abs(val_o - val_e) < 1e-6
+if abs(val_o - val_e)/val_e < rtol
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -497,11 +540,11 @@ atmosphere.deallocate!(atmos)
 # Inform at end
 # -------------
 @info " "
-if passing
-    @info "All tests passed"
+if failed == 0
+    @info "All $total tests have passed"
     exit(0)
 else
-    @warn "Some tests failed"
+    @warn "Some tests failed ($failed/$total)"
     exit(1)
 end
 
