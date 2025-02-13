@@ -20,11 +20,13 @@ include("../src/atmosphere.jl")
 include("../src/setpt.jl")
 include("../src/energy.jl")
 include("../src/plotting.jl")
+include("../src/dump.jl")
 import .phys
 import .atmosphere
 import .setpt
 import .energy
 import .plotting
+import .dump
 
 
 # Prepare
@@ -78,9 +80,9 @@ total += 1
 # -------------
 @info " "
 @info "Testing H2O ideal gas equation of state"
-t_test = [30.0,  200.0, 373.0,  1273.0,  1000.0] # Tested values of temperature [K]
-p_test = [1e0,   1e3,   1e5,     1e7,    1e8]    # Tested values of pressure [Pa]
-v_expt = [7.22235e-5, 1.08335e-2, 5.80886e-1, 1.70204e1, 2.16670e2]  # Expected rho [kg m-3]
+t_test = [200.0,  300.0, 500.0,   1273.0,  3200.0] # Tested values of temperature [K]
+p_test = [1e0,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
+v_expt = [1.0833532e-5, 7.2223549e-3, 4.33341295e-1, 1.7020475e1, 6.7709577e1]  # Expected rho [kg m-3]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5
@@ -106,7 +108,7 @@ total += 1
 @info " "
 @info "Testing H2O AQUA equation of state"
 aqua_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, true)
-v_expt = [7.22235e-5, 1.08335e-2, 5.80886e-1, 1.70204e1, 2.16670e2] 
+v_expt = [9.26121571e2, 7.2269991e-3, 4.35193299e-1, 1.7022212e1, 6.68198662e1]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5
@@ -133,7 +135,7 @@ total += 1
 @info " "
 @info "Testing CO2 VdW equation of state"
 vdw_CO2::phys.Gas_t = phys.load_gas("res/thermodynamics/", "CO2", true, true)
-v_expt = [5.04101511928e-5, 0.02650480037, 1.424883064 , 41.24848093 , 418.138735 ]
+v_expt = [2.646531089e-5, 1.76442986e-2, 1.0597595366, 4.1190987467e1, 1.475256797e2]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5
@@ -181,8 +183,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          tmp_surf,
                          gravity, radius,
                          nlev_centre, p_surf, p_top,
-                         mf_dict, "",
-                         real_gas=false
+                         mf_dict, ""
                  )
 atmosphere.allocate!(atmos,"")
 
@@ -204,8 +205,6 @@ end
 total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
-
-
 
 
 # -------------
@@ -353,18 +352,38 @@ total += 1
 
 
 # -------------
+# Test write NetCDF
+# -------------
+@info " "
+@info "Testing write NetCDF"
+out_path::String = "/tmp/agni_atm.nc"
+rm(out_path, force=true)
+dump.write_ncdf(atmos, out_path)
+@info "Expecting file at $out_path"
+if isfile(out_path)
+    @info "Found file at $out_path"
+    @info "Pass"
+    rm(out_path, force=true)
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+@info "--------------------------"
+
+# -------------
 # Test plot T(p)
 # -------------
 @info " "
 @info "Testing plot temperatures"
-plt_path::String = "/tmp/agni_plot_tmp.png"
-rm(plt_path, force=true)
-plotting.plot_pt(atmos, plt_path)
-@info "Expecting file at $plt_path"
-if isfile(plt_path)
-    @info "Found file at $plt_path"
+out_path = "/tmp/agni_plot_tmp.png"
+rm(out_path, force=true)
+plotting.plot_pt(atmos, out_path)
+@info "Expecting file at $out_path"
+if isfile(out_path)
+    @info "Found file at $out_path"
     @info "Pass"
-    rm(plt_path, force=true)
+    rm(out_path, force=true)
 else
     @warn "Fail"
     failed += 1
@@ -378,13 +397,13 @@ total += 1
 # -------------
 @info " "
 @info "Testing plot height"
-plt_path = "/tmp/agni_plot_hei.png"
-plotting.plot_height(atmos, plt_path)
-@info "Expecting file at $plt_path"
-if isfile(plt_path)
-    @info "Found file at $plt_path"
+out_path = "/tmp/agni_plot_hei.png"
+plotting.plot_height(atmos, out_path)
+@info "Expecting file at $out_path"
+if isfile(out_path)
+    @info "Found file at $out_path"
     @info "Pass"
-    rm(plt_path, force=true)
+    rm(out_path, force=true)
 else
     @warn "Fail"
     failed += 1
@@ -398,13 +417,13 @@ total += 1
 # -------------
 @info " "
 @info "Testing plot albedo"
-plt_path = "/tmp/agni_plot_alb.png"
-plotting.plot_albedo(atmos, plt_path)
-@info "Expecting file at $plt_path"
-if isfile(plt_path)
-    @info "Found file at $plt_path"
+out_path = "/tmp/agni_plot_alb.png"
+plotting.plot_albedo(atmos, out_path)
+@info "Expecting file at $out_path"
+if isfile(out_path)
+    @info "Found file at $out_path"
     @info "Pass"
-    rm(plt_path, force=true)
+    rm(out_path, force=true)
 else
     @warn "Fail"
     failed += 1
@@ -525,6 +544,26 @@ val_e = 6.366596000871719  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected value = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"
+if abs(val_o - val_e)/val_e < rtol
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+@info "--------------------------"
+
+
+# -------------
+# Test flux calculation
+# -------------
+@info " "
+@info "Testing fluxes"
+energy.calc_fluxes!(atmos, true, true, true, true)
+val_e = 8.60308315276e3  # from previous tests
+val_o = atmos.flux_tot[atmos.nlev_c-10]
+@info "Expected value = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
 if abs(val_o - val_e)/val_e < rtol
     @info "Pass"
 else
