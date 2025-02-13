@@ -1378,6 +1378,7 @@ module atmosphere
             if atmos.gas_dat[g].stub        # flag as containing stub thermo data
                 gas_flags *= "NO_THERMO "
             end
+            gas_flags *= String(Symbol(atmos.gas_dat[g].eos))*" "
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
             end
