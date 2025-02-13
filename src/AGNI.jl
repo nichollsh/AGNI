@@ -290,7 +290,6 @@ module AGNI
         incl_sens::Bool        =        cfg["execution"]["sensible_heat"]
         incl_latent::Bool      =        cfg["execution"]["latent_heat"]
         sol_type::Int          =        cfg["execution"]["solution_type"]
-        solvers_cmd::Array{String,1} =  cfg["execution"]["solvers"]
         dx_max::Float64        =        cfg["execution"]["dx_max"]
         linesearch::Int        =        cfg["execution"]["linesearch"]
         easy_start::Bool       =        cfg["execution"]["easy_start"]
@@ -402,56 +401,45 @@ module AGNI
 
         # Loop over requested solvers
         solver_success::Bool = true
-        method_map::Array{String,1} = ["newton", "gauss", "levenberg"]
-
-        if length(solvers_cmd) == 0  # is empty
-            solvers_cmd = [""]
-        end
-        if !isempty(solvers_cmd[end])  # append "no solve" case to end, for calculating cff
-            push!(solvers_cmd, "")
-        end
+        allowed_solvers::Array{String,1} = ["newton", "gauss", "levenberg"]
 
         @info " "
-        for sol in solvers_cmd
-
-            sol = strip(lowercase(sol))
-            if isempty(sol)
-                sol = "none"
-            end
-            @info "Solving with '$sol'"
-
-            # No solve - just calc fluxes at the end
-            if sol == "none"
-                energy.calc_fluxes!(atmos, incl_latent,
-                                    incl_convect, incl_sens, incl_conduct,
-                                    calc_cf=cfg["plots"]["contribution"], rainout=rainout)
-                @info "    done"
-
-            # Nonlinear solver
-            elseif (sol in method_map)
-                if cfg["plots"]["at_runtime"]
-                    modplot = 1
-                end
-                method_idx = findfirst(==(sol), method_map)
-                solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
-                                    conduct=incl_conduct,  chem_type=chem_type,
-                                    convect=incl_convect, latent=incl_latent,
-                                    sens_heat=incl_sens, max_steps=max_steps,
-                                    max_runtime=max_runtime,
-                                    conv_atol=conv_atol, conv_rtol=conv_rtol,
-                                    method=method_idx, rainout=rainout,
-                                    dx_max=dx_max, ls_method=linesearch,
-                                    easy_start=easy_start,
-                                    modplot=modplot,save_frames=plt_ani)
-                return_success = return_success && solver_success
-
-            else
-                @error "Invalid solver"
-                return_success = false
-                break
-            end
-            @info " "
+        sol = strip(lowercase(cfg["execution"]["solver"]))
+        if isempty(sol)
+            sol = "none"
         end
+        @info "Solving with '$sol'"
+
+        # No solve - just calc fluxes at the end
+        if sol == "none"
+            energy.calc_fluxes!(atmos, incl_latent,
+                                incl_convect, incl_sens, incl_conduct,
+                                calc_cf=cfg["plots"]["contribution"], rainout=rainout)
+
+        # Use the requested solver
+        elseif sol in allowed_solvers
+            if cfg["plots"]["at_runtime"]
+                modplot = 1
+            end
+            method_idx = findfirst(==(sol), allowed_solvers)
+            solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
+                                conduct=incl_conduct,  chem_type=chem_type,
+                                convect=incl_convect, latent=incl_latent,
+                                sens_heat=incl_sens, max_steps=max_steps,
+                                max_runtime=max_runtime,
+                                conv_atol=conv_atol, conv_rtol=conv_rtol,
+                                method=method_idx, rainout=rainout,
+                                dx_max=dx_max, ls_method=linesearch,
+                                easy_start=easy_start,
+                                modplot=modplot,save_frames=plt_ani)
+            return_success = return_success && solver_success
+
+        # Invalid selection
+        else
+            @error "Invalid solver"
+            return_success = false
+        end
+        @info "    done"
 
         @info "Total RT evalulations: $(atmos.num_rt_eval)"
 

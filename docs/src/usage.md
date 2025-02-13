@@ -52,7 +52,7 @@ Some parameters:
      - 2 : zero flux divergence, with `tmp_surf` set such that the conductive skin (CBL) conserves energy flux
      - 3 : the net flux (up minus down) at each layer is equal to `flux_int`
 
-* `execution.solvers` tells the model which solvers to use. This is a list of strings, so multiple solvers can be applied sequentially. An empty string is always appended to the end of this list. Allowed solvers are...
+* `execution.solver` tells the model which solver to use. Allowed solvers are...
      - [empty string] : no solving takes place, so the model just calculates fluxes using the initial state
      - `newton` : the Newton-Raphson algorithm is used
      - `gauss`  : the Gauss-Newton algorithm is used

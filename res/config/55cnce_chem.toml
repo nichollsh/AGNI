@@ -37,7 +37,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     cloud           = false
     aerosol         = false
     overlap_method  = "ee"
-    real_gas        = true 
+    real_gas        = true
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = false
@@ -45,7 +45,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     convection      = true
     rainout         = false
     solution_type   = 3
-    solvers         = ["newton"]
+    solver          = "newton"
     dx_max          = 400.0
     initial_state   = ["iso", "2700"]
     linesearch      = 0
