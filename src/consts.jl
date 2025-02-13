@@ -40,6 +40,10 @@ module consts
     const zero_celcius::Float64 = 273.15
     export zero_celcius
 
+    # Mixing length parameter, dimensionless
+    const αMLT::Float64 = 1.0
+    export αMLT
+
     # Newton's gravitational constant [m3 kg-1 s-2]
     const G_grav::Float64 = 6.67430e-11 # NIST CODATA
     export G_grav
