@@ -140,6 +140,7 @@ module dump
             var_fcon =      defVar(ds, "flag_continuum",Char, ())                                               # Includes continuum absorption?
             var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())                                               # Includes clouds?
             var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())                                               # Using temperature-dependent thermodynamic functions
+            var_rgas =      defVar(ds, "real_gas"      ,Char, ())                                               # Using real gas EOS
             var_ssol =      defVar(ds, "solved"        ,Char, ())                                               # Has a solver been used?
             var_scon =      defVar(ds, "converged"     ,Char, ())                                               # Did the solver converge?
             var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg"))    # Zenith angle of direct stellar radiation
@@ -185,6 +186,12 @@ module dump
                 var_tfun[1] = 'y'
             else
                 var_tfun[1] = 'n'
+            end
+
+            if atmos.real_gas
+                var_rgas[1] = 'y'
+            else
+                var_rgas[1] = 'n'
             end
 
             if atmos.is_solved
