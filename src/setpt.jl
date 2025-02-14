@@ -374,14 +374,15 @@ module setpt
 
 
     # Ensure that the surface isn't supersaturated
-    function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)
+    function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)::Bool
         if !(atmos.is_alloc && atmos.is_param)
             @error "setpt: Atmosphere is not setup or allocated"
             return
         end
 
-        x::Float64 = 0.0
-        psat::Float64 = 0.0
+        x::Float64      = 0.0
+        psat::Float64   = 0.0
+        rained::Bool    = false
 
         # For each condensable volatile
         for gas in atmos.gas_names
@@ -399,6 +400,10 @@ module setpt
             # Check surface pressure (should not be supersaturated)
             psat = phys.get_Psat(atmos.gas_dat[gas], atmos.tmp_surf)
             if x*atmos.pl[end] > psat
+
+                # Set flag
+                rained = true
+
                 # Reduce amount of volatile until reaches phase curve
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
                 atmos.gas_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa
@@ -422,7 +427,7 @@ module setpt
         # Generate new pressure grid
         atmosphere.generate_pgrid!(atmos)
 
-        return nothing
+        return rained
     end
 
 
