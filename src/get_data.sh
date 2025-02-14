@@ -18,7 +18,6 @@ res="$root/res"
 spfiles=$res/spectral_files
 stellar=$res/stellar_spectra
 surface=$res/surface_albedos
-realgas=$res/realgas
 thermo=$res/thermodynamics
 
 # Make basic data folders
@@ -26,7 +25,6 @@ mkdir -p $res
 mkdir -p $spfiles
 mkdir -p $stellar
 mkdir -p $surface
-mkdir -p $realgas
 mkdir -p $thermo
 
 # Help strings
@@ -35,7 +33,6 @@ help_highres="Get a spectral file with many high-resolution opacities"
 help_steam="Get pure-steam spectral files"
 help_stellar="Get a collection of stellar spectra"
 help_surfaces="Get a collection of surface single-scattering albedos"
-help_realgas="Get a real-gas EOS coefficients and lookup tables"
 help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
 help="\
 Download and unpack data used to run the model.
@@ -54,8 +51,6 @@ Where [TARGET] can be any of the following:
         $help_stellar
     surfaces
         $help_surfaces
-    realgas
-        $help_realgas
     thermodynamics
         $help_thermo\
 "
@@ -166,14 +161,6 @@ function handle_request {
             osf q6ujb $surface rhyolite.dat
             osf usj7w $surface tephrite.dat
             osf aj6us $surface tholeiitic_basalt.dat
-            ;;
-
-        "realgas")
-            echo $help_realgas
-
-            # AQUA PT lookup
-            get_zip uqrdx $realgas
-
             ;;
 
         "thermodynamics")

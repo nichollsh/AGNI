@@ -85,7 +85,6 @@ module dump
         # into PROTEUS without compatibility issues.
 
         # Absorb output from these calls, because they spam the Debug logger
-        @debug "ALL DEBUG SUPPRESSED"
         with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
 
             ds = Dataset(fname,"c")
@@ -141,6 +140,7 @@ module dump
             var_fcon =      defVar(ds, "flag_continuum",Char, ())                                               # Includes continuum absorption?
             var_fcld =      defVar(ds, "flag_cloud"    ,Char, ())                                               # Includes clouds?
             var_tfun =      defVar(ds, "thermo_funct"  ,Char, ())                                               # Using temperature-dependent thermodynamic functions
+            var_rgas =      defVar(ds, "real_gas"      ,Char, ())                                               # Using real gas EOS
             var_ssol =      defVar(ds, "solved"        ,Char, ())                                               # Has a solver been used?
             var_scon =      defVar(ds, "converged"     ,Char, ())                                               # Did the solver converge?
             var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg"))    # Zenith angle of direct stellar radiation
@@ -186,6 +186,12 @@ module dump
                 var_tfun[1] = 'y'
             else
                 var_tfun[1] = 'n'
+            end
+
+            if atmos.real_gas
+                var_rgas[1] = 'y'
+            else
+                var_rgas[1] = 'n'
             end
 
             if atmos.is_solved
@@ -257,7 +263,7 @@ module dump
             var_tmpl[:] =   atmos.tmpl
             var_z[:]    =   atmos.z
             var_zl[:]   =   atmos.zl
-            var_mmw[:]  =   atmos.layer_mmw
+            var_mmw[:]  =   atmos.layer_μ
             var_cp[:]  =    atmos.layer_cp
             var_grav[:]  =  atmos.layer_grav
             var_thick[:]  = atmos.layer_thick
@@ -333,7 +339,6 @@ module dump
             close(ds)
 
         end # suppress output
-        @debug "ALL DEBUG RESTORED"
 
         return nothing
     end # end write_ncdf

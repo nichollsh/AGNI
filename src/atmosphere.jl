@@ -14,7 +14,7 @@ module atmosphere
     using Logging
     using LoopVectorization
     import Statistics
-    import PCHIPInterpolation:Interpolator
+    import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
     # Local files
@@ -119,10 +119,11 @@ module atmosphere
         gas_soc_names::Array{String,1}
 
         # Layers' average properties
+        real_gas::Bool                      # use real-gas equations of state where possible
         thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
         gravity_funct::Bool                 # use height-dependent gravity calculation (otherwise, use surface value throughout)
-        layer_density::Array{Float64,1}     # density [kg m-3]
-        layer_mmw::Array{Float64,1}         # mean molecular weight [kg mol-1]
+        layer_ρ::Array{Float64,1}           # mass density [kg m-3]
+        layer_μ::Array{Float64,1}           # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
         layer_kc::Array{Float64,1}          # thermal conductivity at const-p [W m-1 K-1]
         layer_grav::Array{Float64,1}        # gravity [m s-2]
@@ -281,6 +282,7 @@ module atmosphere
     - `flag_continuum::Bool`            include continuum absorption?
     - `flag_aerosol::Bool`              include aersols?
     - `flag_cloud::Bool`                include clouds?
+    - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `gravity_functions::Bool`         use height-dependent gravity calculation
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
@@ -316,6 +318,7 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
+                    real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
                     gravity_functions::Bool =   true,
 
@@ -333,7 +336,7 @@ module atmosphere
         @info  "Setting-up a new atmosphere struct"
 
         # Code versions
-        atmos.AGNI_VERSION = "1.0.3"
+        atmos.AGNI_VERSION = "1.1.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = "*atmos.AGNI_VERSION
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -367,6 +370,7 @@ module atmosphere
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
 
+        atmos.real_gas      =   real_gas
         atmos.thermo_funct  =   thermo_functions
         atmos.gravity_funct =   gravity_functions
 
@@ -436,8 +440,8 @@ module atmosphere
         atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
 
         # Initialise thermodynamics
-        atmos.layer_mmw     = zeros(Float64, atmos.nlev_c)
-        atmos.layer_density = zeros(Float64, atmos.nlev_c)
+        atmos.layer_μ     = zeros(Float64, atmos.nlev_c)
+        atmos.layer_ρ = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         atmos.layer_kc      = zeros(Float64, atmos.nlev_c)
         atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
@@ -559,16 +563,16 @@ module atmosphere
 
                 # Extend loaded profile to higher pressures (prevents domain error)
                 if arr_p[end] < atmos.p_boa
-                    push!(arr_p,   atmos.p_boa*1.1)
-                    push!(arr_x,   arr_x[end])
+                    push!(arr_p, atmos.p_boa*1.1)
+                    push!(arr_x, arr_x[end])
                 end
 
                 # Set up interpolator using file data
-                itp::Interpolator = Interpolator(arr_p, arr_x)
+                itp = interpolate((log10.(arr_p),),arr_x, Gridded(Linear()))
 
                 # Set values in atmos struct
                 for i in 1:atmos.nlev_c
-                    atmos.gas_vmr[atmos.gas_names[gidx]][i] = itp(atmos.p[i])
+                    atmos.gas_vmr[atmos.gas_names[gidx]][i] = itp(log10(atmos.p[i]))
                 end
             end
 
@@ -576,22 +580,8 @@ module atmosphere
 
         # add extra gases if required
         if use_all_gases
-
-            # for each gas in the file
-            open(joinpath(atmos.THERMO_DIR, "standard.txt"), "r") do hdl
-                for gas in readlines(hdl)
-                    # comment line
-                    if isempty(gas) || occursin("#",gas)
-                        continue
-                    end
-                    gas = strip(gas)
-
-                    # duplicate
-                    if gas in atmos.gas_names
-                        continue
-                    end
-
-                    # add gas
+            for gas in phys.gases_standard
+                if !(gas in atmos.gas_names)
                     atmos.gas_vmr[gas] = zeros(Float64, atmos.nlev_c)
                     push!(atmos.gas_names, gas)
                     atmos.gas_num += 1
@@ -633,7 +623,8 @@ module atmosphere
 
         # Load gas thermodynamic data
         for g in atmos.gas_names
-            atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g, atmos.thermo_funct)
+            atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
+                                                atmos.thermo_funct, atmos.real_gas)
         end
 
         # store condensates
@@ -813,7 +804,7 @@ module atmosphere
     """
     **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
 
-    Assumes that the atmosphere may be treated as an ideal gas.
+    Assumes that the atmosphere is hydrostatically supported.
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -832,35 +823,25 @@ module atmosphere
         fill!(atmos.zl        ,     0.0)
         fill!(atmos.layer_grav,     0.0)
         fill!(atmos.layer_thick,    0.0)
-        fill!(atmos.layer_density,  0.0)
         fill!(atmos.layer_mass   ,  0.0)
-        fill!(atmos.layer_cp,       0.0)
-        fill!(atmos.layer_kc,       0.0)
-        fill!(atmos.layer_mmw,      0.0)
 
         # Temporary values
         g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
         g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
         dzc::Float64= 0.0; dzl::Float64 = 0.0
         GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
-        mmr::Float64 = 0.0
         code::Int64 = 0 # 0: ok, 1: blew up, 2: collapsed
         dz_max::Float64 = 6e8
         dz_min::Float64 = 1e-20
 
-        # Set MMW at each level
-        for gas in atmos.gas_names
-            @turbo @. atmos.layer_mmw += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
-        end
+        # MMW
+        calc_profile_mmw!(atmos)
 
-        # Set cp, kc at each level
-        for gas in atmos.gas_names
-            @inbounds for i in 1:atmos.nlev_c
-                mmr = atmos.gas_vmr[gas][i] * atmos.gas_dat[gas].mmw/atmos.layer_mmw[i]
-                atmos.layer_cp[i] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[i])
-                atmos.layer_kc[i] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[i])
-            end
-        end
+        # Heat capacity and thermal conductivity
+        calc_profile_cpkc!(atmos)
+
+        # Set density at each level
+        calc_profile_density!(atmos)
 
         # Integrate from bottom upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
@@ -877,8 +858,7 @@ module atmosphere
             end
             p1 = 0.5 * (atmos.p[i] + atmos.pl[i+1])
             t1 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i+1])
-            dzc = phys.R_gas * t1 /
-                        (atmos.layer_mmw[i] * g1 * p1) * (atmos.pl[i+1] - atmos.p[i])
+            dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * g1)
             if !ignore_errors
                 if (dzc < dz_min)
                     ok = 2
@@ -896,8 +876,7 @@ module atmosphere
             end
             p2 = 0.5 * (atmos.p[i] + atmos.pl[i])
             t2 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i])
-            dzl = phys.R_gas * t2 / (
-                        atmos.layer_mmw[i] * g2 * p2) * (atmos.p[i]- atmos.pl[i])
+            dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * g2)
             if !ignore_errors
                 if (dzl < dz_min)
                     ok = 2
@@ -910,6 +889,9 @@ module atmosphere
             # Layer-centre gravity [m s-2]
             atmos.layer_grav[i] = g2
 
+            # Layer-centre mass per unit area [kg m-2]
+            atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
+
             # Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
         end
@@ -920,19 +902,113 @@ module atmosphere
             @error "Height integration failure: blew up, dz >= $dz_max"
         end
 
-        # Mass (per unit area, kg m-2) and density (kg m-3)
-        # Loop from top downards
-        @inbounds for i in 1:atmos.nlev_c
-            atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
-            atmos.atm.mass[1, i] = atmos.layer_mass[i]          # pass to SOCRATES
-
-            atmos.layer_density[i] = ( atmos.p[i] * atmos.layer_mmw[i] ) /
-                                                        (phys.R_gas * atmos.tmp[i])
-            atmos.atm.density[1,i] = atmos.layer_density[i]     # pass to SOCRATES
-        end
+        # Pass arrays to SOCRATES
+        atmos.atm.p[1, :]           .= atmos.p[:]
+        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+        atmos.atm.r_layer[1,:]      .= atmos.z[:]  .+ atmos.rp
+        atmos.atm.r_level[1,0:end]  .= atmos.zl[:] .+ atmos.rp
+        atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
+        atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
 
         return Bool(code==0)
     end
+
+    """
+    **Calculate mean molecular weight for all layers.**
+
+    MMW stored as kg/mol.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function calc_profile_mmw!(atmos::atmosphere.Atmos_t)
+        fill!(atmos.layer_μ, 0.0)
+        for gas in atmos.gas_names
+            @turbo @. atmos.layer_μ += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
+        end
+        return nothing
+    end
+
+    """
+    **Calculate specific heat capacity and thermal conductivity for all layers.**
+
+    Specific heat per unit mass: J K-1 kg-1.
+    Thermal conductivity: W m-1 K-1.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function calc_profile_cpkc!(atmos::atmosphere.Atmos_t)
+        # Loop over layers
+        @inbounds for i in 1:atmos.nlev_c
+            calc_single_cpkc!(atmos, i)
+        end
+        return nothing
+    end
+
+    """
+    **Calculate specific heat capacity and thermal conductivity of a single layer.**
+
+    Specific heat per unit mass: J K-1 kg-1.
+    Thermal conductivity: W m-1 K-1.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    - `idx::Int`            index of the layer
+    """
+    function calc_single_cpkc!(atmos::atmosphere.Atmos_t, idx::Int)
+        # Reset
+        mmr::Float64 = 0.0
+        atmos.layer_cp[idx] = 0.0
+        atmos.layer_kc[idx] = 0.0
+        # Loop over gases
+        for gas in atmos.gas_names
+            mmr = atmos.gas_vmr[gas][idx] * atmos.gas_dat[gas].mmw/atmos.layer_μ[idx]
+            atmos.layer_cp[idx] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[idx])
+            atmos.layer_kc[idx] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[idx])
+        end
+        return nothing
+    end
+
+    """
+    **Calculate the mass-density for all layers.**
+
+    Requires temperature, pressure, mmw to be already have been set.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function calc_profile_density!(atmos::atmosphere.Atmos_t)
+        # Loop over levels
+        @inbounds for i in 1:atmos.nlev_c
+            calc_single_density!(atmos, i)
+        end
+        return nothing
+    end
+
+    """
+    **Calculate the mass-density of a single layer.**
+
+    Requires temperature, pressure, mmw to be already have been set.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    - `idx::Int`            index of the layer
+    """
+    function calc_single_density!(atmos::atmosphere.Atmos_t, idx::Int)
+        # Array of gas properties
+        gas_arr = [atmos.gas_dat[gas]      for gas in atmos.gas_names]
+        vmr_arr = [atmos.gas_vmr[gas][idx] for gas in atmos.gas_names]
+
+        # Evaluate density
+        atmos.layer_ρ[idx] = phys.calc_rho_mix(
+                                                    gas_arr, vmr_arr,
+                                                    atmos.tmp[idx], atmos.p[idx],
+                                                    atmos.layer_μ[idx]
+                                                    )
+        return nothing
+    end
+
 
     """
     **Generate pressure grid.**
@@ -1302,6 +1378,7 @@ module atmosphere
             if atmos.gas_dat[g].stub        # flag as containing stub thermo data
                 gas_flags *= "NO_THERMO "
             end
+            gas_flags *= String(Symbol(atmos.gas_dat[g].eos))*" "
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
             end
@@ -1420,7 +1497,7 @@ module atmosphere
             @turbo @. _alb_s = sqrt(1.0 - _alb_s) # operating in place
 
             # create interpolator on gamma
-            _gamma::Interpolator = Interpolator(_alb_w, _alb_s)
+            _gamma = extrapolate(interpolate((_alb_w,),_alb_s,Gridded(Linear())),Flat())
 
             # use interpolator to fill band values
             ga::Float64 = 0.0
@@ -1584,12 +1661,12 @@ module atmosphere
             # number densities normalised relative to hydrogen
             # for each element X, value = log10(N_X/N_H) + 12
             # N = X(P/(K*T) , where X is the VMR and K is boltz-const
-            N_t = zeros(Float64, length(phys.elements_list))      # total atoms in all gases
-            N_g = zeros(Float64, length(phys.elements_list))      # atoms in current gas
+            N_t = zeros(Float64, length(phys.elems_standard))      # total atoms in all gases
+            N_g = zeros(Float64, length(phys.elems_standard))      # atoms in current gas
             for gas in atmos.gas_names
                 d = phys.count_atoms(gas)
                 fill!(N_g, 0.0)
-                for (i,e) in enumerate(phys.elements_list)
+                for (i,e) in enumerate(phys.elems_standard)
                     if e in keys(d)
                         N_g[i] += d[e]
                     end
@@ -1604,7 +1681,7 @@ module atmosphere
             # Write elemental abundances
             open(elempath,"w") do f
                 write(f,"# Elemental abundances derived from AGNI volatiles \n")
-                for (i,e) in enumerate(phys.elements_list)
+                for (i,e) in enumerate(phys.elems_standard)
                     if N_t[i] > 1.0e-30
                         # skip this element if its abundance is too small
                         # normalise relative to hydrogen
@@ -1727,7 +1804,7 @@ module atmosphere
         # If we are missing gases then that's okay.
 
         # Find where we truncated the temperature profile,
-        #      and make sure that regions above that use the same x_gas values
+        #      and make sure that regions above that use the same gas_vmr values
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
             if atmos.tmp[i] < atmos.fastchem_floor
                 for g in atmos.gas_names
@@ -1866,7 +1943,7 @@ module atmosphere
                     # set rainout kg/m2
                     cond_kg[c] = atmos.gas_dat[c].mmw*atmos.p[i]*
                                             (atmos.gas_vmr[c][i] - x_sat)/
-                                            (atmos.layer_grav[i] * atmos.layer_mmw[i])
+                                            (atmos.layer_grav[i] * atmos.layer_μ[i])
 
                     # condensation yield at this level
                     atmos.gas_yield[c][i] += cond_kg[c]
@@ -1955,7 +2032,7 @@ module atmosphere
 
                     # Calculate kg/m2 of gas that would saturate layer j
                     dm_sat = atmos.gas_dat[c].mmw * dp_sat/
-                                            (atmos.layer_grav[j] * atmos.layer_mmw[j])
+                                            (atmos.layer_grav[j] * atmos.layer_μ[j])
 
                     # can we evaporate all rain within this layer?
                     if total_rain < dm_sat
@@ -1974,7 +2051,7 @@ module atmosphere
 
                     # add partial pressure from evaporation to pp at this level
                     dp_sat = dm_sat * atmos.layer_grav[j] *
-                                              atmos.layer_mmw[j] / atmos.gas_dat[c].mmw
+                                              atmos.layer_μ[j] / atmos.gas_dat[c].mmw
 
                     # convert extra pp to extra vmr
                     atmos.gas_vmr[c][j] += dp_sat / atmos.p[j]
@@ -1982,22 +2059,10 @@ module atmosphere
                     # reduce total rain correspondingly
                     total_rain -= dm_sat
 
-                    # @printf("    %d: evaporating %.3e \n", j, dm_sat)
-
-                    # ---------------------
-                    # WARNING
-                    # THIS IS NOT CORRECT. IT WILL LEAD TO sum(x_gas)>1
-                    # IN MANY CASES BECAUSE OF THE PREDEFINED PRESSURE GRID.
-                    # THIS NEEDS TO RE-ADJUST THE WHOLE PRESSURE GRID IN
-                    # ORDER TO CONSERVE MASS!
-                    # ----------------------
-                    # normalise_vmrs!(atmos, j)
-                    #
-
                     # Recalculate layer mmw
-                    atmos.layer_mmw[j] = 0.0
+                    atmos.layer_μ[j] = 0.0
                     for g in atmos.gas_names
-                        atmos.layer_mmw[j] += atmos.gas_vmr[g][j] * atmos.gas_dat[g].mmw
+                        atmos.layer_μ[j] += atmos.gas_vmr[g][j] * atmos.gas_dat[g].mmw
                     end
 
                 end # go to next j level (below)
@@ -2045,20 +2110,6 @@ module atmosphere
         return nothing
     end
 
-    # Smooth temperature at cell-centres
-    # function smooth_centres!(atmos::atmosphere.Atmos_t, width::Int)
-
-    #     if width > 2
-    #         if mod(width,2) == 0
-    #             width += 1 # window width has to be an odd number
-    #         end
-    #         atmos.tmp = moving_average.hma(atmos.tmp, width)
-    #     end
-    #     clamp!(atmos.tmp, atmos.tmp_floor, atmos.tmp_ceiling)
-
-    #     return nothing
-    # end
-
     """
     **Set cell-edge temperatures from cell-centre values.**
 
@@ -2067,18 +2118,17 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`            the atmosphere struct instance to be used.
-    - `back_interp::Bool=false`   interpolate resultant tmpl back to tmp (should be avoided)
     """
-    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t; back_interp::Bool=false)
+    function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t)
 
         # Interpolate temperature to bulk cell-edge values (log-linear)
-        itp = Interpolator(log.(atmos.p), atmos.tmp)
-        atmos.tmpl[2:end-1] .= itp.(log.(atmos.pl[2:end-1]))
+        itp = extrapolate(interpolate((log10.(atmos.p),),atmos.tmp,Gridded(Linear())),Flat())
+        atmos.tmpl[2:end-1] .= itp.(log10.(atmos.pl[2:end-1]))
 
         # Extrapolate top edge temperature (log-linear)
         grad_dt::Float64 = atmos.tmp[1] - atmos.tmp[2]
-        grad_dp::Float64 = log(atmos.p[1]/atmos.p[2])
-        atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log(atmos.pl[1]/atmos.p[1])
+        grad_dp::Float64 = log10(atmos.p[1]/atmos.p[2])
+        atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log10(atmos.pl[1]/atmos.p[1])
 
         # Set bottom edge to bottom cell-centre value
         # This is fine because the bottom cell is very small (in pressure space)
@@ -2086,16 +2136,6 @@ module atmosphere
 
         # Clamp
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
-
-        # Second interpolation back to cell-centres.
-        # This can help prevent grid-imprinting issues, but in some cases it can
-        # lead to unphysical behaviour, because it gives the interpolator too
-        # much control over the temperature profile at small scales.
-        if back_interp
-            clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
-            itp = Interpolator(log.(atmos.pl), atmos.tmpl)
-            @. atmos.tmp = itp(log(atmos.p))
-        end
 
         return nothing
     end

@@ -18,13 +18,14 @@ module energy
     # Local files
     import ..atmosphere
     import ..phys
-    import ..spectrum
+    include("spectrum.jl")
+    import .spectrum
 
     """
     **Calculate radiative fluxes using SOCRATES.**
 
     Uses the configuration inside the atmos struct. Can either do LW or SW
-    calculation, as required. Imports SOCRATES wrapper from the atmosphere
+    calculation as required. Imports SOCRATES wrapper from the atmosphere
     module, rather than loading it twice.
 
     Arguments:
@@ -192,7 +193,7 @@ module energy
                     # convert VOLUME mixing ratio to MASS mixing ratio
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = atmos.gas_vmr[s_gas][i] *
                                                             atmos.gas_dat[s_gas].mmw /
-                                                            atmos.layer_mmw[i]
+                                                            atmos.layer_μ[i]
                 else
                     atmos.atm.gas_mix_ratio[1, i, i_gas] = 0.0
                 end
@@ -280,7 +281,7 @@ module energy
     function sensible!(atmos::atmosphere.Atmos_t)
         # TKE scheme for this 1D case
         # transports energy from the surface to the bottom node
-        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_mmw[end]*
+        atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_μ[end]*
                             atmos.p[end]/(phys.R_gas*atmos.tmp[end]) *
                             atmos.C_d * atmos.U *
                             (atmos.tmp_surf-atmos.tmp[end])
@@ -324,6 +325,14 @@ module energy
     The mixing length is set to asymptotically approach H (for z>>H) or z (for
     z<H) as per Blackadar (1962). Alternatively, it can be set equal to H.
 
+    The scale height is formulated as:
+        `Hp = P / (ρ g)`
+    The adiabatic lapse rate is formulated as:
+        `∇_ad = dln(T)/dln(P) = (P/T)*(dT/dP) = (P/T)*(1/[ρ c_p])`
+    for an ideal gas, this becomes:
+        `∇_ad = R / (μ c_p)`
+
+
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `pmin::Float64`           pressure [bar] below which convection is disabled
@@ -331,106 +340,79 @@ module energy
     """
     function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=2)
 
-        pmin *= 1.0e5 # convert bar to Pa
-
         # Reset arrays
-        fill!(atmos.flux_cdry, 0.0)
-        fill!(atmos.Kzz,       atmos.Kzzcst)
+        fill!(atmos.mask_c,     false)
+        fill!(atmos.flux_cdry,  0.0)
+        fill!(atmos.Kzz,        atmos.Kzzcst)
 
         # Work variables
-        H::Float64 = 0.0; l::Float64 = 0.0; w::Float64 = 0.0
+        Hp::Float64 = 0.0; λ::Float64 = 0.0; w::Float64 = 0.0
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
-        grad_ad::Float64 = 0.0; grad_pr::Float64 = 0.0
-        beta::Float64 = 0.0; xv::Float64=0.0
-        inhib::Float64 = 0.0; condition::Bool = false
-        cmax::String = ""; do_moist::Bool = false
+        ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0
 
         # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
 
-            # Profile lapse rate: d(ln T)/d(ln P)
-            grad_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
+            # Profile lapse rate: d(ln T)/d(ln P) = (P/T)*(dT/dP)
+            ∇_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
 
             # Optionally skip low pressures
-            if atmos.pl[i] <= pmin
-                continue
+            if atmos.pl[i] <= pmin * 1.0e5  # convert bar to Pa
+                break
             end
 
+            # Mass weights
             m1 = atmos.layer_mass[i-1]
             m2 = atmos.layer_mass[i]
             mt = m1+m2
 
-            grav = (atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1)/mt
-            mu   = (atmos.layer_mmw[i]  * m2 + atmos.layer_mmw[i-1]  * m1)/mt
-            c_p  = (atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1)/mt
-            tmp  = (atmos.tmp[i]        * m2 + atmos.tmp[i-1]        * m1)/mt
+            # Normalise weights
+            m1 = m1/mt
+            m2 = m2/mt
 
+            # Properties interpolated to layer edge
+            grav = atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1
+            mu   = atmos.layer_μ[i]    * m2 + atmos.layer_μ[i-1]    * m1
+            c_p  = atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1
+            rho  = atmos.layer_ρ[i]    * m2 + atmos.layer_ρ[i-1]    * m1
 
-            # Dry convection
-            grad_ad = (phys.R_gas / mu) / c_p
-            condition = (grad_pr > grad_ad)
-
-            if atmos.condense_any && do_moist
-                # Check which condensable species has the largest (L/RT)^2*x
-
-                cmax = ""
-                for c in atmos.condensates
-                    if atmos.gas_yield[c][i] > 0.0
-                        cmax = c
-                        break
-                    end
-                end
-
-                if !isempty(cmax)
-                    mmw_v = atmos.gas_dat[cmax].mmw
-                    xv = (atmos.gas_vmr[cmax][i]*m2 + atmos.gas_vmr[cmax][i-1]*m1)/mt
-                    beta = phys.get_Lv(atmos.gas_dat[cmax], tmp)*mmw_v/tmp/phys.R_gas
-
-                    grad_ad = (1 - xv + beta*xv) /
-                                 (c_p*mu/phys.R_gas * (1-xv) + beta^2 * xv)
-
-                    # Critical value (in vmr, NOT mmr form, only when mmw_v>mmw_d)
-                    if mmw_v > (mu - xv*mmw_v)/(1-xv)
-                        inhib = phys.R_gas * tmp/L * (1-xv)/(mmw_v/mu - 1)
-                        condition = (grad_pr > grad_ad) && xv < inhib
-                    else
-                        condition = (grad_pr > grad_ad)
-                    end
-                end
-
+            # Dry convective lapse rate, and pressure scale height
+            if atmos.real_gas
+                # general solution
+                ∇_ad = atmos.pl[i] / (atmos.tmpl[i] * rho * c_p)
+                Hp = atmos.pl[i] / (rho * grav)
+            else
+                # ideal gas solution
+                ∇_ad = (phys.R_gas / mu) / c_p
+                Hp = phys.R_gas * atmos.tmpl[i] / (mu * grav)
             end
 
             # Check instability
-            if condition
-
-                rho = (atmos.layer_density[i] * m2 + atmos.layer_density[i-1] * m1)/mt
+            if ∇_pr > ∇_ad
 
                 atmos.mask_c[i] = true
 
-                # Pressure scale height
-                H = phys.R_gas * atmos.tmpl[i] / (mu * grav)
-
-                # Mixing length
+                # Calculate the mixing length
                 if mltype == 1
                     # Fixed
-                    l = H
+                    λ = phys.αMLT * Hp
                 elseif mltype == 2
                     # Asymptotic
-                    l = phys.k_vk * atmos.zl[i] / (1 + phys.k_vk * atmos.zl[i]/H)
+                    λ = phys.k_vk * atmos.zl[i] / (1 + phys.k_vk * atmos.zl[i]/Hp)
                 else
                     # Otherwise
-                    error("Invalid mixing length type selected")
+                    error("Invalid mixing length type selected: $mltype")
                 end
 
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel)
-                w = l * sqrt(grav/H * (grad_pr-grad_ad))
+                w = λ * sqrt(grav/Hp * (∇_pr-∇_ad))
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (l/H)*(grad_pr-grad_ad)
+                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (λ/Hp)*(∇_pr-∇_ad)
 
-                # Mixing eddy diffusion coefficient
-                atmos.Kzz[i] = w * l
+                # Mixing eddy diffusion coefficient [m2 s-1]
+                atmos.Kzz[i] = w * λ
 
             end
         end
@@ -610,10 +592,6 @@ module energy
     """
     function reset_fluxes!(atmos::atmosphere.Atmos_t)
 
-        # masks
-        fill!(atmos.mask_l, false)
-        fill!(atmos.mask_c, false)
-
         # scalar fluxes
         atmos.flux_sens = 0.0
 
@@ -767,71 +745,6 @@ module energy
         atmos.heating_rate *= 86400.0 # K/day
 
         return nothing
-    end
-
-    # Dry convective adjustment (returning the temperature tendency)
-    function adjust_dry(atmos::atmosphere.Atmos_t, nsteps::Int)
-
-        tmp_old = zeros(Float64, atmos.nlev_c)  # old temperatures
-        tmp_tnd = zeros(Float64, atmos.nlev_c)  # temperature tendency
-
-        @. tmp_old +=  atmos.tmp
-
-        for i in 1:nsteps
-
-            # Downward pass
-            for i in 2:atmos.nlev_c
-
-                T1 = atmos.tmp[i-1]    # upper layer
-                p1 = atmos.p[i-1]
-
-                T2 = atmos.tmp[i]  # lower layer
-                p2 = atmos.p[i]
-
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +
-                             atmos.layer_cp[i] * atmos.layer_mmw[i])
-                pfact = (p1/p2)^(phys.R_gas / cp)
-
-                # If slope dT/dp is steeper than adiabat (unstable), adjust to adiabat
-                if T1 < T2*pfact
-                    Tbar = 0.5 * ( T1 + T2 )
-                    T2 = 2.0 * Tbar / (1.0 + pfact)
-                    T1 = T2 * pfact
-                    atmos.tmp[i-1] = T1
-                    atmos.tmp[i]   = T2
-                end
-            end
-
-            # Upward pass
-            for i in atmos.nlev_c:2
-
-                T1 = atmos.tmp[i-1]
-                p1 = atmos.p[i-1]
-
-                T2 = atmos.tmp[i]
-                p2 = atmos.p[i]
-
-                cp = 0.5 * ( atmos.layer_cp[i-1] * atmos.layer_mmw[i-1] +
-                             atmos.layer_cp[i] * atmos.layer_mmw[i])
-                pfact = (p1/p2)^(phys.R_gas / cp)
-
-                if T1 < T2*pfact
-                    Tbar = 0.5 * ( T1 + T2 )
-                    T2 = 2.0 * Tbar / ( 1.0 + pfact)
-                    T1 = T2 * pfact
-                    atmos.tmp[i-1] = T1
-                    atmos.tmp[i]   = T2
-                end
-            end
-        end
-
-        # Calculate tendency
-        @. tmp_tnd = atmos.tmp - tmp_old
-
-        # Restore temperature array
-        @. atmos.tmp = tmp_old
-
-        return tmp_tnd
     end
 
 end # end module
