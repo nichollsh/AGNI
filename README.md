@@ -20,14 +20,14 @@
 </p>
 
 <p align="center">
-  <b>A radiative-convective model for lava planet atmospheres</b>
+  <b>A radiative-convective atmosphere model for lava planets</b>
 </p>
 
 
 ## Overview
-A numerical model for the atmospheres of hot rocky (exo)planets. AGNI's primary purpose is to simulate the evolving atmospheres of magma ocean planets, while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere.
+A numerical model for the atmospheres of hot rocky (exo)planets. The model's primary purpose is to simulate the evolving atmospheres of magma ocean (lava) planets, while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere.
 
-AGNI models correlated-k radiative transfer including shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and CIA. Mixing length theory is used to model convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile.
+AGNI models correlated-k radiative transfer including shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and CIA. Mixing length theory is used to model convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile. It also supports real gas equations of state.
 
 Consult the [AGNI documentation](https://nichollsh.github.io/AGNI/) for information about the model.
 
@@ -38,8 +38,8 @@ See the [Getting Started](https://nichollsh.github.io/AGNI/dev/setup/) page in t
 
 ## Citation
 If you use AGNI, please cite the following papers:
-* Nicholls et al., (2024) - https://doi.org/10.1093/mnras/stae2772
-* Nicholls et al., (2025) - submitted to JOSS
+* Nicholls et al., (2024b) - https://doi.org/10.1093/mnras/stae2772
+* Nicholls et al., (2025) - in review at JOSS
 
 ## Repository structure
 * `agni.jl`         - The main AGNI executable
