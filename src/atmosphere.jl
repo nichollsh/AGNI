@@ -1373,7 +1373,7 @@ module atmosphere
                 gas_flags *= "NO_OPACITY "
             end
             if g in atmos.condensates       # flag as condensable
-                gas_flags *= "COND"
+                gas_flags *= "COND "
             end
             if atmos.gas_dat[g].stub        # flag as containing stub thermo data
                 gas_flags *= "NO_THERMO "
