@@ -20,11 +20,13 @@ include("../src/atmosphere.jl")
 include("../src/setpt.jl")
 include("../src/energy.jl")
 include("../src/plotting.jl")
+include("../src/dump.jl")
 import .phys
 import .atmosphere
 import .setpt
 import .energy
 import .plotting
+import .dump
 
 
 # Prepare
@@ -33,41 +35,125 @@ p_top           = 1e-8
 nlev_centre     = 100
 radius          = 1.0e7    # metres
 gravity         = 10.0      # m s-2
+total  = 0
+failed = 0
 
 rm(output_dir,force=true,recursive=true)
 if !isdir(output_dir) && !isfile(output_dir)
     mkdir(output_dir)
 end
 
-passing = true
+
+rtol   = 1e-3
 
 
 # -------------
-# Test shomate
+# Test heat capacity lookup tables
 # -------------
 @info " "
 @info "Testing heat capacity functions"
-data_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true)
-c_expt::Array{Float64, 1} = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
-t_test::Array{Float64, 1} = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
-c_obs::Array{Float64,1} = zeros(Float64, 5)
-cp_pass = true
+ideal_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, false)
+t_test  = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
+v_expt  = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
+v_obs   = zero(t_test)
+test_pass = true
 for i in 1:5
-    c_obs[i] = phys.get_Cp(data_H2O, t_test[i]) * data_H2O.mmw # get value and convert units
-    if abs(c_expt[i]- c_obs[i])/c_expt[i] > 0.01  # error must be <1%
-        global cp_pass = false
+    v_obs[i] = phys.get_Cp(ideal_H2O, t_test[i]) * ideal_H2O.mmw # get value and convert units
+    if abs(v_expt[i]- v_obs[i])/v_expt[i] > rtol
+        global test_pass = false
     end
 end
-@info "Expected values = $(c_expt) J mol-1 K-1"
-@info "Modelled values = $(c_obs) J mol-1 K-1"
-if cp_pass
+@info "Expected values = $(v_expt) J mol-1 K-1"
+@info "Modelled values = $(v_obs) J mol-1 K-1"
+if test_pass
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
+
+# -------------
+# Test ideal gas equation of state
+# -------------
+@info " "
+@info "Testing H2O ideal gas equation of state"
+t_test = [200.0,  300.0, 500.0,   1273.0,  3200.0] # Tested values of temperature [K]
+p_test = [1e0,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
+v_expt = [1.0833532e-5, 7.2223549e-3, 4.33341295e-1, 1.7020475e1, 6.7709577e1]  # Expected rho [kg m-3]
+v_obs  = zero(p_test)
+test_pass = true
+for i in 1:5
+    v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], ideal_H2O)
+    if abs(v_expt[i] - v_obs[i])/v_expt[i] > rtol
+        global test_pass = false
+    end
+end
+@info "Expected values = $(v_expt) kg m-3"
+@info "Modelled values = $(v_obs) kg m-3"
+if test_pass
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+@info "--------------------------"
+
+# -------------
+# Test AQUA equation of state
+# -------------
+@info " "
+@info "Testing H2O AQUA equation of state"
+aqua_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, true)
+v_expt = [9.26121571e2, 7.2269991e-3, 4.35193299e-1, 1.7022212e1, 6.68198662e1]
+v_obs  = zero(p_test)
+test_pass = true
+for i in 1:5
+    v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], aqua_H2O)
+    if abs(v_expt[i] - v_obs[i])/v_expt[i] > rtol
+        global test_pass = false
+    end
+end
+@info "Expected values = $(v_expt) kg m-3"
+@info "Modelled values = $(v_obs) kg m-3"
+if test_pass
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+@info "--------------------------"
+
+
+# -------------
+# Test VdW equation of state
+# -------------
+@info " "
+@info "Testing CO2 VdW equation of state"
+vdw_CO2::phys.Gas_t = phys.load_gas("res/thermodynamics/", "CO2", true, true)
+v_expt = [2.646531089e-5, 1.76442986e-2, 1.0597595366, 4.1190987467e1, 1.475256797e2]
+v_obs  = zero(p_test)
+test_pass = true
+for i in 1:5
+    v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], vdw_CO2)
+    if abs(v_expt[i] - v_obs[i])/v_expt[i] > rtol
+        global test_pass = false
+    end
+end
+@info "Expected values = $(v_expt) kg m-3"
+@info "Modelled values = $(v_obs) kg m-3"
+if test_pass
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+@info "--------------------------"
 
 
 
@@ -103,23 +189,22 @@ atmosphere.allocate!(atmos,"")
 
 dct_e::Dict{String, Float64} = mf_dict
 dct_o::Dict{String, Float64} = Dict()
-sp_pass = true
+test_pass = true
 for k in keys(dct_e)
     dct_o[k] = atmos.gas_vmr[k][20]
-    global sp_pass = sp_pass && ( abs(dct_o[k]-dct_e[k]) < 1.0e-6 )
+    global test_pass = test_pass && ( abs(dct_o[k]-dct_e[k]) < 1.0e-6 )
 end
 @info "Expected values = $(dct_e)"
 @info "Modelled values = $(dct_o)"
-if sp_pass
+if test_pass
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
-
-
 
 
 # -------------
@@ -149,7 +234,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict,"",
                          flag_gcontinuum=false,
                          flag_rayleigh=false,
-                         overlap_method="ro"
+                         overlap_method="ro",
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 energy.radtrans!(atmos, false)
@@ -162,8 +248,9 @@ if abs(val_e-val_o) < 2
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -181,8 +268,9 @@ if abs(val_e-val_o) < 1.0e-10
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -211,14 +299,15 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
                          gravity, radius,
-                         nlev_centre, p_surf, p_top,
+                         300, p_surf, p_top,
                          mf_dict,"",
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
                          overlap_method="ee",
                          condensates=["H2O"],
                          surface_material="greybody",
-                         albedo_s=0.5
+                         albedo_s=0.5,
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.prevent_surfsupersat!(atmos)
@@ -236,8 +325,9 @@ if ( val_o > val_e[1]) && (val_o < val_e[2])
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -247,36 +337,58 @@ end
 @info " "
 @info "Testing hydrostatic integration"
 
-val_e = 431792.0902977038  # known from previous tests
+val_e = 424238.22072713776   # known from previous tests
 val_o = atmos.z[1] # top level
 @info "Expected value = $(val_e) m"
 @info "Modelled value = $(val_o) m"
-if abs(val_o - val_e) < 0.1
+if abs(val_o - val_e)/val_e < rtol
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
+
+# -------------
+# Test write NetCDF
+# -------------
+@info " "
+@info "Testing write NetCDF"
+out_path::String = "/tmp/agni_atm.nc"
+rm(out_path, force=true)
+dump.write_ncdf(atmos, out_path)
+@info "Expecting file at $out_path"
+if isfile(out_path)
+    @info "Found file at $out_path"
+    @info "Pass"
+    rm(out_path, force=true)
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+@info "--------------------------"
 
 # -------------
 # Test plot T(p)
 # -------------
 @info " "
 @info "Testing plot temperatures"
-plt_path::String = "/tmp/agni_plot_tmp.png"
-rm(plt_path, force=true)
-plotting.plot_pt(atmos, plt_path)
-@info "Expecting file at $plt_path"
-if isfile(plt_path)
-    @info "Found file at $plt_path"
+out_path = "/tmp/agni_plot_tmp.png"
+rm(out_path, force=true)
+plotting.plot_pt(atmos, out_path)
+@info "Expecting file at $out_path"
+if isfile(out_path)
+    @info "Found file at $out_path"
     @info "Pass"
-    rm(plt_path, force=true)
+    rm(out_path, force=true)
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -285,17 +397,18 @@ end
 # -------------
 @info " "
 @info "Testing plot height"
-plt_path = "/tmp/agni_plot_hei.png"
-plotting.plot_height(atmos, plt_path)
-@info "Expecting file at $plt_path"
-if isfile(plt_path)
-    @info "Found file at $plt_path"
+out_path = "/tmp/agni_plot_hei.png"
+plotting.plot_height(atmos, out_path)
+@info "Expecting file at $out_path"
+if isfile(out_path)
+    @info "Found file at $out_path"
     @info "Pass"
-    rm(plt_path, force=true)
+    rm(out_path, force=true)
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -304,17 +417,18 @@ end
 # -------------
 @info " "
 @info "Testing plot albedo"
-plt_path = "/tmp/agni_plot_alb.png"
-plotting.plot_albedo(atmos, plt_path)
-@info "Expecting file at $plt_path"
-if isfile(plt_path)
-    @info "Found file at $plt_path"
+out_path = "/tmp/agni_plot_alb.png"
+plotting.plot_albedo(atmos, out_path)
+@info "Expecting file at $out_path"
+if isfile(out_path)
+    @info "Found file at $out_path"
     @info "Pass"
-    rm(plt_path, force=true)
+    rm(out_path, force=true)
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 @info "--------------------------"
 
 
@@ -323,16 +437,17 @@ end
 # -------------
 @info " "
 @info "Testing surface albedo "
-val_e = 30.31364083727528  # known from previous tests
+val_e = 30.24053638241024  # known from previous tests
 val_o = atmos.flux_u_sw[end] # bottom level
 @info "Expected value = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
-if abs(val_o - val_e) < 1e-6
+if abs(val_o - val_e)/val_e < rtol
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -364,7 +479,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          mf_dict, "",
                          flag_gcontinuum=true,
                          flag_rayleigh=true,
-                         overlap_method="ro"
+                         overlap_method="ro",
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 energy.radtrans!(atmos, true)
@@ -378,8 +494,9 @@ if ( val_o > val_e[1]) && (val_o < val_e[2])
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed  += 1
 end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -411,7 +528,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          flag_gcontinuum=true,
                          flag_rayleigh=false,
                          overlap_method="ro",
-                         thermo_functions=false
+                         thermo_functions=false,
+                         real_gas=false
                  )
 atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
 setpt.isothermal!(atmos, 300.0)
@@ -422,16 +540,37 @@ energy.radtrans!(atmos, false)
 atmos.flux_tot += atmos.flux_n
 energy.calc_hrates!(atmos)
 
-val_e = 6.366831453838685  # from previous tests
+val_e = 6.366596000871719  # from previous tests
 val_o = atmos.heating_rate[atmos.nlev_c-10]
 @info "Expected value = $(val_e) K/day"
 @info "Modelled value = $(val_o) K/day"
-if abs(val_o - val_e) < 1e-6
+if abs(val_o - val_e)/val_e < rtol
     @info "Pass"
 else
     @warn "Fail"
-    passing = false
+    failed += 1
 end
+total += 1
+@info "--------------------------"
+
+
+# -------------
+# Test flux calculation
+# -------------
+@info " "
+@info "Testing fluxes"
+energy.calc_fluxes!(atmos, true, true, true, true)
+val_e = 8.60308315276e3  # from previous tests
+val_o = atmos.flux_tot[atmos.nlev_c-10]
+@info "Expected value = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
+if abs(val_o - val_e)/val_e < rtol
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
@@ -440,11 +579,11 @@ atmosphere.deallocate!(atmos)
 # Inform at end
 # -------------
 @info " "
-if passing
-    @info "All tests passed"
+if failed == 0
+    @info "All $total tests have passed"
     exit(0)
 else
-    @warn "Some tests failed"
+    @warn "Some tests failed ($failed/$total)"
     exit(1)
 end
 

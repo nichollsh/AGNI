@@ -21,7 +21,7 @@ title = "Hot and dry"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 270.0
+    p_surf          = 2700.0
     p_top           = 1e-5
     vmr_dict        = { H2O = 1.0}
     vmr_path        = ""
@@ -41,6 +41,7 @@ title = "Hot and dry"
     cloud           = false
     aerosol         = false
     overlap_method  = "ee"
+    real_gas        = true
     thermo_funct    = true
     gravity_funct   = true
     sensible_heat   = true
@@ -48,7 +49,7 @@ title = "Hot and dry"
     convection      = true
     rainout         = false
     solution_type   = 3
-    solvers         = ["newton"]
+    solver          = "newton"
     dx_max          = 400.0
     initial_state   = ["iso","2300"]
     linesearch      = 0
