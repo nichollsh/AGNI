@@ -407,10 +407,10 @@ module solver
 
         # Allocate initial guess for the x array, as well as a,b arrays
         # Array storage structure:
-        #   in the sol_type=2 case
+        #   in the sol_type>=2 cases
         #       1:end-1 => cell centre temperatures
         #       end     => bottom cell edge temperature
-        #   other cases
+        #   sol_type == 1 case
         #       1:end => cell centre temperatures
         x_ini    = zeros(Float64, arr_len)
         for i in 1:atmos.nlev_c
