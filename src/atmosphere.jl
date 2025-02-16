@@ -14,7 +14,7 @@ module atmosphere
     using Logging
     using LoopVectorization
     import Statistics
-    import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
+    import Interpolations: interpolate, Gridded, Linear, Flat, Line, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
     # Local files
@@ -336,7 +336,7 @@ module atmosphere
         @info  "Setting-up a new atmosphere struct"
 
         # Code versions
-        atmos.AGNI_VERSION = "1.1.0"
+        atmos.AGNI_VERSION = "1.1.1"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         @debug "AGNI VERSION = "*atmos.AGNI_VERSION
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
@@ -1036,14 +1036,14 @@ module atmosphere
         # Logarithmically-spaced levels above
         atmos.pl[1:end-1] .= collect(Float64, range( start=atmos.pl[1],
                                                       stop=atmos.pl[end-1],
-                                                      length=atmos.nlev_l-1))
+                                                            length=atmos.nlev_l-1))
 
         # Shrink near-surface layers by stretching all layers above
         p_fact::Float64 = 0.6
         p_mid::Float64 = atmos.pl[end-1]*p_fact + atmos.pl[end-2]*(1.0-p_fact)
         atmos.pl[1:end-2] .= collect(Float64, range( start=atmos.pl[1],
-                                                     stop=p_mid,
-                                                     length=atmos.nlev_l-2))
+                                                            stop=p_mid,
+                                                            length=atmos.nlev_l-2))
 
         # Set cell-centres at midpoint of cell-edges
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
@@ -2122,17 +2122,10 @@ module atmosphere
     function set_tmpl_from_tmp!(atmos::atmosphere.Atmos_t)
 
         # Interpolate temperature to bulk cell-edge values (log-linear)
-        itp = extrapolate(interpolate((log10.(atmos.p),),atmos.tmp,Gridded(Linear())),Flat())
-        atmos.tmpl[2:end-1] .= itp.(log10.(atmos.pl[2:end-1]))
-
-        # Extrapolate top edge temperature (log-linear)
-        grad_dt::Float64 = atmos.tmp[1] - atmos.tmp[2]
-        grad_dp::Float64 = log10(atmos.p[1]/atmos.p[2])
-        atmos.tmpl[1] = atmos.tmp[1] + grad_dt/grad_dp * log10(atmos.pl[1]/atmos.p[1])
-
-        # Set bottom edge to bottom cell-centre value
-        # This is fine because the bottom cell is very small (in pressure space)
-        atmos.tmpl[end]=atmos.tmp[end]
+        itp = extrapolate( interpolate( (log10.(atmos.p[:]),),
+                                        atmos.tmp,Gridded(Linear())
+                                        ),Line())
+        atmos.tmpl[:] .= itp.(log10.(atmos.pl))
 
         # Clamp
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
