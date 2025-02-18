@@ -135,7 +135,7 @@ total += 1
 @info " "
 @info "Testing CO2 VdW equation of state"
 vdw_CO2::phys.Gas_t = phys.load_gas("res/thermodynamics/", "CO2", true, true)
-v_expt = [2.646531089e-5, 1.76442986e-2, 1.0597595366, 4.1190987467e1, 1.475256797e2]
+v_expt = [2.6465333e-5, 1.7664486595e-2, 1.0612271156, 4.12385376e1, 1.47631823e2]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5

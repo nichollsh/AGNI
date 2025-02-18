@@ -6,7 +6,6 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end
 
-
 module energy
 
     # System libraries
