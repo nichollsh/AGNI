@@ -16,13 +16,14 @@ module phys
     using .consts
 
     # A large floating point number
-    const BIGFLOAT::Float64 = 1e90
+    const BIGFLOAT::Float64 = 1e99
 
     # Enable/disable flags
     const ENABLE_AQUA::Bool = true
+    const ENABLE_CMS19::Bool = true
 
     # Enumerate potential equations of state
-    @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3
+    @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3 EOS_CMS19=4
 
     # Structure containing data for a single gas
     mutable struct Gas_t
@@ -38,6 +39,10 @@ module phys
 
         # Should evaluations be temperature-dependent or use constant values?
         tmp_dep::Bool
+
+        # Maximum valid range for T,P
+        tmp_max::Float64
+        prs_max::Float64
 
         # Constituent atoms (dictionary of numbers)
         atoms::Dict{String, Int}
@@ -144,6 +149,8 @@ module phys
 
         # set EOS to ideal gas
         gas.eos = EOS_IDEAL
+        gas.tmp_max = BIGFLOAT
+        gas.prs_max = BIGFLOAT
         eos_name = "ideal gas"
 
         # Check if we have data from file
@@ -194,6 +201,7 @@ module phys
                     if haskey(ds, "vdw_T")
                         gas.eos = EOS_VDW
                     end
+
                     #  try to use aqua EOS for water
                     if (formula == "H2O") && ENABLE_AQUA
                         if haskey(ds, "aqua_T")
@@ -201,9 +209,19 @@ module phys
                             # aqua data found -  this is preferred
                         else
                             @warn("Could not find AQUA table for H2O equation of state")
-                            # this means we will use vdw if available
                         end
                     end
+
+                    # try to use cms19 EOS for dihydrogen
+                    if (formula == "H2") && ENABLE_CMS19
+                        if haskey(ds, "cms19_T")
+                            gas.eos = EOS_CMS19
+                            # cms19 data found -  this is preferred
+                        else
+                            @warn("Could not find CMS19 table for H2 equation of state")
+                        end
+                    end
+
                 end
 
                 # prepare eos data if necessary
@@ -213,12 +231,17 @@ module phys
                         eos_name = "Van der Waals"
                         gas.eos_P = ds["vdw_P"][:]      # log Pa
                         gas.eos_T = ds["vdw_T"][:]      # K
-                        gas.eos_ρ = ds["vdw_rho"][:,:]    # log kg m-3
+                        gas.eos_ρ = ds["vdw_rho"][:,:]  # log kg m-3 (converted later)
                     elseif gas.eos == EOS_AQUA
                         eos_name = "AQUA"
                         gas.eos_P = ds["aqua_P"][:]
                         gas.eos_T = ds["aqua_T"][:]
                         gas.eos_ρ = ds["aqua_rho"][:,:]
+                    elseif gas.eos == EOS_CMS19
+                        eos_name = "CMS19"
+                        gas.eos_P = ds["cms19_P"][:]
+                        gas.eos_T = ds["cms19_T"][:]
+                        gas.eos_ρ = ds["cms19_rho"][:,:]
                     end
 
                     # check shape
@@ -244,6 +267,13 @@ module phys
                         close(ds)
                         return gas
                     end
+
+                    # record valid T,P range
+                    gas.tmp_max = maximum(gas.eos_T)
+                    gas.prs_max = 10.0 ^ maximum(gas.eos_P)
+
+                    # convert density to SI units
+                    @. gas.eos_ρ = 10.0 ^ gas.eos_ρ
 
                     # interpolate to 2D grid
                     gas.eos_I = extrapolate(interpolate(
@@ -615,7 +645,7 @@ module phys
             return _rho_ideal(tmp, prs, gas.mmw)
         else
             # otherwise, will use interpolated VDW or AQUA equation of state
-            return 10^gas.eos_I(tmp, log10(prs))
+            return gas.eos_I(tmp, log10(prs))
         end
     end
 

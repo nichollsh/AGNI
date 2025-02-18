@@ -393,16 +393,17 @@ module solver
         # ----------------------------------------------------------
         # Setup initial guess
         # ----------------------------------------------------------
-            @info @sprintf("    sol_type = %d", sol_type)
+            @info @sprintf("    chem_type = %d", chem_type)
+            @info @sprintf("    sol_type  = %d", sol_type)
         if (sol_type == 1)
-            @info @sprintf("    tmp_surf = %.2f K", atmos.tmp_surf)
+            @info @sprintf("    tmp_surf  = %.2f K", atmos.tmp_surf)
         elseif (sol_type == 2)
-            @info @sprintf("    skin_d   = %.2f m",         atmos.skin_d)
-            @info @sprintf("    skin_k   = %.2f W K-1 m-1", atmos.skin_k)
+            @info @sprintf("    skin_d    = %.2f m",         atmos.skin_d)
+            @info @sprintf("    skin_k    = %.2f W K-1 m-1", atmos.skin_k)
         elseif (sol_type == 3)
-            @info @sprintf("    flux_int = %.2f W m-2", atmos.flux_int)
+            @info @sprintf("    flux_int  = %.2f W m-2", atmos.flux_int)
         elseif (sol_type == 4)
-            @info @sprintf("    tgt_olr  = %.2f W m-2", atmos.target_olr)
+            @info @sprintf("    tgt_olr   = %.2f W m-2", atmos.target_olr)
         end
 
         # Allocate initial guess for the x array, as well as a,b arrays

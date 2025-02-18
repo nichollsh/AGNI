@@ -62,7 +62,7 @@ module atmosphere
         zenith_degrees::Float64         # Solar zenith angle [deg]
         toa_heating::Float64            # Derived downward shortwave radiation flux at topmost level [W m-2]
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
-        s0_fact::Float64                # Scale factor to instellation (cronin+14)
+        s0_fact::Float64                # Scale factor to instellation (see Cronin+14)
 
         surface_material::String        # Surface material file path
         albedo_s::Float64               # Grey surface albedo when surface=greybody
@@ -659,6 +659,16 @@ module atmosphere
             atmos.tmpl[end] = max(atmos.tmpl[end], atmos.gas_dat[g].T_crit+5.0)
             fill!(atmos.tmpl, atmos.tmpl[end])
             fill!(atmos.tmp, atmos.tmpl[end])
+        end
+
+        # Check T,P range vs EOS limits
+        for g in atmos.gas_names
+            if atmos.p_boa > atmos.gas_dat[g].prs_max
+                @warn "Surface pressure exceeds the valid range ($g EOS)"
+            end
+            if maximum(atmos.tmp) > atmos.gas_dat[g].tmp_max
+                @warn "Temperature profile exceeds the valid range ($g EOS)"
+            end
         end
 
         # Fastchem
