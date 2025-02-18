@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <b>A radiative-convective atmosphere model for lava planets</b>
+  <b>A radiative-convective model for lava planet atmospheres</b>
 </p>
 
 
