@@ -17,6 +17,7 @@ module energy
     # Local files
     import ..atmosphere
     import ..phys
+    import ..chemistry
     include("spectrum.jl")
     import .spectrum
 
@@ -437,7 +438,7 @@ module energy
     phase change at each level, a phase change flux is calculated by assuming
     a fixed condensation timescale.
 
-    Updates fluxes. Requires `atmosphere.handle_saturation` to be called first in the
+    Updates fluxes. Requires `chemistry.handle_saturation` to be called first in the
     multi-component case.
 
     Arguments:
@@ -664,7 +665,7 @@ module energy
             atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout
-            atmosphere.handle_saturation!(atmos)
+            chemistry.handle_saturation!(atmos)
 
             # Calculate latent heat flux
             condense_diffuse!(atmos)
