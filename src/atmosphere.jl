@@ -828,21 +828,8 @@ module atmosphere
             error("Atmosphere parameters have not been set")
         end
 
-        # Reset arrays
-        fill!(atmos.z         ,     0.0)
-        fill!(atmos.zl        ,     0.0)
-        fill!(atmos.layer_grav,     0.0)
-        fill!(atmos.layer_thick,    0.0)
-        fill!(atmos.layer_mass   ,  0.0)
-
-        # Temporary values
-        g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
-        g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
-        dzc::Float64= 0.0; dzl::Float64 = 0.0
-        GMpl::Float64 = atmos.grav_surf * (atmos.rp^2.0)
-        code::Int64 = 0 # 0: ok, 1: blew up, 2: collapsed
-        dz_max::Float64 = 6e8
-        dz_min::Float64 = 1e-20
+        # Status
+        ok::Bool = true
 
         # MMW
         calc_profile_mmw!(atmos)
@@ -853,6 +840,52 @@ module atmosphere
         # Set density at each level
         calc_profile_density!(atmos)
 
+        # Perform hydrostatic integration
+        ok = ok && calc_profile_height!(atmos, ignore_errors=ignore_errors)
+
+        # Pass arrays to SOCRATES
+        atmos.atm.p[1, :]           .= atmos.p[:]
+        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+        atmos.atm.r_layer[1,:]      .= atmos.z[:]  .+ atmos.rp
+        atmos.atm.r_level[1,0:end]  .= atmos.zl[:] .+ atmos.rp
+        atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
+        atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
+
+        return ok
+    end
+
+    """
+    **Calculate height and gravity for all layers.**
+
+    Performs hydrostatic integration from the ground upwards.
+    Requires density, temperature, pressure to have already been set.
+
+    Arguments:
+        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+        - `ignore_errors::Bool`     do not generate errors from hydrostatic integrator.
+
+    Returns:
+        - `ok::Bool`                function result is ok
+    """
+    function calc_profile_height!(atmos::atmosphere.Atmos_t;
+                                    ignore_errors::Bool=false)::Bool
+
+        # Reset arrays
+        fill!(atmos.z         ,   0.0)
+        fill!(atmos.zl        ,   0.0)
+        fill!(atmos.layer_grav,   0.0)
+        fill!(atmos.layer_thick,  0.0)
+        fill!(atmos.layer_mass ,  0.0)
+
+        # Temporary values
+        g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
+        g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
+        dzc::Float64= 0.0; dzl::Float64 = 0.0
+        GMpl::Float64 = atmos.grav_surf * atmos.rp * atmos.rp
+        code::Int64 = 0 # 0: ok, 1: blew up, 2: collapsed
+        dz_max::Float64 = 1e9
+        dz_min::Float64 = 1e-20
+
         # Integrate from bottom upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
@@ -862,7 +895,7 @@ module atmosphere
 
             # Integrate from lower edge to centre
             if atmos.gravity_funct
-                g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2.0)
+                g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2)
             else
                 g1 = atmos.grav_surf
             end
@@ -871,16 +904,16 @@ module atmosphere
             dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * g1)
             if !ignore_errors
                 if (dzc < dz_min)
-                    ok = 2
+                    code = 2
                 elseif  (dzc > dz_max)
-                    ok = 1
+                    code = 1
                 end
             end
             atmos.z[i] = atmos.zl[i+1] + min(dzc,dz_max)
 
             # Integrate from centre to upper edge
             if atmos.gravity_funct
-                g2 = GMpl / ((atmos.rp + atmos.z[i])^2.0)
+                g2 = GMpl / ((atmos.rp + atmos.z[i])^2)
             else
                 g2 = atmos.grav_surf
             end
@@ -889,9 +922,9 @@ module atmosphere
             dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * g2)
             if !ignore_errors
                 if (dzl < dz_min)
-                    ok = 2
+                    code = 2
                 elseif (dzl > dz_max)
-                    ok = 1
+                    code = 1
                 end
             end
             atmos.zl[i] = atmos.z[i] + min(dzl,dz_max)
@@ -906,21 +939,18 @@ module atmosphere
             atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
         end
 
-        if code == 2
-            @error "Height integration failure: collapse, dz <= $dz_min"
-        elseif code == 1
-            @error "Height integration failure: blew up, dz >= $dz_max"
+        # Inform user on error
+        if ignore_errors
+            code = 0
+        else
+            if code == 2
+                @error "Height integration failure: collapse, dz <= $dz_min"
+            elseif code == 1
+                @error "Height integration failure: blew up, dz >= $dz_max"
+            end
         end
 
-        # Pass arrays to SOCRATES
-        atmos.atm.p[1, :]           .= atmos.p[:]
-        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-        atmos.atm.r_layer[1,:]      .= atmos.z[:]  .+ atmos.rp
-        atmos.atm.r_level[1,0:end]  .= atmos.zl[:] .+ atmos.rp
-        atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
-        atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
-
-        return Bool(code==0)
+        return Bool(code == 0)
     end
 
     """
@@ -929,7 +959,7 @@ module atmosphere
     MMW stored as kg/mol.
 
     Arguments:
-    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
     """
     function calc_profile_mmw!(atmos::atmosphere.Atmos_t)
         fill!(atmos.layer_μ, 0.0)
@@ -946,7 +976,7 @@ module atmosphere
     Thermal conductivity: W m-1 K-1.
 
     Arguments:
-    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
     """
     function calc_profile_cpkc!(atmos::atmosphere.Atmos_t)
         # Loop over layers
@@ -963,8 +993,8 @@ module atmosphere
     Thermal conductivity: W m-1 K-1.
 
     Arguments:
-    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
-    - `idx::Int`            index of the layer
+        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+        - `idx::Int`            index of the layer
     """
     function calc_single_cpkc!(atmos::atmosphere.Atmos_t, idx::Int)
         # Reset
@@ -986,7 +1016,7 @@ module atmosphere
     Requires temperature, pressure, mmw to be already have been set.
 
     Arguments:
-    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
     """
     function calc_profile_density!(atmos::atmosphere.Atmos_t)
         # Loop over levels

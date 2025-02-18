@@ -17,6 +17,7 @@ module AGNI
     include("phys.jl")
     include("spectrum.jl")
     include("atmosphere.jl")
+    include("chemistry.jl")
     include("setpt.jl")
     include("dump.jl")
     include("plotting.jl")
@@ -31,12 +32,8 @@ module AGNI
     import .plotting
     import .energy
     import .solver
+    import .chemistry
 
-    # Export
-    # export atmosphere
-    # export solver
-    # export plotting
-    # export energy
 
     """
     **Setup terminal logging and file logging**
