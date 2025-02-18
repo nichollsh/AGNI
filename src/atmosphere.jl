@@ -814,8 +814,6 @@ module atmosphere
     """
     **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
 
-    Assumes that the atmosphere is hydrostatically supported.
-
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
         - `ignore_errors::Bool`     do not generate errors from hydrostatic integrator.
@@ -877,14 +875,17 @@ module atmosphere
         fill!(atmos.layer_thick,  0.0)
         fill!(atmos.layer_mass ,  0.0)
 
-        # Temporary values
-        g1::Float64 = 0.0; p1::Float64 = 0.0; t1::Float64 = 0.0
-        g2::Float64 = 0.0; p2::Float64 = 0.0; t2::Float64 = 0.0
-        dzc::Float64= 0.0; dzl::Float64 = 0.0
-        GMpl::Float64 = atmos.grav_surf * atmos.rp * atmos.rp
-        code::Int64 = 0 # 0: ok, 1: blew up, 2: collapsed
+        # Parameters
         dz_max::Float64 = 1e9
         dz_min::Float64 = 1e-20
+
+        # Temporary values
+        code::Int64         = 0                 # 0: ok, 1: blew up, 2: collapsed
+        grav::Float64       = atmos.grav_surf   # gravity at current level
+        mass_encl::Float64  = 0.0               # mass enclosed within current level
+        dzc::Float64        = 0.0               # dz to cell centre
+        dzl::Float64        = 0.0               # dz to cell top edge
+        GMpl::Float64 = atmos.grav_surf * atmos.rp * atmos.rp
 
         # Integrate from bottom upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
@@ -895,13 +896,9 @@ module atmosphere
 
             # Integrate from lower edge to centre
             if atmos.gravity_funct
-                g1 = GMpl / ((atmos.rp + atmos.zl[i+1])^2)
-            else
-                g1 = atmos.grav_surf
+                grav = GMpl / ((atmos.rp + atmos.zl[i+1])^2)
             end
-            p1 = 0.5 * (atmos.p[i] + atmos.pl[i+1])
-            t1 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i+1])
-            dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * g1)
+            dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * grav)
             if !ignore_errors
                 if (dzc < dz_min)
                     code = 2
@@ -913,13 +910,9 @@ module atmosphere
 
             # Integrate from centre to upper edge
             if atmos.gravity_funct
-                g2 = GMpl / ((atmos.rp + atmos.z[i])^2)
-            else
-                g2 = atmos.grav_surf
+                grav = GMpl / ((atmos.rp + atmos.z[i])^2)
             end
-            p2 = 0.5 * (atmos.p[i] + atmos.pl[i])
-            t2 = 0.5 * (atmos.tmp[i] + atmos.tmpl[i])
-            dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * g2)
+            dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * grav)
             if !ignore_errors
                 if (dzl < dz_min)
                     code = 2
@@ -930,7 +923,7 @@ module atmosphere
             atmos.zl[i] = atmos.z[i] + min(dzl,dz_max)
 
             # Layer-centre gravity [m s-2]
-            atmos.layer_grav[i] = g2
+            atmos.layer_grav[i] = grav
 
             # Layer-centre mass per unit area [kg m-2]
             atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
@@ -952,6 +945,21 @@ module atmosphere
 
         return Bool(code == 0)
     end
+
+    """
+    **Calculate the total mass enclosed within with given layer**
+
+    Arguments:
+        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+        - `idx::Int64`          index of enclosing layer
+
+    Returns:
+        - `mass::Float64`       enclosed mass [kg]
+    """
+    # function get_enclosed_mass(atmos::atmosphere.Atmos_t, idx::Int64)::Float64
+    #     if idx == atmos.nlev_l
+    #     return sum()
+    # end
 
     """
     **Calculate mean molecular weight for all layers.**
