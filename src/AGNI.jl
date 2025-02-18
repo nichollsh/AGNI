@@ -383,7 +383,7 @@ module AGNI
                 return false
             end
 
-            atmosphere.chemistry_eqm!(atmos, chem_type, true)
+            chemistry.fastchem_eqm!(atmos, chem_type, true)
         end
 
         # Frame dir

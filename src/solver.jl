@@ -18,6 +18,7 @@ module solver
     import ..energy
     import ..phys
     import ..plotting
+    import ..chemistry
 
     """
     **Golden section search algorithm**
@@ -488,7 +489,7 @@ module solver
             # Run chemistry scheme
             if chem_type in [1,2,3]
                 @debug "        chemistry"
-                fc_retcode = atmosphere.chemistry_eqm!(atmos, chem_type, false)
+                fc_retcode = chemistry.fastchem_eqm!(atmos, chem_type, false)
                 if fc_retcode == 0
                     stepflags *= "Cs-"  # chemistry success
                 else
