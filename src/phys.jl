@@ -16,7 +16,8 @@ module phys
     using .consts
 
     # A large floating point number
-    const BIGFLOAT::Float64 = 1e99
+    const BIGFLOAT::Float64     = 1e99
+    const BIGLOGFLOAT::Float64  = 99.0
 
     # Enable/disable flags
     ENABLE_AQUA::Bool = true
@@ -57,8 +58,8 @@ module phys
         # Saturation curve
         no_sat::Bool                # No saturation data
         sat_T::Array{Float64,1}     # Reference temperatures [K]
-        sat_P::Array{Float64,1}     # Corresponding saturation pressures [Pa]
-        sat_I::Extrapolation        # 1D linear interpolator-extrapolator
+        sat_P::Array{Float64,1}     # Corresponding saturation pressures [log10 Pa]
+        sat_I::Extrapolation        # Psat(T), 1D linear interpolator-extrapolator
 
         # Latent heat (enthalpy) of phase change
         lat_T::Array{Float64,1}     # Reference temperatures [K]
@@ -140,7 +141,7 @@ module phys
 
         # saturation pressure set to large value (ensures always gas phase)
         gas.sat_T = [0.0, BIGFLOAT]
-        gas.sat_P = [BIGFLOAT, BIGFLOAT]
+        gas.sat_P = [BIGLOGFLOAT, BIGLOGFLOAT]
         gas.no_sat = true
 
         # critical set to small value (always supercritical)
@@ -190,8 +191,8 @@ module phys
 
                 # saturation pressure
                 if haskey(ds, "sat_T")
-                    gas.sat_T = ds["sat_T"][:]
-                    gas.sat_P = ds["sat_P"][:]
+                    gas.sat_T = ds["sat_T"][:] # K
+                    gas.sat_P = ds["sat_P"][:] # log10 Pa
                     gas.no_sat = false
                 end
 
@@ -481,13 +482,14 @@ module phys
         end
 
         # Get value from interpolator
-        return gas.sat_I(t)
+        return 10.0 ^ gas.sat_I(t)
     end
 
     """
-    **Approximate the dew point temperature without interpolation**
+    **Get gas dew point temperature for a given partial pressure.**
 
-    This should be avoided as much as possible.
+    If the pressure is below the critical point pressure, then T_crit is returned.
+    This function is horrendous, and should be avoided at all costs.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -502,6 +504,8 @@ module phys
         if gas.stub
             return 0.0
         end
+
+        p = log10(p)
 
         # Find closest value in array
         i::Int = argmin(abs.(gas.sat_P .- p))

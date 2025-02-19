@@ -866,89 +866,55 @@ module atmosphere
         fill!(atmos.r         ,   atmos.rp)
         fill!(atmos.rl        ,   atmos.rp)
         fill!(atmos.layer_grav,   atmos.grav_surf)
-        fill!(atmos.layer_thick,  0.0)
-        fill!(atmos.layer_mass ,  0.0)
-
-        # Parameters
-        dr_max::Float64 = 1e9
-        dr_min::Float64 = 1e-20
+        fill!(atmos.layer_thick,  1.0)
+        fill!(atmos.layer_mass ,  1.0)
 
         # Temporary values
-        code::Int64         = 0                 # 0: ok, 1: blew up, 2: collapsed
         grav::Float64       = atmos.grav_surf   # gravity at current level
         mass_encl::Float64  = atmos.interior_mass # mass enclosed within current level
-        drc::Float64        = 0.0               # dr to cell centre
-        drl::Float64        = 0.0               # dr to cell top edge
 
-        # Integrate from bottom upwards
+        # Integrate from surface upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
-            # Calculate gravity at bottom edge
+            # Calculate gravity at lower edge
             grav = phys.G_grav * mass_encl / atmos.rl[i+1]^2
 
             # Integrate from lower edge to centre
-            drc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * grav)
-            if !ignore_errors
-                if (drc < dr_min)
-                    code = 2
-                elseif  (drc > dr_max)
-                    code = 1
-                end
-            end
-            atmos.r[i] = atmos.rl[i+1] + min(drc,dr_max)
+            atmos.r[i] = integrate_hydrograv(atmos.rl[i+1], grav, atmos.pl[i+1], atmos.p[i], atmos.layer_ρ[i])
 
             # Calculate gravity at cell centre
             grav = phys.G_grav * mass_encl / atmos.r[i]^2
 
             # Integrate from centre to upper edge
-            drl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * grav)
-            if !ignore_errors
-                if (drl < dr_min)
-                    code = 2
-                elseif (drl > dr_max)
-                    code = 1
-                end
-            end
-            atmos.rl[i] = atmos.r[i] + min(drl,dr_max)
+            atmos.rl[i] = integrate_hydrograv(atmos.r[i], grav, atmos.p[i], atmos.pl[i], atmos.layer_ρ[i])
 
-            # Layer-centre gravity [m s-2]
+            # Store: Layer-centre gravity [m s-2]
             atmos.layer_grav[i] = grav
 
-            # Layer geometrical thickness [m]
+            # Store: Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
-            # Layer-centre mass per unit area [kg m-2]
+            # Store: Layer-centre mass per unit area [kg m-2]
             atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
 
             # Add cumulative mass [kg]
             mass_encl += atmos.layer_mass[i] * 4 * pi * atmos.r[i]^2
         end
 
-        # Inform user on error
-        if ignore_errors
-            code = 0
-        else
-            if code == 2
-                @error "Height integration failure: collapse, dr <= $dr_min"
-            elseif code == 1
-                @error "Height integration failure: blew up, dr >= $dr_max"
-            end
-        end
-
-        return Bool(code == 0)
+        return true
     end
 
     """
-    **Integrate hydrostatic and gravity equations across a given range.**
+    **Integrate hydrostatic and gravity equations across a pressure interval.**
 
     Uses the classic fourth-order Runge-Kutta method.
 
     Arguments:
         - `r0::Float64`     radius   at start of interval [m]
         - `g0::Float64`     gravity  at start of interval [m s-2]
-        - `p0::Float64`     pressure at start of iterval  [Pa]
-        - `p1::Float64`     pressure at end of interval [Pa]
-        - `rho::Float64`    density throughout interval [kg m-3]
+        - `p0::Float64`     pressure at start of interval [Pa]
+        - `p1::Float64`     pressure at end   of interval [Pa]
+        - `rho::Float64`    density throughout interval, constant [kg m-3]
 
     Returns:
         - `r1::Float64`     radius at end of interval [m]
@@ -967,7 +933,7 @@ module atmosphere
         end
 
         # Parameters
-        nsteps::Int  = 30
+        nsteps::Int  = 10
         dp::Float64  = (p1-p0)/nsteps # this will be negative
         dp2::Float64 = dp/2
         k1::Float64  = 0.0; k2::Float64 = 0.0
@@ -990,8 +956,6 @@ module atmosphere
             # step pressure (decrease)
             pj += dp
         end
-
-        # @printf("Final pressure = %.3e  ,  target = %.3e Pa \n", pj, p1)
 
         return rj
     end

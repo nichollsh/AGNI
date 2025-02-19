@@ -119,7 +119,7 @@ module plotting
                         size=(size_x,size_y); plt_default...)
 
         # Plot surface
-        scatter!(plt, [atmos.rp], [atmos.pl[end]*1e-5], color="brown3", label=L"P_s")
+        scatter!(plt, [atmos.rp*1e-3], [atmos.pl[end]*1e-5], color="brown3", label=L"P_s")
 
         # Plot cell-centres and cell-edges
         scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Centres")
