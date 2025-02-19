@@ -63,14 +63,6 @@ module atmosphere
         toa_heating::Float64            # Derived downward shortwave radiation flux at topmost level [W m-2]
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (see Cronin+14)
-
-        surface_material::String        # Surface material file path
-        albedo_s::Float64               # Grey surface albedo when surface=greybody
-        surf_r_arr::Array{Float64,1}    # Spectral surface reflectance
-        surf_e_arr::Array{Float64,1}    # Spectral surface emissivity
-
-        tmp_surf::Float64               # Surface brightness temperature [K]
-        grav_surf::Float64              # Surface gravity [m s-2]
         overlap_method::String          # Absorber overlap method to be used
 
         # Spectral bands
@@ -83,11 +75,8 @@ module atmosphere
         # Pressure-temperature grid (with i=1 at the top of the model)
         nlev_c::Int         # Cell centre (count)
         nlev_l::Int         # Cell edge (count)
-
         p_boa::Float64      # Pressure at bottom [Pa]
         p_toa::Float64      # Pressure at top [Pa]
-        rp::Float64         # surface radius [m]
-
         tmp::Array{Float64,1}   # cc temperature [K]
         tmpl::Array{Float64,1}  # ce temperature
         p::Array{Float64,1}     # cc pressure
@@ -98,10 +87,17 @@ module atmosphere
         tmp_floor::Float64      # Temperature floor to prevent numerics [K]
         tmp_ceiling::Float64    # Temperature ceiling to prevent numerics [K]
 
-        # Conductive skin
-        skin_d::Float64         # skin thickness [m]
-        skin_k::Float64         # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
-        tmp_magma::Float64      # Mantle temperature [K]
+        # Surface
+        surface_material::String        # Surface material file path
+        albedo_s::Float64               # Grey surface albedo when surface=greybody
+        surf_r_arr::Array{Float64,1}    # Spectral surface reflectance
+        surf_e_arr::Array{Float64,1}    # Spectral surface emissivity
+        tmp_surf::Float64               # Surface brightness temperature [K]
+        rp::Float64                     # surface radius [m]
+        grav_surf::Float64              # surface gravity [m s-2]
+        skin_d::Float64                 # skin thickness [m]
+        skin_k::Float64                 # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
+        tmp_magma::Float64              # Mantle temperature [K]
 
         # Gas variables (incl gases which are not in spectralfile)
         gas_num::Int                                # Number of gases
@@ -882,10 +878,9 @@ module atmosphere
         # Temporary values
         code::Int64         = 0                 # 0: ok, 1: blew up, 2: collapsed
         grav::Float64       = atmos.grav_surf   # gravity at current level
-        mass_encl::Float64  = 0.0               # mass enclosed within current level
+        mass_encl::Float64  = atmos.interior_mass # mass enclosed within current level
         dzc::Float64        = 0.0               # dz to cell centre
         dzl::Float64        = 0.0               # dz to cell top edge
-        GMpl::Float64 = atmos.grav_surf * atmos.rp * atmos.rp
 
         # Integrate from bottom upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
@@ -894,10 +889,12 @@ module atmosphere
             # but here they are not. This loose integration has been found to
             # be reasonable in all of my tests.
 
-            # Integrate from lower edge to centre
+            # Calculate gravity at bottom edge
             if atmos.gravity_funct
-                grav = GMpl / ((atmos.rp + atmos.zl[i+1])^2)
+                grav = phys.G_grav * mass_encl / (atmos.rp + atmos.zl[i+1])^2
             end
+
+            # Integrate from lower edge to centre
             dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * grav)
             if !ignore_errors
                 if (dzc < dz_min)
@@ -908,10 +905,12 @@ module atmosphere
             end
             atmos.z[i] = atmos.zl[i+1] + min(dzc,dz_max)
 
-            # Integrate from centre to upper edge
+            # Calculate gravity at cell centre
             if atmos.gravity_funct
-                grav = GMpl / ((atmos.rp + atmos.z[i])^2)
+                grav = phys.G_grav * mass_encl / (atmos.rp + atmos.z[i])^2
             end
+
+            # Integrate from centre to upper edge
             dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * grav)
             if !ignore_errors
                 if (dzl < dz_min)
@@ -925,11 +924,14 @@ module atmosphere
             # Layer-centre gravity [m s-2]
             atmos.layer_grav[i] = grav
 
+            # Layer geometrical thickness [m]
+            atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
+
             # Layer-centre mass per unit area [kg m-2]
             atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
 
-            # Layer geometrical thickness [m]
-            atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
+            # Add cumulative mass [kg]
+            mass_encl += atmos.layer_mass[i] * 4 * pi * (atmos.rp + atmos.z[i])^2
         end
 
         # Inform user on error
@@ -945,21 +947,6 @@ module atmosphere
 
         return Bool(code == 0)
     end
-
-    """
-    **Calculate the total mass enclosed within with given layer**
-
-    Arguments:
-        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
-        - `idx::Int64`          index of enclosing layer
-
-    Returns:
-        - `mass::Float64`       enclosed mass [kg]
-    """
-    # function get_enclosed_mass(atmos::atmosphere.Atmos_t, idx::Int64)::Float64
-    #     if idx == atmos.nlev_l
-    #     return sum()
-    # end
 
     """
     **Calculate mean molecular weight for all layers.**
