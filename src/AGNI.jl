@@ -364,7 +364,6 @@ module AGNI
                                 overlap_method    = cfg["execution"]["overlap_method"],
                                 real_gas          = cfg["execution"]["real_gas"],
                                 thermo_functions  = cfg["execution"]["thermo_funct"],
-                                gravity_functions = cfg["execution"]["gravity_funct"],
                                 use_all_gases     = cfg["composition"]["include_all"],
                                 C_d=turb_coeff, U=wind_speed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,

@@ -41,7 +41,6 @@ title = "Cloud radiative properties test"
     overlap_method  = "ro"
     real_gas        = false
     thermo_funct    = true
-    gravity_funct   = true
     sensible_heat   = false
     latent_heat     = false
     convection      = true
