@@ -22,6 +22,9 @@ module atmosphere
     import ..phys
     import ..spectrum
 
+    # Constants
+    const HYDROGRAV_STEPS::Int64 = 30
+
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
 
@@ -933,8 +936,7 @@ module atmosphere
         end
 
         # Parameters
-        nsteps::Int  = 10
-        dp::Float64  = (p1-p0)/nsteps # this will be negative
+        dp::Float64  = (p1-p0)/HYDROGRAV_STEPS # this will be negative
         dp2::Float64 = dp/2
         k1::Float64  = 0.0; k2::Float64 = 0.0
         k3::Float64  = 0.0; k4::Float64 = 0.0
