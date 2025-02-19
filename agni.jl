@@ -9,13 +9,18 @@ if !("RAD_DIR" in keys(ENV))
     error("Cannot find SOCRATES! Have you set RAD_DIR?")
 end
 
+# Check SOCRATES.jl
+SOCjl = joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl")
+if !isfile(SOCjl)
+    error("Cannot find SOCRATES library! Tried: '$SOCjl'")
+end
+
 # Activate environment
 import Pkg
 Pkg.activate(AGNI_DIR)
 
 # Include AGNI
-include(joinpath([AGNI_DIR,"src","AGNI.jl"]))
-import .AGNI
+import AGNI
 
 # Run
 if AGNI.main()

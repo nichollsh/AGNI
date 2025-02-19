@@ -31,7 +31,7 @@ directory. This will also have downloaded some basic input data, and have run th
 ## Testing
 If you want to run the tests manually, simply use the script in the `test/` folder...
 ```bash
-julia ./test/runtests.jl
+julia test/runtests.jl
 ```
 This will print information on whether tests passed or failed.
 

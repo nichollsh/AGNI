@@ -7,7 +7,7 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
 end
 
 
-module dump
+module save
 
     import ..atmosphere
 
