@@ -18,11 +18,11 @@ module save
     using Dates
 
     """
-    Write Pressure vs Temperature & Height profile to a CSV file
+    Write {Pressure, Temperature, Radius} profile to a CSV file
     """
-    function write_ptz(atmos::atmosphere.Atmos_t, fname::String)
+    function write_profile(atmos::atmosphere.Atmos_t, fname::String)
 
-        arr_P, arr_T, arr_Z = atmosphere.get_interleaved_ptz(atmos)
+        arr_P, arr_T, arr_R = atmosphere.get_interleaved_ptr(atmos)
 
         # Remove old file if exists
         rm(fname, force=true)
@@ -30,10 +30,10 @@ module save
         @debug "Writing T(p) csv to $fname"
 
         open(fname, "w") do f
-            write(f, "# pressure  , temperature, height \n")
+            write(f, "# pressure  , temperature, radius \n")
             write(f, "# [Pa]      , [K]        , [m]  \n")
             for i in 1:atmos.nlev_l+atmos.nlev_c
-                @printf(f, "%1.5e , %1.5e , %1.5e \n", arr_P[i], arr_T[i], arr_Z[i])
+                @printf(f, "%1.5e , %1.5e , %1.5e \n", arr_P[i], arr_T[i], arr_R[i])
             end
         end
         return nothing
@@ -219,8 +219,8 @@ module save
             var_pl =        defVar(ds, "pl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "Pa"))
             var_tmp =       defVar(ds, "tmp",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "K"))
             var_tmpl =      defVar(ds, "tmpl",      Float64, ("nlev_l",), attrib = OrderedDict("units" => "K"))
-            var_z =         defVar(ds, "z",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
-            var_zl =        defVar(ds, "zl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
+            var_r =         defVar(ds, "r",         Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
+            var_rl =        defVar(ds, "rl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
             var_thick =     defVar(ds, "dz",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
             var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
             var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "J K-1 kg-1"))
@@ -261,8 +261,8 @@ module save
             var_pl[:] =     atmos.pl
             var_tmp[:] =    atmos.tmp
             var_tmpl[:] =   atmos.tmpl
-            var_z[:]    =   atmos.z
-            var_zl[:]   =   atmos.zl
+            var_r[:]    =   atmos.r
+            var_rl[:]   =   atmos.rl
             var_mmw[:]  =   atmos.layer_μ
             var_cp[:]  =    atmos.layer_cp
             var_grav[:]  =  atmos.layer_grav

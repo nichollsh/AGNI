@@ -322,8 +322,8 @@ total += 1
 @info " "
 @info "Testing hydrostatic integration"
 
-val_e = 424139.454295769   # known from previous tests
-val_o = atmos.z[1] # height of topmost layer-centre
+val_e = 424139.454295769 - atmos.rp   # known from previous tests
+val_o = atmos.r[1] # height of topmost layer-centre
 @info "Expected value = $(val_e) m"
 @info "Modelled value = $(val_o) m"
 if abs(val_o - val_e)/val_e < rtol
@@ -341,7 +341,7 @@ total += 1
 # -------------
 @info " "
 @info "Testing write NetCDF"
-out_path::String = "/tmp/agni_atm.nc"
+out_path::String = joinpath(OUT_DIR,"agni_atm.nc")
 rm(out_path, force=true)
 save.write_ncdf(atmos, out_path)
 @info "Expecting file at $out_path"
@@ -361,7 +361,7 @@ total += 1
 # -------------
 @info " "
 @info "Testing plot temperatures"
-out_path = "/tmp/agni_plot_tmp.png"
+out_path = joinpath(OUT_DIR,"agni_plot_tmp.png")
 rm(out_path, force=true)
 plotting.plot_pt(atmos, out_path)
 @info "Expecting file at $out_path"
@@ -378,12 +378,12 @@ total += 1
 
 
 # -------------
-# Test plot height
+# Test plot radius
 # -------------
 @info " "
-@info "Testing plot height"
-out_path = "/tmp/agni_plot_hei.png"
-plotting.plot_height(atmos, out_path)
+@info "Testing plot radius"
+out_path = joinpath(OUT_DIR,"agni_plot_rad.png")
+plotting.plot_radius(atmos, out_path)
 @info "Expecting file at $out_path"
 if isfile(out_path)
     @info "Found file at $out_path"
@@ -402,7 +402,7 @@ total += 1
 # -------------
 @info " "
 @info "Testing plot albedo"
-out_path = "/tmp/agni_plot_alb.png"
+out_path = joinpath(OUT_DIR,"agni_plot_alb.png")
 plotting.plot_albedo(atmos, out_path)
 @info "Expecting file at $out_path"
 if isfile(out_path)
