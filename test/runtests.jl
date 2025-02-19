@@ -10,23 +10,9 @@ Pkg.activate(ROOT_DIR)
 
 # Include libraries
 using LoggingExtras
+using AGNI
 
 @info "Begin tests"
-
-# Include local jl files
-include("../src/phys.jl")
-include("../src/spectrum.jl")
-include("../src/atmosphere.jl")
-include("../src/setpt.jl")
-include("../src/energy.jl")
-include("../src/plotting.jl")
-include("../src/dump.jl")
-import .phys
-import .atmosphere
-import .setpt
-import .energy
-import .plotting
-import .dump
 
 
 # Prepare

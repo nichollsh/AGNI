@@ -21,6 +21,7 @@ module AGNI
     include("setpt.jl")
     include("dump.jl")
     include("plotting.jl")
+    include("spectrum.jl")
     include("energy.jl")
     include("solver.jl")
 
@@ -30,10 +31,22 @@ module AGNI
     import .setpt
     import .dump
     import .plotting
+    import .spectrum
     import .energy
     import .solver
     import .chemistry
 
+    # Export
+    export phys
+    export atmosphere
+    export setpt
+    export dump
+    export plotting
+    export spectrum
+    export energy
+    export chemistry
+    export solver
+    export dump
 
     """
     **Setup terminal logging and file logging**

@@ -18,8 +18,7 @@ module energy
     import ..atmosphere
     import ..phys
     import ..chemistry
-    include("spectrum.jl")
-    import .spectrum
+    import ..spectrum
 
     """
     **Calculate radiative fluxes using SOCRATES.**

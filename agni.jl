@@ -2,13 +2,12 @@
 
 # Don't show plot windows
 ENV["GKSwstype"] = "100"
+AGNI_DIR = dirname(abspath(@__FILE__))
 
 # Check RAD_DIR
 if !("RAD_DIR" in keys(ENV))
     error("Cannot find SOCRATES! Have you set RAD_DIR?")
 end
-
-AGNI_DIR = dirname(abspath(@__FILE__))
 
 # Activate environment
 import Pkg

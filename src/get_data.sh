@@ -101,8 +101,8 @@ function handle_request {
             osf heuza $spfiles/Dayspring/48/ Dayspring.sf
             osf c5jv3 $spfiles/Dayspring/48/ Dayspring.sf_k
 
-            osf b5gsh $spfiles/Dayspring/256/ Dayspring.sf
-            osf dn6wh $spfiles/Dayspring/256/ Dayspring.sf_k
+            osf b5gsh $spfiles/Honeyside/256/ Honeyside.sf
+            osf dn6wh $spfiles/Honeyside/256/ Honeyside.sf_k
 
             osf 2qdu8 $stellar sun.txt
 
