@@ -409,8 +409,6 @@ module AGNI
         # Loop over requested solvers
         solver_success::Bool = true
         allowed_solvers::Array{String,1} = ["newton", "gauss", "levenberg"]
-
-        @info " "
         sol = strip(lowercase(cfg["execution"]["solver"]))
         if isempty(sol)
             sol = "none"

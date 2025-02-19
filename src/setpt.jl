@@ -66,10 +66,10 @@ module setpt
                 # condensing a volatile
                 idx_req += 1
                 setpt.saturation!(atmos, request[idx_req])
-                if atmos.control.l_cloud
-                    @debug "Applying clouds to initial state"
-                    atmosphere.water_cloud!(atmos)
-                end
+                # if atmos.control.l_cloud
+                #     @debug "Applying clouds to initial state"
+                #     atmosphere.water_cloud!(atmos)
+                # end
 
             else
                 @error "Invalid initial state '$str_req'"
@@ -461,7 +461,7 @@ module setpt
             # Set cell-centre temperatures
             Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i] * x)
             if atmos.tmp[i] < Tdew
-                atmos.tmp[i] = Tdew
+                atmos.tmp[i]  = Tdew
                 atmos.gas_sat[gas][i] = true
             end
         end

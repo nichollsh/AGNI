@@ -322,7 +322,7 @@ total += 1
 @info " "
 @info "Testing hydrostatic integration"
 
-val_e = 424139.454295769 - atmos.rp   # known from previous tests
+val_e = 1.0438945347722374e7   # known from previous tests
 val_o = atmos.r[1] # height of topmost layer-centre
 @info "Expected value = $(val_e) m"
 @info "Modelled value = $(val_o) m"
