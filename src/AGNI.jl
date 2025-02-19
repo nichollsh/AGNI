@@ -381,7 +381,7 @@ module AGNI
         setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
 
         # Write initial state
-        save.write_ptz(atmos, joinpath(atmos.OUT_DIR,"ptz_initial.csv"))
+        save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
         # Do chemistry on initial composition
         if chem_type in [1,2,3]
@@ -452,8 +452,6 @@ module AGNI
 
         # Write arrays
         @info "Writing results"
-        # save.write_ptz(atmos,     joinpath(atmos.OUT_DIR,"ptz.csv"))
-        # save.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
         save.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 
         # Save plots
@@ -474,7 +472,7 @@ module AGNI
         cfg["plots"]["albedo"] && \
             plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.png"))
         cfg["plots"]["height"] && \
-            plotting.plot_height(atmos, joinpath(atmos.OUT_DIR,"plot_height.png"))
+            plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.png"))
 
         # Deallocate atmosphere
         @info "Deallocating memory"

@@ -10,7 +10,7 @@ if !("RAD_DIR" in keys(ENV))
 end
 
 # Check SOCRATES.jl
-SOCjl = joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl")
+SOCjl = joinpath([abspath(ENV["RAD_DIR"]),"julia","src","SOCRATES.jl"])
 if !isfile(SOCjl)
     error("Cannot find SOCRATES library! Tried: '$SOCjl'")
 end

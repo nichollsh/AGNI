@@ -295,13 +295,13 @@ module energy
 
         # bulk layers
         @inbounds for i in 2:atmos.nlev_l-1
-            atmos.flux_cdct[i] = 0.5*(atmos.layer_kc[i-1]+atmos.layer_kc[i]) *
-                                     (atmos.tmp[i]-atmos.tmp[i-1])/(atmos.z[i-1]-atmos.z[i])
+            atmos.flux_cdct[i] = atmos.layer_kc[i] * (atmos.tmp[i]-atmos.tmp[i-1]) /
+                                                        (atmos.r[i-1]-atmos.r[i])
         end
 
         # bottom layer
-        atmos.flux_cdct[end] = atmos.layer_kc[end] *
-                                    (atmos.tmp[end]-atmos.tmp_surf) / atmos.z[end]
+        atmos.flux_cdct[end] = atmos.layer_kc[end] * (atmos.tmp[end]-atmos.tmp_surf) /
+                                                      (atmos.r[end] - atmos.rp)
         return nothing
     end
 
@@ -348,7 +348,7 @@ module energy
         Hp::Float64 = 0.0; λ::Float64 = 0.0; w::Float64 = 0.0
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
-        ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0
+        ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0; hgt::Float64 = 0.0
 
         # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
@@ -398,7 +398,8 @@ module energy
                     λ = phys.αMLT * Hp
                 elseif mltype == 2
                     # Asymptotic
-                    λ = phys.k_vk * atmos.zl[i] / (1 + phys.k_vk * atmos.zl[i]/Hp)
+                    hgt = atmos.rl[i] - atmos.rp # height above the ground 
+                    λ = phys.k_vk * hgt / (1 + phys.k_vk * hgt/Hp)
                 else
                     # Otherwise
                     error("Invalid mixing length type selected: $mltype")

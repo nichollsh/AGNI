@@ -78,11 +78,11 @@ module atmosphere
         p_boa::Float64      # Pressure at bottom [Pa]
         p_toa::Float64      # Pressure at top [Pa]
         tmp::Array{Float64,1}   # cc temperature [K]
-        tmpl::Array{Float64,1}  # ce temperature
-        p::Array{Float64,1}     # cc pressure
-        pl::Array{Float64,1}    # ce pressure
-        z::Array{Float64,1}     # cc height
-        zl::Array{Float64,1}    # ce height
+        tmpl::Array{Float64,1}  # ce temperature [K]
+        p::Array{Float64,1}     # cc pressure [Pa]
+        pl::Array{Float64,1}    # ce pressure [Pa]
+        r::Array{Float64,1}     # cc radius [m]
+        rl::Array{Float64,1}    # ce radius [m]
 
         tmp_floor::Float64      # Temperature floor to prevent numerics [K]
         tmp_ceiling::Float64    # Temperature ceiling to prevent numerics [K]
@@ -427,17 +427,19 @@ module atmosphere
 
         # Initialise pressure grid with current p_toa and p_boa
         generate_pgrid!(atmos)
-        atmos.z          = zeros(Float64, atmos.nlev_c)
-        atmos.zl         = zeros(Float64, atmos.nlev_l)
-        atmos.layer_grav = ones(Float64, atmos.nlev_c) * atmos.grav_surf
 
-        # Initialise thermodynamics
-        atmos.layer_μ     = zeros(Float64, atmos.nlev_c)
-        atmos.layer_ρ = zeros(Float64, atmos.nlev_c)
+        # Initialise mesh geometry
+        atmos.r             = zeros(Float64, atmos.nlev_c) # radii at cell centres [m]
+        atmos.rl            = zeros(Float64, atmos.nlev_l) # radii at cell edges [m]
+        atmos.layer_thick   = zeros(Float64, atmos.nlev_c) # geometric thickness [m]
+        atmos.layer_mass    = zeros(Float64, atmos.nlev_c) # mass per unit area [kg m-2]
+        atmos.layer_grav    = ones(Float64, atmos.nlev_c) * atmos.grav_surf
+
+        # Initialise thermodynamic properties
+        atmos.layer_μ       = zeros(Float64, atmos.nlev_c)
+        atmos.layer_ρ       = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         atmos.layer_kc      = zeros(Float64, atmos.nlev_c)
-        atmos.layer_mass    = zeros(Float64, atmos.nlev_c)
-        atmos.layer_thick   = zeros(Float64, atmos.nlev_c)
 
         # Initialise cloud arrays
         atmos.cloud_arr_r   = zeros(Float64, atmos.nlev_c)
@@ -787,7 +789,7 @@ module atmosphere
 
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
-        atmos.transspec_r = atmos.z[idx] + atmos.rp
+        atmos.transspec_r = atmos.r[idx]
 
         # get mass of whole atmosphere, assuming hydrostatic
         atmos.transspec_m = atmos.p_boa * 4 * pi * atmos.rp^2 / atmos.grav_surf
@@ -831,13 +833,13 @@ module atmosphere
         calc_profile_density!(atmos)
 
         # Perform hydrostatic integration
-        ok = ok && calc_profile_height!(atmos, ignore_errors=ignore_errors)
+        ok = ok && calc_profile_radius!(atmos, ignore_errors=ignore_errors)
 
         # Pass arrays to SOCRATES
         atmos.atm.p[1, :]           .= atmos.p[:]
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-        atmos.atm.r_layer[1,:]      .= atmos.z[:]  .+ atmos.rp
-        atmos.atm.r_level[1,0:end]  .= atmos.zl[:] .+ atmos.rp
+        atmos.atm.r_layer[1,:]      .= atmos.r[:]
+        atmos.atm.r_level[1,0:end]  .= atmos.rl[:]
         atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
         atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
 
@@ -845,7 +847,7 @@ module atmosphere
     end
 
     """
-    **Calculate height and gravity for all layers.**
+    **Calculate radius and gravity for all layers.**
 
     Performs hydrostatic integration from the ground upwards.
     Requires density, temperature, pressure to have already been set.
@@ -857,73 +859,69 @@ module atmosphere
     Returns:
         - `ok::Bool`                function result is ok
     """
-    function calc_profile_height!(atmos::atmosphere.Atmos_t;
+    function calc_profile_radius!(atmos::atmosphere.Atmos_t;
                                     ignore_errors::Bool=false)::Bool
 
         # Reset arrays
-        fill!(atmos.z         ,   0.0)
-        fill!(atmos.zl        ,   0.0)
-        fill!(atmos.layer_grav,   0.0)
+        fill!(atmos.r         ,   atmos.rp)
+        fill!(atmos.rl        ,   atmos.rp)
+        fill!(atmos.layer_grav,   atmos.grav_surf)
         fill!(atmos.layer_thick,  0.0)
         fill!(atmos.layer_mass ,  0.0)
 
         # Parameters
-        dz_max::Float64 = 1e9
-        dz_min::Float64 = 1e-20
+        dr_max::Float64 = 1e9
+        dr_min::Float64 = 1e-20
 
         # Temporary values
         code::Int64         = 0                 # 0: ok, 1: blew up, 2: collapsed
         grav::Float64       = atmos.grav_surf   # gravity at current level
         mass_encl::Float64  = atmos.interior_mass # mass enclosed within current level
-        dzc::Float64        = 0.0               # dz to cell centre
-        dzl::Float64        = 0.0               # dz to cell top edge
+        drc::Float64        = 0.0               # dr to cell centre
+        drl::Float64        = 0.0               # dr to cell top edge
 
         # Integrate from bottom upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
-            # Technically, g and z should be integrated as coupled equations,
-            # but here they are not. This loose integration has been found to
-            # be reasonable in all of my tests.
-
             # Calculate gravity at bottom edge
-            grav = phys.G_grav * mass_encl / (atmos.rp + atmos.zl[i+1])^2
+            grav = phys.G_grav * mass_encl / atmos.rl[i+1]^2
 
             # Integrate from lower edge to centre
-            dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * grav)
+            drc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * grav)
             if !ignore_errors
-                if (dzc < dz_min)
+                if (drc < dr_min)
                     code = 2
-                elseif  (dzc > dz_max)
+                elseif  (drc > dr_max)
                     code = 1
                 end
             end
-            atmos.z[i] = atmos.zl[i+1] + min(dzc,dz_max)
+            atmos.r[i] = atmos.rl[i+1] + min(drc,dr_max)
 
             # Calculate gravity at cell centre
-            grav = phys.G_grav * mass_encl / (atmos.rp + atmos.z[i])^2
+            grav = phys.G_grav * mass_encl / atmos.r[i]^2
 
             # Integrate from centre to upper edge
-            dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * grav)
+            drl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * grav)
             if !ignore_errors
-                if (dzl < dz_min)
+                if (drl < dr_min)
                     code = 2
-                elseif (dzl > dz_max)
+                elseif (drl > dr_max)
                     code = 1
                 end
             end
-            atmos.zl[i] = atmos.z[i] + min(dzl,dz_max)
+            atmos.rl[i] = atmos.r[i] + min(drl,dr_max)
 
             # Layer-centre gravity [m s-2]
             atmos.layer_grav[i] = grav
 
             # Layer geometrical thickness [m]
-            atmos.layer_thick[i] = atmos.zl[i] - atmos.zl[i+1]
+            atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
             # Layer-centre mass per unit area [kg m-2]
             atmos.layer_mass[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.layer_grav[i]
 
             # Add cumulative mass [kg]
-            mass_encl += atmos.layer_mass[i] * 4 * pi * (atmos.rp + atmos.z[i])^2
+            mass_encl += atmos.layer_mass[i] * 4 * pi * atmos.r[i]^2
         end
 
         # Inform user on error
@@ -931,9 +929,9 @@ module atmosphere
             code = 0
         else
             if code == 2
-                @error "Height integration failure: collapse, dz <= $dz_min"
+                @error "Height integration failure: collapse, dr <= $dr_min"
             elseif code == 1
-                @error "Height integration failure: blew up, dz >= $dz_max"
+                @error "Height integration failure: blew up, dr >= $dr_max"
             end
         end
 
@@ -972,7 +970,8 @@ module atmosphere
         nsteps::Int  = 30
         dp::Float64  = (p1-p0)/nsteps # this will be negative
         dp2::Float64 = dp/2
-        k1::Float64; k2::Float64; k3::Float64; k4::Float64
+        k1::Float64  = 0.0; k2::Float64 = 0.0
+        k3::Float64  = 0.0; k4::Float64 = 0.0
 
         # Integrate over pressure space
         pj::Float64 = p0    # rolling pressure (decreasing)
@@ -992,7 +991,7 @@ module atmosphere
             pj += dp
         end
 
-        @printf("Final pressure = %.3e  ,  target = %.3e Pa \n", pj, p1)
+        # @printf("Final pressure = %.3e  ,  target = %.3e Pa \n", pj, p1)
 
         return rj
     end
@@ -1473,7 +1472,7 @@ module atmosphere
         # Calc layer properties using initial temperature profile.
         #    Can generate weird issues since the TOA temperature may be large
         #    large but pressure small, which gives it a low density. With the
-        #    hydrostatic integrator, this can cause dz to blow up, especially
+        #    hydrostatic integrator, this can cause dr to blow up, especially
         #    with a low MMW gas. Should be okay as long as the T(p) provided
         #    by the user is more reasonable. Silence errors *in this case*.
         calc_layer_props!(atmos, ignore_errors=true)
@@ -1705,15 +1704,15 @@ module atmosphere
         return nothing
     end
 
-    # Get interleaved cell-centre and cell-edge PTZ grid
-    function get_interleaved_ptz(atmos::atmosphere.Atmos_t)
-        arr_Z::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
+    # Get interleaved cell-centre and cell-edge PTR grid
+    function get_interleaved_ptr(atmos::atmosphere.Atmos_t)
+        arr_R::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         arr_T::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         arr_P::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         idx::Int = 1
 
         # top
-        arr_Z[1] = atmos.zl[1]
+        arr_R[1] = atmos.rl[1]
         arr_T[1] = atmos.tmpl[1]
         arr_P[1] = atmos.pl[1]
 
@@ -1726,16 +1725,16 @@ module atmosphere
             arr_P[idx+1] = atmos.pl[i]
             arr_P[idx+2] = atmos.p[i]
 
-            arr_Z[idx+1] = atmos.zl[i]
-            arr_Z[idx+2] = atmos.z[i]
+            arr_R[idx+1] = atmos.rl[i]
+            arr_R[idx+2] = atmos.r[i]
         end
 
         # bottom
-        arr_Z[end] = atmos.zl[end]
+        arr_R[end] = atmos.rl[end]
         arr_T[end] = atmos.tmpl[end]
         arr_P[end] = atmos.pl[end]
 
-        return arr_P, arr_T, arr_Z
+        return arr_P, arr_T, arr_R
     end
 
 end
