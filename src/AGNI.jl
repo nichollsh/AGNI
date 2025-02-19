@@ -19,34 +19,32 @@ module AGNI
     include("atmosphere.jl")
     include("chemistry.jl")
     include("setpt.jl")
-    include("dump.jl")
+    include("save.jl")
     include("plotting.jl")
-    include("spectrum.jl")
     include("energy.jl")
     include("solver.jl")
 
     # Import src files
     import .phys
+    import .spectrum
     import .atmosphere
     import .setpt
-    import .dump
+    import .save
     import .plotting
-    import .spectrum
     import .energy
     import .solver
     import .chemistry
 
     # Export
     export phys
+    export spectrum
     export atmosphere
     export setpt
-    export dump
+    export save
     export plotting
-    export spectrum
     export energy
     export chemistry
     export solver
-    export dump
 
     """
     **Setup terminal logging and file logging**
@@ -384,7 +382,7 @@ module AGNI
         setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
 
         # Write initial state
-        dump.write_ptz(atmos, joinpath(atmos.OUT_DIR,"ptz_initial.csv"))
+        save.write_ptz(atmos, joinpath(atmos.OUT_DIR,"ptz_initial.csv"))
 
         # Do chemistry on initial composition
         if chem_type in [1,2,3]
@@ -455,9 +453,9 @@ module AGNI
 
         # Write arrays
         @info "Writing results"
-        # dump.write_ptz(atmos,     joinpath(atmos.OUT_DIR,"ptz.csv"))
-        # dump.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
-        dump.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
+        # save.write_ptz(atmos,     joinpath(atmos.OUT_DIR,"ptz.csv"))
+        # save.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
+        save.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 
         # Save plots
         @info "Plotting results"
