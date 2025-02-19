@@ -48,7 +48,6 @@ title = "Default"                       # Name for this configuration file
     overlap_method  = "ee"                      # Method for treating line overlap.
     real_gas        = true                      # Use real gas equation of state where possible?
     thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?
-    gravity_funct   = true                      # Use height-dependent gravity calculation?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     # Include heat release from phase change
     convection      = true                      # Include heat transport by convection

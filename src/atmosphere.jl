@@ -18,7 +18,7 @@ module atmosphere
     import DelimitedFiles:readdlm
 
     # Local files
-    include(joinpath(ENV["RAD_DIR"],"julia/src/SOCRATES.jl"))
+    include(joinpath([abspath(ENV["RAD_DIR"]), "julia","src","SOCRATES.jl"]))
     import ..phys
     import ..spectrum
 
@@ -117,7 +117,6 @@ module atmosphere
         # Layers' average properties
         real_gas::Bool                      # use real-gas equations of state where possible
         thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
-        gravity_funct::Bool                 # use height-dependent gravity calculation (otherwise, use surface value throughout)
         layer_ρ::Array{Float64,1}           # mass density [kg m-3]
         layer_μ::Array{Float64,1}           # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
@@ -280,7 +279,6 @@ module atmosphere
     - `flag_cloud::Bool`                include clouds?
     - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
-    - `gravity_functions::Bool`         use height-dependent gravity calculation
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
 
     Returns:
@@ -316,7 +314,6 @@ module atmosphere
                     flag_cloud::Bool =          false,
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
-                    gravity_functions::Bool =   true,
 
                     use_all_gases::Bool =       false,
                     fastchem_work::String =     "",
@@ -368,7 +365,6 @@ module atmosphere
 
         atmos.real_gas      =   real_gas
         atmos.thermo_funct  =   thermo_functions
-        atmos.gravity_funct =   gravity_functions
 
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     2.0e4
@@ -890,9 +886,7 @@ module atmosphere
             # be reasonable in all of my tests.
 
             # Calculate gravity at bottom edge
-            if atmos.gravity_funct
-                grav = phys.G_grav * mass_encl / (atmos.rp + atmos.zl[i+1])^2
-            end
+            grav = phys.G_grav * mass_encl / (atmos.rp + atmos.zl[i+1])^2
 
             # Integrate from lower edge to centre
             dzc = (atmos.pl[i+1] - atmos.p[i]) / (atmos.layer_ρ[i] * grav)
@@ -906,9 +900,7 @@ module atmosphere
             atmos.z[i] = atmos.zl[i+1] + min(dzc,dz_max)
 
             # Calculate gravity at cell centre
-            if atmos.gravity_funct
-                grav = phys.G_grav * mass_encl / (atmos.rp + atmos.z[i])^2
-            end
+            grav = phys.G_grav * mass_encl / (atmos.rp + atmos.z[i])^2
 
             # Integrate from centre to upper edge
             dzl = (atmos.p[i]- atmos.pl[i]) / (atmos.layer_ρ[i] * grav)
@@ -946,6 +938,63 @@ module atmosphere
         end
 
         return Bool(code == 0)
+    end
+
+    """
+    **Integrate hydrostatic and gravity equations across a given range.**
+
+    Uses the classic fourth-order Runge-Kutta method.
+
+    Arguments:
+        - `r0::Float64`     radius   at start of interval [m]
+        - `g0::Float64`     gravity  at start of interval [m s-2]
+        - `p0::Float64`     pressure at start of iterval  [Pa]
+        - `p1::Float64`     pressure at end of interval [Pa]
+        - `rho::Float64`    density throughout interval [kg m-3]
+
+    Returns:
+        - `r1::Float64`     radius at end of interval [m]
+    """
+    function integrate_hydrograv(r0::Float64, g0::Float64, p0::Float64, p1::Float64, rho::Float64)::Float64
+
+        # Gravity at given radius (neglecting mass within the interval)
+        function _grav(r)
+            return g0 * (r0/r)^2
+        end
+
+        # Derivative to integrate
+        #   dr/dp = -1 / (rho * g(r))
+        function _drdp(p,r)
+            return -1 / (rho * _grav(r))
+        end
+
+        # Parameters
+        nsteps::Int  = 30
+        dp::Float64  = (p1-p0)/nsteps # this will be negative
+        dp2::Float64 = dp/2
+        k1::Float64; k2::Float64; k3::Float64; k4::Float64
+
+        # Integrate over pressure space
+        pj::Float64 = p0    # rolling pressure (decreasing)
+        rj::Float64 = r0    # rolling radius   (increasing)
+        for _ in range(p0, stop=p1, step=dp)
+
+            # gradient terms
+            k1 = _drdp(pj,       rj)
+            k2 = _drdp(pj + dp2, rj + k1*dp2)
+            k3 = _drdp(pj + dp2, rj + k2*dp2)
+            k4 = _drdp(pj + dp,  rj + k3*dp)
+
+            # step height (increase)
+            rj += dp/6 * (k1 + 2*k2 + 2*k3 + k4)
+
+            # step pressure (decrease)
+            pj += dp
+        end
+
+        @printf("Final pressure = %.3e  ,  target = %.3e Pa \n", pj, p1)
+
+        return rj
     end
 
     """
