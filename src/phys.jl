@@ -19,8 +19,8 @@ module phys
     const BIGFLOAT::Float64 = 1e99
 
     # Enable/disable flags
-    const ENABLE_AQUA::Bool = true
-    const ENABLE_CMS19::Bool = true
+    ENABLE_AQUA::Bool = true
+    ENABLE_CMS19::Bool = true
 
     # Enumerate potential equations of state
     @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3 EOS_CMS19=4
