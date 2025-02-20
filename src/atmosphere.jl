@@ -628,6 +628,7 @@ module atmosphere
         end
         if gas_fail
             @error "Problem when loading thermodynamic data"
+            @error "Try downloading it again and/or updating AGNI."
             return false
         end
 
@@ -827,7 +828,8 @@ module atmosphere
     """
     function calc_layer_props!(atmos::atmosphere.Atmos_t; ignore_errors::Bool=false)::Bool
         if !atmos.is_param
-            error("Atmosphere parameters have not been set")
+            @error("Atmosphere struct has not been setup")
+            return false
         end
 
         # Status
@@ -1129,7 +1131,7 @@ module atmosphere
 
         @debug "Allocate atmosphere"
         if !atmos.is_param
-            @error "Atmosphere parameters have not been set"
+            @error "Atmosphere struct has not been setup"
             return false
         end
 
