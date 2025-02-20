@@ -24,7 +24,7 @@ module AGNI
     include("energy.jl")
     include("solver.jl")
 
-    # Import src files
+    # Import submodules
     import .phys
     import .spectrum
     import .atmosphere
@@ -35,7 +35,7 @@ module AGNI
     import .solver
     import .chemistry
 
-    # Export
+    # Export submodules
     export phys
     export spectrum
     export atmosphere

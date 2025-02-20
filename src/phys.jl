@@ -8,12 +8,16 @@ end
 
 module phys
 
+    # Import external modules
     using NCDatasets
     using LoggingExtras
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
+    # Import internal modules
     include("consts.jl")
+    include("blake.jl")
     using .consts
+    import .blake
 
     # A large floating point number
     const BIGFLOAT::Float64     = 1e99
@@ -23,8 +27,9 @@ module phys
     const MIN_DATA_VERSION::Int64 = 20250220
 
     # Enable/disable flags
-    ENABLE_AQUA::Bool = true
-    ENABLE_CMS19::Bool = true
+    ENABLE_CHECKSUM::Bool = true
+    ENABLE_AQUA::Bool     = true
+    ENABLE_CMS19::Bool    = true
 
     # Enumerate potential equations of state
     @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3 EOS_CMS19=4
@@ -165,9 +170,17 @@ module phys
         if gas.stub
             # no data
             @debug("    stub")
+
+        elseif ENABLE_CHECKSUM && !blake.valid_file(fpath)
+            # file exists - check its integrity
+            @debug("    ncdf file is corrupt")
+            fail = true
+
         else
             # have data => load what we can find inside the file
             @debug("    ncdf")
+
+            # open the file
             with_logger(MinLevelLogger(current_logger(), Logging.Info)) do
             Dataset(fpath,"r") do ds
 
@@ -176,13 +189,13 @@ module phys
                 if !haskey(ds,"created")
                     @error("Data file ($formula) has no creation date")
                     fail = true
-                    return
+                    return gas
                 end
                 created = ds["created"][1]
                 if created < MIN_DATA_VERSION
                     @error("Data file ($formula) is outdated ($created < $MIN_DATA_VERSION)")
                     fail = true
-                    return
+                    return gas
                 end
 
                 # we always have these
@@ -272,7 +285,7 @@ module phys
                         @error("    pres. length = $(length(gas.eos_P))")
                         @error("    dens. length = $(length(gas.eos_ρ))")
                         fail = true
-                        return
+                        return gas
                     end
 
                     # check ascending
@@ -280,13 +293,13 @@ module phys
                         @error("Could not parse $formula EOS data from file")
                         @error("    Pressure array must be strictly ascending")
                         fail = true
-                        return
+                        return gas
                     end
                     if !issorted(gas.eos_T)
                         @error("Could not parse $formula EOS data from file")
                         @error("    Temperature array must be strictly ascending")
                         fail = true
-                        return
+                        return gas
                     end
 
                     # record valid T,P range

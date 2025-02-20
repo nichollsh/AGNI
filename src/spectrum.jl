@@ -182,7 +182,7 @@ module spectrum
                                             outp_file::String, insert_rscatter::Bool)
 
         # Inputs to prep_spec
-        prep_spec = joinpath(ENV["RAD_DIR"],"bin","prep_spec")
+        prep_spec = abspath(ENV["RAD_DIR"],"bin","prep_spec")
         @debug "Using prep_spec at: "*prep_spec
         star_inputs = [
             "6","n","T",            # ask prep_spec to tabulate the thermal source function
