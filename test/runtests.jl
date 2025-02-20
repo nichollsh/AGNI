@@ -33,11 +33,26 @@ end
 rtol   = 1e-3
 
 # -------------
+# Test thermodynamic lookup data validity
+# -------------
+@info " "
+@info "Testing thermodynamics data validity"
+ideal_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+if !ideal_H2O.fail
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+@info "--------------------------"
+
+
+# -------------
 # Test heat capacity lookup tables
 # -------------
 @info " "
 @info "Testing heat capacity functions for H2O"
-ideal_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
 t_test  = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
 v_expt  = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
 v_obs   = zero(t_test)
@@ -93,7 +108,7 @@ total += 1
 @info " "
 @info "Testing H2O AQUA equation of state"
 aqua_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
-v_expt = [9.26121571e2, 7.2269991e-3, 4.35193299e-1, 1.7022212e1, 6.68198662e1]
+v_expt = [926.1211619878637, 0.007234298129244018, 0.43571347466328847, 17.03899955369294, 66.87150907049445]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5

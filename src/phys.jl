@@ -20,7 +20,7 @@ module phys
     const BIGLOGFLOAT::Float64  = 99.0
 
     # Minimum data file version [YYYYMMDD, as integer]
-    const MIN_DATA_VERSION::Int64 = 20250221
+    const MIN_DATA_VERSION::Int64 = 20250220
 
     # Enable/disable flags
     ENABLE_AQUA::Bool = true
@@ -113,7 +113,7 @@ module phys
         gas = Gas_t()
         gas.formula = formula
         gas.tmp_dep = tmp_dep
-        fail = true
+        fail = false
 
         # Count atoms
         gas.atoms = count_atoms(formula)
