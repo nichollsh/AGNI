@@ -619,9 +619,16 @@ module atmosphere
         end
 
         # Load gas thermodynamic data
+        gas_fail = false
         for g in atmos.gas_names
             atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
                                                 atmos.thermo_funct, atmos.real_gas)
+
+            gas_fail = gas_fail || atmos.gas_dat[g].fail
+        end
+        if gas_fail
+            @error "Problem when loading thermodynamic data"
+            return false
         end
 
         # store condensates
