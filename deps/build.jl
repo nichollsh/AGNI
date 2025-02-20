@@ -23,7 +23,7 @@ end
 
 # Download basic data
 println("Get data")
-get_data = abspats(ROOT_DIR,"src","get_data.sh")
+get_data = abspath(ROOT_DIR,"src","get_data.sh")
 run(`bash $get_data basic`)
 
 println("Build completed")
