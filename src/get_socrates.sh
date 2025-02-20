@@ -5,7 +5,7 @@
 if [ -n "$RAD_DIR" ]; then
     echo "WARNING: You already have SOCRATES installed"
     echo "         RAD_DIR=$RAD_DIR"
-    echo "Continuing..."
+    echo "Reinstalling SOCRATES..."
     echo ""
     sleep 5
 fi

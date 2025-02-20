@@ -1,6 +1,8 @@
 #!/bin/bash
 # Download and compile fastchem
 
+set -e
+
 root=$(dirname $(realpath $0))
 root=$(realpath "$root/..")
 

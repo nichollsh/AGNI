@@ -2,21 +2,25 @@
 
 # Don't show plot windows
 ENV["GKSwstype"] = "100"
+AGNI_DIR = dirname(abspath(@__FILE__))
 
 # Check RAD_DIR
 if !("RAD_DIR" in keys(ENV))
     error("Cannot find SOCRATES! Have you set RAD_DIR?")
 end
 
-AGNI_DIR = dirname(abspath(@__FILE__))
+# Check SOCRATES.jl
+SOCjl = joinpath([abspath(ENV["RAD_DIR"]),"julia","src","SOCRATES.jl"])
+if !isfile(SOCjl)
+    error("Cannot find SOCRATES library! Tried: '$SOCjl'")
+end
 
 # Activate environment
 import Pkg
 Pkg.activate(AGNI_DIR)
 
 # Include AGNI
-include(joinpath([AGNI_DIR,"src","AGNI.jl"]))
-import .AGNI
+import AGNI
 
 # Run
 if AGNI.main()

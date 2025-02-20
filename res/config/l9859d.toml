@@ -45,7 +45,6 @@ title = "L 98-59 d"
     overlap_method  = "ee"
     real_gas        = true
     thermo_funct    = true
-    gravity_funct   = true
     sensible_heat   = true
     latent_heat     = true
     convection      = true

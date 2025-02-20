@@ -10,27 +10,14 @@ Pkg.activate(ROOT_DIR)
 
 # Include libraries
 using LoggingExtras
+using AGNI
 
 @info "Begin tests"
 
-# Include local jl files
-include("../src/phys.jl")
-include("../src/spectrum.jl")
-include("../src/atmosphere.jl")
-include("../src/setpt.jl")
-include("../src/energy.jl")
-include("../src/plotting.jl")
-include("../src/dump.jl")
-import .phys
-import .atmosphere
-import .setpt
-import .energy
-import .plotting
-import .dump
-
 
 # Prepare
-output_dir    = "out/"
+RES_DIR         = joinpath(ROOT_DIR,"res/")
+OUT_DIR         = joinpath(ROOT_DIR,"out/")
 p_top           = 1e-8
 nlev_centre     = 100
 radius          = 1.0e7    # metres
@@ -38,21 +25,34 @@ gravity         = 10.0      # m s-2
 total  = 0
 failed = 0
 
-rm(output_dir,force=true,recursive=true)
-if !isdir(output_dir) && !isfile(output_dir)
-    mkdir(output_dir)
+rm(OUT_DIR,force=true,recursive=true)
+if !isdir(OUT_DIR) && !isfile(OUT_DIR)
+    mkdir(OUT_DIR)
 end
 
-
 rtol   = 1e-3
+
+# -------------
+# Test thermodynamic lookup data validity
+# -------------
+@info " "
+@info "Testing thermodynamics data validity"
+ideal_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+if !ideal_H2O.fail
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+@info "--------------------------"
 
 
 # -------------
 # Test heat capacity lookup tables
 # -------------
 @info " "
-@info "Testing heat capacity functions"
-ideal_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, false)
+@info "Testing heat capacity functions for H2O"
 t_test  = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
 v_expt  = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]
 v_obs   = zero(t_test)
@@ -107,8 +107,8 @@ total += 1
 # -------------
 @info " "
 @info "Testing H2O AQUA equation of state"
-aqua_H2O::phys.Gas_t = phys.load_gas("res/thermodynamics/", "H2O", true, true)
-v_expt = [9.26121571e2, 7.2269991e-3, 4.35193299e-1, 1.7022212e1, 6.68198662e1]
+aqua_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
+v_expt = [926.1211619878637, 0.007234298129244018, 0.43571347466328847, 17.03899955369294, 66.87150907049445]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5
@@ -134,8 +134,8 @@ total += 1
 # -------------
 @info " "
 @info "Testing CO2 VdW equation of state"
-vdw_CO2::phys.Gas_t = phys.load_gas("res/thermodynamics/", "CO2", true, true)
-v_expt = [2.646531089e-5, 1.76442986e-2, 1.0597595366, 4.1190987467e1, 1.475256797e2]
+vdw_CO2::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "CO2", true, true)
+v_expt = [2.6465333e-5, 1.7664486595e-2, 1.0612271156, 4.12385376e1, 1.47631823e2]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5
@@ -173,11 +173,11 @@ mf_dict         = Dict([
                         ("N2"  , 0.1),
                         ("H2"  , 0.2)
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
+spfile_name   ="$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir,
+atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -221,11 +221,11 @@ mf_dict         = Dict([
                         ("H2O" , 0.8),
                         ("CO2" , 0.2),
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
+spfile_name   = "$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir,
+atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -237,7 +237,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method="ro",
                          real_gas=false
                  )
-atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
+atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
 energy.radtrans!(atmos, false)
 
 val_e = toa_heating * cosd(theta)
@@ -290,11 +290,11 @@ mf_dict         = Dict([
                         ("H2O" , 1.0),
                         ("N2"  , 1.0e-9)
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/318/Oak.sf")
+spfile_name   = "$RES_DIR/spectral_files/Oak/318/Oak.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir,
+atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -309,7 +309,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          albedo_s=0.5,
                          real_gas=false
                  )
-atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
+atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
 setpt.prevent_surfsupersat!(atmos)
 setpt.dry_adiabat!(atmos)
 setpt.saturation!(atmos, "H2O")
@@ -337,8 +337,8 @@ total += 1
 @info " "
 @info "Testing hydrostatic integration"
 
-val_e = 424238.22072713776   # known from previous tests
-val_o = atmos.z[1] # top level
+val_e = 1.0438945347722374e7   # known from previous tests
+val_o = atmos.r[1] # height of topmost layer-centre
 @info "Expected value = $(val_e) m"
 @info "Modelled value = $(val_o) m"
 if abs(val_o - val_e)/val_e < rtol
@@ -356,9 +356,9 @@ total += 1
 # -------------
 @info " "
 @info "Testing write NetCDF"
-out_path::String = "/tmp/agni_atm.nc"
+out_path::String = joinpath(OUT_DIR,"agni_atm.nc")
 rm(out_path, force=true)
-dump.write_ncdf(atmos, out_path)
+save.write_ncdf(atmos, out_path)
 @info "Expecting file at $out_path"
 if isfile(out_path)
     @info "Found file at $out_path"
@@ -376,7 +376,7 @@ total += 1
 # -------------
 @info " "
 @info "Testing plot temperatures"
-out_path = "/tmp/agni_plot_tmp.png"
+out_path = joinpath(OUT_DIR,"agni_plot_tmp.png")
 rm(out_path, force=true)
 plotting.plot_pt(atmos, out_path)
 @info "Expecting file at $out_path"
@@ -393,12 +393,12 @@ total += 1
 
 
 # -------------
-# Test plot height
+# Test plot radius
 # -------------
 @info " "
-@info "Testing plot height"
-out_path = "/tmp/agni_plot_hei.png"
-plotting.plot_height(atmos, out_path)
+@info "Testing plot radius"
+out_path = joinpath(OUT_DIR,"agni_plot_rad.png")
+plotting.plot_radius(atmos, out_path)
 @info "Expecting file at $out_path"
 if isfile(out_path)
     @info "Found file at $out_path"
@@ -417,7 +417,7 @@ total += 1
 # -------------
 @info " "
 @info "Testing plot albedo"
-out_path = "/tmp/agni_plot_alb.png"
+out_path = joinpath(OUT_DIR,"agni_plot_alb.png")
 plotting.plot_albedo(atmos, out_path)
 @info "Expecting file at $out_path"
 if isfile(out_path)
@@ -466,11 +466,11 @@ mf_dict         = Dict([
                         ("H2O" , 0.6),
                         ("CO2" , 0.4),
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Dayspring/48/Dayspring.sf")
+spfile_name   = "$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir,
+atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -482,7 +482,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          overlap_method="ro",
                          real_gas=false
                  )
-atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
+atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
 energy.radtrans!(atmos, true)
 energy.radtrans!(atmos, false)
 
@@ -514,11 +514,11 @@ theta           = 45.0
 mf_dict         = Dict([
                         ("H2O" , 1.0)
                         ])
-spfile_name   = joinpath(ROOT_DIR,"res/spectral_files/Oak/318/Oak.sf")
+spfile_name   = "$RES_DIR/spectral_files/Oak/318/Oak.sf"
 
 # Setup atmosphere
 atmos = atmosphere.Atmos_t()
-atmosphere.setup!(atmos, ROOT_DIR, output_dir,
+atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
                          spfile_name,
                          toa_heating, 1.0, 0.0, theta,
                          tmp_surf,
@@ -531,7 +531,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                          thermo_functions=false,
                          real_gas=false
                  )
-atmosphere.allocate!(atmos,joinpath(ROOT_DIR,"res/stellar_spectra/sun.txt"))
+atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
 setpt.isothermal!(atmos, 300.0)
 atmosphere.calc_layer_props!(atmos)
 atmos.flux_tot[:] .= 0.0
