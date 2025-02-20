@@ -23,12 +23,13 @@ module atmosphere
     import ..spectrum
 
     # Constants
+    const AGNI_VERSION::String   = "1.2.1"
     const HYDROGRAV_STEPS::Int64 = 30
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
 
-        # Code version
+        # AGNI version used to generate this struct
         AGNI_VERSION::String
 
         # Track state of atmos struct
@@ -332,9 +333,9 @@ module atmosphere
         @info  "Setting-up a new atmosphere struct"
 
         # Code versions
-        atmos.AGNI_VERSION = "1.2.0"
         atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
-        @debug "AGNI VERSION = "*atmos.AGNI_VERSION
+        atmos.AGNI_VERSION = AGNI_VERSION
+        @debug "AGNI VERSION = "*AGNI_VERSION
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
         @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
