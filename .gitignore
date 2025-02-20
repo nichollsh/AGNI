@@ -28,6 +28,7 @@ res/spectral_files/*
 res/stellar_spectra/*
 res/surface_albedos/*
 res/thermodynamics/*.nc
+res/thermodynamics/*.nc.chk
 !res/*/_readme.txt
 
 # Output files
