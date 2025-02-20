@@ -621,6 +621,7 @@ module atmosphere
 
         # Load gas thermodynamic data
         gas_fail = false
+        @info "Loading thermodyamic data"
         for g in atmos.gas_names
             atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
                                                 atmos.thermo_funct, atmos.real_gas)
@@ -629,7 +630,7 @@ module atmosphere
         end
         if gas_fail
             @error "Problem when loading thermodynamic data"
-            @error "Try downloading it again and/or updating AGNI."
+            @error "Try downloading them again and/or updating AGNI."
             return false
         end
 
@@ -705,7 +706,7 @@ module atmosphere
                 @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             else
-                @info "Found FastChem executable"
+                @debug "Found FastChem executable"
             end
         else
             @debug "FastChem env variable not set"

@@ -32,7 +32,7 @@ module blake
             @warn "File not found '$fpath'"
             return "FILE_NOT_FOUND:$fpath"
         end
-        content = chomp(read(`$exec_path $fpath`, String))
+        content = strip(read(`$exec_path $fpath`, String))
         return split(content, " ")[1]
     end
 
@@ -44,6 +44,7 @@ module blake
     function valid_file(fpath::String)::Bool
         # Return true if unsupported
         if !_is_linux()
+            @debug "Skipping integrity check for '$fpath'"
             return true
         end
 
@@ -56,15 +57,21 @@ module blake
             @warn "File not found '$cpath'"
             return false
         end
-        hash_exp = readchomp(fpath*".chk")
+        hash_exp = strip(read(fpath*".chk", String))
 
         # Check if equal
-        return Bool(hash_exp == hash_obs)
+        if Bool(hash_exp != hash_obs)
+            @warn "File '$fpath' failed integrity check"
+            @warn "    obs = '$hash_obs'"
+            @warn "    exp = '$hash_exp'"
+            return false
+        end
+        return true
     end
 
 end # end module
 
-# If executed directly
+# If executed directly...
 if abspath(PROGRAM_FILE) == @__FILE__
     import .blake
     if length(ARGS) != 1
