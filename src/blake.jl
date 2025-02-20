@@ -13,7 +13,7 @@ module blake
     # Hashing only works on AMD64 Linux
     function _is_linux()
         if !Sys.islinux()
-            @warn "Cannot determine hash - only supported on Linux"
+            @warn "Cannot determine file hash - only supported on Linux"
             return false
         end
         return true
