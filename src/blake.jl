@@ -10,22 +10,13 @@ module blake
                                         "..", "res", "blobs", "b2sum-amd64-linux")
 
 
-    # Hashing only works on AMD64 Linux
-    function _is_linux()
-        if !Sys.islinux()
-            @warn "Cannot determine file hash - only supported on Linux"
-            return false
-        end
-        return true
-    end
-
     """
     **Calculate the BLAKE2b hash for a file.**
 
     Only works on AMD64 Linux.
     """
     function hash_file(fpath::String)::String
-        if !_is_linux()
+        if !Sys.islinux()
             return "ONLY_SUPPORTED_ON_LINUX"
         end
         if !isfile(fpath)
@@ -43,7 +34,7 @@ module blake
     """
     function valid_file(fpath::String)::Bool
         # Return true if unsupported
-        if !_is_linux()
+        if !Sys.islinux()
             @debug "Skipping integrity check for '$fpath'"
             return true
         end
@@ -76,6 +67,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     import .blake
     if length(ARGS) != 1
         @error("Invalid arguments: $(ARGS)")
+    elseif !Sys.islinux()
+        @error("File hashing is only supported on Linux")
     else
         @info("Computing BLAKE2b hash...")
         hash_obs = blake.hash_file(ARGS[1])
