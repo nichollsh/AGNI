@@ -30,6 +30,7 @@ Check the path in the configuration file. Download additional spectral files usi
 ```bash
 ./src/get_data.sh steam
 ```
+Other spectral files can be downloaded from OSF: https://osf.io/vehxg/.
 
 ## Cannot find FastChem
 You need to install FastChem. This can be done by running the command:

@@ -17,26 +17,34 @@ module AGNI
     include("phys.jl")
     include("spectrum.jl")
     include("atmosphere.jl")
+    include("chemistry.jl")
     include("setpt.jl")
-    include("dump.jl")
+    include("save.jl")
     include("plotting.jl")
     include("energy.jl")
     include("solver.jl")
 
     # Import src files
     import .phys
+    import .spectrum
     import .atmosphere
     import .setpt
-    import .dump
+    import .save
     import .plotting
     import .energy
     import .solver
+    import .chemistry
 
     # Export
-    # export atmosphere
-    # export solver
-    # export plotting
-    # export energy
+    export phys
+    export spectrum
+    export atmosphere
+    export setpt
+    export save
+    export plotting
+    export energy
+    export chemistry
+    export solver
 
     """
     **Setup terminal logging and file logging**
@@ -356,7 +364,6 @@ module AGNI
                                 overlap_method    = cfg["execution"]["overlap_method"],
                                 real_gas          = cfg["execution"]["real_gas"],
                                 thermo_functions  = cfg["execution"]["thermo_funct"],
-                                gravity_functions = cfg["execution"]["gravity_funct"],
                                 use_all_gases     = cfg["composition"]["include_all"],
                                 C_d=turb_coeff, U=wind_speed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
@@ -374,7 +381,7 @@ module AGNI
         setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
 
         # Write initial state
-        dump.write_ptz(atmos, joinpath(atmos.OUT_DIR,"ptz_initial.csv"))
+        save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
         # Do chemistry on initial composition
         if chem_type in [1,2,3]
@@ -386,7 +393,7 @@ module AGNI
                 return false
             end
 
-            atmosphere.chemistry_eqm!(atmos, chem_type, true)
+            chemistry.fastchem_eqm!(atmos, chem_type, true)
         end
 
         # Frame dir
@@ -402,8 +409,6 @@ module AGNI
         # Loop over requested solvers
         solver_success::Bool = true
         allowed_solvers::Array{String,1} = ["newton", "gauss", "levenberg"]
-
-        @info " "
         sol = strip(lowercase(cfg["execution"]["solver"]))
         if isempty(sol)
             sol = "none"
@@ -445,9 +450,7 @@ module AGNI
 
         # Write arrays
         @info "Writing results"
-        # dump.write_ptz(atmos,     joinpath(atmos.OUT_DIR,"ptz.csv"))
-        # dump.write_fluxes(atmos,  joinpath(atmos.OUT_DIR,"fl.csv"))
-        dump.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
+        save.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
 
         # Save plots
         @info "Plotting results"
@@ -467,7 +470,7 @@ module AGNI
         cfg["plots"]["albedo"] && \
             plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.png"))
         cfg["plots"]["height"] && \
-            plotting.plot_height(atmos, joinpath(atmos.OUT_DIR,"plot_height.png"))
+            plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.png"))
 
         # Deallocate atmosphere
         @info "Deallocating memory"

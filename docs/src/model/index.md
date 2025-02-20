@@ -17,7 +17,7 @@ Convection is a turbulent process which occurs across more than one spatial dime
 
 MLT directly calculates the energy flux associated with convective heat transport, and thus is the preferred parameterisation within the model. It assumes that parcels of gas are diffused over a characteristic _mixing length_, transporting energy in the process. This requires choosing a scale for this mixing length, but in practice this has very little impact on the results from the model.
 
-The atmosphere is assumed to be hydrostatically supported. Gas densities are combined using Amagat's additive volume law. The densities of each gas are calculated nominally using the Van der Walls equation of state. AQUA can be used as the EOS for water. The model will fallback to the ideal gas EOS if AQUA and VdW data are not available.
+The atmosphere is assumed to be hydrostatically supported. Gas densities are combined using Amagat's additive volume law. The densities of each gas are nominally calculated using the Van der Walls equation of state (EOS). AQUA is implemented as the EOS for water. The Chabrier+2019 EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
 
 
 ## Phase change
@@ -37,7 +37,7 @@ AGNI is designed for modelling planetary atmospheres with high surface pressures
 It is necessary to tell AGNI what kind of atmospheric solution to solve for. There are currently a few options available set by the `solution_type` variable in the configuration file.
 * (1) Aim to conserve energy fluxes throughout the column. The surface temperature is fixed.
 * (2) Aim to conserve energy fluxes throughout the column. The surface temperature is set by energy transport through a solid conductive boundary layer of thickness $d$ such that $T_s = T_m - \frac{Fd}{k}$, where $T_m$ is the mantle temperature and $k$ is the thermal conductivity.
-* (3) Solve for a state such that the flux carried at each level is equal to $F_{\text{eff}} = \sigma T_{\text{eff}}^4$, representing the rate at which a planet is losing energy into space.
+* (3) Solve for a state such that the flux carried at each level is equal to $F_{\text{net}} = \sigma T_{\text{net}}^4$, representing the rate at which a planet is losing energy into space.
 
 ### Construction
 The atmosphere is constructed of $N$ levels (cell-centres), corresponding to $N+1$ interfaces (cell-edges). The RT model takes cell-centre temperatures $T_i$, pressures $p_i$, geometric heights, and mixing ratios as input variables at each level $i$. As well as the surface temperature and incoming stellar flux. In return, it provides cell-edges spectral fluxes $F_i$ at all $N+1$ interfaces for LW & SW components and upward & downward streams. Convective fluxes can be estimated using the MLT scheme, condensation fluxes from the condensation scheme, and sensible heat from a simple TKE approximation.

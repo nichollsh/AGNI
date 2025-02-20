@@ -19,28 +19,35 @@ Follow the steps below in order to setup the code.
 4. Setup SOCRATES by doing either **ONE** of the following...
     - Follow the instructions on the [SOCRATES GitHub](https://github.com/nichollsh/SOCRATES) page
     - Run `source src/get_socrates.sh`
-5. `julia -e 'using Pkg; Pkg.activate("."); Pkg.build()'`
+5. `bash src/get_agni.sh`
 AGNI is now installed as a package into a Julia environment in the AGNI
-directory. This will also have downloaded some basic input data.
-You should run the tests next.
+directory. This will also have downloaded some basic input data, and have run the tests.
 
 !!! tip
-    The `src/get_socrates.sh` script automatically adds the radiation code to your
+    The `get_socrates.sh` script automatically adds the radiation code to your
     environment with the variable `RAD_DIR`, which points to the SOCRATES installation.
     This variable must be set whenever AGNI is being used.
 
 ## Testing
-Now try running the tests in your terminal.
+If you want to run the tests manually, simply use the script in the `test/` folder...
 ```bash
-julia ./test/runtests.jl
+julia test/runtests.jl
 ```
 This will print information on whether tests passed or failed.
+
+## Updating
+It's important that you keep AGNI up to date, especially if you are using as part of
+the [PROTEUS framework](https://github.com/FormingWorlds/PROTEUS). Use this script to
+automatically pull changes from GitHub and download any required data files.
+```bash
+bash src/get_agni.sh
+```
+
+## Using the code
+See [Running the model](@ref) for information on using the code.
+See [Troubleshooting](@ref) for troubleshooting advice.
 
 ## Coupling with FastChem
 This can be enabled using the configuration file parameter `composition.chem_type`. Of
 course, it is first necessary to setup FastChem, which can be done by running
 `source src/get_fastchem.sh` and then setting the `FC_DIR` environment variable.
-
-## Using the code
-See [Running the model](@ref) for information on using the code.
-See [Troubleshooting](@ref) for troubleshooting advice.
