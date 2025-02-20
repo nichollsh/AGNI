@@ -19,6 +19,9 @@ module phys
     const BIGFLOAT::Float64     = 1e99
     const BIGLOGFLOAT::Float64  = 99.0
 
+    # Minimum data file version [YYYYMMDD, as integer]
+    const MIN_DATA_VERSION::Int64 = 20250221
+
     # Enable/disable flags
     ENABLE_AQUA::Bool = true
     ENABLE_CMS19::Bool = true
@@ -35,8 +38,10 @@ module phys
         fastchem_name::String   # FastChem name (to be determined from FC output file)
 
         # Is this a stub?
-        #   This is the case when we cannot find an appropriate data file
         stub::Bool
+
+        # Fail if file found but cannot be parsed
+        fail::Bool
 
         # Should evaluations be temperature-dependent or use constant values?
         tmp_dep::Bool
@@ -108,6 +113,7 @@ module phys
         gas = Gas_t()
         gas.formula = formula
         gas.tmp_dep = tmp_dep
+        fail = true
 
         # Count atoms
         gas.atoms = count_atoms(formula)
@@ -164,6 +170,20 @@ module phys
             @debug("    ncdf")
             with_logger(MinLevelLogger(current_logger(), Logging.Info)) do
             Dataset(fpath,"r") do ds
+
+                # check date created
+                created::Int64 = 0
+                if !haskey(ds,"created")
+                    @error("Data file ($formula) has no creation date")
+                    fail = true
+                    return
+                end
+                created = ds["created"][1]
+                if created < MIN_DATA_VERSION
+                    @error("Data file ($formula) is outdated ($created < $MIN_DATA_VERSION)")
+                    fail = true
+                    return
+                end
 
                 # we always have these
                 gas.mmw = ds["mmw"][1]
@@ -251,22 +271,22 @@ module phys
                         @error("    temp. length = $(length(gas.eos_T))")
                         @error("    pres. length = $(length(gas.eos_P))")
                         @error("    dens. length = $(length(gas.eos_ρ))")
-                        close(ds)
-                        return gas
+                        fail = true
+                        return
                     end
 
                     # check ascending
                     if !issorted(gas.eos_P)
                         @error("Could not parse $formula EOS data from file")
                         @error("    Pressure array must be strictly ascending")
-                        close(ds)
-                        return gas
+                        fail = true
+                        return
                     end
                     if !issorted(gas.eos_T)
                         @error("Could not parse $formula EOS data from file")
                         @error("    Temperature array must be strictly ascending")
-                        close(ds)
-                        return gas
+                        fail = true
+                        return
                     end
 
                     # record valid T,P range
@@ -294,6 +314,7 @@ module phys
 
         @debug("    using '$eos_name' equation of state")
         @debug("    done")
+        gas.fail = fail
         return gas
     end # end load_gas
 
