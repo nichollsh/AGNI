@@ -11,6 +11,9 @@ module setpt
     import ..phys
     import ..atmosphere
 
+    include("guillot.jl")
+    import .guillot
+
     using NCDatasets
     using Printf
     using LoggingExtras
@@ -66,10 +69,11 @@ module setpt
                 # condensing a volatile
                 idx_req += 1
                 setpt.saturation!(atmos, request[idx_req])
-                # if atmos.control.l_cloud
-                #     @debug "Applying clouds to initial state"
-                #     atmosphere.water_cloud!(atmos)
-                # end
+
+            elseif str_req == "ana"
+                # analytic solution
+                idx_req += 1
+                setpt.analytic!(atmos)
 
             else
                 @error "Invalid initial state '$str_req'"
@@ -468,7 +472,31 @@ module setpt
 
         # Set cell-edge temperatures
         atmosphere.set_tmpl_from_tmp!(atmos)
+        return nothing
+    end
 
+    """
+    **Set temperature profile using Guillot (2010) analytic solution.**
+    """
+    function analytic!(atmos::atmosphere.Atmos_t)
+
+        # Evalulate Tirr from the instellation
+        Tirr = (atmos.instellation / phys.σSB)^0.25
+
+        # Evalulate Tint from flux
+        Tint = (atmos.flux_int / phys.σSB)^0.25
+
+        # Evalulate cell-centre temperatures
+        for i in 1:atmos.nlev_c
+            # get LW optical depth
+            τ = guillot.eval_tau(atmos.p[i], atmos.layer_grav[i])
+
+            # set temperature
+            atmos.tmp[i] = guillot.eval_T4_cos(τ, Tint, Tirr, atmos.zenith_degrees)^0.25
+        end
+
+        # Set cell-edge temperatures
+        atmosphere.set_tmpl_from_tmp!(atmos)
         return nothing
     end
 
