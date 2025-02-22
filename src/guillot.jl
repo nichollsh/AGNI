@@ -10,12 +10,15 @@ module guillot
 
     import SpecialFunctions:expinti
 
-    # Scalars
-    κ_vs::Float64 = 4e-3 * 10  # m2/kg
-    κ_th::Float64 = 1e-2 * 10  # m2/kg
-    γ::Float64    = κ_vs/κ_th  # opacity ratio
+    # These functions implement the grey-gas analytical solutions from Guillot (2010)
+    #   Paper here: https://arxiv.org/pdf/1006.4702
 
-    # Evalulate exponential integral of order 1
+    # Constants
+    const κ_vs::Float64 = 4e-3 * 10  # SW opacity [m2/kg]
+    const κ_th::Float64 = 7e-2 * 10  # LW opacity [m2/kg]
+    const γ::Float64    = κ_vs/κ_th  # opacity ratio
+
+    # Evaluate exponential integral of order 1
     function _E1(z::Float64)::Float64
         return -1*expinti(-z)
     end
@@ -25,22 +28,22 @@ module guillot
         return exp(-z) - z*_E1(z)
     end
 
-    # Evalulate irradiation temperature
+    # Evaluate irradiation temperature
     function eval_Tirr(Tstar::Float64, Rstar::Float64, sep::Float64)::Float64
         return Tstar * sqrt(Rstar/sep)
     end
 
-    # Evalulate planetary equilibrium temperature
+    # Evaluate planetary equilibrium temperature
     function eval_Teqm(Tstar::Float64, Rstar::Float64, sep::Float64)::Float64
         return Tstar * sqrt(Rstar/(2*sep))
     end
 
     """
-    **Evalulate planet-average T^4 at a given optical depth.**
+    **Evaluate planet-average T^4 at a given optical depth.**
 
     Equation 49 in Guillot (2010).
     """
-    function _eval_T4_avg(τ::Float64, Tint::Float64, Teqm::Float64)::Float64
+    function eval_T4_avg(τ::Float64, Tint::Float64, Teqm::Float64)::Float64
         pt1 = (3.0 * Tint^4 / 4) * (2.0/3 + τ)
         pt2 = (2.0/(3*γ)) * (1+  (γ*τ/2 - 1)* exp(-γ*τ) )
         pt3 = (2.0*γ/3) * (1- τ*τ/2)*_E2(γ*τ)
@@ -48,11 +51,11 @@ module guillot
     end
 
     """
-    **Evalulate collimated-beam T^4 at a given optical depth.**
+    **Evaluate collimated-beam T^4 at a given optical depth.**
 
     Equation 27 in Guillot (2010).
     """
-    function _eval_T4_cos(τ::Float64, Tint::Float64, Tirr::Float64, θ::Float64)::Float64
+    function eval_T4_cos(τ::Float64, Tint::Float64, Tirr::Float64, θ::Float64)::Float64
         mu  = cos(θ * pi / 180)
         pt1 = (3.0 * Tint^4 / 4) * (2.0/3 + τ)
         pt2 = mu/γ
@@ -61,7 +64,7 @@ module guillot
     end
 
     """
-    **Evalulate LW optical depth as a function of pressure.**
+    **Evaluate LW optical depth as a function of pressure.**
 
     Assuming constant gravity.
     """

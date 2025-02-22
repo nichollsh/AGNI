@@ -17,8 +17,8 @@ module consts
     export R_gas
 
     # Stefan-boltzmann constant, W m−2 K−4
-    const sigma::Float64 =  5.670374419e-8 # NIST CODATA
-    export R_gas
+    const σSB::Float64 =  5.670374419e-8 # NIST CODATA
+    export σSB
 
     # Von Karman constant, dimensionless
     const k_vk::Float64 = 0.40  # Hogstrom 1988
