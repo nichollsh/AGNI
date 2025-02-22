@@ -41,6 +41,11 @@ If you use AGNI, please cite the following papers:
 * Nicholls et al., (2024b) - https://doi.org/10.1093/mnras/stae2772
 * Nicholls et al., (2025) - in review at JOSS
 
+## Example
+Below is an animated example of AGNI solving for a temperature-pressure profile, starting from an isothermal state.
+<video autoplay loop muted width="100%" src="https://github.com/user-attachments/assets/759d635e-5de4-410c-8d0e-a0a70ae2ea30"></video>
+
+
 ## Repository structure
 * `agni.jl`         - The main AGNI executable
 * `LICENSE.txt`     - License for use and re-use
