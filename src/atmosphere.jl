@@ -24,7 +24,7 @@ module atmosphere
 
     # Constants
     const AGNI_VERSION::String   = "1.3.0"
-    const HYDROGRAV_STEPS::Int64 = 30
+    const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
@@ -413,7 +413,7 @@ module atmosphere
         # derived statistics
         atmos.interior_mass =   atmos.grav_surf * atmos.rp^2 / phys.G_grav
         atmos.interior_rho  =   3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
-        atmos.transspec_p   =   1e2     # 1 mbar = 100 Pa
+        atmos.transspec_p   =   2e3     # 20 mbar = 2000 Pa
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -798,7 +798,7 @@ module atmosphere
         # transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
 
         # Store reference pressure in atmos struct
-        estimate_photosphere!(atmos)
+        # estimate_photosphere!(atmos)
 
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
