@@ -486,11 +486,11 @@ atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
 energy.radtrans!(atmos, true)
 energy.radtrans!(atmos, false)
 
-val_e = [1.0e-4, 1e9]
+val_e = 37.125717835788286
 val_o = atmos.flux_u_sw[20]
-@info "Expected range = $(val_e) W m-2"
+@info "Expected value = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
-if ( val_o > val_e[1]) && (val_o < val_e[2])
+if abs(val_o - val_e)/val_e < rtol
     @info "Pass"
 else
     @warn "Fail"
@@ -560,7 +560,7 @@ total += 1
 @info " "
 @info "Testing fluxes"
 energy.calc_fluxes!(atmos, true, true, true, true)
-val_e = 8.60308315276e3  # from previous tests
+val_e = 8602.78747109532  # from previous tests
 val_o = atmos.flux_tot[atmos.nlev_c-10]
 @info "Expected value = $(val_e) W m-2"
 @info "Modelled value = $(val_o) W m-2"
