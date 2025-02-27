@@ -547,6 +547,35 @@ module phys
     end
 
     """
+    **Check if pressure-temperature coordinate is within the vapour regime.**
+
+    Returns true if p > p_sat and t < t_crit.
+
+    Arguments:
+    - `gas::Gas_t`              the gas struct to be used
+    - `t::Float64`              temperature [K]
+    - `p::Float64`              temperature [K]
+
+    Returns:
+    - `vapour::Bool`           is within vapour regime?
+    """
+    function is_vapour(gas::Gas_t, t::Float64, p::Float64)::Bool
+
+        # Handle stub cases
+        if gas.stub || gas.no_sat
+            return true
+        end
+
+        # Above critical point?
+        if t >= gas.T_crit
+            return true
+        end
+
+        # Saturated by pressure? (with offset to account for transition)
+        return Bool(p > 10.0 ^ gas.sat_I(t+0.2))
+    end
+
+    """
     **Get gas enthalpy (latent heat) of phase change.**
 
     If the temperature is above the critical point, then a zero value
@@ -678,11 +707,11 @@ module phys
     - `rho::Float64`        mass density [kg m-3]
     """
     function calc_rho_gas(tmp::Float64, prs::Float64, gas::Gas_t)::Float64
-        if gas.eos == EOS_IDEAL
+        if (gas.eos == EOS_IDEAL) || !is_vapour(gas, tmp, prs)
             # analytical form of ideal gas equation of state
             return _rho_ideal(tmp, prs, gas.mmw)
         else
-            # otherwise, will use interpolated VDW or AQUA equation of state
+            # otherwise, will use tabulated real-gas EOS to evaluate the density
             return gas.eos_I(tmp, log10(prs))
         end
     end

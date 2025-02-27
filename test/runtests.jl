@@ -108,7 +108,7 @@ total += 1
 @info " "
 @info "Testing H2O AQUA equation of state"
 aqua_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
-v_expt = [926.1211619878637, 0.007234298129244018, 0.43571347466328847, 17.03899955369294, 66.87150907049445]
+v_expt = [926.12116198786, 0.007222354920, 0.4333412952269, 17.038999553692, 66.87150907049]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5
@@ -135,7 +135,7 @@ total += 1
 @info " "
 @info "Testing CO2 VdW equation of state"
 vdw_CO2::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "CO2", true, true)
-v_expt = [2.6465333e-5, 1.7664486595e-2, 1.0612271156, 4.12385376e1, 1.47631823e2]
+v_expt = [2.646533036586e-5, 0.01764355357724, 1.061227115599, 41.2385376189, 147.631823888]
 v_obs  = zero(p_test)
 test_pass = true
 for i in 1:5

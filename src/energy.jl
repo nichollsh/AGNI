@@ -398,7 +398,7 @@ module energy
                     λ = phys.αMLT * Hp
                 elseif mltype == 2
                     # Asymptotic
-                    hgt = atmos.rl[i] - atmos.rp # height above the ground 
+                    hgt = atmos.rl[i] - atmos.rp # height above the ground
                     λ = phys.k_vk * hgt / (1 + phys.k_vk * hgt/Hp)
                 else
                     # Otherwise
@@ -636,7 +636,10 @@ module energy
     end
 
     """
-    **Calculate total flux at each level.**
+    **Calculate energy flux at each level.**
+
+    Calculates flux components (radtrans, convection, etc.) and sums them to get total flux.
+    Also updates thermodynamic properties (heat capacity, density, etc.) at each layer.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
@@ -681,6 +684,7 @@ module energy
                 restore_composition!(atmos)
             end
         end
+
         # Calculate layer properties
         atmosphere.calc_layer_props!(atmos)
 

@@ -498,9 +498,6 @@ module solver
                 end
             end
 
-            # Update properties (mmw, density, height, etc.)
-            # step_ok = step_ok && atmosphere.calc_layer_props!(atmos)
-
             # Check convective modulation
             easy_step = false
             if easy_start
