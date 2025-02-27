@@ -223,6 +223,7 @@ module save
             var_rl =        defVar(ds, "rl",        Float64, ("nlev_l",), attrib = OrderedDict("units" => "m"))
             var_thick =     defVar(ds, "dz",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "m"))
             var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",), attrib = OrderedDict("units" => "m s-2"))
+            var_rho =       defVar(ds, "density",   Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg m-3"))
             var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",), attrib = OrderedDict("units" => "J K-1 kg-1"))
             var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",), attrib = OrderedDict("units" => "kg mol-1"))
             var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases")) # Transposed cf JANUS because of how Julia stores arrays
@@ -265,6 +266,7 @@ module save
             var_rl[:]   =   atmos.rl
             var_mmw[:]  =   atmos.layer_μ
             var_cp[:]  =    atmos.layer_cp
+            var_rho[:]  =   atmos.layer_ρ
             var_grav[:]  =  atmos.layer_grav
             var_thick[:]  = atmos.layer_thick
 
