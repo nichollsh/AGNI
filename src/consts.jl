@@ -59,7 +59,7 @@ module consts
         "H2S", "HCN", "NH3", "OCS", "S2", "S8", "SO2", "SiO2", "O3", "N2O", "NO", "NO2",
         "HNO3", "FeH", "PH3", "C2H2", "NO3", "N2O5", "HONO", "HO2NO2", "H2O2", "C2H6",
         "CH3", "H2CO", "HO2", "C", "Fe", "FeO", "H", "Mg2", "Mg", "MgO", "N", "O", "Si",
-        "S", "SO",
+        "S", "SO", "CS2"
     ]
     export gases_standard
 
