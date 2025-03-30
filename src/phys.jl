@@ -144,7 +144,7 @@ module phys
 
         # heat capacity set to zero
         gas.cap_T = [0.0, BIGFLOAT]
-        gas.cap_C = [0.0, 0.0]
+        gas.cap_C = [Cp_ideal/gas.mmw, Cp_ideal/gas.mmw]
 
         # latent heat set to zero
         gas.lat_T = [0.0, BIGFLOAT]

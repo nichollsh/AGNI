@@ -48,6 +48,10 @@ module consts
     const G_grav::Float64 = 6.67430e-11 # NIST CODATA
     export G_grav
 
+    # Specific heat capacity for ideal gas [J mol-1 K-1]
+    const Cp_ideal::Float64 = 29.10   # = 7/2 R_gas, assuming that it is diatomic
+    export Cp_ideal
+
     # List of elements included in the model
     const elems_standard::Array{String,1} = ["H","C","N","O","S","P",
                                                 "Fe","Mg","Si","Ca","Al"]
