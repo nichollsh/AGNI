@@ -7,7 +7,7 @@ root=$(dirname $(realpath $0))
 root=$(realpath "$root/..")
 
 # Download via HTTPS only
-fcpath=$(realpath "$root/fastchem")
+fcpath="$root/fastchem"
 rm -rf "$fcpath"
 
 git clone https://github.com/NewStrangeWorlds/FastChem.git "$fcpath"
