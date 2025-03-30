@@ -21,7 +21,7 @@ fi
 # Download (using SSH if possible)
 root=$(dirname $(realpath $0))
 root=$(realpath "$root/..")
-socpath=$(realpath "$root/socrates")
+socpath="$root/socrates"
 rm -rf "$socpath"
 if [ "$use_ssh" = true ]; then
     git clone git@github.com:nichollsh/SOCRATES.git "$socpath"
