@@ -342,7 +342,7 @@ module energy
         # Reset arrays
         fill!(atmos.mask_c,     false)
         fill!(atmos.flux_cdry,  0.0)
-        fill!(atmos.Kzz,        atmos.Kzzcst)
+        fill!(atmos.Kzz,        0.0)
 
         # Work variables
         Hp::Float64 = 0.0; λ::Float64 = 0.0; w::Float64 = 0.0
@@ -411,11 +411,14 @@ module energy
                 # Dry convective flux
                 atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (λ/Hp)*(∇_pr-∇_ad)
 
-                # Mixing eddy diffusion coefficient [m2 s-1]
+                # Convection eddy diffusion coefficient [m2 s-1]
                 atmos.Kzz[i] = w * λ
 
             end
         end
+
+        # Set surface Kzz
+        atmos.Kzz[end] = atmos.Kzz[end-1]
 
         # Check for spurious shallow convection occuring ABOVE condensing regions
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.
@@ -430,6 +433,63 @@ module energy
 
         return nothing
     end # end of mlt
+
+    """
+    **Fill Kzz values for the entire profile.**
+
+    This function is called after the convection scheme has been run.
+
+    The Kzz value in the convective region (and below) are set equal to the maximum value
+    in the convective region, as calculated by MLT. The value increases with power-law
+    scaling with pressure in the stratosphere.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    """
+    function fill_Kzz!(atmos::atmosphere.Atmos_t)
+
+        Fthresh::Float64 = 1.0e-8
+
+        # Kzz limits
+        clamp!(atmos.Kzz, atmos.Kzz_floor, atmos.Kzz_ceiling)
+
+        # Find bottom of convective region (looping downwards)
+        i_cnvct_bot::Int = atmos.nlev_l
+        @inbounds for i in 1:atmos.nlev_l-1
+            if (atmos.flux_cdry[i+1] < Fthresh) && (atmos.flux_cdry[i] > Fthresh)
+                i_cnvct_bot = i
+            end
+        end
+
+        # Find top of convective region (looping upwards from bottom)
+        i_cnvct_top::Int = i_cnvct_bot
+        atmos.Kzz_pbreak = min(1e5, atmos.pl[end])
+        atmos.Kzz_kbreak = atmos.Kzz_floor
+        @inbounds for i in range(start=i_cnvct_bot, step=-1, stop=1)
+            if (atmos.flux_cdry[i] < Fthresh) && (atmos.flux_cdry[i+1] > Fthresh)
+                i_cnvct_top = i
+            end
+        end
+
+        # Store breakpoint values
+        atmos.Kzz_pbreak = atmos.pl[i_cnvct_top]
+        atmos.Kzz_kbreak = maximum(atmos.Kzz[i_cnvct_top:end])
+
+        # Set Kzz within and below convective region to constant value. This value best
+        #    represents the diffusive mixing in this region.
+        atmos.Kzz[i_cnvct_top:end] .= atmos.Kzz_kbreak
+
+        # Extend Kzz in stratosphere based on power-law scaling.
+        #   See equation 28 in Tsai+2020
+        #   https://iopscience.iop.org/article/10.3847/1538-4357/ac29bc/pdf
+        atmos.Kzz[1:i_cnvct_top-1] .= atmos.Kzz[i_cnvct_top] .*
+                                        ( atmos.Kzz_pbreak ./ atmos.pl[1:i_cnvct_top-1]).^0.4
+
+        # Kzz limits
+        clamp!(atmos.Kzz, atmos.Kzz_floor, atmos.Kzz_ceiling)
+
+        return nothing
+    end
 
     """
     **Analytical diffusion scheme for condensation and evaporation energy.**

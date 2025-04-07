@@ -23,7 +23,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.3.2"
+    const AGNI_VERSION::String   = "1.3.3"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -169,7 +169,10 @@ module atmosphere
         mask_c::Array{Bool,1}               # Layers transporting convective flux
         flux_cdry::Array{Float64,1}         # Dry convective fluxes from MLT
         Kzz::Array{Float64,1}               # Eddy diffusion coefficient from MLT
-        Kzzcst::Float64                     # Constant value for Kzz in stable regions
+        Kzz_floor::Float64                  # Kzz floor [m2 s-1]
+        Kzz_ceiling::Float64                # Kzz ceiling [m2 s-1]
+        Kzz_pbreak::Float64                 # Kzz break point pressure [Pa]
+        Kzz_kbreak::Float64                 # Kzz break point diffusion [m2 s-1]
 
         # Conduction
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
@@ -268,7 +271,7 @@ module atmosphere
     - `tmp_floor::Float64`              temperature floor [K].
     - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].
     - `U::Float64`                      surface wind speed [m s-1].
-    - `Kzzcst::Float64`                 eddy diffusion coefficient in stable layers [m2 s-1]
+    - `Kzz_floor::Float64`              eddy diffusion coefficient, min value [cm2 s-1]
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
     - `skin_d::Float64`                 skin thickness [m].
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].
@@ -303,7 +306,7 @@ module atmosphere
                     tmp_floor::Float64 =        2.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
-                    Kzzcst::Float64 =           0.0,
+                    Kzz_floor::Float64 =        1e5,
                     tmp_magma::Float64 =        3000.0,
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
@@ -395,7 +398,10 @@ module atmosphere
 
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
-        atmos.Kzzcst =          max(0.0, Kzzcst)
+        atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
+        atmos.Kzz_ceiling =     1.0e20 / 1e4
+        atmos.Kzz_pbreak =      1e5 # 1 bar as default location for break point
+        atmos.Kzz_kbreak =      Kzz_floor
 
         atmos.tmp_magma =       max(atmos.tmp_floor, tmp_magma)
         atmos.skin_d =          max(1.0e-9, skin_d)
