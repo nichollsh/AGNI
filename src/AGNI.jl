@@ -446,6 +446,9 @@ module AGNI
         end
         @info "    done"
 
+        # Fill Kzz in remaining regions
+        energy.fill_Kzz!(atmos)
+
         @info "Total RT evalulations: $(atmos.num_rt_eval)"
 
         # Write arrays

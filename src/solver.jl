@@ -776,6 +776,7 @@ module solver
         end
 
         _fev!(x_cur, zeros(Float64, arr_len))
+        energy.fill_Kzz!(atmos)
         energy.calc_hrates!(atmos)
         energy.radtrans!(atmos, true, calc_cf=true)       # calculate LW radtrans with contfunc
         atmosphere.calc_observed_rho!(atmos)
