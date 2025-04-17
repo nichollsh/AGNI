@@ -11,9 +11,11 @@ root=$(realpath "$root/..")
 
 # SOCRATES?
 if [ -n "$RAD_DIR" ]; then
-    echo "SOCRATES is already installed"
+    echo "Found SOCRATES path: yes"
 else
-    echo "You need to install SOCRATES and set RAD_DIR first. Check the docs."
+    echo "Found SOCRATES path: no"
+    echo "You need to install SOCRATES AND set the RAD_DIR environment variable"
+    echo "Check the docs:https://nichollsh.github.io/AGNI/"
     exit 1
 fi
 
