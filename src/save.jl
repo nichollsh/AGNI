@@ -17,10 +17,15 @@ module save
     using Printf
     using Dates
 
-    const nc_comp = Dict(:deflatelevel => 6, :shuffle => true, :checksum => :nochecksum)
+    # Parameters for NetCDF compression
+    const nc_comp = Dict(:deflatelevel => 2, :shuffle => true, :checksum => :nochecksum)
 
     """
     Write {Pressure, Temperature, Radius} profile to a CSV file
+
+    Arguments
+    - `atmos::Atmos_t`      Atmosphere object
+    - `fname::String`       Filename to write to
     """
     function write_profile(atmos::atmosphere.Atmos_t, fname::String)
 
@@ -44,6 +49,10 @@ module save
 
     """
     Write cell-edge energy fluxes to a CSV file
+
+    Arguments
+    - `atmos::Atmos_t`      Atmosphere object
+    - `fname::String`       Filename to write to
     """
     function write_fluxes(atmos::atmosphere.Atmos_t, fname::String)
 
