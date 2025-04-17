@@ -14,6 +14,12 @@ module blake
     **Calculate the BLAKE2b hash for a file.**
 
     Only works on AMD64 Linux.
+
+    Arguments:
+    - `fpath::String`: Path to the file to hash.
+
+    Returns:
+    - `String`: The BLAKE2b hash of the file.
     """
     function hash_file(fpath::String)::String
         if !Sys.islinux()
@@ -31,6 +37,12 @@ module blake
     **Validate the integrity of a file using its BLAKE2b hash.**
 
     Assumes that there's a `.chk` file in the same folder.
+
+    Arguments
+    - `fpath::String`: Path to the file to validate.
+
+    Returns
+    - `Bool`: True if the file is valid, false otherwise.
     """
     function valid_file(fpath::String)::Bool
         # Return true if unsupported
