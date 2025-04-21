@@ -151,18 +151,19 @@ module save
             var_tmax =      defVar(ds, "tceiling",      Float64, (), attrib = OrderedDict("units" => "K"))      # Maximum temperature
             var_plrad =     defVar(ds, "planet_radius", Float64, (), attrib = OrderedDict("units" => "m"))      # Value taken for planet radius
             var_gsurf =     defVar(ds, "surf_gravity",  Float64, (), attrib = OrderedDict("units" => "m s-2"))  # Surface gravity
-            var_fray =      defVar(ds, "flag_rayleigh", Char,    ())                                               # Includes rayleigh scattering?
-            var_fcon =      defVar(ds, "flag_continuum",Char,    ())                                               # Includes continuum absorption?
-            var_fcld =      defVar(ds, "flag_cloud"    ,Char,    ())                                               # Includes clouds?
-            var_tfun =      defVar(ds, "thermo_funct"  ,Char,    ())                                               # Using temperature-dependent thermodynamic functions
-            var_rgas =      defVar(ds, "real_gas"      ,Char,    ())                                               # Using real gas EOS
-            var_ssol =      defVar(ds, "solved"        ,Char,    ())                                               # Has a solver been used?
-            var_scon =      defVar(ds, "converged"     ,Char,    ())                                               # Did the solver converge?
+            var_fray =      defVar(ds, "flag_rayleigh", Char,    ())                                            # Includes rayleigh scattering?
+            var_fcon =      defVar(ds, "flag_continuum",Char,    ())                                            # Includes continuum absorption?
+            var_fcld =      defVar(ds, "flag_cloud"    ,Char,    ())                                            # Includes clouds?
+            var_tfun =      defVar(ds, "thermo_funct"  ,Char,    ())                                            # Using temperature-dependent thermodynamic functions
+            var_rgas =      defVar(ds, "real_gas"      ,Char,    ())                                            # Using real gas EOS
+            var_ssol =      defVar(ds, "solved"        ,Char,    ())                                            # Has a solver been used?
+            var_scon =      defVar(ds, "converged"     ,Char,    ())                                            # Did the solver converge?
             var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg"))    # Zenith angle of direct stellar radiation
             var_sknd =      defVar(ds, "cond_skin_d"   ,Float64, (), attrib = OrderedDict("units" => "m"))      # Conductive skin thickness
             var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1"))    # Conductive skin thermal conductivity
             var_specfile =  defVar(ds, "specfile"      ,String,  ())     # Path to spectral file when read
             var_starfile =  defVar(ds, "starfile"      ,String,  ())     # Path to star file when read
+            var_flux_sns =  defVar(ds, "fl_sens",       Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Surface sensible heat flux [W m-2]
 
             #     Store data
             var_max_cff_p[1] =  atmos.transspec_p
@@ -178,6 +179,7 @@ module save
             var_tmax[1] =       atmos.tmp_ceiling
             var_plrad[1]  =     atmos.rp
             var_gsurf[1] =      atmos.grav_surf
+            var_flux_sns[1] =   atmos.flux_sens
 
             if atmos.control.l_rayleigh
                 var_fray[1] = 'y'
