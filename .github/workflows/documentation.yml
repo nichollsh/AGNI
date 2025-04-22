@@ -4,6 +4,13 @@
 name: Docs
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/src/**
+      - docs/make.jl
+      - docs/Project.toml
+      - .github/workflows/documentation.yml
   push:
     branches: [main]
     paths:
