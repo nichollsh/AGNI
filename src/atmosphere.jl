@@ -17,8 +17,11 @@ module atmosphere
     import Interpolations: interpolate, Gridded, Linear, Flat, Line, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
-    # Local files
-    include(joinpath([abspath(ENV["RAD_DIR"]), "julia","src","SOCRATES.jl"]))
+    # SOCRATES library
+    const SOCRATESjl = abspath(ENV["RAD_DIR"], "julia","src","SOCRATES.jl")
+    include(SOCRATESjl)
+
+    # Local modules
     import ..phys
     import ..spectrum
 
