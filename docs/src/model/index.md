@@ -10,14 +10,16 @@ The model uses k-terms fitted to spectral absorption cross-section data from [DA
 ```@raw html
   <img src="assets/spectral_flowchart.svg" width=100% class="center"/>
 ```
-Surface reflectivity can be modelled as a greybody with an albedo from 0 to 1. Alternatively, it can be modelled from empirical single-scattering data which varies with zenith angle and wavelength.
+Surface reflectivity can be modelled as a greybody with an albedo from 0 to 1. Alternatively, it can be modelled from empirical single-scattering data that varies with zenith angle and wavelength.
 
 ## Convection
-Convection is a turbulent process that occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it is typically parameterised inside 3D global circulation models, as resolving convection is numerically expensive. AGNI uses mixing length theory (MLT) to parameterise convection. This is in contrast to convective adjustment, which forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat while ensuring that enthalpy is conserved.
+Convection is a turbulent process that occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it is typically parameterised inside 3D global circulation models, as resolving convection is numerically expensive. AGNI uses mixing length theory (MLT) to parameterise atmospheric convection. This is in contrast to convective adjustment, which forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat while ensuring that enthalpy is conserved.
 
 MLT directly calculates the energy flux associated with convective heat transport, and thus is the preferred parameterisation within the model. It assumes that parcels of gas are diffused over a characteristic _mixing length_, transporting energy in the process. This requires choosing a scale for this mixing length, but in practice this has very little impact on the results from the model.
 
-The atmosphere is assumed to be hydrostatically supported. Gas densities are combined using Amagat's additive volume law. The densities of each gas are nominally calculated using the Van der Walls equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
+When evaluating convective energy fluxes, AGNI first calculates the temperature gradient across each layer of the atmosphere. Convection occurs within each layer that has a lapse rate $dT/dP$ greater than the critical lapse rate for triggering Schwarzchild convection. Equations 2 to 6 of Nicholls+[2025](https://academic.oup.com/mnras/article/536/3/2957/7926963) describe the calculation of the convective energy flux. The atmosphere is not explicitly split into convecting and non-convecting regions, thereby allowing disconnected regions of convection.
+
+The atmosphere is assumed to be hydrostatically supported. The density of the gas mixture is calculated using using Amagat's additive volume law to combine the densities of the components. The densities of each gas component are nominally calculated using the Van der Walls equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
 
 
 ## Phase change
@@ -93,7 +95,7 @@ The model converges when the cost function $c(\bm{x}) = \sqrt{\sum_i |r_i|}$ sat
 ```math
 c(\bm{x}) < c_a + c_r \cdot \underset{i}{\max} \text{ } |F_i|
 ```
-which represents a state where the fluxes are sufficiently conserved.
+which represents a state where the fluxes are sufficiently conserved. The quantities $c_a$ and $c_r$ are the absolute and relative tolerances provided by the user (parameters `conv_atol` and `conv_rtol` in `solver.solve_energy!()`).
 
 ### Iterative steps
 The model solves for $\bm{x}$ iteratively, starting from some initial guess. The initial guess should be any reasonable temperature profile which is not significantly cooler than the expected solution. The flowchart below broadly outlines the solution process.
@@ -104,7 +106,7 @@ The Jacobian matrix $\bm{J}$ represents the directional gradient of the residual
 ```math
 J_{uv} = \frac{\partial r_u}{\partial x_v}
 ```
-AGNI estimates $\bm{J}$ using finite-differences, requiring $N+1$ evalulations of $\bm{r}$ in order to fill the matrix. This corresponds to $2(N+1)+1$ objective function calculations under a 2nd order central-difference scheme. Each level $v$ with temperature $x_v$ is perturbed by an amount $\pm \varepsilon x_v$ in order to fill a single column of $\bm{J}$. As such, it can be expensive to construct a full Jacobian, especially when it is discarded at the end of each iteration. To reduce the total number of calculations AGNI retains some of the columns in $\bm{J}$ between model iterations. This assumes that the second derivative of the residuals is small. A column $v$ is retained only when
+AGNI estimates $\bm{J}$ using finite-differences, requiring $N+1$ evalulations of $\bm{r}$ in order to fill the matrix. This corresponds to $2(N+1)+1$ objective function calculations under a 2nd order central-difference scheme. Each level $v$ with temperature $x_v$ is perturbed by an amount $\pm \varepsilon x_v$ in order to fill a single column of $\bm{J}$. As such, it can be expensive to construct a full Jacobian, especially when it is discarded at the end of each iteration. To reduce the total number of calculations, AGNI retains some of the columns in $\bm{J}$ between model iterations. This assumes that the second derivative of the residuals is small. A column $v$ is retained only when
 ```math
 \max |r_i| \lt 0.7 \text{ for } i \in \{v-1, v, v+1\}
 ```
