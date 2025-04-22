@@ -23,6 +23,7 @@ module AGNI
     include("plotting.jl")
     include("energy.jl")
     include("solver.jl")
+    include("load.jl")
 
     # Import submodules
     import .phys
@@ -34,6 +35,7 @@ module AGNI
     import .energy
     import .solver
     import .chemistry
+    import .load
 
     # Export submodules
     export phys
@@ -41,6 +43,7 @@ module AGNI
     export atmosphere
     export setpt
     export save
+    export load
     export plotting
     export energy
     export chemistry
