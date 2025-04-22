@@ -1,5 +1,5 @@
 # Running the model
-First, follow the [Getting started](@ref) instructions. Only read-on once you
+First, follow the [Getting started](@ref) instructions. Only read on once you
 have confirmed that the code is working.
 
 ## Input data files
@@ -20,13 +20,12 @@ The environment variable `RAD_DIR` must point to the SOCRATES installation
 directory. This is required for AGNI to find the SOCRATES libraries. The best way to do
 this is to add `RAD_DIR=path/to/socrates/folder/` to your shell rc file (e.g. `~/.bashrc`).
 
-Then to use the model, simply run `./agni.jl [cfg]` where `[cfg]` is the path
-to the required configuration file. If `[cfg]` is not passed, then the default
-configuration will be used.
-
-To calculate equilibrium chemistry self-consistently with the climate, FastChem
-is coupled to AGNI. For AGNI to find FastChem, the environment variable `FC_DIR`
-must point to the FastChem installation directory.
+Then to use the model, simply run
+```bash
+./agni.jl [cfg]
+```
+where `[cfg]` is the path to the desired configuration file.
+If `[cfg]` is not passed, then the default configuration file will be used.
 
 ## Configuration
 AGNI configuration files are formatted using [TOML](https://toml.io/en/). There
@@ -52,7 +51,7 @@ Some parameters:
      - 2 : zero flux divergence such that the conductive skin (CBL) conserves energy flux with fixed `tmp_magma`
      - 3 : the net flux (up minus down) at each layer is equal to `flux_int`
 
-     See the 'model description' page for an explanation of these solution types.
+     See the [Model description](@ref) page for an explanation of these solution types.
 
 * `execution.solver` tells the model which solver to use. Allowed solvers are...
      - [empty string] : no solving takes place, so the model just calculates fluxes using the initial state
@@ -72,11 +71,13 @@ Some parameters:
 
     For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model.
 
-* `composition.chem_type` describes the type of chemistry to implement within the model. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. The allowed values (integers) are...
+* `composition.chemistry` describes the type of chemistry to implement within the model. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. The allowed values (integers) are...
      - 0 : Disabled
      - 1 : Equilibrium, gas phase only
      - 2 : Equilibrium, with condensation (condensates retained)
      - 3 : Equilibrium, with condensation (condensates rained out)
+
+     More information on the chemistry is available on the [Equilibrium chemistry](@ref) page
 
 ## Outputs
 Results are optionally plotted and animated, and data will be saved as NetCDF or CSV files.

@@ -18,15 +18,14 @@ Follow the steps below in order to setup the code.
 3. Change directory: `cd AGNI`
 4. Setup SOCRATES by doing either **ONE** of the following...
     - Follow the instructions on the [SOCRATES GitHub](https://github.com/nichollsh/SOCRATES) page
-    - Run `source src/get_socrates.sh`
-5. `bash src/get_agni.sh`
-AGNI is now installed as a package into a Julia environment in the AGNI
-directory. This will also have downloaded some basic input data, and have run the tests.
+    - Run `bash src/get_socrates.sh`
+5. Finally, install AGNI: `bash src/get_agni.sh`
+AGNI is now installed as a package into the Julia environment of the AGNI
+directory. This will also have downloaded some basic input data and run the tests.
 
-!!! tip
-    The `get_socrates.sh` script automatically adds the radiation code to your
-    environment with the variable `RAD_DIR`, which points to the SOCRATES installation.
-    This variable must be set whenever AGNI is being used.
+!!! warning
+    The `RAD_DIR` environment variable must be set to your SOCRATES path whenever AGNI is being used.
+    This is so that AGNI can locate the SOCRATES libraries.
 
 ## Testing
 If you want to run the tests manually, simply use the script in the `test/` folder...
@@ -49,5 +48,11 @@ See [Troubleshooting](@ref) for troubleshooting advice.
 
 ## Coupling with FastChem
 This can be enabled using the configuration file parameter `composition.chem_type`. Of
-course, it is first necessary to setup FastChem, which can be done by running
-`source src/get_fastchem.sh` and then setting the `FC_DIR` environment variable.
+course, it is first necessary to set up FastChem, which can be done by running:
+```bash
+bash src/get_fastchem.sh
+```
+You **must** then set the `FC_DIR` environment variable to the location of the FastChem
+installation folder. Ideally you should also add this variable to your bashrc file.
+
+There is information 
