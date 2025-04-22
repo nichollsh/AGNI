@@ -30,6 +30,13 @@ Latent heats are temperature-dependent, using values derived from Coker (2007) a
 ## Stellar flux
 A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, an artificial additional albedo factor, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
 
+## Equilibrium chemistry
+By default, AGNI assumes that the atmosphere composition is "well-mixed". This means that the mixing ratios of the species are constant with height. Condensation of a super-saturated volatile will reduce its mixing ratio such that it becomes exactly saturated.
+
+With condensation turned off, AGNI can couple to [FastChem](https://newstrangeworlds.github.io/FastChem/) - a fast numerical model of equilibrium gas-phase chemistry. FastChem takes metallicities (elemental ratios), pressures, and temperatures as input variables. It outputs the partial pressures of a wide range of volatile species, with their mixing ratios set by the equilibrium of their collective thermochemical reactions.
+
+AGNI uses the inputted gas partial pressures (or mixing ratios) to calculate the atmosphere's metallicity. When the configuration variable `composition.chemistry` is set to a value of 1, 2, or 3 FastChem will be enabled. At each step of the solver loop, the metallicity and T-P profile will be provided to FastChem in order to calculate the atmospheric composition at each layer. This new composition is applied when calculating energy fluxes, emission spectra, etc.
+
 ## Obtaining a solution
 
 ### Summary
