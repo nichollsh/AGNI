@@ -39,9 +39,9 @@ jobs:
         run: julia -e 'using Pkg; Pkg.add("Documenter"); Pkg.instantiate()'
 
       - name: Install AGNI
-        run: julia --project="./" -e 'using Pkg; Pkg.add(path="./")'
+        run: julia -e 'using Pkg; Pkg.develop(path=pwd())'
 
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-        run: julia --project="./" docs/make.jl
+        run: julia docs/make.jl
