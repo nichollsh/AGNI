@@ -17,6 +17,7 @@
   <a href="https://doi.org/10.1093/mnras/stae2772">
     <img src="https://img.shields.io/badge/DOI-10.1093%2Fmnras%2Fstae2772-blue">
   </a>
+  <a href="https://joss.theoj.org/papers/380d8e608e9f863b639af76ceebc7131"><img src="https://joss.theoj.org/papers/380d8e608e9f863b639af76ceebc7131/status.svg"></a>
 </p>
 
 <p align="center">
