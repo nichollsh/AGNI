@@ -26,7 +26,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.3.4"
+    const AGNI_VERSION::String   = "1.4.0"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
