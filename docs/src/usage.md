@@ -11,6 +11,9 @@ to use this script, run it without arguments like so:
 ./src/get_data.sh
 ```
 
+Opacities are contained within "spectral files". Use the table within
+`res/spectral_files/reference.pdf` to decide which spectral files are best for you.
+
 For example, if you wanted to get the spectral file "Honeyside48" you would run:
 ```bash
 ./src/get_data.sh anyspec Honeyside 48
