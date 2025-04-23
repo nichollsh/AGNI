@@ -35,6 +35,33 @@ Then to use the model, simply run
 where `[cfg]` is the path to the desired configuration file.
 If `[cfg]` is not passed, then the default configuration file will be used.
 
+You should see the following output:
+```log
+[ INFO  ] Using configuration 'Default'
+[ INFO  ] Setting-up a new atmosphere struct
+[ INFO  ] Loading thermodyamic data
+[ INFO  ] Inserting stellar spectrum and Rayleigh coefficients
+[ INFO  ] Allocating atmosphere with composition:
+[ INFO  ]       1 H2O     1.00e+00 (EOS_AQUA)
+[ INFO  ] Setting T(p): dry, sat
+[ INFO  ] Solving with 'none'
+[ INFO  ]     done
+[ INFO  ] Total RT evalulations: 2
+[ INFO  ] Writing results
+[ INFO  ] Plotting results
+[ INFO  ] Deallocating memory
+[ INFO  ] Model runtime: 16.60 seconds
+```
+
+The line following "Allocating atmosphere with composition" is a table of gases, their
+volume mixing ratios, and flags. In this case there is only one gas.
+
+Potential flags for each species are:
+* `EOS_[XX]` - using the `[XX]` equation of state (e.g. ideal gas, AQUA)
+* `NO_OPACITY` - no opacity data available, but can contribute to the thermodynamics
+* `NO_THERMO` - no thermodynamic data available, so will be treated as a diatomic ideal gas
+* `COND` - this gas is allowed to condense
+
 ## Configuration
 AGNI configuration files are formatted using [TOML](https://toml.io/en/). There
 are examples in `res/config/`. The default configuration file contains comments
