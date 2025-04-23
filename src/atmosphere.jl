@@ -1156,6 +1156,7 @@ module atmosphere
         if !isfile(atmos.spectral_file)
             @error "Spectral file '$(atmos.spectral_file)' does not exist"
             @error "Try running `\$ ./src/get_data.sh`"
+            @error "    e.g. to get Honeyside16 you would run `\$ ./src/get_data.sh Honeyside 16`"
             return false
         end
 
