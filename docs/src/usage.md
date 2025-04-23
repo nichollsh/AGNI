@@ -11,6 +11,11 @@ to use this script, run it without arguments like so:
 ./src/get_data.sh
 ```
 
+For example, if you wanted to get the spectral file "Honeyside48" you would run:
+```bash
+./src/get_data.sh anyspec Honeyside 48
+```
+
 ## Tutorials
 There are Jupyter notebooks containing tutorials in the `tutorials/` directory
 of the repository.
