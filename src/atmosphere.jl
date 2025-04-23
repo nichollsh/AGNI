@@ -434,6 +434,12 @@ module atmosphere
         atmos.control.l_drop::Bool =        flag_cloud
         atmos.control.l_ice::Bool  =        false
 
+        # warn user about clouds
+        if atmos.control.l_cloud
+            @warn "Clouds are enabled but are poorly tested in AGNI"
+            @warn "    Expect weird behaviour and/or crashes"
+        end
+
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
         atmos.tmp =  zeros(Float64, atmos.nlev_c)
