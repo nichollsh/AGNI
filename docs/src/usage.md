@@ -1,4 +1,4 @@
-# Running the model
+# Using the model
 First, follow the [Getting started](@ref) instructions. Only read on once you
 have confirmed that the code is working.
 
@@ -71,16 +71,96 @@ There are no 'default values'. Not all parameters are required in all cases,
 but the model will return an error naming any parameters which are both
 necessary and absent.
 
-Broadly, the configuration files are broken up into four sections:
-* `[planet]` -  general characteristics of the planet
-* `[files]` - input/output files and other paths
-* `[composition]` - atmospheric composition and chemistry
-* `[execution]` - what the model should do
-* `[plots]` - which plots should be produced
+The configuration files are broken up into four sections (or "tables"), each containing a
+number of parameters. These tables of parameters are described below.
 
-Some parameters:
-* `files.input_sf` is the file path to the "spectral file" containing opacity data. Several spectral files are packged with AGNI, but you can find more online via the [Open Science Framework](https://osf.io/vehxg/).
+### `[planet]`
+General properties of the planet.
+| Parameter          | Description   |
+| ------------------ | ------------- |
+| `tmp_surf        ` | Temperature of the surface [kelvin].  |
+| `instellation    ` | Stellar flux at planet's orbital distance [W m-2]. |
+| `albedo_b        ` | A pseudo bond-albedo which downscales the stellar flux by 1-albedo_b. |
+| `s0_fact         ` | Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13). |
+| `zenith_angle    ` | Characteristic zenith angle for incoming stellar radiation [degrees]. |
+| `surface_material` | Surface material (can be "greybody" or path to data file in `res/`). |
+| `albedo_s        ` | Spectrally-grey surface albedo used when `material=greybody`. Optional otherwise. |
+| `radius          ` | Radius of the planet's surface [m]. |
+| `gravity         ` | Gravitational acceleration at the surface [m s-2]. Incompatible with `mass` option. |
+| `mass            ` | Total mass of material below the atmosphere [kg]. Incompatible with `gravity` option. |
+| `skin_d          ` | Thickness of the conductive boundary layer [m]. Used when `solution_type=2`. |
+| `skin_k          ` | Conductivity of the conductive boundary layer [W m-1 K-1]. Used when `solution_type=2`. |
+| `tmp_magma       ` | Temperature of the topmost layer of the planet's mantle [K]. Used when `solution_type=2`. |
+| `flux_int        ` | Internal flux [W m-2] to be solved-for when `solution_type=3`. |
+| `turb_coeff      ` | Turbulent exchange coefficient for sensible heat transport. |
+| `wind_speed      ` | Effective wind speed for sensible heat transport [m s-1]. |
 
+
+### `[files]`
+Input/output files and other paths.
+| Parameter          | Description   |
+| ------------------ | ------------- |
+| `input_sf       `  | Path to the desired spectral file ending in `.sf`, in `res/spectral_files/`. |
+| `input_star     `  | Path to stellar spectrum file. Spectrum assumed to be inside spectral file if this is left blank. |
+| `output_dir     `  | Path to the output directory. |
+
+
+### `[composition]`
+Atmospheric composition and chemistry.
+| Parameter         | Description   |
+| ----------------- | ------------- |
+| `p_top         `  | Total top-of-atmosphere pressure [bar]. |
+| `p_dict        `  | Dictionary of gas partial surface pressures [bar]. Summed to obtain `p_surf`. |
+| `p_surf        `  | Total surface pressure [bar]. Incompatible with `p_dict`.|
+| `vmr_dict      `  | Gas volume mixing ratios (=mole fractions) at the surface. Must be set alongside `p_surf`. |
+| `vmr_file      `  | Path to a file containing mixing ratio profiles. Replaces `vmr_dict`. |
+| `chemistry     `  | Type of chemistry to be used (see below). |
+| `condensates   `  | List of volatiles which are allowed to condense. Incompatible with `chemistry > 0`. |
+
+
+### `[execution]`
+Parameters that tell the model what to do.
+| Parameter         | Description   |
+| ----------------- | ------------- |
+| `clean_output  `  | Clean old files from the output folder at model startup (true/false). |
+| `verbosity     `  | Logging verbosity (0: quiet, 1: normal, 2: extra logging) |
+| `max_steps     `  | Maximum number of steps the solver should take before giving up (typically <200). |
+| `max_runtime   `  | Maximum wall-clock runtime [s] before giving up. |
+| `num_levels    `  | Number of model levels. Typically ~50, and ideally less than 150.  |
+| `continua      `  | Include collisional/continuum absorption in radiative transfer (true/false) |
+| `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false) |
+| `cloud         `  | Include cloud scattering and opacity in radiative transfer (true/false) |
+| `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see below) |
+| `real_gas      `  | Use real-gas equation(s) of state where possible (true/false) |
+| `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
+| `sensible_heat `  | Include sensible heat transport at the surface (true/false) |
+| `latent_heat   `  | Include vertical heat transport from condensation and precipitation (true/false) |
+| `convection    `  | Include vertical heat transport associated with convection (true/false) |
+| `rainout       `  | Enable compositional rainout of condensable species. If disabled, phase change does not impact composition. |
+| `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |
+| `solution_type `  | Solution type (see below). |
+| `solver        `  | Solver to use (see below). |
+| `dx_max        `  | Maximum step size [kelvin] allowed to be taken by the solver during each step. |
+| `linesearch    `  | Linesearch method to be used (0: None, 1: Golden section, 2: Backtracking) |
+| `easy_start    `  | Initially down-scale convective/condensation fluxes, if initial guess is poor/unknown. **Enable if the model is struggling.** |
+| `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
+| `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
+
+### `[plots]`
+Configure plotting routines all of these should be `true` or `false`.
+| Parameter         | Description   |
+| ----------------- | ------------- |
+| `at_runtime     ` | Make some plots at runtime? |
+| `temperature    ` | Plot temperature-pressure profile? |
+| `fluxes         ` | Plot energy flux profiles? |
+| `contribution   ` | Plot spectral contribution function? |
+| `emission       ` | Plot outgoing emission spectrum? |
+| `albedo         ` | Plot spectral albedo? This is the ratio of upward:downward SW fluxes |
+| `mixing_ratios  ` | Plot mixing ratio profiles? |
+| `height         ` | Plot radius-pressure profile? |
+| `animate        ` | Make an animation of the solver obtaining its solution? |
+
+### Details on specific parameters
 * `execution.solution_type` tells the model which state to solve for. The allowed values (integers) are...
      - 1 : zero flux divergence at fixed `tmp_surf`
      - 2 : zero flux divergence such that the conductive skin (CBL) conserves energy flux with fixed `tmp_magma`
@@ -114,8 +194,10 @@ Some parameters:
 
      More information on the chemistry is available on the [Equilibrium chemistry](@ref) page
 
-## Outputs
-Results are optionally plotted and animated, and data will be saved as NetCDF or CSV files.
+* `execution.overlap_method` tells SOCRATES which algorithm to use to combine gas opacities. The spectral files contain k-tables for pure gases, and combining these coefficients can be done in several ways. See Amundsen+[2017](https://www.aanda.org/articles/aa/full_html/2017/02/aa29322-16/aa29322-16.html) for a nice comparison of overlap methods. Allowed options are...
+     - `"ee"`   : equivalent extinction (fastest)
+     - `"rorr"` : random overlap, with resorting and re-binning
+     - `"ro"`   : random overlap (most accurate, slowest)
 
 ## Accessing AGNI from Python
 It is possible to interact with AGNI from Python. This is best done with the `juliacall` package from [PythonCall.jl](https://github.com/JuliaPy/PythonCall.jl).
