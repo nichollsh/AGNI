@@ -27,7 +27,6 @@ title = "Condensation test"
     p_surf          = 7000.0
     p_top           = 1e-5
     vmr_dict        = { H2O=0.8, CO2=0.19, N2=0.01}
-    include_all     = false
     chemistry       = 0
     condensates     = ["H2O"]
 
@@ -40,7 +39,6 @@ title = "Condensation test"
     continua        = true
     rayleigh        = false
     cloud           = false
-    aerosol         = false
     overlap_method  = "ee"
     real_gas        = true
     thermo_funct    = true

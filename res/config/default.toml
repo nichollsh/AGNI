@@ -30,8 +30,7 @@ title = "Default"                       # Name for this configuration file
     p_surf          = 270.0                     # Total surface pressure [bar].
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
     vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
-    vmr_path        = ""                        # Path to input volume mixing ratios. Not required if planet.vmr is passed.
-    include_all     = false                     # Track extra gases, even when their mixing ratio is zero.
+    vmr_file        = ""                        # Path to input volume mixing ratios. Not required if planet.vmr is passed.
     chemistry       = 0                         # Chemistry type (see wiki).
     condensates     = []                        # List of volatiles which are allowed to condense.
 
@@ -44,7 +43,6 @@ title = "Default"                       # Name for this configuration file
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
-    aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
     real_gas        = true                      # Use real gas equation of state where possible?
     thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?
