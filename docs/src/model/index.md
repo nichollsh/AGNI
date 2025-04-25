@@ -1,6 +1,11 @@
 # Model description
 AGNI models a planetary atmosphere by treating it as a single column (1D) and splitting it up into levels of finite thickness. These levels are defined in pressure-space, and are arranged logarithmically between the surface and the top of the atmosphere. The atmosphere is assumed to be plane-parallel. Quantities such as pressure and temperature are calculated at level-centres and level-edges, while energy fluxes are calculated only at the edges, and thermodynamic properties (e.g. heat capacity) are calculated only at their centres.
 
+## Height structure
+The atmosphere is assumed to be hydrostatically supported. The density of the gas mixture is calculated using using Amagat's additive volume law to combine the densities of the components. The densities of each gas component are nominally calculated using the Van der Walls equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
+
+The height at each pressure level is obtained by integrating from the surface upwards using a fourth order Runge-Kutta method. This includes self-gravitational attraction, and makes AGNI applicable as an atmospheric structure model.
+
 ## Radiative transfer
 Radiative transfer (RT) refers to the transport of radiation energy through a medium subject to the characteristics of the medium. Radiation passing through an atmosphere is absorbed, emitted, scattered, and reflected. In the context of planetary atmospheres, we also have to handle their surfaces, cloud formation, and radiation from the host star.
 
@@ -18,9 +23,6 @@ Convection is a turbulent process that occurs across more than one spatial dimen
 MLT directly calculates the energy flux associated with convective heat transport, and thus is the preferred parameterisation within the model. It assumes that parcels of gas are diffused over a characteristic _mixing length_, transporting energy in the process. This requires choosing a scale for this mixing length, but in practice this has very little impact on the results from the model.
 
 When evaluating convective energy fluxes, AGNI first calculates the temperature gradient across each layer of the atmosphere. Convection occurs within each layer that has a lapse rate $dT/dP$ greater than the critical lapse rate for triggering Schwarzchild convection. Equations 2 to 6 of Nicholls+[2025](https://academic.oup.com/mnras/article/536/3/2957/7926963) describe the calculation of the convective energy flux. The atmosphere is not explicitly split into convecting and non-convecting regions, thereby allowing disconnected regions of convection.
-
-The atmosphere is assumed to be hydrostatically supported. The density of the gas mixture is calculated using using Amagat's additive volume law to combine the densities of the components. The densities of each gas component are nominally calculated using the Van der Walls equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
-
 
 ## Phase change
 Gases release energy ("latent heat" or "enthalpy") into their surroundings when condensing into a liquid or solid. This is included in the model through a diffusive condensation scheme, which assumes a fixed condensation timescale. This takes place as follows... firstly, the mixing ratios of the gases are updated according to the temperature profile, where rainout occurs until all condensables are saturated or sub-saturated. The mixing ratios of dry species are increased in order to satisfy the total pressure at condensing levels. The heat released associated with the change in partial pressure of condensable gases is used to calculate a latent heating rate. This is then integrated (from the TOA downwards) to provide a latent heat transport flux at cell-edges. The integrated condensable heat flux is balanced by evaporation at deeper layers.
