@@ -76,8 +76,9 @@ number of parameters. These tables of parameters are described below.
 
 ### `[planet]`
 General properties of the planet.
+
 | Parameter          | Description   |
-| ------------------ | ------------- |
+| -----------------: | :------------ |
 | `tmp_surf        ` | Temperature of the surface [kelvin].  |
 | `instellation    ` | Stellar flux at planet's orbital distance [W m-2]. |
 | `albedo_b        ` | A pseudo bond-albedo which downscales the stellar flux by 1-albedo_b. |
@@ -98,8 +99,9 @@ General properties of the planet.
 
 ### `[files]`
 Input/output files and other paths.
+
 | Parameter          | Description   |
-| ------------------ | ------------- |
+| -----------------: | :------------ |
 | `input_sf       `  | Path to the desired spectral file ending in `.sf`, in `res/spectral_files/`. |
 | `input_star     `  | Path to stellar spectrum file. Spectrum assumed to be inside spectral file if this is left blank. |
 | `output_dir     `  | Path to the output directory. |
@@ -107,8 +109,9 @@ Input/output files and other paths.
 
 ### `[composition]`
 Atmospheric composition and chemistry.
+
 | Parameter         | Description   |
-| ----------------- | ------------- |
+| ----------------: | :------------ |
 | `p_top         `  | Total top-of-atmosphere pressure [bar]. |
 | `p_dict        `  | Dictionary of gas partial surface pressures [bar]. Summed to obtain `p_surf`. |
 | `p_surf        `  | Total surface pressure [bar]. Incompatible with `p_dict`.|
@@ -120,8 +123,9 @@ Atmospheric composition and chemistry.
 
 ### `[execution]`
 Parameters that tell the model what to do.
+
 | Parameter         | Description   |
-| ----------------- | ------------- |
+| ----------------: | :------------ |
 | `clean_output  `  | Clean old files from the output folder at model startup (true/false). |
 | `verbosity     `  | Logging verbosity (0: quiet, 1: normal, 2: extra logging) |
 | `max_steps     `  | Maximum number of steps the solver should take before giving up (typically <200). |
@@ -148,8 +152,9 @@ Parameters that tell the model what to do.
 
 ### `[plots]`
 Configure plotting routines all of these should be `true` or `false`.
+
 | Parameter         | Description   |
-| ----------------- | ------------- |
+| ----------------: | :------------ |
 | `at_runtime     ` | Make some plots at runtime? |
 | `temperature    ` | Plot temperature-pressure profile? |
 | `fluxes         ` | Plot energy flux profiles? |
@@ -206,7 +211,6 @@ Coupling with Python is done via `juliacall` within the modular [PROTEUS framewo
 
 A skeleton example is given below:
 ```python
-
 # Import juliacall
 from juliacall import Main as jl
 
