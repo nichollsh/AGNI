@@ -29,7 +29,7 @@
 ## Overview
 A numerical model for the atmospheres of hot rocky (exo)planets. The model's primary purpose is to simulate the evolving atmospheres of magma ocean (lava) planets, while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere.
 
-AGNI models correlated-k radiative transfer including shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and CIA. Mixing length theory is used to model convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile. It also supports real gas equations of state.
+AGNI models correlated-k radiative transfer including shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and CIA. Mixing length theory is used to model convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile. It also supports real gas equations of state and self-gravitation.
 
 Consult the [AGNI documentation](https://nichollsh.github.io/AGNI/) for information about the model.
 
@@ -40,8 +40,8 @@ See the [Getting Started](https://nichollsh.github.io/AGNI/dev/setup/) page in t
 
 ## Citation
 If you use AGNI, please cite the following papers:
-* Nicholls et al., (2024b) - https://doi.org/10.1093/mnras/stae2772
-* Nicholls et al., (2025) - in review at JOSS
+* Nicholls et al., (2025a) - https://doi.org/10.1093/mnras/stae2772
+* Nicholls et al., (2025b) - in review at JOSS
 
 ## Example
 Below is an animated example of AGNI solving for a temperature-pressure profile, starting from an isothermal state.
