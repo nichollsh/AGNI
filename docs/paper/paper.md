@@ -61,7 +61,7 @@ This is possible due to the method by which AGNI numerically obtains a solution 
 
 Radiative transfer is performed under the correlated-k and two-stream approximations using SOCRATES[^3], a well-established FORTRAN code developed by the UK Met Office [@manners_socrates_2024; @sergeev_socrates_2023; @amundsen_treatment_2017; @amundsen_radiation_2014]. Convection, condensation, and sensible heat transport are also modelled.
 
-AGNI was used in @hammond_photometric_2024, @nicholls_convection_2025, and @nicholls_tidal_2025.
+AGNI was used in @hammond_photometric_2024, @nicholls_convection_2025, @nicholls_tidal_2025, and @nicholls_escape_2025
 
 [^2]: The PROTEUS framework can be found on GitHub [here](https://github.com/FormingWorlds/PROTEUS).
 [^3]: SOCRATES is mirrored on GitHub, with additional tools, under its original open-source license [here](https://github.com/nichollsh/SOCRATES).
