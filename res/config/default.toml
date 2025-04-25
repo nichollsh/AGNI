@@ -22,16 +22,15 @@ title = "Default"                       # Name for this configuration file
     wind_speed      = 2.0               # Effective wind speed for sensible heat [m s-1].
 
 [files]
-    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"   # Path to SOCRATES spectral file.
-    input_star      = "res/stellar_spectra/trappist-1.txt"              # Path to stellar spectrum.
+    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"   # Path to SOCRATES spectral file.
+    input_star      = "res/stellar_spectra/sun.txt"              # Path to stellar spectrum.
     output_dir      = "out/"                                            # Path to output directory.
 
 [composition]
     p_surf          = 270.0                     # Total surface pressure [bar].
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
     vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
-    vmr_path        = ""                        # Path to input volume mixing ratios. Not required if planet.vmr is passed.
-    include_all     = false                     # Track extra gases, even when their mixing ratio is zero.
+    vmr_file        = ""                        # Path to input volume mixing ratios. Not required if planet.vmr is passed.
     chemistry       = 0                         # Chemistry type (see wiki).
     condensates     = []                        # List of volatiles which are allowed to condense.
 
@@ -44,7 +43,6 @@ title = "Default"                       # Name for this configuration file
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
-    aerosol         = false                     # Include aerosol radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
     real_gas        = true                      # Use real gas equation of state where possible?
     thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?

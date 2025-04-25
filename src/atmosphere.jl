@@ -17,13 +17,16 @@ module atmosphere
     import Interpolations: interpolate, Gridded, Linear, Flat, Line, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
-    # Local files
-    include(joinpath([abspath(ENV["RAD_DIR"]), "julia","src","SOCRATES.jl"]))
+    # SOCRATES library
+    const SOCRATESjl = abspath(ENV["RAD_DIR"], "julia","src","SOCRATES.jl")
+    include(SOCRATESjl)
+
+    # Local modules
     import ..phys
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.3.4"
+    const AGNI_VERSION::String   = "1.4.0"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -430,6 +433,12 @@ module atmosphere
         atmos.control.l_cloud::Bool =       flag_cloud
         atmos.control.l_drop::Bool =        flag_cloud
         atmos.control.l_ice::Bool  =        false
+
+        # warn user about clouds
+        if atmos.control.l_cloud
+            @warn "Clouds are enabled but are poorly tested in AGNI"
+            @warn "    Expect weird behaviour and/or crashes"
+        end
 
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
@@ -1153,6 +1162,7 @@ module atmosphere
         if !isfile(atmos.spectral_file)
             @error "Spectral file '$(atmos.spectral_file)' does not exist"
             @error "Try running `\$ ./src/get_data.sh`"
+            @error "    e.g. to get Honeyside16 you would run `\$ ./src/get_data.sh Honeyside 16`"
             return false
         end
 
