@@ -801,7 +801,6 @@ module atmosphere
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-        - `p_ref::Float64`          observed pressure level [Pa]
 
     Returns:
         - `transspec_rho::Float64`  the bulk density observed in transmission
@@ -948,7 +947,8 @@ module atmosphere
     Returns:
         - `r1::Float64`     radius at end of interval [m]
     """
-    function integrate_hydrograv(r0::Float64, g0::Float64, p0::Float64, p1::Float64, rho::Float64)::Float64
+    function integrate_hydrograv(r0::Float64, g0::Float64,
+                                    p0::Float64, p1::Float64, rho::Float64)::Float64
 
         # Gravity at given radius (neglecting mass within the interval)
         function _grav(r)
