@@ -1,6 +1,7 @@
 <h1 align="center">
     <div>
-        <img src="docs/src/assets/logo_title.svg" style="vertical-align: middle;" width="22%"/>
+        <img src="docs/src/assets/logo_title_light.svg#gh-light-mode-only" style="vertical-align: middle;" width="22%"/>
+        <img src="docs/src/assets/logo_title_dark.svg#gh-dark-mode-only" style="vertical-align: middle;" width="22%"/>
     </div>
 </h1>
 

@@ -1,5 +1,6 @@
 ```@raw html
-    <img src="assets/logo_title.svg" width=32% class="center"/>
+    <img class="display-light-only" src="assets/logo_title_light.svg" width=32% alt="AGNI logo, light mode"/>
+    <img class="display-dark-only"  src="assets/logo_title_dark.svg"  width=32% alt="AGNI logo, dark mode"/>
     <p align="center">
         <b>A radiative-convective model for lava planet atmospheres</b>
     </p>
