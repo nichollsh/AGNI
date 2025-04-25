@@ -5,7 +5,7 @@ format = Documenter.HTML(edit_link = "main",
                          prettyurls = get(ENV, "CI", nothing) == "true",
                          assets = [
                              joinpath("assets", "style.css"),
-                            #  joinpath("assets", "logo.ico")
+                             joinpath("assets", "logo.ico")
                         ]
 )
 
