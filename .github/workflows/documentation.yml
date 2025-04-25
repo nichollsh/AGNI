@@ -1,9 +1,15 @@
 # This job updates the documentation and pushes it to GitHub pages
-# This occurs when a PR to main is merged
 
 name: Docs
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/src/**
+      - docs/make.jl
+      - docs/Project.toml
+      - .github/workflows/documentation.yml
   push:
     branches: [main]
     paths:
@@ -22,13 +28,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
       - uses: julia-actions/cache@v1
-      - name: Install dependencies
+
+      - name: Install Documenter
         run: julia -e 'using Pkg; Pkg.add("Documenter"); Pkg.instantiate()'
-      - name: Build and deploy
+
+      # Setup SOCRATES
+      - name: Get SOCRATES
+        uses: actions/checkout@v4
+        with:
+          repository: 'nichollsh/SOCRATES'
+          path: 'SOCRATES'
+
+      - uses: actions/cache@v4
+        id: cache-socrates
+        with:
+          path: |
+            SOCRATES/bin
+            SOCRATES/sbin
+            SOCRATES/set_rad_env
+          key: socrates-${{ hashFiles('SOCRATES/version') }}
+
+      - name: Build SOCRATES
+        if: steps.cache-socrates.outputs.cache-hit != 'true'
+        run: |
+          export LD_LIBRARY_PATH=""
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          cd $RAD_DIR
+          ./configure
+          ./build_code
+          cd ..
+
+      - name: Build AGNI
+        run: |
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_BIN="$RAD_DIR/bin/"
+          export LD_LIBRARY_PATH=""
+          julia --project="./" -e 'using Pkg; Pkg.build()'
+
+      - name: Build docs and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-        run: julia docs/make.jl
+        run: julia --project="./" docs/make.jl

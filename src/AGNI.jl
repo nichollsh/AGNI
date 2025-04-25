@@ -23,6 +23,7 @@ module AGNI
     include("plotting.jl")
     include("energy.jl")
     include("solver.jl")
+    include("load.jl")
 
     # Import submodules
     import .phys
@@ -34,6 +35,7 @@ module AGNI
     import .energy
     import .solver
     import .chemistry
+    import .load
 
     # Export submodules
     export phys
@@ -41,6 +43,7 @@ module AGNI
     export atmosphere
     export setpt
     export save
+    export load
     export plotting
     export energy
     export chemistry
@@ -262,7 +265,7 @@ module AGNI
                 mf_dict = cfg["composition"]["vmr_dict"]
             elseif haskey(cfg["composition"], "vmr_path")
                 # from csv file to be read-in
-                mf_path = cfg["files"]["input_vmr"]
+                mf_path = cfg["composition"]["vmr_file"]
             else
                 @error "Misconfiguration: if providing p_surf, must also provide VMRs"
                 return false
@@ -344,27 +347,26 @@ module AGNI
         # Setup atmosphere
         @debug "Setup atmosphere "
         return_success = atmosphere.setup!(atmos, ROOT_DIR,output_dir,
-                                cfg["files" ]["input_sf"],
-                                cfg["planet"]["instellation"],
-                                cfg["planet"]["s0_fact"],
-                                cfg["planet"]["albedo_b"],
-                                cfg["planet"]["zenith_angle"],
-                                cfg["planet"]["tmp_surf"],
+                                String(cfg["files" ]["input_sf"]),
+                                Float64(cfg["planet"]["instellation"]),
+                                Float64(cfg["planet"]["s0_fact"]),
+                                Float64(cfg["planet"]["albedo_b"]),
+                                Float64(cfg["planet"]["zenith_angle"]),
+                                Float64(cfg["planet"]["tmp_surf"]),
                                 gravity, radius,
-                                cfg["execution"]["num_levels"],
+                                Int(cfg["execution"]["num_levels"]),
                                 p_surf,
-                                cfg["composition"]["p_top"],
+                                Float64(cfg["composition"]["p_top"]),
                                 mf_dict, mf_path,
 
                                 condensates=condensates,
                                 flag_gcontinuum   = cfg["execution"]["continua"],
                                 flag_rayleigh     = cfg["execution"]["rayleigh"],
                                 flag_cloud        = cfg["execution"]["cloud"],
-                                flag_aerosol      = cfg["execution"]["aerosol"],
                                 overlap_method    = cfg["execution"]["overlap_method"],
                                 real_gas          = cfg["execution"]["real_gas"],
                                 thermo_functions  = cfg["execution"]["thermo_funct"],
-                                use_all_gases     = cfg["composition"]["include_all"],
+                                use_all_gases     = Bool(chem_type > 0),
                                 C_d=turb_coeff, U=wind_speed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
