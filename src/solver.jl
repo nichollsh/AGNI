@@ -806,10 +806,11 @@ module solver
         return atmos.is_converged
     end # end solve_energy
 
-    function solve_transparent!(atmos::atmosphere.Atmos_t,
+    function solve_transparent!(atmos::atmosphere.Atmos_t;
                                     sol_type::Int=1,
                                     conv_atol::Float64=1.0e-2,
-                                    conv_rtol::Float64=1.0e-3)::Bool
+                                    conv_rtol::Float64=1.0e-3,
+                                    max_steps::Int=120)::Bool
         """
         **Solve for energy balance with a transparent atmosphere.**
 
@@ -817,16 +818,17 @@ module solver
 
         Arguments:
         - `atmos::Atmos_t`         the atmosphere struct instance to be used.
-        - `sol_type::Int`          solution type, 1: tmp_surf | 2: skin | 3: flux_int
+        - `sol_type::Int`          solution types, same as solve_energy
         - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
         - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
+        - `max_steps::Int`         maximum number of solver steps
 
         Returns:
         - `Bool` indicating success
         """
 
         # Validate sol_type
-        if (sol_type < 1) || (sol_type > 3)
+        if (sol_type < 1) || (sol_type > 4)
             @error "Invalid solution type ($sol_type)"
             return false
         end
@@ -837,6 +839,9 @@ module solver
             @error "    Cannot use `solve_transparent`"
             return false
         end
+
+        # Parameters
+        tmp_upper::Float64 = 5000.0     # Initial upper bracket on Tsurf [K]
 
         # Handle different solution types
         if sol_type == 1
@@ -857,13 +862,13 @@ module solver
 
                 # Residual = radiative flux minus skin flux
                 energy.calc_fluxes!(atmos, false, false, false, false)
-                return atmos.flux_tot[1] - energy.skin_flux(atmos)
+                return (atmos.flux_tot[end-1] - energy.skin_flux(atmos))^2
             end
 
             # Find solution for T_surf
             tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
             T_surf = gs_search(_skinfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
-                                    1.0e-9, tol, 100)
+                                    0.0, tol, max_steps)
 
             # Store final result
             _skinfunc!(T_surf)
@@ -881,13 +886,37 @@ module solver
 
                 # Residual = radiative flux minus desired flux
                 energy.calc_fluxes!(atmos, false, false, false, false)
-                return atmos.flux_tot[1] - atmos.flux_int
+                return (atmos.flux_tot[end-1] - atmos.flux_int)^2
             end
 
             # Find solution for T_surf
             tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            T_surf = gs_search(_intfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
-                                    1.0e-9, tol, 100)
+            T_surf = gs_search(_intfunc!, atmos.tmp_floor, tmp_upper,
+                                    0.0, tol, max_steps)
+
+            # Store final result
+            _intfunc!(T_surf)
+
+        elseif sol_type == 4
+
+            function _olrfunc!(_tsurf::Float64)::Float64
+                # Cost function, to be minimised. Takes _tsurf and returns the
+                # difference between calculated OLR and required OLR
+
+                # Set temperature
+                atmos.tmp_surf = _tsurf
+                fill!(atmos.tmp,  atmos.tmp_surf)
+                fill!(atmos.tmpl, atmos.tmp_surf)
+
+                # Residual = radiative flux minus desired flux
+                energy.calc_fluxes!(atmos, false, false, false, false)
+                return (atmos.flux_u_lw[end-1] - atmos.target_olr)^2
+            end
+
+            # Find solution for T_surf
+            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
+            T_surf = gs_search(_intfunc!, atmos.tmp_floor, tmp_upper,
+                                    0.0, tol, max_steps)
 
             # Store final result
             _intfunc!(T_surf)

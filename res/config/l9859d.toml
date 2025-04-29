@@ -16,7 +16,7 @@ title = "L 98-59 d"
     wind_speed      = 10.0
 
 [files]
-    input_sf        = "res/spectral_files/nogit_shared/Honeyside/256/Honeyside.sf"
+    input_sf        = "res/spectral_files/Honeyside/256/Honeyside.sf"
     input_star      = "res/stellar_spectra/l-98-59.txt"
     output_dir      = "out/"
 

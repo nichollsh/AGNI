@@ -39,6 +39,11 @@ With condensation turned off, AGNI can couple to [FastChem](https://newstrangewo
 
 AGNI uses the inputted gas partial pressures (or mixing ratios) to calculate the atmosphere's metallicity. When the configuration variable `composition.chemistry` is set to a value of 1, 2, or 3 FastChem will be enabled. At each step of the solver loop, the metallicity and T-P profile will be provided to FastChem in order to calculate the atmospheric composition at each layer. This new composition is applied when calculating energy fluxes, emission spectra, etc.
 
+## Transparent atmospheres
+It is useful to run AGNI with a transparent atmosphere in various scenarios. For example, in the calculation of reflectance or emission spectra of 'bare rock' planets. Or alternatively to determine a planet's surface temperature in the absence of an overlying atmosphere. AGNI incorporates this functionality through the configuration variable `composition.transparent=true`. This will set the atmosphere surface pressure to be small and disable the gas opacity, continuum opacity, and other absorption processes in SOCRATES.
+
+When this is enabled, make sure to use the "transparent" solver. The section below does not apply in this case, as there is only one variable (the surface temperature) to solve for - this is done using a Golden-Section search method.
+
 ## Obtaining a solution
 
 ### Summary
