@@ -574,6 +574,27 @@ total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
+# -------------
+# Transparent atmosphere solver
+# -------------
+@info " "
+@info "Testing transparent solver"
+atmosphere.make_transparent!(atmos)
+solver.solve_transparent!(atmos)
+val_e = 8602.78747109532  # from previous tests
+val_o = atmos.tmp_surf
+@info "Expected value = $(val_e) K"
+@info "Modelled value = $(val_o) K"
+if abs(val_o - val_e)/val_e < rtol
+    @info "Pass"
+else
+    @warn "Fail"
+    failed += 1
+end
+total += 1
+atmosphere.deallocate!(atmos)
+@info "--------------------------"
+
 
 # -------------
 # Inform at end

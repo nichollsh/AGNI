@@ -119,6 +119,7 @@ Atmospheric composition and chemistry.
 | `vmr_file      `  | Path to a file containing mixing ratio profiles. Replaces `vmr_dict`. |
 | `chemistry     `  | Type of chemistry to be used (see below). |
 | `condensates   `  | List of volatiles which are allowed to condense. Incompatible with `chemistry > 0`. |
+| `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
 
 
 ### `[execution]`
@@ -166,6 +167,8 @@ Configure plotting routines all of these should be `true` or `false`.
 | `animate        ` | Make an animation of the solver obtaining its solution? |
 
 ### Details on specific parameters
+* `composition.transparent` configures the atmosphere to be transparent. This works by setting the pressure to be small, and turning off the gas opacity. With this provided, the rest of the parameters in `[configuration]` are redundant. With this enabled, make sure to use the appropriate solver in the `[execution]` table.
+
 * `execution.solution_type` tells the model which state to solve for. The allowed values (integers) are...
      - 1 : zero flux divergence at fixed `tmp_surf`
      - 2 : zero flux divergence such that the conductive skin (CBL) conserves energy flux with fixed `tmp_magma`
@@ -178,6 +181,7 @@ Configure plotting routines all of these should be `true` or `false`.
      - `newton` : the Newton-Raphson algorithm is used
      - `gauss`  : the Gauss-Newton algorithm is used
      - `levenberg` : the Levenberg–Marquardt algorithm is used
+     - `transparent` : solver to be used when `composition.transparent=true`.
 
 * `execution.initial_state` describes the initial temperature profile applied to the atmosphere. This is a list of strings which are applied in the given order, which allows the user to describe a specific state as required. The descriptors are listed below, some of which take a single argument that needs to immediately follow the descriptor in the list order.
      - `dry`              : integrate the dry adiabatic lapse rate from the surface upwards

@@ -253,66 +253,76 @@ module AGNI
         end
 
         #    composition stuff
-        condensates::Array{String,1}    = cfg["composition"]["condensates"]
-        chem_type::Int                  = cfg["composition"]["chemistry"]
+        condensates::Array{String,1}    = String[]
+        chem_type::Int                  = 0
         p_surf::Float64                 = 0.0
+        p_top::Float64                  = 0.0
         mf_dict::Dict{String, Float64}  = Dict{String, Float64}()
         mf_path::String                 = ""
         transparent::Bool               = false
+        real_gas::Bool                  = false
 
-        # transparent atmosphere
+        # transparent atmosphere?
         if haskey(cfg["composition"], "transparent")
             transparent = Bool(cfg["composition"]["transparent"])
+        end
+        if transparent
+            @info "Transparent atmosphere requested"
 
             # set dummy values
-            mf_dict = Dict("N2"=>1.0,"H2O"=>0.0,"CO2"=>0.0,"S2"=>0.0)
-            p_surf  = 1.0
-        end
+            mf_dict  = Dict("N2"=>1.0,"H2O"=>0.0,"CO2"=>0.0,"S2"=>0.0)
+            p_surf   = 1e-3
+            p_top    = 1e-5
+            real_gas = false
 
-        # composition set by VMRs
-        if haskey(cfg["composition"],"p_surf")
-            # set composition using VMRs + Psurf
-            if haskey(cfg["composition"],"vmr_dict")
-                # from dict in cfg file
-                mf_dict = cfg["composition"]["vmr_dict"]
-            elseif haskey(cfg["composition"], "vmr_path")
-                # from csv file to be read-in
-                mf_path = cfg["composition"]["vmr_file"]
+
+        # not transparent
+        else
+            p_top = Float64(cfg["composition"]["p_top"])
+            real_gas = Bool(cfg["execution"]["real_gas"])
+            chem_type = Int(cfg["composition"]["chemistry"])
+            condensates = cfg["composition"]["condensates"]
+
+            # composition set by VMRs
+            if haskey(cfg["composition"],"p_surf")
+                # set composition using VMRs + Psurf
+                if haskey(cfg["composition"],"vmr_dict")
+                    # from dict in cfg file
+                    mf_dict = cfg["composition"]["vmr_dict"]
+                elseif haskey(cfg["composition"], "vmr_path")
+                    # from csv file to be read-in
+                    mf_path = cfg["composition"]["vmr_file"]
+                else
+                    @error "Misconfiguration: if providing p_surf, must also provide VMRs"
+                    return false
+                end
+                p_surf = cfg["composition"]["p_surf"]
+
+            # composition set by partial pressures
+            elseif haskey(cfg["composition"], "p_dict")
+                # set composition from partial pressures (converted to mixing ratios)
+                pp_dict::Dict{String, Float64} = cfg["composition"]["p_dict"]
+                for k in keys(pp_dict)
+                    p_surf += pp_dict[k]
+                end
+                for k in keys(pp_dict)
+                    mf_dict[k] = pp_dict[k]/p_surf
+                end
+
+            # most provide either VMR or partial pressures, if not transparent
             else
-                @error "Misconfiguration: if providing p_surf, must also provide VMRs"
+                @error "Must provide either p_dict or p_surf+VMRs in config"
+                @error "    Neglect these keys only when transparent=true"
                 return false
             end
-            p_surf = cfg["composition"]["p_surf"]
-
-        # composition set by partial pressures
-        elseif haskey(cfg["composition"], "p_dict")
-            # set composition from partial pressures (converted to mixing ratios)
-            pp_dict::Dict{String, Float64} = cfg["composition"]["p_dict"]
-            for k in keys(pp_dict)
-                p_surf += pp_dict[k]
-            end
-            for k in keys(pp_dict)
-                mf_dict[k] = pp_dict[k]/p_surf
-            end
-
-        # most provide either VMR or partial pressures, if not transparent
-        elseif !transparent
-            @error "Must provide either p_dict or p_surf+VMRs in config"
-            @error "    Neglect these keys only when transparent=true"
-            return false
         end
 
+        #    chemistry
         if chem_type in [1,2,3]
             if length(condensates)>0
                 @error "Chemistry coupling is incompatible with condensation"
                 return false
             end
-
-            if transparent
-                @error "Chemistry couplng is incompatible with transparent atmosphere"
-                return false
-            end
-
             mkdir(dir_fastchem)
         end
 
@@ -333,7 +343,7 @@ module AGNI
         # Read OPTIONAL configuration options from dict
         #     sensible heat at the surface
         turb_coeff::Float64 = 0.0; wind_speed::Float64 = 0.0
-        if incl_sens
+        if incl_sens && !transparent
             turb_coeff = cfg["planet"]["turb_coeff"]
             wind_speed = cfg["planet"]["wind_speed"]
         end
@@ -371,7 +381,7 @@ module AGNI
                                 gravity, radius,
                                 Int(cfg["execution"]["num_levels"]),
                                 p_surf,
-                                Float64(cfg["composition"]["p_top"]),
+                                p_top,
                                 mf_dict, mf_path,
 
                                 condensates=condensates,
@@ -379,7 +389,7 @@ module AGNI
                                 flag_rayleigh     = cfg["execution"]["rayleigh"],
                                 flag_cloud        = cfg["execution"]["cloud"],
                                 overlap_method    = cfg["execution"]["overlap_method"],
-                                real_gas          = cfg["execution"]["real_gas"],
+                                real_gas          = real_gas,
                                 thermo_functions  = cfg["execution"]["thermo_funct"],
                                 use_all_gases     = Bool(chem_type > 0),
                                 C_d=turb_coeff, U=wind_speed,
@@ -393,14 +403,17 @@ module AGNI
         # Allocate atmosphere
         return_success = atmosphere.allocate!(atmos,star_file) || return false
 
-        # Set transparent
+        # Set temperatures as appropriate
         if transparent
+            # Make the atmosphere transparent. Also sets pressures to be small and turns
+            #    off the gas opacity, scattering, continuum, etc.
+            @debug "Making atmosphere transparent"
             atmosphere.make_transparent!(atmos)
+        else
+            # Set T(p) by looping over requests in the config.
+            #     Each request may be a command, or an argument following a command
+            setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
         end
-
-        # Set T(p) by looping over requests
-        # Each request may be a command, or an argument following a command
-        setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
 
         # Write initial state
         save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
@@ -446,7 +459,9 @@ module AGNI
         # Transparent atmosphere solver
         elseif sol == "transparent"
             solver_success = solver.solve_transparent!(atmos, sol_type=sol_type,
-                                conv_atol=conv_atol, conv_rtol=conv_rtol)
+                                conv_atol=conv_atol,
+                                conv_rtol=conv_rtol,
+                                max_steps=Int(cfg["execution"]["max_steps"]))
 
         # Use the nonlinear requested solver
         elseif sol in allowed_solvers
@@ -460,7 +475,7 @@ module AGNI
                                 convect=incl_convect, latent=incl_latent,
                                 sens_heat=incl_sens,
                                 max_steps=Int(cfg["execution"]["max_steps"]),
-                                max_runtime=Int( cfg["execution"]["max_runtime"]),
+                                max_runtime=Float64(cfg["execution"]["max_runtime"]),
                                 conv_atol=conv_atol,
                                 conv_rtol=conv_rtol,
                                 method=Int(method_idx),
