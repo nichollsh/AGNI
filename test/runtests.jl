@@ -571,7 +571,6 @@ else
     failed += 1
 end
 total += 1
-atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
 # -------------
