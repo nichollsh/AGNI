@@ -26,7 +26,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.4.0"
+    const AGNI_VERSION::String   = "1.5.0"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -79,11 +79,14 @@ module atmosphere
         bands_cen::Array{Float64,1}    # Midpoint [m]
         bands_wid::Array{Float64,1}    # Width [m]
 
+        # Transparent model?
+        transparent::Bool             # Atmosphere configured to be transparent?
+
         # Pressure-temperature grid (with i=1 at the top of the model)
-        nlev_c::Int         # Cell centre (count)
-        nlev_l::Int         # Cell edge (count)
-        p_boa::Float64      # Pressure at bottom [Pa]
-        p_toa::Float64      # Pressure at top [Pa]
+        nlev_c::Int             # Cell centre (count)
+        nlev_l::Int             # Cell edge (count)
+        p_boa::Float64          # Pressure at bottom [Pa]
+        p_toa::Float64          # Pressure at top [Pa]
         tmp::Array{Float64,1}   # cc temperature [K]
         tmpl::Array{Float64,1}  # ce temperature [K]
         p::Array{Float64,1}     # cc pressure [Pa]
@@ -397,7 +400,7 @@ module atmosphere
                                     s0_fact * cosd(atmos.zenith_degrees)
 
         atmos.flux_int =        flux_int
-        atmos.target_olr =      max(1.0e-20, target_olr)
+        atmos.target_olr =      max(1.0e-10, target_olr)
 
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
@@ -433,6 +436,7 @@ module atmosphere
         atmos.control.l_cloud::Bool =       flag_cloud
         atmos.control.l_drop::Bool =        flag_cloud
         atmos.control.l_ice::Bool  =        false
+        atmos.transparent =                 false
 
         # warn user about clouds
         if atmos.control.l_cloud
@@ -1640,6 +1644,51 @@ module atmosphere
 
         return true
     end  # end of allocate
+
+
+    function make_transparent!(atmos::atmosphere.Atmos_t)
+        """
+        **Set atmosphere properties such that it is effectively transparent.**
+
+        This will modify the surface pressure and disable gas opacity in SOCRATES.
+        These changes cannot be reversed directly. To undo them, it is best to create and
+        allocate a new atmosphere struct.
+
+        Arguments:
+        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+        """
+
+        # Turn off clouds
+        fill!(atmos.cloud_arr_r, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        fill!(atmos.cloud_arr_f, 0.0)
+
+        # Set all gases to use ideal gas EOS
+        # Avoid issues with partial pressures near zero
+        for g in atmos.gas_names
+            atmos.gas_dat[g].eos = phys.EOS_IDEAL
+        end
+
+        # Set surface pressure to be very small, but still larger than TOA pressure
+        atmos.p_boa = atmos.p_toa * 1.1
+        atmos.transspec_p = atmos.p_boa
+        generate_pgrid!(atmos)
+
+        # Set temperatures to be small, except the surface
+        fill!(atmos.tmp[1:end-1],  atmos.tmp_floor)
+        fill!(atmos.tmpl[1:end-1], atmos.tmp_floor)
+
+        # Turn off gas opacity and rayleigh scattering
+        atmos.control.l_continuum = false
+        atmos.control.l_cont_gen  = false
+        atmos.control.l_gas       = false
+        atmos.control.l_rayleigh  = false
+
+        # Flag as transparent
+        atmos.transparent = true
+
+        return nothing
+    end
 
     """
     **Manually set water cloud properties at saturated levels.**

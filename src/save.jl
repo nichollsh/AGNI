@@ -151,6 +151,7 @@ module save
             var_tmax =      defVar(ds, "tceiling",      Float64, (), attrib = OrderedDict("units" => "K"))      # Maximum temperature
             var_plrad =     defVar(ds, "planet_radius", Float64, (), attrib = OrderedDict("units" => "m"))      # Value taken for planet radius
             var_gsurf =     defVar(ds, "surf_gravity",  Float64, (), attrib = OrderedDict("units" => "m s-2"))  # Surface gravity
+            var_ftra =      defVar(ds, "transparent",   Char,    ())                                            # Configured to be transparent?
             var_fray =      defVar(ds, "flag_rayleigh", Char,    ())                                            # Includes rayleigh scattering?
             var_fcon =      defVar(ds, "flag_continuum",Char,    ())                                            # Includes continuum absorption?
             var_fcld =      defVar(ds, "flag_cloud"    ,Char,    ())                                            # Includes clouds?
@@ -180,6 +181,12 @@ module save
             var_plrad[1]  =     atmos.rp
             var_gsurf[1] =      atmos.grav_surf
             var_flux_sns[1] =   atmos.flux_sens
+
+            if atmos.transparent
+                var_ftra[1] = 'y'
+            else
+                var_ftra[1] = 'n'
+            end
 
             if atmos.control.l_rayleigh
                 var_fray[1] = 'y'

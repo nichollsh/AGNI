@@ -571,6 +571,50 @@ else
     failed += 1
 end
 total += 1
+@info "--------------------------"
+
+# -------------
+# Transparent atmosphere solver (sol_type = 4)
+# -------------
+@info " "
+@info "Testing transparent solver (sol_type=4)"
+atmosphere.make_transparent!(atmos)
+atmos.target_olr = 5000.0
+solver.solve_transparent!(atmos; sol_type=4)
+val_e = atmos.target_olr
+val_o = atmos.flux_u_lw[1]
+@info "Expected value = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
+if abs(val_o - val_e)/val_e < rtol
+    @info "Pass"
+else
+    @warn "Fail"
+    display(atmos.flux_u_lw)
+    failed += 1
+end
+total += 1
+@info "--------------------------"
+
+# -------------
+# Transparent atmosphere solver (sol_type = 3)
+# -------------
+@info " "
+@info "Testing transparent solver (sol_type=3)"
+atmosphere.make_transparent!(atmos)
+atmos.flux_int = 1200.0
+solver.solve_transparent!(atmos; sol_type=3)
+val_e = atmos.flux_int
+val_o = atmos.flux_tot[1]
+@info "Expected value = $(val_e) W m-2"
+@info "Modelled value = $(val_o) W m-2"
+if abs(val_o - val_e)/val_e < rtol
+    @info "Pass"
+else
+    @warn "Fail"
+    display(atmos.flux_tot)
+    failed += 1
+end
+total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 

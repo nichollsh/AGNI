@@ -1,5 +1,5 @@
 # AGNI configuration file
-title = "L 98-59 d"
+title = "Transparent atmosphere"
 
 [planet]
     tmp_surf        = 2500.0
@@ -11,42 +11,38 @@ title = "L 98-59 d"
     albedo_s        = 0.0
     radius          = 8.091e6
     gravity         = 12.7
-    flux_int        = 0.1
-    turb_coeff      = 1.0e-2
-    wind_speed      = 10.0
+    flux_int        = 0.0
+    skin_k          = 2.0
+    skin_d          = 0.01
+    tmp_magma       = 3200.0
 
 [files]
-    input_sf        = "res/spectral_files/Honeyside/256/Honeyside.sf"
+    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"
     input_star      = "res/stellar_spectra/l-98-59.txt"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 32.89e3
-    p_top           = 1e-4
-    vmr_dict        = { SO2=1.0 }
-    vmr_file        = ""
-    chemistry       = 0
-    condensates     = []
-
+    transparent     = true
 
 [execution]
     clean_output    = true
-    verbosity       = 1
+    verbosity       = 2
     max_steps       = 200
     max_runtime     = 400
     num_levels      = 50
     continua        = true
     rayleigh        = true
     cloud           = false
+    aerosol         = false
     overlap_method  = "ee"
-    real_gas        = true
-    thermo_funct    = true
-    sensible_heat   = true
-    latent_heat     = true
-    convection      = true
+    real_gas        = false
+    thermo_funct    = false
+    sensible_heat   = false
+    latent_heat     = false
+    convection      = false
     rainout         = false
-    solution_type   = 3
-    solver          = "newton"
+    solution_type   = 1
+    solver          = "transparent"
     dx_max          = 200.0
     initial_state   = ["loglin","600"]
     linesearch      = 0

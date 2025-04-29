@@ -84,6 +84,14 @@ function osf {
         exit 1
     fi
 
+    # check if file contains error message
+    header=$(head --bytes 80 $tgt)
+    if [[ $header == *"message_short"* ]]; then
+        echo "ERROR: Failed to download $1"
+        echo "Response: $header ..."
+        exit 1
+    fi
+
     return 0
 }
 
