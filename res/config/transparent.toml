@@ -12,8 +12,6 @@ title = "L 98-59 d"
     radius          = 8.091e6
     gravity         = 12.7
     flux_int        = 0.1
-    turb_coeff      = 1.0e-2
-    wind_speed      = 10.0
 
 [files]
     input_sf        = "res/spectral_files/nogit_shared/Honeyside/256/Honeyside.sf"
@@ -21,14 +19,10 @@ title = "L 98-59 d"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 32.89e3
-    p_top           = 1e-4
-    vmr_dict        = { SO2=1.0 }
-    vmr_path        = ""
+    transparent     = true
     include_all     = false
     chemistry       = 0
     condensates     = []
-
 
 [execution]
     clean_output    = true
@@ -48,7 +42,7 @@ title = "L 98-59 d"
     convection      = true
     rainout         = false
     solution_type   = 3
-    solver          = "newton"
+    solver          = "transparent"
     dx_max          = 200.0
     initial_state   = ["loglin","600"]
     linesearch      = 0
