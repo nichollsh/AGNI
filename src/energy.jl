@@ -648,6 +648,13 @@ module energy
     end
 
     """
+    **Calculate flux carried by conductive skin.**
+    """
+    function skin_flux(atmos::atmosphere.Atmos_t)::Float64
+        return (atmos.tmp_magma - atmos.tmp_surf) * atmos.skin_k / atmos.skin_d
+    end
+
+    """
     **Reset energy fluxes to zero.**
     """
     function reset_fluxes!(atmos::atmosphere.Atmos_t)

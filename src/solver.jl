@@ -123,6 +123,13 @@ module solver
             return false
         end
 
+        # Check if transparent
+        if atmos.transparent
+            @error "Atmosphere is configured to be transparent."
+            @error "    Cannot use `solve_energy`. Use `solve_transparent` instead."
+            return false
+        end
+
         # Start timer
         wct_start::Float64 = time()
 
@@ -258,8 +265,7 @@ module solver
                 # Zero loss
                 resid[1:end-1] .= atmos.flux_dif[1:end]
                 # Conductive boundary layer
-                resid[end] = atmos.flux_tot[end] -
-                             (atmos.tmp_magma - atmos.tmp_surf) * atmos.skin_k/atmos.skin_d
+                resid[end] = atmos.flux_tot[end] - energy.skin_flux(atmos)
 
             elseif (sol_type == 3)
                 # Zero loss
@@ -788,8 +794,7 @@ module solver
         loss_pct = 100.0*loss/maximum(abs.(atmos.flux_tot))
         @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
         if (sol_type == 2)
-            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
-            @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", F_skin)
+            @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", energy.skin_flux(atmos))
         end
         @info @sprintf("    total flux at TOA  = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    total flux at BOA  = %+.2e W m-2     ", atmos.flux_tot[end])
@@ -800,4 +805,108 @@ module solver
 
         return atmos.is_converged
     end # end solve_energy
+
+    function solve_transparent!(atmos::atmosphere.Atmos_t,
+                                    sol_type::Int=1,
+                                    conv_atol::Float64=1.0e-2,
+                                    conv_rtol::Float64=1.0e-3)::Bool
+        """
+        **Solve for energy balance with a transparent atmosphere.**
+
+        This will use an isothermal temperature profile, and only modify T_surf.
+
+        Arguments:
+        - `atmos::Atmos_t`         the atmosphere struct instance to be used.
+        - `sol_type::Int`          solution type, 1: tmp_surf | 2: skin | 3: flux_int
+        - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
+        - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
+
+        Returns:
+        - `Bool` indicating success
+        """
+
+        # Validate sol_type
+        if (sol_type < 1) || (sol_type > 3)
+            @error "Invalid solution type ($sol_type)"
+            return false
+        end
+
+        # Check if transparent
+        if !atmos.transparent
+            @error "Atmosphere is NOT configured to be transparent"
+            @error "    Cannot use `solve_transparent`"
+            return false
+        end
+
+        # Handle different solution types
+        if sol_type == 1
+            # Fixed temperature case => just calculate fluxes
+            energy.calc_fluxes!(atmos, false, false, false, false)
+
+        elseif sol_type == 2
+            # Conductive boundary layer => find Tsurf based on Tmagma
+
+            function _skinfunc!(_tsurf::Float64)::Float64
+                # Cost function, to be minimised. Takes _tsurf and returns the
+                # difference between outgoing flux and conductive skin flux
+
+                # Set temperature
+                atmos.tmp_surf = _tsurf
+                fill!(atmos.tmp,  atmos.tmp_surf)
+                fill!(atmos.tmpl, atmos.tmp_surf)
+
+                # Residual = radiative flux minus skin flux
+                energy.calc_fluxes!(atmos, false, false, false, false)
+                return atmos.flux_tot[1] - energy.skin_flux(atmos)
+            end
+
+            # Find solution for T_surf
+            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
+            T_surf = gs_search(_skinfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
+                                    1.0e-9, tol, 100)
+
+            # Store final result
+            _skinfunc!(T_surf)
+
+        elseif sol_type == 3
+
+            function _intfunc!(_tsurf::Float64)::Float64
+                # Cost function, to be minimised. Takes _tsurf and returns the
+                # difference between calculated flux and required total flux
+
+                # Set temperature
+                atmos.tmp_surf = _tsurf
+                fill!(atmos.tmp,  atmos.tmp_surf)
+                fill!(atmos.tmpl, atmos.tmp_surf)
+
+                # Residual = radiative flux minus desired flux
+                energy.calc_fluxes!(atmos, false, false, false, false)
+                return atmos.flux_tot[1] - atmos.flux_int
+            end
+
+            # Find solution for T_surf
+            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
+            T_surf = gs_search(_intfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
+                                    1.0e-9, tol, 100)
+
+            # Store final result
+            _intfunc!(T_surf)
+        end
+
+        # Flag as solved
+        atmos.is_converged = true
+        atmos.is_solved = true
+
+        # Print info
+        @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
+        if (sol_type == 2)
+            F_skin = atmos.skin_k / atmos.skin_d * (atmos.tmp_magma - atmos.tmp_surf)
+            @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", F_skin)
+        end
+        @info @sprintf("    total flux         = %+.2e W m-2     ", atmos.flux_tot[1])
+        @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
+
+        return atmos.is_converged
+    end  # end solve_transparent
+
 end
