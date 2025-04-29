@@ -76,11 +76,14 @@ module atmosphere
         bands_cen::Array{Float64,1}    # Midpoint [m]
         bands_wid::Array{Float64,1}    # Width [m]
 
+        # Transparent model?
+        transparent::Bool             # Atmosphere configured to be transparent?
+
         # Pressure-temperature grid (with i=1 at the top of the model)
-        nlev_c::Int         # Cell centre (count)
-        nlev_l::Int         # Cell edge (count)
-        p_boa::Float64      # Pressure at bottom [Pa]
-        p_toa::Float64      # Pressure at top [Pa]
+        nlev_c::Int             # Cell centre (count)
+        nlev_l::Int             # Cell edge (count)
+        p_boa::Float64          # Pressure at bottom [Pa]
+        p_toa::Float64          # Pressure at top [Pa]
         tmp::Array{Float64,1}   # cc temperature [K]
         tmpl::Array{Float64,1}  # ce temperature [K]
         p::Array{Float64,1}     # cc pressure [Pa]
@@ -430,6 +433,7 @@ module atmosphere
         atmos.control.l_cloud::Bool =       flag_cloud
         atmos.control.l_drop::Bool =        flag_cloud
         atmos.control.l_ice::Bool  =        false
+        atmos.transparent =                 false
 
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
@@ -1630,6 +1634,66 @@ module atmosphere
 
         return true
     end  # end of allocate
+
+
+    function make_transparent!(atmos::atmosphere.Atmos_t)
+        """
+        **Set atmosphere properties such that it is effectively transparent.**
+
+        This will modify the surface pressure and composition.
+
+        Arguments:
+        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+        """
+
+        # Turn off clouds
+        fill!(atmos.cloud_arr_r, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        fill!(atmos.cloud_arr_f, 0.0)
+
+        # Determine a filling gas (ideally N2)
+        fill_gas::String = "N2"
+        if !(fill_gas in atmos.gas_names)
+            @warn "Atmosphere does not contain gas $fill_gas"
+            fill_gas = atmos.gas_names[1]
+            @warn "Filling with $fill_gas instead"
+        end
+
+        # Set atmosphere to contain only the filling gas
+        for g in atmos.gas_names
+            if g == fill_gas
+                # use a small mixing ratio for filling gas
+                atmos.gas_vmr[g]  .= 1e-5
+                atmos.gas_ovmr[g] .= 1e-5
+            else
+                # zero mixing ratio for all other gases
+                atmos.gas_vmr[g]  .= 0.0
+                atmos.gas_ovmr[g] .= 0.0
+            end
+        end
+
+        # Set all gases to use ideal gas EOS
+        # Avoid issues with partial pressures near zero
+        for g in atmos.gas_names
+            atmos.gas_dat[g].eos = phys.EOS_IDEAL
+        end
+
+        # Set surface pressure to be very small, but still larger than TOA pressure
+        atmos.p_boa = atmos.p_toa * (1 + 1e-3)
+        atmos.transspec_p = atmos.p_boa
+        generate_pgrid!(atmos)
+
+        # Turn off gas opacity and rayleigh scattering
+        atmos.control.l_continuum = false
+        atmos.control.l_cont_gen  = false
+        atmos.control.l_gas       = false
+        atmos.control.l_rayleigh  = false
+
+        # Flag as transparent
+        atmos.transparent = true
+
+        return nothing
+    end
 
     """
     **Manually set water cloud properties at saturated levels.**
