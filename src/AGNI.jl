@@ -255,6 +255,18 @@ module AGNI
         p_surf::Float64                 = 0.0
         mf_dict::Dict{String, Float64}  = Dict{String, Float64}()
         mf_path::String                 = ""
+        transparent::Bool               = false
+
+        # transparent atmosphere
+        if haskey(cfg["composition"], "transparent")
+            transparent = Bool(cfg["composition"]["transparent"])
+
+            # set dummy values
+            mf_dict = Dict("N2"=>1.0,"H2O"=>0.0,"CO2"=>0.0,"S2"=>0.0)
+            p_surf  = 1.0
+        end
+
+        # composition set by VMRs
         if haskey(cfg["composition"],"p_surf")
             # set composition using VMRs + Psurf
             if haskey(cfg["composition"],"vmr_dict")
@@ -269,6 +281,7 @@ module AGNI
             end
             p_surf = cfg["composition"]["p_surf"]
 
+        # composition set by partial pressures
         elseif haskey(cfg["composition"], "p_dict")
             # set composition from partial pressures (converted to mixing ratios)
             pp_dict::Dict{String, Float64} = cfg["composition"]["p_dict"]
@@ -279,17 +292,25 @@ module AGNI
                 mf_dict[k] = pp_dict[k]/p_surf
             end
 
-        else
-            @error "Misconfiguration: must provide either p_dict or p_surf+VMRs"
+        # most provide either VMR or partial pressures, if not transparent
+        elseif !transparent
+            @error "Must provide either p_dict or p_surf+VMRs in config"
+            @error "    Neglect these keys only when transparent=true"
             return false
         end
+
         if chem_type in [1,2,3]
             if length(condensates)>0
-                @error "Misconfiguration: chemistry coupling is incompatible with condensation"
+                @error "Chemistry coupling is incompatible with condensation"
                 return false
-            else
-                mkdir(dir_fastchem)
             end
+
+            if transparent
+                @error "Chemistry couplng is incompatible with transparent atmosphere"
+                return false
+            end
+
+            mkdir(dir_fastchem)
         end
 
         #    solver stuff
@@ -298,14 +319,8 @@ module AGNI
         incl_sens::Bool        =        cfg["execution"]["sensible_heat"]
         incl_latent::Bool      =        cfg["execution"]["latent_heat"]
         sol_type::Int          =        cfg["execution"]["solution_type"]
-        dx_max::Float64        =        cfg["execution"]["dx_max"]
-        linesearch::Int        =        cfg["execution"]["linesearch"]
-        easy_start::Bool       =        cfg["execution"]["easy_start"]
         conv_atol::Float64     =        cfg["execution"]["converge_atol"]
         conv_rtol::Float64     =        cfg["execution"]["converge_rtol"]
-        max_steps::Int         =        cfg["execution"]["max_steps"]
-        max_runtime::Float64   =        cfg["execution"]["max_runtime"]
-        rainout::Bool          =        cfg["execution"]["rainout"]
 
         #    plotting stuff
         plt_tmp::Bool          = cfg["plots"]["temperature"]
@@ -376,6 +391,11 @@ module AGNI
         # Allocate atmosphere
         return_success = atmosphere.allocate!(atmos,star_file) || return false
 
+        # Set transparent
+        if transparent
+            atmosphere.make_transparent!(atmos)
+        end
+
         # Set T(p) by looping over requests
         # Each request may be a command, or an argument following a command
         setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
@@ -403,7 +423,6 @@ module AGNI
         end
 
         # Solver variables
-        modplot::Int      = 0
         incl_conduct::Bool = false
 
         # Loop over requested solvers
@@ -419,31 +438,44 @@ module AGNI
         if sol == "none"
             energy.calc_fluxes!(atmos, incl_latent,
                                 incl_convect, incl_sens, incl_conduct,
-                                calc_cf=cfg["plots"]["contribution"], rainout=rainout)
+                                calc_cf=Bool(cfg["plots"]["contribution"]),
+                                rainout=Bool(cfg["execution"]["rainout"]))
 
-        # Use the requested solver
+        # Transparent atmosphere solver
+        elseif sol == "transparent"
+            solver_success = solver.solve_transparent!(atmos, sol_type=sol_type,
+                                conv_atol=conv_atol, conv_rtol=conv_rtol)
+
+        # Use the nonlinear requested solver
         elseif sol in allowed_solvers
+            modplot::Int = 0
             if cfg["plots"]["at_runtime"]
                 modplot = 1
             end
             method_idx = findfirst(==(sol), allowed_solvers)
             solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
-                                conduct=incl_conduct,  chem_type=chem_type,
+                                conduct=incl_conduct, chem_type=chem_type,
                                 convect=incl_convect, latent=incl_latent,
-                                sens_heat=incl_sens, max_steps=max_steps,
-                                max_runtime=max_runtime,
-                                conv_atol=conv_atol, conv_rtol=conv_rtol,
-                                method=method_idx, rainout=rainout,
-                                dx_max=dx_max, ls_method=linesearch,
-                                easy_start=easy_start,
-                                modplot=modplot,save_frames=plt_ani)
-            return_success = return_success && solver_success
+                                sens_heat=incl_sens,
+                                max_steps=Int(cfg["execution"]["max_steps"]),
+                                max_runtime=Int( cfg["execution"]["max_runtime"]),
+                                conv_atol=conv_atol,
+                                conv_rtol=conv_rtol,
+                                method=Int(method_idx),
+                                rainout=Bool(cfg["execution"]["rainout"]),
+                                dx_max=Float64(cfg["execution"]["dx_max"]),
+                                ls_method=Int(cfg["execution"]["linesearch"]),
+                                easy_start=Bool(cfg["execution"]["easy_start"]),
+                                modplot=modplot,
+                                save_frames=plt_ani)
 
         # Invalid selection
         else
             @error "Invalid solver"
             return_success = false
         end
+
+        return_success = return_success && solver_success
         @info "    done"
 
         # Fill Kzz in remaining regions
@@ -457,23 +489,25 @@ module AGNI
 
         # Save plots
         @info "Plotting results"
-
-        plt_ani && plotting.animate(atmos)
-        plt_tmp && plotting.plot_pt(atmos,        joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
-        atmos.control.l_cloud && \
-            plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
-        cfg["plots"]["mixing_ratios"] && \
-            plotting.plot_vmr(atmos, joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
-        cfg["plots"]["contribution"]  && \
-            plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.png"))
+        if !transparent
+            plt_ani && plotting.animate(atmos)
+            atmos.control.l_cloud && \
+                plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
+            cfg["plots"]["mixing_ratios"] && \
+                plotting.plot_vmr(atmos, joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
+            cfg["plots"]["contribution"]  && \
+                plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.png"))
+            cfg["plots"]["height"] && \
+                plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.png"))
+        end
+        plt_tmp && \
+            plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
         cfg["plots"]["fluxes"] && \
             plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=incl_convect, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
         cfg["plots"]["emission"] && \
             plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
         cfg["plots"]["albedo"] && \
             plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.png"))
-        cfg["plots"]["height"] && \
-            plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.png"))
 
         # Deallocate atmosphere
         @info "Deallocating memory"
