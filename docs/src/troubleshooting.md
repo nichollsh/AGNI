@@ -25,11 +25,23 @@ rc file permanently.
 
 
 ## Spectral file does not exist
-Check the path in the configuration file. Download additional spectral files using the
-`get_data` script. For example, for additional pure-steam spectral files you would run
+First, check the path in the configuration file.
+
+Download additional spectral files using the `get_data` script.
+For example, for additional pure-steam spectral files you would run:
 ```bash
 ./src/get_data.sh steam
 ```
+
+When you downloaded AGNI it should have obtained a "basic" set of data. This will include
+a reference guide located at `res/spectral_files/reference.pdf`. Using the table inside
+this PDF file, you can decide which set of opacities are appropriate for you.
+
+For example, to download the spectral file `Honeyside16` you would then run:
+```bash
+./src/get_data.sh anyspec Honeyside 16
+```
+Note the space between the codename and number of bands.
 Other spectral files can be downloaded from OSF: https://osf.io/vehxg/.
 
 ## Cannot find FastChem

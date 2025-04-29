@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Download and unpack required and/or optional data
 # All files can be found on OSF at https://osf.io/8dumn/
 
@@ -31,6 +31,7 @@ mkdir -p $thermo
 help_basic="Get the basic data required to run the model"
 help_highres="Get a spectral file with many high-resolution opacities"
 help_steam="Get pure-steam spectral files"
+help_anyspec="Get a particular spectral file by name, passing it as an argument"
 help_stellar="Get a collection of stellar spectra"
 help_surfaces="Get a collection of surface single-scattering albedos"
 help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
@@ -49,6 +50,8 @@ Where [TARGET] can be any of the following:
         $help_steam
     stellar
         $help_stellar
+    anyspec
+        $help_anyspec
     surfaces
         $help_surfaces
     thermodynamics
@@ -75,6 +78,12 @@ function osf {
     mkdir -p $2
     curl -LsS "https://osf.io/download/$1/" > $tgt
 
+    # check file exists
+    if [[ ! -f "$tgt" ]]; then
+        echo "ERROR: Failed to download $1"
+        exit 1
+    fi
+
     return 0
 }
 
@@ -89,20 +98,82 @@ function get_zip {
     rm $2/$zipfile
 }
 
+# Get a spectral file by name (associative arrays not supported on MacOS)
+function anyspec {
+    # $1 = Codename (e.g. Honeyside)
+    # $2 = Number of bands (e.g. 48)
+
+    name="$1$2"
+
+    # Get identifiers
+    case $name in
+        "Frostflow16" )
+            id_a="6rvfe"; id_b="kxve8"
+            ;;
+        "Frostflow48" )
+            id_a="9n6mw"; id_b="xfap8"
+            ;;
+        "Frostflow256")
+            id_a="mnvyq"; id_b="tzsgc"
+            ;;
+        "Frostflow4096")
+            id_a="eyw6b"; id_b="ry6qz"
+            ;;
+
+        "Dayspring16" )
+            id_a="uwfja"; id_b="j7f2w"
+            ;;
+        "Dayspring48" )
+            id_a="heuza"; id_b="c5jv3"
+            ;;
+        "Dayspring256")
+            id_a="b5gsh"; id_b="dn6wh"
+            ;;
+        "Dayspring4096")
+            id_a="g5nh8"; id_b="htn3q"
+            ;;
+
+        "Honeyside16" )
+            id_a="6cqnp"; id_b="f5snk"
+            ;;
+        "Honeyside48" )
+            id_a="rxj5a"; id_b="xfc5h"
+            ;;
+        "Honeyside256")
+            id_a="97436"; id_b="xny6v"
+            ;;
+        "Honeyside4096")
+            id_a="p672d"; id_b="ujb4z"
+            ;;
+
+        "Oak318" )
+            id_a="qmp4e"; id_b="5fxr7"
+            ;;
+
+        "Legacy318" )
+            id_a="b7dvn"; id_b="m8zf5"
+            ;;
+        * )
+            echo "ERROR: Unknown spectral file requested"
+            exit 1
+            ;;
+    esac
+
+    # Download the file
+    osf $id_a $spfiles/$1/$2 $1.sf
+    osf $id_b $spfiles/$1/$2 $1.sf_k
+}
+
 # Handle request for downloading a group of data
 function handle_request {
     case $1 in
         "basic")
             echo $help_basic
 
-            osf qmp4e $spfiles/Oak/318/ Oak.sf
-            osf 5fxr7 $spfiles/Oak/318/ Oak.sf_k
-
-            osf heuza $spfiles/Dayspring/48/ Dayspring.sf
-            osf c5jv3 $spfiles/Dayspring/48/ Dayspring.sf_k
-
-            osf b5gsh $spfiles/Honeyside/256/ Honeyside.sf
-            osf dn6wh $spfiles/Honeyside/256/ Honeyside.sf_k
+            anyspec Oak 318
+            anyspec Dayspring 48
+            anyspec Honeyside 256
+            osf 6k8ba $spfiles reference.pdf
 
             osf 2qdu8 $stellar sun.txt
 
@@ -111,22 +182,19 @@ function handle_request {
 
         "highres")
             echo $help_highres
-
-            osf p672d $spfiles/Honeyside/4096/ Honeyside.sf
-            osf ujb4z $spfiles/Honeyside/4096/ Honeyside.sf_k
+            anyspec Honeyside 4096
             ;;
 
         "steam")
             echo $help_steam
+            anyspec Frostflow 16
+            anyspec Frostflow 48
+            anyspec Frostflow 256
+            ;;
 
-            osf 6rvfe $spfiles/Frostflow/16/ Frostflow.sf
-            osf kxve8 $spfiles/Frostflow/16/ Frostflow.sf_k
-
-            osf 9n6mw $spfiles/Frostflow/48/ Frostflow.sf
-            osf xfap8 $spfiles/Frostflow/48/ Frostflow.sf_k
-
-            osf mnvyq $spfiles/Frostflow/256/ Frostflow.sf
-            osf tzsgc $spfiles/Frostflow/256/ Frostflow.sf_k
+        "anyspec")
+            echo $help_anyspec
+            anyspec $2 $3
             ;;
 
         "stellar")
@@ -165,10 +233,7 @@ function handle_request {
 
         "thermodynamics")
             echo $help_thermo
-
-            # NetCDF files from OSF
             get_zip 4m5x8 $thermo
-
             ;;
 
         *)
@@ -179,6 +244,6 @@ function handle_request {
     return 0
 }
 
-handle_request $1
+handle_request $@
 
 exit 0

@@ -26,7 +26,6 @@ title = "Line-by-line validation tests"
     p_surf          = 123.0
     p_top           = 1e-6
     vmr_dict        = { H2O = 0.9, CO2=0.1 }
-    include_all     = false
     chemistry       = 0
     condensates     = []
 
@@ -39,7 +38,6 @@ title = "Line-by-line validation tests"
     continua        = false
     rayleigh        = false
     cloud           = false
-    aerosol         = false
     overlap_method  = "ro"
     real_gas        = false
     thermo_funct    = true

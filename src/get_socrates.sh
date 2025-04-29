@@ -18,7 +18,10 @@ else
     use_ssh=false
 fi
 
-# Download (using SSH if possible)
+# Disable SSH (uncomment to allow SSH clone of SOCRATES)
+use_ssh=false
+
+# Download
 root=$(dirname $(realpath $0))
 root=$(realpath "$root/..")
 socpath="$root/socrates"

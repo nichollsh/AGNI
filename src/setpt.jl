@@ -72,7 +72,6 @@ module setpt
 
             elseif str_req == "ana"
                 # analytic solution
-                idx_req += 1
                 setpt.analytic!(atmos)
 
             else

@@ -24,8 +24,7 @@ title = "Hot and dry"
     p_surf          = 2700.0
     p_top           = 1e-5
     vmr_dict        = { H2O = 1.0}
-    vmr_path        = ""
-    include_all     = false
+    vmr_file        = ""
     chemistry       = 0
     condensates     = []
 
@@ -39,7 +38,6 @@ title = "Hot and dry"
     continua        = true
     rayleigh        = true
     cloud           = false
-    aerosol         = false
     overlap_method  = "ee"
     real_gas        = true
     thermo_funct    = true
