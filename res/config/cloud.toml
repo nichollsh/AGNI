@@ -14,17 +14,14 @@ title = "Cloud radiative properties test"
     flux_int        = 0.0
 
 [files]
-    # input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"
-    # input_star      = "res/stellar_spectra/sun.txt"
-    input_sf  = "out/runtime.sf"
-    input_star = ""
+    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"
+    input_star      = "res/stellar_spectra/sun.txt"
     output_dir      = "out/"
 
 [composition]
     p_surf          = 2000.0
     p_top           = 1e-6
     vmr_dict        = { H2O=0.8, CO2=0.19, N2=0.01}
-    include_all     = false
     chemistry       = 0
     condensates     = ["H2O"]
 
@@ -36,8 +33,7 @@ title = "Cloud radiative properties test"
     num_levels      = 100
     continua        = true
     rayleigh        = false
-    cloud           = false
-    aerosol         = false
+    cloud           = true
     overlap_method  = "ro"
     real_gas        = false
     thermo_funct    = true

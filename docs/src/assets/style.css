@@ -8,3 +8,23 @@
     margin-left: auto;
     margin-right: auto;
 }
+
+.display-light-only {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.display-dark-only {
+    display: none;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.theme--documenter-dark .display-light-only {
+    display: none;
+}
+
+.theme--documenter-dark .display-dark-only {
+    display: block;
+}

@@ -17,13 +17,16 @@ module atmosphere
     import Interpolations: interpolate, Gridded, Linear, Flat, Line, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
-    # Local files
-    include(joinpath([abspath(ENV["RAD_DIR"]), "julia","src","SOCRATES.jl"]))
+    # SOCRATES library
+    const SOCRATESjl = abspath(ENV["RAD_DIR"], "julia","src","SOCRATES.jl")
+    include(SOCRATESjl)
+
+    # Local modules
     import ..phys
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.3.4"
+    const AGNI_VERSION::String   = "1.4.0"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -435,6 +438,12 @@ module atmosphere
         atmos.control.l_ice::Bool  =        false
         atmos.transparent =                 false
 
+        # warn user about clouds
+        if atmos.control.l_cloud
+            @warn "Clouds are enabled but are poorly tested in AGNI"
+            @warn "    Expect weird behaviour and/or crashes"
+        end
+
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
         atmos.tmp =  zeros(Float64, atmos.nlev_c)
@@ -461,8 +470,8 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 3.0e4   # mixed composition case
-        atmos.phs_tau_sgl = 3.0e4   # single gas case
+        atmos.phs_tau_mix = 1.0e5   # mixed composition case
+        atmos.phs_tau_sgl = 1.0e5   # single gas case
 
         # Hardcoded cloud properties
         atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
@@ -796,7 +805,6 @@ module atmosphere
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-        - `p_ref::Float64`          observed pressure level [Pa]
 
     Returns:
         - `transspec_rho::Float64`  the bulk density observed in transmission
@@ -943,7 +951,8 @@ module atmosphere
     Returns:
         - `r1::Float64`     radius at end of interval [m]
     """
-    function integrate_hydrograv(r0::Float64, g0::Float64, p0::Float64, p1::Float64, rho::Float64)::Float64
+    function integrate_hydrograv(r0::Float64, g0::Float64,
+                                    p0::Float64, p1::Float64, rho::Float64)::Float64
 
         # Gravity at given radius (neglecting mass within the interval)
         function _grav(r)
@@ -1157,6 +1166,7 @@ module atmosphere
         if !isfile(atmos.spectral_file)
             @error "Spectral file '$(atmos.spectral_file)' does not exist"
             @error "Try running `\$ ./src/get_data.sh`"
+            @error "    e.g. to get Honeyside16 you would run `\$ ./src/get_data.sh Honeyside 16`"
             return false
         end
 
