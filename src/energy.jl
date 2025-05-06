@@ -31,8 +31,10 @@ module energy
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `lw::Bool`                        longwave calculation? Else: shortwave
     - `calc_cf::Bool=false`             also calculate contribution function?
+    - `benchmark::Bool=false`           add time spent doing RT to counter
     """
-    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
+    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool;
+                            calc_cf::Bool=false, benchmark::Bool=false)
         if !atmos.is_alloc
             error("atmosphere arrays have not been allocated")
         end
@@ -41,6 +43,10 @@ module energy
         end
 
         atmos.num_rt_eval += 1
+
+        if benchmark
+            time_start::UInt64 = time_ns()
+        end
 
         # Longwave or shortwave calculation?
         # Set the two-stream approximation to be used (-t f)
@@ -270,6 +276,11 @@ module energy
             atmos.flux_d = atmos.flux_d_lw + atmos.flux_d_sw
             atmos.flux_u = atmos.flux_u_lw + atmos.flux_u_sw
             atmos.flux_n = atmos.flux_n_lw + atmos.flux_n_sw
+        end
+
+        # Store time
+        if benchmark
+            atmos.tim_rt_eval += time_ns() - time_start
         end
 
         return nothing
