@@ -49,29 +49,20 @@ Ensuring sufficient spectral resolution is important in modelling the blanketing
 
 # Comparison with other codes
 
-AGNI is developed with the view of being coupled into the PROTEUS framework[^2] alongside other physical models. In addressing the aforementioned problems, it is able to:
+AGNI is developed with the view of being coupled into the PROTEUS framework[^2] alongside other modules. In addressing the aforementioned problems, it is able to:
 
-* be coupled to a planet-interior model (PROTEUS) with an appropriate surface boundary condition,
+* be coupled to a planetary interior modelwith an appropriate surface boundary condition,
 * account for atmospheres of diverse gaseous composition with realistic opacities and equations of state,
 * solve for an atmospheric temperature structure that conserves energy and allows for convectively stable regions,
 * operate with sufficient speed that it may participate in a wide parameter space,
 
-This is possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport (@nicholls_convection_2025). Rather than time-stepping each model level according to radiative heating and applying convective adjustment (e.g. @malik_helios_2017, @selsis_cool_2023, @pierrehumbert_book_2010), AGNI uses the Newton-Raphson method to conserve energy fluxes through the column to a required tolerence. A typical runtime when applying the model standalone (Figure 1) from a poor initial guess of the true temperature profile is 3 minutes. When providing a 'good' guess, such as when AGNI is applied within the PROTEUS framework (see Figure 1), AGNI will obtain a solution in less than 1 minute. A single radiative transfer call takes approximately 30 ms, performed under the correlated-k and two-stream approximations using SOCRATES[^3]: a well-established FORTRAN code developed by the UK Met Office [@edwards_studies_1996; @sergeev_socrates_2023; @amundsen_treatment_2017]. Convection, condensation, and sensible heat transport are also modelled.
+This is possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport (@nicholls_convection_2025). Our model uses the Newton-Raphson method to conserve energy fluxes through each level of the column to a required tolerence. A typical runtime when applying the model standalone using its command-line interface (Figure 1b) with a poor initial guess of the true temperature profile is 3 minutes. When providing a 'good' guess, such as when AGNI is coupled within the PROTEUS framework (Figure 1a), an atmosphere solution will be obtaind in less than 1 minute. A single radiative transfer calculation takes approximately 30 ms, performed under the correlated-k and two-stream approximations using SOCRATES[^3]: a well-established FORTRAN code developed by the UK Met Office [@edwards_studies_1996; @sergeev_socrates_2023; @amundsen_treatment_2017]. Convection, condensation, and sensible heat transport are also modelled.
 
-Table 1 below compares AGNI to existing atmosphere models which have been applied to lava planets in the literature. Whilst all of these codes have been used to model the atmospheres of static non-evolving planets, AGNI stands out as being the only open source code currently integrated into a comprehensive interior-atmosphere evolution model.
+HELIOS [@malik_helios_2017] is popular atmosphere model similar to AGNI, but it depends on an Nvidia GPU in order to perform radiative transfer calculations. Whilst this makes each calculation fast, it also means that HELIOS cannot be used on platforms without an Nvidia GPU or with limited resources. GENESIS [@piette_rocky_2023] has been applied to lava planet atmospheres but is closed-source and not publically available. Exo_k [@selsis_cool_2023] is open source and written in pure Python, but is not designed to be coupled with an interior evolution model. These codes have been used to model the atmospheres of static non-evolving planets, so AGNI stands out as being the only open source model currently integrated into a comprehensive interior-atmosphere evolution framework like PROTEUS. No other models of lava planet atmospheres implement a real-gas equation of state.
 
-| Model                               | Solution method    | Open source? | Real gas EoS?   | Interior coupling? | Chemistry   | Supported platforms |
-|:---------                           |:----------------   |:------------:|:---------------:|:------------------:|:--------    |:------------------- |
-| HELIOS @malik_helios_2017           | Time-stepping      | Yes          | -               |  -                 | Diseqm.     | Nvidia devices only |
-| PCM-LBL @wordsworth_coupled_2021    | Time-stepping      | Yes          | -               |  -                 | None        | Linux & MacOS       |
-| Exo_k  @selsis_cool_2023            | Nondim. time-step  | Yes          | -               |  -                 | None        | Linux & MacOS       |
-| PICASO  @mukherjee_picaso_2023      | Nonlinear opt.     | Yes          | -               |  -                 | Diseqm.     | Linux & MacOS       |
-| GENESIS  @piette_rocky_2023         | Time-stepping      | -            | -               |  Partially?        | Diseqm.     | Unknown             |
-| **AGNI** @nicholls_convection_2025  | **Nonlinear opt.** | **Yes**      | **Yes**         | **Yes**            | **Eqm.**    | **Linux & MacOS**   |
+Coupling with PROTEUS is one primary use-case for AGNI. Our model can also be used standalone (as in @hammond_photometric_2024) through its command-line interface and configuration files, or through Jupyter notebooks (as in the tutorials). Figure 1 below compares the two primary use-cases driving the development of AGNI.
 
-The primary use-case for AGNI is the integration into the PROTEUS framework, where it is self-consistently coupled to other open source modules. However, AGNI can still be applied to answer science questions standalone (as in @hammond_photometric_2024). Figure 1 below compares the two primary use-cases driving the development of AGNI.
-
-![Visual comparison of the two primary use-cases for AGNI.](application.svg){ width=80% }
+![Visual comparison of the two primary use-cases for AGNI.](application.svg){ width=90% }
 
 [^2]: The PROTEUS framework can be found [here](https://github.com/FormingWorlds/PROTEUS).
 [^3]: SOCRATES, packaged with additional tooling, is available [here](https://github.com/nichollsh/SOCRATES).
