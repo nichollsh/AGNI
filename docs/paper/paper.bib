@@ -11,12 +11,38 @@
     url={https://epubs.siam.org/doi/10.1137/141000671}
 }
 
-@techreport{manners_socrates_2024,
-  title={SOCRATES Technical Guide: Suite Of Community RAdiative Transfer Codes Based on Edwards and Slingo},
-  author={Manners, James and others},
-  year={2024},
-  institution={Met Office, Exeter, UK}
+@article{edwards_studies_1996,
+author = {Edwards, J. M. and Slingo, A.},
+title = {Studies with a flexible new radiation code. I: Choosing a configuration for a large-scale model},
+journal = {Quarterly Journal of the Royal Meteorological Society},
+volume = {122},
+number = {531},
+pages = {689-719},
+keywords = {Climate modelling, Cloud radiative properties, Numerical weather prediction, Portable code, Radiation parametrization, Variable spectral resolution},
+doi = {https://doi.org/10.1002/qj.49712253107},
+url = {https://rmets.onlinelibrary.wiley.com/doi/abs/10.1002/qj.49712253107},
+eprint = {https://rmets.onlinelibrary.wiley.com/doi/pdf/10.1002/qj.49712253107},
+abstract = {Abstract A comprehensive new radiation code based on the two-stream equations in both the long-wave and short-wave spectral regions is described. The spectral resolution of the code is variable, enabling it to be used in a wide range of applications. Because of its flexibility, the code is well-suited to the investigation of the sensitivity of radiative calculations to changes in the way in which physical processes are parametrized. The gaseous transmission data are derived from a line-by-line model. Particular attention is directed towards the treatment of the water vapour continuum, the overlap between gases, and the sensitivity to changing the carbon dioxide concentrations. The performance of the code is examined both at high spectral resolution and in a lower-resolution configuration designed for the UK Meteorological Office Unified Forecast/Climate Model (UM). Particularly for use in the UM, the code must be shown to perform satisfactorily across the whole range of atmospheric conditions. Comparisons are therefore made with reference calculations in both the long-wave and the short-wave, in clear and cloudy skies, and the accuracy with which various processes may be represented is studied. For the cloudy calculations in the short-wave, a new method is presented for deriving the single-scattering properties in broad bands, based on the analytic expression for the reflectivity of an optically thick cloud. This minimizes the errors in calculating the short-wave radiative properties of water clouds when the spectral resolution is reduced to that designed for the UM. In contrast, for ice clouds the errors are minimized by deriving the single-scattering properties using linear averaging, as appropriate for optically thin clouds. In the long-wave, the vertical distribution of the radiative heating in cirrus clouds is examined at high spectral resolution. The effect of scattering of long-wave radiation, usually ignored in large-scale models, is examined in some detail and is explained using a simple model. Taking all these studies into account, it is concluded that the configuration designed for the UM retains the generality of the code, without significantly compromising the overall accuracy.},
+year = {1996}
 }
+
+
+@article{gandhi_genesis_2017,
+    author = {Gandhi, Siddharth and Madhusudhan, Nikku},
+    title = {genesis: new self-consistent models of exoplanetary spectra},
+    journal = {Monthly Notices of the Royal Astronomical Society},
+    volume = {472},
+    number = {2},
+    pages = {2334-2355},
+    year = {2017},
+    month = {06},
+    abstract = {We are entering the era of high-precision and high-resolution spectroscopy of exoplanets. Such observations herald the need for robust self-consistent spectral models of exoplanetary atmospheres to investigate intricate atmospheric processes and to make observable predictions. Spectral models of plane-parallel exoplanetary atmospheres exist, mostly adapted from other astrophysical applications, with different levels of sophistication and accuracy. There is a growing need for a new generation of models custom-built for exoplanets and incorporating state-of-the-art numerical methods and opacities. The present work is a step in this direction. Here we introduce genesis, a plane-parallel, self-consistent, line-by-line exoplanetary atmospheric modelling code that includes (a) formal solution of radiative transfer using the Feautrier method, (b) radiative–convective equilibrium with temperature correction based on the Rybicki linearization scheme, (c) latest absorption cross-sections, and (d) internal flux and external irradiation, under the assumptions of hydrostatic equilibrium, local thermodynamic equilibrium and thermochemical equilibrium. We demonstrate the code here with cloud-free models of giant exoplanetary atmospheres over a range of equilibrium temperatures, metallicities, C/O ratios and spanning non-irradiated and irradiated planets, with and without thermal inversions. We provide the community with theoretical emergent spectra and pressure–temperature profiles over this range, along with those for several known hot Jupiters. The code can generate self-consistent spectra at high resolution and has the potential to be integrated into general circulation and non-equilibrium chemistry models as it is optimized for efficiency and convergence. genesis paves the way for high-fidelity remote sensing of exoplanetary atmospheres at high resolution with current and upcoming observations.},
+    issn = {0035-8711},
+    doi = {10.1093/mnras/stx1601},
+    url = {https://doi.org/10.1093/mnras/stx1601},
+    eprint = {https://academic.oup.com/mnras/article-pdf/472/2/2334/19942998/stx1601.pdf},
+}
+
 
 @article{malik_helios_2017,
 	title = {{HELIOS}: {AN} {OPEN}-{SOURCE}, {GPU}-{ACCELERATED} {RADIATIVE} {TRANSFER} {CODE} {FOR} {SELF}-{CONSISTENT} {EXOPLANETARY} {ATMOSPHERES}},
@@ -34,10 +60,24 @@
 	pages = {56},
 }
 
+@article{mukherjee_picaso_2023,
+doi = {10.3847/1538-4357/ac9f48},
+url = {https://dx.doi.org/10.3847/1538-4357/ac9f48},
+year = {2023},
+month = {jan},
+publisher = {The American Astronomical Society},
+volume = {942},
+number = {2},
+pages = {71},
+author = {Mukherjee, Sagnick and Batalha, Natasha E. and Fortney, Jonathan J. and Marley, Mark S.},
+title = {PICASO 3.0: A One-dimensional Climate Model for Giant Planets and Brown Dwarfs},
+journal = {The Astrophysical Journal},
+}
+
 
 @article{amundsen_treatment_2017,
-	author = {{Amundsen, David S.} and {Tremblin, Pascal} and {Manners, James} and {Baraffe, Isabelle} and {Mayne, Nathan J.}},
-	title = {Treatment of overlapping gaseous absorption   with the correlated-k method in hot Jupiter   and brown dwarf atmosphere models},
+	author = {Amundsen, David S. and Tremblin, Pascal and Manners, James and Baraffe, Isabelle and Mayne, Nathan J.},
+	title = {Treatment of overlapping gaseous absorption with the correlated-k method in hot Jupiter and brown dwarf atmosphere models},
 	DOI= "10.1051/0004-6361/201629322",
 	url= "https://doi.org/10.1051/0004-6361/201629322",
 	journal = {A&A},
@@ -56,6 +96,30 @@
 	year = {2014},
 	pages = {A59},
 }
+
+@Article{wordsworth_coupled_2021,
+author="Wordsworth, Robin
+and Knoll, Andrew H.
+and Hurowitz, Joel
+and Baum, Mark
+and Ehlmann, Bethany L.
+and Head, James W.
+and Steakley, Kathryn",
+title="A coupled model of episodic warming, oxidation and geochemical transitions on early Mars",
+journal="Nature Geoscience",
+year="2021",
+month="Mar",
+day="01",
+volume="14",
+number="3",
+pages="127--132",
+abstract="Reconciling the geology of Mars with models of atmospheric evolution remains a major challenge. Martian geology is characterized by past evidence for episodic surface liquid water, and geochemistry indicating a slow and intermittent transition from wetter to drier and more oxidizing surface conditions. Here we present a model that incorporates randomized injection of reducing greenhouse gases and oxidation due to hydrogen escape to investigate the conditions responsible for these diverse observations. We find that Mars could have transitioned repeatedly from reducing (hydrogen-rich) to oxidizing (oxygen-rich) atmospheric conditions in its early history. Our model predicts a generally cold early Mars, with mean annual temperatures below 240{\thinspace}K. If peak reducing-gas release rates and background carbon dioxide levels are high enough, it nonetheless exhibits episodic warm intervals sufficient to degrade crater walls, form valley networks and create other fluvial/lacustrine features. Our model also predicts transient build-up of atmospheric oxygen, which can help explain the occurrence of oxidized mineral species such as manganese oxides at Gale Crater. We suggest that the apparent Noachian--Hesperian transition from phyllosilicate deposition to sulfate deposition around 3.5 billion years ago can be explained as a combined outcome of increasing planetary oxidation, decreasing groundwater availability and a waning bolide impactor flux, which dramatically slowed the remobilization and thermochemical destruction of surface sulfates. Ultimately, rapid and repeated variations in Mars's early climate and surface chemistry would have presented both challenges and opportunities for any emergent microbial life.",
+issn="1752-0908",
+doi="10.1038/s41561-021-00701-8",
+url="https://doi.org/10.1038/s41561-021-00701-8"
+}
+
+
 
 
 @article{schaefer_magma_2016,
@@ -84,22 +148,14 @@ URL = {https://gmd.copernicus.org/articles/16/5601/2023/},
 DOI = {10.5194/gmd-16-5601-2023}
 }
 
-@ARTICLE{zieba_obs_2023,
-       author = {{Zieba}, Sebastian and {Kreidberg}, Laura and {Ducrot}, Elsa and {Gillon}, Micha{\"e}l and {Morley}, Caroline and {Schaefer}, Laura and {Tamburo}, Patrick and {Koll}, Daniel D.~B. and {Lyu}, Xintong and {Acu{\~n}a}, Lorena and {Agol}, Eric and {Iyer}, Aishwarya R. and {Hu}, Renyu and {Lincowski}, Andrew P. and {Meadows}, Victoria S. and {Selsis}, Franck and {Bolmont}, Emeline and {Mandell}, Avi M. and {Suissa}, Gabrielle},
-        title = "{No thick carbon dioxide atmosphere on the rocky exoplanet TRAPPIST-1 c}",
-      journal = {Nature},
-     keywords = {Astrophysics - Earth and Planetary Astrophysics},
-         year = 2023,
-        month = aug,
-       volume = {620},
-       number = {7975},
-        pages = {746-749},
-          doi = {10.1038/s41586-023-06232-z},
-archivePrefix = {arXiv},
-       eprint = {2306.10150},
- primaryClass = {astro-ph.EP},
-       adsurl = {https://ui.adsabs.harvard.edu/abs/2023Natur.620..746Z},
-      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+@misc{belloarufe_so2_2025,
+      title={Evidence for a volcanic atmosphere on the sub-Earth L98-59b},
+      author={Aaron Bello-Arufe and Mario Damiano and Katherine A. Bennett and Renyu Hu and Luis Welbanks and Ryan J. MacDonald and Darryl Z. Seligman and David K. Sing and Armen Tokadjian and Apurva Oza and Jeehyun Yang},
+      year={2025},
+      eprint={2501.18680},
+      archivePrefix={arXiv},
+      primaryClass={astro-ph.EP},
+      url={https://arxiv.org/abs/2501.18680},
 }
 
 @ARTICLE{hu_cancri_2024,
@@ -351,6 +407,24 @@ archivePrefix = {arXiv},
        adsurl = {https://ui.adsabs.harvard.edu/abs/2025ApJ...978L..40H},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
+
+@article{nicholls_redox_2024,
+author = {Nicholls, Harrison and Lichtenberg, Tim and Bower, Dan J. and Pierrehumbert, Raymond},
+title = {Magma Ocean Evolution at Arbitrary Redox State},
+journal = {Journal of Geophysical Research: Planets},
+volume = {129},
+number = {12},
+pages = {e2024JE008576},
+keywords = {magma oceans, lava planets, exoplanets, atmospheres, simulation, convection},
+doi = {https://doi.org/10.1029/2024JE008576},
+url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2024JE008576},
+eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2024JE008576},
+note = {e2024JE008576 2024JE008576},
+abstract = {Abstract Interactions between magma oceans and overlying atmospheres on young rocky planets leads to an evolving feedback of outgassing, greenhouse forcing, and mantle melt fraction. Previous studies have predominantly focused on the solidification of oxidized Earth-similar planets, but the diversity in mean density and irradiation observed in the low-mass exoplanet census motivate exploration of strongly varying geochemical scenarios. We aim to explore how variable redox properties alter the duration of magma ocean solidification, the equilibrium thermodynamic state, melt fraction of the mantle, and atmospheric composition. We develop a 1D coupled interior-atmosphere model that can simulate the time-evolution of lava planets. This is applied across a grid of fixed redox states, orbital separations, hydrogen endowments, and C/H ratios around a Sun-like star. The composition of these atmospheres is highly variable before and during solidification. The evolutionary path of an Earth-like planet at 1 AU ranges between permanent magma ocean states and solidification within 1 Myr. Recently solidified planets typically host H2O \${\mathrm{H}}\_{2}\mathrm{O}\$- or H2 \${\mathrm{H}}\_{2}\$-dominated atmospheres in the absence of escape. Orbital separation is the primary factor determining magma ocean evolution, followed by the total hydrogen endowment, mantle oxygen fugacity, and finally the planet's C/H ratio. Collisional absorption by H2 \${\mathrm{H}}\_{2}\$ induces a greenhouse effect which can prevent or stall magma ocean solidification. Through this effect, as well as the outgassing of other volatiles, geochemical properties exert significant control over the fate of magma oceans on rocky planets.},
+year = {2024}
+}
+
+
 
 @ARTICLE{nicholls_convection_2025,
     author = {Nicholls, Harrison and Pierrehumbert, Raymond T and Lichtenberg, Tim and Soucasse, Laurent and Smeets, Stef},

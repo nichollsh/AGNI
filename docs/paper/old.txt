@@ -1,0 +1,10 @@
+| Model                               | Solution method    | Open source? | Real gas EoS?   | Interior coupling? | Chemistry   | Supported platforms |
+|:---------                           |:----------------   |:------------:|:---------------:|:------------------:|:--------    |:------------------- |
+| HELIOS            | Time-stepping      | Yes          | -               |  -                 | Diseqm.     | Nvidia devices only |
+| PCM-LBL @wordsworth_coupled_2021    | Time-stepping      | Yes          | -               |  -                 | None        | Linux & MacOS       |
+| Exo_k              | Nondim. time-step  | Yes          | -               |  -                 | None        | Linux & MacOS       |
+| PICASO  @mukherjee_picaso_2023      | Nonlinear opt.     | Yes          | -               |  -                 | Diseqm.     | Linux & MacOS       |
+| GENESIS           | Time-stepping      | -            | -               |  Partially?        | Diseqm.     | Unknown             |
+| **AGNI** @nicholls_convection_2025  | **Nonlinear opt.** | **Yes**      | **Yes**         | **Yes**            | **Eqm.**    | **Linux & MacOS**   |
+
+

@@ -783,6 +783,10 @@ module solver
                 break
             end
 
+            # Show benchmark
+            rt_avg::Float64 = atmos.tim_rt_eval / atmos.num_rt_eval / 1e9 * 1e3
+            @debug @sprintf("Average RT time: %.2f ms", rt_avg)
+
         end # end solver loop
 
         # ----------------------------------------------------------
