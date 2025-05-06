@@ -31,7 +31,7 @@ title = "Hot and dry"
 
 [execution]
     clean_output    = true
-    verbosity       = 1
+    verbosity       = 2
     max_steps       = 200
     max_runtime     = 400
     num_levels      = 35

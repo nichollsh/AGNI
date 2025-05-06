@@ -62,6 +62,7 @@ module atmosphere
 
         # Radiation parameters
         num_rt_eval::Int                # Total number of RT evaluations
+        tim_rt_eval::UInt64             # Total time spent doing RT evaluations [ns]
         all_channels::Bool              # Use all bands?
         spectral_file::String           # Path to spectral file
         star_file::String               # Path to star spectrum
@@ -358,6 +359,7 @@ module atmosphere
 
 
         atmos.num_rt_eval = 0
+        atmos.tim_rt_eval = 0.0
 
         atmos.dimen =       SOCRATES.StrDim()
         atmos.control =     SOCRATES.StrCtrl()
