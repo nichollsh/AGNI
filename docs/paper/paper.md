@@ -56,18 +56,18 @@ AGNI is developed with the view of being coupled into the PROTEUS framework[^2] 
 * solve for an atmospheric temperature structure that conserves energy and allows for convectively stable regions,
 * operate with sufficient speed that it may participate in a wide parameter space,
 
-This is possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport (@nicholls_convection_2025). Rather than time-stepping each model level according to radiative heating and applying convective adjustment (e.g. @malik_helios_2017, @selsis_cool_2023, @pierrehumbert_book_2010), AGNI uses the Newton-Raphson method to conserve energy fluxes through the column to a required tolerence. A typical runtime when applying the model standalone (see Figure 1) from a poor initial guess of the true temperature profile is 3 minutes. When providing a 'good' guess, such as when AGNI is applied within the PROTEUS framework (see Figure 1), AGNI will obtain a solution in less than 1 minute. A single radiative transfer call takes approximately 30 ms, performed under the correlated-k and two-stream approximations using SOCRATES[^3]: a well-established FORTRAN code developed by the UK Met Office [@edwards_studies_1996; @sergeev_socrates_2023; @amundsen_treatment_2017]. Convection, condensation, and sensible heat transport are also modelled.
+This is possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport (@nicholls_convection_2025). Rather than time-stepping each model level according to radiative heating and applying convective adjustment (e.g. @malik_helios_2017, @selsis_cool_2023, @pierrehumbert_book_2010), AGNI uses the Newton-Raphson method to conserve energy fluxes through the column to a required tolerence. A typical runtime when applying the model standalone (Figure 1) from a poor initial guess of the true temperature profile is 3 minutes. When providing a 'good' guess, such as when AGNI is applied within the PROTEUS framework (see Figure 1), AGNI will obtain a solution in less than 1 minute. A single radiative transfer call takes approximately 30 ms, performed under the correlated-k and two-stream approximations using SOCRATES[^3]: a well-established FORTRAN code developed by the UK Met Office [@edwards_studies_1996; @sergeev_socrates_2023; @amundsen_treatment_2017]. Convection, condensation, and sensible heat transport are also modelled.
 
 Table 1 below compares AGNI to existing radiative-convective modelling codes described in the literature. Whilst the majority of them are open source and have been used to model static non-evolving planets, AGNI stands out as being the only open source code currently integrated into a comprehensive interior-atmosphere evolution model.
 
-| Model    | Solution method    | Open source? | Real gas EoS?   | Interior coupling? | Chemistry   | Supported platforms | Reference|
-|:---------|:----------------   |:------------:|:---------------:|:------------------:|:--------    |:------------------- |:----|
-| AGNI     | Nonlinear opt.     | Yes          | Yes             |  Yes               | Eqm.        | Linux & MacOS       | @nicholls_convection_2025 |
-| HELIOS   | Time-step          | Yes          | -               |  -                 | Diseqm.     | Nvidia devices only | @malik_helios_2017    |
-| GENESIS  | Time-step          | -            | -               |  -                 | Diseqm.     | ❓                  | @piette_rocky_2023    |
-| PCM-LBL  | Time-step          | Yes          | -               |  -                 | None        | Linux & MacOS       | @wordsworth_coupled_2021    |
-| Exo_k    | Nondim. time-step  | Yes          | -               |  -                 | None        | Linux & MacOS       | @selsis_cool_2023   |
-| PICASO   | Nonlinear opt.     | Yes          | -               |  -                 | Diseqm.     | Linux & MacOS       | @mukherjee_picaso_2023    |
+| Model                           | Solution method    | Open source? | Real gas EoS?   | Interior coupling? | Chemistry   | Supported platforms |
+|:---------                       |:----------------   |:------------:|:---------------:|:------------------:|:--------    |:------------------- |
+| HELIOS @malik_helios_2017       | Time-step          | Yes          | -               |  -                 | Diseqm.     | Nvidia devices only |
+| PCM-LBL @wordsworth_coupled_2021| Time-step          | Yes          | -               |  -                 | None        | Linux & MacOS       |
+| Exo_k  @selsis_cool_2023        | Nondim. time-step  | Yes          | -               |  -                 | None        | Linux & MacOS       |
+| PICASO  @mukherjee_picaso_2023  | Nonlinear opt.     | Yes          | -               |  -                 | Diseqm.     | Linux & MacOS       |
+| GENESIS  @piette_rocky_2023     | Time-step          | -            | -               |  Partially?        | Diseqm.     | Unknown             |
+| AGNI @nicholls_convection_2025  | Nonlinear opt.     | Yes          | Yes             |  Yes               | Eqm.        | Linux & MacOS       |
 
 The primary use-case for AGNI is the integration into the PROTEUS framework, where it is self-consistently coupled to other open source modules. However, AGNI can still be applied to answer science questions standalone (as in @hammond_photometric_2024). Figure 1 below compares the two primary use-cases driving the development of AGNI.
 
