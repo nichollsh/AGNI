@@ -1,6 +1,22 @@
 #!/bin/bash
 # Download and compile socrates
 
+# Do we have NetCDF?
+if ! [ -x "$(command -v nc-config)" ]; then
+  echo 'ERROR: NetCDF is not installed.' >&2
+  exit 1
+fi
+if ! [ -x "$(command -v nf-config)" ]; then
+  echo 'ERROR: NetCDF-Fortran library is not installed.' >&2
+  exit 1
+fi
+
+# Do we have gfortran?
+if ! [ -x "$(command -v gfortran)" ]; then
+  echo 'ERROR: gfortran compiler is not installed.' >&2
+  exit 1
+fi
+
 # Already setup?
 if [ -n "$RAD_DIR" ]; then
     echo "WARNING: You already have SOCRATES installed"
