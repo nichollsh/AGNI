@@ -15,14 +15,15 @@ if [ -n "$RAD_DIR" ]; then
 else
     echo "Found SOCRATES path: no"
     echo "You need to install SOCRATES AND set the RAD_DIR environment variable"
-    echo "Check the docs:https://nichollsh.github.io/AGNI/"
+    echo "Check the docs: https://nichollsh.github.io/AGNI/"
     exit 1
 fi
 
 # Install
 echo "Installing AGNI..."
 rm -f Manifest.toml
-julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate(); Pkg.build()'
+julia "$root/deps/build.jl"
+julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'
 
 # Run tests
 echo "Running tests..."

@@ -1,6 +1,22 @@
 #!/bin/bash
 # Download and compile socrates
 
+# Do we have NetCDF?
+if ! [ -x "$(command -v nc-config)" ]; then
+  echo 'ERROR: NetCDF is not installed.' >&2
+  exit 1
+fi
+if ! [ -x "$(command -v nf-config)" ]; then
+  echo 'ERROR: NetCDF-Fortran library is not installed.' >&2
+  exit 1
+fi
+
+# Do we have gfortran?
+if ! [ -x "$(command -v gfortran)" ]; then
+  echo 'ERROR: gfortran compiler is not installed.' >&2
+  exit 1
+fi
+
 # Already setup?
 if [ -n "$RAD_DIR" ]; then
     echo "WARNING: You already have SOCRATES installed"
@@ -41,8 +57,20 @@ cd "$socpath"
 export RAD_DIR=$socpath
 cd $root
 
+# Check radlib exists
+radlib="$socpath/bin/radlib.a"
+if [ -f "$radlib" ]; then
+    echo "SOCRATES has been installed"
+    echo ""
+else
+    echo "Could not find compiled SOCRATES binaries - failed to compile"
+    exit 1
+fi
+
+
 # Inform user
-echo "SOCRATES has been installed"
-echo "It is recommended that you add the following line to your shell rc file"
-echo "export RAD_DIR='$socpath'"
+echo "You must now run the following command:"
+echo "    export RAD_DIR='$socpath'"
+echo " "
+echo "You should also add this command to your shell rc file (e.g. ~/.bashrc)"
 exit 0
