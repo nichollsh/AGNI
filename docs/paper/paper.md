@@ -24,7 +24,7 @@ affiliations:
    index: 1
  - name: Kapteyn Astronomical Institute, University of Groningen, P.O. Box 800, 9700 AV Groningen, The Netherlands
    index: 2
-date: 06 May 2025
+date: 08 May 2025
 bibliography: paper.bib
 
 ---
@@ -35,7 +35,7 @@ It is important that we are able to accurately model the atmospheres of (exo)pla
 
 AGNI is a Julia program designed to solve for the temperature and radiation environment within the atmospheres of rocky (exo)planets. It leverages a well established FORTRAN code [@edwards_studies_1996; @sergeev_socrates_2023] to calculate radiative fluxes from a given atmospheric temperature structure and composition, which -- alongside representations of convection and other processes -- enables an energy-conserving numerical solution for the atmospheric conditions. In contrast to most other numerical atmosphere models, AGNI uses a Newton-Raphson optimisation method to obtain its solution, which enables improved performance and scalability. Our model was specifically developed for use alongside planetary interior models within a coupled simulation framework. However, it can also be applied to scientific problems standalone when used as an executable program; it reads TOML configuration files and outputs figures and NetCDF datasets. AGNI can also function as a software library; it is used in this sense within the [Jupyter notebook tutorials](https://github.com/nichollsh/AGNI/tree/main/tutorials) of our GitHub repository[^1].
 
-[^1]: AGNI can be found on GitHub [here](https://github.com/nichollsh/AGNI).
+[^1]: [nichollsh.github.io/AGNI](https://nichollsh.github.io/AGNI/dev/)
 
 # Statement of need
 
@@ -56,14 +56,16 @@ AGNI is developed with the view of being coupled into the PROTEUS framework[^2] 
 
 These are possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport (@nicholls_convection_2025). Our model uses the Newton-Raphson method to conserve energy fluxes through each level of the column to a required tolerence. A typical runtime when applying the model standalone using its command-line interface (Figure 1b) with a poor initial guess of the true temperature profile is 3 minutes. When providing a 'good' guess, such as when AGNI is coupled within the PROTEUS framework (Figure 1a), an atmosphere solution will be obtaind in less than 1 minute. A single radiative transfer calculation takes approximately 30 ms, performed under the correlated-k and two-stream approximations using SOCRATES[^3]: a well-established FORTRAN code developed by the UK Met Office [@edwards_studies_1996; @sergeev_socrates_2023; @amundsen_treatment_2017]. Convection, condensation, and sensible heat transport are also accounted for.
 
-HELIOS [@malik_helios_2017] is popular atmosphere model similar to AGNI, but it depends on an Nvidia GPU in order to perform radiative transfer calculations. Whilst this makes each calculation fast, it also means that HELIOS cannot be used on platforms without an Nvidia GPU or with limited resources. GENESIS [@piette_rocky_2023] has been applied to lava planet atmospheres but is closed-source and not publically available. Exo_k [@selsis_cool_2023] is open source and written in pure Python, but not designed to be coupled with an interior evolution model. These codes have been used to model the atmospheres of static non-evolving planets, while AGNI stands out as being the only open source code currently integrated into a comprehensive interior-atmosphere evolution framework like PROTEUS. No other models of lava planet atmospheres implement a real-gas equation of state.
+HELIOS[^4] [@malik_helios_2017] is a popular atmosphere model similar to AGNI, but it depends on an Nvidia GPU in order to perform radiative transfer calculations. Whilst this makes each calculation fast, it also means that HELIOS cannot be used on platforms without an Nvidia GPU or with limited resources. GENESIS [@piette_rocky_2023] has been applied to lava planet atmospheres but is closed-source and not publically available. Exo_k [@selsis_cool_2023] is open source and written in pure Python, but not designed to be coupled with an interior evolution model. These codes have been used to model the atmospheres of static non-evolving planets, while AGNI stands out as being the only open source code currently integrated into a comprehensive interior-atmosphere evolution framework like PROTEUS. No other models of lava planet atmospheres implement a real-gas equation of state.
 
 Coupling with PROTEUS is one primary use-case for AGNI. However, our model can also be used standalone (as in @hammond_photometric_2024) through its command-line interface and configuration files, or through Jupyter notebooks (as in the tutorials). Figure 1 below compares these two primary use-cases driving the development of AGNI.
 
 ![A visual comparison of the two primary use-cases for AGNI. Left: coupling within the PROTEUS framework. Right: using the code standalone.](application.svg){ width=98% }
 
-[^2]: The PROTEUS framework can be found [here](https://github.com/FormingWorlds/PROTEUS).
-[^3]: SOCRATES, packaged with additional tooling, is available [here](https://github.com/nichollsh/SOCRATES).
+[^2]: [fwl-proteus.readthedocs.io](https://fwl-proteus.readthedocs.io/en/latest/)
+[^3]: [github.com/nichollsh/SOCRATES](https://github.com/nichollsh/SOCRATES)
+[^4]: [github.com/exoclime/HELIOS](https://github.com/exoclime/HELIOS)
+[^5]: [perso.astrophy.u-bordeaux.fr/~jleconte](https://perso.astrophy.u-bordeaux.fr/~jleconte/exo_k-doc/index.html)
 
 # Future developments
 
