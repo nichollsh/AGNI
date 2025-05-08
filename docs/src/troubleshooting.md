@@ -15,6 +15,20 @@ If this does not help, it's possible that you are using a Julia distribution pro
 your system package manager. It's important that you only use Julia distributed from the
 official website.
 
+## NetCDF is not installed
+You need to install NetCDF on your machine. This is a library designed for reading and writing
+data files, commonly used in atmospheric sciences. [Wikipedia page](https://en.wikipedia.org/wiki/NetCDF).
+
+To install on Ubuntu:
+```bash
+sudo apt install libnetcdf-dev netcdf-bin ncview libnetcdff-dev
+```
+
+To install on MacOS:
+```bash
+sudo brew install netcdf netcdf-fortran
+```
+
 
 ## Cannot find SOCRATES
 Check the installation instructions. Have you set `RAD_DIR`? Try running
