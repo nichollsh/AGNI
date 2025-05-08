@@ -41,8 +41,20 @@ cd "$socpath"
 export RAD_DIR=$socpath
 cd $root
 
+# Check radlib exists
+radlib="$socpath/bin/radlib.a"
+if [ -f "$radlib" ]; then
+    echo "SOCRATES has been installed"
+    echo ""
+else
+    echo "Could not find compiled SOCRATES binaries - failed to compile"
+    exit 1
+fi
+
+
 # Inform user
-echo "SOCRATES has been installed"
-echo "It is recommended that you add the following line to your shell rc file"
-echo "export RAD_DIR='$socpath'"
+echo "You must now run the following command:"
+echo "    export RAD_DIR='$socpath'"
+echo " "
+echo "You should also add this command to your shell rc file (e.g. ~/.bashrc)"
 exit 0

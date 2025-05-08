@@ -18,8 +18,8 @@ Follow the steps below in order to setup the code.
 3. Change directory: `cd AGNI`
 4. Setup SOCRATES by doing either **ONE** of the following...
     - Follow the instructions on the [SOCRATES GitHub](https://github.com/nichollsh/SOCRATES) page
-    - Run `bash src/get_socrates.sh`
-5. Finally, install AGNI: `bash src/get_agni.sh`
+    - Run `./src/get_socrates.sh`
+5. Finally, install AGNI: `./src/get_agni.sh`
 AGNI is now installed as a package into the Julia environment of the AGNI
 directory. This will also have downloaded some basic input data and run the tests.
 
@@ -39,7 +39,7 @@ It's important that you keep AGNI up to date, especially if you are using as par
 the [PROTEUS framework](https://github.com/FormingWorlds/PROTEUS). Use this script to
 automatically pull changes from GitHub and download any required data files.
 ```bash
-bash src/get_agni.sh
+./src/get_agni.sh
 ```
 
 ## Using the code
@@ -50,7 +50,7 @@ See [Troubleshooting](@ref) for troubleshooting advice.
 This can be enabled using the configuration file parameter `composition.chemistry`. Of
 course, it is first necessary to set up FastChem, which can be done by running:
 ```bash
-bash src/get_fastchem.sh
+./src/get_fastchem.sh
 ```
 You **must** then set the `FC_DIR` environment variable to the location of the FastChem
 installation folder. Ideally you should also add this variable to your bashrc file.
