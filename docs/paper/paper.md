@@ -69,7 +69,9 @@ Coupling with PROTEUS is one primary use-case for AGNI. However, our model can a
 
 # Similar tools
 
-One of the key strengths of AGNI is that it is designed to be used as part of the PROTEUS framework, which can simulate the evolution of rocky planets on Gyr timescales (Figure 1a). Other radiative-convective atmosphere models -- compared to AGNI in the previous section -- are available. HELIOS, for example, has been used alongside volatile and rock-vapour outgassing models (e.g. @van_lav_2025) to simulate the emission spectra of lava planets [@zilinskas_canc_2025, @seidler_impact_2024].
+One of the key strengths of AGNI is that it is designed to be used as part of the PROTEUS framework, which can simulate the evolution of rocky planets on Gyr timescales (Figure 1a). Other radiative-convective atmosphere models -- compared to AGNI in the previous section -- are available. HELIOS, for example, has been used alongside volatile and rock-vapour outgassing models (e.g. LavAtmos[^6], @van_lav_2025) to simulate the emission spectra of lava planets [@zilinskas_canc_2025, @seidler_impact_2024].
+
+[^6]: [github.com/cvbuchem/LavAtmos](https://github.com/cvbuchem/LavAtmos)
 
 # Future developments
 
