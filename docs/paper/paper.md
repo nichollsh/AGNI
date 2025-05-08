@@ -52,7 +52,7 @@ AGNI is developed with the view of being coupled into the PROTEUS framework[^2] 
 * be self-coupled to a planetary interior model with an appropriate boundary condition,
 * simulate atmospheres of diverse gaseous composition using realistic gas opacities and equations of state,
 * solve for an atmospheric temperature structure that conserves energy and allows for convectively stable regions,
-* operate with sufficient speed such that it may participate in the exploration of a wide parameter space,
+* operate with sufficient speed such that it may participate in the exploration of a wide parameter space.
 
 These are possible due to the method by which AGNI numerically obtains a solution for atmospheric temperature structure and energy transport (@nicholls_convection_2025). Our model uses the Newton-Raphson method to conserve energy fluxes through each level of the column to a required tolerence. A typical runtime when applying the model standalone using its command-line interface (Figure 1b) with a poor initial guess of the true temperature profile is 3 minutes. When providing a 'good' guess, such as when AGNI is coupled within the PROTEUS framework (Figure 1a), an atmosphere solution will be obtaind in less than 1 minute. A single radiative transfer calculation takes approximately 30 ms, performed under the correlated-k and two-stream approximations using SOCRATES[^3]: a well-established FORTRAN code developed by the UK Met Office [@edwards_studies_1996; @sergeev_socrates_2023; @amundsen_treatment_2017]. Convection, condensation, and sensible heat transport are also accounted for.
 
