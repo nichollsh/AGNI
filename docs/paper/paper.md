@@ -81,6 +81,7 @@ The landscape of exoplanet science is rapidly evolving. Future updates to AGNI m
 * An equatorial multi-column mode which parametrises zonal redistribution by atmospheric dynamics
 * Accounting for compositional inhibition of convection; e.g. via the Ledoux stability criterion
 * Parametrisation of dry convection with a 'full spectrum' model which better represents turbulence in convective fluids
+* Parallel computing, allowing multiple solvers to run simultaneously and to enhance the speed of each radiative transfer calculation.
 
 # Documentation
 
