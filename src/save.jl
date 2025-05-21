@@ -278,7 +278,7 @@ module save
             var_bds =       defVar(ds, "ba_D_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_bus =       defVar(ds, "ba_U_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
-            var_rfm_nu =    defVar(ds, "rfm_nu",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "cm-1"))
+            var_rfm_wn =    defVar(ds, "rfm_wn",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "cm-1"))
             var_rfm_fl =    defVar(ds, "rfm_fl",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "erg/(s cm2 cm-1)"))
             var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c") ;  nc_comp..., )
             var_albr =      defVar(ds, "albedo_r",  Float64, ("nbands",)         ;  nc_comp..., )
@@ -368,7 +368,7 @@ module save
 
             # RFM array
             var_rfm_fl[:] = atmos.rfm_fl
-            var_rfm_nu[:] = atmos.rfm_nu
+            var_rfm_wn[:] = atmos.rfm_wn
 
             close(ds)
 
