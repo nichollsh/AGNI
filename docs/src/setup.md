@@ -46,13 +46,22 @@ automatically pull changes from GitHub and download any required data files.
 See [Using the model](@ref) for information on using the code.
 See [Troubleshooting](@ref) for troubleshooting advice.
 
+
 ## Coupling with FastChem
-This can be enabled using the configuration file parameter `composition.chemistry`. Of
-course, it is first necessary to set up FastChem, which can be done by running:
+Coupling with FastChem can be enabled using the configuration parameter `composition.chemistry`.
+Of course, it is first necessary to set up FastChem, which can be done by running:
 ```bash
 ./src/get_fastchem.sh
 ```
 You **must** then set the `FC_DIR` environment variable to the location of the FastChem
 installation folder. Ideally you should also add this variable to your bashrc file.
 
-There is information
+## Coupling with RFM
+The RFM radiative transfer code is proprietary. If you have obtained the code, coupling with
+AGNI can be enabled by setting the `RFM_DIR` environment variable to the location of the
+RFM root directory. 
+
+You should then set configuration parameter `execution.rfm_parfile` to the
+desired HITRAN-formatted (.par) linelist on your computer. Obtain these par files
+from the HITRAN website: https://hitran.org/lbl/
+

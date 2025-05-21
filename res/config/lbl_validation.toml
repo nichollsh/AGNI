@@ -16,10 +16,8 @@ title = "Line-by-line validation tests"
     wind_speed      = 2.0
 
 [files]
-    input_sf        = "res/spectral_files/Mallard/318/Mallard.sf"
+    input_sf        = "res/spectral_files/Oak/318/Oak.sf"
     input_star      = "res/stellar_spectra/sun.txt"
-    # input_sf        = "out/ds4096.sf"
-    # input_star      = ""
     output_dir      = "out/"
 
 [composition]
@@ -31,7 +29,7 @@ title = "Line-by-line validation tests"
 
 [execution]
     clean_output    = false
-    verbosity       = 1
+    verbosity       = 2
     max_steps       = 20000
     max_runtime     = 400
     num_levels      = 180
@@ -53,6 +51,7 @@ title = "Line-by-line validation tests"
     easy_start      = false
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3
+    rfm_parfile     = "res/par_files/h2o_co2_1000_6000.par"
 
 [plots]
     at_runtime      = true

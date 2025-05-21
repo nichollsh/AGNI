@@ -302,7 +302,7 @@ module chemistry
         state::Int = 0
 
         # Check fastchem enabled
-        if !atmos.fastchem_flag
+        if !atmos.flag_fastchem
             @warn "Fastchem is not enabled but `fastchem_eqm!` was called. Have you set FC_DIR?"
             return 1
         end

@@ -168,6 +168,11 @@ module atmosphere
         # Contribution function (to outgoing flux) per-band
         contfunc_band::Array{Float64,2}     # LW only, not normalised
 
+        # RFM line-by-line calculation
+        rfm_fl::Array{Float64,1}            # upward flux [erg/(s cm2 cm-1)]
+        rfm_nu::Array{Float64,1}            # wavenumber array [cm-1]
+        rfm_npts::Int                       # number of points
+
         # Sensible heating
         C_d::Float64                        # Turbulent exchange coefficient [dimensionless]
         U::Float64                          # Wind speed [m s-1]
@@ -213,15 +218,15 @@ module atmosphere
         heating_rate::Array{Float64,1}
 
         # FastChem equilibrium chemistry
+        flag_fastchem::Bool             # Fastchem enabled?
         fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
         fastchem_maxiter::Int           # Maximum FC iterations
         fastchem_xtol::Float64          # FC solver tolerance
-        fastchem_flag::Bool             # Fastchem enabled?
         fastchem_exec::String           # Path to fastchem executable
         fastchem_work::String           # Path to fastchem working directory
 
         # RFM radiative transfer
-        rfm_flag::Bool                  # RFM enabled?
+        flag_rfm::Bool                  # RFM enabled?
         rfm_exec::String                # Path to rfm executable
         rfm_work::String                # Path to rfm working directory
         rfm_parfile::String             # Path to rfm parfile. If empty, do not run RFM.
@@ -343,7 +348,7 @@ module atmosphere
                     fastchem_maxiter::Float64 = 2e4,
                     fastchem_xtol::Float64 =    1.0e-4,
 
-                    rfm_parfile::String =       ""
+                    rfm_parfile::String =       "",
                     )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -710,7 +715,7 @@ module atmosphere
         end
 
         # Fastchem
-        atmos.fastchem_flag = false
+        atmos.flag_fastchem = false
         if ("FC_DIR" in keys(ENV))
 
             @debug "FastChem env has been set"
@@ -725,8 +730,8 @@ module atmosphere
 
             # check executable
             atmos.fastchem_exec = abspath(atmos.FC_DIR,"fastchem")
-            atmos.fastchem_flag = isfile(atmos.fastchem_exec)
-            if !atmos.fastchem_flag
+            atmos.flag_fastchem = isfile(atmos.fastchem_exec)
+            if !atmos.flag_fastchem
                 @error "Could not find fastchem executable inside '$(atmos.FC_DIR)'"
                 @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
@@ -753,7 +758,7 @@ module atmosphere
         atmos.fastchem_xtol    = fastchem_xtol
 
         # RFM
-        atmos.rfm_flag = false
+        atmos.flag_rfm = false
         if ("RFM_DIR" in keys(ENV)) && !isempty(rfm_parfile)
             atmos.rfm_parfile = abspath(rfm_parfile)
 
@@ -768,8 +773,8 @@ module atmosphere
 
             # check executable exists
             atmos.rfm_exec = abspath(atmos.RFM_DIR,"rfm","rfm")
-            atmos.rfm_flag = isfile(atmos.rfm_exec)
-            if !atmos.rfm_flag
+            atmos.flag_rfm = isfile(atmos.rfm_exec)
+            if !atmos.flag_rfm
                 @error "Could not find RFM executable inside '$(atmos.RFM_DIR)'"
                 return false
             else
@@ -1640,6 +1645,9 @@ module atmosphere
 
             # calculate emissivity (eq 4 from Hammond24 and eq 15.29 from Hapke 2012)
             @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
+
+            # set dummy grey albedo
+            atmos.albedo_s = median(atmos.surf_r_arr)
         end
 
         #######################################
@@ -1685,6 +1693,11 @@ module atmosphere
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
         atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
+
+        # RFM values will be overwritten at runtime
+        atmos.rfm_npts =          4
+        atmos.rfm_nu =            zeros(Float64, atmos.rfm_npts)
+        atmos.rfm_fl =            zeros(Float64, atmos.rfm_npts)
 
         # Mark as allocated
         atmos.is_alloc = true
