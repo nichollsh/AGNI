@@ -47,7 +47,8 @@ module atmosphere
         ROOT_DIR::String        # path to AGNI root folder (containing agni.jl)
         OUT_DIR::String         # path to output folder
         THERMO_DIR::String      # path to thermo data
-        FC_DIR::String          # path to fastchem exec folder
+        FC_DIR::String          # path to fastchem install folder
+        RFM_DIR::String         # path to RFM install folder
 
         # SOCRATES objects
         SOCRATES_VERSION::String
@@ -211,12 +212,19 @@ module atmosphere
         # Heating rate felt at each level [K/day]
         heating_rate::Array{Float64,1}
 
-        # Chemistry stuff
+        # FastChem equilibrium chemistry
         fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
         fastchem_maxiter::Int           # Maximum FC iterations
         fastchem_xtol::Float64          # FC solver tolerance
         fastchem_flag::Bool             # Fastchem enabled?
+        fastchem_exec::String           # Path to fastchem executable
         fastchem_work::String           # Path to fastchem working directory
+
+        # RFM radiative transfer
+        rfm_flag::Bool                  # RFM enabled?
+        rfm_exec::String                # Path to rfm executable
+        rfm_work::String                # Path to rfm working directory
+        rfm_parfile::String             # Path to rfm parfile. If empty, do not run RFM.
 
         # Observing properties
         transspec_p::Float64            # Pressure level probed in transmission [Pa]
@@ -334,6 +342,8 @@ module atmosphere
                     fastchem_floor::Float64 =   273.0,
                     fastchem_maxiter::Float64 = 2e4,
                     fastchem_xtol::Float64 =    1.0e-4,
+
+                    rfm_parfile::String =       ""
                     )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -700,14 +710,7 @@ module atmosphere
         end
 
         # Fastchem
-        # enabled?
         atmos.fastchem_flag = false
-        # path to fc working directory
-        if isempty(fastchem_work)
-            atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
-        else
-            atmos.fastchem_work = abspath(fastchem_work)
-        end
         if ("FC_DIR" in keys(ENV))
 
             @debug "FastChem env has been set"
@@ -721,7 +724,8 @@ module atmosphere
             end
 
             # check executable
-            atmos.fastchem_flag = isfile(joinpath(atmos.FC_DIR,"fastchem"))
+            atmos.fastchem_exec = abspath(atmos.FC_DIR,"fastchem")
+            atmos.fastchem_flag = isfile(atmos.fastchem_exec)
             if !atmos.fastchem_flag
                 @error "Could not find fastchem executable inside '$(atmos.FC_DIR)'"
                 @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
@@ -729,6 +733,17 @@ module atmosphere
             else
                 @debug "Found FastChem executable"
             end
+
+            # working directory
+            if isempty(fastchem_work)
+                atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
+            else
+                atmos.fastchem_work = abspath(fastchem_work)
+            end
+
+            # make folder
+            rm(atmos.fastchem_work,force=true,recursive=true)
+            mkdir(atmos.fastchem_work)
         else
             @debug "FastChem env variable not set"
         end
@@ -736,6 +751,37 @@ module atmosphere
         atmos.fastchem_maxiter = fastchem_maxiter
         atmos.fastchem_floor   = fastchem_floor
         atmos.fastchem_xtol    = fastchem_xtol
+
+        # RFM
+        atmos.rfm_flag = false
+        if ("RFM_DIR" in keys(ENV)) && !isempty(rfm_parfile)
+            atmos.rfm_parfile = abspath(rfm_parfile)
+
+            @debug "RFM env has been set"
+
+            # check folder
+            atmos.RFM_DIR = abspath(ENV["RFM_DIR"])
+            if !isdir(atmos.RFM_DIR)
+                @error "Could not find RFM folder at '$(atmos.RFM_DIR)'"
+                return false
+            end
+
+            # check executable exists
+            atmos.rfm_exec = abspath(atmos.RFM_DIR,"rfm","rfm")
+            atmos.rfm_flag = isfile(atmos.rfm_exec)
+            if !atmos.rfm_flag
+                @error "Could not find RFM executable inside '$(atmos.RFM_DIR)'"
+                return false
+            else
+                @debug "Found RFM executable"
+            end
+
+            atmos.rfm_work = joinpath(atmos.OUT_DIR, "rfm/")
+            rm(atmos.rfm_work,force=true,recursive=true)
+            mkdir(atmos.rfm_work)
+        else
+            @debug "RFM env variable not set"
+        end
 
         # Record that the parameters are set
         atmos.is_param = true
