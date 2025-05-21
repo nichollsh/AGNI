@@ -170,7 +170,7 @@ module atmosphere
 
         # RFM line-by-line calculation
         rfm_fl::Array{Float64,1}            # upward flux [erg/(s cm2 cm-1)]
-        rfm_nu::Array{Float64,1}            # wavenumber array [cm-1]
+        rfm_wn::Array{Float64,1}            # wavenumber array [cm-1]
         rfm_npts::Int                       # number of points
 
         # Sensible heating
@@ -1696,7 +1696,7 @@ module atmosphere
 
         # RFM values will be overwritten at runtime
         atmos.rfm_npts =          4
-        atmos.rfm_nu =            zeros(Float64, atmos.rfm_npts)
+        atmos.rfm_wn =            zeros(Float64, atmos.rfm_npts)
         atmos.rfm_fl =            zeros(Float64, atmos.rfm_npts)
 
         # Mark as allocated

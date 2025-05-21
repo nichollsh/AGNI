@@ -270,10 +270,10 @@ module rfm
         end
 
         # set wavenumber array
-        atmos.rfm_nu = collect(Float64, range(start=numin,length=atmos.rfm_npts,step=nures))
+        atmos.rfm_wn = collect(Float64, range(start=numin,length=atmos.rfm_npts,step=nures))
 
         # set flux array
-        atmos.rfm_fl = zero(atmos.rfm_nu)
+        atmos.rfm_fl = zero(atmos.rfm_wn)
         for (idx,val) in enumerate(split(datastr))
             atmos.rfm_fl[idx] = parse(Float64, val)
         end
