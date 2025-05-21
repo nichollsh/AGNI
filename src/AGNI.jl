@@ -427,7 +427,7 @@ module AGNI
             @debug "Initial chemistry"
 
             # check we found fastchem
-            if !atmos.fastchem_flag
+            if !atmos.flag_fastchem
                 @error "Chemistry enabled but could not find FastChem. Have you set FC_DIR?"
                 return false
             end
@@ -499,11 +499,17 @@ module AGNI
 
         return_success = return_success && solver_success
         @info "    done"
+        @info "Total SOCRATES evaluations: $(atmos.num_rt_eval)"
 
         # Fill Kzz in remaining regions
         energy.fill_Kzz!(atmos)
 
-        @info "Total RT evalulations: $(atmos.num_rt_eval)"
+        # RFM calculation?
+        if atmos.flag_rfm
+            @info "Running RFM line-by-line radiative transfer..."
+            rfm.run_rfm(atmos)
+            @info "    done"
+        end
 
         # Write arrays
         @info "Writing results"

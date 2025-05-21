@@ -10,6 +10,7 @@ module rfm
 
     # Import modules
     using LoggingExtras
+    using Printf
 
     # Local files
     import ..atmosphere
@@ -38,7 +39,7 @@ module rfm
         # Convert arrays
         t_arr::Array{Float64} = reverse(atmos.tmpl) # K
         p_arr::Array{Float64} = reverse(atmos.pl) / 1e5  * 1e3 # mbar
-        z_arr::Array{Float64} = reverse(atmos.zl) / 1e3 # km
+        z_arr::Array{Float64} = reverse(atmos.rl .- atmos.rl[end]) / 1e3 # km
 
         # file counters
         ir::Int = 0
@@ -46,7 +47,7 @@ module rfm
 
         # header
         outstr::String =  ""
-        outstr *= "         %d ! Profile Levels\n"%nlev
+        outstr *= "         $(atmos.nlev_l) ! Profile Levels\n"
 
         # height profile
         outstr *= "*HGT [km]\n"
@@ -137,9 +138,15 @@ module rfm
 
     Parameters:
     - `atmos::atmosphere.Atmos_t`       atmosphere data struct
+    - `numin::Float64`                  minimum wavenumber [cm-1]
+    - `numax::Float64`                  maximum wavenumber [cm-1]
+    - `nures::Float64`                  resolution on wavenumber [cm-1]
     """
-    function write_driver(atmos::atmosphere.Atmos_t)
-        @debug "Write driver for RFM"
+    function write_driver(atmos::atmosphere.Atmos_t;
+                            numin::Float64=4000.0, numax::Float64=4050.0,
+                            nures::Float64=1.0)
+
+        @debug "Write driver file for RFM"
 
         # Header
         outstr::String = "*HDR\n  RFM flux observing downwards from TOA \n"
@@ -148,7 +155,7 @@ module rfm
         outstr *= "*FLG\n  NAD RAD SFC \n"
 
         # Spectral regions
-        outstr *= "*SPC\n  1000 7000 1 \n"
+        outstr *= @sprintf("*SPC\n  %.4f %.4f %.4f \n", numin, numax, nures)
 
         # Gases
         outstr *= "*GAS\n  "
@@ -163,17 +170,16 @@ module rfm
         outstr *= "*ATM\n  $(joinpath(atmos.rfm_work,"profile.atm")) \n"
 
         # Secant of viewing angle
-        outstr *= "*SEC\n  1"
+        outstr *= "*SEC\n  $(secd(atmos.zenith_degrees)) \n"
 
         # Surface properties
         outstr *= "*SFC\n"
         outstr *= "  temsfc=$(atmos.tmp_surf) \n"
-        outstr *= "  emssfc=1.0 \n"
+        outstr *= "  emssfc=$(1-atmos.albedo_s) \n"
         outstr *= "  hgtsfc=0.0 \n"
 
         # LbL par file (HITRAN format)
-        hitran_path = "/home/n/nichollsh/RFM/par/h2o+co2/00000-12000.par"
-        outstr *= "*HIT\n  $hitran_path \n"
+        outstr *= "*HIT\n  $(atmos.rfm_parfile) \n"
 
         # Output file
         outstr *= "*OUT\n  radfil=$(joinpath(atmos.rfm_work, "fluxes.asc")) \n"
@@ -182,7 +188,7 @@ module rfm
         outstr *= "*END\n "
 
         # write driver content to file
-        driver_path = joinpath(atmos.rfm_work,"config.drv")
+        driver_path = joinpath(atmos.rfm_work,"rfm.drv")
         open(driver_path,"w") do hdl
             write(hdl,outstr)
         end
@@ -213,16 +219,67 @@ module rfm
     function read_fluxes(atmos::atmosphere.Atmos_t)
         @debug "Read fluxes from RFM"
 
+        # output file path
         outpath = joinpath(atmos.rfm_work, "fluxes.asc")
-        open(outpath,"r") do f
-            while !eof(f)
-               # read next line
-               s = readline(f)
-               println(s)
-            end
+        if !isfile(outpath)
+            @error "Could not find RFM output file: $outpath"
+            return
         end
 
-    end
+        # file header info
+        numin::Float64  = 0.0       # min wavenumber from file [cm-1]
+        nures::Float64  = 0.0       # wavenumber resolution from file [cm-1]
 
+        # read the file
+        headstr::String = ""   # ASCII, header info
+        datastr::String = ""   # ASCII, full flux data
+        open(outpath,"r") do f
+            # loop through lines
+            idx::Int = -1
+            linestr::String = ""   # string containing content from line
+            while !eof(f)
+                # read next line
+                linestr = readline(f)
+
+                # skip comments
+                if startswith(linestr,'!')
+                    continue
+                end
+                idx += 1
+
+                # first line is header
+                if idx == 0
+                    headstr = linestr
+                    continue
+                end
+
+                # all other lines are data ...
+                datastr *= chomp(strip(linestr))
+            end
+        end # close fluxes file
+
+        # parse header
+        atmos.rfm_npts = parse(Int, split(headstr)[1])
+        numin = parse(Float64, split(headstr)[2])
+        nures = parse(Float64, split(headstr)[3])
+
+        # check grid regularity
+        if nures <= 0
+            @error "Cannot parse irregular wavenumber grid"
+            return
+        end
+
+        # set wavenumber array
+        atmos.rfm_nu = collect(Float64, range(start=numin,length=atmos.rfm_npts,step=nures))
+
+        # set flux array
+        atmos.rfm_fl = zero(atmos.rfm_nu)
+        for (idx,val) in enumerate(split(datastr))
+            atmos.rfm_fl[idx] = parse(Float64, val)
+        end
+
+        # convert flux units to [erg/(s cm2 cm-1)]
+        atmos.rfm_fl *= 1e-9 * 1e7 * pi
+    end
 
 end # end module

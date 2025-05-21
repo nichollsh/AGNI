@@ -129,12 +129,13 @@ module save
             ngases = atmos.gas_num
             nchars = 16
 
-            defDim(ds, "nlev_c", nlev_c)        # Cell centres
-            defDim(ds, "nlev_l", nlev_l)        # Cell edges
-            defDim(ds, "ngases", ngases)        # Gases
-            defDim(ds, "nchars", nchars)        # Length of string containing gas names
-            defDim(ds, "nbands", atmos.nbands)  # Number of spectral bands
-            defDim(ds, "nchannels", atmos.dimen.nd_channel)  # Number of spectral channels used for calculations
+            defDim(ds, "nlev_c",    nlev_c)        # Cell centres
+            defDim(ds, "nlev_l",    nlev_l)        # Cell edges
+            defDim(ds, "ngases",    ngases)        # Gases
+            defDim(ds, "nchars",    nchars)        # Length of string containing gas names
+            defDim(ds, "nbands",    atmos.nbands)  # Number of spectral bands
+            defDim(ds, "nchannels", atmos.dimen.nd_channel)  # Number of spectral channels
+            defDim(ds, "rfm_npts",  atmos.rfm_npts)  # Number of RFM spectral points
 
             # ----------------------
             # Scalar quantities (not compressed)
@@ -277,6 +278,8 @@ module save
             var_bds =       defVar(ds, "ba_D_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_bus =       defVar(ds, "ba_U_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
+            var_rfm_nu =    defVar(ds, "rfm_nu",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "cm-1"))
+            var_rfm_fl =    defVar(ds, "rfm_fl",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "erg/(s cm2 cm-1)"))
             var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c") ;  nc_comp..., )
             var_albr =      defVar(ds, "albedo_r",  Float64, ("nbands",)         ;  nc_comp..., )
             var_albe =      defVar(ds, "albedo_e",  Float64, ("nbands",)         ;  nc_comp..., )
@@ -316,7 +319,7 @@ module save
             # Kzz mixing
             var_kzz[:] =    atmos.Kzz
 
-            # Bolometric fluxes
+            # SOCRATES bolometric fluxes
             var_fdl[:] =    atmos.flux_d_lw
             var_ful[:] =    atmos.flux_u_lw
             var_fnl[:] =    atmos.flux_n_lw
@@ -337,7 +340,7 @@ module save
             var_hr[:] =     atmos.heating_rate
             var_fdiff[:] =  atmos.flux_dif
 
-            # Spectral fluxes
+            # SOCRATES spectral fluxes
             var_bmin[:] =   atmos.bands_min
             var_bmax[:] =   atmos.bands_max
 
@@ -352,6 +355,7 @@ module save
                 end
             end
 
+            # SOCRATES contribution function
             for lc in 1:atmos.nlev_c
                 for ba in 1:atmos.nbands
                     var_cfn[ba, lc] = atmos.contfunc_band[lc, ba]
@@ -361,6 +365,10 @@ module save
             # Surface spectral albedo
             var_albr[:] = atmos.surf_r_arr
             var_albe[:] = atmos.surf_e_arr
+
+            # RFM array
+            var_rfm_fl[:] = atmos.rfm_fl
+            var_rfm_nu[:] = atmos.rfm_nu
 
             close(ds)
 
