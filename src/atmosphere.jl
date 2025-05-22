@@ -761,7 +761,7 @@ module atmosphere
         atmos.flag_rfm = !isempty(rfm_parfile)
         if atmos.flag_rfm
             atmos.rfm_parfile = abspath(rfm_parfile)
-            @debug "RFM parfile has been set: $(atmos.rfm_parfile)"
+            @debug "RFM parfile set: $(atmos.rfm_parfile)"
 
             atmos.rfm_work = joinpath(atmos.OUT_DIR, "rfm/")
             rm(atmos.rfm_work,force=true,recursive=true)

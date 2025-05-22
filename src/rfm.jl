@@ -112,7 +112,7 @@ module rfm
             x_arr *= 1e6
 
             # reduce VMR by small fraction so that total VMR is not >1
-            x_arr *= 1-1e-10
+            x_arr *= 1-1e-7
 
             # write profile for this  gas
             ir=0
@@ -148,11 +148,20 @@ module rfm
     - `numax::Float64`                  maximum wavenumber [cm-1]
     - `nures::Float64`                  resolution on wavenumber [cm-1]
     """
-    function write_driver(atmos::atmosphere.Atmos_t;
-                            numin::Float64=4000.0, numax::Float64=4050.0,
-                            nures::Float64=1.0)
+    function write_driver(atmos::atmosphere.Atmos_t,
+                            numin::Float64, numax::Float64, nures::Float64)
 
         @debug "Write driver file for RFM"
+
+        # Validate wavenumber parameters
+        if numin > numax
+            numin, numax = numax, numin
+        end
+        if nures > 1.0
+            @warn "Clipping wavenumber resolution to 1 cm^-1"
+            nures = 1.0
+        end
+        numax = max(numax, numin+nures*2) # must do at least two points
 
         # Header
         outstr::String = "*HDR\n  RFM flux observing downwards from TOA \n"
@@ -202,13 +211,20 @@ module rfm
 
     """
     **Run RFM radiative transfer with nadir-viewing geometry**
+
+    Parameters:
+    - `atmos::atmosphere.Atmos_t`       atmosphere data struct
+    - `numin::Float64`                  minimum wavenumber [cm-1]
+    - `numax::Float64`                  maximum wavenumber [cm-1]
+    - `nures::Float64`                  resolution on wavenumber [cm-1]
     """
-    function run_rfm(atmos::atmosphere.Atmos_t)
+    function run_rfm(atmos::atmosphere.Atmos_t,
+                        numin::Float64, numax::Float64; nures::Float64=1.0)
         # Write required files
         write_profile(atmos)
-        write_driver(atmos)
+        write_driver(atmos, numin, numax, nures)
 
-        # Run subprocess
+        # Locate executable
         if Sys.isapple()
             @debug "Run RFM (MacOS binary)"
             execpath = RFM_MACOS
@@ -217,9 +233,13 @@ module rfm
             execpath = RFM_LINUX
         end
 
-        # cmd = pipeline(`$execpath`, stdout=devnull)
-        cmd = `$execpath`
-        run(setenv(cmd, dir=atmos.rfm_work))
+        # Construct command
+        cmd = `$execpath` # path to RFM executable
+        cmd = setenv(cmd, dir=atmos.rfm_work) # run inside working directory
+        cmd = pipeline(cmd, stdout=devnull) # hide rfm terminal output
+
+        # Run subprocess
+        run(cmd)
 
         # Get output from RFM
         read_fluxes(atmos::atmosphere.Atmos_t)

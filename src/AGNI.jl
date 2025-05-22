@@ -324,8 +324,17 @@ module AGNI
 
         #    RFM radtrans
         rfm_parfile::String = ""
-        if haskey(cfg["execution"],"rfm_parfile")
-            rfm_parfile = cfg["execution"]["rfm_parfile"]
+        rfm_wn_min::Float64 = 4000.0
+        rfm_wn_max::Float64 = 4020.0
+        if haskey(cfg["files"],"rfm_parfile")
+            rfm_parfile = cfg["files"]["rfm_parfile"]
+            if haskey(cfg["execution"],"rfm_wn_min") && haskey(cfg["execution"],"rfm_wn_max")
+                rfm_wn_min = Float64(cfg["execution"]["rfm_wn_min"])
+                rfm_wn_max = Float64(cfg["execution"]["rfm_wn_max"])
+            else
+                @error "RFM calculation enabled (rfm_parfile=$rfm_parfile)"
+                @error "Must also provide rfm_wn_min AND rfm_wn_max"
+            end
         end
 
         #    solver stuff
@@ -508,7 +517,7 @@ module AGNI
         # RFM calculation?
         if atmos.flag_rfm
             @info "Running RFM line-by-line radiative transfer..."
-            rfm.run_rfm(atmos)
+            rfm.run_rfm(atmos, rfm_wn_min, rfm_wn_max)
             @info "    done"
         end
 
