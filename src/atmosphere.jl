@@ -758,34 +758,14 @@ module atmosphere
         atmos.fastchem_xtol    = fastchem_xtol
 
         # RFM
-        atmos.flag_rfm = false
-        if ("RFM_DIR" in keys(ENV)) && !isempty(rfm_parfile)
+        atmos.flag_rfm = !isempty(rfm_parfile)
+        if atmos.flag_rfm
             atmos.rfm_parfile = abspath(rfm_parfile)
-
-            @debug "RFM env has been set"
-
-            # check folder
-            atmos.RFM_DIR = abspath(ENV["RFM_DIR"])
-            if !isdir(atmos.RFM_DIR)
-                @error "Could not find RFM folder at '$(atmos.RFM_DIR)'"
-                return false
-            end
-
-            # check executable exists
-            atmos.rfm_exec = abspath(atmos.RFM_DIR,"rfm","rfm")
-            atmos.flag_rfm = isfile(atmos.rfm_exec)
-            if !atmos.flag_rfm
-                @error "Could not find RFM executable inside '$(atmos.RFM_DIR)'"
-                return false
-            else
-                @debug "Found RFM executable"
-            end
+            @debug "RFM parfile has been set: $(atmos.rfm_parfile)"
 
             atmos.rfm_work = joinpath(atmos.OUT_DIR, "rfm/")
             rm(atmos.rfm_work,force=true,recursive=true)
             mkdir(atmos.rfm_work)
-        else
-            @debug "RFM env variable not set"
         end
 
         # Record that the parameters are set
