@@ -105,6 +105,7 @@ Input/output files and other paths.
 | `input_sf       `  | Path to the desired spectral file ending in `.sf`, in `res/spectral_files/`. |
 | `input_star     `  | Path to stellar spectrum file. Spectrum assumed to be inside spectral file if this is left blank. |
 | `output_dir     `  | Path to the output directory. |
+| `rfm_parfile  `    | Path to .par linelist file, for running line-by-line calculations with the RFM. |
 
 
 ### `[composition]`
@@ -150,6 +151,8 @@ Parameters that tell the model what to do.
 | `easy_start    `  | Initially down-scale convective/condensation fluxes, if initial guess is poor/unknown. **Enable if the model is struggling.** |
 | `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
 | `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
+| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] |
+| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] |
 
 ### `[plots]`
 Configure plotting routines all of these should be `true` or `false`.
@@ -237,3 +240,15 @@ jl.AGNI.solver.solve_energy_b(atmos)
 # Write results to a file
 jl.AGNI.save.write_ncdf(atmos, "out.nc")
 ```
+
+## Line-by-line radiative transfer
+Performed using the [Reference Forward Model](https://eodg.atm.ox.ac.uk/RFM/).
+You must provide a HITRAN-formatted `.par` file, setting the path via `files.rfm_parfile`.
+This parfile can contain absorption from multiple species, and can be obtained from [hitran.org](https://hitran.org/lbl/).
+Alternatively, get the parfiles stored on OSF using: `./src/get_data.sh parfiles`.
+
+Then, you must also set the variables `execution.rfm_wn_min` and `execution.rfm_wn_max`.
+These two parameters specify the wavenumber [cm-1] range over which to perform the LbL calculations.
+The wavenumber resolution is set to 1 cm-1.
+
+Results are saved to the NetCDF file, alongside all the usual data, as `rfm_wn` and `rfm_fl` arrays.

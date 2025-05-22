@@ -44,5 +44,12 @@ debug/
 nogit*
 .osfcli.config
 
+# RFM
+rfm
+RFM
+Rfm
+*.par
+rfm.log
+
 # Paper
 paper/main.pdf

@@ -19,6 +19,7 @@ spfiles=$res/spectral_files
 stellar=$res/stellar_spectra
 surface=$res/surface_albedos
 thermo=$res/thermodynamics
+parfiles=$res/parfiles
 
 # Make basic data folders
 mkdir -p $res
@@ -26,6 +27,7 @@ mkdir -p $spfiles
 mkdir -p $stellar
 mkdir -p $surface
 mkdir -p $thermo
+mkdir -p $parfiles
 
 # Help strings
 help_basic="Get the basic data required to run the model"
@@ -34,6 +36,7 @@ help_steam="Get pure-steam spectral files"
 help_anyspec="Get a particular spectral file by name, passing it as an argument"
 help_stellar="Get a collection of stellar spectra"
 help_surfaces="Get a collection of surface single-scattering albedos"
+help_parfiles="Get a collection of gas linelist par files"
 help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
 help="\
 Download and unpack data used to run the model.
@@ -54,6 +57,8 @@ Where [TARGET] can be any of the following:
         $help_anyspec
     surfaces
         $help_surfaces
+    parfiles
+        $help_parfiles
     thermodynamics
         $help_thermo\
 "
@@ -242,6 +247,12 @@ function handle_request {
         "thermodynamics")
             echo $help_thermo
             get_zip 4m5x8 $thermo
+            ;;
+
+        "parfiles")
+            echo $help_parfiles
+            osf me3uc $parfiles h2o-co2_4000-5000.par
+            osf mucfd $parfiles mixture_100-50000.par
             ;;
 
         *)

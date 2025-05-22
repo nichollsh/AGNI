@@ -26,7 +26,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.5.0"
+    const AGNI_VERSION::String   = "1.5.1"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -47,7 +47,8 @@ module atmosphere
         ROOT_DIR::String        # path to AGNI root folder (containing agni.jl)
         OUT_DIR::String         # path to output folder
         THERMO_DIR::String      # path to thermo data
-        FC_DIR::String          # path to fastchem exec folder
+        FC_DIR::String          # path to fastchem install folder
+        RFM_DIR::String         # path to RFM install folder
 
         # SOCRATES objects
         SOCRATES_VERSION::String
@@ -167,6 +168,11 @@ module atmosphere
         # Contribution function (to outgoing flux) per-band
         contfunc_band::Array{Float64,2}     # LW only, not normalised
 
+        # RFM line-by-line calculation
+        rfm_fl::Array{Float64,1}            # upward flux [erg/(s cm2 cm-1)]
+        rfm_wn::Array{Float64,1}            # wavenumber array [cm-1]
+        rfm_npts::Int                       # number of points
+
         # Sensible heating
         C_d::Float64                        # Turbulent exchange coefficient [dimensionless]
         U::Float64                          # Wind speed [m s-1]
@@ -211,12 +217,19 @@ module atmosphere
         # Heating rate felt at each level [K/day]
         heating_rate::Array{Float64,1}
 
-        # Chemistry stuff
+        # FastChem equilibrium chemistry
+        flag_fastchem::Bool             # Fastchem enabled?
         fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
         fastchem_maxiter::Int           # Maximum FC iterations
         fastchem_xtol::Float64          # FC solver tolerance
-        fastchem_flag::Bool             # Fastchem enabled?
+        fastchem_exec::String           # Path to fastchem executable
         fastchem_work::String           # Path to fastchem working directory
+
+        # RFM radiative transfer
+        flag_rfm::Bool                  # RFM enabled?
+        rfm_exec::String                # Path to rfm executable
+        rfm_work::String                # Path to rfm working directory
+        rfm_parfile::String             # Path to rfm parfile. If empty, do not run RFM.
 
         # Observing properties
         transspec_p::Float64            # Pressure level probed in transmission [Pa]
@@ -334,6 +347,8 @@ module atmosphere
                     fastchem_floor::Float64 =   273.0,
                     fastchem_maxiter::Float64 = 2e4,
                     fastchem_xtol::Float64 =    1.0e-4,
+
+                    rfm_parfile::String =       "",
                     )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -700,14 +715,7 @@ module atmosphere
         end
 
         # Fastchem
-        # enabled?
-        atmos.fastchem_flag = false
-        # path to fc working directory
-        if isempty(fastchem_work)
-            atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
-        else
-            atmos.fastchem_work = abspath(fastchem_work)
-        end
+        atmos.flag_fastchem = false
         if ("FC_DIR" in keys(ENV))
 
             @debug "FastChem env has been set"
@@ -721,14 +729,26 @@ module atmosphere
             end
 
             # check executable
-            atmos.fastchem_flag = isfile(joinpath(atmos.FC_DIR,"fastchem"))
-            if !atmos.fastchem_flag
+            atmos.fastchem_exec = abspath(atmos.FC_DIR,"fastchem")
+            atmos.flag_fastchem = isfile(atmos.fastchem_exec)
+            if !atmos.flag_fastchem
                 @error "Could not find fastchem executable inside '$(atmos.FC_DIR)'"
                 @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             else
                 @debug "Found FastChem executable"
             end
+
+            # working directory
+            if isempty(fastchem_work)
+                atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
+            else
+                atmos.fastchem_work = abspath(fastchem_work)
+            end
+
+            # make folder
+            rm(atmos.fastchem_work,force=true,recursive=true)
+            mkdir(atmos.fastchem_work)
         else
             @debug "FastChem env variable not set"
         end
@@ -736,6 +756,17 @@ module atmosphere
         atmos.fastchem_maxiter = fastchem_maxiter
         atmos.fastchem_floor   = fastchem_floor
         atmos.fastchem_xtol    = fastchem_xtol
+
+        # RFM
+        atmos.flag_rfm = !isempty(rfm_parfile)
+        if atmos.flag_rfm
+            atmos.rfm_parfile = abspath(rfm_parfile)
+            @debug "RFM parfile set: $(atmos.rfm_parfile)"
+
+            atmos.rfm_work = joinpath(atmos.OUT_DIR, "rfm/")
+            rm(atmos.rfm_work,force=true,recursive=true)
+            mkdir(atmos.rfm_work)
+        end
 
         # Record that the parameters are set
         atmos.is_param = true
@@ -1594,6 +1625,9 @@ module atmosphere
 
             # calculate emissivity (eq 4 from Hammond24 and eq 15.29 from Hapke 2012)
             @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
+
+            # set dummy grey albedo
+            atmos.albedo_s = median(atmos.surf_r_arr)
         end
 
         #######################################
@@ -1639,6 +1673,11 @@ module atmosphere
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
         atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
+
+        # RFM values will be overwritten at runtime
+        atmos.rfm_npts =          4
+        atmos.rfm_wn =            zeros(Float64, atmos.rfm_npts)
+        atmos.rfm_fl =            zeros(Float64, atmos.rfm_npts)
 
         # Mark as allocated
         atmos.is_alloc = true
