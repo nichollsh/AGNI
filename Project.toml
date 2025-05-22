@@ -1,7 +1,7 @@
 name = "AGNI"
 uuid = "ede838c1-9ec3-4ebe-8ae8-da4091b3f21c"
 authors = ["Harrison Nicholls <harrison.nicholls@physics.ox.ac.uk>"]
-version = "1.6.0"
+version = "1.5.1"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
