@@ -405,6 +405,7 @@ module AGNI
                         ) || return false
 
         # Allocate atmosphere
+        @debug "Reticulating splines..."
         return_success = atmosphere.allocate!(atmos,star_file) || return false
 
         # Set temperatures as appropriate
