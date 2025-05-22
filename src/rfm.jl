@@ -27,6 +27,12 @@ module rfm
         "ClONO2", "N2O5", "SF6", "CCl4", "HNO4", "SF5CF3", "BrONO2", "ClOOCl", "CH3OH",
         ]
 
+    # Executable paths
+    const RFM_LINUX::String = abspath(dirname(@__FILE__),
+                                            "..", "res", "blobs", "rfm-amd64-linux")
+    const RFM_MACOS::String = abspath(dirname(@__FILE__),
+                                            "..", "res", "blobs", "rfm-arm64-macos")
+
     """
     **Write atmospheric profile for RFM from current state.**
 
@@ -203,8 +209,14 @@ module rfm
         write_driver(atmos)
 
         # Run subprocess
-        @debug "Run RFM"
-        execpath = joinpath(atmos.RFM_DIR, "rfm", "rfm")
+        if Sys.isapple()
+            @debug "Run RFM (MacOS binary)"
+            execpath = RFM_MACOS
+        else
+            @debug "Run RFM (Linux binary)"
+            execpath = RFM_LINUX
+        end
+
         # cmd = pipeline(`$execpath`, stdout=devnull)
         cmd = `$execpath`
         run(setenv(cmd, dir=atmos.rfm_work))

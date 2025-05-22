@@ -49,6 +49,7 @@ rfm
 RFM
 Rfm
 *.par
+rfm.log
 
 # Paper
 paper/main.pdf
