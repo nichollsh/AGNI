@@ -18,6 +18,7 @@ module AGNI
     include("spectrum.jl")
     include("atmosphere.jl")
     include("chemistry.jl")
+    include("rfm.jl")
     include("setpt.jl")
     include("save.jl")
     include("plotting.jl")
@@ -35,6 +36,7 @@ module AGNI
     import .energy
     import .solver
     import .chemistry
+    import .rfm
     import .load
 
     # Export submodules
@@ -47,6 +49,7 @@ module AGNI
     export plotting
     export energy
     export chemistry
+    export rfm
     export solver
 
     """
@@ -212,12 +215,6 @@ module AGNI
         # Hello
         @debug "Hello"
 
-        # Temp folders for OUTPUT
-        dir_fastchem = joinpath(output_dir,"fastchem/")
-        dir_frames   = joinpath(output_dir,"frames/")
-        rm(dir_fastchem,force=true,recursive=true)
-        rm(dir_frames,force=true,recursive=true)
-
         # Copy configuration file
         cp(cfg_path, joinpath(output_dir, "agni.toml"), force=true)
 
@@ -323,7 +320,21 @@ module AGNI
                 @error "Chemistry coupling is incompatible with condensation"
                 return false
             end
-            mkdir(dir_fastchem)
+        end
+
+        #    RFM radtrans
+        rfm_parfile::String = ""
+        rfm_wn_min::Float64 = 4000.0
+        rfm_wn_max::Float64 = 4020.0
+        if haskey(cfg["files"],"rfm_parfile")
+            rfm_parfile = cfg["files"]["rfm_parfile"]
+            if haskey(cfg["execution"],"rfm_wn_min") && haskey(cfg["execution"],"rfm_wn_max")
+                rfm_wn_min = Float64(cfg["execution"]["rfm_wn_min"])
+                rfm_wn_max = Float64(cfg["execution"]["rfm_wn_max"])
+            else
+                @error "RFM calculation enabled (rfm_parfile=$rfm_parfile)"
+                @error "Must also provide rfm_wn_min AND rfm_wn_max"
+            end
         end
 
         #    solver stuff
@@ -398,9 +409,12 @@ module AGNI
                                 flux_int=flux_int,
                                 surface_material=surface_mat,
                                 albedo_s=albedo_s,
+
+                                rfm_parfile=rfm_parfile
                         ) || return false
 
         # Allocate atmosphere
+        @debug "Reticulating splines..."
         return_success = atmosphere.allocate!(atmos,star_file) || return false
 
         # Set temperatures as appropriate
@@ -423,7 +437,7 @@ module AGNI
             @debug "Initial chemistry"
 
             # check we found fastchem
-            if !atmos.fastchem_flag
+            if !atmos.flag_fastchem
                 @error "Chemistry enabled but could not find FastChem. Have you set FC_DIR?"
                 return false
             end
@@ -434,6 +448,7 @@ module AGNI
         # Frame dir
         if plt_ani
             @debug "Will animate"
+            rm(dir_frames,force=true,recursive=true)
             mkdir(dir_frames)
         end
 
@@ -494,11 +509,17 @@ module AGNI
 
         return_success = return_success && solver_success
         @info "    done"
+        @info "Total SOCRATES evaluations: $(atmos.num_rt_eval)"
 
         # Fill Kzz in remaining regions
         energy.fill_Kzz!(atmos)
 
-        @info "Total RT evalulations: $(atmos.num_rt_eval)"
+        # RFM calculation?
+        if atmos.flag_rfm
+            @info "Running RFM line-by-line radiative transfer..."
+            rfm.run_rfm(atmos, rfm_wn_min, rfm_wn_max)
+            @info "    done"
+        end
 
         # Write arrays
         @info "Writing results"
@@ -533,20 +554,24 @@ module AGNI
         # Temp folders
         if clean_output
             @debug "Cleaning output folder"
-            # save fastchem outputs
+
+            # chemistry
+            dir_fastchem = joinpath(output_dir,"fastchem")
             if chem_type in [1,2,3]
 
-                cp(joinpath(output_dir,"fastchem","chemistry.dat"),
-                   joinpath(output_dir,"fc_gas.dat"), force=true)
+                cp(joinpath(dir_fastchem,"chemistry.dat"),
+                   joinpath(output_dir,  "fc_gas.dat"), force=true)
 
                 if chem_type in [2,3]
-                    cp(joinpath(output_dir,"fastchem","condensates.dat"),
-                       joinpath(output_dir,"fc_con.dat"), force=true)
+                    cp(joinpath(dir_fastchem,"condensates.dat"),
+                       joinpath(output_dir,  "fc_con.dat"), force=true)
                 end
             end
-            # remove folders
             rm(dir_fastchem,force=true,recursive=true)
-            rm(dir_frames,force=true,recursive=true)
+
+            # other
+            rm(joinpath(output_dir,"frames"),force=true,recursive=true)
+            rm(joinpath(output_dir,"rfm"),force=true,recursive=true)
         end
 
         # Finish up
