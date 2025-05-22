@@ -16,14 +16,15 @@ title = "Line-by-line validation tests"
     wind_speed      = 2.0
 
 [files]
-    input_sf        = "res/spectral_files/Oak/318/Oak.sf"
+    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"
     input_star      = "res/stellar_spectra/sun.txt"
     output_dir      = "out/"
+    rfm_parfile     = "res/parfiles/h2o-co2_4000-5000.par"
 
 [composition]
     p_surf          = 123.0
     p_top           = 1e-6
-    vmr_dict        = { H2O = 0.9, CO2=0.1 }
+    vmr_dict        = { H2O = 1.0, CO2=0.0 }
     chemistry       = 0
     condensates     = []
 
@@ -32,7 +33,7 @@ title = "Line-by-line validation tests"
     verbosity       = 2
     max_steps       = 20000
     max_runtime     = 400
-    num_levels      = 180
+    num_levels      = 100
     continua        = false
     rayleigh        = false
     cloud           = false
@@ -51,7 +52,8 @@ title = "Line-by-line validation tests"
     easy_start      = false
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3
-    rfm_parfile     = "res/par_files/h2o_co2_1000_6000.par"
+    rfm_wn_min      = 4050.0
+    rfm_wn_max      = 4950.0
 
 [plots]
     at_runtime      = true
