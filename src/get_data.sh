@@ -90,9 +90,9 @@ function osf {
     fi
 
     # check if file contains error message
-    header=$(head --bytes 80 $tgt)
-    if [[ $header == *"message_short"* ]]; then
-        echo "ERROR: Failed to download $1"
+    header=$(head --bytes 100 $tgt)
+    if [[ $header == *"message_short"* || $header == *"Server Error"* ]]; then
+        echo "ERROR: Failed to download from OSF identifier $1"
         echo "Response: $header ..."
         exit 1
     fi
