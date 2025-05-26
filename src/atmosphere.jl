@@ -211,14 +211,14 @@ module atmosphere
         cloud_val_l::Float64                #  |-> Default scalar values to above arrays
         cloud_val_f::Float64                # /
 
-        # Cell-internal heating
-        ediv_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-3] (e.g. from advection)
+        # Calculated heating internal to each cell (not incl. phase change)
+        fdif_heating::Array{Float64, 1} # Input extra flux diff, across each cell [W m-2]
 
         # Total energy flux
         flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2]
         flux_tot::Array{Float64,1}      # Total upward-directed flux at cell edges [W m-2]
 
-        # Heating rate felt at each level [K/day]
+        # Heating rate within at each level [K/day]
         heating_rate::Array{Float64,1}
 
         # FastChem equilibrium chemistry
@@ -1676,7 +1676,7 @@ module atmosphere
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
-        atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
+        atmos.fdif_heating =      zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
 
         # RFM values will be overwritten at runtime

@@ -237,7 +237,6 @@ module solver
         #      statistics
         r_med::Float64 =        9.0     # Median residual
         r_max::Float64 =        9.0     # Maximum residual (sign agnostic)
-        c_max::Float64 =        0.0     # Maximum cost (sign agnostic)
         x_med::Float64 =        0.0     # Median solution
         x_max::Float64 =        0.0     # Maximum solution (sign agnostic)
         iworst::Int =           0       # Level which is furthest from convergence
@@ -280,27 +279,28 @@ module solver
                                 rainout=rainout)
 
             # Energy divergence term
-            @turbo @. atmos.flux_dif -= atmos.ediv_add
+
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
                 # Zero loss with constant tmp_surf
-                resid[1:end] .= atmos.flux_dif[1:end]
+                resid[1:end] .= atmos.flux_dif[1:end] .- atmos.fdif_heating[1:end]
 
             elseif (sol_type == 2)
                 # Zero loss
-                resid[1:end-1] .= atmos.flux_dif[1:end]
+                resid[1:end-1] .= atmos.flux_dif[1:end] .- atmos.fdif_heating[1:end]
+
                 # Conductive boundary layer
                 resid[end] = atmos.flux_tot[end] - energy.skin_flux(atmos)
 
             elseif (sol_type == 3)
                 # Zero loss
-                resid[2:end] .= atmos.flux_dif[1:end]
+                resid[2:end] .= atmos.flux_dif[1:end] .- atmos.fdif_heating[1:end]
                 resid[1] = atmos.flux_tot[1] - atmos.flux_int
 
             elseif (sol_type == 4)
                 # Zero loss
-                resid[2:end] .= atmos.flux_dif[1:end]
+                resid[2:end] .= atmos.flux_dif[1:end] .- atmos.fdif_heating[1:end]
                 # OLR is equal to target_olr
                 resid[1] = atmos.target_olr - atmos.flux_u_lw[1]
 
@@ -398,10 +398,16 @@ module solver
             return norm(_r,3)
         end
 
+        # Cost for convergence
+        function _conv_cost()
+            conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
+        end
+
         # Plot current state
         function plot_step()
 
-            # plotting.plot_cloud(atmos, "out/cloud.png")
+            # plotting.plot_cloud(atmos, "$(atmos.OUT_DIR)/plot_cloud.png")
+            # plotting.plot_fluxdif(atmos, "$(atmos.OUT_DIR)/plot_fdif.png"; maxcost=_conv_cost())
 
             # Info string
             plt_info::String = ""
@@ -537,7 +543,7 @@ module solver
                 stepflags *= "M"
 
                 # Check if sf needs to be increased
-                if c_cur*easy_trig < conv_atol + conv_rtol * c_max
+                if c_cur*easy_trig < _conv_cost()
                     if easy_sf < 1.0
                         # increase sf => reduce modulation by easy_incr
                         stepflags *= "r"
@@ -572,7 +578,7 @@ module solver
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
             if (step <= 2) || perturb_all || easy_step ||
-                    (c_cur*perturb_trig < conv_atol + conv_rtol * c_max) ||
+                    (c_cur*perturb_trig < _conv_cost()) ||
                     mod(step,perturb_mod)==0
                 # Update whole matrix when any of these are true:
                 #    - first step
@@ -688,7 +694,7 @@ module solver
                     # Yes, we do need to do linesearch...
                     stepflags *= "Ls-"
 
-                    if (ls_method == 1) || (ls_cost*0.1 < conv_atol + conv_rtol * c_max)
+                    if (ls_method == 1) || (ls_cost*0.1 < _conv_cost())
                         # Use golden-section search method
                         ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha,
                                                 1.0e-9, ls_min_scale, ls_max_steps)
@@ -752,7 +758,6 @@ module solver
             dx_stat =   maximum(abs.(x_dif))
             r_old_2nm = r_cur_2nm
             r_cur_2nm = norm(r_cur)
-            c_max =     maximum(abs.(atmos.flux_tot))
 
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
@@ -778,7 +783,7 @@ module solver
 
             # Converged?
             @debug "        check convergence"
-            if (c_cur < conv_atol + conv_rtol * c_max) && !easy_start
+            if (c_cur < _conv_cost()) && !easy_start
                 code = 0
                 break
             end

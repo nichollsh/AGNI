@@ -377,6 +377,73 @@ module plotting
     end
 
     """
+    Plot the flux difference at each pressure level
+
+    Note that x-axis is symmetric-log10, of flux units in mW/m^2.
+    """
+    function plot_fluxdif(atmos::atmosphere.Atmos_t, fname::String;
+                            size_x::Int=550, size_y::Int=400,
+                            title::String="", maxcost::Float64=-0.1
+                        )
+
+        col_t::String = "#ff4400"
+        col_o::String = "#66CD00"
+        alpha = 0.7
+        w = 2.0
+
+        ylims  = Float64[atmos.p_toa*1e-5 /1.5, atmos.p_boa*1e-5 *1.5]
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
+        max_x = log10(max(1.0, maximum(abs.(atmos.flux_dif)), maxcost)) + 3
+        xticks_pos = unique(ceil.(Int, range( start=1, stop=max_x+1, step=1)))
+        xticks = unique(vcat(-1.0.*reverse(xticks_pos), 0.0, xticks_pos))
+        xlims = (-xticks_pos[end], xticks_pos[end])
+        xticklabels = _intstr.(round.(Int, abs.(xticks)))
+
+        plt = plot(legend=:outertopright, ylims=ylims, yticks=yticks,
+                    xticks=(xticks, xticklabels), xlims=xlims,
+                    size=(size_x,size_y); plt_default...)
+
+        # Zero line
+        plot!(plt, [0.0, 0.0], ylims, lw=0.5, lc="black", label="")
+
+        # Heating rate from user
+        scatter!(plt,  _symlog.(atmos.fdif_heating*1e3), atmos.p/1e5,
+                    markercolor=col_o, markersize=3, marekershape=:square, label="Input")
+
+        # Max cost for convergence
+        if maxcost > 0.0
+            _x = _symlog.(atmos.fdif_heating*1e3 .- maxcost*1e3)
+            plot!(plt,_x,atmos.p/1e5, lw=1.0, lc="black", ls=:dash, label="Converge")
+
+            _x = _symlog.(atmos.fdif_heating*1e3 .+ maxcost*1e3)
+            plot!(plt,_x,atmos.p/1e5, lw=1.0, lc="black", ls=:dash, label="")
+        end
+
+        # Total flux difference
+        plot!(plt, _symlog.(atmos.flux_dif*1e3), atmos.p/1e5, label="Solved",
+                    lw=w, lc=col_t, ls=:solid, linealpha=alpha)
+
+        # Labels
+        annotate!(plt, xlims[1]/2.0, ylims[1]*2, text("Cooling", :black, :center, 9))
+        annotate!(plt, xlims[2]/2.0, ylims[1]*2, text("Heating", :black, :center, 9))
+
+        # Finalise + save
+        xlabel!(plt, "log Flux difference [mW m⁻²]")
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10)
+        if !isempty(title)
+            title!(plt, title)
+        end
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt
+    end
+
+    """
     Plot emission spectrum at the TOA
     """
     function plot_emission(atmos::atmosphere.Atmos_t, fname::String)
