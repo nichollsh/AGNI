@@ -26,7 +26,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.5.1"
+    const AGNI_VERSION::String   = "1.5.2"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -49,6 +49,7 @@ module atmosphere
         THERMO_DIR::String      # path to thermo data
         FC_DIR::String          # path to fastchem install folder
         RFM_DIR::String         # path to RFM install folder
+        FRAMES_DIR::String      # path to frames of animation
 
         # SOCRATES objects
         SOCRATES_VERSION::String
@@ -61,9 +62,12 @@ module atmosphere
         bound::SOCRATES.StrBound
         radout::SOCRATES.StrOut
 
-        # Radiation parameters
+        # Radiation scheme performance
+        benchmark::Bool                 # Benchmark RT?
         num_rt_eval::Int                # Total number of RT evaluations
         tim_rt_eval::UInt64             # Total time spent doing RT evaluations [ns]
+
+        # Radiation parameters
         all_channels::Bool              # Use all bands?
         spectral_file::String           # Path to spectral file
         star_file::String               # Path to star spectrum
@@ -372,7 +376,7 @@ module atmosphere
             @error "    version is "*atmos.SOCRATES_VERSION
         end
 
-
+        atmos.benchmark   = false
         atmos.num_rt_eval = 0
         atmos.tim_rt_eval = 0.0
 
@@ -388,6 +392,7 @@ module atmosphere
         # Set the parameters (and make sure that they're reasonable)
         atmos.ROOT_DIR =        abspath(ROOT_DIR)
         atmos.OUT_DIR =         abspath(OUT_DIR)
+        atmos.FRAMES_DIR  =     joinpath(atmos.OUT_DIR, "frames")
         atmos.THERMO_DIR  =     joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
         atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
@@ -1627,7 +1632,7 @@ module atmosphere
             @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
 
             # set dummy grey albedo
-            atmos.albedo_s = median(atmos.surf_r_arr)
+            atmos.albedo_s = Statistics.median(atmos.surf_r_arr)
         end
 
         #######################################

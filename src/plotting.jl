@@ -657,7 +657,7 @@ module plotting
 
         # Find output files
         out::String = atmos.OUT_DIR
-        frames = glob("frames/*.png",out)
+        frames = glob("*.png",atmos.FRAMES_DIR)
         nframes::Int = length(frames)
 
         # Create animation
@@ -665,7 +665,7 @@ module plotting
             @warn "Cannot animate solver because no output frames were found"
         else
             fps::Float64 = nframes/duration*1.0
-            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$out/frames/*.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/animation.mp4`)
+            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$(atmos.FRAMES_DIR)/*.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/animation.mp4`)
         end
 
         return nothing
