@@ -448,8 +448,8 @@ module AGNI
         # Frame dir
         if plt_ani
             @debug "Will animate"
-            rm(dir_frames,force=true,recursive=true)
-            mkdir(dir_frames)
+            rm(atmos.FRAMES_DIR,force=true,recursive=true)
+            mkdir(atmos.FRAMES_DIR)
         end
 
         # Solver variables
@@ -570,7 +570,7 @@ module AGNI
             rm(dir_fastchem,force=true,recursive=true)
 
             # other
-            rm(joinpath(output_dir,"frames"),force=true,recursive=true)
+            rm(atmos.FRAMES_DIR,force=true,recursive=true)
             rm(joinpath(output_dir,"rfm"),force=true,recursive=true)
         end
 

@@ -418,7 +418,7 @@ module solver
             plotting.combined(plt_pt, plt_fl, plt_mr, plt_info, path_plt)
 
             if save_frames
-                cp(path_plt,@sprintf("%s/frames/%04d.png",atmos.OUT_DIR,step))
+                cp(path_plt,@sprintf("%s/%04d.png",atmos.FRAMES_DIR,step))
             end
         end
 
@@ -784,8 +784,10 @@ module solver
             end
 
             # Show benchmark
-            rt_avg::Float64 = atmos.tim_rt_eval / atmos.num_rt_eval / 1e9 * 1e3
-            @debug @sprintf("Average RT time: %.2f ms", rt_avg)
+            if atmos.benchmark
+                rt_avg = atmos.tim_rt_eval / atmos.num_rt_eval / 1e9 * 1e3
+                @debug @sprintf("Average RT time: %.3f ms", rt_avg)
+            end
 
         end # end solver loop
 
