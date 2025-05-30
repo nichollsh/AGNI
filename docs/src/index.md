@@ -20,6 +20,7 @@ GitHub: [https://github.com/nichollsh/AGNI](https://github.com/nichollsh/AGNI)
 
 If you use AGNI, please cite the following papers:
 * Nicholls et al., (2025a) - [DOI 10.1093/mnras/stae2772](https://doi.org/10.1093/mnras/stae2772)
-* Nicholls et al., (2025b) - submitted to JOSS
+* Nicholls et al., (2025b) - [DOI 10.21105/joss.07726](https://doi.org/10.21105/joss.07726)
+* Nicholls et al., (2025c) - submitted
 
 This software is available under the GPLv3. Copyright (C) 2025 Harrison Nicholls.

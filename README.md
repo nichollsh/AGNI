@@ -41,7 +41,8 @@ See the [Getting Started](https://nichollsh.github.io/AGNI/dev/setup/) page in t
 ## Citation
 If you use AGNI, please cite the following papers:
 * Nicholls et al., (2025a) - https://doi.org/10.1093/mnras/stae2772
-* Nicholls et al., (2025b) - in review at JOSS
+* Nicholls et al., (2025b) - https://doi.org/10.21105/joss.07726
+* Nicholls et al., (2025c) - submitted
 
 ## Example
 Below is an animated example of AGNI solving for a temperature-pressure profile, starting from an isothermal state.
