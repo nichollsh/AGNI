@@ -2,7 +2,7 @@
 title: 'AGNI: A radiative-convective model for lava planet atmospheres'
 tags:
   - astronomy
-  - physics,
+  - physics
   - radiative transfer
   - exoplanets
   - convection
