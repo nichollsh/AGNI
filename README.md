@@ -22,14 +22,12 @@
 </p>
 
 <p align="center">
-  <b>A radiative-convective model for lava planet atmospheres</b>
+  <b>An open-source model for extreme atmospheres on rocky exoplanets</b>
 </p>
 
 
 ## Overview
-A numerical model for the atmospheres of hot rocky (exo)planets. The model's primary purpose is to simulate the evolving atmospheres of magma ocean (lava) planets, while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere.
-
-AGNI models correlated-k radiative transfer including shortwave irradiation from the star, surface emission, gaseous absorption, Rayleigh scattering, parameterised clouds, and CIA. Mixing length theory is used to model convection. Together, energy transport processes allow for an energy-conserving calculation of the atmosphere's temperature profile. It also supports real gas equations of state and self-gravitation.
+AGNI's primary purpose is to simulate the atmospheric temperature-, height-, and compositional-structures of atmospheres overlying magma oceans. It does this while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere. SOCRATES is used to perform correlated-k radiative transfer including: shortwave irradiation from the star, surface emission, line absorption, Rayleigh scattering, parameterised clouds, and collisional absorption. Mixing length theory is used to parametrise convection. AGNI also supports real gas equations of state, self-gravitation, and various spectral surface compositions. Accounting for these energy transport processes permits an energy-conserving calculation of atmospheric structure, obtained using numerical optimisation, which also yields realistic cooling rates for young rocky planets with magma oceans.
 
 Consult the [AGNI documentation](https://nichollsh.github.io/AGNI/) for information about the model.
 
@@ -40,9 +38,9 @@ See the [Getting Started](https://nichollsh.github.io/AGNI/dev/setup/) page in t
 
 ## Citation
 If you use AGNI, please cite the following papers:
-* Nicholls et al., (2025a) - https://doi.org/10.1093/mnras/stae2772
-* Nicholls et al., (2025b) - https://doi.org/10.21105/joss.07726
-* Nicholls et al., (2025c) - submitted
+* Nicholls et al., (2025a) - [DOI 10.1093/mnras/stae2772](https://doi.org/10.1093/mnras/stae2772)
+* Nicholls et al., (2025b) - [DOI 10.21105/joss.07726](https://doi.org/10.21105/joss.07726)
+* Nicholls et al., (2025d) - in review at Nature Astronomy
 
 ## Example
 Below is an animated example of AGNI solving for a temperature-pressure profile, starting from an isothermal state.
