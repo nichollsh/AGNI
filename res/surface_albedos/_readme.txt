@@ -7,4 +7,3 @@ All data must be in columns of:
     single-scattering albedo [dimensionless]
 
 Files can be obtained from Zenodo (Hammond+24): https://zenodo.org/records/13691960
-These are also mirrored on OSF: https://osf.io/2gcd9/

@@ -56,7 +56,7 @@ For example, to download the spectral file `Honeyside16` you would then run:
 ./src/get_data.sh anyspec Honeyside 16
 ```
 Note the space between the codename and number of bands.
-Other spectral files can be downloaded from OSF: https://osf.io/vehxg/.
+Other spectral files can be downloaded from the [PROTEUS community on Zenodo](https://zenodo.org/communities/proteus_framework/records?q&f=subject%3Aspectral_files&l=list&p=1&s=10&sort=newest).
 
 ## Cannot find FastChem
 You need to install FastChem. This can be done by running the command:
