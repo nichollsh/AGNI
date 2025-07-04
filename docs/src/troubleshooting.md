@@ -1,6 +1,15 @@
 # Troubleshooting
-This page may be useful if you are having problems. However, I would suggest that
-you also double check the [Getting started](@ref) instructions.
+This page may be useful if you are having problems. However, I would suggest that you also double check that you followed all of the [Getting started](@ref) instructions.
+
+## Curl is not installed
+You need to install [curl](https://curl.se/). This is a tool for tranferring files over a network. Curl is used by AGNI to obtain lookup data files from Zenodo, and by Julia to obtain the required libraries.
+
+To install curl on Ubuntu:
+```bash
+sudo apt install curl
+```
+
+For other Linux distributions, see the [curl download page](https://curl.se/download.html). MacOS comes with curl pre-installed.
 
 ## Julia errors on start, potentially referencing the CURL library
 It is important that the shell environment variable `LD_LIBRARY_PATH` is
@@ -19,12 +28,12 @@ official website.
 You need to install NetCDF on your machine. This is a library designed for reading and writing
 data files, commonly used in atmospheric sciences. [Wikipedia page](https://en.wikipedia.org/wiki/NetCDF).
 
-To install on Ubuntu:
+To install NetCDF on Ubuntu:
 ```bash
 sudo apt install libnetcdf-dev netcdf-bin ncview libnetcdff-dev
 ```
 
-To install on MacOS:
+To install NetCDF on MacOS:
 ```bash
 sudo brew install netcdf netcdf-fortran
 ```
