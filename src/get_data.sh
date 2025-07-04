@@ -7,9 +7,18 @@ set -e
 
 # Check that curl is installed
 if ! [ -x "$(command -v curl)" ]; then
-  echo 'ERROR: curl is not installed' >&2
-  echo 'You must install curl in order to use this script' >&2
+  echo "ERROR: curl is not installed" >&2
+  echo "You must install curl in order to use this script" >&2
   exit 1
+fi
+
+# Check internet connectivity
+header=$(curl -Is  https://zenodo.org | head -n 1)
+if ! [[ $header == "HTTP/1.1 2"* || $header == "HTTP/1.1 3"* ]]; then
+    # Return error if we don't get a positive HTTP response from Zenodo
+    echo "ERROR: Failed to establish a connection to Zenodo"
+    echo "Response: $header"
+    exit 1
 fi
 
 # Root and resources folders
