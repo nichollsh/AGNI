@@ -6,6 +6,9 @@
 </h1>
 
 <p align="center">
+  <b>An open-source model for extreme atmospheres on rocky exoplanets</b>
+  <br /><br />
+
   <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml">
     <img src="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml/badge.svg">
   </a>
@@ -19,10 +22,6 @@
     <img src="https://img.shields.io/badge/DOI-10.1093%2Fmnras%2Fstae2772-blue">
   </a>
   <a href="https://joss.theoj.org/papers/380d8e608e9f863b639af76ceebc7131"><img src="https://joss.theoj.org/papers/380d8e608e9f863b639af76ceebc7131/status.svg"></a>
-</p>
-
-<p align="center">
-  <b>An open-source model for extreme atmospheres on rocky exoplanets</b>
 </p>
 
 
