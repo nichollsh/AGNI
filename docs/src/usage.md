@@ -245,7 +245,7 @@ jl.AGNI.save.write_ncdf(atmos, "out.nc")
 Performed using the [Reference Forward Model](https://eodg.atm.ox.ac.uk/RFM/).
 You must provide a HITRAN-formatted `.par` file, setting the path via `files.rfm_parfile`.
 This parfile can contain absorption from multiple species, and can be obtained from [hitran.org](https://hitran.org/lbl/).
-Alternatively, get the parfiles stored on OSF using: `./src/get_data.sh parfiles`.
+Alternatively, get the parfiles stored on Zenodo using: `./src/get_data.sh parfiles`.
 
 Then, you must also set the variables `execution.rfm_wn_min` and `execution.rfm_wn_max`.
 These two parameters specify the wavenumber [cm-1] range over which to perform the LbL calculations.
