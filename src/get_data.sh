@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Download and unpack required and/or optional data
-# All files can be found on OSF at https://osf.io/8dumn/
+# All files can be found at https://zenodo.org/communities/proteus_framework
 
 # Exit script if any of the commands fail
 set -e
 
 # Check that curl is installed
 if ! [ -x "$(command -v curl)" ]; then
-  echo 'ERROR: curl is not installed.' >&2
+  echo 'ERROR: curl is not installed' >&2
+  echo 'You must install curl in order to use this script' >&2
   exit 1
 fi
 
@@ -63,11 +64,11 @@ Where [TARGET] can be any of the following:
         $help_thermo\
 "
 
-# Generic OSF downloader function
-function osf {
-    # $1 = OSF identifier
-    # $2 = target folder
-    # $3 = target filename
+# Generic Zenodo downloader function
+function zenodo {
+    # $1 = Zenodo identifier for Record
+    # $2 = target folder (on disk)
+    # $3 = target filename (on disk and in Record)
 
     # target file path
     tgt="$2/$3"
@@ -81,7 +82,7 @@ function osf {
     # get data
     echo "    $1 > $tgt"
     mkdir -p $2
-    curl -LsS "https://osf.io/download/$1/" > $tgt
+    curl -LsS "https://zenodo.org/records/$1/files/$3" > $tgt
 
     # check file exists
     if [[ ! -f "$tgt" ]]; then
@@ -89,10 +90,10 @@ function osf {
         exit 1
     fi
 
-    # check if file contains error message
-    header=$(head --bytes 100 $tgt)
-    if [[ $header == *"message_short"* || $header == *"Server Error"* ]]; then
-        echo "ERROR: Failed to download from OSF identifier $1"
+    # check if file contains error message (replace NULL with blank)
+    header=$(head --bytes 100 $tgt | tr '\0' '\n')
+    if [[ $header == *"error"* || $header == *"Error"* ]]; then
+        echo "ERROR: Failed to download from Zenodo Record $1"
         echo "Response: $header ..."
         exit 1
     fi
@@ -100,81 +101,93 @@ function osf {
     return 0
 }
 
-# Get zip file
+# Get zip file and extract it
 function get_zip {
-    # $1 = OSF identifier
-    # $2 = target folder
+    # $1 = Zenodo record
+    # $2 = target folder on disk
+    # $3 = name of zip file in the Zenodo record
 
-    zipfile=".temp.zip"
-    osf $1 $2 $zipfile
-    unzip -oq $2/$zipfile -d $2
-    rm $2/$zipfile
+    zippath="$2/$3"
+
+    zenodo $1 $2 $3
+    unzip -oq $zippath -d $2
+    rm $zippath
 }
 
-# Get a spectral file by name (associative arrays not supported on MacOS)
+# Get a spectral file by name
 function anyspec {
     # $1 = Codename (e.g. Honeyside)
     # $2 = Number of bands (e.g. 48)
 
+    # This could be made much neater using associative arrays,
+    #    but unfortunately they are not supported on MacOS
+
+    # Key provided by user, used for match statement below
     name="$1$2"
 
-    # Get identifiers
+    # Default filenames for .sf and .sf_k parts of spectral file
+    sf_h="$1.sf"
+    sf_k="$1.sf_k"
+
+    # Get record on Zenodo containing the .sf and .sf_k files
     case $name in
         "Frostflow16" )
-            id_a="6rvfe"; id_b="kxve8"
+            rec="15799743"
             ;;
         "Frostflow48" )
-            id_a="9n6mw"; id_b="xfap8"
+            rec="15696415"
             ;;
         "Frostflow256")
-            id_a="mnvyq"; id_b="tzsgc"
+            rec="15799754"
             ;;
         "Frostflow4096")
-            id_a="eyw6b"; id_b="ry6qz"
+            rec="15799776"
             ;;
 
         "Dayspring16" )
-            id_a="uwfja"; id_b="j7f2w"
+            rec="15799318"
             ;;
         "Dayspring48" )
-            id_a="heuza"; id_b="c5jv3"
+            rec="15721749"
             ;;
         "Dayspring256")
-            id_a="b5gsh"; id_b="dn6wh"
+            rec="15799474"
             ;;
         "Dayspring4096")
-            id_a="g5nh8"; id_b="htn3q"
+            rec="15799495"
             ;;
 
         "Honeyside16" )
-            id_a="6cqnp"; id_b="f5snk"
+            rec="15799607"
             ;;
         "Honeyside48" )
-            id_a="rxj5a"; id_b="xfc5h"
+            rec="15799652"
             ;;
         "Honeyside256")
-            id_a="97436"; id_b="xny6v"
+            rec="15799731"
             ;;
         "Honeyside4096")
-            id_a="p672d"; id_b="ujb4z"
+            rec="15696457"
             ;;
 
         "Oak318" )
-            id_a="qmp4e"; id_b="5fxr7"
+            rec="15743843"
             ;;
 
         "Legacy318" )
-            id_a="b7dvn"; id_b="m8zf5"
+            rec="15806343"
+            sf_h="sp_b318_HITRAN_a16_no_spectrum"
+            sf_k="sp_b318_HITRAN_a16_no_spectrum_k"
             ;;
         * )
-            echo "ERROR: Unknown spectral file requested"
+            echo "ERROR: Unknown spectral file requested ($name)"
             exit 1
             ;;
     esac
 
-    # Download the file
-    osf $id_a $spfiles/$1/$2 $1.sf
-    osf $id_b $spfiles/$1/$2 $1.sf_k
+    # Download the files
+    zenodo $rec $spfiles/$1/$2 $sf_h
+    zenodo $rec $spfiles/$1/$2 $sf_k
 }
 
 # Handle request for downloading a group of data
@@ -186,11 +199,10 @@ function handle_request {
             anyspec Oak 318
             anyspec Dayspring 48
             anyspec Honeyside 256
-            osf 6k8ba $spfiles reference.pdf
 
-            osf 2qdu8 $stellar sun.txt
+            zenodo 15721440 $stellar sun.txt
 
-            get_zip 4m5x8 $thermo
+            get_zip 15805460 $thermo gases.zip
             ;;
 
         "highres")
@@ -212,47 +224,49 @@ function handle_request {
 
         "stellar")
             echo $help_stellar
-
-            osf mabp2 $stellar trappist-1.txt
-            osf rk7mj $stellar eps-eri.txt
-            osf agsrq $stellar hd97658.txt
-            osf ehfsy $stellar gj1214.txt
-            osf 2qdu8 $stellar sun.txt
-            osf 45cjx $stellar l-98-59.txt
+            rec="15721440"
+            zenodo $rec $stellar trappist-1.txt
+            zenodo $rec $stellar eps-eri.txt
+            zenodo $rec $stellar hd97658.txt
+            zenodo $rec $stellar gj1214.txt
+            zenodo $rec $stellar sun.txt
+            zenodo $rec $stellar l-98-59.txt
             ;;
 
         "surfaces")
             echo $help_surfaces
-            osf 3af8u $surface andesite.dat
-            osf mgae7 $surface basalt_glass.dat
-            osf d92wk $surface basalt_tuff.dat
-            osf pz54b $surface diorite.dat
-            osf bz5jy $surface gabbro.dat
-            osf hyqv5 $surface granite.dat
-            osf hwkby $surface harzburgite.dat
-            osf 2xpmb $surface hematite.dat
-            osf 6ga5d $surface lherzolite.dat
-            osf bdcte $surface lunar_anorthosite.dat
-            osf 5x4fy $surface lunar_marebasalt.dat
-            osf 8r3x2 $surface mars_basalticshergottite.dat
-            osf 97zsh $surface mars_breccia.dat
-            osf y6knb $surface norite.dat
-            osf wqz48 $surface phonolite.dat
-            osf qsntg $surface pyrite.dat
-            osf q6ujb $surface rhyolite.dat
-            osf usj7w $surface tephrite.dat
-            osf aj6us $surface tholeiitic_basalt.dat
+            rec="15805460"
+            zenodo $rec $surface andesite.dat
+            zenodo $rec $surface basalt_glass.dat
+            zenodo $rec $surface basalt_tuff.dat
+            zenodo $rec $surface diorite.dat
+            zenodo $rec $surface gabbro.dat
+            zenodo $rec $surface granite.dat
+            zenodo $rec $surface harzburgite.dat
+            zenodo $rec $surface hematite.dat
+            zenodo $rec $surface lherzolite.dat
+            zenodo $rec $surface lunar_anorthosite.dat
+            zenodo $rec $surface lunar_marebasalt.dat
+            zenodo $rec $surface mars_basalticshergottite.dat
+            zenodo $rec $surface mars_breccia.dat
+            zenodo $rec $surface norite.dat
+            zenodo $rec $surface phonolite.dat
+            zenodo $rec $surface pyrite.dat
+            zenodo $rec $surface rhyolite.dat
+            zenodo $rec $surface tephrite.dat
+            zenodo $rec $surface tholeiitic_basalt.dat
             ;;
 
         "thermodynamics")
             echo $help_thermo
-            get_zip 4m5x8 $thermo
+            get_zip 15805460 $thermo gases.zip
             ;;
 
         "parfiles")
             echo $help_parfiles
-            osf me3uc $parfiles h2o-co2_4000-5000.par
-            osf mucfd $parfiles mixture_100-50000.par
+            rec="15806626"
+            zenodo $rec $parfiles h2o-co2_4000-5000.par
+            zenodo $rec $parfiles mixture_100-50000.par
             ;;
 
         *)
