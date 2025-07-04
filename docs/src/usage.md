@@ -1,12 +1,9 @@
 # Using the model
-First, follow the [Getting started](@ref) instructions. Only read on once you
-have confirmed that the code is working.
+Follow the [Getting started](@ref) instructions. Only read on once you have confirmed that the model runs on your machine.
+Otherwise, see the [Troubleshooting](@ref) guide.
 
 ## Input data files
-The minimal input data required to run the model will have been downloaded automatically.
-If you require more data, such as additional stellar spectra or opacities, then these can
-also be easily obtained using the `get_data` script in the AGNI root directory. To see how
-to use this script, run it without arguments like so:
+The minimal input data required to run the model will have been downloaded automatically from Zenodo. If you require more data, such as additional stellar spectra or opacities, then these can also be easily obtained using the `get_data` script in the AGNI root directory. To see how to use this script, run it without arguments like so:
 ```bash
 ./src/get_data.sh
 ```
