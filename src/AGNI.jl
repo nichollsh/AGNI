@@ -229,7 +229,7 @@ module AGNI
             gravity = cfg["planet"]["gravity"]
         end
         if haskey(cfg["planet"],"mass")
-            mass = cfg["planet"]["gravity"]
+            mass = cfg["planet"]["mass"]
             if gravity > 0.0
                 # overspecified
                 @error "Misconfiguration: provide `mass` OR `gravity`, not both"
