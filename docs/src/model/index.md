@@ -15,7 +15,8 @@ The model uses k-terms fitted to spectral absorption cross-section data from [DA
 ```@raw html
   <img src="assets/spectral_flowchart.svg" width=100% class="center"/>
 ```
-Surface reflectivity can be modelled as a greybody with an albedo from 0 to 1. Alternatively, it can be modelled from empirical single-scattering data that varies with zenith angle and wavelength.
+
+Surface reflectivity can be modelled as a greybody with an albedo from 0 to 1. Alternatively, the surface can be modelled using empirical reflectance data that varies (spectrally) with wavelength. In the latter case a filepath must be provided via the config. The file can tabulate any one of: spherical reflectance ('r'), hemispherical emissivity ('e'), or single scattering albedo ('w').
 
 AGNI also includes an interface to the [Reference Forward Model](https://eodg.atm.ox.ac.uk/RFM/), which is packaged as a binary
 blob (the RFM source code is proprietary). This interface provides an extremely easy way to validate and benchmark SOCRATES.

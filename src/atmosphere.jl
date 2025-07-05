@@ -1595,7 +1595,7 @@ module atmosphere
             #   second column describes the optical properties 'value'
             # Options for second column:
             #    r = spherical reflectance (AKA Bond albedo), converted to e in code
-            #    e = spherical emissivity, converted to r in code
+            #    e = hemispherical emissivity, converted to r in code
             #    w = single scattering albedo, converted to r and e in code
             # Which of these 3 are provided must be indicated on 1st data line of file
 
