@@ -1,12 +1,9 @@
 # Using the model
-First, follow the [Getting started](@ref) instructions. Only read on once you
-have confirmed that the code is working.
+Follow the [Getting started](@ref) instructions. Only read on once you have confirmed that the model runs on your machine.
+Otherwise, see the [Troubleshooting](@ref) guide.
 
 ## Input data files
-The minimal input data required to run the model will have been downloaded automatically.
-If you require more data, such as additional stellar spectra or opacities, then these can
-also be easily obtained using the `get_data` script in the AGNI root directory. To see how
-to use this script, run it without arguments like so:
+The minimal input data required to run the model will have been downloaded automatically from Zenodo. If you require more data, such as additional stellar spectra or opacities, then these can also be easily obtained using the `get_data` script in the AGNI root directory. To see how to use this script, run it without arguments like so:
 ```bash
 ./src/get_data.sh
 ```
@@ -245,7 +242,7 @@ jl.AGNI.save.write_ncdf(atmos, "out.nc")
 Performed using the [Reference Forward Model](https://eodg.atm.ox.ac.uk/RFM/).
 You must provide a HITRAN-formatted `.par` file, setting the path via `files.rfm_parfile`.
 This parfile can contain absorption from multiple species, and can be obtained from [hitran.org](https://hitran.org/lbl/).
-Alternatively, get the parfiles stored on OSF using: `./src/get_data.sh parfiles`.
+Alternatively, get the parfiles stored on Zenodo using: `./src/get_data.sh parfiles`.
 
 Then, you must also set the variables `execution.rfm_wn_min` and `execution.rfm_wn_max`.
 These two parameters specify the wavenumber [cm-1] range over which to perform the LbL calculations.
