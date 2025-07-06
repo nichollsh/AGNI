@@ -281,8 +281,7 @@ module save
             var_rfm_wn =    defVar(ds, "rfm_wn",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "cm-1"))
             var_rfm_fl =    defVar(ds, "rfm_fl",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "erg/(s cm2 cm-1)"))
             var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c") ;  nc_comp..., )
-            var_albr =      defVar(ds, "albedo_r",  Float64, ("nbands",)         ;  nc_comp..., )
-            var_albe =      defVar(ds, "albedo_e",  Float64, ("nbands",)         ;  nc_comp..., )
+            var_albr =      defVar(ds, "surface_r", Float64, ("nbands",)         ;  nc_comp..., )
 
             #     Store data
             var_p[:] =      atmos.p
@@ -364,7 +363,6 @@ module save
 
             # Surface spectral albedo
             var_albr[:] = atmos.surf_r_arr
-            var_albe[:] = atmos.surf_e_arr
 
             # RFM array
             var_rfm_fl[:] = atmos.rfm_fl
