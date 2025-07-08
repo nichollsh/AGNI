@@ -100,7 +100,7 @@ function zenodo {
     fi
 
     # check if file contains error message (replace NULL with blank)
-    header=$(head --bytes 100 $tgt | LC_CTYPE=C tr '\0' '\n')
+    header=$(head --bytes 100 $tgt)
     if [[ $header == *"error"* || $header == *"Error"* ]]; then
         echo "ERROR: Failed to download from Zenodo Record $1"
         echo "Response: $header ..."
