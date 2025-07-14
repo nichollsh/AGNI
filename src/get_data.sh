@@ -6,15 +6,16 @@
 set -e
 
 # Check that curl is installed
-if ! [ -x "$(command -v curl)" ]; then
-  echo "ERROR: curl is not installed" >&2
-  echo "You must install curl in order to use this script" >&2
+if ! [ -x "$(command -v wget)" ]; then
+  echo "ERROR: wget is not installed" >&2
+  echo "You must install wget in order to use this script" >&2
   exit 1
 fi
 
 # Check internet connectivity
-header=$(curl -Is  https://zenodo.org | head -n 1)
-if ! [[ $header == "HTTP/1.1 2"* || $header == "HTTP/1.1 3"* ]]; then
+header=$(wget --spider -S "https://zenodo.org" 2>&1 | grep "HTTP/")
+echo $header
+if ! [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* ]]; then
     # Return error if we don't get a positive HTTP response from Zenodo
     echo "ERROR: Failed to establish a connection to Zenodo"
     echo "Response: $header"
@@ -40,6 +41,7 @@ mkdir -p $thermo
 mkdir -p $parfiles
 
 # Help strings
+help_dryrun="Test the get_data script"
 help_basic="Get the basic data required to run the model"
 help_highres="Get a spectral file with many high-resolution opacities"
 help_steam="Get pure-steam spectral files"
@@ -82,20 +84,18 @@ function zenodo {
     # target file path
     tgt="$2/$3"
 
-    # exists?
-    # if [[ -f "$tgt" ]]; then
-    #     echo "    $1 > file already exists"
-    #     return 0
-    # fi
+    # target url
+    url="https://zenodo.org/records/$1/files/$3"
 
     # get data
     echo "    $1 > $tgt"
     mkdir -p $2
-    curl -LsS "https://zenodo.org/records/$1/files/$3" > $tgt
+    # curl -LsS $url > $tgt
+    wget -qO $tgt $url
 
     # check if command failed
     if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with curl command."
+        echo "ERROR: Failed to download $1. Issue with wget command"
         exit 1
     fi
 
@@ -106,12 +106,12 @@ function zenodo {
     fi
 
     # check if file contains error message (replace NULL with blank)
-    # header=$(head --bytes 100 $tgt)
-    # if [[ $header == *"error"* || $header == *"Error"* ]]; then
-    #     echo "ERROR: Failed to download from Zenodo Record $1"
-    #     echo "Response: $header ..."
-    #     exit 1
-    # fi
+    header=$(head --bytes 100 $tgt)
+    if [[ $header == *"error"* || $header == *"Error"* ]]; then
+        echo "ERROR: Failed to download from Zenodo Record $1"
+        echo "Response: $header ..."
+        exit 1
+    fi
 
     return 0
 }
@@ -208,6 +208,13 @@ function anyspec {
 # Handle request for downloading a group of data
 function handle_request {
     case $1 in
+
+        "dryrun")
+            echo $help_dryrun
+            echo "Sleeping for 3 seconds..."
+            sleep 3
+            ;;
+
         "basic")
             echo $help_basic
 
@@ -286,7 +293,6 @@ function handle_request {
 
         *)
             echo "$help"
-            return 0
             ;;
     esac
     return 0
