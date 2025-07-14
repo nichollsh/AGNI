@@ -2,14 +2,14 @@
 This page outlines requirements and installation steps for the code. Currently,
 GNU/Linux and MacOS (including ARM) are supported.
 
-## Requirements
+## Software requirements
 * gfortran
 * NetCDF library for FORTRAN
 * make
-* curl
+* wget
 
 !!! warning
-    Do not install Julia using your system package manager. Install only from julialang.org
+    Do not install Julia using your system package manager. Install only from julialang.org as below.
 
 ## Installation
 Follow the steps below in order to setup the code.
