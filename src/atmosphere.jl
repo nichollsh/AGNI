@@ -1615,7 +1615,7 @@ module atmosphere
 
             # read spectral surface radiative properties from file
             (_srf_data::Array{Float64,2}, _srf_head) =
-                        readdlm(atmos.surface_material, Float64; header=true)
+                        readdlm(atmos.surface_material, Float64; header=true, comments=true)
 
             _srf_w::Array{Float64, 1} = _srf_data[:,1]     # wavelength [nm]
             _srf_v::Array{Float64, 1} = _srf_data[:,2]     # value [dimensionless]
