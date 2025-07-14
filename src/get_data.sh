@@ -93,19 +93,25 @@ function zenodo {
     mkdir -p $2
     curl -LsS "https://zenodo.org/records/$1/files/$3" > $tgt
 
+    # check if command failed
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with curl command."
+        exit 1
+    fi
+
     # check file exists
     if [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1"
+        echo "ERROR: Failed to download $1. File not found on disk."
         exit 1
     fi
 
     # check if file contains error message (replace NULL with blank)
-    header=$(head --bytes 100 $tgt)
-    if [[ $header == *"error"* || $header == *"Error"* ]]; then
-        echo "ERROR: Failed to download from Zenodo Record $1"
-        echo "Response: $header ..."
-        exit 1
-    fi
+    # header=$(head --bytes 100 $tgt)
+    # if [[ $header == *"error"* || $header == *"Error"* ]]; then
+    #     echo "ERROR: Failed to download from Zenodo Record $1"
+    #     echo "Response: $header ..."
+    #     exit 1
+    # fi
 
     return 0
 }
