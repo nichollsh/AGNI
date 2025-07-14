@@ -1668,6 +1668,7 @@ module atmosphere
                 @error "Unexpected format for surface data"
                 @error "File path: $(atmos.surface_material)"
                 @error "File header: $_srf_head"
+                @error "Try downloading the data again using `src/get_data.sh`"
                 return false
             end
 
