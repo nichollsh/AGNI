@@ -24,6 +24,7 @@ docs/build
 *.bin
 
 # Model data
+*.zip
 res/spectral_files/*
 res/stellar_spectra/*
 res/surface_albedos/*
