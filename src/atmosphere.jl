@@ -1631,6 +1631,11 @@ module atmosphere
             # convert wl array from [nm] to [m]
             @turbo @. _srf_w = _srf_w / 1e9
 
+            # sort data
+            _srf_mask = sortperm(_srf_w)
+            _srf_w = _srf_w[_srf_mask]
+            _srf_v = _srf_v[_srf_mask]
+
             # create linear interpolator on the data
             _srf_i = extrapolate(interpolate((_srf_w,),_srf_v,Gridded(Linear())),Flat())
 

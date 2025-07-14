@@ -47,7 +47,8 @@ help_highres="Get a spectral file with many high-resolution opacities"
 help_steam="Get pure-steam spectral files"
 help_anyspec="Get a particular spectral file by name, passing it as an argument"
 help_stellar="Get a collection of stellar spectra"
-help_surfaces="Get a collection of surface single-scattering albedos"
+help_surf_standard="Get a basic collection of surface reflectance data"
+help_surf_extended="Get an extended collection of surface reflectance data"
 help_parfiles="Get a collection of gas linelist par files"
 help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
 help="\
@@ -68,7 +69,9 @@ Where [TARGET] can be any of the following:
     anyspec
         $help_anyspec
     surfaces
-        $help_surfaces
+        $help_surf_standard
+    surfaces_extended
+        $help_surf_extended
     parfiles
         $help_parfiles
     thermodynamics
@@ -257,7 +260,7 @@ function handle_request {
             ;;
 
         "surfaces")
-            echo $help_surfaces
+            echo $help_surf_standard
             rec="15880455"
             zenodo $rec $surface andesite.dat
             zenodo $rec $surface basaltglass.dat
@@ -278,6 +281,11 @@ function handle_request {
             zenodo $rec $surface rhyolite.dat
             zenodo $rec $surface tephrite.dat
             zenodo $rec $surface tholeiiticbasalt.dat
+            ;;
+
+        "surfaces_extended")
+            echo $help_surf_extended
+            get_zip 15881238 $surface ecostress.zip
             ;;
 
         "thermodynamics")
