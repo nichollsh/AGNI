@@ -7,7 +7,7 @@ title = "Transparent atmosphere"
     albedo_b        = 0.0
     s0_fact         = 0.25
     zenith_angle    =  54.74
-    surface_material= "res/surface_albedos/lunar_marebasalt.dat"
+    surface_material= "res/surface_albedos/ecostress/mineral/carbonate/none.fine.vswir.c-1a.jpl.beckman.spectrum.dat"
     albedo_s        = 0.0
     radius          = 8.091e6
     gravity         = 12.7
@@ -17,7 +17,7 @@ title = "Transparent atmosphere"
     tmp_magma       = 3200.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"
+    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"
     input_star      = "res/stellar_spectra/l-98-59.txt"
     output_dir      = "out/"
 
@@ -31,7 +31,7 @@ title = "Transparent atmosphere"
     max_runtime     = 400
     num_levels      = 50
     continua        = true
-    rayleigh        = true
+    rayleigh        = false
     cloud           = false
     aerosol         = false
     overlap_method  = "ee"
