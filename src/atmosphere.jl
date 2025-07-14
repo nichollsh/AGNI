@@ -26,7 +26,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.5.3"
+    const AGNI_VERSION::String   = "1.6.0"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -106,8 +106,8 @@ module atmosphere
         # Surface
         surface_material::String        # Surface material file path
         albedo_s::Float64               # Grey surface albedo when surface=greybody
-        surf_r_arr::Array{Float64,1}    # Spectral surface reflectance
-        surf_e_arr::Array{Float64,1}    # Spectral surface emissivity
+        surf_r_arr::Array{Float64,1}    # Spectral surface spherical reflectance
+        surf_e_arr::Array{Float64,1}    # Spectral surface hemispheric emissivity
         tmp_surf::Float64               # Surface brightness temperature [K]
         rp::Float64                     # surface radius [m]
         grav_surf::Float64              # surface gravity [m s-2]
@@ -1576,19 +1576,34 @@ module atmosphere
         # Surface properties
         ###########################################
         # allocate reflectance and emissivity arrays
-        atmos.surf_r_arr = zeros(Float64, atmos.nbands) # directional-hemispheric reflect.
-        atmos.surf_e_arr = ones(Float64, atmos.nbands)  # emissivity
+        atmos.surf_r_arr = zeros(Float64, atmos.nbands) # spherical reflectivity
+        atmos.surf_e_arr = ones(Float64, atmos.nbands)  # hemispherical emissivity
 
         if atmos.surface_material == "greybody"
             # grey albedo
-            fill!(atmos.surf_r_arr, atmos.albedo_s)
             # Kirchoff's law: set emissivity equal to 1-albedo (spectrally)
+            fill!(atmos.surf_r_arr, atmos.albedo_s)
             fill!(atmos.surf_e_arr, 1.0-atmos.albedo_s)
 
         else
             # spectral albedo and emissivity
             # Hapke2012: https://doi.org/10.1017/CBO9781139025683
             # Hammond2024: https://arxiv.org/abs/2409.04386
+
+            # AGNI is flexible in accepting multiple forms of two-column surface data
+            #   first column is WL in nm
+            #   second column describes the optical properties 'value'
+            # Options for second column:
+            #    r = spherical reflectance (AKA Bond albedo), converted to e in code
+            #    e = hemispherical emissivity, converted to r in code
+            #    w = single scattering albedo, converted to r and e in code
+            # Which of these 3 are provided must be indicated on 1st data line of file
+
+            # reflectivity: r_hh = r_s = r0 * (1 - γ/(3+3γ) )
+            # emissivity: e_h = 1- r_s
+            # r0 is the diffusive reflectance = (1 − γ)/(1 + γ)
+            # γ is the albedo factor = sqrt(1 − w)
+            # w is the single-scattering albedo
 
             # try to find a matching file
             atmos.surface_material = abspath(atmos.surface_material)
@@ -1598,40 +1613,66 @@ module atmosphere
                 return false
             end
 
-            # read single-scattering albedo data from file
-            _alb_data::Array{Float64,2} = readdlm(atmos.surface_material, Float64)
-            _alb_w::Array{Float64, 1} = _alb_data[:,1]     # wavelength [nm]
-            _alb_s::Array{Float64, 1} = _alb_data[:,2]     # ss albedo [dimensionless]
+            # read spectral surface radiative properties from file
+            (_srf_data::Array{Float64,2}, _srf_head) =
+                        readdlm(atmos.surface_material, Float64; header=true, comments=true)
 
-            # extrapolate to 0 wavelength, with constant value
-            pushfirst!(_alb_w, 0.0)
-            pushfirst!(_alb_s, _alb_s[1])
+            _srf_w::Array{Float64, 1} = _srf_data[:,1]     # wavelength [nm]
+            _srf_v::Array{Float64, 1} = _srf_data[:,2]     # value [dimensionless]
 
-            # extrapolate to large wavelength, with constant value
-            push!(_alb_w, 1e10)
-            push!(_alb_s, _alb_s[end])
+            # extrapolate to 0 wavelength with constant value
+            pushfirst!(_srf_w, 0.0)
+            pushfirst!(_srf_v, _srf_v[1])
 
-            # convert ss albedo to gamma values (eq 14.3 from Hapke 2012)
-            @turbo @. _alb_s = sqrt(1.0 - _alb_s) # operating in place
+            # extrapolate to large wavelength with constant value
+            push!(_srf_w, 1e10)
+            push!(_srf_v, _srf_v[end])
 
-            # create interpolator on gamma
-            _gamma = extrapolate(interpolate((_alb_w,),_alb_s,Gridded(Linear())),Flat())
+            # convert wl array from [nm] to [m]
+            @turbo @. _srf_w = _srf_w / 1e9
 
-            # use interpolator to fill band values
-            ga::Float64 = 0.0
-            mu::Float64 = cosd(atmos.zenith_degrees)
-            @inbounds for i in 1:atmos.nbands
-                # evaluate gamma at band centre, converting from m to nm
-                ga = _gamma(1.0e9 * atmos.bands_cen[i])
+            # sort data
+            _srf_mask = sortperm(_srf_w)
+            _srf_w = _srf_w[_srf_mask]
+            _srf_v = _srf_v[_srf_mask]
 
-                # calculate spherical reflectance (eq 4 from Hammond24)
-                atmos.surf_r_arr[i] = (1-ga)/(1+ga) * (1- ga/(3*(1+ga)))
+            # create linear interpolator on the data
+            _srf_i = extrapolate(interpolate((_srf_w,),_srf_v,Gridded(Linear())),Flat())
+
+            # calculate r and e depending on what 'value' in the file actually represents
+            if _srf_head[1] == "r"
+                @debug "Reading surface data, spherical reflectance (r_hh, r_s)"
+                for i in 1:atmos.nbands
+                    atmos.surf_r_arr[i] = _srf_i(atmos.bands_cen[i])
+                end
+                @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
+
+            elseif _srf_head[1] == "e"
+                @debug "Reading surface data, hemispherical emissivity (e_h)"
+                for i in 1:atmos.nbands
+                    atmos.surf_e_arr[i] = _srf_i(atmos.bands_cen[i])
+                end
+                @turbo @. atmos.surf_r_arr = 1.0 - atmos.surf_e_arr
+
+
+            elseif _srf_head[1] == "w"
+                @debug "Reading surface data, single scattering albedo (w)"
+                γ::Float64 = 0.0
+                for i in 1:atmos.nbands
+                    γ = sqrt( 1 - _srf_i(atmos.bands_cen[i]) )
+                    atmos.surf_r_arr[i] = (1−γ)/(1+γ) *(1 - γ/(3+3γ) )
+                end
+                @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
+
+            else
+                @error "Unexpected format for surface data"
+                @error "File path: $(atmos.surface_material)"
+                @error "File header: $_srf_head"
+                @error "Try downloading the data again using `src/get_data.sh`"
+                return false
             end
 
-            # calculate emissivity (eq 4 from Hammond24 and eq 15.29 from Hapke 2012)
-            @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
-
-            # set dummy grey albedo
+            # set dummy value for the scalar variable containing the grey albedo
             atmos.albedo_s = Statistics.median(atmos.surf_r_arr)
         end
 
