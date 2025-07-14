@@ -109,14 +109,6 @@ function zenodo {
         exit 1
     fi
 
-    # check if file contains error message (replace NULL with blank)
-    header=$(head --bytes 100 $tgt)
-    if [[ $header == *"error"* || $header == *"Error"* ]]; then
-        echo "ERROR: Failed to download from Zenodo Record $1"
-        echo "Response: $header ..."
-        exit 1
-    fi
-
     return 0
 }
 
@@ -286,6 +278,7 @@ function handle_request {
         "surfaces_extended")
             echo $help_surf_extended
             get_zip 15881238 $surface ecostress.zip
+            get_zip 15881496 $surface lavaworld.zip
             ;;
 
         "thermodynamics")
