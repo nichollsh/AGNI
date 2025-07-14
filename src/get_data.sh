@@ -3,7 +3,7 @@
 # All files can be found at https://zenodo.org/communities/proteus_framework
 
 # Exit script if any of the commands fail
-set -e
+# set -e
 
 # Check that curl is installed
 if ! [ -x "$(command -v wget)" ]; then
@@ -14,7 +14,7 @@ fi
 
 # Check internet connectivity
 header=$(wget --spider -S "https://zenodo.org" 2>&1 | grep "HTTP/")
-echo $header
+# echo $header
 if ! [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* ]]; then
     # Return error if we don't get a positive HTTP response from Zenodo
     echo "ERROR: Failed to establish a connection to Zenodo"
@@ -96,6 +96,7 @@ function zenodo {
     # check if command failed
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to download $1. Issue with wget command"
+        wget -O - $url
         exit 1
     fi
 
@@ -257,26 +258,26 @@ function handle_request {
 
         "surfaces")
             echo $help_surfaces
-            rec="15805460"
+            rec="15880455"
             zenodo $rec $surface andesite.dat
-            zenodo $rec $surface basalt_glass.dat
-            zenodo $rec $surface basalt_tuff.dat
+            zenodo $rec $surface basaltglass.dat
+            zenodo $rec $surface basalttuff.dat
             zenodo $rec $surface diorite.dat
             zenodo $rec $surface gabbro.dat
             zenodo $rec $surface granite.dat
             zenodo $rec $surface harzburgite.dat
             zenodo $rec $surface hematite.dat
             zenodo $rec $surface lherzolite.dat
-            zenodo $rec $surface lunar_anorthosite.dat
-            zenodo $rec $surface lunar_marebasalt.dat
-            zenodo $rec $surface mars_basalticshergottite.dat
-            zenodo $rec $surface mars_breccia.dat
+            zenodo $rec $surface lunaranorthosite.dat
+            zenodo $rec $surface lunarmarebasalt.dat
+            zenodo $rec $surface marsbasalticshergottite.dat
+            zenodo $rec $surface marsbreccia.dat
             zenodo $rec $surface norite.dat
             zenodo $rec $surface phonolite.dat
             zenodo $rec $surface pyrite.dat
             zenodo $rec $surface rhyolite.dat
             zenodo $rec $surface tephrite.dat
-            zenodo $rec $surface tholeiitic_basalt.dat
+            zenodo $rec $surface tholeiiticbasalt.dat
             ;;
 
         "thermodynamics")
