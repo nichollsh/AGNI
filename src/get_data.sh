@@ -3,18 +3,19 @@
 # All files can be found at https://zenodo.org/communities/proteus_framework
 
 # Exit script if any of the commands fail
-set -e
+# set -e
 
 # Check that curl is installed
-if ! [ -x "$(command -v curl)" ]; then
-  echo "ERROR: curl is not installed" >&2
-  echo "You must install curl in order to use this script" >&2
+if ! [ -x "$(command -v wget)" ]; then
+  echo "ERROR: wget is not installed" >&2
+  echo "You must install wget in order to use this script" >&2
   exit 1
 fi
 
 # Check internet connectivity
-header=$(curl -Is  https://zenodo.org | head -n 1)
-if ! [[ $header == "HTTP/1.1 2"* || $header == "HTTP/1.1 3"* ]]; then
+header=$(wget --spider -S "https://zenodo.org" 2>&1 | grep "HTTP/")
+# echo $header
+if ! [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* ]]; then
     # Return error if we don't get a positive HTTP response from Zenodo
     echo "ERROR: Failed to establish a connection to Zenodo"
     echo "Response: $header"
@@ -40,12 +41,14 @@ mkdir -p $thermo
 mkdir -p $parfiles
 
 # Help strings
+help_dryrun="Test the get_data script"
 help_basic="Get the basic data required to run the model"
 help_highres="Get a spectral file with many high-resolution opacities"
 help_steam="Get pure-steam spectral files"
 help_anyspec="Get a particular spectral file by name, passing it as an argument"
 help_stellar="Get a collection of stellar spectra"
-help_surfaces="Get a collection of surface single-scattering albedos"
+help_surf_standard="Get a basic collection of surface reflectance data"
+help_surf_extended="Get an extended collection of surface reflectance data"
 help_parfiles="Get a collection of gas linelist par files"
 help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
 help="\
@@ -66,7 +69,9 @@ Where [TARGET] can be any of the following:
     anyspec
         $help_anyspec
     surfaces
-        $help_surfaces
+        $help_surf_standard
+    surfaces_extended
+        $help_surf_extended
     parfiles
         $help_parfiles
     thermodynamics
@@ -82,28 +87,25 @@ function zenodo {
     # target file path
     tgt="$2/$3"
 
-    # exists?
-    # if [[ -f "$tgt" ]]; then
-    #     echo "    $1 > file already exists"
-    #     return 0
-    # fi
+    # target url
+    url="https://zenodo.org/records/$1/files/$3"
 
     # get data
     echo "    $1 > $tgt"
     mkdir -p $2
-    curl -LsS "https://zenodo.org/records/$1/files/$3" > $tgt
+    # curl -LsS $url > $tgt
+    wget -qO $tgt $url
 
-    # check file exists
-    if [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1"
+    # check if command failed
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command"
+        wget -O - $url
         exit 1
     fi
 
-    # check if file contains error message (replace NULL with blank)
-    header=$(head --bytes 100 $tgt)
-    if [[ $header == *"error"* || $header == *"Error"* ]]; then
-        echo "ERROR: Failed to download from Zenodo Record $1"
-        echo "Response: $header ..."
+    # check file exists
+    if [[ ! -f "$tgt" ]]; then
+        echo "ERROR: Failed to download $1. File not found on disk."
         exit 1
     fi
 
@@ -202,6 +204,13 @@ function anyspec {
 # Handle request for downloading a group of data
 function handle_request {
     case $1 in
+
+        "dryrun")
+            echo $help_dryrun
+            echo "Sleeping for 3 seconds..."
+            sleep 3
+            ;;
+
         "basic")
             echo $help_basic
 
@@ -243,27 +252,33 @@ function handle_request {
             ;;
 
         "surfaces")
-            echo $help_surfaces
-            rec="15805460"
+            echo $help_surf_standard
+            rec="15880455"
             zenodo $rec $surface andesite.dat
-            zenodo $rec $surface basalt_glass.dat
-            zenodo $rec $surface basalt_tuff.dat
+            zenodo $rec $surface basaltglass.dat
+            zenodo $rec $surface basalttuff.dat
             zenodo $rec $surface diorite.dat
             zenodo $rec $surface gabbro.dat
             zenodo $rec $surface granite.dat
             zenodo $rec $surface harzburgite.dat
             zenodo $rec $surface hematite.dat
             zenodo $rec $surface lherzolite.dat
-            zenodo $rec $surface lunar_anorthosite.dat
-            zenodo $rec $surface lunar_marebasalt.dat
-            zenodo $rec $surface mars_basalticshergottite.dat
-            zenodo $rec $surface mars_breccia.dat
+            zenodo $rec $surface lunaranorthosite.dat
+            zenodo $rec $surface lunarmarebasalt.dat
+            zenodo $rec $surface marsbasalticshergottite.dat
+            zenodo $rec $surface marsbreccia.dat
             zenodo $rec $surface norite.dat
             zenodo $rec $surface phonolite.dat
             zenodo $rec $surface pyrite.dat
             zenodo $rec $surface rhyolite.dat
             zenodo $rec $surface tephrite.dat
-            zenodo $rec $surface tholeiitic_basalt.dat
+            zenodo $rec $surface tholeiiticbasalt.dat
+            ;;
+
+        "surfaces_extended")
+            echo $help_surf_extended
+            get_zip 15881238 $surface ecostress.zip
+            get_zip 15881496 $surface lavaworld.zip
             ;;
 
         "thermodynamics")
@@ -280,7 +295,6 @@ function handle_request {
 
         *)
             echo "$help"
-            return 0
             ;;
     esac
     return 0

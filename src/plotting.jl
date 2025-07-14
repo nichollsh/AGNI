@@ -619,7 +619,7 @@ module plotting
 
         plot!(plt, atmos.bands_cen*1e9, y, color="black", label="")
 
-        xlims  = (200.0, 1000.0)
+        xlims  = (200.0, 1500.0)
         xticks = range( xlims[1], xlims[2], step=100.0)
         xaxis!(plt, xlims=xlims, xticks=xticks, minorgrid=true)
 

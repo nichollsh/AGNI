@@ -179,7 +179,7 @@ module energy
         #     line 129. Having this 1-albedo term (and using this low-order integration)
         #     gives the correct results from my tests versus SOCRATES's native function.
         @inbounds for i in 1:atmos.nbands
-            atmos.bound.flux_ground[1,i] = atmos.surf_flux[i] * (1.0 - atmos.surf_r_arr[i])
+            atmos.bound.flux_ground[1,i] = atmos.surf_flux[i] * atmos.surf_e_arr[i]
         end
 
         ######################################################
