@@ -64,7 +64,7 @@ module spectrum
         @debug "Read stellar spectrum from file"
 
         if isfile(path)
-            spec_data = readdlm(abspath(path), '\t', Float64; header=false, skipstart=2)
+            spec_data = readdlm(abspath(path), Float64; header=false, skipstart=2)
         else
             @error "Cannot find stellar spectrum at '$path'"
             exit(1)

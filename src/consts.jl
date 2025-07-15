@@ -53,7 +53,7 @@ module consts
     export Cp_ideal
 
     # List of elements included in the model
-    const elems_standard::Array{String,1} = ["H","C","N","O","S","P",
+    const elems_standard::Array{String,1} = ["H","C","N","O","S","P","He",
                                                 "Fe","Mg","Si","Ca","Al"]
     export elems_standard
 
@@ -63,7 +63,7 @@ module consts
         "H2S", "HCN", "NH3", "OCS", "S2", "S8", "SO2", "SiO2", "O3", "N2O", "NO", "NO2",
         "HNO3", "FeH", "PH3", "C2H2", "NO3", "N2O5", "HONO", "HO2NO2", "H2O2", "C2H6",
         "CH3", "H2CO", "HO2", "C", "Fe", "FeO", "H", "Mg2", "Mg", "MgO", "N", "O", "Si",
-        "S", "SO", "CS2"
+        "S", "SO", "CS2","He",
     ]
     export gases_standard
 
