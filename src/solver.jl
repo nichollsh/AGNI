@@ -274,7 +274,7 @@ module solver
             _set_tmps!(x)
 
             # Calculate fluxes
-            energy.calc_fluxes!(atmos,
+            energy.calc_fluxes!(atmos, true,
                                 latent, convect, sens_heat, conduct,
                                 convect_sf=easy_sf, latent_sf=easy_sf,
                                 rainout=rainout)
@@ -877,8 +877,8 @@ module solver
 
         # Handle different solution types
         if sol_type == 1
-            # Fixed temperature case => just calculate fluxes
-            energy.calc_fluxes!(atmos, false, false, false, false)
+            # Fixed temperature case => just calculate radiative fluxes
+            energy.calc_fluxes!(atmos, true, false, false, false, false)
 
         elseif sol_type == 2
             # Conductive boundary layer => find Tsurf based on Tmagma
@@ -891,7 +891,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus skin flux
-                energy.calc_fluxes!(atmos, false, false, false, false)
+                energy.calc_fluxes!(atmos, true, false, false, false, false)
                 return (atmos.flux_tot[end-1] - energy.skin_flux(atmos))^2
             end
 
@@ -913,7 +913,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, false, false, false, false)
+                energy.calc_fluxes!(atmos, true, false, false, false, false)
                 return (atmos.flux_tot[end-1] - atmos.flux_int)^2
             end
 
@@ -935,7 +935,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, false, false, false, false)
+                energy.calc_fluxes!(atmos, true, false, false, false, false)
                 return (atmos.flux_u_lw[end-1] - atmos.target_olr)^2
             end
 

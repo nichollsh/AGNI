@@ -466,7 +466,7 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
-            energy.calc_fluxes!(atmos, incl_latent,
+            energy.calc_fluxes!(atmos, true, incl_latent,
                                 incl_convect, incl_sens, incl_conduct,
                                 calc_cf=Bool(cfg["plots"]["contribution"]),
                                 rainout=Bool(cfg["execution"]["rainout"]))
