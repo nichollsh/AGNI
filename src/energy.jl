@@ -720,6 +720,7 @@ module energy
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `radiative::Bool`                 include radiation fluxes
     - `latent::Bool`                    include condensation flux
     - `convect::Bool`                   include MLT convection flux
     - `sens_heat::Bool`                 include TKE sensible heat transport
@@ -730,6 +731,7 @@ module energy
     - `rainout::Bool`                   allow rainout ( do not reset VMRs to dry values )
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t,
+                          radiative::Bool,
                           latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
                           calc_cf::Bool=false, rainout::Bool=true)
@@ -764,9 +766,11 @@ module energy
         atmosphere.calc_layer_props!(atmos)
 
         # +Radiation
-        radtrans!(atmos, true, calc_cf=calc_cf)   # Longwave
-        radtrans!(atmos, false)                   # Shortwave
-        @turbo @. atmos.flux_tot += atmos.flux_n  # Add to total flux
+        if radiative
+            radtrans!(atmos, true, calc_cf=calc_cf)   # Longwave
+            radtrans!(atmos, false)                   # Shortwave
+            @turbo @. atmos.flux_tot += atmos.flux_n  # Add to total flux
+        end
 
         # +Dry convection
         if convect
