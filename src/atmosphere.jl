@@ -496,7 +496,7 @@ module atmosphere
         atmos.phs_tau_sgl = 1.0e5   # single gas case
 
         # Hardcoded cloud properties
-        atmos.cond_alpha    = 0.0     # 0% of condensate is retained (i.e. complete rainout)
+        atmos.cond_alpha    = 1.0     # 0% of condensate is retained (i.e. complete rainout)
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
