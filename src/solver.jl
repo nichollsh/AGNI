@@ -137,7 +137,7 @@ module solver
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, ls_method::Int=1, easy_start::Bool=false,
                             ls_increase::Float64=1.08,
-                            detect_plateau::Bool=true, perturb_all::Bool=true,
+                            detect_plateau::Bool=true, perturb_all::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=false,
                             conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3

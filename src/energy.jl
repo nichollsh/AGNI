@@ -738,7 +738,7 @@ module energy
         reset_fluxes!(atmos)
 
         # +Condensation and evaporation
-        if atmos.condense_any && latent
+        if atmos.condense_any
 
             # Restore mixing ratios
             restore_composition!(atmos)
@@ -748,13 +748,11 @@ module energy
             chemistry.handle_saturation!(atmos)
 
             # Calculate latent heat flux
-            condense_diffuse!(atmos)
-
-            # Modulate?
-            atmos.flux_l *= latent_sf
-
-            # Add to total flux
-            @turbo @. atmos.flux_tot += atmos.flux_l
+            if latent
+                condense_diffuse!(atmos)                    # Calculate latent heat flux
+                atmos.flux_l *= latent_sf                   # Modulate for stability?
+                @turbo @. atmos.flux_tot += atmos.flux_l    # Add to total flux
+            end
 
             # Restore mixing ratios - do not allow rainout
             if !rainout
@@ -762,24 +760,19 @@ module energy
             end
         end
 
-        # Calculate layer properties
+        # Recalculate layer properties
         atmosphere.calc_layer_props!(atmos)
 
         # +Radiation
-        radtrans!(atmos, true, calc_cf=calc_cf)
-        radtrans!(atmos, false)
-        @turbo @. atmos.flux_tot += atmos.flux_n
+        radtrans!(atmos, true, calc_cf=calc_cf)   # Longwave
+        radtrans!(atmos, false)                   # Shortwave
+        @turbo @. atmos.flux_tot += atmos.flux_n  # Add to total flux
 
         # +Dry convection
         if convect
-            # Calc flux
-            convection!(atmos)
-
-            # Modulate?
-            atmos.flux_cdry *= convect_sf
-
-            # Add to total flux
-            @turbo @. atmos.flux_tot += atmos.flux_cdry
+            convection!(atmos)                          # Calc dry convection heat flux
+            atmos.flux_cdry *= convect_sf               # Modulate for stability?
+            @turbo @. atmos.flux_tot += atmos.flux_cdry # Add to total flux
         end
 
         # +Surface turbulence
