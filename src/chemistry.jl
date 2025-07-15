@@ -316,10 +316,10 @@ module chemistry
         count_elem_nonzero::Int = 0
 
         # Paths
-        execpath::String = joinpath(atmos.FC_DIR,       "fastchem")             # Executable file
-        confpath::String = joinpath(atmos.fastchem_work,"config.input")         # Configuration by AGNI
-        elempath::String = joinpath(atmos.fastchem_work,"elements.dat")         # Elements by AGNI
-        chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat")        # Chemistry by FastChem
+        execpath::String = joinpath(atmos.FC_DIR,       "fastchem")      # Executable file
+        confpath::String = joinpath(atmos.fastchem_work,"config.input")  # Configuration by AGNI
+        elempath::String = joinpath(atmos.fastchem_work,"elements.dat")  # Elements by AGNI
+        chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat") # Chemistry by FastChem
 
         # Check file exists
         write_cfg = write_cfg || !isfile(confpath) || !isfile(elempath)

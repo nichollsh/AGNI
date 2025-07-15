@@ -57,22 +57,23 @@ module plotting
 
         # Plot phase boundary
         if atmos.condense_any
-            sat_n::Int = 100
-            sat_p::Array{Float64,1} = zeros(Float64, sat_n)
-            sat_t::Array{Float64,1} = zeros(Float64, sat_n)
+            sat_t::Array{Float64,1} = zeros(Float64, atmos.nlev_c)
             for c in atmos.condensates
 
                 if atmos.gas_dat[c].no_sat
                     continue
                 end
 
-                sat_t = collect(Float64, 1:sat_n) * atmos.gas_dat[c].T_crit / sat_n
-                for i in 1:sat_n
-                    sat_p[i] = phys.get_Psat(atmos.gas_dat[c], sat_t[i]) .* 1e-5
+                for i in 1:atmos.nlev_c
+                    sat_t[i] = phys.get_Tdew(atmos.gas_dat[c], atmos.p[i]*atmos.gas_vmr[c][i])
+                    # @info("    $c at $(atmos.p[i]/1e5) : Tdew=$(sat_t[i])K")
+                    if sat_t[i] > atmos.gas_dat[c].T_crit-0.1
+                        sat_t[i] = NaN
+                    end
                 end
 
                 # plot phase boundary for this condensate
-                plot!(plt, sat_t, sat_p, lc=atmos.gas_dat[c].plot_color, ls=:dot,
+                plot!(plt, sat_t, atmos.p*1e-5, lc=atmos.gas_dat[c].plot_color, ls=:dot,
                             label=atmos.gas_dat[c].plot_label)
             end
         end
