@@ -16,6 +16,8 @@ module spectrum
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
+    import ..phys
+
     """
     **Validate spectral file.**
 
@@ -45,6 +47,42 @@ module spectrum
         end
 
         return true
+    end
+
+    """
+    **Generate blackbody stellar spectrum.**
+
+    Arguments:
+    - `Teff::Float64`       Star's photospheric effective temperature
+    - `S0::Float64`         Bolometric instellation received by planet
+
+    Returns:
+    - `wl::Array`           Wavelength array [nm]
+    - `fl::Array`           Flux array [erg s-1 cm-2 nm-1]
+    """
+    function blackbody_star(Teff::Float64, S0::Float64)::Tuple{Array{Float64,1}, Array{Float64,1}}
+
+        @debug "Generate blackbody stellar spectrum"
+
+        # Generate wavelength array (1 nm linear spacing from 0.5 nm to 100 μm)
+        wl::Array{Float64, 1} = collect(Float64, range(start=1.0, stop=100e3, step=1.0))
+        fl::Array{Float64, 1} = zero(wl)
+
+        # Calculate fluxes at star surface [W m-2 nm-1]
+        fl[:] .= phys.evaluate_planck.(wl[:], Teff)
+
+        # Convert to [erg s-1 cm-2 nm-1]
+        fl *= 1e7
+
+        # Calculate scaling factor to account for Rstar and Separation
+        #    S0 = σT^4 * (R/a)^2
+        # Apply scaling factor to fl array, to get spectrum at planet's TOA
+        fl *= S0 / ( phys.σSB * Teff^4)
+
+        # Limit range on fl to prevent numerical problems
+        clamp!(fl, 1e-30, 1e30)
+
+        return wl, fl
     end
 
     """
