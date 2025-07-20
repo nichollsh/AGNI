@@ -494,7 +494,7 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 1.0e5   # mixed composition case
+        atmos.phs_tau_mix = 1.0e3   # mixed composition case
 
         # Evaporation efficiency
         atmos.evap_efficiency = 0.5
