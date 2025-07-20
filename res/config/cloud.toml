@@ -61,3 +61,4 @@ title = "Cloud radiative properties test"
     mixing_ratios   = true
     animate         = false
     height          = true
+    cloud           = true

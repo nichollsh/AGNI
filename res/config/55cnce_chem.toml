@@ -61,3 +61,4 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     mixing_ratios   = true
     animate         = true
     height          = true
+    cloud           = false
