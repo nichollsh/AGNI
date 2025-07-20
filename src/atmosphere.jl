@@ -205,7 +205,7 @@ module atmosphere
         mask_l::Array{Bool,1}               # Layers transporting latent heat
 
         # Clouds
-        cond_alpha::Float64                 # Condensate retention fraction (i.e. how much goes into forming clouds vs rainout)
+        cloud_alpha::Float64                # Condensate cloud formation fraction
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m].
         cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
         cloud_arr_f::Array{Float64,1}       # Total cloud area fraction in layers. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
@@ -501,7 +501,7 @@ module atmosphere
         atmos.evap_scaling    = 0.1
 
         # Hardcoded cloud properties
-        atmos.cond_alpha    = 0.1     # 10% of condensate forms substantial clouds
+        atmos.cloud_alpha   = 0.01    # 1% of condensed water forms substantial clouds
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud

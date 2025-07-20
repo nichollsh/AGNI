@@ -532,7 +532,11 @@ module energy
             fill!(atmos.phs_wrk_fl,0.0)
 
             # Loop from top to bottom
-            for i in 1:atmos.nlev_c
+            for i in 1:atmos.nlev_c-1
+
+                # Skip bottom-most layer. Condensation at the surface is assumed to be in
+                #    eqm with a surface ocean, so easier to assume there's no significant
+                #    energy exchange, otherwise we get weird behaviour in the energy balance.
 
                 # Calculate latent heat release at this level from the contributions
                 #   of condensation (+) and evaporation (-), and a fixed timescale.
