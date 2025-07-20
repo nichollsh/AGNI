@@ -524,15 +524,10 @@ module energy
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, false)
 
-        # Single-gas relaxation case
-        single::Bool = Bool(atmos.gas_num == 1)
-
-        # Variables for tracking phase change energy
-        evap_eff::Float64 =  0.1    # evaporation efficiency [dimensionless]
-        evap_scl::Float64 =  1.0e-3 # relative increase in evap_eff w/ pressure [K-1]
-        E_accum::Float64 =   0.0    # accumulated condensational energy [J]
-        i_dry_top::Int =     1      # deepest point at which condensation occurs
-        i_dry_bot::Int =     2      # deepest point at which criticality occurs
+        # Variables for tracking phase change energy (for the current condensable)
+        E_accum::Float64 =      0.0    # accumulated condensational energy [J]
+        i_dry_top::Int =        1      # deepest point at which condensation occurs
+        i_dry_bot::Int =        2      # deepest point at which criticality occurs
 
         # For each condensable
         for c in atmos.condensates
@@ -540,44 +535,17 @@ module energy
             # reset df,fl for this condensable
             fill!(atmos.phs_wrk_df,0.0)
             fill!(atmos.phs_wrk_fl,0.0)
+            E_accum = 0.0
+            i_dry_top = 1
+            i_dry_bot = 2
 
-            # Loop from bottom to top
+            # Loop from top to bottom
             for i in 1:atmos.nlev_c
 
-                if single
-                    # --------------------------------
-                    # Single-component relaxation scheme
-
-                    # Check criticality
-                    if atmos.tmp[i] > atmos.gas_dat[c].T_crit
-                        continue
-                    end
-
-                    # check saturation
-                    qsat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i])/atmos.p[i]
-                    if (atmos.gas_vmr[c][i] < qsat+1.0e-10)
-                        continue
-                    end
-
-                    # relaxation function
-                    atmos.phs_wrk_df[i] = (atmos.gas_vmr[c][i]-qsat)* atmos.layer_thick[i]*
-                                          (atmos.pl[i+1]-atmos.pl[i])/ atmos.phs_tau_sgl
-
-                    # flag layer as set by saturation
-                    if atmos.phs_wrk_df[i] > 1.0e-10
-                        atmos.gas_sat[c][i] = true
-                    end
-
-                else
-                    # --------------------------------
-                    # Multicomponent diffusion scheme
-
-                    # Calculate latent heat release at this level from the contributions
-                    #   of condensation (+) and evaporation (-), and a fixed timescale.
-                    atmos.phs_wrk_df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) *
-                                        (atmos.gas_yield[c][i] / atmos.phs_tau_mix)
-
-                end
+                # Calculate latent heat release at this level from the contributions
+                #   of condensation (+) and evaporation (-), and a fixed timescale.
+                atmos.phs_wrk_df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) *
+                                    (atmos.cond_yield[c][i] / atmos.phs_tau_mix)
 
             end # go to next level
 
@@ -603,12 +571,10 @@ module energy
                 end
             end
 
-            i_dry_bot = atmos.nlev_c
-
             # accumulated condensational energy
             E_accum = sum(atmos.phs_wrk_df[1:i_dry_top])
 
-            # dissipate E_accum by evaporation in the dry region
+            # dissipate E_accum by evaporation in the vapour region
             for i in i_dry_top+1:i_dry_bot
 
                 if E_accum < 1.0e-7
@@ -618,13 +584,10 @@ module energy
                     break
                 else
                     # dissipate some fraction of the accumuated flux
-                    atmos.phs_wrk_df[i] = -1.0 * evap_eff *E_accum
+                    atmos.phs_wrk_df[i] = -1.0 * E_accum
 
                     # update total energy budget
                     E_accum += atmos.phs_wrk_df[i]
-
-                    # evaporation becomes increasingly efficient at hotter levels
-                    evap_eff = min(1.0, evap_eff * (1 + evap_scl * atmos.tmp[i]))
                 end
 
             end
