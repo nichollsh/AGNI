@@ -261,12 +261,12 @@ module chemistry
         if "H2O" in atmos.condensates
             for i in 1:atmos.nlev_c
                 # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
-                atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i] * atmos.cond_alpha) /
+                atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i] * atmos.cloud_alpha) /
                                             atmos.layer_mass[i]
 
-                if atmos.cloud_arr_l[i] > 1.0
-                    @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
-                end
+                # if atmos.cloud_arr_l[i] > 1.0
+                #     @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
+                # end
 
                 # droplet radius and area fraction (fixed values)
                 atmos.cloud_arr_r[i] = atmos.cloud_val_r

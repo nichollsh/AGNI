@@ -530,6 +530,13 @@ module AGNI
             @info "    done"
         end
 
+        # Print information about ocean formation, if any
+        for c in atmos.condensates
+            if atmos.cond_ocean[c] > 1e-20
+                @info @sprintf("Formed %s ocean, mass %.2e kg/m^2", c, atmos.cond_ocean[c])
+            end
+        end
+
         # Write arrays
         @info "Writing results"
         save.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
