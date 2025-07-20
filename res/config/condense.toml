@@ -3,7 +3,7 @@ title = "Condensation test"
 
 [planet]
     tmp_surf        = 2200.0
-    instellation    = 2000.0
+    instellation    = 1800.0
     albedo_b        = 0.0
     s0_fact         = 0.375
     zenith_angle    = 48.19
@@ -49,12 +49,12 @@ title = "Condensation test"
     rainout         = false
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 300.0
-    initial_state   = ["loglin","1100"]
-    linesearch      = 1
-    easy_start      = true
+    dx_max          = 500.0
+    initial_state   = ["loglin","1000"]
+    linesearch      = 2
+    easy_start      = false
     converge_atol   = 1.0
-    converge_rtol   = 1.0e-3
+    converge_rtol   = 1.0e-2
     perturb_all     = true
 
 
@@ -68,3 +68,4 @@ title = "Condensation test"
     mixing_ratios   = true
     animate         = true
     height          = true
+    cloud           = true

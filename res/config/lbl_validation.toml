@@ -66,3 +66,4 @@ title = "Line-by-line validation tests"
     mixing_ratios   = true
     animate         = false
     height          = true
+    cloud           = false

@@ -65,3 +65,4 @@ title = "K2-18 b, mixed"
     mixing_ratios   = true
     animate         = false
     height          = false
+    cloud           = false

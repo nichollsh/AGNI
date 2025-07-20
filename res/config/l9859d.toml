@@ -65,3 +65,4 @@ title = "L 98-59 d"
     mixing_ratios   = true
     animate         = false
     height          = false
+    cloud           = false

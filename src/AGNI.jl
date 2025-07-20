@@ -555,6 +555,8 @@ module AGNI
             plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
         cfg["plots"]["albedo"] && \
             plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.png"))
+        cfg["plots"]["cloud"] && \
+            plotting.plot_cloud(atmos, joinpath(atmos.OUT_DIR,"plot_cloud.png"))
 
         # Deallocate atmosphere
         @info "Deallocating memory"

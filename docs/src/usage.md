@@ -167,6 +167,7 @@ Configure plotting routines all of these should be `true` or `false`.
 | `mixing_ratios  ` | Plot mixing ratio profiles? |
 | `height         ` | Plot radius-pressure profile? |
 | `animate        ` | Make an animation of the solver obtaining its solution? |
+| `cloud          ` | Plot water cloud mass fraction and area fraction profiles? |
 
 ### Details on specific parameters
 * `composition.transparent` configures the atmosphere to be transparent. This works by setting the pressure to be small, and turning off the gas opacity. With this provided, the rest of the parameters in `[configuration]` are redundant. With this enabled, make sure to use the appropriate solver in the `[execution]` table.

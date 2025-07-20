@@ -61,3 +61,4 @@ title = "Transparent atmosphere"
     mixing_ratios   = true
     animate         = false
     height          = false
+    cloud           = false

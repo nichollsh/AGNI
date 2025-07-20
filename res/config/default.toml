@@ -70,3 +70,4 @@ title = "Default"                       # Name for this configuration file
     mixing_ratios   = true                      # Plot mixing ratios?
     animate         = false                     # Make animation from runtime plots?
     height          = true                      # Plot hydrostatic solution for height?
+    cloud           = false                     # Plot cloud profiles

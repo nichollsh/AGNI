@@ -363,13 +363,13 @@ module energy
         # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
 
-            # Profile lapse rate: d(ln T)/d(ln P) = (P/T)*(dT/dP)
-            ∇_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
-
             # Optionally skip low pressures
             if atmos.pl[i] <= pmin * 1.0e5  # convert bar to Pa
                 break
             end
+
+            # Profile lapse rate: d(ln T)/d(ln P) = (P/T)*(dT/dP)
+            ∇_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
 
             # Mass weights
             m1 = atmos.layer_mass[i-1]
@@ -434,12 +434,12 @@ module energy
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.
         #    This is okay because this shouldn't physically happen, and will only occur
         #    because of weird numerical issues which only act to make solving difficult.
-        @inbounds for i in 1:atmos.nlev_l-1
-            if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
-                atmos.mask_c[i] = false
-                atmos.flux_cdry[i] = 0.0
-            end
-        end
+        # @inbounds for i in 1:atmos.nlev_l-1
+        #     if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
+        #         atmos.mask_c[i] = false
+        #         atmos.flux_cdry[i] = 0.0
+        #     end
+        # end
 
         return nothing
     end # end of mlt
@@ -556,7 +556,7 @@ module energy
                     break
                 end
             end
-            
+
             # add energy from this gas to total
             @turbo @. atmos.flux_l += atmos.phs_wrk_fl
 

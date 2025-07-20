@@ -65,3 +65,4 @@ title = "Hot and dry"
     mixing_ratios   = true
     animate         = true
     height          = true
+    cloud           = false
