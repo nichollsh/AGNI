@@ -32,7 +32,6 @@ module solver
     - `b`           Initial bracket, upper valuie
     - `dxtol`       Convergence: exit when bracket is smaller than this size
     - `atol`        Convergence: absolute tolerance on minimum
-    - `rtol`        Convergence: relative tolerance on minimum
     - `max_steps`   Maximum number of iterations
     - `warnings`    Print warning if search does not converge before `max_steps`` are taken.
     """
