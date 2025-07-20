@@ -121,7 +121,8 @@ module atmosphere
         gas_vmr::Dict{String, Array{Float64,1}}     # Layer volume mixing ratios in dict, (key,value) = (gas_name,array)
         gas_sat::Dict{String, Array{Bool, 1}}       # Layer is saturated or cold-trapped
         gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
-        gas_yield::Dict{String, Array{Float64,1}}   # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
+        cond_yield::Dict{String, Array{Float64,1}}  # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
+        cond_ocean::Dict{String, Float64}           # condensate accumulation after evaporation (implicit surface ocean mass) [kg/m^2]
         gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
@@ -197,6 +198,8 @@ module atmosphere
         # Phase change
         phs_tau_mix::Float64                # Time scale (mixed composition)
         phs_tau_sgl::Float64                # Time scale (single gas)
+        evap_efficiency::Float64            # Base evaporation efficiency of rain (0 to 1)
+        evap_scaling::Float64               # Scale factor to evaporation efficiency [K-1]
         phs_wrk_df::Array{Float64,1}        # work array: flux difference
         phs_wrk_fl::Array{Float64,1}        # work array: edge fluxes
         flux_l::Array{Float64, 1}           # Latent heat energy flux [W m-2]
@@ -495,6 +498,10 @@ module atmosphere
         atmos.phs_tau_mix = 1.0e5   # mixed composition case
         atmos.phs_tau_sgl = 1.0e5   # single gas case
 
+        # Evaporation efficiency
+        atmos.evap_efficiency = 0.5
+        atmos.evap_scaling    = 0.1
+
         # Hardcoded cloud properties
         atmos.cond_alpha    = 1.0     # 0% of condensate is retained (i.e. complete rainout)
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
@@ -522,7 +529,8 @@ module atmosphere
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
         atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation
-        atmos.gas_yield =   Dict{String, Array{Float64,1}}()  # dict of condensate yield
+        atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # dict of condensate yield
+        atmos.cond_ocean =  Dict{String, Float64}()           # dict of ocean masses
         atmos.gas_num   =   0                                 # number of gases
         atmos.condensates   =   Array{String}(undef, 0)       # list of condensates
 
@@ -636,8 +644,9 @@ module atmosphere
 
         # set condensation mask and yield values [kg]
         for g in atmos.gas_names
-            atmos.gas_sat[g]   = falses(atmos.nlev_c)
-            atmos.gas_yield[g] = zeros(Float64, atmos.nlev_c)
+            atmos.gas_sat[g]    = falses(atmos.nlev_c)
+            atmos.cond_yield[g] = zeros(Float64, atmos.nlev_c)
+            atmos.cond_ocean[g] = 0.0
         end
 
         # Check that we actually stored some values
@@ -1180,13 +1189,17 @@ module atmosphere
     """
     **Allocate atmosphere arrays, prepare spectral files, and final steps.**
 
-    Will not modify spectral file if `stellar_spectrum`` is an empty string.
+    Will not modify spectral file if `stellar_spectrum` is an empty string.
+    Will treat star as blackbody with photospheric effective temperature of `stellar_Teff`
+    if the parameter `stellar_spectrum` has value of `"blackbody"`.
 
     Arguments:
     - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
     - `stellar_spectrum::String`       path to stellar spectrum csv file
+    - `stellar_Teff::Float64`          star effective temperature if blackbody
     """
-    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String)::Bool
+    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String;
+                        stellar_Teff::Float64=-1.0)::Bool
 
         @debug "Allocate atmosphere"
         if !atmos.is_param
@@ -1212,25 +1225,46 @@ module atmosphere
         spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])
 
         # Setup spectral file
-        socstar::String = ""
+        socstar::String = joinpath([atmos.OUT_DIR, "socstar.dat"])
         if !isempty(stellar_spectrum)
-            @debug "Inserting stellar spectrum"
+            @debug "Inserting stellar spectrum into spectral file"
 
-            if !isfile(stellar_spectrum)
-                @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
-                @error "Try running `\$ ./src/get_data.sh stellar`"
-                return false
-            end
-
-            # File to be loaded
+            # Spectral file to be loaded, created in output folder
             rm(spectral_file_run , force=true)
             rm(spectral_file_runk, force=true)
 
-            atmos.star_file = abspath(stellar_spectrum)
+            # Wl and Fl arrays, dummy values at TOA
+            wl::Array{Float64,1} = Float64[1.0, 2.0, 3.0]  # nm
+            fl::Array{Float64,1} = Float64[0.0, 0.0, 0.0]  # erg s-1 cm-2 nm-1
 
-            # Write spectrum in required format
-            socstar = joinpath([atmos.OUT_DIR, "socstar.dat"])
-            wl::Array{Float64,1}, fl::Array{Float64,1} = spectrum.load_from_file(atmos.star_file)
+            # Insert stellar spectrum
+            if lowercase(stellar_spectrum) == "blackbody"
+                # generate blackbody spectrum
+                @debug "Inserting spectrum as blackbody with Teff=$stellar_Teff K"
+
+                if stellar_Teff < 1.0
+                    @error "Invalid stellar photospheric temperature: $stellar_Teff K"
+                    @error "    Choose a valid temperature when using blackbody spectrum"
+                    return false
+                end
+                atmos.star_file = "_CALC_AS_BLACKBODY=$stellar_Teff"
+
+                wl, fl = spectrum.blackbody_star(stellar_Teff, atmos.instellation)
+            else
+                # use spectrum on disk
+                @debug "Inserting stellar spectrum from file $stellar_spectrum"
+
+                if !isfile(stellar_spectrum)
+                    @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
+                    @error "Try running `\$ ./src/get_data.sh stellar`"
+                    return false
+                end
+                atmos.star_file = abspath(stellar_spectrum)
+
+                wl, fl = spectrum.load_from_file(atmos.star_file)
+            end
+
+            # Write stellar spectrum to disk in format required by SOCRATES
             spectrum.write_to_socrates_format(wl, fl, socstar) || return false
 
             # Insert stellar spectrum and rayleigh scattering, if required
@@ -1241,10 +1275,10 @@ module atmosphere
         else
             # Stellar spectrum was not provided, which is taken to mean that
             #       the spectral file includes it already.
-            atmos.star_file = "IN_SPECTRAL_FILE"
+            @info "Using pre-existing spectral file without modifications"
+            atmos.star_file = "_ALREADY_IN_SPECTRAL_FILE"
             spectral_file_run  = atmos.spectral_file
             spectral_file_runk = atmos.spectral_file*"_k"
-            @info "Using pre-existing spectral file without modifications"
         end
 
         # Validate files

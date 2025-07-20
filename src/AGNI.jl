@@ -337,14 +337,20 @@ module AGNI
             end
         end
 
+        # star stuff
+        star_file::String   = cfg["files" ]["input_star"]
+        star_Teff::Float64  = -1.0
+        if haskey(cfg["planet"],"star_Teff")
+            star_Teff = Float64(cfg["planet"]["star_Teff"])
+        end
+
         #    solver stuff
-        star_file::String      =        cfg["files" ]["input_star"]
-        incl_convect::Bool     =        cfg["execution"]["convection"]
-        incl_sens::Bool        =        cfg["execution"]["sensible_heat"]
-        incl_latent::Bool      =        cfg["execution"]["latent_heat"]
-        sol_type::Int          =        cfg["execution"]["solution_type"]
-        conv_atol::Float64     =        cfg["execution"]["converge_atol"]
-        conv_rtol::Float64     =        cfg["execution"]["converge_rtol"]
+        incl_convect::Bool     = cfg["execution"]["convection"]
+        incl_sens::Bool        = cfg["execution"]["sensible_heat"]
+        incl_latent::Bool      = cfg["execution"]["latent_heat"]
+        sol_type::Int          = cfg["execution"]["solution_type"]
+        conv_atol::Float64     = cfg["execution"]["converge_atol"]
+        conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
 
         #    plotting stuff
         plt_tmp::Bool          = cfg["plots"]["temperature"]
@@ -382,7 +388,7 @@ module AGNI
 
         # Setup atmosphere
         @debug "Setup atmosphere "
-        return_success = atmosphere.setup!(atmos, ROOT_DIR,output_dir,
+        atmosphere.setup!(atmos, ROOT_DIR,output_dir,
                                 String(cfg["files" ]["input_sf"]),
                                 Float64(cfg["planet"]["instellation"]),
                                 Float64(cfg["planet"]["s0_fact"]),
@@ -415,7 +421,7 @@ module AGNI
 
         # Allocate atmosphere
         @debug "Reticulating splines..."
-        return_success = atmosphere.allocate!(atmos,star_file) || return false
+        atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
 
         # Set temperatures as appropriate
         if transparent

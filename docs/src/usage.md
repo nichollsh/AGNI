@@ -92,6 +92,7 @@ General properties of the planet.
 | `flux_int        ` | Internal flux [W m-2] to be solved-for when `solution_type=3`. |
 | `turb_coeff      ` | Turbulent exchange coefficient for sensible heat transport. |
 | `wind_speed      ` | Effective wind speed for sensible heat transport [m s-1]. |
+| `star_Teff      `  | Stellar photospheric temperature [K] used if `files.input_star=="blackbody"`. |
 
 
 ### `[files]`
@@ -100,7 +101,7 @@ Input/output files and other paths.
 | Parameter          | Description   |
 | -----------------: | :------------ |
 | `input_sf       `  | Path to the desired spectral file ending in `.sf`, in `res/spectral_files/`. |
-| `input_star     `  | Path to stellar spectrum file. Spectrum assumed to be inside spectral file if this is left blank. |
+| `input_star     `  | Path to stellar spectrum. If blank, spectrum assumed to be inside spectral file. If "blackbody" must provide `planet.star_Teff`. |
 | `output_dir     `  | Path to the output directory. |
 | `rfm_parfile  `    | Path to .par linelist file, for running line-by-line calculations with the RFM. |
 
@@ -136,10 +137,11 @@ Parameters that tell the model what to do.
 | `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see below) |
 | `real_gas      `  | Use real-gas equation(s) of state where possible (true/false) |
 | `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
-| `sensible_heat `  | Include sensible heat transport at the surface (true/false) |
-| `latent_heat   `  | Include vertical heat transport from condensation and precipitation (true/false) |
+| `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false) |
 | `convection    `  | Include vertical heat transport associated with convection (true/false) |
-| `rainout       `  | Enable compositional rainout of condensable species. If disabled, phase change does not impact composition. |
+| `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
+| `rainout       `  | Enable compositional rainout of condensables. If disabled, phase change does not impact composition. |
+| `evaporation   `  | Enable re-evaporation of rain. If disabled, all rain accumulates at surface. |
 | `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |
 | `solution_type `  | Solution type (see below). |
 | `solver        `  | Solver to use (see below). |

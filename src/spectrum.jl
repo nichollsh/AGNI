@@ -54,7 +54,7 @@ module spectrum
 
     Arguments:
     - `Teff::Float64`       Star's photospheric effective temperature
-    - `S0::Float64`         Bolometric instellation received by planet
+    - `S0::Float64`         Bolometric instellation received by planet [W m-2]
 
     Returns:
     - `wl::Array`           Wavelength array [nm]
@@ -88,7 +88,7 @@ module spectrum
     """
     **Load stellar spectrum from a text file.**
 
-    The flux needs to be scaled to the top of the atmosphere.
+    Doesn't matter where the flux is scaled to, because SOCRATES will normalise it.
 
     Arguments:
     - `path::String`        Path to the file
