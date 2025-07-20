@@ -54,6 +54,7 @@ title = "Line-by-line validation tests"
     converge_rtol   = 1.0e-3
     rfm_wn_min      = 4050.0
     rfm_wn_max      = 4950.0
+    perturb_all     = false
 
 [plots]
     at_runtime      = true

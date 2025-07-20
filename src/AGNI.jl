@@ -351,6 +351,7 @@ module AGNI
         sol_type::Int          = cfg["execution"]["solution_type"]
         conv_atol::Float64     = cfg["execution"]["converge_atol"]
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
+        perturb_all::Bool      = cfg["execution"]["perturb_all"]
 
         #    plotting stuff
         plt_tmp::Bool          = cfg["plots"]["temperature"]
@@ -505,7 +506,9 @@ module AGNI
                                 ls_method=Int(cfg["execution"]["linesearch"]),
                                 easy_start=Bool(cfg["execution"]["easy_start"]),
                                 modplot=modplot,
-                                save_frames=plt_ani)
+                                save_frames=plt_ani,
+                                perturb_all=perturb_all
+                                )
 
         # Invalid selection
         else
