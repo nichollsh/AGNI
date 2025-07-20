@@ -200,7 +200,6 @@ module atmosphere
         # Phase change
         phs_tau_mix::Float64                # Time scale (mixed composition)
         evap_efficiency::Float64            # Base evaporation efficiency of rain (0 to 1)
-        evap_scaling::Float64               # Scale factor to evaporation efficiency [K-1]
         phs_wrk_df::Array{Float64,1}        # work array: flux difference
         phs_wrk_fl::Array{Float64,1}        # work array: edge fluxes
         flux_l::Array{Float64, 1}           # Latent heat energy flux [W m-2]
@@ -523,8 +522,7 @@ module atmosphere
         atmos.phs_tau_mix = 1.0e3   # mixed composition case
 
         # Evaporation efficiency
-        atmos.evap_efficiency = 0.5
-        atmos.evap_scaling    = 0.1
+        atmos.evap_efficiency = 0.05
 
         # Hardcoded cloud properties
         atmos.cloud_alpha   = 0.01    # 1% of condensed water forms substantial clouds
