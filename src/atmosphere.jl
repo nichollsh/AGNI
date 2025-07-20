@@ -191,6 +191,8 @@ module atmosphere
         Kzz_ceiling::Float64                # Kzz ceiling [m2 s-1]
         Kzz_pbreak::Float64                 # Kzz break point pressure [Pa]
         Kzz_kbreak::Float64                 # Kzz break point diffusion [m2 s-1]
+        mlt_asymptotic::Bool                # Mixing length scales asymptotically, but ~0 near ground
+        mlt_criterion::Char                 # Stability criterion. Options: (s)chwarzschild, (l)edoux
 
         # Conduction
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
@@ -298,6 +300,8 @@ module atmosphere
     - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].
     - `U::Float64`                      surface wind speed [m s-1].
     - `Kzz_floor::Float64`              eddy diffusion coefficient, min value [cm2 s-1]
+    - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
+    - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
     - `skin_d::Float64`                 skin thickness [m].
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].
@@ -313,6 +317,11 @@ module atmosphere
     - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
+    - `fastchem_work::String`           working directory for fastchem
+    - `fastchem_floor::Float64`         temperature floor on profile provided to fastchem
+    - `fastchem_maxiter::Float64`       maximum solver iterations allowed by fastchem
+    - `fastchem_xtol::Float64`          solution tolerance required of fastchem
+    - `rfm_parfile::String`             path to LbL .par file provided to RFM
 
     Returns:
         Nothing
@@ -333,6 +342,8 @@ module atmosphere
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
                     Kzz_floor::Float64 =        1e5,
+                    mlt_asymptotic::Bool =      true,
+                    mlt_criterion::Char =       's',
                     tmp_magma::Float64 =        3000.0,
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
@@ -345,10 +356,11 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
+
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
-
                     use_all_gases::Bool =       false,
+
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
                     fastchem_maxiter::Float64 = 2e4,
@@ -428,10 +440,24 @@ module atmosphere
 
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
+
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
         atmos.Kzz_pbreak =      1e5 # 1 bar as default location for break point
-        atmos.Kzz_kbreak =      Kzz_floor
+        atmos.Kzz_kbreak =      max(0.0, Kzz_floor)
+        atmos.mlt_asymptotic =  mlt_asymptotic
+        atmos.mlt_criterion =   mlt_criterion
+
+        if atmos.real_gas && (atmos.mlt_criterion == 'l')
+            @warn "Ledoux criterion not supported for real gases"
+            @warn "    Switching criterion to Schwarzschild, neglecting MMW gradients"
+            atmos.mlt_criterion = 's'
+        end
+        if !(atmos.mlt_criterion in ['s','l'])
+            @error "Invalid choice for mlt_criterion: $(atmos.mlt_criterion)"
+            @error "    Must be: 's' or 'l' only"
+            return false
+        end
 
         atmos.tmp_magma =       max(atmos.tmp_floor, tmp_magma)
         atmos.skin_d =          max(1.0e-9, skin_d)

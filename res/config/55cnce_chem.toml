@@ -7,7 +7,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     albedo_b        = 0.0
     s0_fact         = 0.6652
     zenith_angle    = 60.0
-    surface_material= "res/surface_albedos/basalt_tuff.dat"
+    surface_material= "res/surface_albedos/basalttuff.dat"
     radius          = 1.1959e7
     gravity         = 22.304
     flux_int        = 0.0
@@ -35,11 +35,12 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
-    real_gas        = true
+    real_gas        = false
     thermo_funct    = true
     sensible_heat   = false
     latent_heat     = true
     convection      = true
+    convection_crit = "l"
     rainout         = false
     solution_type   = 3
     solver          = "newton"

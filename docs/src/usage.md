@@ -139,6 +139,7 @@ Parameters that tell the model what to do.
 | `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
 | `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false) |
 | `convection    `  | Include vertical heat transport associated with convection (true/false) |
+| `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
 | `rainout       `  | Enable compositional rainout of condensables. If disabled, phase change does not impact composition. |
 | `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |

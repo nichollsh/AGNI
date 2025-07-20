@@ -319,35 +319,46 @@ module energy
     """
     **Calculate dry convective fluxes using mixing length theory.**
 
-    Uses the mixing length formulation outlined by Joyce & Tayar (2023), which
-    was also implemented in Lee et al. (2024), and partially outlined in an
-    earlier paper by Robinson & Marley (2014).
-
-    https://arxiv.org/abs/2303.09596
-    https://doi.org/10.1093/mnras/stae537
-    https://ui.adsabs.harvard.edu/abs/1962JGR....67.3095B/abstract
-
     Convective energy transport fluxes are calculated at every level edge, just
     like the radiative fluxes. This is not compatible with moist convection. By
     using MLT to parameterise convection, we can also calculate Kzz directly.
 
-    The mixing length is set to asymptotically approach H (for z>>H) or z (for
-    z<H) as per Blackadar (1962). Alternatively, it can be set equal to H.
+    Uses the mixing length formulation outlined by Joyce & Tayar (2023), which
+    was also implemented in Lee et al. (2024), and also partially outlined in the review by
+    Robinson & Marley (2014).
+    https://arxiv.org/abs/2303.09596
+    https://doi.org/10.1093/mnras/stae537
+    https://ui.adsabs.harvard.edu/abs/1962JGR....67.3095B/abstract
 
-    The scale height is formulated as:
-        `Hp = P / (ρ g)`
-    The adiabatic lapse rate is formulated as:
+     The adiabatic lapse rate is formulated as:
         `∇_ad = dln(T)/dln(P) = (P/T)*(dT/dP) = (P/T)*(1/[ρ c_p])`
     for an ideal gas, this becomes:
         `∇_ad = R / (μ c_p)`
 
+    The mixing length is set to asymptotically approach H (for z>>H) or z (for
+    z<H) as per Blackadar (1962). Alternatively, it can be set equal to H.
+    https://doi.org/10.1029/JZ067i008p03095
+
+    The scale height is formulated as:
+        `Hp = P / (ρ g)`
+    Where ρ is obtained from the equation of state.
+
+    To account for convective stability due to compositional gradients, we can use the
+    Ledoux criterion rather than the Schwarzschild criterion. This is described nicely in
+    Gabriel et al. (2014), as well as Salaris & Cassisi (2017).
+    http://dx.doi.org/10.1051/0004-6361/201423442
+    https://doi.org/10.1098/rsos.170192
+
+    In the ideal gas regime, the Ledoux criterion can be simply written as:
+        `∇_ld = ∇_ad + dln(μ)/dln(P)`
+    Using Equation (10) of Gabriel+14. Taking β=Pg/P=1 means the gas pressure equals the
+    total pressure, neglecting pressure contributions from ions and electrons.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `pmin::Float64`           pressure [bar] below which convection is disabled
-    - `mltype::Int`             mixing length value (1: scale height, 2: asymptotic)
     """
-    function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=2)
+    function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4)
 
         # Reset arrays
         fill!(atmos.mask_c,     false)
@@ -358,7 +369,8 @@ module energy
         Hp::Float64 = 0.0; λ::Float64 = 0.0; w::Float64 = 0.0
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
-        ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0; hgt::Float64 = 0.0
+        ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0; ∇_μ::Float64 = 0.0; staby::Float64 = 0.0
+        hgt::Float64 = 0.0
 
         # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
@@ -369,7 +381,7 @@ module energy
             end
 
             # Profile lapse rate: d(ln T)/d(ln P) = (P/T)*(dT/dP)
-            ∇_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
+            ∇_pr = log(atmos.tmp[i-1]/atmos.tmp[i]) / log(atmos.p[i-1]/atmos.p[i])
 
             # Mass weights
             m1 = atmos.layer_mass[i-1]
@@ -397,29 +409,37 @@ module energy
                 Hp = phys.R_gas * atmos.tmpl[i] / (mu * grav)
             end
 
+            # Calculate lapse rate deviation from stability
+            if atmos.mlt_criterion == 's'
+                # Schwarzschild
+                staby = ∇_pr - ∇_ad
+
+            else
+                # Ledoux is the only other option, for now
+                ∇_μ = log(atmos.layer_μ[i-1]/atmos.layer_μ[i]) / log(atmos.p[i-1]/atmos.p[i])
+                staby = ∇_pr - ∇_ad - ∇_μ
+            end
+
             # Check instability
-            if ∇_pr > ∇_ad
+            if staby > 0
 
                 atmos.mask_c[i] = true
 
                 # Calculate the mixing length
-                if mltype == 1
+                if !atmos.mlt_asymptotic
                     # Fixed
                     λ = phys.αMLT * Hp
-                elseif mltype == 2
+                else
                     # Asymptotic
                     hgt = atmos.rl[i] - atmos.rp # height above the ground
-                    λ = phys.k_vk * hgt / (1 + phys.k_vk * hgt/Hp)
-                else
-                    # Otherwise
-                    error("Invalid mixing length type selected: $mltype")
+                    λ = phys.k_vk * hgt / (1 + phys.k_vk * hgt/(phys.αMLT*Hp))
                 end
 
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel)
-                w = λ * sqrt(grav/Hp * (∇_pr-∇_ad))
+                w = λ * sqrt(grav/Hp * staby)
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (λ/Hp)*(∇_pr-∇_ad)
+                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (λ/Hp) * staby
 
                 # Convection eddy diffusion coefficient [m2 s-1]
                 atmos.Kzz[i] = w * λ

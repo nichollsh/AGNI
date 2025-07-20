@@ -400,7 +400,7 @@ module AGNI
                                 Int(cfg["execution"]["num_levels"]),
                                 p_surf,
                                 p_top,
-                                mf_dict, mf_path,
+                                mf_dict, mf_path;
 
                                 condensates=condensates,
                                 flag_gcontinuum   = cfg["execution"]["continua"],
@@ -414,9 +414,8 @@ module AGNI
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
                                 flux_int=flux_int,
-                                surface_material=surface_mat,
-                                albedo_s=albedo_s,
-
+                                surface_material=surface_mat, albedo_s=albedo_s,
+                                mlt_criterion=only(cfg["execution"]["convection_crit"][1]),
                                 rfm_parfile=rfm_parfile
                         ) || return false
 
