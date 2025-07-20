@@ -48,6 +48,7 @@ title = "Default"                       # Name for this configuration file
     thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     latent_heat     = false                     # Include heat release from phase change
+    convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
     convection      = true                      # Include heat transport by convection
     rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
     solution_type   = 0                         # Solution type (see wiki).
