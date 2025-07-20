@@ -197,7 +197,6 @@ module atmosphere
 
         # Phase change
         phs_tau_mix::Float64                # Time scale (mixed composition)
-        phs_tau_sgl::Float64                # Time scale (single gas)
         evap_efficiency::Float64            # Base evaporation efficiency of rain (0 to 1)
         evap_scaling::Float64               # Scale factor to evaporation efficiency [K-1]
         phs_wrk_df::Array{Float64,1}        # work array: flux difference
@@ -496,14 +495,13 @@ module atmosphere
 
         # Phase change timescales [seconds]
         atmos.phs_tau_mix = 1.0e5   # mixed composition case
-        atmos.phs_tau_sgl = 1.0e5   # single gas case
 
         # Evaporation efficiency
         atmos.evap_efficiency = 0.5
         atmos.evap_scaling    = 0.1
 
         # Hardcoded cloud properties
-        atmos.cond_alpha    = 1.0     # 0% of condensate is retained (i.e. complete rainout)
+        atmos.cond_alpha    = 0.1     # 10% of condensate forms substantial clouds
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
@@ -703,8 +701,8 @@ module atmosphere
             atmos.condense_any = true
         end
 
-        # Except for single gas case, must have at least one non-condensable gas
-        if (length(condensates) == atmos.gas_num) && (atmos.gas_num > 1)
+        # Must have at least one non-condensable gas
+        if (length(condensates) == atmos.gas_num)
             @error "There must be at least one non-condensable gas"
             return false
         end

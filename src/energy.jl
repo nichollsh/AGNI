@@ -524,20 +524,12 @@ module energy
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, false)
 
-        # Variables for tracking phase change energy (for the current condensable)
-        E_accum::Float64 =      0.0    # accumulated condensational energy [J]
-        i_dry_top::Int =        1      # deepest point at which condensation occurs
-        i_dry_bot::Int =        2      # deepest point at which criticality occurs
-
         # For each condensable
         for c in atmos.condensates
 
             # reset df,fl for this condensable
             fill!(atmos.phs_wrk_df,0.0)
             fill!(atmos.phs_wrk_fl,0.0)
-            E_accum = 0.0
-            i_dry_top = 1
-            i_dry_bot = 2
 
             # Loop from top to bottom
             for i in 1:atmos.nlev_c
@@ -548,49 +540,6 @@ module energy
                                     (atmos.cond_yield[c][i] / atmos.phs_tau_mix)
 
             end # go to next level
-
-            # Evaporation flux ...
-
-            # find top of dry region
-            for i in 1:atmos.nlev_c
-                if abs(atmos.phs_wrk_df[i]) > 0
-                    i_dry_top=i+2
-                end
-            end
-
-            # find bottom of dry region
-            i_dry_bot = i_dry_top + 1
-            for i in i_dry_top+1:atmos.nlev_c
-                for c in atmos.condensates
-                    if atmos.tmp[i] < atmos.gas_dat[c].T_crit
-                        # this layer is not supercritical for this gas, so
-                        # evaporative flux can be dissipated here
-                        i_dry_bot = i
-                        break # go to next layer (below)
-                    end
-                end
-            end
-
-            # accumulated condensational energy
-            E_accum = sum(atmos.phs_wrk_df[1:i_dry_top])
-
-            # dissipate E_accum by evaporation in the vapour region
-            for i in i_dry_top+1:i_dry_bot
-
-                if E_accum < 1.0e-7
-                    # dissipate all of the flux
-                    atmos.phs_wrk_df[i] = -E_accum
-                    E_accum = 0.0
-                    break
-                else
-                    # dissipate some fraction of the accumuated flux
-                    atmos.phs_wrk_df[i] = -1.0 * E_accum
-
-                    # update total energy budget
-                    E_accum += atmos.phs_wrk_df[i]
-                end
-
-            end
 
             # Convert divergence to cell-edge fluxes.
             #     Assuming zero condensation at TOA, integrating downwards
@@ -607,8 +556,7 @@ module energy
                     break
                 end
             end
-            atmos.phs_wrk_fl[end] = 0.0
-
+            
             # add energy from this gas to total
             @turbo @. atmos.flux_l += atmos.phs_wrk_fl
 

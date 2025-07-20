@@ -77,6 +77,8 @@ module chemistry
     into gas from a liquid state.
 
     Any rain that reaches the surface without being evaporated leads to ocean formation.
+    Disabling evaporation will lead to unclosed energy budget when calculation of latent
+    heat fluxes is performed.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -181,7 +183,7 @@ module chemistry
                 i_bot_dry = atmos.nlev_c
 
                 # no rain? go to next condensable
-                if atmos.cond_ocean[g] < 1.0e-10
+                if atmos.cond_ocean[c] < 1.0e-10
                     continue
                 end
 

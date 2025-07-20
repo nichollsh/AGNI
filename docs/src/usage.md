@@ -141,7 +141,6 @@ Parameters that tell the model what to do.
 | `convection    `  | Include vertical heat transport associated with convection (true/false) |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
 | `rainout       `  | Enable compositional rainout of condensables. If disabled, phase change does not impact composition. |
-| `evaporation   `  | Enable re-evaporation of rain. If disabled, all rain accumulates at surface. |
 | `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |
 | `solution_type `  | Solution type (see below). |
 | `solver        `  | Solver to use (see below). |
@@ -150,6 +149,7 @@ Parameters that tell the model what to do.
 | `easy_start    `  | Initially down-scale convective/condensation fluxes, if initial guess is poor/unknown. **Enable if the model is struggling.** |
 | `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
 | `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
+| `perturb_all`     | Perturb all rows of jacobian matrix at each solver iteration? True=stable, False=fast. |
 | `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] |
 | `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] |
 
