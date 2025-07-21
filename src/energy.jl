@@ -135,10 +135,9 @@ module energy
         # Cloud information
         ###################################################
 
-        atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]
-        atmos.cld.frac_cloud[1,:,1]          .= 1.0
-        atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]
-        atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]
+        atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]    # Total cloud area fraction in layers
+        atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]    # Mass mixing ratios of condensate
+        atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]    # Characteristic dimensions of condensed species
 
         ###################################################
         # Treatment of scattering
@@ -675,7 +674,7 @@ module energy
         reset_fluxes!(atmos)
 
         # +Condensation and evaporation
-        if atmos.condense_any
+        if atmos.condense_any && (latent || rainout)
 
             # Restore mixing ratios
             restore_composition!(atmos)

@@ -175,20 +175,20 @@ module chemistry
             # For each condensable
             for c in atmos.condensates
 
+                # set to zero at TOA
+                atmos.cond_ocean[c] = 0.0
+
                 # no rain? go to next condensable
                 if sum(atmos.cond_yield[c]) < 1.0e-10
                     continue
                 end
-
-                # set to zero at TOA
-                atmos.cond_ocean[c] = 0.0
 
                 # loop from top down (rain always goes downwards)
                 for j in 1:atmos.nlev_c
 
                     # raining in this layer...
                     #     don't evaporate
-                    if atmos.cond_yield[c][j] > 1e-10
+                    if atmos.cond_yield[c][j] > 0.0
                         atmos.cond_ocean[c] += atmos.cond_yield[c][j]
                         continue
                     end
@@ -198,6 +198,12 @@ module chemistry
                     # skip if no rain entering from above
                     if atmos.cond_ocean[c] < 1e-10
                         continue
+                    end
+
+                    # exit loop if supercritical, because then condensate mixes miscibly
+                    if atmos.tmp[j] >= atmos.gas_dat[c].T_crit
+                        atmos.cond_ocean[c] = 0.0
+                        break
                     end
 
                     # change in partial pressure that would saturate
@@ -211,6 +217,7 @@ module chemistry
                     # Evaporation efficiency factor
                     #   This fraction of the rain that *could* be evaporated
                     #   at this layer *is* converted to vapour in this layer.
+                    #   In reality, this depends on a bunch of microphysical processes.
                     dm_sat *= atmos.evap_efficiency
 
                     # don't evaporate more rain than the total available
@@ -247,25 +254,18 @@ module chemistry
         # Recalculate layer properties
         atmosphere.calc_layer_props!(atmos)
 
-        # Set water clouds at this level
-        if "H2O" in atmos.condensates
-            for i in 1:atmos.nlev_c
+        # Set water clouds at levels where condensation occurs
+        if ("H2O" in atmos.condensates) && atmos.control.l_cloud
+            for i in 1:atmos.nlev_c-1
+                if atmos.cond_yield["H2O"][i] > 0.0
+                    # liquid water content (take ratio of mass surface densities [kg/m^2])
+                    atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i]*atmos.cloud_alpha) /
+                                                atmos.layer_mass[i]
 
-                if atmos.cond_yield["H2O"][i] <= 0.0
-                    continue
+                    # droplet radius and area fraction (fixed values)
+                    atmos.cloud_arr_r[i] = atmos.cloud_val_r
+                    atmos.cloud_arr_f[i] = atmos.cloud_val_f
                 end
-
-                # mass mixing ratio (take ratio of mass surface densities [kg/m^2])
-                atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i] * atmos.cloud_alpha) /
-                                            atmos.layer_mass[i]
-
-                # if atmos.cloud_arr_l[i] > 1.0
-                #     @warn "Water cloud mass mixing ratio is greater than unity (level $i)"
-                # end
-
-                # droplet radius and area fraction (fixed values)
-                atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                atmos.cloud_arr_f[i] = atmos.cloud_val_f
             end
         end
 

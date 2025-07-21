@@ -461,9 +461,9 @@ module setpt
                 continue
             end
 
-            # Set cell-centre temperatures
+            # Set to saturation curve
             Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i] * x)
-            if atmos.tmp[i] < Tdew
+            if atmos.tmp[i] <= Tdew+1e-2
                 atmos.tmp[i]  = Tdew
                 atmos.gas_sat[gas][i] = true
             end
@@ -471,6 +471,18 @@ module setpt
 
         # Set cell-edge temperatures
         atmosphere.set_tmpl_from_tmp!(atmos)
+
+        # Set cloud
+        if (gas == "H2O") && atmos.control.l_cloud
+            fill!(atmos.cloud_arr_r, 0.0)
+            fill!(atmos.cloud_arr_l, 0.0)
+            fill!(atmos.cloud_arr_f, 0.0)
+
+            atmos.cloud_arr_r[atmos.gas_sat["H2O"][:]] .= atmos.cloud_val_r
+            atmos.cloud_arr_l[atmos.gas_sat["H2O"][:]] .= atmos.cloud_val_l
+            atmos.cloud_arr_f[atmos.gas_sat["H2O"][:]] .= atmos.cloud_val_f
+        end
+
         return nothing
     end
 
