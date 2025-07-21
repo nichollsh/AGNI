@@ -487,12 +487,6 @@ module atmosphere
         atmos.control.l_ice::Bool  =        false
         atmos.transparent =                 false
 
-        # warn user about clouds
-        if atmos.control.l_cloud
-            @warn "Clouds are enabled but are poorly tested in AGNI"
-            @warn "    Expect weird behaviour and/or crashes"
-        end
-
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
         atmos.tmp =  zeros(Float64, atmos.nlev_c)
@@ -1366,8 +1360,8 @@ module atmosphere
         npd_opt_level_cloud_prsc = 170      # Size allocated for levels
 
         # modules_gen/dimensioms_fixed_pcf.f90
-        npd_cloud_component        =  1     # Number of components of clouds.
-        npd_cloud_type             =  1     # Number of permitted types of clouds.
+        npd_cloud_component        =  4     # Number of components of clouds.
+        npd_cloud_type             =  4     # Number of permitted types of clouds.
         npd_overlap_coeff          = 18     # Number of overlap coefficients for cloud
         npd_source_coeff           =  2     # Number of coefficients for two-stream sources
         npd_region                 =  1     # Number of regions in a layer
@@ -1619,8 +1613,25 @@ module atmosphere
             atmos.cld.n_condensed       = 1
             atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
             atmos.cld.n_cloud_type      = 1
-            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
+            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_water
             atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
+
+            # reset parameters
+            fill!(atmos.cld.condensed_param_list, 0.0)
+
+            # input_cloud_cdf.f90, line 565
+            n_cloud_parameter = 16 # for  ip_drop_pade_2
+            for j in 1:atmos.nbands
+                for k in 1:n_cloud_parameter
+                    atmos.cld.condensed_param_list[k, 1, j] = atmos.spectrum.Drop.parm_list[k, j,
+                                                                    atmos.cld.i_condensed_param[1]]
+                end
+            end
+
+            # In-cloud fractions of different types of cloud
+            fill!(atmos.cld.frac_cloud, 0.0)
+            atmos.cld.frac_cloud[1,:,1] .= 1.0
+
         else
             atmos.cld.n_condensed  = 0
             atmos.cld.n_cloud_type = 0
@@ -1829,39 +1840,6 @@ module atmosphere
 
         # Flag as transparent
         atmos.transparent = true
-
-        return nothing
-    end
-
-    """
-    **Manually set water cloud properties at saturated levels.**
-
-    Uses the default mass mixing ratio, area fraction, and droplet sizes.
-    This function is redundant if condensation is done via `chemsitry.handle_saturation!()`.
-
-    Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    """
-    function water_cloud!(atmos::atmosphere.Atmos_t)
-
-        # Reset
-        fill!(atmos.cloud_arr_r, 0.0)
-        fill!(atmos.cloud_arr_l, 0.0)
-        fill!(atmos.cloud_arr_f, 0.0)
-
-        # Check that atmosphere can contain water
-        if !("H2O" in atmos.gas_names)
-            return nothing
-        end
-
-        # Set at each level
-        for i in 1:atmos.nlev_c-1
-            if atmos.gas_sat["H2O"][i]
-                atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                atmos.cloud_arr_l[i] = atmos.cloud_val_l
-                atmos.cloud_arr_f[i] = atmos.cloud_val_f
-            end
-        end
 
         return nothing
     end

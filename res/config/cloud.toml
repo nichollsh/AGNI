@@ -26,7 +26,7 @@ title = "Cloud radiative properties test"
     condensates     = ["H2O"]
 
 [execution]
-    clean_output    = false
+    clean_output    = true
     verbosity       = 2
     max_steps       = 300
     max_runtime     = 400
