@@ -4,9 +4,11 @@ GNU/Linux and MacOS (including ARM) are supported.
 
 ## Software requirements
 * gfortran
-* NetCDF library for FORTRAN
+* netcdf
+* netcdf-fortran
 * make
 * wget
+* unzip
 
 !!! warning
     Do not install Julia using your system package manager. Install only from julialang.org as below.
