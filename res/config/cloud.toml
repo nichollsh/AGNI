@@ -26,7 +26,7 @@ title = "Cloud radiative properties test"
     condensates     = ["H2O"]
 
 [execution]
-    clean_output    = false
+    clean_output    = true
     verbosity       = 2
     max_steps       = 300
     max_runtime     = 400
@@ -40,6 +40,7 @@ title = "Cloud radiative properties test"
     sensible_heat   = false
     latent_heat     = false
     convection      = true
+    convection_crit = "s"
     rainout         = false
     solution_type   = 3
     solver          = ""
@@ -49,7 +50,7 @@ title = "Cloud radiative properties test"
     easy_start      = true
     converge_atol   = 0.1
     converge_rtol   = 1.0e-3
-
+    perturb_all     = false
 
 [plots]
     at_runtime      = true
@@ -61,3 +62,4 @@ title = "Cloud radiative properties test"
     mixing_ratios   = true
     animate         = false
     height          = true
+    cloud           = true

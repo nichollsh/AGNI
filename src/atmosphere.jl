@@ -26,7 +26,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.6.1"
+    const AGNI_VERSION::String   = "1.7.0"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -121,7 +121,8 @@ module atmosphere
         gas_vmr::Dict{String, Array{Float64,1}}     # Layer volume mixing ratios in dict, (key,value) = (gas_name,array)
         gas_sat::Dict{String, Array{Bool, 1}}       # Layer is saturated or cold-trapped
         gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
-        gas_yield::Dict{String, Array{Float64,1}}   # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
+        cond_yield::Dict{String, Array{Float64,1}}  # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
+        cond_ocean::Dict{String, Float64}           # condensate accumulation after evaporation (implicit surface ocean mass) [kg/m^2]
         gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
@@ -190,20 +191,22 @@ module atmosphere
         Kzz_ceiling::Float64                # Kzz ceiling [m2 s-1]
         Kzz_pbreak::Float64                 # Kzz break point pressure [Pa]
         Kzz_kbreak::Float64                 # Kzz break point diffusion [m2 s-1]
+        mlt_asymptotic::Bool                # Mixing length scales asymptotically, but ~0 near ground
+        mlt_criterion::Char                 # Stability criterion. Options: (s)chwarzschild, (l)edoux
 
         # Conduction
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
 
         # Phase change
         phs_tau_mix::Float64                # Time scale (mixed composition)
-        phs_tau_sgl::Float64                # Time scale (single gas)
+        evap_efficiency::Float64            # Base evaporation efficiency of rain (0 to 1)
         phs_wrk_df::Array{Float64,1}        # work array: flux difference
         phs_wrk_fl::Array{Float64,1}        # work array: edge fluxes
         flux_l::Array{Float64, 1}           # Latent heat energy flux [W m-2]
         mask_l::Array{Bool,1}               # Layers transporting latent heat
 
         # Clouds
-        cond_alpha::Float64                 # Condensate retention fraction (i.e. how much goes into forming clouds vs rainout)
+        cloud_alpha::Float64                # Condensate cloud formation fraction
         cloud_arr_r::Array{Float64,1}       # Characteristic dimensions of condensed species [m].
         cloud_arr_l::Array{Float64,1}       # Mass mixing ratios of condensate. 0 : saturated water vapor does not turn liquid ; 1 : the entire mass of the cell contributes to the cloud
         cloud_arr_f::Array{Float64,1}       # Total cloud area fraction in layers. 0 : clear sky cell ; 1 : the cloud takes over the entire area of the Cell
@@ -296,6 +299,8 @@ module atmosphere
     - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].
     - `U::Float64`                      surface wind speed [m s-1].
     - `Kzz_floor::Float64`              eddy diffusion coefficient, min value [cm2 s-1]
+    - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
+    - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
     - `skin_d::Float64`                 skin thickness [m].
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].
@@ -311,6 +316,11 @@ module atmosphere
     - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
+    - `fastchem_work::String`           working directory for fastchem
+    - `fastchem_floor::Float64`         temperature floor on profile provided to fastchem
+    - `fastchem_maxiter::Float64`       maximum solver iterations allowed by fastchem
+    - `fastchem_xtol::Float64`          solution tolerance required of fastchem
+    - `rfm_parfile::String`             path to LbL .par file provided to RFM
 
     Returns:
         Nothing
@@ -331,6 +341,8 @@ module atmosphere
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
                     Kzz_floor::Float64 =        1e5,
+                    mlt_asymptotic::Bool =      true,
+                    mlt_criterion::Char =       's',
                     tmp_magma::Float64 =        3000.0,
                     skin_d::Float64 =           0.05,
                     skin_k::Float64 =           2.0,
@@ -343,10 +355,11 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
+
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
-
                     use_all_gases::Bool =       false,
+
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
                     fastchem_maxiter::Float64 = 2e4,
@@ -426,10 +439,24 @@ module atmosphere
 
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
+
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
         atmos.Kzz_pbreak =      1e5 # 1 bar as default location for break point
-        atmos.Kzz_kbreak =      Kzz_floor
+        atmos.Kzz_kbreak =      max(0.0, Kzz_floor)
+        atmos.mlt_asymptotic =  mlt_asymptotic
+        atmos.mlt_criterion =   mlt_criterion
+
+        if atmos.real_gas && (atmos.mlt_criterion == 'l')
+            @warn "Ledoux criterion not supported for real gases"
+            @warn "    Switching criterion to Schwarzschild, neglecting MMW gradients"
+            atmos.mlt_criterion = 's'
+        end
+        if !(atmos.mlt_criterion in ['s','l'])
+            @error "Invalid choice for mlt_criterion: $(atmos.mlt_criterion)"
+            @error "    Must be: 's' or 'l' only"
+            return false
+        end
 
         atmos.tmp_magma =       max(atmos.tmp_floor, tmp_magma)
         atmos.skin_d =          max(1.0e-9, skin_d)
@@ -460,12 +487,6 @@ module atmosphere
         atmos.control.l_ice::Bool  =        false
         atmos.transparent =                 false
 
-        # warn user about clouds
-        if atmos.control.l_cloud
-            @warn "Clouds are enabled but are poorly tested in AGNI"
-            @warn "    Expect weird behaviour and/or crashes"
-        end
-
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
         atmos.tmp =  zeros(Float64, atmos.nlev_c)
@@ -492,11 +513,13 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 1.0e5   # mixed composition case
-        atmos.phs_tau_sgl = 1.0e5   # single gas case
+        atmos.phs_tau_mix = 1.0e6   # mixed composition case
+
+        # Evaporation efficiency
+        atmos.evap_efficiency = 0.05
 
         # Hardcoded cloud properties
-        atmos.cond_alpha    = 1.0     # 0% of condensate is retained (i.e. complete rainout)
+        atmos.cloud_alpha   = 0.01    # 1% of condensed water forms substantial clouds
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
@@ -522,7 +545,8 @@ module atmosphere
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
         atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation
-        atmos.gas_yield =   Dict{String, Array{Float64,1}}()  # dict of condensate yield
+        atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # dict of condensate yield
+        atmos.cond_ocean =  Dict{String, Float64}()           # dict of ocean masses
         atmos.gas_num   =   0                                 # number of gases
         atmos.condensates   =   Array{String}(undef, 0)       # list of condensates
 
@@ -636,8 +660,9 @@ module atmosphere
 
         # set condensation mask and yield values [kg]
         for g in atmos.gas_names
-            atmos.gas_sat[g]   = falses(atmos.nlev_c)
-            atmos.gas_yield[g] = zeros(Float64, atmos.nlev_c)
+            atmos.gas_sat[g]    = falses(atmos.nlev_c)
+            atmos.cond_yield[g] = zeros(Float64, atmos.nlev_c)
+            atmos.cond_ocean[g] = 0.0
         end
 
         # Check that we actually stored some values
@@ -694,8 +719,8 @@ module atmosphere
             atmos.condense_any = true
         end
 
-        # Except for single gas case, must have at least one non-condensable gas
-        if (length(condensates) == atmos.gas_num) && (atmos.gas_num > 1)
+        # Must have at least one non-condensable gas
+        if (length(condensates) == atmos.gas_num)
             @error "There must be at least one non-condensable gas"
             return false
         end
@@ -1180,13 +1205,17 @@ module atmosphere
     """
     **Allocate atmosphere arrays, prepare spectral files, and final steps.**
 
-    Will not modify spectral file if `stellar_spectrum`` is an empty string.
+    Will not modify spectral file if `stellar_spectrum` is an empty string.
+    Will treat star as blackbody with photospheric effective temperature of `stellar_Teff`
+    if the parameter `stellar_spectrum` has value of `"blackbody"`.
 
     Arguments:
     - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
     - `stellar_spectrum::String`       path to stellar spectrum csv file
+    - `stellar_Teff::Float64`          star effective temperature if blackbody
     """
-    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String)::Bool
+    function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String;
+                        stellar_Teff::Float64=-1.0)::Bool
 
         @debug "Allocate atmosphere"
         if !atmos.is_param
@@ -1204,7 +1233,7 @@ module atmosphere
         if !isfile(atmos.spectral_file)
             @error "Spectral file '$(atmos.spectral_file)' does not exist"
             @error "Try running `\$ ./src/get_data.sh`"
-            @error "    e.g. to get Honeyside16 you would run `\$ ./src/get_data.sh Honeyside 16`"
+            @error "    e.g. to get CodenameXX you would run `\$ ./src/get_data.sh anyspec Codename XX`"
             return false
         end
 
@@ -1212,25 +1241,46 @@ module atmosphere
         spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])
 
         # Setup spectral file
-        socstar::String = ""
+        socstar::String = joinpath([atmos.OUT_DIR, "socstar.dat"])
         if !isempty(stellar_spectrum)
-            @debug "Inserting stellar spectrum"
+            @debug "Inserting stellar spectrum into spectral file"
 
-            if !isfile(stellar_spectrum)
-                @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
-                @error "Try running `\$ ./src/get_data.sh stellar`"
-                return false
-            end
-
-            # File to be loaded
+            # Spectral file to be loaded, created in output folder
             rm(spectral_file_run , force=true)
             rm(spectral_file_runk, force=true)
 
-            atmos.star_file = abspath(stellar_spectrum)
+            # Wl and Fl arrays, dummy values at TOA
+            wl::Array{Float64,1} = Float64[1.0, 2.0, 3.0]  # nm
+            fl::Array{Float64,1} = Float64[0.0, 0.0, 0.0]  # erg s-1 cm-2 nm-1
 
-            # Write spectrum in required format
-            socstar = joinpath([atmos.OUT_DIR, "socstar.dat"])
-            wl::Array{Float64,1}, fl::Array{Float64,1} = spectrum.load_from_file(atmos.star_file)
+            # Insert stellar spectrum
+            if lowercase(stellar_spectrum) == "blackbody"
+                # generate blackbody spectrum
+                @debug "Inserting spectrum as blackbody with Teff=$stellar_Teff K"
+
+                if stellar_Teff < 1.0
+                    @error "Invalid stellar photospheric temperature: $stellar_Teff K"
+                    @error "    Choose a valid temperature when using blackbody spectrum"
+                    return false
+                end
+                atmos.star_file = "_CALC_AS_BLACKBODY=$stellar_Teff"
+
+                wl, fl = spectrum.blackbody_star(stellar_Teff, atmos.instellation)
+            else
+                # use spectrum on disk
+                @debug "Inserting stellar spectrum from file $stellar_spectrum"
+
+                if !isfile(stellar_spectrum)
+                    @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
+                    @error "Try running `\$ ./src/get_data.sh stellar`"
+                    return false
+                end
+                atmos.star_file = abspath(stellar_spectrum)
+
+                wl, fl = spectrum.load_from_file(atmos.star_file)
+            end
+
+            # Write stellar spectrum to disk in format required by SOCRATES
             spectrum.write_to_socrates_format(wl, fl, socstar) || return false
 
             # Insert stellar spectrum and rayleigh scattering, if required
@@ -1241,10 +1291,10 @@ module atmosphere
         else
             # Stellar spectrum was not provided, which is taken to mean that
             #       the spectral file includes it already.
-            atmos.star_file = "IN_SPECTRAL_FILE"
+            @info "Using pre-existing spectral file without modifications"
+            atmos.star_file = "_ALREADY_IN_SPECTRAL_FILE"
             spectral_file_run  = atmos.spectral_file
             spectral_file_runk = atmos.spectral_file*"_k"
-            @info "Using pre-existing spectral file without modifications"
         end
 
         # Validate files
@@ -1310,8 +1360,8 @@ module atmosphere
         npd_opt_level_cloud_prsc = 170      # Size allocated for levels
 
         # modules_gen/dimensioms_fixed_pcf.f90
-        npd_cloud_component        =  1     # Number of components of clouds.
-        npd_cloud_type             =  1     # Number of permitted types of clouds.
+        npd_cloud_component        =  4     # Number of components of clouds.
+        npd_cloud_type             =  4     # Number of permitted types of clouds.
         npd_overlap_coeff          = 18     # Number of overlap coefficients for cloud
         npd_source_coeff           =  2     # Number of coefficients for two-stream sources
         npd_region                 =  1     # Number of regions in a layer
@@ -1563,8 +1613,25 @@ module atmosphere
             atmos.cld.n_condensed       = 1
             atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
             atmos.cld.n_cloud_type      = 1
-            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_homogen
+            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_water
             atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
+
+            # reset parameters
+            fill!(atmos.cld.condensed_param_list, 0.0)
+
+            # input_cloud_cdf.f90, line 565
+            n_cloud_parameter = 16 # for  ip_drop_pade_2
+            for j in 1:atmos.nbands
+                for k in 1:n_cloud_parameter
+                    atmos.cld.condensed_param_list[k, 1, j] = atmos.spectrum.Drop.parm_list[k, j,
+                                                                    atmos.cld.i_condensed_param[1]]
+                end
+            end
+
+            # In-cloud fractions of different types of cloud
+            fill!(atmos.cld.frac_cloud, 0.0)
+            atmos.cld.frac_cloud[1,:,1] .= 1.0
+
         else
             atmos.cld.n_condensed  = 0
             atmos.cld.n_cloud_type = 0
@@ -1773,39 +1840,6 @@ module atmosphere
 
         # Flag as transparent
         atmos.transparent = true
-
-        return nothing
-    end
-
-    """
-    **Manually set water cloud properties at saturated levels.**
-
-    Uses the default mass mixing ratio, area fraction, and droplet sizes.
-    This function is redundant if condensation is done via `chemsitry.handle_saturation!()`.
-
-    Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-    """
-    function water_cloud!(atmos::atmosphere.Atmos_t)
-
-        # Reset
-        fill!(atmos.cloud_arr_r, 0.0)
-        fill!(atmos.cloud_arr_l, 0.0)
-        fill!(atmos.cloud_arr_f, 0.0)
-
-        # Check that atmosphere can contain water
-        if !("H2O" in atmos.gas_names)
-            return nothing
-        end
-
-        # Set at each level
-        for i in 1:atmos.nlev_c-1
-            if atmos.gas_sat["H2O"][i]
-                atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                atmos.cloud_arr_l[i] = atmos.cloud_val_l
-                atmos.cloud_arr_f[i] = atmos.cloud_val_f
-            end
-        end
 
         return nothing
     end

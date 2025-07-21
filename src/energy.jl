@@ -135,10 +135,9 @@ module energy
         # Cloud information
         ###################################################
 
-        atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]
-        atmos.cld.frac_cloud[1,:,1]          .= 1.0
-        atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]
-        atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]
+        atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]    # Total cloud area fraction in layers
+        atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]    # Mass mixing ratios of condensate
+        atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]    # Characteristic dimensions of condensed species
 
         ###################################################
         # Treatment of scattering
@@ -319,35 +318,46 @@ module energy
     """
     **Calculate dry convective fluxes using mixing length theory.**
 
-    Uses the mixing length formulation outlined by Joyce & Tayar (2023), which
-    was also implemented in Lee et al. (2024), and partially outlined in an
-    earlier paper by Robinson & Marley (2014).
-
-    https://arxiv.org/abs/2303.09596
-    https://doi.org/10.1093/mnras/stae537
-    https://ui.adsabs.harvard.edu/abs/1962JGR....67.3095B/abstract
-
     Convective energy transport fluxes are calculated at every level edge, just
     like the radiative fluxes. This is not compatible with moist convection. By
     using MLT to parameterise convection, we can also calculate Kzz directly.
 
-    The mixing length is set to asymptotically approach H (for z>>H) or z (for
-    z<H) as per Blackadar (1962). Alternatively, it can be set equal to H.
+    Uses the mixing length formulation outlined by Joyce & Tayar (2023), which
+    was also implemented in Lee et al. (2024), and also partially outlined in the review by
+    Robinson & Marley (2014).
+    https://arxiv.org/abs/2303.09596
+    https://doi.org/10.1093/mnras/stae537
+    https://ui.adsabs.harvard.edu/abs/1962JGR....67.3095B/abstract
 
-    The scale height is formulated as:
-        `Hp = P / (ρ g)`
-    The adiabatic lapse rate is formulated as:
+     The adiabatic lapse rate is formulated as:
         `∇_ad = dln(T)/dln(P) = (P/T)*(dT/dP) = (P/T)*(1/[ρ c_p])`
     for an ideal gas, this becomes:
         `∇_ad = R / (μ c_p)`
 
+    The mixing length is set to asymptotically approach H (for z>>H) or z (for
+    z<H) as per Blackadar (1962). Alternatively, it can be set equal to H.
+    https://doi.org/10.1029/JZ067i008p03095
+
+    The scale height is formulated as:
+        `Hp = P / (ρ g)`
+    Where ρ is obtained from the equation of state.
+
+    To account for convective stability due to compositional gradients, we can use the
+    Ledoux criterion rather than the Schwarzschild criterion. This is described nicely in
+    Gabriel et al. (2014), as well as Salaris & Cassisi (2017).
+    http://dx.doi.org/10.1051/0004-6361/201423442
+    https://doi.org/10.1098/rsos.170192
+
+    In the ideal gas regime, the Ledoux criterion can be simply written as:
+        `∇_ld = ∇_ad + dln(μ)/dln(P)`
+    Using Equation (10) of Gabriel+14. Taking β=Pg/P=1 means the gas pressure equals the
+    total pressure, neglecting pressure contributions from ions and electrons.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     - `pmin::Float64`           pressure [bar] below which convection is disabled
-    - `mltype::Int`             mixing length value (1: scale height, 2: asymptotic)
     """
-    function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4, mltype::Int=2)
+    function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4)
 
         # Reset arrays
         fill!(atmos.mask_c,     false)
@@ -358,18 +368,19 @@ module energy
         Hp::Float64 = 0.0; λ::Float64 = 0.0; w::Float64 = 0.0
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
-        ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0; hgt::Float64 = 0.0
+        ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0; ∇_μ::Float64 = 0.0; staby::Float64 = 0.0
+        hgt::Float64 = 0.0
 
         # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
-
-            # Profile lapse rate: d(ln T)/d(ln P) = (P/T)*(dT/dP)
-            ∇_pr = ( log(atmos.tmp[i-1]/atmos.tmp[i]) )/( log(atmos.p[i-1]/atmos.p[i]) )
 
             # Optionally skip low pressures
             if atmos.pl[i] <= pmin * 1.0e5  # convert bar to Pa
                 break
             end
+
+            # Profile lapse rate: d(ln T)/d(ln P) = (P/T)*(dT/dP)
+            ∇_pr = log(atmos.tmp[i-1]/atmos.tmp[i]) / log(atmos.p[i-1]/atmos.p[i])
 
             # Mass weights
             m1 = atmos.layer_mass[i-1]
@@ -397,29 +408,37 @@ module energy
                 Hp = phys.R_gas * atmos.tmpl[i] / (mu * grav)
             end
 
+            # Calculate lapse rate deviation from stability
+            if atmos.mlt_criterion == 's'
+                # Schwarzschild
+                staby = ∇_pr - ∇_ad
+
+            else
+                # Ledoux is the only other option, for now
+                ∇_μ = log(atmos.layer_μ[i-1]/atmos.layer_μ[i]) / log(atmos.p[i-1]/atmos.p[i])
+                staby = ∇_pr - ∇_ad - ∇_μ
+            end
+
             # Check instability
-            if ∇_pr > ∇_ad
+            if staby > 0
 
                 atmos.mask_c[i] = true
 
                 # Calculate the mixing length
-                if mltype == 1
+                if !atmos.mlt_asymptotic
                     # Fixed
                     λ = phys.αMLT * Hp
-                elseif mltype == 2
+                else
                     # Asymptotic
                     hgt = atmos.rl[i] - atmos.rp # height above the ground
-                    λ = phys.k_vk * hgt / (1 + phys.k_vk * hgt/Hp)
-                else
-                    # Otherwise
-                    error("Invalid mixing length type selected: $mltype")
+                    λ = phys.k_vk * hgt / (1 + phys.k_vk * hgt/(phys.αMLT*Hp))
                 end
 
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel)
-                w = λ * sqrt(grav/Hp * (∇_pr-∇_ad))
+                w = λ * sqrt(grav/Hp * staby)
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (λ/Hp)*(∇_pr-∇_ad)
+                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (λ/Hp) * staby
 
                 # Convection eddy diffusion coefficient [m2 s-1]
                 atmos.Kzz[i] = w * λ
@@ -434,12 +453,12 @@ module energy
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.
         #    This is okay because this shouldn't physically happen, and will only occur
         #    because of weird numerical issues which only act to make solving difficult.
-        @inbounds for i in 1:atmos.nlev_l-1
-            if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
-                atmos.mask_c[i] = false
-                atmos.flux_cdry[i] = 0.0
-            end
-        end
+        # @inbounds for i in 1:atmos.nlev_l-1
+        #     if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
+        #         atmos.mask_c[i] = false
+        #         atmos.flux_cdry[i] = 0.0
+        #     end
+        # end
 
         return nothing
     end # end of mlt
@@ -524,16 +543,6 @@ module energy
         fill!(atmos.flux_l, 0.0)
         fill!(atmos.mask_l, false)
 
-        # Single-gas relaxation case
-        single::Bool = Bool(atmos.gas_num == 1)
-
-        # Variables for tracking phase change energy
-        evap_eff::Float64 =  0.1    # evaporation efficiency [dimensionless]
-        evap_scl::Float64 =  1.0e-3 # relative increase in evap_eff w/ pressure [K-1]
-        E_accum::Float64 =   0.0    # accumulated condensational energy [J]
-        i_dry_top::Int =     1      # deepest point at which condensation occurs
-        i_dry_bot::Int =     2      # deepest point at which criticality occurs
-
         # For each condensable
         for c in atmos.condensates
 
@@ -541,93 +550,19 @@ module energy
             fill!(atmos.phs_wrk_df,0.0)
             fill!(atmos.phs_wrk_fl,0.0)
 
-            # Loop from bottom to top
-            for i in 1:atmos.nlev_c
+            # Loop from top to bottom
+            for i in 1:atmos.nlev_c-1
 
-                if single
-                    # --------------------------------
-                    # Single-component relaxation scheme
+                # Skip bottom-most layer. Condensation at the surface is assumed to be in
+                #    eqm with a surface ocean, so easier to assume there's no significant
+                #    energy exchange, otherwise we get weird behaviour in the energy balance.
 
-                    # Check criticality
-                    if atmos.tmp[i] > atmos.gas_dat[c].T_crit
-                        continue
-                    end
-
-                    # check saturation
-                    qsat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i])/atmos.p[i]
-                    if (atmos.gas_vmr[c][i] < qsat+1.0e-10)
-                        continue
-                    end
-
-                    # relaxation function
-                    atmos.phs_wrk_df[i] = (atmos.gas_vmr[c][i]-qsat)* atmos.layer_thick[i]*
-                                          (atmos.pl[i+1]-atmos.pl[i])/ atmos.phs_tau_sgl
-
-                    # flag layer as set by saturation
-                    if atmos.phs_wrk_df[i] > 1.0e-10
-                        atmos.gas_sat[c][i] = true
-                    end
-
-                else
-                    # --------------------------------
-                    # Multicomponent diffusion scheme
-
-                    # Calculate latent heat release at this level from the contributions
-                    #   of condensation (+) and evaporation (-), and a fixed timescale.
-                    atmos.phs_wrk_df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) *
-                                        (atmos.gas_yield[c][i] / atmos.phs_tau_mix)
-
-                end
+                # Calculate latent heat release at this level from the contributions
+                #   of condensation (+) and evaporation (-), and a fixed timescale.
+                atmos.phs_wrk_df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) *
+                                    (atmos.cond_yield[c][i] / atmos.phs_tau_mix)
 
             end # go to next level
-
-            # Evaporation flux ...
-
-            # find top of dry region
-            for i in 1:atmos.nlev_c
-                if abs(atmos.phs_wrk_df[i]) > 0
-                    i_dry_top=i+2
-                end
-            end
-
-            # find bottom of dry region
-            i_dry_bot = i_dry_top + 1
-            for i in i_dry_top+1:atmos.nlev_c
-                for c in atmos.condensates
-                    if atmos.tmp[i] < atmos.gas_dat[c].T_crit
-                        # this layer is not supercritical for this gas, so
-                        # evaporative flux can be dissipated here
-                        i_dry_bot = i
-                        break # go to next layer (below)
-                    end
-                end
-            end
-
-            i_dry_bot = atmos.nlev_c
-
-            # accumulated condensational energy
-            E_accum = sum(atmos.phs_wrk_df[1:i_dry_top])
-
-            # dissipate E_accum by evaporation in the dry region
-            for i in i_dry_top+1:i_dry_bot
-
-                if E_accum < 1.0e-7
-                    # dissipate all of the flux
-                    atmos.phs_wrk_df[i] = -E_accum
-                    E_accum = 0.0
-                    break
-                else
-                    # dissipate some fraction of the accumuated flux
-                    atmos.phs_wrk_df[i] = -1.0 * evap_eff *E_accum
-
-                    # update total energy budget
-                    E_accum += atmos.phs_wrk_df[i]
-
-                    # evaporation becomes increasingly efficient at hotter levels
-                    evap_eff = min(1.0, evap_eff * (1 + evap_scl * atmos.tmp[i]))
-                end
-
-            end
 
             # Convert divergence to cell-edge fluxes.
             #     Assuming zero condensation at TOA, integrating downwards
@@ -644,7 +579,6 @@ module energy
                     break
                 end
             end
-            atmos.phs_wrk_fl[end] = 0.0
 
             # add energy from this gas to total
             @turbo @. atmos.flux_l += atmos.phs_wrk_fl
@@ -740,7 +674,7 @@ module energy
         reset_fluxes!(atmos)
 
         # +Condensation and evaporation
-        if atmos.condense_any
+        if atmos.condense_any && (latent || rainout)
 
             # Restore mixing ratios
             restore_composition!(atmos)

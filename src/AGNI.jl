@@ -337,14 +337,21 @@ module AGNI
             end
         end
 
+        # star stuff
+        star_file::String   = cfg["files" ]["input_star"]
+        star_Teff::Float64  = -1.0
+        if haskey(cfg["planet"],"star_Teff")
+            star_Teff = Float64(cfg["planet"]["star_Teff"])
+        end
+
         #    solver stuff
-        star_file::String      =        cfg["files" ]["input_star"]
-        incl_convect::Bool     =        cfg["execution"]["convection"]
-        incl_sens::Bool        =        cfg["execution"]["sensible_heat"]
-        incl_latent::Bool      =        cfg["execution"]["latent_heat"]
-        sol_type::Int          =        cfg["execution"]["solution_type"]
-        conv_atol::Float64     =        cfg["execution"]["converge_atol"]
-        conv_rtol::Float64     =        cfg["execution"]["converge_rtol"]
+        incl_convect::Bool     = cfg["execution"]["convection"]
+        incl_sens::Bool        = cfg["execution"]["sensible_heat"]
+        incl_latent::Bool      = cfg["execution"]["latent_heat"]
+        sol_type::Int          = cfg["execution"]["solution_type"]
+        conv_atol::Float64     = cfg["execution"]["converge_atol"]
+        conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
+        perturb_all::Bool      = cfg["execution"]["perturb_all"]
 
         #    plotting stuff
         plt_tmp::Bool          = cfg["plots"]["temperature"]
@@ -382,7 +389,7 @@ module AGNI
 
         # Setup atmosphere
         @debug "Setup atmosphere "
-        return_success = atmosphere.setup!(atmos, ROOT_DIR,output_dir,
+        atmosphere.setup!(atmos, ROOT_DIR,output_dir,
                                 String(cfg["files" ]["input_sf"]),
                                 Float64(cfg["planet"]["instellation"]),
                                 Float64(cfg["planet"]["s0_fact"]),
@@ -393,7 +400,7 @@ module AGNI
                                 Int(cfg["execution"]["num_levels"]),
                                 p_surf,
                                 p_top,
-                                mf_dict, mf_path,
+                                mf_dict, mf_path;
 
                                 condensates=condensates,
                                 flag_gcontinuum   = cfg["execution"]["continua"],
@@ -407,15 +414,14 @@ module AGNI
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
                                 flux_int=flux_int,
-                                surface_material=surface_mat,
-                                albedo_s=albedo_s,
-
+                                surface_material=surface_mat, albedo_s=albedo_s,
+                                mlt_criterion=only(cfg["execution"]["convection_crit"][1]),
                                 rfm_parfile=rfm_parfile
                         ) || return false
 
         # Allocate atmosphere
         @debug "Reticulating splines..."
-        return_success = atmosphere.allocate!(atmos,star_file) || return false
+        atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
 
         # Set temperatures as appropriate
         if transparent
@@ -499,7 +505,9 @@ module AGNI
                                 ls_method=Int(cfg["execution"]["linesearch"]),
                                 easy_start=Bool(cfg["execution"]["easy_start"]),
                                 modplot=modplot,
-                                save_frames=plt_ani)
+                                save_frames=plt_ani,
+                                perturb_all=perturb_all
+                                )
 
         # Invalid selection
         else
@@ -521,6 +529,13 @@ module AGNI
             @info "    done"
         end
 
+        # Print information about ocean formation, if any
+        for c in atmos.condensates
+            if atmos.cond_ocean[c] > 1e-20
+                @info @sprintf("Formed %s ocean, mass %.2e kg/m^2", c, atmos.cond_ocean[c])
+            end
+        end
+
         # Write arrays
         @info "Writing results"
         save.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
@@ -529,7 +544,7 @@ module AGNI
         @info "Plotting results"
         if !transparent
             plt_ani && plotting.animate(atmos)
-            atmos.control.l_cloud && \
+            cfg["plots"]["cloud"] && \
                 plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
             cfg["plots"]["mixing_ratios"] && \
                 plotting.plot_vmr(atmos, joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)

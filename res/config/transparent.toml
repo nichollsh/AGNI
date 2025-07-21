@@ -40,6 +40,7 @@ title = "Transparent atmosphere"
     sensible_heat   = false
     latent_heat     = false
     convection      = false
+    convection_crit = "s"
     rainout         = false
     solution_type   = 1
     solver          = "transparent"
@@ -49,7 +50,7 @@ title = "Transparent atmosphere"
     easy_start      = false
     converge_atol   = 1e-1
     converge_rtol   = 1.0e-3
-
+    perturb_all     = true
 
 [plots]
     at_runtime      = true
@@ -61,3 +62,4 @@ title = "Transparent atmosphere"
     mixing_ratios   = true
     animate         = false
     height          = false
+    cloud           = false
