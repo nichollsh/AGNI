@@ -519,7 +519,7 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 1.0e3   # mixed composition case
+        atmos.phs_tau_mix = 1.0e6   # mixed composition case
 
         # Evaporation efficiency
         atmos.evap_efficiency = 0.05
@@ -1239,7 +1239,7 @@ module atmosphere
         if !isfile(atmos.spectral_file)
             @error "Spectral file '$(atmos.spectral_file)' does not exist"
             @error "Try running `\$ ./src/get_data.sh`"
-            @error "    e.g. to get Honeyside16 you would run `\$ ./src/get_data.sh Honeyside 16`"
+            @error "    e.g. to get CodenameXX you would run `\$ ./src/get_data.sh anyspec Codename XX`"
             return false
         end
 

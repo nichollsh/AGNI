@@ -1,28 +1,21 @@
 # Troubleshooting
 This page may be useful if you are having problems. However, I would suggest that you also double check that you followed all of the [Getting started](@ref) instructions.
 
-## Curl is not installed
-You need to install [curl](https://curl.se/). This is a tool for tranferring files over a network. Curl is used by AGNI to obtain lookup data files from Zenodo, and by Julia to obtain the required libraries.
+## Wget is not installed
+You need to install [wget](https://www.gnu.org/software/wget/). This is a tool for tranferring files over a network. Wget is used by AGNI to obtain lookup data files from Zenodo. Most Linux distributions come with wget; otherwise see [this page](https://www.tecmint.com/install-wget-in-linux/).
 
-To install curl on Ubuntu:
+To install wget on MacOS:
 ```bash
-sudo apt install curl
+brew install wget
 ```
 
-For other Linux distributions, see the [curl download page](https://curl.se/download.html). MacOS comes with curl pre-installed.
+## Unzip is not installed
+You need to install [unzip](https://www.gnu.org/software/wget/). This command is used by AGNI to extract some data files once downloaded. Most computers come with this command; otherwise see [this page](https://ioflood.com/blog/install-unzip-command-linux/).
 
-## Julia errors on start, potentially referencing the CURL library
-It is important that the shell environment variable `LD_LIBRARY_PATH` is
-not set when running AGNI. This will cause Julia to use the wrong libraries,
-which will causes problems. You can unset this variable or reset using either of the
-following commands
+To install unzip on Ubuntu/Debian:
 ```bash
-unset LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=""
+sudo apt-get install unzip
 ```
-If this does not help, it's possible that you are using a Julia distribution provided by
-your system package manager. It's important that you only use Julia distributed from the
-official website.
 
 ## NetCDF is not installed
 You need to install NetCDF on your machine. This is a library designed for reading and writing
@@ -38,9 +31,23 @@ To install NetCDF on MacOS:
 sudo brew install netcdf netcdf-fortran
 ```
 
+## Julia errors on start, potentially referencing the CURL library
+It is important that the shell environment variable `LD_LIBRARY_PATH` is
+not set when running AGNI. This will cause Julia to use the wrong libraries,
+which will causes problems. You can unset this variable or reset using either of the
+following commands
+```bash
+unset LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=""
+```
+If this does not help, it's possible that you are using a Julia distribution provided by
+your system package manager. It's important that you only use Julia distributed from the
+official website.
+
+
 
 ## Cannot find SOCRATES
-Check the installation instructions. Have you set `RAD_DIR`? Try running
+Check the installation instructions. Have you set the `RAD_DIR` environment variable? Try running
 `l_run_cdf` in the terminal; if this fails, then SOCRATES has not compiled
 or you haven't added it to your `PATH`. It is necessary to set the `RAD_DIR` variable
 for the environment in which you are running AGNI, so it is best to add it to your shell's
@@ -67,6 +74,7 @@ For example, to download the spectral file `Honeyside16` you would then run:
 Note the space between the codename and number of bands.
 Other spectral files can be downloaded from the [PROTEUS community on Zenodo](https://zenodo.org/communities/proteus_framework/records?q&f=subject%3Aspectral_files&l=list&p=1&s=10&sort=newest).
 
+
 ## Cannot find FastChem
 You need to install FastChem. This can be done by running the command:
 ```bash
@@ -74,7 +82,8 @@ You need to install FastChem. This can be done by running the command:
 ```
 and then adding `FC_DIR` to your shell rc file.
 
+
 ## Finally...
 If you are still stuck, or feel that there is a problem with the code, then
-you can contact the authors using the information on the main page.
+you can contact me using directions on [my website homepage](https://www.h-nicholls.space/).
 
