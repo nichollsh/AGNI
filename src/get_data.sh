@@ -5,10 +5,17 @@
 # Exit script if any of the commands fail
 # set -e
 
-# Check that curl is installed
+# Check that wget is installed
 if ! [ -x "$(command -v wget)" ]; then
   echo "ERROR: wget is not installed" >&2
   echo "You must install wget in order to use this script" >&2
+  exit 1
+fi
+
+# Check that unzip is installed
+if ! [ -x "$(command -v unzip)" ]; then
+  echo "ERROR: unzip is not installed" >&2
+  echo "You must install unzip in order to use this script" >&2
   exit 1
 fi
 

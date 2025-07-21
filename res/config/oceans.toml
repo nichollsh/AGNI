@@ -1,40 +1,42 @@
 # AGNI configuration file
-title = "K2-18 b, mixed"
+title = "Ocean formation test"
 
 [planet]
     tmp_surf        = 1000.0
-    instellation    = 1368.0
+    instellation    = 1500.0
     albedo_b        = 0.0
     s0_fact         = 0.375
     zenith_angle    = 48.19
-    surface_material= "res/surface_albedos/lunarmarebasalt.dat"
-    albedo_s        = 0.0
-    radius          = 16628310.0
-    gravity         = 12.43
+    surface_material= "greybody"
+    albedo_s        = 0.2
+    radius          = 6.37e6
+    gravity         = 9.81
     flux_int        = 0.0
-    turb_coeff      = 1.0e-2
+    turb_coeff      = 1.0e-4
     wind_speed      = 10.0
+    skin_k          = 2.0
+    skin_d          = 0.01
+    tmp_magma       = 1700.0
+    star_Teff       = 5000.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"
-    input_star      = "res/stellar_spectra/l-98-59.txt"
+    input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"
+    input_star      = "blackbody"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 10e3
+    p_surf          = 7000.0
     p_top           = 1e-5
-    vmr_dict        = { H2O=0.424, H2=0.433, CO2=0.0715, CH4=0.0715 }
-    vmr_file        = ""
+    vmr_dict        = { H2O=0.1, CO2=0.75, N2=0.05}
     chemistry       = 0
-    condensates     = ["H2O","CO2","CH4"]
-
+    condensates     = ["H2O"]
 
 [execution]
     clean_output    = true
     verbosity       = 1
-    max_steps       = 200
+    max_steps       = 300
     max_runtime     = 400
-    num_levels      = 60
+    num_levels      = 44
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -42,19 +44,20 @@ title = "K2-18 b, mixed"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
-    latent_heat     = false
+    latent_heat     = true
     convection      = true
     convection_crit = "l"
     rainout         = true
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 500.0
-    initial_state   = ["loglin","500"]
+    dx_max          = 150.0
+    initial_state   = ["iso", "700"]
     linesearch      = 2
-    easy_start      = false
-    converge_atol   = 1e-1
-    converge_rtol   = 1.0e-3
+    easy_start      = true
+    converge_atol   = 1.0
+    converge_rtol   = 1.0e-2
     perturb_all     = true
+
 
 [plots]
     at_runtime      = true
@@ -64,6 +67,6 @@ title = "K2-18 b, mixed"
     emission        = true
     albedo          = true
     mixing_ratios   = true
-    animate         = false
-    height          = false
-    cloud           = false
+    animate         = true
+    height          = true
+    cloud           = true

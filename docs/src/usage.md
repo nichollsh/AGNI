@@ -92,6 +92,7 @@ General properties of the planet.
 | `flux_int        ` | Internal flux [W m-2] to be solved-for when `solution_type=3`. |
 | `turb_coeff      ` | Turbulent exchange coefficient for sensible heat transport. |
 | `wind_speed      ` | Effective wind speed for sensible heat transport [m s-1]. |
+| `star_Teff      `  | Stellar photospheric temperature [K] used if `files.input_star=="blackbody"`. |
 
 
 ### `[files]`
@@ -100,7 +101,7 @@ Input/output files and other paths.
 | Parameter          | Description   |
 | -----------------: | :------------ |
 | `input_sf       `  | Path to the desired spectral file ending in `.sf`, in `res/spectral_files/`. |
-| `input_star     `  | Path to stellar spectrum file. Spectrum assumed to be inside spectral file if this is left blank. |
+| `input_star     `  | Path to stellar spectrum. If blank, spectrum assumed to be inside spectral file. If "blackbody" must provide `planet.star_Teff`. |
 | `output_dir     `  | Path to the output directory. |
 | `rfm_parfile  `    | Path to .par linelist file, for running line-by-line calculations with the RFM. |
 
@@ -136,10 +137,11 @@ Parameters that tell the model what to do.
 | `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see below) |
 | `real_gas      `  | Use real-gas equation(s) of state where possible (true/false) |
 | `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
-| `sensible_heat `  | Include sensible heat transport at the surface (true/false) |
-| `latent_heat   `  | Include vertical heat transport from condensation and precipitation (true/false) |
+| `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false) |
 | `convection    `  | Include vertical heat transport associated with convection (true/false) |
-| `rainout       `  | Enable compositional rainout of condensable species. If disabled, phase change does not impact composition. |
+| `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux |
+| `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
+| `rainout       `  | Enable compositional rainout of condensables. If disabled, phase change does not impact composition. |
 | `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |
 | `solution_type `  | Solution type (see below). |
 | `solver        `  | Solver to use (see below). |
@@ -148,6 +150,7 @@ Parameters that tell the model what to do.
 | `easy_start    `  | Initially down-scale convective/condensation fluxes, if initial guess is poor/unknown. **Enable if the model is struggling.** |
 | `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
 | `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
+| `perturb_all`     | Perturb all rows of jacobian matrix at each solver iteration? True=stable, False=fast. |
 | `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] |
 | `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] |
 
@@ -165,6 +168,7 @@ Configure plotting routines all of these should be `true` or `false`.
 | `mixing_ratios  ` | Plot mixing ratio profiles? |
 | `height         ` | Plot radius-pressure profile? |
 | `animate        ` | Make an animation of the solver obtaining its solution? |
+| `cloud          ` | Plot water cloud mass fraction and area fraction profiles? |
 
 ### Details on specific parameters
 * `composition.transparent` configures the atmosphere to be transparent. This works by setting the pressure to be small, and turning off the gas opacity. With this provided, the rest of the parameters in `[configuration]` are redundant. With this enabled, make sure to use the appropriate solver in the `[execution]` table.
