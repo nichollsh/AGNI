@@ -26,7 +26,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.7.0"
+    const AGNI_VERSION::String   = "1.7.1"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -746,11 +746,12 @@ module atmosphere
 
         # Fastchem
         atmos.flag_fastchem = false
+        atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")  # default path
         if ("FC_DIR" in keys(ENV))
 
             @debug "FastChem env has been set"
 
-            # check folder
+            # check fastchem installation folder
             atmos.FC_DIR = abspath(ENV["FC_DIR"])
             if !isdir(atmos.FC_DIR)
                 @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
@@ -769,14 +770,15 @@ module atmosphere
                 @debug "Found FastChem executable"
             end
 
-            # working directory
-            if isempty(fastchem_work)
-                atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")
-            else
+            # working directory for FC runtime files
+            if !isempty(fastchem_work)
                 atmos.fastchem_work = abspath(fastchem_work)
+                @debug "Fastchem working dir set to $(atmos.fastchem_work)"
+            else
+                @debug "Fastchem working dir defaulting to $(atmos.fastchem_work)"
             end
 
-            # make folder
+            # make working directory
             rm(atmos.fastchem_work,force=true,recursive=true)
             mkdir(atmos.fastchem_work)
         else
