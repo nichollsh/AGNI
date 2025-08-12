@@ -122,10 +122,16 @@ module atmosphere
         gas_sat::Dict{String, Array{Bool, 1}}       # Layer is saturated or cold-trapped
         gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
         cond_yield::Dict{String, Array{Float64,1}}  # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
-        cond_ocean::Dict{String, Float64}           # condensate accumulation after evaporation (implicit surface ocean mass) [kg/m^2]
+        cond_surf::Dict{String, Float64}            # condensate accumulation left after evaporation (implicit surface liquid) [kg/m^2]
         gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
+
+        # Ocean variables (surface liquid layering)
+        ocean_calc::Bool                # enable ocean calculations
+        ocean_frac::Float64             # ocean basin area, as fraction of planet surface
+        ocean_depth::Float64            # continental shelf height [m]
+        ocean_layers::Array{Tuple,1}    # OUTPUT: layer structure of surface liquids
 
         # Gases (only those in spectralfile)
         gas_soc_num::Int
@@ -366,6 +372,10 @@ module atmosphere
                     fastchem_xtol::Float64 =    1.0e-4,
 
                     rfm_parfile::String =       "",
+
+                    ocean_calc::Bool =          false,
+                    ocean_frac::Float64 =       0.6,
+                    ocean_depth::Float64 =      3000.0
                     )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -439,6 +449,10 @@ module atmosphere
 
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
+
+        atmos.ocean_calc  =     ocean_calc,
+        atmos.ocean_frac  =     max(0.0, min(1.0, ocean_frac))
+        atmos.ocean_depth =     max(0.0, ocean_depth)
 
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
@@ -546,7 +560,7 @@ module atmosphere
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
         atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation
         atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # dict of condensate yield
-        atmos.cond_ocean =  Dict{String, Float64}()           # dict of ocean masses
+        atmos.cond_surf =  Dict{String, Float64}()           # dict of ocean masses
         atmos.gas_num   =   0                                 # number of gases
         atmos.condensates   =   Array{String}(undef, 0)       # list of condensates
 
@@ -662,7 +676,7 @@ module atmosphere
         for g in atmos.gas_names
             atmos.gas_sat[g]    = falses(atmos.nlev_c)
             atmos.cond_yield[g] = zeros(Float64, atmos.nlev_c)
-            atmos.cond_ocean[g] = 0.0
+            atmos.cond_surf[g] = 0.0
         end
 
         # Check that we actually stored some values

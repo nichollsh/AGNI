@@ -222,4 +222,18 @@ module consts
         ("Na" , "#1144ff")
     ])
 
+    # Table of liquid-phase density for ocean calculation [kg/m^3]
+    #     All taken from this website:
+    #     https://encyclopedia.airliquide.com/water#properties
+    const _lookup_liquid_rho::Dict{String, Float64} = Dict([
+        ("H2O", 958.37 ),  # boiling
+        ("CO2", 1178.4 ),  # triple
+        ("H2" , 70.516 ),  # boiling
+        ("CH4", 422.36 ),  # boiling
+        ("CO" , 793.2  ),  # boiling
+        ("N2" , 806.11 ),  # boiling
+        ("NH3", 681.97 ),  # boiling
+        ("SO2", 1461.1 ),  # boiling
+    ])
+
 end
