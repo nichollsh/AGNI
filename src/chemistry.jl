@@ -270,11 +270,19 @@ module chemistry
             end
         end
 
-        # Calculate surface liquid distribution
-        #    Can be in oceans, or over entire surface once oceans are full
+        # Calculate layering structure of surface liquid distribution
+        #    Liquids start in ocean basins, then cover entire surface once basins fill
         if atmos.ocean_calc
+            # work out layering structure
             atmos.ocean_layers = ocean.dist_surf_liq(atmos.cond_surf,
-                                            atmos.ocean_frac, atmos.ocean_depth, atmos.rp)
+                                                        atmos.ocean_ob_frac,
+                                                        atmos.ocean_cs_height,
+                                                        atmos.rp)
+
+            # calc ocean properties
+            atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
+            atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
+            atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
         end
 
         return nothing
