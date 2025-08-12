@@ -1,11 +1,11 @@
-cff-version: 1.7.1
+cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
 - family-names: "Nicholls"
   given-names: "Harrison"
   orcid: "https://orcid.org/0000-0002-8368-4641"
 title: "Convective shutdown in the atmospheres of lava worlds"
-version: 1.1.3
+version: 1.7.0
 doi: 10.1093/mnras/stae2772
-date-released: 2024-12-29
+date-released: 2025-07-21
 url: "https://doi.org/10.1093/mnras/stae2772"
