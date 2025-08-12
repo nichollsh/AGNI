@@ -23,8 +23,9 @@ module ocean
     Once the OBs are full, remaining liquid spills onto the surface and covers the entire
     planet area. Can handle multiple liquids, assuming that they don't mix.
 
-    Output is an array of length=4 tuples, one tuple per liquid. First tuple index is the
-    location of the liquid (denser )
+    Output is an array of length=4 tuples, one tuple per liquid. 1st tuple index is the
+    location of the liquid (i=1 is bottom of ocean). 2nd index is the liquid name.
+    3rd index is its height [m] in the ocean bains. 4th index is height above oceans.
 
     Arguments:
     - `sigs::Dict{String, Float64}`    dictionary of rainout densities for liquids [kg m-2]
@@ -47,7 +48,7 @@ module ocean
 
         # Get liquid densities
         liqs::Array{String, 1} = collect(keys(sigs))
-        rhos::Array{Float64,1} = Float64[ liquid_rho(l) for l in liqs]
+        rhos::Array{Float64,1} = Float64[ phys.liquid_rho(l) for l in liqs]
 
         # Sort liquids by decreasing density
         mask::Array{Int, 1} = reverse(sortperm(rhos))

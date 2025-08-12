@@ -270,10 +270,11 @@ module chemistry
             end
         end
 
-        # Calculate surface water distribution
+        # Calculate surface liquid distribution
+        #    Can be in oceans, or over entire surface once oceans are full
         if atmos.ocean_calc
-            atmos.ocean_layers = \
-                ocean.dist_surf_liq(cond_surf, atmos.ocean_frac, atmos.ocean_depth, atmos.rp)
+            atmos.ocean_layers = ocean.dist_surf_liq(atmos.cond_surf,
+                                            atmos.ocean_frac, atmos.ocean_depth, atmos.rp)
         end
 
         return nothing

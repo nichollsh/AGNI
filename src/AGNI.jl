@@ -17,6 +17,7 @@ module AGNI
     include("phys.jl")
     include("spectrum.jl")
     include("atmosphere.jl")
+    include("ocean.jl")
     include("chemistry.jl")
     include("rfm.jl")
     include("setpt.jl")
@@ -25,7 +26,7 @@ module AGNI
     include("energy.jl")
     include("solver.jl")
     include("load.jl")
-    include("ocean.jl")
+
 
     # Import submodules
     import .phys
@@ -36,10 +37,10 @@ module AGNI
     import .plotting
     import .energy
     import .solver
+    import .ocean
     import .chemistry
     import .rfm
     import .load
-    import .ocean
 
     # Export submodules (mostly for autodoc purposes)
     export phys
@@ -50,10 +51,10 @@ module AGNI
     export load
     export plotting
     export energy
+    export ocean
     export chemistry
     export rfm
     export solver
-    export ocean
 
     """
     **Setup terminal logging and file logging**
@@ -535,7 +536,7 @@ module AGNI
         # Print information about ocean formation, if any
         for c in atmos.condensates
             if atmos.cond_surf[c] > 1e-20
-                @info @sprintf("Formed %s ocean, mass %.2e kg/m^2", c, atmos.cond_surf[c])
+                @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.cond_surf[c])
             end
         end
 

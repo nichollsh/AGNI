@@ -165,7 +165,9 @@ module save
             var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1"))    # Conductive skin thermal conductivity
             var_specfile =  defVar(ds, "specfile"      ,String,  ())     # Path to spectral file when read
             var_starfile =  defVar(ds, "starfile"      ,String,  ())     # Path to star file when read
-            var_flux_sns =  defVar(ds, "fl_sens",       Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Surface sensible heat flux [W m-2]
+            var_flux_sns =  defVar(ds, "fl_sens"       ,Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Surface sensible heat flux [W m-2]
+            var_ocfull =    defVar(ds, "oceans_full"   ,String,  ())     # Ocean basins are full
+            var_octop  =    defVar(ds, "oceans_top"    ,String,  ())     # Top-most surface liquid layer
 
             #     Store data
             var_max_cff_p[1] =  atmos.transspec_p
@@ -236,6 +238,17 @@ module save
 
             var_specfile[1] = atmos.spectral_file
             var_starfile[1] = atmos.star_file
+
+            var_ocfull[1] = 'n'
+            var_octop[1]  = "none"
+            if atmos.ocean_calc
+                if atmos.ocean_layers[end][end] > 0
+                    var_ocfull[1] = 'y'
+                else
+                    var_ocfull[1] = 'n'
+                end
+                var_octop[1] = atmos.ocean_layers[end][2]
+            end
 
             # ----------------------
             # Vector quantities

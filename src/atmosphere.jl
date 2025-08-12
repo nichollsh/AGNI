@@ -373,7 +373,7 @@ module atmosphere
 
                     rfm_parfile::String =       "",
 
-                    ocean_calc::Bool =          false,
+                    ocean_calc::Bool =          true,
                     ocean_frac::Float64 =       0.6,
                     ocean_depth::Float64 =      3000.0
                     )::Bool
@@ -449,10 +449,6 @@ module atmosphere
 
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
-
-        atmos.ocean_calc  =     ocean_calc,
-        atmos.ocean_frac  =     max(0.0, min(1.0, ocean_frac))
-        atmos.ocean_depth =     max(0.0, ocean_depth)
 
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
@@ -738,6 +734,11 @@ module atmosphere
             @error "There must be at least one non-condensable gas"
             return false
         end
+
+        # Ocean params
+        atmos.ocean_calc  =     ocean_calc && atmos.condense_any
+        atmos.ocean_frac  =     max(0.0, min(1.0, ocean_frac))
+        atmos.ocean_depth =     max(0.0, ocean_depth)
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to
