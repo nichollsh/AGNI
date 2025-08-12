@@ -792,7 +792,7 @@ module phys
     """
     function liquid_rho(name::String)::Float64
         if name in keys(_lookup_liquid_rho)
-            return _lookup_liquid_rho[name]
+            return consts._lookup_liquid_rho[name]
         else
             return BIGFLOAT
         end
