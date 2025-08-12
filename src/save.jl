@@ -166,8 +166,9 @@ module save
             var_specfile =  defVar(ds, "specfile"      ,String,  ())     # Path to spectral file when read
             var_starfile =  defVar(ds, "starfile"      ,String,  ())     # Path to star file when read
             var_flux_sns =  defVar(ds, "fl_sens"       ,Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Surface sensible heat flux [W m-2]
-            var_ocfull =    defVar(ds, "oceans_full"   ,String,  ())     # Ocean basins are full
-            var_octop  =    defVar(ds, "oceans_top"    ,String,  ())     # Top-most surface liquid layer
+            var_octop  =    defVar(ds, "oceans_topliq" ,String,  ())                                          # Name of liquid making up top-most ocean layer
+            var_ocdepth  =  defVar(ds, "oceans_maxdepth",Float64,(), attrib = OrderedDict("units" => "m"))    # Deepest part of ocean [m]
+            var_ocarea =    defVar(ds, "oceans_areafrac",Float64, ())                                         # Ocean area-fraction
 
             #     Store data
             var_max_cff_p[1] =  atmos.transspec_p
@@ -239,16 +240,9 @@ module save
             var_specfile[1] = atmos.spectral_file
             var_starfile[1] = atmos.star_file
 
-            var_ocfull[1] = 'n'
-            var_octop[1]  = "none"
-            if atmos.ocean_calc
-                if atmos.ocean_layers[end][end] > 0
-                    var_ocfull[1] = 'y'
-                else
-                    var_ocfull[1] = 'n'
-                end
-                var_octop[1] = atmos.ocean_layers[end][2]
-            end
+            var_octop[1]   = atmos.ocean_topliq
+            var_ocdepth[1] = atmos.ocean_maxdepth
+            var_ocarea[1]  = atmos.ocean_areacov
 
             # ----------------------
             # Vector quantities

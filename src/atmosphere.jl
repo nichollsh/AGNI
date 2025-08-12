@@ -6,6 +6,14 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end
 
+"""
+**Main atmosphere module for storing model data**
+
+This module primarily contains the `Atmos_t` struct which does most of the heavy lifting
+in AGNI. There are also functions for setting up and configuring the struct.
+
+Also includes hydrostatic integrator and ways to estimate observable quantities.
+"""
 module atmosphere
 
     # System libraries
@@ -26,7 +34,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.7.1"
+    const AGNI_VERSION::String   = "1.7.2"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -128,10 +136,13 @@ module atmosphere
         condense_any::Bool                          # length(condensates)>0 ?
 
         # Ocean variables (surface liquid layering)
-        ocean_calc::Bool                # enable ocean calculations
-        ocean_frac::Float64             # ocean basin area, as fraction of planet surface
-        ocean_depth::Float64            # continental shelf height [m]
+        ocean_calc::Bool                # INPUT: enable ocean calculations
+        ocean_ob_frac::Float64          # INPUT: ocean basin area, as fraction of planet surface
+        ocean_cs_height::Float64        # INPUT: continental shelf height [m]
         ocean_layers::Array{Tuple,1}    # OUTPUT: layer structure of surface liquids
+        ocean_maxdepth::Float64         # OUTPUT: ocean depth at deepest part [m]
+        ocean_areacov::Float64          # OUTPUT: fraction of planet surface covered by oceans
+        ocean_topliq::String            # OUTPUT: name of top-most ocean component
 
         # Gases (only those in spectralfile)
         gas_soc_num::Int
@@ -374,8 +385,8 @@ module atmosphere
                     rfm_parfile::String =       "",
 
                     ocean_calc::Bool =          true,
-                    ocean_frac::Float64 =       0.6,
-                    ocean_depth::Float64 =      3000.0
+                    ocean_ob_frac::Float64 =    0.6,
+                    ocean_cs_height::Float64 =  3000.0
                     )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -737,8 +748,11 @@ module atmosphere
 
         # Ocean params
         atmos.ocean_calc  =     ocean_calc && atmos.condense_any
-        atmos.ocean_frac  =     max(0.0, min(1.0, ocean_frac))
-        atmos.ocean_depth =     max(0.0, ocean_depth)
+        atmos.ocean_ob_frac  =  max(0.0, min(1.0, ocean_ob_frac))
+        atmos.ocean_cs_height = max(0.0, ocean_cs_height)
+        atmos.ocean_maxdepth  = 0.0
+        atmos.ocean_areacov   = 0.0
+        atmos.ocean_topliq    = "none"
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to

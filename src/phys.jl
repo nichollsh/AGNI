@@ -27,7 +27,7 @@ module phys
     const MIN_DATA_VERSION::Int64 = 20250220
 
     # Enable/disable flags
-    ENABLE_CHECKSUM::Bool = true
+    ENABLE_CHECKSUM::Bool = true  # can still be disabled when function is called
     ENABLE_AQUA::Bool     = true
     ENABLE_CMS19::Bool    = true
 
@@ -106,7 +106,8 @@ module phys
     Load gas data into a new struct
     """
     function load_gas(thermo_dir::String, formula::String,
-                            tmp_dep::Bool, real_gas::Bool)::Gas_t
+                            tmp_dep::Bool, real_gas::Bool;
+                            check_integrity::Bool=true)::Gas_t
 
         @debug ("Loading data for gas $formula")
 
@@ -171,7 +172,7 @@ module phys
             # no data
             @debug("    stub")
 
-        elseif ENABLE_CHECKSUM && !blake.valid_file(fpath)
+        elseif ENABLE_CHECKSUM && check_integrity && !blake.valid_file(fpath)
             # file exists - check its integrity
             @debug("    ncdf file is corrupt")
             fail = true
@@ -785,13 +786,13 @@ module phys
     Returns BIGFLOAT density for unsupported phases, to avoid divide-by-zero error
 
     Arguments:
-    - `name::String`     Name of liquid
+    - `name::String`    Name of liquid
 
     Returns:
-    - `rho::Float64`
+    - `rho::Float64`    Density of liquid phase [kg m-3]
     """
     function liquid_rho(name::String)::Float64
-        if name in keys(_lookup_liquid_rho)
+        if name in keys(consts._lookup_liquid_rho)
             return consts._lookup_liquid_rho[name]
         else
             return BIGFLOAT

@@ -6,22 +6,23 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end
 
+"""
+**This module handles ocean formation**
+
+Assumes a binary area of ocean basin (OB) and contintenal shelf (CS). Rained-out liquid is
+deposited into these two reservoirs, filling the oceans first. The functions are designed
+to handle multiple condensing liquids. The exposed liquid is the one with the lowest
+density, assuming that they do not mix miscibly.
+
+At the moment this assumes a top-hat continent shape. But these could be expanded to allow
+for a shelf area distribution which changes with height (i.e. sloped shelf edges).
+"""
 module ocean
 
     import ..phys
 
-    # This module handles ocean formation given a binary distribution of ocean basin (OB)
-    #    and contintenal shelf (CS). Rained-out liquid is deposited into these two
-    #    reservoirs, filling the oceans first. The functions are designed to handle
-    #    multiple condensing liquids. The exposed liquid is the one with the lowest
-    #    density, assuming that they do not mix miscibly.
-
     """
     **Determine the layering structure of surface liquids**
-
-    Rained-out liquid is deposited into two reservoirs. Ocean bains are filled first.
-    Once the OBs are full, remaining liquid spills onto the surface and covers the entire
-    planet area. Can handle multiple liquids, assuming that they don't mix.
 
     Output is an array of length=4 tuples, one tuple per liquid. 1st tuple index is the
     location of the liquid (i=1 is bottom of ocean). 2nd index is the liquid name.
@@ -34,7 +35,7 @@ module ocean
     - `Rpl::Float64`                   planet radius at bottom of ocean [m]
 
     Returns:
-    - `output::Array`                   Array containing tuples as described above.
+    - `output::Array`                  array containing tuples as described above.
     """
     function dist_surf_liq(sigs::Dict{String, Float64},
                             fOB::Float64, hCS::Float64, Rpl::Float64)::Array{Tuple,1}
@@ -85,10 +86,62 @@ module ocean
 
             # output array with consolidated info
             #   surface liquid is divided by total area, since it covers oceans+continents
-            push!(output, (j, liqs[i], v_fill_OB[i]/aOB, v_fill_CS[i]/aPL))
+            #   do not include empty layers
+            if v_fill_CS[i] + v_fill_OB[i] > 1.0
+                push!(output, (j, liqs[i], v_fill_OB[i]/aOB, v_fill_CS[i]/aPL))
+            end
         end
 
         return output
     end # end ocean_layers
 
+    """
+    **Get component of topmost ocean layer.**
+
+    This is the liquified component exposed to the atmosphere.
+    """
+    function get_topliq(layers::Array{Tuple,1})::String
+        if length(layers) == 0
+            return "none"
+        else
+            return layers[end][2]
+        end
+    end
+
+    """
+    **Get ocean depth [m] at deepest point of ocean**
+    """
+    function get_maxdepth(layers::Array{Tuple,1})::Float64
+        if length(layers) == 0
+            return 0.0
+        else
+            # sum over all layers
+            return sum([la[3]+la[4] for la in layers])
+        end
+    end
+
+    """
+    **Get area-fraction of the planet that is covered by oceans.**
+
+    The area depends on how full the ocean basins are.
+    """
+    function get_areacov(layers::Array{Tuple,1},
+                            fOB::Float64)::Float64
+
+        # basins empty => desert planet
+        if get_maxdepth(layers) < 1e-2
+            return 0.0
+
+        # basins not empty
+        else
+            # liquid on shelf => aqua planet
+            if sum([la[4] for la in layers]) > 1e-2
+                return 1.0
+
+            # otherwise, must be contintental planet
+            else
+                return fOB
+            end
+        end
+    end
 end
