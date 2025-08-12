@@ -16,6 +16,7 @@ module chemistry
     # Local files
     import ..atmosphere
     import ..phys
+    import ..ocean
 
     """
     **Normalise gas VMRs, keeping condensates unchanged**
@@ -167,7 +168,7 @@ module chemistry
 
             # all condensation goes into ocean, if evap not enabled
             for g in atmos.gas_names
-                atmos.cond_ocean[g] = sum(atmos.cond_yield[g])
+                atmos.cond_surf[g] = sum(atmos.cond_yield[g])
             end
 
         else # evap is enabled...
@@ -176,7 +177,7 @@ module chemistry
             for c in atmos.condensates
 
                 # set to zero at TOA
-                atmos.cond_ocean[c] = 0.0
+                atmos.cond_surf[c] = 0.0
 
                 # no rain? go to next condensable
                 if sum(atmos.cond_yield[c]) < 1.0e-10
@@ -189,20 +190,20 @@ module chemistry
                     # raining in this layer...
                     #     don't evaporate
                     if atmos.cond_yield[c][j] > 0.0
-                        atmos.cond_ocean[c] += atmos.cond_yield[c][j]
+                        atmos.cond_surf[c] += atmos.cond_yield[c][j]
                         continue
                     end
 
                     # in a dry layer...
 
                     # skip if no rain entering from above
-                    if atmos.cond_ocean[c] < 1e-10
+                    if atmos.cond_surf[c] < 1e-10
                         continue
                     end
 
                     # exit loop if supercritical, because then condensate mixes miscibly
                     if atmos.tmp[j] >= atmos.gas_dat[c].T_crit
-                        atmos.cond_ocean[c] = 0.0
+                        atmos.cond_surf[c] = 0.0
                         break
                     end
 
@@ -221,7 +222,7 @@ module chemistry
                     dm_sat *= atmos.evap_efficiency
 
                     # don't evaporate more rain than the total available
-                    dm_sat = min(dm_sat, atmos.cond_ocean[c])
+                    dm_sat = min(dm_sat, atmos.cond_surf[c])
 
                     # offset condensate yield at this level by the evaporation
                     atmos.cond_yield[c][j] -= dm_sat
@@ -243,7 +244,7 @@ module chemistry
                     end
 
                     # recalculate total rain correspondingly
-                    atmos.cond_ocean[c] -= dm_sat
+                    atmos.cond_surf[c] -= dm_sat
 
                 end # go to next j level (below)
 
@@ -267,6 +268,12 @@ module chemistry
                     atmos.cloud_arr_f[i] = atmos.cloud_val_f
                 end
             end
+        end
+
+        # Calculate surface water distribution
+        if atmos.ocean_calc
+            atmos.ocean_layers = \
+                ocean.dist_surf_liq(cond_surf, atmos.ocean_frac, atmos.ocean_depth, atmos.rp)
         end
 
         return nothing

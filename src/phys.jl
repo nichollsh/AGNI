@@ -779,4 +779,23 @@ module phys
         return G_grav * mass / (radius * radius)
     end
 
+    """
+    **Evaluate the density of a liquid phase.**
+
+    Returns BIGFLOAT density for unsupported phases, to avoid divide-by-zero error
+
+    Arguments:
+    - `name::String`     Name of liquid
+
+    Returns:
+    - `rho::Float64`
+    """
+    function liquid_rho(name::String)::Float64
+        if name in keys(_lookup_liquid_rho)
+            return _lookup_liquid_rho[name]
+        else
+            return BIGFLOAT
+        end
+    end
+
 end # end module
