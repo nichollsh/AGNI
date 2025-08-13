@@ -93,7 +93,7 @@ module ocean
         end
 
         return output
-    end # end ocean_layers
+    end # end dist_surf_liq
 
     """
     **Get component of topmost ocean layer.**

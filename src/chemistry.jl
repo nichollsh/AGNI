@@ -280,7 +280,7 @@ module chemistry
                                                         atmos.rp)
 
             # Ocean properties can be synthesised from `ocean_layers` in a later step.
-            # For now, leave atmos.ocean_depth (etc) unset to improve performance.
+            # For now, leave atmos.ocean_maxdepth (etc) unset to improve performance.
         end
 
         return nothing
