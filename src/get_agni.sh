@@ -27,7 +27,7 @@ julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'
 
 # Run tests
 echo "Running tests..."
-julia $root/test/runtests.jl
+julia $root/test/runtests.jl fast
 
 echo "Done!"
 exit 0
