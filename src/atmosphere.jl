@@ -1872,6 +1872,12 @@ module atmosphere
         atmos.control.l_gas       = false
         atmos.control.l_rayleigh  = false
 
+        # Turn off oceans
+        atmos.ocean_maxdepth  = 0.0
+        atmos.ocean_areacov   = 0.0
+        atmos.ocean_topliq    = "_unset"
+        atmos.ocean_layers    = Tuple[(1,"_unset",0.0,0.0),]
+
         # Flag as transparent
         atmos.transparent = true
 
