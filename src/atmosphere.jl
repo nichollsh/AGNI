@@ -754,7 +754,7 @@ module atmosphere
         atmos.ocean_cs_height = max(0.0, ocean_cs_height)
         atmos.ocean_maxdepth  = 0.0
         atmos.ocean_areacov   = 0.0
-        atmos.ocean_topliq    = "none"
+        atmos.ocean_topliq    = "_unset"
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to
