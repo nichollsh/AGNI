@@ -17,6 +17,7 @@ module AGNI
     include("phys.jl")
     include("spectrum.jl")
     include("atmosphere.jl")
+    include("ocean.jl")
     include("chemistry.jl")
     include("rfm.jl")
     include("setpt.jl")
@@ -25,6 +26,7 @@ module AGNI
     include("energy.jl")
     include("solver.jl")
     include("load.jl")
+
 
     # Import submodules
     import .phys
@@ -35,11 +37,12 @@ module AGNI
     import .plotting
     import .energy
     import .solver
+    import .ocean
     import .chemistry
     import .rfm
     import .load
 
-    # Export submodules
+    # Export submodules (mostly for autodoc purposes)
     export phys
     export spectrum
     export atmosphere
@@ -48,9 +51,12 @@ module AGNI
     export load
     export plotting
     export energy
+    export ocean
     export chemistry
     export rfm
     export solver
+
+    const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../")
 
     """
     **Setup terminal logging and file logging**
@@ -170,54 +176,18 @@ module AGNI
     end
 
     """
-    **Main function to be called by executable file.**
+    **Run AGNI using a configuration dictionary**
 
-    This function parses the cfg file provided by the call arguments, and runs
-    AGNI according to these requirements. It will also save and plot the
-    output as requested by the cfg file.
+    Runs AGNI according to requirements in the configuration dict.
+    Will also save and plot the output as requested.
+
+    Arguments:
+    - `cfg_dict::Dict`          dictionary containing the configuration
 
     Returns:
-    - `return_success::Bool`        flag for model success
+    - `return_success::Bool`    flag for model success
     """
-    function main()::Bool
-
-        # Record start time
-        tbegin = time()
-
-        # Variables
-        ROOT_DIR = dirname(abspath(PROGRAM_FILE))
-        output_dir::String = ""
-        clean_output::Bool = false
-        return_success::Bool = true
-
-        # Open and validate config file
-        cfg_path::String = joinpath(ROOT_DIR, "res/config/default.toml")
-        if length(ARGS)>0
-            cfg_path = ARGS[1]
-        end
-        if !ispath(cfg_path)
-            error("Cannot find configuration file at '$cfg_path'")
-        end
-        cfg = open_config(cfg_path)
-
-        # Output folder
-        output_dir = abspath(cfg["files"]["output_dir"])
-        clean_output = Bool(cfg["execution"]["clean_output"])
-        if clean_output || !(ispath(output_dir) && isdir(output_dir))
-            rm(output_dir,force=true,recursive=true)
-            mkdir(output_dir)
-        end
-
-        # Logging
-        verbosity::Int = cfg["execution"]["verbosity"]
-        setup_logging(joinpath(output_dir, "agni.log"), verbosity)
-
-        # Hello
-        @debug "Hello"
-
-        # Copy configuration file
-        cp(cfg_path, joinpath(output_dir, "agni.toml"), force=true)
-
+    function run_from_config(cfg::Dict)::Bool
         # Read configuration options from dict
         @info "Using configuration '$(cfg["title"])'"
 
@@ -383,6 +353,9 @@ module AGNI
             target_olr = cfg["planet"]["target_olr"]
         end
 
+        # Output folder
+        output_dir = abspath(cfg["files"]["output_dir"])
+
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
         atmos = atmosphere.Atmos_t()
@@ -463,6 +436,7 @@ module AGNI
 
         # Loop over requested solvers
         solver_success::Bool = true
+        return_success::Bool = true
         allowed_solvers::Array{String,1} = ["newton", "gauss", "levenberg"]
         sol = strip(lowercase(cfg["execution"]["solver"]))
         if isempty(sol)
@@ -519,9 +493,6 @@ module AGNI
         @info "    done"
         @info "Total SOCRATES evaluations: $(atmos.num_rt_eval)"
 
-        # Fill Kzz in remaining regions
-        energy.fill_Kzz!(atmos)
-
         # RFM calculation?
         if atmos.flag_rfm
             @info "Running RFM line-by-line radiative transfer..."
@@ -531,9 +502,13 @@ module AGNI
 
         # Print information about ocean formation, if any
         for c in atmos.condensates
-            if atmos.cond_ocean[c] > 1e-20
-                @info @sprintf("Formed %s ocean, mass %.2e kg/m^2", c, atmos.cond_ocean[c])
+            if atmos.cond_surf[c] > 1e-20
+                @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.cond_surf[c])
             end
+        end
+        if atmos.ocean_calc
+            @info @sprintf("Oceans cover %d%% of area, max depth of %g km",
+                                atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
         end
 
         # Write arrays
@@ -566,27 +541,78 @@ module AGNI
         @info "Deallocating memory"
         atmosphere.deallocate!(atmos)
 
+        return return_success
+    end
+
+
+    """
+    **Main function to be called by executable file.**
+
+    This function parses the cfg file provided by the call arguments, sets up the output
+    folders, and configures the logger. It then calls the `run_from_config` function.
+
+    Returns:
+    - `return_success::Bool`        flag for model success
+    """
+    function main()::Bool
+
+        # Record start time
+        tbegin = time()
+
+        # Variables
+        output_dir::String = ""
+        clean_output::Bool = false
+
+        # Open and validate config file
+        cfg_path::String = joinpath(ROOT_DIR, "res", "config", "default.toml")
+        if length(ARGS)>0
+            cfg_path = ARGS[1]
+        end
+        if !ispath(cfg_path)
+            error("Cannot find configuration file at '$cfg_path'")
+        end
+        cfg = open_config(cfg_path)
+
+        # Output folder
+        output_dir = abspath(cfg["files"]["output_dir"])
+        clean_output = Bool(cfg["execution"]["clean_output"])
+        if clean_output || !(ispath(output_dir) && isdir(output_dir))
+            rm(output_dir,force=true,recursive=true)
+            mkdir(output_dir)
+        end
+
+        # Logging
+        verbosity::Int = cfg["execution"]["verbosity"]
+        setup_logging(joinpath(output_dir, "agni.log"), verbosity)
+
+        # Hello
+        @debug "Hello"
+
+        # Copy configuration file
+        cp(cfg_path, joinpath(output_dir, "agni.toml"), force=true)
+
+        # Run the model
+        return_success = run_from_config(cfg)
+
         # Temp folders
         if clean_output
             @debug "Cleaning output folder"
 
             # chemistry
             dir_fastchem = joinpath(output_dir,"fastchem")
-            if chem_type in [1,2,3]
-
-                cp(joinpath(dir_fastchem,"chemistry.dat"),
-                   joinpath(output_dir,  "fc_gas.dat"), force=true)
-
-                if chem_type in [2,3]
-                    cp(joinpath(dir_fastchem,"condensates.dat"),
-                       joinpath(output_dir,  "fc_con.dat"), force=true)
-                end
+            fsrc = joinpath(dir_fastchem,"chemistry.dat")
+            if isfile(fsrc)
+                cp(fsrc, joinpath(output_dir,  "fc_gas.dat"), force=true)
+            end
+            fsrc = joinpath(dir_fastchem,"condensates.dat")
+            if isfile(fsrc)
+                cp(fsrc, joinpath(output_dir,  "fc_con.dat"), force=true)
             end
             rm(dir_fastchem,force=true,recursive=true)
 
             # other
-            rm(atmos.FRAMES_DIR,force=true,recursive=true)
-            rm(joinpath(output_dir,"rfm"),force=true,recursive=true)
+            rm(joinpath(output_dir,"frames"),force=true,recursive=true)
+            rm(joinpath(output_dir,"rfm"),   force=true,recursive=true)
         end
 
         # Finish up

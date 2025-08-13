@@ -222,6 +222,7 @@ function handle_request {
             echo $help_basic
 
             anyspec Oak 318
+            anyspec Dayspring 16
             anyspec Dayspring 48
             anyspec Honeyside 256
 
@@ -240,6 +241,7 @@ function handle_request {
             anyspec Frostflow 16
             anyspec Frostflow 48
             anyspec Frostflow 256
+            anyspec Frostflow 4096
             ;;
 
         "anyspec")

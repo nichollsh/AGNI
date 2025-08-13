@@ -21,13 +21,16 @@ fi
 
 # Install
 echo "Installing AGNI..."
-rm -f Manifest.toml
+rm -f Manifest.tomlear
 julia "$root/deps/build.jl"
 julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'
 
 # Run tests
 echo "Running tests..."
-julia $root/test/runtests.jl
+dir=$(pwd)
+cd $root/test/
+julia runtests.jl fast
+cd $dir
 
 echo "Done!"
 exit 0

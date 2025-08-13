@@ -1,7 +1,7 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # Get AGNI root directory
-ROOT_DIR = abspath(joinpath(dirname(abspath(PROGRAM_FILE)),"../"))
+ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
 
 # Activate environment
 ENV["GKSwstype"] = "100"
@@ -18,12 +18,19 @@ using AGNI
 # Prepare
 RES_DIR         = joinpath(ROOT_DIR,"res/")
 OUT_DIR         = joinpath(ROOT_DIR,"out/")
+TEST_DIR        = joinpath(ROOT_DIR,"test/")
 p_top           = 1e-8
 nlev_centre     = 100
 radius          = 1.0e7    # metres
 gravity         = 10.0      # m s-2
 total  = 0
 failed = 0
+
+fast = false
+if length(ARGS)>0
+    fast = Bool(ARGS[1] == "fast")
+end
+@info "Using fast suite: $fast"
 
 rm(OUT_DIR,force=true,recursive=true)
 if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -618,6 +625,24 @@ total += 1
 atmosphere.deallocate!(atmos)
 @info "--------------------------"
 
+# -------------
+# Run example TOML config file
+# -------------
+if !fast
+    @info " "
+    @info "Testing model with energy-conserving TP solver"
+    cfg = AGNI.open_config(joinpath(TEST_DIR, "test.toml"))
+    succ = AGNI.run_from_config(cfg)
+    if succ
+        @info "Pass"
+    else
+        @warn "Fail"
+        failed += 1
+    end
+    total += 1
+    atmosphere.deallocate!(atmos)
+    @info "--------------------------"
+end
 
 # -------------
 # Inform at end
