@@ -1,5 +1,5 @@
 # AGNI configuration file
-title = "Ocean formation test"
+title = "Unit tests configuration"
 
 [planet]
     tmp_surf        = 1000.0
@@ -60,13 +60,13 @@ title = "Ocean formation test"
 
 
 [plots]
-    at_runtime      = true
-    temperature     = true
-    fluxes          = true
-    contribution    = true
-    emission        = true
-    albedo          = true
-    mixing_ratios   = true
-    animate         = true
-    height          = true
-    cloud           = true
+    at_runtime      = false
+    temperature     = false
+    fluxes          = false
+    contribution    = false
+    emission        = false
+    albedo          = false
+    mixing_ratios   = false
+    animate         = false
+    height          = false
+    cloud           = false

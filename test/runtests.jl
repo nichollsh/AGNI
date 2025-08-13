@@ -30,6 +30,7 @@ fast = false
 if length(ARGS)>0
     fast = Bool(ARGS[1] == "fast")
 end
+@info "Using fast suite: $fast"
 
 rm(OUT_DIR,force=true,recursive=true)
 if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -641,7 +642,7 @@ if !fast
     total += 1
     atmosphere.deallocate!(atmos)
     @info "--------------------------"
-end 
+end
 
 # -------------
 # Inform at end

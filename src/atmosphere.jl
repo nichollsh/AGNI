@@ -376,6 +376,7 @@ module atmosphere
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
                     use_all_gases::Bool =       false,
+                    check_integrity::Bool =     true,
 
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
@@ -711,7 +712,8 @@ module atmosphere
         @info "Loading thermodyamic data"
         for g in atmos.gas_names
             atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
-                                                atmos.thermo_funct, atmos.real_gas)
+                                                atmos.thermo_funct, atmos.real_gas;
+                                                check_integrity=check_integrity)
 
             gas_fail = gas_fail || atmos.gas_dat[g].fail
         end
