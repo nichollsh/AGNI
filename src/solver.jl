@@ -66,19 +66,19 @@ module solver
 
 
             if fx1 < atol
-                @debug "GS search found minimum. $(i+2) function evaluations, best = $x1"
+                # @debug "GS search found minimum. $(i+2) function evaluations, best = $x1"
                 return x1
             end
 
             if fx2 < atol
-                @debug "GS search found minimum. $(i+2) function evaluations, best = $x2"
+                # @debug "GS search found minimum. $(i+2) function evaluations, best = $x2"
                 return x2
             end
 
             midp = 0.5*(a+b)
 
             if abs(b-a) < dxtol
-                @debug "GS search reached minimum bracket size. $(i+2) function evaluations, best = $best"
+                # @debug "GS search reached minimum bracket size. $(i+2) function evaluations, best = $best"
                 return midp
             end
         end
@@ -623,19 +623,19 @@ module solver
             @turbo @. x_old = x_cur
             if (method == 1)
                 # Newton-Raphson step
-                @debug "        NR step"
+                # @debug "        NR step"
                 x_dif = -b\r_cur
                 stepflags *= "Nr-"
 
             elseif method == 2
                 # Gauss-Newton step
-                @debug "        GN step"
+                # @debug "        GN step"
                 x_dif = -(b'*b) \ (b'*r_cur)
                 stepflags *= "Gn-"
 
             elseif method == 3
                 # Levenberg-Marquardt step
-                @debug "        LM step"
+                # @debug "        LM step"
                 #    Calculate damping parameter ("delayed gratification")
                 if r_cur_2nm < r_old_2nm
                     lml /= 5.0
