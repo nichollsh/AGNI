@@ -166,7 +166,7 @@ module chemistry
         # Handle evaporation into lower layers
         if !evap_enabled
 
-            # all condensation goes into ocean, if evap not enabled
+            # all condensation goes into ocean if evap not enabled
             for g in atmos.gas_names
                 atmos.cond_surf[g] = sum(atmos.cond_yield[g])
             end
@@ -270,19 +270,17 @@ module chemistry
             end
         end
 
-        # Calculate layering structure of surface liquid distribution
-        #    Liquids start in ocean basins, then cover entire surface once basins fill
+        # Calculate layering structure of surface liquid distribution.
+        # Liquids start in ocean basins, then cover entire surface once basins fill up.
         if atmos.ocean_calc
-            # work out layering structure
+            # work out surface liq layering structure
             atmos.ocean_layers = ocean.dist_surf_liq(atmos.cond_surf,
                                                         atmos.ocean_ob_frac,
                                                         atmos.ocean_cs_height,
                                                         atmos.rp)
 
-            # calc ocean properties
-            atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
-            atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
-            atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
+            # Ocean properties can be synthesised from `ocean_layers` in a later step.
+            # For now, leave atmos.ocean_depth (etc) unset to improve performance.
         end
 
         return nothing
