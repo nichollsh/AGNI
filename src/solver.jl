@@ -813,7 +813,7 @@ module solver
             @error "    failure (other)"
         end
 
-        # perform one last forward evalulation
+        # perform one last evaluation to set `atmos` given the final `x_cur`
         _fev!(x_cur, zeros(Float64, arr_len))
 
         # calc kzz profile
@@ -829,9 +829,11 @@ module solver
         atmosphere.calc_observed_rho!(atmos)
 
         # calc ocean scalar quantities
-        atmos.ocean_topliq   = ocean.get_topliq(atmos.ocean_layers)
-        atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
-        atmos.ocean_areacov  = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
+        if atmos.ocean_calc
+            atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
+            atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
+            atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
+        end
 
 
         # ----------------------------------------------------------

@@ -523,12 +523,16 @@ module energy
     """
     **Analytical diffusion scheme for condensation and evaporation energy.**
 
+    Updates fluxes. Requires `chemistry.handle_saturation` to be called first.
+
     Integrates from bottom of model upwards. Based on the amount of
     phase change at each level, a phase change flux is calculated by assuming
     a fixed condensation timescale.
 
-    Updates fluxes. Requires `chemistry.handle_saturation` to be called first in the
-    multi-component case.
+    If evaporation is enabled, then integrates from top downwards to determine flux from
+    re-evaporation of droplets
+
+    Any droplets which reach the ground go towards forming an ocean.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
