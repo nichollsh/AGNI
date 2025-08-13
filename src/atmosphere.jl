@@ -6,6 +6,14 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end
 
+"""
+**Main atmosphere module for storing model data**
+
+This module primarily contains the `Atmos_t` struct which does most of the heavy lifting
+in AGNI. There are also functions for setting up and configuring the struct.
+
+Also includes hydrostatic integrator and ways to estimate observable quantities.
+"""
 module atmosphere
 
     # System libraries
@@ -26,7 +34,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.7.1"
+    const AGNI_VERSION::String   = "1.7.2"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -122,10 +130,19 @@ module atmosphere
         gas_sat::Dict{String, Array{Bool, 1}}       # Layer is saturated or cold-trapped
         gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
         cond_yield::Dict{String, Array{Float64,1}}  # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
-        cond_ocean::Dict{String, Float64}           # condensate accumulation after evaporation (implicit surface ocean mass) [kg/m^2]
+        cond_surf::Dict{String, Float64}            # condensate accumulation left after evaporation (implicit surface liquid) [kg/m^2]
         gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
+
+        # Ocean variables (surface liquid layering)
+        ocean_calc::Bool                # INPUT: enable ocean calculations
+        ocean_ob_frac::Float64          # INPUT: ocean basin area, as fraction of planet surface
+        ocean_cs_height::Float64        # INPUT: continental shelf height [m]
+        ocean_layers::Array{Tuple,1}    # OUTPUT: layer structure of surface liquids
+        ocean_maxdepth::Float64         # OUTPUT: ocean depth at deepest part [m]
+        ocean_areacov::Float64          # OUTPUT: fraction of planet surface covered by oceans
+        ocean_topliq::String            # OUTPUT: name of top-most ocean component
 
         # Gases (only those in spectralfile)
         gas_soc_num::Int
@@ -359,6 +376,7 @@ module atmosphere
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
                     use_all_gases::Bool =       false,
+                    check_integrity::Bool =     true,
 
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
@@ -366,6 +384,10 @@ module atmosphere
                     fastchem_xtol::Float64 =    1.0e-4,
 
                     rfm_parfile::String =       "",
+
+                    ocean_calc::Bool =          true,
+                    ocean_ob_frac::Float64 =    0.6,
+                    ocean_cs_height::Float64 =  3000.0
                     )::Bool
 
         if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -546,7 +568,7 @@ module atmosphere
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
         atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation
         atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # dict of condensate yield
-        atmos.cond_ocean =  Dict{String, Float64}()           # dict of ocean masses
+        atmos.cond_surf =  Dict{String, Float64}()           # dict of ocean masses
         atmos.gas_num   =   0                                 # number of gases
         atmos.condensates   =   Array{String}(undef, 0)       # list of condensates
 
@@ -662,7 +684,7 @@ module atmosphere
         for g in atmos.gas_names
             atmos.gas_sat[g]    = falses(atmos.nlev_c)
             atmos.cond_yield[g] = zeros(Float64, atmos.nlev_c)
-            atmos.cond_ocean[g] = 0.0
+            atmos.cond_surf[g] = 0.0
         end
 
         # Check that we actually stored some values
@@ -690,7 +712,8 @@ module atmosphere
         @info "Loading thermodyamic data"
         for g in atmos.gas_names
             atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
-                                                atmos.thermo_funct, atmos.real_gas)
+                                                atmos.thermo_funct, atmos.real_gas;
+                                                check_integrity=check_integrity)
 
             gas_fail = gas_fail || atmos.gas_dat[g].fail
         end
@@ -724,6 +747,15 @@ module atmosphere
             @error "There must be at least one non-condensable gas"
             return false
         end
+
+        # Ocean params
+        atmos.ocean_calc  =     ocean_calc && atmos.condense_any
+        atmos.ocean_ob_frac  =  max(0.0, min(1.0, ocean_ob_frac))
+        atmos.ocean_cs_height = max(0.0, ocean_cs_height)
+        atmos.ocean_maxdepth  = 0.0
+        atmos.ocean_areacov   = 0.0
+        atmos.ocean_topliq    = "_unset"
+        atmos.ocean_layers    = Tuple[(1,"_unset",0.0,0.0),]
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to
