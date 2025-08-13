@@ -523,9 +523,6 @@ module AGNI
         @info "    done"
         @info "Total SOCRATES evaluations: $(atmos.num_rt_eval)"
 
-        # Fill Kzz in remaining regions
-        energy.fill_Kzz!(atmos)
-
         # RFM calculation?
         if atmos.flag_rfm
             @info "Running RFM line-by-line radiative transfer..."
@@ -538,6 +535,10 @@ module AGNI
             if atmos.cond_surf[c] > 1e-20
                 @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.cond_surf[c])
             end
+        end
+        if atmos.ocean_calc
+            @info @sprintf("Oceans cover %d%% of area, max depth of %g km",
+                                atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
         end
 
         # Write arrays

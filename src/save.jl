@@ -166,9 +166,9 @@ module save
             var_specfile =  defVar(ds, "specfile"      ,String,  ())     # Path to spectral file when read
             var_starfile =  defVar(ds, "starfile"      ,String,  ())     # Path to star file when read
             var_flux_sns =  defVar(ds, "fl_sens"       ,Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Surface sensible heat flux [W m-2]
-            var_octop  =    defVar(ds, "oceans_topliq" ,String,  ())                                          # Name of liquid making up top-most ocean layer
-            var_ocdepth  =  defVar(ds, "oceans_maxdepth",Float64,(), attrib = OrderedDict("units" => "m"))    # Deepest part of ocean [m]
-            var_ocarea =    defVar(ds, "oceans_areafrac",Float64, ())                                         # Ocean area-fraction
+            var_octop  =    defVar(ds, "ocean_topliq" , String,  ())                                          # Name of liquid making up top-most ocean layer
+            var_ocdepth  =  defVar(ds, "ocean_maxdepth",Float64, (), attrib = OrderedDict("units" => "m"))    # Deepest part of ocean [m]
+            var_ocarea =    defVar(ds, "ocean_areafrac",Float64, ())                                          # Ocean area-fraction
 
             #     Store data
             var_max_cff_p[1] =  atmos.transspec_p

@@ -19,6 +19,7 @@ module solver
     import ..phys
     import ..plotting
     import ..chemistry
+    import ..ocean
 
     """
     **Golden section search algorithm**
@@ -812,11 +813,26 @@ module solver
             @error "    failure (other)"
         end
 
+        # perform one last forward evalulation
         _fev!(x_cur, zeros(Float64, arr_len))
+
+        # calc kzz profile
         energy.fill_Kzz!(atmos)
+
+        # calc heating rate profile
         energy.calc_hrates!(atmos)
-        energy.radtrans!(atmos, true, calc_cf=true)       # calculate LW radtrans with contfunc
+
+        # calc LW contribution function
+        energy.radtrans!(atmos, true, calc_cf=true)
+
+        # calc radius of photosphere, and correspondingly the bulk density of the planet
         atmosphere.calc_observed_rho!(atmos)
+
+        # calc ocean scalar quantities
+        atmos.ocean_topliq   = ocean.get_topliq(atmos.ocean_layers)
+        atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
+        atmos.ocean_areacov  = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
+
 
         # ----------------------------------------------------------
         # Print info
