@@ -817,4 +817,21 @@ module phys
         end
     end
 
+    """
+    **Calculate thermal diffusivity.**
+
+    https://en.wikipedia.org/wiki/Thermal_diffusivity?useskin=vector
+
+    Arguments:
+    - `k::Float64`       Thermal conductivity [W m-1 K-1]
+    - `ρ::Float64`       Density [kg m-3]
+    - `cp::Float64`      Specific heat capacity [J K-1 kg-1]
+
+    Returns:
+    - `α::Float64`       Thermal diffusivity [m2 s-1]
+    """
+    function calc_therm_diffus(k::Float64, ρ::Float64, cp::Float64)::Float64
+        return k / (ρ * cp)
+    end
+
 end # end module

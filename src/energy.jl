@@ -363,6 +363,8 @@ module energy
         fill!(atmos.mask_c,     false)
         fill!(atmos.flux_cdry,  0.0)
         fill!(atmos.Kzz,        0.0)
+        fill!(atmos.λ_conv,     0.0)
+        fill!(atmos.w_conv,     0.0)
 
         # Work variables
         Hp::Float64 = 0.0; λ::Float64 = 0.0; w::Float64 = 0.0
@@ -427,27 +429,29 @@ module energy
                 # Calculate the mixing length
                 if !atmos.mlt_asymptotic
                     # Fixed
-                    λ = phys.αMLT * Hp
+                    atmos.λ_conv[i] = phys.αMLT * Hp
                 else
                     # Asymptotic
                     hgt = atmos.rl[i] - atmos.rp # height above the ground
-                    λ = phys.k_vk * hgt / (1 + phys.k_vk * hgt/(phys.αMLT*Hp))
+                    atmos.λ_conv[i] = phys.k_vk * hgt / (1 + phys.k_vk * hgt/(phys.αMLT*Hp))
                 end
 
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel)
-                w = λ * sqrt(grav/Hp * staby)
+                atmos.w_conv[i] = atmos.λ_conv[i] * sqrt(grav/Hp * staby)
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (λ/Hp) * staby
+                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (atmos.λ_conv[i]/Hp) * staby
 
                 # Convection eddy diffusion coefficient [m2 s-1]
-                atmos.Kzz[i] = w * λ
+                atmos.Kzz[i] =  atmos.w_conv[i] * atmos.λ_conv[i]
 
             end
         end
 
-        # Set surface Kzz
-        atmos.Kzz[end] = atmos.Kzz[end-1]
+        # Set surface quantities
+        atmos.Kzz[end]    = atmos.Kzz[end-1]
+        atmos.w_conv[end] = atmos.w_conv[end-1]
+        atmos.λ_conv[end] = atmos.λ_conv[end-1]
 
         # Check for spurious shallow convection occuring ABOVE condensing regions
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.

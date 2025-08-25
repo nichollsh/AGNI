@@ -316,6 +316,7 @@ module AGNI
 
         #    solver stuff
         incl_convect::Bool     = cfg["execution"]["convection"]
+        incl_conduct::Bool     = cfg["execution"]["conduction"]
         incl_sens::Bool        = cfg["execution"]["sensible_heat"]
         incl_latent::Bool      = cfg["execution"]["latent_heat"]
         sol_type::Int          = cfg["execution"]["solution_type"]
@@ -430,9 +431,6 @@ module AGNI
             rm(atmos.FRAMES_DIR,force=true,recursive=true)
             mkdir(atmos.FRAMES_DIR)
         end
-
-        # Solver variables
-        incl_conduct::Bool = false
 
         # Loop over requested solvers
         solver_success::Bool = true

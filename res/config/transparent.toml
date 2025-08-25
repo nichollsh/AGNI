@@ -38,6 +38,7 @@ title = "Transparent atmosphere"
     real_gas        = false
     thermo_funct    = false
     sensible_heat   = false
+    conduction      = true
     latent_heat     = false
     convection      = false
     convection_crit = "s"
