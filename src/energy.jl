@@ -498,7 +498,7 @@ module energy
         i_cnvct_top::Int = i_cnvct_bot
         atmos.Kzz_pbreak = min(1e5, atmos.pl[end])
         atmos.Kzz_kbreak = atmos.Kzz_floor
-        @inbounds for i in range(start=i_cnvct_bot, step=-1, stop=1)
+        for i in range(start=i_cnvct_bot, step=-1, stop=1)
             if (atmos.flux_cdry[i] < Fthresh) && (atmos.flux_cdry[i+1] > Fthresh)
                 i_cnvct_top = i
             end
