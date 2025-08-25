@@ -374,18 +374,18 @@ module solver
                 if central
                     if order == 4
                         # 4th order central difference
-                        @turbo @. jacob[:,i] = (-rf2 + 8.0*rf1 - 8.0*rb1 + rb2)/(12.0*fd_s)
+                        @. jacob[:,i] = (-rf2 + 8.0*rf1 - 8.0*rb1 + rb2)/(12.0*fd_s)
                     else
                         # 2nd order central difference
-                        @turbo @. jacob[:,i] = (rf1 - rb1)/(2.0*fd_s)
+                        @. jacob[:,i] = (rf1 - rb1)/(2.0*fd_s)
                     end
                 else
                     if order == 4
                         # 4th order forward difference
-                        @turbo @. jacob[:,i] = (-rf2 + 4.0*rf1 - 3.0*resid)/(2.0*fd_s)
+                        @. jacob[:,i] = (-rf2 + 4.0*rf1 - 3.0*resid)/(2.0*fd_s)
                     else
                         # 2nd order forward difference
-                        @turbo @. jacob[:,i] = (rf1 - resid)/fd_s
+                        @. jacob[:,i] = (rf1 - resid)/fd_s
                     end
                 end # end central/forward
             end # end levels
@@ -824,6 +824,11 @@ module solver
 
         # calc LW contribution function
         energy.radtrans!(atmos, true, calc_cf=true)
+
+        # calc diagnostic quantities
+        atmosphere.estimate_Ra!(atmos)
+        atmosphere.estimate_timescale_conv!(atmos)
+        atmosphere.estimate_timescale_rad!(atmos)
 
         # calc radius of photosphere, and correspondingly the bulk density of the planet
         atmosphere.calc_observed_rho!(atmos)

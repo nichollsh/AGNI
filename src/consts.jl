@@ -45,7 +45,7 @@ module consts
     export αMLT
 
     # Convection beta parameter for obtaining Ra, dimensionless
-    const βRa::Float64 = 0.25
+    const βRa::Float64 = 0.3
     export βRa
 
     # Newton's gravitational constant [m3 kg-1 s-2]
