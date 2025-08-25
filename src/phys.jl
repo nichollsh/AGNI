@@ -81,8 +81,9 @@ module phys
         cap_C::Array{Float64,1}     # Corresponding Cp values [J K-1 kg-1]
         cap_I::Extrapolation        # 1D linear interpolator-extrapolator
 
-        # Thermal conductivity
-        kc::Float64                 # Constant conductivity [J K-1 kg-1]
+        # Particle mass [kg] and diameter [m]
+        particle_m::Float64
+        particle_d::Float64
 
         # Plotting colour (hex code) and label
         plot_color::String
@@ -133,15 +134,18 @@ module phys
         gas.plot_color = _pretty_color(formula)
         gas.plot_label = _pretty_name(formula)
 
-        # Thermal conductivity
-        gas.kc = 0.0
-
         # Fastchem name (to be learned later)
         gas.fastchem_name = "_unknown"
 
         # Default parameters, assuming we have no data...
         gas.mmw = _get_mmw(formula)
         gas.JANAF_name = "_unknown"
+
+        # Calculate particle mass [kg], taking mmw as atomic mass units
+        gas.particle_m = gas.mmw * 1e3 * proton_mass
+
+        # Set fixed particle diameter [m]
+        gas.particle_d = 2e-10
 
         # heat capacity set to zero
         gas.cap_T = [0.0, BIGFLOAT]
@@ -641,10 +645,13 @@ module phys
         return gas.cap_I(t)
     end
 
+    # Constant prefactor used in `get_Kc`
+    const kc_prefactor::Float64 = 2.0 * (5 * k_B / 2) / (3 * pi^1.5)
+
     """
     **Get gas thermal conductivity at a given temperature.**
 
-    This is always set to zero - not yet implemented.
+    This assumes that the gas is within the ideal regime.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -653,8 +660,19 @@ module phys
     Returns:
     - `kc::Float64`             thermal conductivity [W m-1 K-1]
     """
-    function get_Kc(gas::Gas_t, t::Float64=-1.0)::Float64
-        return gas.kc
+    function get_Kc(gas::Gas_t, t::Float64)::Float64
+
+        # Constant value
+        if !gas.tmp_dep
+            t = zero_celcius
+        end
+
+        # Temperature floor to avoid sqrt of negative number
+        t = max(t, 0.0)
+
+        # Equation 5.255 from
+        #     https://farside.ph.utexas.edu/teaching/355/Surveyhtml/node221.html
+        return kc_prefactor * sqrt(k_B * t / gas.particle_m) / gas.particle_d^2
     end
 
     """
