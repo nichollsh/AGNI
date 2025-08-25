@@ -1976,13 +1976,13 @@ module atmosphere
 
         # Thermal diffusivity array
         κ::Array{Float64,1} = zero(atmos.layer_cp)
-        @turbo @. κ = phys.calc_therm_diffus(atmos.layer_kc, atmos.layer_ρ, atmos.layer_cp)
+        @. κ = phys.calc_therm_diffus(atmos.layer_kc, atmos.layer_ρ, atmos.layer_cp)
 
         # One over beta
         ooβ::Float64 = 1.0 / phys.βRa
 
         # Estimate Rayleigh number
-        @turbo @. atmos.diagnostic_Ra = ( atmos.w_conv * atmos.λ_conv / $κ) ^ $ooβ
+        @. atmos.diagnostic_Ra = ( atmos.w_conv * atmos.λ_conv / $κ) ^ $ooβ
 
         return nothing
     end
@@ -2016,7 +2016,7 @@ module atmosphere
     """
     function estimate_timescale_conv!(atmos::atmosphere.Atmos_t)
 
-        @turbo @. atmos.timescale_conv = atmos.λ_conv / max(atmos.w_conv, 1e-300)
+        @. atmos.timescale_conv = atmos.λ_conv / max(atmos.w_conv, 1e-300)
 
         return nothing
     end
