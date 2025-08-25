@@ -34,7 +34,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.7.2"
+    const AGNI_VERSION::String   = "1.7.3"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -201,15 +201,17 @@ module atmosphere
         flux_sens::Float64                  # Turbulent flux
 
         # Convection
-        mask_c::Array{Bool,1}               # Layers transporting convective flux
-        flux_cdry::Array{Float64,1}         # Dry convective fluxes from MLT
-        Kzz::Array{Float64,1}               # Eddy diffusion coefficient from MLT
-        Kzz_floor::Float64                  # Kzz floor [m2 s-1]
-        Kzz_ceiling::Float64                # Kzz ceiling [m2 s-1]
-        Kzz_pbreak::Float64                 # Kzz break point pressure [Pa]
-        Kzz_kbreak::Float64                 # Kzz break point diffusion [m2 s-1]
-        mlt_asymptotic::Bool                # Mixing length scales asymptotically, but ~0 near ground
-        mlt_criterion::Char                 # Stability criterion. Options: (s)chwarzschild, (l)edoux
+        mlt_asymptotic::Bool                # INPUT: Mixing length scales asymptotically, but ~0 near ground
+        mlt_criterion::Char                 # INPUT: Stability criterion. Options: (s)chwarzschild, (l)edoux
+        Kzz_floor::Float64                  # INPUT: Kzz floor [m2 s-1]
+        Kzz_ceiling::Float64                # INPUT: Kzz ceiling [m2 s-1]
+        Kzz_pbreak::Float64                 # INPUT: Kzz break point pressure [Pa]
+        Kzz_kbreak::Float64                 # INPUT: Kzz break point diffusion [m2 s-1]
+        mask_c::Array{Bool,1}               # OUT: Layers transporting convective flux
+        flux_cdry::Array{Float64,1}         # OUT: Dry convective fluxes from MLT
+        Kzz::Array{Float64,1}               # OUT: Eddy diffusion coefficient from MLT
+        w_conv::Array{Float64,1}            # OUT: Convective velocities [m s-1]
+        λ_conv::Array{Float64,1}            # OUT: Mixing lengths [m s-1]
 
         # Conduction
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
@@ -240,6 +242,11 @@ module atmosphere
 
         # Heating rate felt at each level [K/day]
         heating_rate::Array{Float64,1}
+
+        # Diagnostic profiles
+        timescale_conv::Array{Float64,1}    # Convective timescale [s]
+        timescale_rad::Array{Float64,1}     # Radiative timescale [s]
+        diagnostic_Ra::Array{Float64,1}     # Rayleigh number at each layer
 
         # FastChem equilibrium chemistry
         flag_fastchem::Bool             # Fastchem enabled?
@@ -1185,7 +1192,6 @@ module atmosphere
         return nothing
     end
 
-
     """
     **Generate pressure grid.**
 
@@ -1371,8 +1377,8 @@ module atmosphere
             atmos.bands_min[i] = atmos.spectrum.Basic.wavelength_short[i]
             atmos.bands_max[i] = atmos.spectrum.Basic.wavelength_long[i]
         end
-        @turbo @. atmos.bands_cen = 0.5 * (atmos.bands_max + atmos.bands_min)
-        @turbo @. atmos.bands_wid = abs(atmos.bands_max - atmos.bands_min)
+        @. atmos.bands_cen = 0.5 * (atmos.bands_max + atmos.bands_min)
+        @. atmos.bands_wid = abs(atmos.bands_max - atmos.bands_min)
 
         # modules_gen/dimensions_field_cdf_ucf.f90
         npd_direction = 1                   # Maximum number of directions for radiances
@@ -1812,14 +1818,20 @@ module atmosphere
         atmos.phs_wrk_df =        zeros(Float64, atmos.nlev_c)  # flux difference
         atmos.phs_wrk_fl =        zeros(Float64, atmos.nlev_l)  # edge fluxes
         atmos.flux_l =            zeros(Float64, atmos.nlev_l)  # Latent heat / phase change
-        atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection
         atmos.flux_cdct =         zeros(Float64, atmos.nlev_l)  # Conduction
+
+        atmos.flux_cdry =         zeros(Float64, atmos.nlev_l)  # Dry convection
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)  # eddy diffusion coeff [m2 s-1]
+        atmos.w_conv =            zeros(Float64, atmos.nlev_l)  # convective velocity [m s-1]
+        atmos.λ_conv =            zeros(Float64, atmos.nlev_l)  # mixing length [m]
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
         atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
+        atmos.timescale_conv =    zeros(Float64, atmos.nlev_c)
+        atmos.timescale_rad =     zeros(Float64, atmos.nlev_c)
+        atmos.diagnostic_Ra =     zeros(Float64, atmos.nlev_c)
 
         # RFM values will be overwritten at runtime
         atmos.rfm_npts =          4
@@ -1833,18 +1845,17 @@ module atmosphere
         return true
     end  # end of allocate
 
+    """
+    **Set atmosphere properties such that it is effectively transparent.**
 
+    This will modify the surface pressure and disable gas opacity in SOCRATES.
+    These changes cannot be reversed directly. To undo them, it is best to create and
+    allocate a new atmosphere struct.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    """
     function make_transparent!(atmos::atmosphere.Atmos_t)
-        """
-        **Set atmosphere properties such that it is effectively transparent.**
-
-        This will modify the surface pressure and disable gas opacity in SOCRATES.
-        These changes cannot be reversed directly. To undo them, it is best to create and
-        allocate a new atmosphere struct.
-
-        Arguments:
-        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-        """
 
         # Turn off clouds
         fill!(atmos.cloud_arr_r, 0.0)
@@ -1899,7 +1910,7 @@ module atmosphere
         itp = extrapolate( interpolate( (log10.(atmos.p[:]),),
                                         atmos.tmp,Gridded(Linear())
                                         ),Line())
-        atmos.tmpl[:] .= itp.(log10.(atmos.pl))
+        @. atmos.tmpl = itp(log10(atmos.pl))
 
         # Clamp
         clamp!(atmos.tmpl, atmos.tmp_floor, atmos.tmp_ceiling)
@@ -1907,7 +1918,17 @@ module atmosphere
         return nothing
     end
 
-    # Get interleaved cell-centre and cell-edge PTR grid
+    """
+    **Get interleaved cell-centre and cell-edge PTR grid.**
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+
+    Returns:
+    - `arr_P::Array`        pressure array [Pa]
+    - `arr_T::Array`        temperature array [K]
+    - `arr_R::Array`        radius array [m]
+    """
     function get_interleaved_ptr(atmos::atmosphere.Atmos_t)
         arr_R::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         arr_T::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
@@ -1938,6 +1959,70 @@ module atmosphere
         arr_P[end] = atmos.pl[end]
 
         return arr_P, arr_T, arr_R
+    end
+
+    """
+    **Estimate a diagnostic Rayleigh number in each layer.**
+
+    Assuming that the Rayleigh number scales like `Ra ~ (wλ/κ)^(1/β)`
+    Where `κ` is the thermal diffusivity and `β` is the convective beta parameter.
+
+    This quantity must be taken lightly.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function estimate_Ra!(atmos::atmosphere.Atmos_t)
+
+        # Thermal diffusivity array
+        κ::Array{Float64,1} = zero(atmos.layer_cp)
+        @. κ = phys.calc_therm_diffus(atmos.layer_kc, atmos.layer_ρ, atmos.layer_cp)
+
+        # One over beta
+        ooβ::Float64 = 1.0 / phys.βRa
+
+        # Estimate Rayleigh number
+        @inbounds for i in 1:atmos.nlev_c
+            atmos.diagnostic_Ra[i] = ( atmos.w_conv[i] * atmos.λ_conv[i] / κ[i]) ^ ooβ
+        end
+
+        return nothing
+    end
+
+    """
+    **Estimate a diagnostic radiative timescale in each layer.**
+
+    This quantity must be taken lightly.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function estimate_timescale_rad!(atmos::atmosphere.Atmos_t)
+
+        # Equation 10.1 from Seager textbook
+        @inbounds for i in 1:atmos.nlev_c
+            atmos.timescale_rad[i] = atmos.layer_cp[i] * (atmos.pl[i+1] - atmos.pl[i]) /
+                                     (atmos.layer_grav[i] * 4 * phys.σSB * atmos.tmp[i])
+        end
+
+        return nothing
+    end
+
+    """
+    **Estimate a diagnostic convective timescale in each layer.**
+
+    This quantity must be taken lightly.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function estimate_timescale_conv!(atmos::atmosphere.Atmos_t)
+
+        @inbounds for i in 1:atmos.nlev_c
+            atmos.timescale_conv[i] = atmos.λ_conv[i] / max(atmos.w_conv[i], 1e-300)
+        end
+
+        return nothing
     end
 
 end

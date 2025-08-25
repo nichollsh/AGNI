@@ -316,6 +316,7 @@ module AGNI
 
         #    solver stuff
         incl_convect::Bool     = cfg["execution"]["convection"]
+        incl_conduct::Bool     = cfg["execution"]["conduction"]
         incl_sens::Bool        = cfg["execution"]["sensible_heat"]
         incl_latent::Bool      = cfg["execution"]["latent_heat"]
         sol_type::Int          = cfg["execution"]["solution_type"]
@@ -431,9 +432,6 @@ module AGNI
             mkdir(atmos.FRAMES_DIR)
         end
 
-        # Solver variables
-        incl_conduct::Bool = false
-
         # Loop over requested solvers
         solver_success::Bool = true
         return_success::Bool = true
@@ -502,7 +500,7 @@ module AGNI
 
         # Print information about ocean formation, if any
         for c in atmos.condensates
-            if atmos.cond_surf[c] > 1e-20
+            if atmos.cond_surf[c] > eps(0.0)
                 @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.cond_surf[c])
             end
         end

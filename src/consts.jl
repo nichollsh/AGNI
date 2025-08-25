@@ -44,13 +44,21 @@ module consts
     const αMLT::Float64 = 1.0
     export αMLT
 
+    # Convection beta parameter for obtaining Ra, dimensionless
+    const βRa::Float64 = 0.3
+    export βRa
+
     # Newton's gravitational constant [m3 kg-1 s-2]
     const G_grav::Float64 = 6.67430e-11 # NIST CODATA
     export G_grav
 
     # Specific heat capacity for ideal gas [J mol-1 K-1]
-    const Cp_ideal::Float64 = 29.10   # = 7/2 R_gas, assuming that it is diatomic
+    const Cp_ideal::Float64 = R_gas * 7/2 # assuming that it is diatomic
     export Cp_ideal
+
+    # Proton mass [kg]
+    const proton_mass::Float64 = 1.67262192595e-27 # NIST CODATA
+    export proton_mass
 
     # List of elements included in the model
     const elems_standard::Array{String,1} = ["H","C","N","O","S","P","He",

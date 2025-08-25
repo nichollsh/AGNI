@@ -38,6 +38,7 @@ title = "Cloud radiative properties test"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = false
+    conduction      = true
     latent_heat     = false
     convection      = true
     convection_crit = "s"
