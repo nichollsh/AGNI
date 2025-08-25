@@ -42,6 +42,7 @@ title = "L 98-59 d"
     real_gas        = true
     thermo_funct    = true
     sensible_heat   = true
+    conduction      = true
     latent_heat     = true
     convection      = true
     convection_crit = "s"

@@ -44,6 +44,7 @@ title = "Unit tests configuration"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
+    conduction      = true
     latent_heat     = true
     convection      = true
     convection_crit = "l"

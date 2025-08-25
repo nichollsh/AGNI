@@ -305,7 +305,7 @@ module energy
         # bulk layers
         @inbounds for i in 2:atmos.nlev_l-1
             atmos.flux_cdct[i] = atmos.layer_kc[i] * (atmos.tmp[i]-atmos.tmp[i-1]) /
-                                                        (atmos.r[i-1]-atmos.r[i])
+                                                        atmos.layer_thick[i]
         end
 
         # bottom layer
@@ -363,6 +363,8 @@ module energy
         fill!(atmos.mask_c,     false)
         fill!(atmos.flux_cdry,  0.0)
         fill!(atmos.Kzz,        0.0)
+        fill!(atmos.λ_conv,     0.0)
+        fill!(atmos.w_conv,     0.0)
 
         # Work variables
         Hp::Float64 = 0.0; λ::Float64 = 0.0; w::Float64 = 0.0
@@ -427,27 +429,29 @@ module energy
                 # Calculate the mixing length
                 if !atmos.mlt_asymptotic
                     # Fixed
-                    λ = phys.αMLT * Hp
+                    atmos.λ_conv[i] = phys.αMLT * Hp
                 else
                     # Asymptotic
                     hgt = atmos.rl[i] - atmos.rp # height above the ground
-                    λ = phys.k_vk * hgt / (1 + phys.k_vk * hgt/(phys.αMLT*Hp))
+                    atmos.λ_conv[i] = phys.k_vk * hgt / (1 + phys.k_vk * hgt/(phys.αMLT*Hp))
                 end
 
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel)
-                w = λ * sqrt(grav/Hp * staby)
+                atmos.w_conv[i] = atmos.λ_conv[i] * sqrt(grav/Hp * staby)
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (λ/Hp) * staby
+                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (atmos.λ_conv[i]/Hp) * staby
 
                 # Convection eddy diffusion coefficient [m2 s-1]
-                atmos.Kzz[i] = w * λ
+                atmos.Kzz[i] =  atmos.w_conv[i] * atmos.λ_conv[i]
 
             end
         end
 
-        # Set surface Kzz
-        atmos.Kzz[end] = atmos.Kzz[end-1]
+        # Set surface quantities
+        atmos.Kzz[end]    = atmos.Kzz[end-1]
+        atmos.w_conv[end] = atmos.w_conv[end-1]
+        atmos.λ_conv[end] = atmos.λ_conv[end-1]
 
         # Check for spurious shallow convection occuring ABOVE condensing regions
         #    If found, reset convective flux to zero AT THIS LAYER ONLY.
@@ -484,8 +488,8 @@ module energy
 
         # Find bottom of convective region (looping downwards)
         i_cnvct_bot::Int = atmos.nlev_l
-        @inbounds for i in 1:atmos.nlev_l-1
-            if (atmos.flux_cdry[i+1] < Fthresh) && (atmos.flux_cdry[i] > Fthresh)
+        @inbounds for i in 1:atmos.nlev_l
+            if atmos.flux_cdry[i] > Fthresh
                 i_cnvct_bot = i
             end
         end
@@ -494,19 +498,19 @@ module energy
         i_cnvct_top::Int = i_cnvct_bot
         atmos.Kzz_pbreak = min(1e5, atmos.pl[end])
         atmos.Kzz_kbreak = atmos.Kzz_floor
-        @inbounds for i in range(start=i_cnvct_bot, step=-1, stop=1)
-            if (atmos.flux_cdry[i] < Fthresh) && (atmos.flux_cdry[i+1] > Fthresh)
+        for i in range(start=i_cnvct_bot, step=-1, stop=1)
+            if atmos.flux_cdry[i] > Fthresh
                 i_cnvct_top = i
             end
         end
 
         # Store breakpoint values
         atmos.Kzz_pbreak = atmos.pl[i_cnvct_top]
-        atmos.Kzz_kbreak = maximum(atmos.Kzz[i_cnvct_top:end])
+        atmos.Kzz_kbreak = atmos.Kzz[i_cnvct_top]
 
         # Set Kzz within and below convective region to constant value. This value best
         #    represents the diffusive mixing in this region.
-        atmos.Kzz[i_cnvct_top:end] .= atmos.Kzz_kbreak
+        atmos.Kzz[i_cnvct_bot:end] .= atmos.Kzz[i_cnvct_bot]
 
         # Extend Kzz in stratosphere based on power-law scaling.
         #   See equation 28 in Tsai+2020
