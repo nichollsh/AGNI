@@ -34,6 +34,7 @@ res/thermodynamics/*.nc.chk
 index.html
 
 # Output files
+test/out/
 out/*
 runtime.sf
 runtime.sf_k

@@ -1982,7 +1982,9 @@ module atmosphere
         ooβ::Float64 = 1.0 / phys.βRa
 
         # Estimate Rayleigh number
-        @. atmos.diagnostic_Ra = ( atmos.w_conv * atmos.λ_conv / $κ) ^ $ooβ
+        @inbounds for i in 1:atmos.nlev_c
+            atmos.diagnostic_Ra[i] = ( atmos.w_conv[i] * atmos.λ_conv[i] / κ[i]) ^ ooβ
+        end
 
         return nothing
     end
@@ -2016,7 +2018,9 @@ module atmosphere
     """
     function estimate_timescale_conv!(atmos::atmosphere.Atmos_t)
 
-        @. atmos.timescale_conv = atmos.λ_conv / max(atmos.w_conv, 1e-300)
+        @inbounds for i in 1:atmos.nlev_c
+            atmos.timescale_conv[i] = atmos.λ_conv[i] / max(atmos.w_conv[i], 1e-300)
+        end
 
         return nothing
     end

@@ -180,7 +180,7 @@ module chemistry
                 atmos.cond_surf[c] = 0.0
 
                 # no rain? go to next condensable
-                if sum(atmos.cond_yield[c]) < 1.0e-10
+                if sum(atmos.cond_yield[c]) < eps(1.0)
                     continue
                 end
 
@@ -197,7 +197,7 @@ module chemistry
                     # in a dry layer...
 
                     # skip if no rain entering from above
-                    if atmos.cond_surf[c] < 1e-10
+                    if atmos.cond_surf[c] < eps(1.0)
                         continue
                     end
 

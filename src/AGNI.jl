@@ -500,7 +500,7 @@ module AGNI
 
         # Print information about ocean formation, if any
         for c in atmos.condensates
-            if atmos.cond_surf[c] > 1e-20
+            if atmos.cond_surf[c] > eps(0.0)
                 @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.cond_surf[c])
             end
         end
