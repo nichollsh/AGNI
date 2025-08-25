@@ -305,7 +305,7 @@ module energy
         # bulk layers
         @inbounds for i in 2:atmos.nlev_l-1
             atmos.flux_cdct[i] = atmos.layer_kc[i] * (atmos.tmp[i]-atmos.tmp[i-1]) /
-                                                        (atmos.r[i-1]-atmos.r[i])
+                                                        atmos.layer_thick[i]
         end
 
         # bottom layer
