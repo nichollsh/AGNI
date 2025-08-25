@@ -488,8 +488,8 @@ module energy
 
         # Find bottom of convective region (looping downwards)
         i_cnvct_bot::Int = atmos.nlev_l
-        @inbounds for i in 1:atmos.nlev_l-1
-            if (atmos.flux_cdry[i+1] < Fthresh) && (atmos.flux_cdry[i] > Fthresh)
+        @inbounds for i in 1:atmos.nlev_l
+            if atmos.flux_cdry[i] > Fthresh
                 i_cnvct_bot = i
             end
         end
@@ -499,18 +499,18 @@ module energy
         atmos.Kzz_pbreak = min(1e5, atmos.pl[end])
         atmos.Kzz_kbreak = atmos.Kzz_floor
         for i in range(start=i_cnvct_bot, step=-1, stop=1)
-            if (atmos.flux_cdry[i] < Fthresh) && (atmos.flux_cdry[i+1] > Fthresh)
+            if atmos.flux_cdry[i] > Fthresh
                 i_cnvct_top = i
             end
         end
 
         # Store breakpoint values
         atmos.Kzz_pbreak = atmos.pl[i_cnvct_top]
-        atmos.Kzz_kbreak = maximum(atmos.Kzz[i_cnvct_top:end])
+        atmos.Kzz_kbreak = atmos.Kzz[i_cnvct_top]
 
         # Set Kzz within and below convective region to constant value. This value best
         #    represents the diffusive mixing in this region.
-        atmos.Kzz[i_cnvct_top:end] .= atmos.Kzz_kbreak
+        atmos.Kzz[i_cnvct_bot:end] .= atmos.Kzz[i_cnvct_bot]
 
         # Extend Kzz in stratosphere based on power-law scaling.
         #   See equation 28 in Tsai+2020

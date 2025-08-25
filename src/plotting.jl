@@ -207,7 +207,7 @@ module plotting
             gas = atmos.gas_names[i]
 
             # store surface value
-            gas_xsurf[i] = log10(clamp(atmos.gas_vmr[gas][end],1e-100, 1e100))
+            gas_xsurf[i] = log10(clamp(atmos.gas_vmr[gas][end], eps(0.0), phys.BIGFLOAT))
         end
 
         num_plotted::Int = 0
@@ -225,7 +225,7 @@ module plotting
             # Get data
             gas = atmos.gas_names[i]
             @. arr_x = atmos.gas_vmr[gas]
-            if minimum(arr_x) < 1e-90
+            if minimum(arr_x) < eps(0.0)
                 continue
             end
             @. arr_x = log10(arr_x)
