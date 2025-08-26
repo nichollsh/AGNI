@@ -256,7 +256,7 @@ module chemistry
         atmosphere.calc_layer_props!(atmos)
 
         # Set water clouds at levels where condensation occurs
-        if ("H2O" in atmos.condensates) && atmos.control.l_cloud
+        if "H2O" in atmos.condensates
             for i in 1:atmos.nlev_c-1
                 if atmos.cond_yield["H2O"][i] > 0.0
                     # liquid water content (take ratio of mass surface densities [kg/m^2])

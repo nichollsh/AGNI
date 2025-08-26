@@ -135,9 +135,15 @@ module energy
         # Cloud information
         ###################################################
 
-        atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]    # Total cloud area fraction in layers
-        atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]    # Mass mixing ratios of condensate
-        atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]    # Characteristic dimensions of condensed species
+        if atmos.control.l_cloud
+            atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]    # Total cloud area fraction in layers
+            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]    # Mass mixing ratios of condensate
+            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]    # Characteristic dimensions of condensed species
+        else
+            atmos.cld.w_cloud[1,:]               .= 0.0
+            atmos.cld.condensed_mix_ratio[1,:,1] .= 0.0
+            atmos.cld.condensed_dim_char[1,:,1]  .= 0.0
+        end
 
         ###################################################
         # Treatment of scattering

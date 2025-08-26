@@ -24,7 +24,6 @@ title = "K2-18 b, mixed"
     p_surf          = 10e3
     p_top           = 1e-5
     vmr_dict        = { H2O=0.424, H2=0.433, CO2=0.0715, CH4=0.0715 }
-    vmr_file        = ""
     chemistry       = 0
     condensates     = ["H2O","CO2","CH4"]
 
