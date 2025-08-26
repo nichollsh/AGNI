@@ -115,7 +115,7 @@ Atmospheric composition and chemistry.
 | `p_dict        `  | Dictionary of gas partial surface pressures [bar]. Summed to obtain `p_surf`. |
 | `p_surf        `  | Total surface pressure [bar]. Incompatible with `p_dict`.|
 | `vmr_dict      `  | Gas volume mixing ratios (=mole fractions) at the surface. Must be set alongside `p_surf`. |
-| `vmr_file      `  | Path to a file containing mixing ratio profiles. Replaces `vmr_dict`. |
+| `vmr_file      `  | Path to a file containing mixing ratio profiles. Replaces `vmr_dict`. Must be set alongside `p_surf`. |
 | `chemistry     `  | Type of chemistry to be used (see below). |
 | `condensates   `  | List of volatiles which are allowed to condense. Incompatible with `chemistry > 0`. |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |

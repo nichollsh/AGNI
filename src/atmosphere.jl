@@ -34,7 +34,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.7.3"
+    const AGNI_VERSION::String   = "1.7.4"
     const HYDROGRAV_STEPS::Int64 = 40
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -612,40 +612,47 @@ module atmosphere
             mf_head::String =   readline(abspath(mf_path))
 
             # remove comment symbol at start
-            mf_head =           mf_head[2:end]
+            mf_head = mf_head[2:end]
 
             # remove whitespace
-            mf_head =            replace(mf_head, " " => "")
+            mf_head = replace(mf_head, " " => "")
 
             # split by column and drop first three
-            heads::Array{String,1} = split(mf_head, ",")[4:end]
-
-            # create arrays
-            for h in heads
-                gas_valid = strip(h, [' ','\t','\n'])
-                # Check if repeated
-                if !(gas_valid in atmos.gas_names)
-                    # Store zero VMR for now
-                    atmos.gas_vmr[gas_valid] = zeros(Float64, atmos.nlev_c)
-                    push!(atmos.gas_names, gas_valid)
-                    atmos.gas_num += 1
-                end
-            end
+            heads::Array{String,1} = split(mf_head, ",")[1:end]
 
             # get body
             mf_body::Array{Float64,2} = readdlm(abspath(mf_path), ',', Float64;
                                                 header=false, skipstart=2)
             mf_body = transpose(mf_body)
 
-            # set composition by interpolating with pressure array
-            gidx::Int=0
-            for li in 4:lastindex(heads)
-                # Gas index
-                gidx += 1
+            # Get pressure array from file
+            arr_p::Array{Float64,1} = mf_body[1,:]
+            arr_x::Array{Float64,1} = zero(arr_p)
 
-                # Arrays from file
-                arr_p::Array{Float64,1} = mf_body[1,:]
-                arr_x::Array{Float64,1} = mf_body[li,:]
+            # set composition by interpolating with pressure array
+            # the pressure array must be the first column in the file
+            for li in 2:lastindex(heads)
+                gas = strip(heads[li], [' ','\t','\n'])
+
+                # Check if this gas is repeated, or contains invalid chars
+                if gas in atmos.gas_names
+                    @warn "VMR file contains repeated gas '$gas'"
+                    continue
+
+                elseif !occursin(r"^[[:alnum:]]*$", gas)
+                    @warn "VMR file contains invalid gas '$gas'"
+                    continue
+
+                else
+                    # Store with zero VMR
+                    atmos.gas_vmr[gas] = zeros(Float64, atmos.nlev_c)
+                    push!(atmos.gas_names, gas)
+                    @debug "    added $gas"
+                    atmos.gas_num += 1
+                end
+
+                # Get VMR values from file
+                arr_x[:] .= mf_body[li,:]
 
                 # Extend loaded profile to lower pressures (prevents domain error)
                 if arr_p[1] > atmos.p_toa
@@ -664,7 +671,7 @@ module atmosphere
 
                 # Set values in atmos struct
                 for i in 1:atmos.nlev_c
-                    atmos.gas_vmr[atmos.gas_names[gidx]][i] = itp(log10(atmos.p[i]))
+                    atmos.gas_vmr[gas][i] = itp(log10(atmos.p[i]))
                 end
             end
 
