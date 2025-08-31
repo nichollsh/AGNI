@@ -21,31 +21,16 @@ module energy
     import ..spectrum
 
     """
-    **Calculate radiative fluxes using SOCRATES.**
+    **Solve radiative transfer using SOCRATES**
 
-    Uses the configuration inside the atmos struct. Can either do LW or SW
-    calculation as required. Imports SOCRATES wrapper from the atmosphere
-    module, rather than loading it twice.
+    Imports SOCRATES wrapper from the atmosphere module, rather than loading it twice.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `lw::Bool`                        longwave calculation? Else: shortwave
     - `calc_cf::Bool=false`             also calculate contribution function?
     """
-    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool;
-                            calc_cf::Bool=false)
-        if !atmos.is_alloc
-            error("atmosphere arrays have not been allocated")
-        end
-        if !atmos.is_param
-            error("atmosphere parameters have not been set")
-        end
-
-        atmos.num_rt_eval += 1
-
-        if atmos.benchmark
-            time_start::UInt64 = time_ns()
-        end
+    function _radtrans_socrates!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
 
         # Longwave or shortwave calculation?
         # Set the two-stream approximation to be used (-t f)
@@ -74,10 +59,6 @@ module energy
             if !Bool(atmos.spectrum.Basic.l_present[2])
                 error("The spectral file contains no solar spectral data.")
             end
-
-            # Downward SW flux in atmosphere at TOA stored by AGNI
-            atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) *
-                                    atmos.s0_fact * cosd(atmos.zenith_degrees)
 
             # SOCRATES requires this to be passed as two variables, since it
             #     needs to know the angle of the direct beam.
@@ -165,12 +146,9 @@ module energy
             atmos.control.l_ir_source_quad = true
         end
 
-        # Set flux in surface emission, by band
-        #     Equal to integral of planck function over band width, which in
-        #     this case is done by simply evaluating at the midpoint and
-        #     multiplying by band width. Scaled by the emissivity.
-        @. atmos.surf_flux = phys.evaluate_planck(atmos.bands_cen, atmos.tmp_surf) *
-                                atmos.bands_wid * 1e9 * atmos.surf_e_arr
+        ####################################################
+        # Pass surface flux to SOCRATES
+        ###################################################
 
         # Pass to socrates array
         #     I would argue that the 1-albedo term shouldn't be here, but it is to correct
@@ -182,7 +160,7 @@ module energy
         end
 
         ######################################################
-        # Run radiative transfer model
+        # Run SOCRATES radiative transfer calculation
         ######################################################
 
         # Calculate contribution function?
@@ -203,7 +181,6 @@ module energy
                 # do not normalise MMRs to 1
             end
         end
-
 
         # Do radiative transfer
         atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control,
@@ -274,6 +251,101 @@ module energy
             atmos.flux_d = atmos.flux_d_lw + atmos.flux_d_sw
             atmos.flux_u = atmos.flux_u_lw + atmos.flux_u_sw
             atmos.flux_n = atmos.flux_n_lw + atmos.flux_n_sw
+        end
+    end
+
+    """
+    **Solve RT using grey-gas formulation**
+
+    Following the two-stream equations in this tutorial:
+    https://brian-rose.github.io/ClimateLaboratoryBook/courseware/radiative-transfer/
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    """
+    function _radtrans_greygas!(atmos)
+
+        # Store transmissivity and emissivity of each layer
+        layer_t::Array{Float64,1} = zero(atmos.layer_grav)
+        layer_ε::Array{Float64,1} = zero(atmos.layer_grav)
+
+        # Downward beam, looping from TOA
+        atmos.flux_d_lw[1]   = atmos.toa_heating
+        for i in 1:atmos.nlev_c
+            # Transmissivity
+            layer_t[i] = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.kappa_grey / atmos.layer_grav[i] )
+
+            # Emissivity
+            layer_ε[i] = 1 - layer_t[i]
+
+            # Downward flux at bottom of layer
+            atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * layer_t[i] + (phys.σSB * atmos.tmp[i]^4) * layer_ε[i]
+        end
+
+        # Upward beam, looping from surface
+        atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
+            atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * layer_t[i] + (phys.σSB * atmos.tmp[i]^4) * layer_ε[i]
+        end
+
+        # Set other arrays to zero
+        fill!(atmos.flux_d_sw, 0.0)
+        fill!(atmos.flux_u_sw, 0.0)
+        atmos.is_out_sw = true
+        atmos.is_out_lw = true
+
+        # Set net arrays
+        atmos.flux_d = atmos.flux_d_lw + atmos.flux_d_sw
+        atmos.flux_u = atmos.flux_u_lw + atmos.flux_u_sw
+        atmos.flux_n = atmos.flux_n_lw + atmos.flux_n_sw
+    end
+
+    """
+    **Calculate radiative fluxes using the desired scheme.**
+
+    Uses the configuration inside the atmos struct. Can either do LW or SW
+    calculation, set by `lw` function argument.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `lw::Bool`                        longwave calculation? Else: shortwave
+    - `calc_cf::Bool=false`             also calculate contribution function?
+    """
+    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
+        if !atmos.is_alloc
+            error("atmosphere arrays have not been allocated")
+        end
+        if !atmos.is_param
+            error("atmosphere parameters have not been set")
+        end
+
+        atmos.num_rt_eval += 1
+
+        if atmos.benchmark
+            time_start::UInt64 = time_ns()
+        end
+
+        # Downward SW flux in atmosphere at TOA
+        atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) *
+                                    atmos.s0_fact * cosd(atmos.zenith_degrees)
+
+        # Set flux in surface emission, by band
+        #     Equal to integral of planck function over band width, which in
+        #     this case is done by simply evaluating at the midpoint and
+        #     multiplying by band width. Scaled by the emissivity.
+        @. atmos.surf_flux = phys.evaluate_planck(atmos.bands_cen, atmos.tmp_surf) *
+                                atmos.bands_wid * 1e9 * atmos.surf_e_arr
+
+
+        # Run the RT using the desired scheme
+        if atmos.rt_scheme == atmosphere.RT_SOCRATES
+            _radtrans_socrates!(atmos, lw, calc_cf=calc_cf)
+
+        elseif atmos.rt_scheme == atmosphere.RT_GREYGAS
+            _radtrans_greygas!(atmos)
+
+        else
+            @error "Invalid RT scheme: $(atmos.rt_scheme)"
         end
 
         # Store time
