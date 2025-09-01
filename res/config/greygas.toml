@@ -3,7 +3,7 @@ title = "Grey gas"
 
 [planet]
     tmp_surf        = 2000.0
-    instellation    = 44000.0
+    instellation    = 90000.0
     albedo_b        = 0.18
     s0_fact         = 0.6652
     zenith_angle    = 60.0
@@ -21,8 +21,8 @@ title = "Grey gas"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 2700.0
-    p_top           = 1e-5
+    p_surf          = 6000.0
+    p_top           = 1e-6
     vmr_dict        = { H2O = 1.0}
     vmr_file        = ""
     chemistry       = 0
@@ -31,21 +31,21 @@ title = "Grey gas"
 
 [execution]
     clean_output    = true
-    verbosity       = 2
+    verbosity       = 1
     max_steps       = 200
     max_runtime     = 400
-    num_levels      = 35
+    num_levels      = 100
     continua        = true
-    rayleigh        = true
+    rayleigh        = false
     cloud           = false
     overlap_method  = "ee"
-    real_gas        = false
+    real_gas        = true
     thermo_funct    = true
     sensible_heat   = true
     conduction      = true
     latent_heat     = false
     convection      = true
-    convection_crit = "l"
+    convection_crit = "s"
     rainout         = false
     solution_type   = 3
     solver          = "newton"
@@ -61,9 +61,9 @@ title = "Grey gas"
     at_runtime      = true
     temperature     = true
     fluxes          = true
-    contribution    = true
-    emission        = true
-    albedo          = true
+    contribution    = false
+    emission        = false
+    albedo          = false
     mixing_ratios   = true
     animate         = true
     height          = true
