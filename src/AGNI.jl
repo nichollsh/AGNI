@@ -489,7 +489,7 @@ module AGNI
 
         return_success = return_success && solver_success
         @info "    done"
-        @info "Total SOCRATES evaluations: $(atmos.num_rt_eval)"
+        @info "Total radiative transfer evaluations: $(atmos.num_rt_eval)"
 
         # RFM calculation?
         if atmos.flag_rfm
