@@ -391,7 +391,7 @@ module atmosphere
                     use_all_gases::Bool =       false,
                     check_integrity::Bool =     true,
 
-                    kappa_grey::Float64  =      1e-30,
+                    kappa_grey::Float64  =      1e-7,
 
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
