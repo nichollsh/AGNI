@@ -34,8 +34,11 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.7.3"
-    const HYDROGRAV_STEPS::Int64 = 40
+    const AGNI_VERSION::String    = "1.7.4"  # current agni version
+    const HYDROGRAV_STEPS::Int64  = 40       # num of sub-layers in hydrostatic integration
+    const SOCVER_minimum::Float64 = 2407.2   # minimum required socrates version
+
+    @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
@@ -70,7 +73,8 @@ module atmosphere
         bound::SOCRATES.StrBound
         radout::SOCRATES.StrOut
 
-        # Radiation scheme performance
+        # Radiation scheme
+        rt_scheme::RTSCHEME             # RT scheme (1: SOCRATES, 2: Grey gas)
         benchmark::Bool                 # Benchmark RT?
         num_rt_eval::Int                # Total number of RT evaluations
         tim_rt_eval::UInt64             # Total time spent doing RT evaluations [ns]
@@ -85,6 +89,8 @@ module atmosphere
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (see Cronin+14)
         overlap_method::String          # Absorber overlap method to be used
+        κ_grey_lw::Float64              # LW opacity used for grey-gas scheme [m2 kg-1]
+        κ_grey_sw::Float64              # SW opacity used for grey-gas scheme [m2 kg-1]
 
         # Spectral bands
         nbands::Int
@@ -301,7 +307,7 @@ module atmosphere
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `ROOT_DIR::String`                AGNI root directory.
     - `OUT_DIR::String`                 Output directory.
-    - `spfile::String`                  path to spectral file.
+    - `spfile::String`                  path to spectral file ('grey' => use grey gas)
     - `instellation::Float64`           bolometric solar flux at the top of the atmosphere [W m-2]
     - `s0_fact::Float64`                scale factor to account for planetary rotation (i.e. S_0^*/S_0 in Cronin+14)
     - `albedo_b::Float64`               bond albedo scale factor applied to instellation in order to imitate shortwave reflection
@@ -340,6 +346,9 @@ module atmosphere
     - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
+    - `check_integrity::Bool`           confirm integrity of thermo files using their checksum
+    - `κ_grey_lw::Float64`              gas opacity when using grey-gas RT scheme, longwave
+    - `κ_grey_sw::Float64`              gas opacity when using grey-gas RT scheme, shortwave
     - `fastchem_work::String`           working directory for fastchem
     - `fastchem_floor::Float64`         temperature floor on profile provided to fastchem
     - `fastchem_maxiter::Float64`       maximum solver iterations allowed by fastchem
@@ -385,6 +394,9 @@ module atmosphere
                     use_all_gases::Bool =       false,
                     check_integrity::Bool =     true,
 
+                    κ_grey_lw::Float64  =       1e-4,
+                    κ_grey_sw::Float64  =       1e-5,
+
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
                     fastchem_maxiter::Float64 = 2e4,
@@ -410,17 +422,33 @@ module atmosphere
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
         @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
-        # Check SOCRATES version is valid
-        SOCVER_minimum = 2407.2
-        if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
-            @error "SOCRATES is out of date and cannot be used!"
-            @error "    found at $(ENV["RAD_DIR"])"
-            @error "    version is "*atmos.SOCRATES_VERSION
-        end
 
         atmos.benchmark   = false
         atmos.num_rt_eval = 0
         atmos.tim_rt_eval = 0.0
+
+        if strip(lowercase(spfile)) == "greygas"
+            atmos.rt_scheme = RT_GREYGAS
+            atmos.spectral_file = "greygas"
+            @info "Using double-grey radiative transfer scheme"
+
+            # check options
+            if flag_rayleigh || flag_cloud
+                @error "Scattering not supported by grey-gas RT scheme"
+                return false
+            end
+
+        else
+            atmos.rt_scheme = RT_SOCRATES
+            atmos.spectral_file = abspath(spfile)
+
+            # Check SOCRATES version is valid
+            if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
+                @error "SOCRATES is out of date and cannot be used!"
+                @error "    found at $(ENV["RAD_DIR"])"
+                @error "    version is "*atmos.SOCRATES_VERSION
+            end
+        end
 
         atmos.dimen =       SOCRATES.StrDim()
         atmos.control =     SOCRATES.StrCtrl()
@@ -436,7 +464,6 @@ module atmosphere
         atmos.OUT_DIR =         abspath(OUT_DIR)
         atmos.FRAMES_DIR  =     joinpath(atmos.OUT_DIR, "frames")
         atmos.THERMO_DIR  =     joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
-        atmos.spectral_file =   abspath(spfile)
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
 
@@ -468,6 +495,9 @@ module atmosphere
 
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
+
+        atmos.κ_grey_lw =       max(0.0, κ_grey_lw)
+        atmos.κ_grey_sw =       max(0.0, κ_grey_sw)
 
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
@@ -972,12 +1002,14 @@ module atmosphere
         ok = ok && calc_profile_radius!(atmos, ignore_errors=ignore_errors)
 
         # Pass arrays to SOCRATES
-        atmos.atm.p[1, :]           .= atmos.p[:]
-        atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-        atmos.atm.r_layer[1,:]      .= atmos.r[:]
-        atmos.atm.r_level[1,0:end]  .= atmos.rl[:]
-        atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
-        atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
+        if atmos.rt_scheme == RT_SOCRATES
+            atmos.atm.p[1, :]           .= atmos.p[:]
+            atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+            atmos.atm.r_layer[1,:]      .= atmos.r[:]
+            atmos.atm.r_level[1,0:end]  .= atmos.rl[:]
+            atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
+            atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
+        end
 
         return ok
     end
@@ -1269,303 +1301,311 @@ module atmosphere
         # spectral data
         #########################################
 
-        # Validate files
-        if !isfile(atmos.spectral_file)
-            @error "Spectral file '$(atmos.spectral_file)' does not exist"
-            @error "Try running `\$ ./src/get_data.sh`"
-            @error "    e.g. to get CodenameXX you would run `\$ ./src/get_data.sh anyspec Codename XX`"
-            return false
-        end
+        if atmos.rt_scheme == RT_GREYGAS
 
-        spectral_file_run::String  = joinpath([atmos.OUT_DIR, "runtime.sf"])
-        spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])
+            atmos.star_file = "_CALC_AS_BLACKBODY=$stellar_Teff"
+            atmos.nbands    = 1
+            atmos.bands_max = Float64[1.0,]  # m
+            atmos.bands_min = Float64[1e-9,] # m
+            atmos.bands_wid = atmos.bands_max - atmos.bands_min
+            atmos.bands_cen = Float64[1e-6,]
 
-        # Setup spectral file
-        socstar::String = joinpath([atmos.OUT_DIR, "socstar.dat"])
-        if !isempty(stellar_spectrum)
-            @debug "Inserting stellar spectrum into spectral file"
+        elseif atmos.rt_scheme == RT_SOCRATES
 
-            # Spectral file to be loaded, created in output folder
-            rm(spectral_file_run , force=true)
-            rm(spectral_file_runk, force=true)
+            # Validate files
+            if !isfile(atmos.spectral_file)
+                @error "Spectral file '$(atmos.spectral_file)' does not exist"
+                @error "Try running `\$ ./src/get_data.sh`"
+                @error "    e.g. to get CodenameXX you would run `\$ ./src/get_data.sh anyspec Codename XX`"
+                return false
+            end
 
-            # Wl and Fl arrays, dummy values at TOA
-            wl::Array{Float64,1} = Float64[1.0, 2.0, 3.0]  # nm
-            fl::Array{Float64,1} = Float64[0.0, 0.0, 0.0]  # erg s-1 cm-2 nm-1
+            spectral_file_run::String  = joinpath([atmos.OUT_DIR, "runtime.sf"])
+            spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])
 
-            # Insert stellar spectrum
-            if lowercase(stellar_spectrum) == "blackbody"
-                # generate blackbody spectrum
-                @debug "Inserting spectrum as blackbody with Teff=$stellar_Teff K"
+            # Setup spectral file
+            socstar::String = joinpath([atmos.OUT_DIR, "socstar.dat"])
+            if !isempty(stellar_spectrum)
+                @debug "Inserting stellar spectrum into spectral file"
 
-                if stellar_Teff < 1.0
-                    @error "Invalid stellar photospheric temperature: $stellar_Teff K"
-                    @error "    Choose a valid temperature when using blackbody spectrum"
-                    return false
+                # Spectral file to be loaded, created in output folder
+                rm(spectral_file_run , force=true)
+                rm(spectral_file_runk, force=true)
+
+                # Wl and Fl arrays, dummy values at TOA
+                wl::Array{Float64,1} = Float64[1.0, 2.0, 3.0]  # nm
+                fl::Array{Float64,1} = Float64[0.0, 0.0, 0.0]  # erg s-1 cm-2 nm-1
+
+                # Insert stellar spectrum
+                if lowercase(stellar_spectrum) == "blackbody"
+                    # generate blackbody spectrum
+                    @debug "Inserting spectrum as blackbody with Teff=$stellar_Teff K"
+
+                    if stellar_Teff < 1.0
+                        @error "Invalid stellar photospheric temperature: $stellar_Teff K"
+                        @error "    Choose a valid temperature when using blackbody spectrum"
+                        return false
+                    end
+                    atmos.star_file = "_CALC_AS_BLACKBODY=$stellar_Teff"
+
+                    wl, fl = spectrum.blackbody_star(stellar_Teff, atmos.instellation)
+                else
+                    # use spectrum on disk
+                    @debug "Inserting stellar spectrum from file $stellar_spectrum"
+
+                    if !isfile(stellar_spectrum)
+                        @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
+                        @error "Try running `\$ ./src/get_data.sh stellar`"
+                        return false
+                    end
+                    atmos.star_file = abspath(stellar_spectrum)
+
+                    wl, fl = spectrum.load_from_file(atmos.star_file)
                 end
-                atmos.star_file = "_CALC_AS_BLACKBODY=$stellar_Teff"
 
-                wl, fl = spectrum.blackbody_star(stellar_Teff, atmos.instellation)
+                # Write stellar spectrum to disk in format required by SOCRATES
+                spectrum.write_to_socrates_format(wl, fl, socstar) || return false
+
+                # Insert stellar spectrum and rayleigh scattering, if required
+                spectrum.insert_stellar_and_rscatter(atmos.spectral_file,
+                                                        socstar, spectral_file_run,
+                                                        atmos.control.l_rayleigh)
+
             else
-                # use spectrum on disk
-                @debug "Inserting stellar spectrum from file $stellar_spectrum"
+                # Stellar spectrum was not provided, which is taken to mean that
+                #       the spectral file includes it already.
+                @info "Using pre-existing spectral file without modifications"
+                atmos.star_file = "_ALREADY_IN_SPECTRAL_FILE"
+                spectral_file_run  = atmos.spectral_file
+                spectral_file_runk = atmos.spectral_file*"_k"
+            end
 
-                if !isfile(stellar_spectrum)
-                    @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
-                    @error "Try running `\$ ./src/get_data.sh stellar`"
+            # Read-in spectral file to be used at runtime
+            atmos.control.spectral_file = spectral_file_run
+
+            SOCRATES.set_spectrum(spectrum=atmos.spectrum,
+                                    spectral_file=atmos.control.spectral_file,
+                                    l_all_gasses=true)
+
+            # Remove temporary star file if it exists
+            rm(socstar, force=true)
+
+            #########################################
+            # diagnostics
+            #########################################
+            atmos.control.l_actinic_flux = Bool(atmos.spectrum.Basic.l_present[2])
+            atmos.control.l_photolysis_rate = atmos.spectrum.Photol.n_pathway > 0
+            atmos.control.l_flux_div = atmos.spectrum.Photol.n_pathway > 0
+
+            #########################################
+            # parameters
+            #########################################
+
+            if atmos.all_channels
+                n_channel = atmos.spectrum.Basic.n_band
+            else
+                n_channel = 1
+            end
+
+            atmos.nbands = atmos.spectrum.Basic.n_band
+            atmos.bands_max = zeros(Float64, atmos.nbands)
+            atmos.bands_min = zeros(Float64, atmos.nbands)
+            atmos.bands_cen = zeros(Float64, atmos.nbands)
+            atmos.bands_wid = zeros(Float64, atmos.nbands)
+
+            for i in 1:atmos.nbands
+                atmos.bands_min[i] = atmos.spectrum.Basic.wavelength_short[i]
+                atmos.bands_max[i] = atmos.spectrum.Basic.wavelength_long[i]
+            end
+
+            @. atmos.bands_cen = 0.5 * (atmos.bands_max + atmos.bands_min)
+            @. atmos.bands_wid = abs(atmos.bands_max - atmos.bands_min)
+
+            # modules_gen/dimensions_field_cdf_ucf.f90
+            npd_direction = 1                   # Maximum number of directions for radiances
+            npd_layer = atmos.nlev_c            # Number of layers
+            npd_column = 24                     # Maximum number of cloudy subcolumns
+            npd_profile = 1
+
+            # BRDF reflections
+            npd_max_order = 101                 # Maximum order of spherical harmonics used
+            npd_brdf_basis_fnc = 2              # Number of BRDF basis functions
+            npd_brdf_trunc = 5                  # Order of BRDF truncation
+
+            # prescribed aerosol optical properties
+            npd_profile_aerosol_prsc = 9        # Size allocated for profiles
+            npd_opt_level_aerosol_prsc = 170    # Size allocated for levels
+
+            # prescribed cloudy optical properties
+            npd_profile_cloud_prsc = 9          # Size allocated for profiles
+            npd_opt_level_cloud_prsc = 170      # Size allocated for levels
+
+            # modules_gen/dimensioms_fixed_pcf.f90
+            npd_cloud_component        =  4     # Number of components of clouds.
+            npd_cloud_type             =  4     # Number of permitted types of clouds.
+            npd_overlap_coeff          = 18     # Number of overlap coefficients for cloud
+            npd_source_coeff           =  2     # Number of coefficients for two-stream sources
+            npd_region                 =  1     # Number of regions in a layer
+
+            atmos.dimen.nd_profile                = npd_profile
+            atmos.dimen.nd_flux_profile           = npd_profile
+            atmos.dimen.nd_2sg_profile            = npd_profile
+            atmos.dimen.nd_radiance_profile       = npd_profile
+            atmos.dimen.nd_j_profile              = 1
+            atmos.dimen.nd_layer                  = npd_layer
+            atmos.dimen.nd_layer_clr              = npd_layer
+            atmos.dimen.id_cloud_top              = 1
+            atmos.dimen.nd_channel                = n_channel
+            atmos.dimen.nd_column                 = npd_column
+            atmos.dimen.nd_max_order              = npd_max_order
+            atmos.dimen.nd_direction              = npd_direction
+            atmos.dimen.nd_viewing_level          = npd_layer
+            atmos.dimen.nd_brdf_basis_fnc         = npd_brdf_basis_fnc
+            atmos.dimen.nd_brdf_trunc             = npd_brdf_trunc
+            atmos.dimen.nd_profile_aerosol_prsc   = npd_profile_aerosol_prsc
+            atmos.dimen.nd_profile_cloud_prsc     = npd_profile_cloud_prsc
+            atmos.dimen.nd_opt_level_aerosol_prsc = npd_opt_level_aerosol_prsc
+            atmos.dimen.nd_opt_level_cloud_prsc   = npd_opt_level_cloud_prsc
+            atmos.dimen.nd_cloud_component        = npd_cloud_component
+            atmos.dimen.nd_cloud_type             = npd_cloud_type
+            atmos.dimen.nd_overlap_coeff          = npd_overlap_coeff
+            atmos.dimen.nd_source_coeff           = npd_source_coeff
+            atmos.dimen.nd_region                 = npd_region
+            atmos.dimen.nd_point_tile             = 1
+            atmos.dimen.nd_tile                   = 1
+            atmos.dimen.nd_subcol_gen             = 1
+            atmos.dimen.nd_subcol_req             = 1
+            atmos.dimen.nd_aerosol_mode           = 1
+
+            # Set to true to enable custom surface emission through the
+            #   variables `planck%flux_ground(l)` and `d_planck_flux_surface`.
+            atmos.control.l_flux_ground = false
+
+            SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
+            SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
+            SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
+            SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
+
+            # Fill with zeros - will be set inside of radtrans function at call time
+            fill!(atmos.bound.flux_ground, 0.0)
+
+
+            ###########################################
+            # Number of profiles, and profile coordinates
+            ###########################################
+            atmos.atm.n_layer =     npd_layer
+            atmos.atm.n_profile =   1
+            atmos.atm.lat[1] =      0.0
+            atmos.atm.lon[1] =      0.0
+
+            ###########################################
+            # Range of bands
+            ###########################################
+
+            atmos.control.last_band = atmos.spectrum.Basic.n_band
+            atmos.control.first_band = 1
+            n_band_active = atmos.control.last_band - atmos.control.first_band + 1
+
+            # Map spectral bands into output channels
+            if ( (n_channel*floor(n_band_active/n_channel) != n_band_active)  &&
+                (atmos.spectrum.Var.n_sub_band >= n_channel) )
+                # Number of bands not a multiple of channels so use sub-bands
+                atmos.control.l_map_sub_bands = true
+            end
+
+            SOCRATES.allocate_control(atmos.control, atmos.spectrum)
+
+            if n_channel == 1
+                atmos.control.map_channel[1:atmos.spectrum.Basic.n_band] .= 1
+            elseif n_channel == atmos.spectrum.Basic.n_band
+                atmos.control.map_channel[1:atmos.spectrum.Basic.n_band] .= 1:n_channel
+            else
+                @error "n_channel $n_channel != 1 and != $n_band_active not supported "
+                return false
+            end
+
+            # Calculate the weighting for the bands.
+            fill!(atmos.control.weight_band, 1.0)
+
+            # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
+            # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
+            atmos.control.i_direct_tau = 1
+            atmos.control.n_order_forward = 2
+
+
+            ############################################
+            # Check Options
+            ############################################
+
+            if atmos.control.l_rayleigh
+                if !Bool(atmos.spectrum.Basic.l_present[3])
+                    @error "The spectral file contains no rayleigh scattering data"
                     return false
                 end
-                atmos.star_file = abspath(stellar_spectrum)
-
-                wl, fl = spectrum.load_from_file(atmos.star_file)
             end
 
-            # Write stellar spectrum to disk in format required by SOCRATES
-            spectrum.write_to_socrates_format(wl, fl, socstar) || return false
+            if atmos.control.l_aerosol
+                if !Bool(atmos.spectrum.Basic.l_present[11])
+                    @error "The spectral file contains no aerosol data"
+                    return false
+                end
+            end
 
-            # Insert stellar spectrum and rayleigh scattering, if required
-            spectrum.insert_stellar_and_rscatter(atmos.spectral_file,
-                                                    socstar, spectral_file_run,
-                                                    atmos.control.l_rayleigh)
+            if atmos.control.l_gas
+                if !Bool(atmos.spectrum.Basic.l_present[5])
+                    @error "The spectral file contains no gaseous absorption data"
+                    return false
+                end
+            end
 
-        else
-            # Stellar spectrum was not provided, which is taken to mean that
-            #       the spectral file includes it already.
-            @info "Using pre-existing spectral file without modifications"
-            atmos.star_file = "_ALREADY_IN_SPECTRAL_FILE"
-            spectral_file_run  = atmos.spectral_file
-            spectral_file_runk = atmos.spectral_file*"_k"
-        end
+            if atmos.control.l_continuum
+                if !Bool(atmos.spectrum.Basic.l_present[9])
+                    @error "The spectral file contains no continuum absorption data"
+                    return false
+                end
+            end
 
-        # Validate files
-
-
-        # Read-in spectral file to be used at runtime
-        atmos.control.spectral_file = spectral_file_run
-
-        SOCRATES.set_spectrum(spectrum=atmos.spectrum,
-                                spectral_file=atmos.control.spectral_file,
-                                l_all_gasses=true)
-
-        # Remove temporary star file if it exists
-        rm(socstar, force=true)
-
-        #########################################
-        # diagnostics
-        #########################################
-        atmos.control.l_actinic_flux = Bool(atmos.spectrum.Basic.l_present[2])
-        atmos.control.l_photolysis_rate = atmos.spectrum.Photol.n_pathway > 0
-        atmos.control.l_flux_div = atmos.spectrum.Photol.n_pathway > 0
-
-        #########################################
-        # parameters
-        #########################################
-
-        if atmos.all_channels
-            n_channel = atmos.spectrum.Basic.n_band
-        else
-            n_channel = 1
-        end
-
-        atmos.nbands = atmos.spectrum.Basic.n_band
-        atmos.bands_max = zeros(Float64, atmos.nbands)
-        atmos.bands_min = zeros(Float64, atmos.nbands)
-        atmos.bands_cen = zeros(Float64, atmos.nbands)
-        atmos.bands_wid = zeros(Float64, atmos.nbands)
-
-        for i in 1:atmos.nbands
-            atmos.bands_min[i] = atmos.spectrum.Basic.wavelength_short[i]
-            atmos.bands_max[i] = atmos.spectrum.Basic.wavelength_long[i]
-        end
-        @. atmos.bands_cen = 0.5 * (atmos.bands_max + atmos.bands_min)
-        @. atmos.bands_wid = abs(atmos.bands_max - atmos.bands_min)
-
-        # modules_gen/dimensions_field_cdf_ucf.f90
-        npd_direction = 1                   # Maximum number of directions for radiances
-        npd_layer = atmos.nlev_c            # Number of layers
-        npd_column = 24                     # Maximum number of cloudy subcolumns
-        npd_profile = 1
-
-        # BRDF reflections
-        npd_max_order = 101                 # Maximum order of spherical harmonics used
-        npd_brdf_basis_fnc = 2              # Number of BRDF basis functions
-        npd_brdf_trunc = 5                  # Order of BRDF truncation
-
-        # prescribed aerosol optical properties
-        npd_profile_aerosol_prsc = 9        # Size allocated for profiles
-        npd_opt_level_aerosol_prsc = 170    # Size allocated for levels
-
-        # prescribed cloudy optical properties
-        npd_profile_cloud_prsc = 9          # Size allocated for profiles
-        npd_opt_level_cloud_prsc = 170      # Size allocated for levels
-
-        # modules_gen/dimensioms_fixed_pcf.f90
-        npd_cloud_component        =  4     # Number of components of clouds.
-        npd_cloud_type             =  4     # Number of permitted types of clouds.
-        npd_overlap_coeff          = 18     # Number of overlap coefficients for cloud
-        npd_source_coeff           =  2     # Number of coefficients for two-stream sources
-        npd_region                 =  1     # Number of regions in a layer
-
-        atmos.dimen.nd_profile                = npd_profile
-        atmos.dimen.nd_flux_profile           = npd_profile
-        atmos.dimen.nd_2sg_profile            = npd_profile
-        atmos.dimen.nd_radiance_profile       = npd_profile
-        atmos.dimen.nd_j_profile              = 1
-        atmos.dimen.nd_layer                  = npd_layer
-        atmos.dimen.nd_layer_clr              = npd_layer
-        atmos.dimen.id_cloud_top              = 1
-        atmos.dimen.nd_channel                = n_channel
-        atmos.dimen.nd_column                 = npd_column
-        atmos.dimen.nd_max_order              = npd_max_order
-        atmos.dimen.nd_direction              = npd_direction
-        atmos.dimen.nd_viewing_level          = npd_layer
-        atmos.dimen.nd_brdf_basis_fnc         = npd_brdf_basis_fnc
-        atmos.dimen.nd_brdf_trunc             = npd_brdf_trunc
-        atmos.dimen.nd_profile_aerosol_prsc   = npd_profile_aerosol_prsc
-        atmos.dimen.nd_profile_cloud_prsc     = npd_profile_cloud_prsc
-        atmos.dimen.nd_opt_level_aerosol_prsc = npd_opt_level_aerosol_prsc
-        atmos.dimen.nd_opt_level_cloud_prsc   = npd_opt_level_cloud_prsc
-        atmos.dimen.nd_cloud_component        = npd_cloud_component
-        atmos.dimen.nd_cloud_type             = npd_cloud_type
-        atmos.dimen.nd_overlap_coeff          = npd_overlap_coeff
-        atmos.dimen.nd_source_coeff           = npd_source_coeff
-        atmos.dimen.nd_region                 = npd_region
-        atmos.dimen.nd_point_tile             = 1
-        atmos.dimen.nd_tile                   = 1
-        atmos.dimen.nd_subcol_gen             = 1
-        atmos.dimen.nd_subcol_req             = 1
-        atmos.dimen.nd_aerosol_mode           = 1
-
-        # Set to true to enable custom surface emission through the
-        #   variables `planck%flux_ground(l)` and `d_planck_flux_surface`.
-        atmos.control.l_flux_ground = false
-
-        # Allocate arrays, etc.
-        SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
-        SOCRATES.allocate_cld(  atmos.cld,   atmos.dimen, atmos.spectrum)
-        SOCRATES.allocate_aer(  atmos.aer,   atmos.dimen, atmos.spectrum)
-        SOCRATES.allocate_bound(atmos.bound, atmos.dimen, atmos.spectrum)
-
-        # Fill with zeros - will be set inside of radtrans function at call time
-        fill!(atmos.bound.flux_ground, 0.0)
+            if atmos.control.l_cont_gen
+                if !Bool(atmos.spectrum.Basic.l_present[19])
+                    @error "The spectral file contains no generalised continuum absorption data"
+                    return false
+                end
+            end
 
 
-        ###########################################
-        # Number of profiles, and profile coordinates
-        ###########################################
-        atmos.atm.n_layer =     npd_layer
-        atmos.atm.n_profile =   1
-        atmos.atm.lat[1] =      0.0
-        atmos.atm.lon[1] =      0.0
+            ################################
+            # Gaseous absorption
+            #################################
 
-        ###########################################
-        # Range of bands
-        ###########################################
+            if atmos.overlap_method == "ro"
+                # random overlap
+                atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random
 
-        atmos.control.last_band = atmos.spectrum.Basic.n_band
-        atmos.control.first_band = 1
-        n_band_active = atmos.control.last_band - atmos.control.first_band + 1
+            elseif atmos.overlap_method == "ee"
+                # equivalent extinction with correct scaling
+                atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_k_eqv_scl
 
-        # Map spectral bands into output channels
-        if ( (n_channel*floor(n_band_active/n_channel) != n_band_active)  &&
-            (atmos.spectrum.Var.n_sub_band >= n_channel) )
-            # Number of bands not a multiple of channels so use sub-bands
-            atmos.control.l_map_sub_bands = true
-        end
+            elseif atmos.overlap_method == "rorr"
+                # random overlap with resorting and rebinning
+                atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random_resort_rebin
 
-        SOCRATES.allocate_control(atmos.control, atmos.spectrum)
-
-        if n_channel == 1
-            atmos.control.map_channel[1:atmos.spectrum.Basic.n_band] .= 1
-        elseif n_channel == atmos.spectrum.Basic.n_band
-            atmos.control.map_channel[1:atmos.spectrum.Basic.n_band] .= 1:n_channel
-        else
-            @error "n_channel $n_channel != 1 and != $n_band_active not supported "
-            return false
-        end
-
-        # Calculate the weighting for the bands.
-        fill!(atmos.control.weight_band, 1.0)
-
-        # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
-        # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
-        atmos.control.i_direct_tau = 1
-
-        atmos.control.n_order_forward = 2
-
-
-        ############################################
-        # Check Options
-        ############################################
-
-        if atmos.control.l_rayleigh
-            if !Bool(atmos.spectrum.Basic.l_present[3])
-                @error "The spectral file contains no rayleigh scattering data"
+            else
+                @error "Invalid overlap method $(atmos.overlap_method)"
                 return false
             end
-        end
 
-        if atmos.control.l_aerosol
-            if !Bool(atmos.spectrum.Basic.l_present[11])
-                @error "The spectral file contains no aerosol data"
-                return false
+            for j in atmos.control.first_band:atmos.control.last_band
+                atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
             end
-        end
 
-        if atmos.control.l_gas
-            if !Bool(atmos.spectrum.Basic.l_present[5])
-                @error "The spectral file contains no gaseous absorption data"
-                return false
+            # Check supported gases
+            atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases
+            atmos.gas_soc_names     = Array{String}(undef, atmos.gas_soc_num)   # list of names
+            for i_gas in 1:atmos.gas_soc_num   # for each supported gas
+                atmos.gas_soc_names[i_gas] =
+                    SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
             end
-        end
-
-        if atmos.control.l_continuum
-            if !Bool(atmos.spectrum.Basic.l_present[9])
-                @error "The spectral file contains no continuum absorption data"
-                return false
-            end
-        end
-
-        if atmos.control.l_cont_gen
-            if !Bool(atmos.spectrum.Basic.l_present[19])
-                @error "The spectral file contains no generalised continuum absorption data"
-                return false
-            end
-        end
-
-
-        ################################
-        # Gaseous absorption
-        #################################
-
-        if atmos.overlap_method == "ro"
-            # random overlap
-            atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random
-
-        elseif atmos.overlap_method == "ee"
-            # equivalent extinction with correct scaling
-            atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_k_eqv_scl
-
-        elseif atmos.overlap_method == "rorr"
-            # random overlap with resorting and rebinning
-            atmos.control.i_gas_overlap = SOCRATES.rad_pcf.ip_overlap_random_resort_rebin
-
-        else
-            @error "Invalid overlap method $(atmos.overlap_method)"
-            return false
-        end
-
-        for j in atmos.control.first_band:atmos.control.last_band
-            atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
-        end
-
-        # Check supported gases
-        atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases
-        atmos.gas_soc_names     = Array{String}(undef, atmos.gas_soc_num)   # list of names
-        for i_gas in 1:atmos.gas_soc_num   # for each supported gas
-            atmos.gas_soc_names[i_gas] =
-                SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
-        end
+        end # end socrates-only
 
         # VMRs are provided to SOCRATES when radtrans is called
         # For now, they are just stored inside the atmos struct
@@ -1577,13 +1617,16 @@ module atmosphere
         for i in 1:atmos.gas_num
             g = atmos.gas_names[i]
             gas_flags = ""
-            if !(g in atmos.gas_soc_names) # flag as not included in radtrans
+            if (atmos.rt_scheme == RT_SOCRATES) && !(g in atmos.gas_soc_names)
+                # flag as not included in radtrans
                 gas_flags *= "NO_OPACITY "
             end
-            if g in atmos.condensates       # flag as condensable
+            if g in atmos.condensates
+                 # flag as condensable
                 gas_flags *= "COND "
             end
-            if atmos.gas_dat[g].stub        # flag as containing stub thermo data
+            if atmos.gas_dat[g].stub
+                # flag as containing stub thermo data
                 gas_flags *= "NO_THERMO "
             end
             gas_flags *= String(Symbol(atmos.gas_dat[g].eos))*" "
@@ -1606,78 +1649,81 @@ module atmosphere
         # Aerosol processes
         #################################
 
-        SOCRATES.allocate_aer_prsc(atmos.aer, atmos.dimen, atmos.spectrum)
-        if atmos.control.l_aerosol
-            @error "Aerosols not implemented"
-            return false
-        else
-            atmos.dimen.nd_profile_aerosol_prsc   = 1
-            atmos.dimen.nd_opt_level_aerosol_prsc = 1
-            atmos.dimen.nd_phf_term_aerosol_prsc  = 1
+        if atmos.rt_scheme == RT_SOCRATES
 
-            atmos.aer.mr_source .= SOCRATES.rad_pcf.ip_aersrc_classic_roff
+            SOCRATES.allocate_aer_prsc(atmos.aer, atmos.dimen, atmos.spectrum)
+            if atmos.control.l_aerosol
+                @error "Aerosols not implemented"
+                return false
+            else
+                atmos.dimen.nd_profile_aerosol_prsc   = 1
+                atmos.dimen.nd_opt_level_aerosol_prsc = 1
+                atmos.dimen.nd_phf_term_aerosol_prsc  = 1
 
-            for i = 1:atmos.spectrum.Dim.nd_aerosol_species
-                atmos.aer.mr_type_index[i] = i
-            end
-        end
+                atmos.aer.mr_source .= SOCRATES.rad_pcf.ip_aersrc_classic_roff
 
-        #######################################
-        # Clouds
-        # see src/aux/input_cloud_cdf.f
-        #######################################
-
-        atmos.dimen.nd_profile_cloud_prsc   = 1
-        atmos.dimen.nd_opt_level_cloud_prsc = 1
-        atmos.dimen.nd_phf_term_cloud_prsc  = 1
-
-        if atmos.control.l_cloud
-            # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen
-            # Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
-
-            atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_homogen
-            atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_mix_max      # Goes with ip_max_rand
-            atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand           # Maximum/random overlap in a mixed column (-C 2)
-            atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous        # Homogeneous cloud
-            atmos.control.i_st_water  = 5                                      # Liquid Water Droplet type 5 (-d 5)
-            atmos.control.i_cnv_water = 5                                      # Convective Liquid Water Droplet type 5
-            atmos.control.i_st_ice    = 11                                     # Water Ice type 11 (-i 11)
-            atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11
-        else
-            atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
-        end
-
-        SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
-
-        if atmos.control.l_cloud
-            atmos.cld.n_condensed       = 1
-            atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
-            atmos.cld.n_cloud_type      = 1
-            atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_water
-            atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
-
-            # reset parameters
-            fill!(atmos.cld.condensed_param_list, 0.0)
-
-            # input_cloud_cdf.f90, line 565
-            n_cloud_parameter = 16 # for  ip_drop_pade_2
-            for j in 1:atmos.nbands
-                for k in 1:n_cloud_parameter
-                    atmos.cld.condensed_param_list[k, 1, j] = atmos.spectrum.Drop.parm_list[k, j,
-                                                                    atmos.cld.i_condensed_param[1]]
+                for i = 1:atmos.spectrum.Dim.nd_aerosol_species
+                    atmos.aer.mr_type_index[i] = i
                 end
             end
 
-            # In-cloud fractions of different types of cloud
-            fill!(atmos.cld.frac_cloud, 0.0)
-            atmos.cld.frac_cloud[1,:,1] .= 1.0
+            #######################################
+            # Clouds
+            # see src/aux/input_cloud_cdf.f
+            #######################################
 
-        else
-            atmos.cld.n_condensed  = 0
-            atmos.cld.n_cloud_type = 0
-        end
+            atmos.dimen.nd_profile_cloud_prsc   = 1
+            atmos.dimen.nd_opt_level_cloud_prsc = 1
+            atmos.dimen.nd_phf_term_cloud_prsc  = 1
 
-        atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
+            if atmos.control.l_cloud
+                # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen
+                # Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
+
+                atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_homogen
+                atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_mix_max      # Goes with ip_max_rand
+                atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand           # Maximum/random overlap in a mixed column (-C 2)
+                atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous        # Homogeneous cloud
+                atmos.control.i_st_water  = 5                                      # Liquid Water Droplet type 5 (-d 5)
+                atmos.control.i_cnv_water = 5                                      # Convective Liquid Water Droplet type 5
+                atmos.control.i_st_ice    = 11                                     # Water Ice type 11 (-i 11)
+                atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11
+            else
+                atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
+            end
+
+            SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
+
+            if atmos.control.l_cloud
+                atmos.cld.n_condensed       = 1
+                atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
+                atmos.cld.n_cloud_type      = 1
+                atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_water
+                atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
+
+                # reset parameters
+                fill!(atmos.cld.condensed_param_list, 0.0)
+
+                # input_cloud_cdf.f90, line 565
+                n_cloud_parameter = 16 # for  ip_drop_pade_2
+                for j in 1:atmos.nbands
+                    for k in 1:n_cloud_parameter
+                        atmos.cld.condensed_param_list[k, 1, j] = atmos.spectrum.Drop.parm_list[k, j,
+                                                                        atmos.cld.i_condensed_param[1]]
+                    end
+                end
+
+                # In-cloud fractions of different types of cloud
+                fill!(atmos.cld.frac_cloud, 0.0)
+                atmos.cld.frac_cloud[1,:,1] .= 1.0
+
+            else
+                atmos.cld.n_condensed  = 0
+                atmos.cld.n_cloud_type = 0
+            end
+
+            atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
+        end # end socrates only
 
         ###########################################
         # Surface properties
@@ -1782,6 +1828,7 @@ module atmosphere
             # set dummy value for the scalar variable containing the grey albedo
             atmos.albedo_s = Statistics.median(atmos.surf_r_arr)
         end
+
 
         #######################################
         # Output arrays
