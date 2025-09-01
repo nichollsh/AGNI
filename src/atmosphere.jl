@@ -34,8 +34,9 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.7.4"
-    const HYDROGRAV_STEPS::Int64 = 40
+    const AGNI_VERSION::String    = "1.7.4"  # current agni version
+    const HYDROGRAV_STEPS::Int64  = 40       # num of sub-layers in hydrostatic integration
+    const SOCVER_minimum::Float64 = 2407.2   # minimum required socrates version
 
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
@@ -88,8 +89,8 @@ module atmosphere
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (see Cronin+14)
         overlap_method::String          # Absorber overlap method to be used
-        kappa_grey_lw::Float64          # LW opacity used for grey-gas scheme [m2 kg-1]
-        kappa_grey_sw::Float64          # SW opacity used for grey-gas scheme [m2 kg-1]
+        κ_grey_lw::Float64              # LW opacity used for grey-gas scheme [m2 kg-1]
+        κ_grey_sw::Float64              # SW opacity used for grey-gas scheme [m2 kg-1]
 
         # Spectral bands
         nbands::Int
@@ -346,8 +347,8 @@ module atmosphere
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
     - `check_integrity::Bool`           confirm integrity of thermo files using their checksum
-    - `kappa_grey_lw::Float64`          gas opacity when using grey-gas RT scheme, longwave
-    - `kappa_grey_sw::Float64`          gas opacity when using grey-gas RT scheme, shortwave
+    - `κ_grey_lw::Float64`              gas opacity when using grey-gas RT scheme, longwave
+    - `κ_grey_sw::Float64`              gas opacity when using grey-gas RT scheme, shortwave
     - `fastchem_work::String`           working directory for fastchem
     - `fastchem_floor::Float64`         temperature floor on profile provided to fastchem
     - `fastchem_maxiter::Float64`       maximum solver iterations allowed by fastchem
@@ -393,8 +394,8 @@ module atmosphere
                     use_all_gases::Bool =       false,
                     check_integrity::Bool =     true,
 
-                    kappa_grey_lw::Float64  =   1e-4,
-                    kappa_grey_sw::Float64  =   1e-6,
+                    κ_grey_lw::Float64  =       1e-4,
+                    κ_grey_sw::Float64  =       1e-5,
 
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
@@ -421,13 +422,6 @@ module atmosphere
         @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
         @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
-        # Check SOCRATES version is valid
-        SOCVER_minimum = 2407.2
-        if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
-            @error "SOCRATES is out of date and cannot be used!"
-            @error "    found at $(ENV["RAD_DIR"])"
-            @error "    version is "*atmos.SOCRATES_VERSION
-        end
 
         atmos.benchmark   = false
         atmos.num_rt_eval = 0
@@ -436,10 +430,24 @@ module atmosphere
         if strip(lowercase(spfile)) == "greygas"
             atmos.rt_scheme = RT_GREYGAS
             atmos.spectral_file = "greygas"
-            @info "Using greygas radiative transfer scheme"
+            @info "Using double-grey radiative transfer scheme"
+
+            # check options
+            if flag_rayleigh || flag_cloud
+                @error "Scattering not supported by grey-gas RT scheme"
+                return false
+            end
+
         else
             atmos.rt_scheme = RT_SOCRATES
             atmos.spectral_file = abspath(spfile)
+
+            # Check SOCRATES version is valid
+            if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
+                @error "SOCRATES is out of date and cannot be used!"
+                @error "    found at $(ENV["RAD_DIR"])"
+                @error "    version is "*atmos.SOCRATES_VERSION
+            end
         end
 
         atmos.dimen =       SOCRATES.StrDim()
@@ -488,8 +496,8 @@ module atmosphere
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
 
-        atmos.kappa_grey_lw =      max(0.0, kappa_grey_lw)
-        atmos.kappa_grey_sw =      max(0.0, kappa_grey_sw)
+        atmos.κ_grey_lw =       max(0.0, κ_grey_lw)
+        atmos.κ_grey_sw =       max(0.0, κ_grey_sw)
 
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4

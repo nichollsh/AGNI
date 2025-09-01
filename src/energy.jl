@@ -257,7 +257,11 @@ module energy
     """
     **Solve RT using double grey-gas formulation**
 
-    Following the two-stream equations in this tutorial:
+    Simple two-stream double grey RT solver which integrates fluxes from the TOA and BOA.
+
+    Uses two opacity values to represent the LW and SW components of the flux field.
+
+    Loosely following this tutorial:
     https://brian-rose.github.io/ClimateLaboratoryBook/courseware/radiative-transfer/
 
     Arguments:
@@ -273,18 +277,18 @@ module energy
         atmos.flux_d_lw[1] = 0.0
         for i in 1:atmos.nlev_c
             # Downward LW flux at bottom of layer
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.kappa_grey_lw / atmos.layer_grav[i] )
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.layer_grav[i] )
             atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * trans + (phys.σSB * atmos.tmpl[i]^4) * (1 - trans)
 
             # Downward SW flux at bottom of layer
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.kappa_grey_sw / atmos.layer_grav[i] )
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_sw / atmos.layer_grav[i] )
             atmos.flux_d_sw[i+1] = atmos.flux_d_sw[i] * trans
         end
 
         # Up-directed LW beam, looping from surface upwards
         atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4 * (1-atmos.albedo_s)
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.kappa_grey_lw / atmos.layer_grav[i] )
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.layer_grav[i] )
             atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * trans + (phys.σSB * atmos.tmpl[i+1]^4) * (1 - trans)
         end
 
