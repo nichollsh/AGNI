@@ -255,7 +255,7 @@ module energy
     end
 
     """
-    **Solve RT using grey-gas formulation**
+    **Solve RT using double grey-gas formulation**
 
     Following the two-stream equations in this tutorial:
     https://brian-rose.github.io/ClimateLaboratoryBook/courseware/radiative-transfer/
@@ -265,39 +265,40 @@ module energy
     """
     function _radtrans_greygas!(atmos)
 
-        # Store transmissivity and emissivity of each layer
-        layer_t::Array{Float64,1} = zero(atmos.layer_grav)
-        layer_ε::Array{Float64,1} = zero(atmos.layer_grav)
+        # Working layer transmissivity and emissivity
+        trans::Float64 = 0.0
 
-        # Downward beam, looping from TOA
-        atmos.flux_d_lw[1]   = atmos.toa_heating
+        # Down-directed SW and LW beams, looping from TOA downwards
+        atmos.flux_d_sw[1] = atmos.toa_heating
+        atmos.flux_d_lw[1] = 0.0
         for i in 1:atmos.nlev_c
-            # Transmissivity
-            layer_t[i] = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.kappa_grey / atmos.layer_grav[i] )
+            # Downward LW flux at bottom of layer
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.kappa_grey_lw / atmos.layer_grav[i] )
+            atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * trans + (phys.σSB * atmos.tmpl[i]^4) * (1 - trans)
 
-            # Emissivity
-            layer_ε[i] = 1 - layer_t[i]
-
-            # Downward flux at bottom of layer
-            atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * layer_t[i] + (phys.σSB * atmos.tmp[i]^4) * layer_ε[i]
+            # Downward SW flux at bottom of layer
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.kappa_grey_sw / atmos.layer_grav[i] )
+            atmos.flux_d_sw[i+1] = atmos.flux_d_sw[i] * trans
         end
 
-        # Upward beam, looping from surface
-        atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4
+        # Up-directed LW beam, looping from surface upwards
+        atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4 * (1-atmos.albedo_s)
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
-            atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * layer_t[i] + (phys.σSB * atmos.tmp[i]^4) * layer_ε[i]
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.kappa_grey_lw / atmos.layer_grav[i] )
+            atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * trans + (phys.σSB * atmos.tmpl[i+1]^4) * (1 - trans)
         end
 
         # Set other arrays to zero
-        fill!(atmos.flux_d_sw, 0.0)
         fill!(atmos.flux_u_sw, 0.0)
         atmos.is_out_sw = true
         atmos.is_out_lw = true
 
         # Set net arrays
-        atmos.flux_d = atmos.flux_d_lw + atmos.flux_d_sw
-        atmos.flux_u = atmos.flux_u_lw + atmos.flux_u_sw
-        atmos.flux_n = atmos.flux_n_lw + atmos.flux_n_sw
+        atmos.flux_d    = atmos.flux_d_lw + atmos.flux_d_sw  # net down
+        atmos.flux_u    = atmos.flux_u_lw + atmos.flux_u_sw  # net up
+        atmos.flux_n_lw = atmos.flux_u_lw - atmos.flux_d_lw  # net lw
+        atmos.flux_n_sw = atmos.flux_u_sw - atmos.flux_d_sw  # net sw
+        atmos.flux_n    = atmos.flux_n_lw + atmos.flux_n_sw  # net
     end
 
     """
