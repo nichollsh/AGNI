@@ -34,7 +34,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String   = "1.7.3"
+    const AGNI_VERSION::String   = "1.7.4"
     const HYDROGRAV_STEPS::Int64 = 40
 
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
