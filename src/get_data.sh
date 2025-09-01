@@ -100,7 +100,6 @@ function zenodo {
     # get data
     echo "    $1 > $tgt"
     mkdir -p $2
-    # curl -LsS $url > $tgt
     wget -qO $tgt $url
 
     # check if command failed

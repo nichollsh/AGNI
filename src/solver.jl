@@ -139,7 +139,7 @@ module solver
                             ls_increase::Float64=1.08,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
                             modplot::Int=1, save_frames::Bool=true,
-                            modprint::Int=1, plot_jacobian::Bool=false,
+                            modprint::Int=1, plot_jacobian::Bool=true,
                             conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
                             )::Bool
 
@@ -805,6 +805,7 @@ module solver
             @error "    failure (maximum iterations)"
         elseif code == 2
             @error "    failure (singular jacobian)"
+            plotting.jacobian(b, path_jac)
         elseif code == 3
             @error "    failure (maximum time)"
         elseif code == 4

@@ -88,7 +88,8 @@ module atmosphere
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (see Cronin+14)
         overlap_method::String          # Absorber overlap method to be used
-        kappa_grey::Float64             # Opacity used for grey-gas scheme [m2 kg-1]
+        kappa_grey_lw::Float64          # LW opacity used for grey-gas scheme [m2 kg-1]
+        kappa_grey_sw::Float64          # SW opacity used for grey-gas scheme [m2 kg-1]
 
         # Spectral bands
         nbands::Int
@@ -345,7 +346,8 @@ module atmosphere
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
     - `check_integrity::Bool`           confirm integrity of thermo files using their checksum
-    - `kappa_grey::Float64`             gas opacity when using grey-gas RT scheme
+    - `kappa_grey_lw::Float64`          gas opacity when using grey-gas RT scheme, longwave
+    - `kappa_grey_sw::Float64`          gas opacity when using grey-gas RT scheme, shortwave
     - `fastchem_work::String`           working directory for fastchem
     - `fastchem_floor::Float64`         temperature floor on profile provided to fastchem
     - `fastchem_maxiter::Float64`       maximum solver iterations allowed by fastchem
@@ -391,7 +393,8 @@ module atmosphere
                     use_all_gases::Bool =       false,
                     check_integrity::Bool =     true,
 
-                    kappa_grey::Float64  =      1e-7,
+                    kappa_grey_lw::Float64  =   1e-4,
+                    kappa_grey_sw::Float64  =   1e-6,
 
                     fastchem_work::String =     "",
                     fastchem_floor::Float64 =   273.0,
@@ -485,7 +488,8 @@ module atmosphere
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
 
-        atmos.kappa_grey =      max(0.0, kappa_grey)
+        atmos.kappa_grey_lw =      max(0.0, kappa_grey_lw)
+        atmos.kappa_grey_sw =      max(0.0, kappa_grey_sw)
 
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
