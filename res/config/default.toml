@@ -30,7 +30,6 @@ title = "Default"                       # Name for this configuration file
     p_surf          = 270.0                     # Total surface pressure [bar].
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
     vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
-    vmr_file        = ""                        # Path to input volume mixing ratios. Not required if planet.vmr is passed.
     chemistry       = 0                         # Chemistry type (see wiki).
     condensates     = []                        # List of volatiles which are allowed to condense.
 

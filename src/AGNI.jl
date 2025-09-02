@@ -256,9 +256,17 @@ module AGNI
                 if haskey(cfg["composition"],"vmr_dict")
                     # from dict in cfg file
                     mf_dict = cfg["composition"]["vmr_dict"]
-                elseif haskey(cfg["composition"], "vmr_path")
+
+                    # don't allow both keys
+                    if haskey(cfg["composition"], "vmr_file")
+                        @error "Misconfiguration: cannot provide `vmr_file` and `vmr_dict`"
+                        return false
+                    end
+
+                elseif haskey(cfg["composition"], "vmr_file")
                     # from csv file to be read-in
                     mf_path = cfg["composition"]["vmr_file"]
+
                 else
                     @error "Misconfiguration: if providing p_surf, must also provide VMRs"
                     return false
@@ -276,9 +284,13 @@ module AGNI
                     mf_dict[k] = pp_dict[k]/p_surf
                 end
 
+                if haskey(cfg["composition"], "vmr_file") || haskey(cfg["composition"], "vmr_dict")
+                    @error "Misconfiguration: cannot provide partial pressures and mixing ratios"
+                end
+
             # most provide either VMR or partial pressures, if not transparent
             else
-                @error "Must provide either p_dict or p_surf+VMRs in config"
+                @error "Must provide either p_dict OR p_surf+VMRs in config"
                 @error "    Neglect these keys only when transparent=true"
                 return false
             end
