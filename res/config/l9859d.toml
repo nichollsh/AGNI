@@ -24,7 +24,6 @@ title = "L 98-59 d"
     p_surf          = 32.89e3
     p_top           = 1e-4
     vmr_dict        = { SO2=1.0 }
-    vmr_file        = ""
     chemistry       = 0
     condensates     = []
 

@@ -24,7 +24,6 @@ title = "Hot and dry"
     p_surf          = 2700.0
     p_top           = 1e-5
     vmr_dict        = { H2O = 1.0}
-    vmr_file        = ""
     chemistry       = 0
     condensates     = []
 
