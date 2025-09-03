@@ -2,7 +2,7 @@
 title = "Line-by-line validation tests"
 
 [planet]
-    tmp_surf        = 600.0
+    tmp_surf        = 400.0
     instellation    = 0.0
     albedo_b        = 0.0
     s0_fact         = 1.0
@@ -16,15 +16,15 @@ title = "Line-by-line validation tests"
     wind_speed      = 2.0
 
 [files]
-    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"
-    input_star      = "res/stellar_spectra/sun.txt"
-    output_dir      = "out/"
-    rfm_parfile     = "res/parfiles/h2o-co2_4000-5000.par"
+    input_sf        = "out/ee/runtime.sf" #"res/spectral_files/Dayspring/4096/Dayspring.sf"
+    input_star      = "" # "res/stellar_spectra/sun.txt"
+    output_dir      = "out/ro/"
+    rfm_parfile     = "res/parfiles/h2o-co2_800-9000.par"
 
 [composition]
-    p_surf          = 123.0
+    p_surf          = 270.0
     p_top           = 1e-6
-    vmr_dict        = { H2O = 1.0, CO2=0.0 }
+    vmr_dict        = { H2O = 0.9, CO2=0.1 }
     chemistry       = 0
     condensates     = []
 
@@ -54,18 +54,18 @@ title = "Line-by-line validation tests"
     easy_start      = false
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3
-    rfm_wn_min      = 4050.0
-    rfm_wn_max      = 4950.0
+    rfm_wn_min      = 1000.0
+    rfm_wn_max      = 6000.0
     perturb_all     = false
 
 [plots]
     at_runtime      = true
     temperature     = true
     fluxes          = true
-    contribution    = true
-    emission        = true
-    albedo          = true
-    mixing_ratios   = true
+    contribution    = false
+    emission        = false
+    albedo          = false
+    mixing_ratios   = false
     animate         = false
-    height          = true
+    height          = false
     cloud           = false
