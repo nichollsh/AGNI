@@ -24,7 +24,6 @@ title = "Grey gas"
     p_surf          = 6000.0
     p_top           = 1e-6
     vmr_dict        = { H2O = 1.0}
-    vmr_file        = ""
     chemistry       = 0
     condensates     = []
 
