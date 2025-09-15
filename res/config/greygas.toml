@@ -23,8 +23,8 @@ title = "Grey gas"
 
 [composition]
     p_surf          = 6000.0
-    p_top           = 1e-6
-    vmr_dict        = { H2O = 1.0}
+    p_top           = 1e-5
+    vmr_dict        = { H2 = 1.0}
     chemistry       = 0
     condensates     = []
 
@@ -50,7 +50,7 @@ title = "Grey gas"
     solution_type   = 3
     solver          = "newton"
     dx_max          = 500.0
-    initial_state   = ["iso","1200"]
+    initial_state   = ["dry","str","50"]
     linesearch      = 0
     easy_start      = false
     converge_atol   = 1.0e-2
