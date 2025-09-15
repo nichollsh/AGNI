@@ -2,8 +2,6 @@ using AGNI
 using .Iterators
 using LoggingExtras
 using Printf
-using Plots
-using Colors
 
 const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../")
 
@@ -18,12 +16,12 @@ cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 
 # Define grid
 grid::Dict = Dict((
-    "vmr_H2S" => range(start=0.0,   stop=1.0,    length=3),
-    "p_surf"  => range(start=100.0, stop=1000.0, length=3),
+    "vmr_H2S" => range(start=0.05,  stop=0.95,   length=6),
+    "p_surf"  => range(start=100.0, stop=1000.0, length=6),
 ))
 
 # Variables to record
-output_keys = ["p_boa", "tmp_surf", "transspec_r", "transspec_rho", "transspec_μ"]
+output_keys = ["p_boa", "tmp_surf", "transspec_r", "transspec_rho", "transspec_μ", "transspec_tmp", "Kzz_kbreak"]
 
 # Other options
 save_netcdfs = false
@@ -147,6 +145,12 @@ for (i,p) in enumerate(grid_flat)
 
     succ = true
 
+    # Set all VMRs to zero
+    for gas in atmos.gas_names
+        atmos.gas_vmr[gas][:] .= 0.0
+        atmos.gas_ovmr[gas][:] .= 0.0
+    end
+
     # Update parameters
     for (key,val) in p
         @info "    set $key = $val"
@@ -176,7 +180,7 @@ for (i,p) in enumerate(grid_flat)
         break
     end
 
-    # Normalise VMRs at each level
+    # Ensure VMRs sum to unity
     tot_vmr::Float64 = 0.0
     for i in 1:atmos.nlev_c
         # get total
@@ -184,11 +188,20 @@ for (i,p) in enumerate(grid_flat)
         for g in atmos.gas_names
             tot_vmr += atmos.gas_vmr[g][i]
         end
-        # normalise to 1
-        for g in atmos.gas_names
-            atmos.gas_vmr[g][i] /= tot_vmr
-            atmos.gas_ovmr[g][i] = atmos.gas_vmr[g][i]
+
+        # normalise to 1 if greater than 1, otherwise fill with H2
+        if tot_vmr > 1
+            for g in atmos.gas_names
+                atmos.gas_vmr[g][i] /= tot_vmr
+            end
+        else
+            atmos.gas_vmr["H2"][i] += 1-tot_vmr
         end
+    end
+    # set original vmr arrays
+    for g in atmos.gas_names
+        atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
+        println("$g: $(atmos.gas_vmr[g][1])")
     end
 
     # Solve for RCE
@@ -232,7 +245,7 @@ end
 atmosphere.deallocate!(atmos)
 
 # =============================================================================
-# Write result to file, make matrix plot, and exit
+# Write result to file, and exit
 # -------------------------------
 
 # Write results
@@ -251,54 +264,6 @@ open(joinpath(output_dir,"result.csv"), "w") do hdl
         write(hdl,row*"\n")
     end
 end
-
-# Create a grid of subplots - one row for each output variable, one column for each input parameter
-@info "Creating parameter response plot..."
-p = plot(
-    layout=(length(output_keys), length(input_keys)),
-    size=(800, 200 * length(output_keys)),
-    margin=3Plots.mm
-)
-
-# Generate colors for each input key (each grid axis)
-cols = Colors.distinguishable_colors(length(input_keys), lchoices=range(0,stop=80,length=15))
-
-display([row["transspec_μ"]  for row in result])
-
-# Loop through each combination of output variable and input parameter
-for (i, output_var) in enumerate(output_keys)
-    for (j, input_param) in enumerate(input_keys)
-
-        # Extract data for this subplot
-        x_values = [row[input_param] for row in grid_flat]
-        y_values = [row[output_var]  for row in result]
-
-        # label
-        xlabel = ""
-        ylabel = ""
-        if i == length(output_keys)
-            xlabel = input_param
-        end
-        if j == 1
-            ylabel = output_var
-        end
-
-        # Create the scatter plot for this combination
-        scatter!(
-            p[i, j],
-            x_values, y_values,
-            xlabel=xlabel,
-            ylabel=ylabel,
-            legend=false,
-            markersize=3,
-            markerstrokewidth=0,
-            markercolor=cols[j]
-        )
-    end
-end
-
-# Save the plot
-savefig(p, joinpath(output_dir, "response.png"))
 
 # Done
 @info "Done!"

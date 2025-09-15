@@ -272,6 +272,7 @@ module atmosphere
         transspec_p::Float64            # Pressure level probed in transmission [Pa]
         transspec_r::Float64            # planet radius probed in transmission [m]
         transspec_μ::Float64            # mmw probed in transmission [kg mol-1]
+        transspec_tmp::Float64          # temperature probed in transmission [K]
         transspec_m::Float64            # mass [kg] enclosed by transspec_r
         transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
         interior_rho::Float64           # interior density [kg m-3]
@@ -374,7 +375,7 @@ module atmosphere
                     tmp_floor::Float64 =        2.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
-                    Kzz_floor::Float64 =        1e5,
+                    Kzz_floor::Float64 =        0.0,
                     mlt_asymptotic::Bool =      true,
                     mlt_criterion::Char =       's',
                     tmp_magma::Float64 =        3000.0,
@@ -535,6 +536,10 @@ module atmosphere
         atmos.interior_mass =   atmos.grav_surf * atmos.rp^2 / phys.G_grav
         atmos.interior_rho  =   3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
         atmos.transspec_p   =   2e3     # 20 mbar = 2000 Pa
+        atmos.transspec_μ   =   0.0
+        atmos.transspec_rho =   0.0
+        atmos.transspec_tmp =   0.0
+        atmos.transspec_r   =   0.0
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -962,8 +967,9 @@ module atmosphere
 
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
-        atmos.transspec_r = atmos.r[idx]
-        atmos.transspec_μ = atmos.layer_μ[idx]
+        atmos.transspec_r   = atmos.r[idx]
+        atmos.transspec_μ   = atmos.layer_μ[idx]
+        atmos.transspec_tmp = atmos.tmp[idx]
 
         # get mass of whole atmosphere, assuming hydrostatic
         atmos.transspec_m = atmos.p_boa * 4 * pi * atmos.rp^2 / atmos.grav_surf
