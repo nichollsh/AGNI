@@ -733,7 +733,7 @@ module energy
     """
     function restore_composition!(atmos::atmosphere.Atmos_t)
         for g in atmos.gas_names
-            @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
         end
     end
 

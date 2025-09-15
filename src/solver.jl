@@ -280,7 +280,7 @@ module solver
                                 rainout=rainout)
 
             # Energy divergence term
-            @turbo @. atmos.flux_dif -= atmos.ediv_add
+            @. atmos.flux_dif -= atmos.ediv_add
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)

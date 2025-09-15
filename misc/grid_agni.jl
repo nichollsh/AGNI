@@ -2,6 +2,8 @@ using AGNI
 using .Iterators
 using LoggingExtras
 using Printf
+using Plots
+using Colors
 
 const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../")
 
@@ -16,13 +18,16 @@ cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 
 # Define grid
 grid::Dict = Dict((
-    "vmr_H2S" => range(start=0.0,   stop=1.0,    length=10),
-    "p_surf"  => range(start=100.0, stop=1000.0, length=5),
+    "vmr_H2S" => range(start=0.0,   stop=1.0,    length=3),
+    "p_surf"  => range(start=100.0, stop=1000.0, length=3),
 ))
 
 # Variables to record
-record_keys = ["transspec_p", "transspec_r", "tmp_surf"]
+output_keys = ["p_boa", "tmp_surf", "transspec_r", "transspec_rho", "transspec_μ"]
 
+# Other options
+save_netcdfs = false
+save_plots   = false
 
 # =============================================================================
 # Parse keys and flatten grid
@@ -65,35 +70,32 @@ mass    = cfg["planet"]["mass"]
 gravity = phys.grav_accel(mass, radius)
 
 # Get the keys from the grid dictionary
-grid_keys = collect(keys(grid))
+input_keys = collect(keys(grid))
 
 # Create a vector of dictionaries for all parameter combinations
-param_list = [
-    Dict(zip(grid_keys, values_combination))
+grid_flat = [
+    Dict(zip(input_keys, values_combination))
     for values_combination in Iterators.product(values(grid)...)
 ]
-gridsize = length(param_list)
+gridsize = length(grid_flat)
 
 # Write combinations to file
 open(joinpath(output_dir,"gridpoints.csv"), "w") do hdl
     # Header
-    head = "index," * join(grid_keys, ",") * "\n"
+    head = "index," * join(input_keys, ",") * "\n"
     write(hdl,head)
 
     # Each row
-    for (i,p) in enumerate(param_list)
+    for (i,p) in enumerate(grid_flat)
         row = @sprintf("%07d,",i) * join([@sprintf("%.6e",v) for v in values(p)], ",") * "\n"
         write(hdl,row)
     end
 end
 
 # Create dictionary to record results in
-result::Dict = Dict()
-for k in record_keys
-    result[k] = zeros(Float64, gridsize)
-end
+result::Array{Dict, 1} = [Dict{String,Float64}() for _ in 1:gridsize]
 
-@info "Generated grid of $(length(grid_keys)) dimensions, with $gridsize points"
+@info "Generated grid of $(length(input_keys)) dimensions, with $gridsize points"
 
 # =============================================================================
 # Setup atmosphere object
@@ -140,7 +142,7 @@ setpt.request!(atmos, cfg["execution"]["initial_state"])
 # Iterate over parameters
 # -------------------------------
 
-for (i,p) in enumerate(param_list)
+for (i,p) in enumerate(grid_flat)
     @info @sprintf("Grid point %d / %-d = %.1f%%",i,gridsize,100*i/gridsize)
 
     succ = true
@@ -189,7 +191,6 @@ for (i,p) in enumerate(param_list)
         end
     end
 
-
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=sol_type,
                                             conduct=incl_conduct, chem_type=chem_type,
@@ -204,43 +205,100 @@ for (i,p) in enumerate(param_list)
                                             dx_max=Float64(cfg["execution"]["dx_max"]),
                                             ls_method=Int(cfg["execution"]["linesearch"]),
                                             easy_start=Bool(cfg["execution"]["easy_start"]),
-                                            modplot=5,
+                                            modplot=0,
                                             save_frames=false,
                                             perturb_all=perturb_all
                                             )
 
     # Write NetCDF file
-    save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d.nc",i)))
+    if save_netcdfs
+        save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d.nc",i)))
+    end
+
+    # Make plot
+    if save_plots
+        plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d_pt.png",i)))
+    end
 
     # Record keys
-    for k in record_keys
-        result[k][i] = Float64(getfield(atmos, Symbol(k)))
+    for k in output_keys
+        result[i][k] = Float64(getfield(atmos, Symbol(k)))
     end
 
     # Iterate
     @info "  "
 end
 
+atmosphere.deallocate!(atmos)
+
 # =============================================================================
-# Write result to file and exit
+# Write result to file, make matrix plot, and exit
 # -------------------------------
 
+# Write results
+@info "Writing results to file..."
 open(joinpath(output_dir,"result.csv"), "w") do hdl
     # Header
-    head = "index," * join(record_keys, ",") * "\n"
+    head = "index," * join(output_keys, ",") * "\n"
     write(hdl,head)
 
     # Each row
     for i in 1:gridsize
         row = @sprintf("%07d",i)
-        for k in record_keys
-            row *= @sprintf(",%.6e",result[k][i])
+        for k in output_keys
+            row *= @sprintf(",%.6e",result[i][k])
         end
-        write(hdl,row * "\n")
+        write(hdl,row*"\n")
     end
 end
 
+# Create a grid of subplots - one row for each output variable, one column for each input parameter
+@info "Creating parameter response plot..."
+p = plot(
+    layout=(length(output_keys), length(input_keys)),
+    size=(800, 200 * length(output_keys)),
+    margin=3Plots.mm
+)
+
+# Generate colors for each input key (each grid axis)
+cols = Colors.distinguishable_colors(length(input_keys), lchoices=range(0,stop=80,length=15))
+
+display([row["transspec_μ"]  for row in result])
+
+# Loop through each combination of output variable and input parameter
+for (i, output_var) in enumerate(output_keys)
+    for (j, input_param) in enumerate(input_keys)
+
+        # Extract data for this subplot
+        x_values = [row[input_param] for row in grid_flat]
+        y_values = [row[output_var]  for row in result]
+
+        # label
+        xlabel = ""
+        ylabel = ""
+        if i == length(output_keys)
+            xlabel = input_param
+        end
+        if j == 1
+            ylabel = output_var
+        end
+
+        # Create the scatter plot for this combination
+        scatter!(
+            p[i, j],
+            x_values, y_values,
+            xlabel=xlabel,
+            ylabel=ylabel,
+            legend=false,
+            markersize=3,
+            markerstrokewidth=0,
+            markercolor=cols[j]
+        )
+    end
+end
+
+# Save the plot
+savefig(p, joinpath(output_dir, "response.png"))
 
 # Done
-atmosphere.deallocate!(atmos)
 @info "Done!"

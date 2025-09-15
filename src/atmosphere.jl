@@ -271,6 +271,7 @@ module atmosphere
         # Observing properties
         transspec_p::Float64            # Pressure level probed in transmission [Pa]
         transspec_r::Float64            # planet radius probed in transmission [m]
+        transspec_μ::Float64            # mmw probed in transmission [kg mol-1]
         transspec_m::Float64            # mass [kg] enclosed by transspec_r
         transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
         interior_rho::Float64           # interior density [kg m-3]
@@ -721,7 +722,7 @@ module atmosphere
         # backup mixing ratios from current state
         for k in keys(atmos.gas_vmr)
             atmos.gas_ovmr[k] = zeros(Float64, atmos.nlev_c)
-            @turbo @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
+            @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
         end
 
         # set condensation mask and yield values [kg]
@@ -962,6 +963,7 @@ module atmosphere
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
         atmos.transspec_r = atmos.r[idx]
+        atmos.transspec_μ = atmos.layer_μ[idx]
 
         # get mass of whole atmosphere, assuming hydrostatic
         atmos.transspec_m = atmos.p_boa * 4 * pi * atmos.rp^2 / atmos.grav_surf
@@ -1146,7 +1148,7 @@ module atmosphere
     function calc_profile_mmw!(atmos::atmosphere.Atmos_t)
         fill!(atmos.layer_μ, 0.0)
         for gas in atmos.gas_names
-            @turbo @. atmos.layer_μ += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
+            @. atmos.layer_μ += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
         end
         return nothing
     end
@@ -1274,8 +1276,8 @@ module atmosphere
         atmos.p[1] = atmos.pl[1]*p_fact + atmos.p[1]*(1-p_fact)
 
         # Finally, convert arrays to actual pressure units [Pa]
-        @turbo @. atmos.p  = 10.0 ^ atmos.p
-        @turbo @. atmos.pl = 10.0 ^ atmos.pl
+        @. atmos.p  = 10.0 ^ atmos.p
+        @. atmos.pl = 10.0 ^ atmos.pl
 
         return nothing
     end
@@ -1789,7 +1791,7 @@ module atmosphere
             push!(_srf_v, _srf_v[end])
 
             # convert wl array from [nm] to [m]
-            @turbo @. _srf_w = _srf_w / 1e9
+            @. _srf_w = _srf_w / 1e9
 
             # sort data
             _srf_mask = sortperm(_srf_w)
@@ -1805,14 +1807,14 @@ module atmosphere
                 for i in 1:atmos.nbands
                     atmos.surf_r_arr[i] = _srf_i(atmos.bands_cen[i])
                 end
-                @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
+                @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
 
             elseif _srf_head[1] == "e"
                 @debug "Reading surface data, hemispherical emissivity (e_h)"
                 for i in 1:atmos.nbands
                     atmos.surf_e_arr[i] = _srf_i(atmos.bands_cen[i])
                 end
-                @turbo @. atmos.surf_r_arr = 1.0 - atmos.surf_e_arr
+                @. atmos.surf_r_arr = 1.0 - atmos.surf_e_arr
 
 
             elseif _srf_head[1] == "w"
@@ -1822,7 +1824,7 @@ module atmosphere
                     γ = sqrt( 1 - _srf_i(atmos.bands_cen[i]) )
                     atmos.surf_r_arr[i] = (1−γ)/(1+γ) *(1 - γ/(3+3γ) )
                 end
-                @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
+                @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
 
             else
                 @error "Unexpected format for surface data"
