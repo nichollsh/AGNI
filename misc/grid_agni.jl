@@ -17,7 +17,7 @@ cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 # Define grid
 grid::Dict = Dict((
     "vmr_H2S" => range(start=0.05,  stop=0.95,   length=6),
-    "p_surf"  => range(start=100.0, stop=1000.0, length=6),
+    "p_surf"  => 10.0 .^ range(start=0.0, stop=4.0, length=6),
 ))
 
 # Variables to record
@@ -201,7 +201,6 @@ for (i,p) in enumerate(grid_flat)
     # set original vmr arrays
     for g in atmos.gas_names
         atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
-        println("$g: $(atmos.gas_vmr[g][1])")
     end
 
     # Solve for RCE
