@@ -4,24 +4,27 @@ using LoggingExtras
 using Printf
 
 const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../")
+const R_earth::Float64 = 6.371e6
+const M_earth::Float64 = 5.972e24
 
 # =============================================================================
 # User config
 # -------------------------------
 
 # Base parameters
-cfg_base = "res/config/greygas.toml"
+cfg_base = "res/config/l9859d.toml"
 @info "Using base config: $cfg_base"
 cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 
 # Define grid
 grid::Dict = Dict((
-    "vmr_H2S" => range(start=0.05,  stop=0.95,   length=6),
-    "p_surf"  => 10.0 .^ range(start=0.0, stop=4.0, length=6),
+    # "mass" => range(start=1.57*M_earth,   stop=2.39*M_earth,  length=2),
+    "vmr_H2S" => range(start=0.02,        stop=0.5,           length=8),
+    "p_surf"  => 10.0 .^ range(start=1.5, stop=4.5,           length=7),
 ))
 
 # Variables to record
-output_keys = ["p_boa", "tmp_surf", "transspec_r", "transspec_rho", "transspec_μ", "transspec_tmp", "Kzz_kbreak"]
+output_keys = ["p_boa", "tmp_surf", "transspec_r", "transspec_rho", "transspec_μ", "transspec_tmp", "mmw_surf", "Kzz_kbreak"]
 
 # Other options
 save_netcdfs = false
@@ -62,6 +65,7 @@ surface_mat      = cfg["planet"]["surface_material"]
 p_surf           = cfg["composition"]["p_surf"]
 mf_dict          = cfg["composition"]["vmr_dict"]
 star_Teff        = cfg["planet"]["star_Teff"]
+stellar_spectrum = cfg["files"]["input_star"]
 
 radius  = cfg["planet"]["radius"]
 mass    = cfg["planet"]["mass"]
@@ -131,7 +135,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                         )
 
 # AGNI struct, allocate
-atmosphere.allocate!(atmos, ""; stellar_Teff=star_Teff)
+atmosphere.allocate!(atmos, stellar_spectrum; stellar_Teff=star_Teff)
 
 # Set PT
 setpt.request!(atmos, cfg["execution"]["initial_state"])
@@ -146,10 +150,10 @@ for (i,p) in enumerate(grid_flat)
     succ = true
 
     # Set all VMRs to zero
-    for gas in atmos.gas_names
-        atmos.gas_vmr[gas][:] .= 0.0
-        atmos.gas_ovmr[gas][:] .= 0.0
-    end
+    # for gas in atmos.gas_names
+    #     atmos.gas_vmr[gas][:] .= 0.0
+    #     atmos.gas_ovmr[gas][:] .= 0.0
+    # end
 
     # Update parameters
     for (key,val) in p
@@ -159,10 +163,12 @@ for (i,p) in enumerate(grid_flat)
             atmosphere.generate_pgrid!(atmos)
 
         elseif key == "mass"
-            atmos.grav_surf = phys.grav_accel(val, atmos.rp)
+            atmos.interior_mass = val
+            atmos.grav_surf = phys.grav_accel(val, radius)
 
         elseif key == "radius"
             atmos.rp = val
+            atmos.grav_surf = phys.grav_accel(atmos.interior_mass, val)
 
         elseif key == "instellation"
             atmos.instellation = val
@@ -201,6 +207,9 @@ for (i,p) in enumerate(grid_flat)
     # set original vmr arrays
     for g in atmos.gas_names
         atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
+        if atmos.gas_vmr[g][end] > 0
+            println("$g: $(atmos.gas_vmr[g][end])")
+        end
     end
 
     # Solve for RCE
@@ -234,7 +243,15 @@ for (i,p) in enumerate(grid_flat)
 
     # Record keys
     for k in output_keys
-        result[i][k] = Float64(getfield(atmos, Symbol(k)))
+        field = Symbol(k)
+        if hasfield(atmosphere.Atmos_t, field)
+            result[i][k] = Float64(getfield(atmos, Symbol(k)))
+        elseif k == "mmw_surf"
+            result[i][k] = Float64(atmos.layer_μ[end])
+        else
+            @error "Unhandled variable: $k"
+            result[i][k] = 0.0
+        end
     end
 
     # Iterate
