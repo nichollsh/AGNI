@@ -100,7 +100,7 @@ Input/output files and other paths.
 
 | Parameter          | Description   |
 | -----------------: | :------------ |
-| `input_sf       `  | Path to the desired spectral file ending in `.sf`, in `res/spectral_files/`. |
+| `input_sf       `  | Path to the desired spectral file in `res/spectral_files/`. If "greygas", uses double-grey RT scheme. |
 | `input_star     `  | Path to stellar spectrum. If blank, spectrum assumed to be inside spectral file. If "blackbody" must provide `planet.star_Teff`. |
 | `output_dir     `  | Path to the output directory. |
 | `rfm_parfile  `    | Path to .par linelist file, for running line-by-line calculations with the RFM. |

@@ -3,22 +3,22 @@ title = "Grey gas"
 
 [planet]
     tmp_surf        = 2000.0
-    instellation    = 90000.0
+    instellation    = 6818.61
     albedo_b        = 0.18
-    s0_fact         = 0.6652
-    zenith_angle    = 60.0
+    s0_fact         = 0.25
+    zenith_angle    = 54.74
     surface_material= "res/surface_albedos/lunarmarebasalt.dat"
     albedo_s        = 0.0
-    radius          = 6.37e6
-    mass            = 5.972e24
-    flux_int        = 0.0
+    radius          = 8064561.9164
+    mass            = 9.79e24
+    flux_int        = 0.58586427102
     turb_coeff      = 1.0e-2
     wind_speed      = 10.0
-    star_Teff       = 5000.0
+    star_Teff       = 3415.0
 
 [files]
     input_sf        = "greygas"
-    input_star      = "res/stellar_spectra/sun.txt"
+    input_star      = "blackbody"
     output_dir      = "out/"
 
 [composition]
@@ -34,7 +34,7 @@ title = "Grey gas"
     verbosity       = 1
     max_steps       = 200
     max_runtime     = 400
-    num_levels      = 100
+    num_levels      = 80
     continua        = true
     rayleigh        = false
     cloud           = false
@@ -49,9 +49,9 @@ title = "Grey gas"
     rainout         = false
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 500.0
-    initial_state   = ["dry","str","50"]
-    linesearch      = 0
+    dx_max          = 400.0
+    initial_state   = ["dry","str","150"]
+    linesearch      = 2
     easy_start      = false
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-4
