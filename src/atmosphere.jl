@@ -1923,7 +1923,6 @@ module atmosphere
         end
 
         # Set surface pressure to be very small, but still larger than TOA pressure
-        atmos.p_boa = atmos.p_toa * 1.1
         atmos.transspec_p = atmos.p_boa
         generate_pgrid!(atmos)
 
