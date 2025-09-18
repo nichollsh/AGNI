@@ -19,13 +19,13 @@ cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 
 # Define grid
 grid::Dict = Dict((
-    "mass_tot"  => range(start=1.00,  stop=6.00,  length=2),  # M_earth
-    "frac_atm"  => range(start=0.01,  stop=0.10,  length=2),
-    "frac_core" => range(start=0.10,  stop=0.80,  length=2),
+    "mass_tot"  => range(start=1.00,  stop=6.00,  length=4),  # M_earth
+    "frac_atm"  => range(start=0.01,  stop=0.10,  length=4),
+    "frac_core" => range(start=0.10,  stop=0.80,  length=4),
 ))
 
 # Variables to record
-output_keys = ["p_surf", "t_surf", "r_surf", "μ_surf", "r_phot", "μ_phot", "t_phot",  "Kzz_max"]
+output_keys = ["succ", "p_surf", "t_surf", "r_surf", "μ_surf", "r_phot", "μ_phot", "t_phot",  "Kzz_max"]
 
 # Other options
 save_netcdfs = false        # NetCDF file for each case
@@ -69,6 +69,8 @@ mf_dict          = cfg["composition"]["vmr_dict"]
 star_Teff        = cfg["planet"]["star_Teff"]
 stellar_spectrum = cfg["files"]["input_star"]
 nlev_c           = cfg["execution"]["num_levels"]
+
+transspec_p      = 2e3 # Pa
 
 # Intial values for interior structure
 radius   = cfg["planet"]["radius"]
@@ -145,6 +147,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
 
 # AGNI struct, allocate
 atmosphere.allocate!(atmos, stellar_spectrum; stellar_Teff=star_Teff)
+atmos.transspec_p = transspec_p
 
 # Set PT
 setpt.request!(atmos, cfg["execution"]["initial_state"])
@@ -296,10 +299,6 @@ for (i,p) in enumerate(grid_flat)
                                             perturb_all=perturb_all
                                             )
 
-    println("Rp     = $(atmos.rp/R_earth)  R_earth")
-    println("r_end  = $(atmos.r[end]/R_earth) R_earth")
-    println("rl_end = $(atmos.rl[end]/R_earth) R_earth")
-
     # Write NetCDF file
     if save_netcdfs
         save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d.nc",i)))
@@ -315,6 +314,12 @@ for (i,p) in enumerate(grid_flat)
         field = Symbol(k)
         if hasfield(atmosphere.Atmos_t, field)
             result_table[i][k] = Float64(getfield(atmos, Symbol(k)))
+        elseif k == "succ"
+            if succ
+                result_table[i][k] = 1.0 # success
+            else
+                result_table[i][k] = -1.0 # failure
+            end
         elseif k == "p_surf"
             result_table[i][k] = atmos.p_boa
         elseif k == "t_surf"
@@ -392,7 +397,7 @@ for i in 1:gridsize
         var_t[j,i] = result_profs[i]["t"][j]
         var_r[j,i] = result_profs[i]["r"][j]
     end
-    @info @sprintf("%d : Ri=%.3f",i,result_profs[i]["r"][end]/R_earth)
+    # @info @sprintf("%d : Ri=%.3f",i,result_profs[i]["r"][end]/R_earth)
 end
 
 close(ds)
