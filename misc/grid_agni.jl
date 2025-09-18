@@ -241,7 +241,7 @@ for (i,p) in enumerate(grid_flat)
         plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d_pt.png",i)))
     end
 
-    # Record keys
+    # Record keys (all in SI)
     for k in output_keys
         field = Symbol(k)
         if hasfield(atmosphere.Atmos_t, field)

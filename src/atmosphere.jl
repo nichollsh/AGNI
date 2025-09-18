@@ -1650,7 +1650,7 @@ module atmosphere
         end
 
         # Print info on the gases
-        @info "Allocating atmosphere with composition:"
+        @info "Allocating atmosphere with initial composition:"
         gas_flags::String = ""
         g::String = ""
         for i in 1:atmos.gas_num
