@@ -262,7 +262,8 @@ module consts
         ("SO2", 1461.1 ),  # boiling
     ])
 
-    # Solar metallicities taken from FastChem source files (Asplund et al. 2020, A&A)
+    # Solar metallicities taken from FastChem source files
+    # https://www.aanda.org/articles/aa/pdf/2021/09/aa40445-21.pdf
     const _solar_metallicity::Dict{String, Float64} = Dict([
         ("Al" , 6.43),
         ("Ar" , 6.38),

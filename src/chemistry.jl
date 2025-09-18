@@ -510,7 +510,7 @@ module chemistry
 
         for (i,h) in enumerate(head)  # for each column (gas)
 
-            # skip T and P
+            # skip columns (p, T, ntot, ngas, mu, and elemental abundances)
             if i <= 5+count_elem_nonzero
                 continue
             end
