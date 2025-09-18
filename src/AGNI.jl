@@ -202,7 +202,7 @@ module AGNI
             mass = cfg["planet"]["mass"]
             if gravity > 0.0
                 # overspecified
-                @error "Misconfiguration: provide `mass` OR `gravity`, not both"
+                @error "Config: provide `mass` OR `gravity`, not both"
                 return false
             end
             # convert mass to gravity
@@ -213,21 +213,23 @@ module AGNI
         surface_mat::String    = cfg["planet"]["surface_material"]
         if surface_mat == "greybody"
             if !haskey(cfg["planet"],"albedo_s")
-                @error "Misconfiguration: surface is greybody, `albedo_s` must be provided"
+                @error "Config: surface is greybody, `albedo_s` must be provided"
                 return false
             end
             albedo_s = cfg["planet"]["albedo_s"]
         end
 
         #    composition stuff
-        condensates::Array{String,1}    = String[]
-        chem_type::Int                  = 0
-        p_surf::Float64                 = 0.0
-        p_top::Float64                  = 0.0
-        mf_dict::Dict{String, Float64}  = Dict{String, Float64}()
-        mf_path::String                 = ""
-        transparent::Bool               = false
-        real_gas::Bool                  = false
+        condensates::Array{String,1}        = String[]
+        chem_type::Int                      = 0
+        p_surf::Float64                     = 0.0
+        p_top::Float64                      = 0.0
+        pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
+        mf_dict::Dict{String, Float64}      = Dict{String, Float64}()
+        mf_path::String                     = ""
+        metallicities::Dict{String, Float64}= Dict{String, Float64}()
+        transparent::Bool                   = false
+        real_gas::Bool                      = false
 
         # transparent atmosphere?
         if haskey(cfg["composition"], "transparent")
@@ -237,7 +239,7 @@ module AGNI
             @info "Transparent atmosphere requested"
 
             # set dummy values
-            mf_dict  = Dict("N2"=>1.0,"H2O"=>0.0,"CO2"=>0.0,"S2"=>0.0)
+            mf_dict  = Dict("H2"=>1.0)
             p_surf   = 1e-3
             p_top    = 1e-5
             real_gas = false
@@ -250,33 +252,54 @@ module AGNI
             chem_type = Int(cfg["composition"]["chemistry"])
             condensates = cfg["composition"]["condensates"]
 
-            # composition set by VMRs
-            if haskey(cfg["composition"],"p_surf")
-                # set composition using VMRs + Psurf
-                if haskey(cfg["composition"],"vmr_dict")
-                    # from dict in cfg file
-                    mf_dict = cfg["composition"]["vmr_dict"]
+            comp_set_by::Int = 0
 
-                    # don't allow both keys
-                    if haskey(cfg["composition"], "vmr_file")
-                        @error "Misconfiguration: cannot provide `vmr_file` and `vmr_dict`"
+            # composition set by VMRs and Psurf
+            if haskey(cfg["composition"],"p_surf")
+
+                p_surf = cfg["composition"]["p_surf"]
+
+                # from dict in cfg file
+                if haskey(cfg["composition"],"vmr_dict")
+                    comp_set_by += 1
+                    mf_dict = cfg["composition"]["vmr_dict"]
+                end
+
+                # from csv file to be read-in
+                if haskey(cfg["composition"], "vmr_file")
+                    comp_set_by += 1
+                    mf_path = cfg["composition"]["vmr_file"]
+                end
+
+                # set using metallicity ratios
+                if haskey(cfg["composition"], "metallicities")
+                    comp_set_by += 1
+                    metallicities = cfg["composition"]["metallicities"]
+
+                    # this requires fastchem to be used, to determine the VMRs
+                    if !(chem_type in [1,2,3])
+                        @error "Config: must enable FastChem if providing metallicities"
                         return false
                     end
 
-                elseif haskey(cfg["composition"], "vmr_file")
-                    # from csv file to be read-in
-                    mf_path = cfg["composition"]["vmr_file"]
+                    # set dummy VMRs for initialising atmosphere struct object
+                    mf_dict = Dict("H2"=>0.6, "H2O"=>0.1, "CO2"=>0.1, "N2"=>0.1, "H2S"=>0.1)
 
-                else
-                    @error "Misconfiguration: if providing p_surf, must also provide VMRs"
+                end
+
+                if comp_set_by == 0
+                    @error "Config: if providing p_surf, must also provide VMRs"
+                    return false
+                elseif comp_set_by != 1
+                    @error "Config: provide only one of `vmr_dict`, `vmr_file`, `metallicities`"
                     return false
                 end
-                p_surf = cfg["composition"]["p_surf"]
 
             # composition set by partial pressures
             elseif haskey(cfg["composition"], "p_dict")
                 # set composition from partial pressures (converted to mixing ratios)
-                pp_dict::Dict{String, Float64} = cfg["composition"]["p_dict"]
+                pp_dict = cfg["composition"]["p_dict"]
+                p_surf = 0.0
                 for k in keys(pp_dict)
                     p_surf += pp_dict[k]
                 end
@@ -285,12 +308,12 @@ module AGNI
                 end
 
                 if haskey(cfg["composition"], "vmr_file") || haskey(cfg["composition"], "vmr_dict")
-                    @error "Misconfiguration: cannot provide partial pressures and mixing ratios"
+                    @error "Config: cannot provide partial pressures and mixing ratios"
                 end
 
             # most provide either VMR or partial pressures, if not transparent
             else
-                @error "Must provide either p_dict OR p_surf+VMRs in config"
+                @error "Must provide either `p_dict` OR `p_surf` in config"
                 @error "    Neglect these keys only when transparent=true"
                 return false
             end
@@ -299,7 +322,11 @@ module AGNI
         #    chemistry
         if chem_type in [1,2,3]
             if length(condensates)>0
-                @error "Chemistry coupling is incompatible with condensation"
+                @error "Config: chemistry is incompatible with condensation"
+                return false
+            end
+            if transparent
+                @error "Config: chemistry is incompatible with transparent atmosphere mode"
                 return false
             end
         end
@@ -314,8 +341,8 @@ module AGNI
                 rfm_wn_min = Float64(cfg["execution"]["rfm_wn_min"])
                 rfm_wn_max = Float64(cfg["execution"]["rfm_wn_max"])
             else
-                @error "RFM calculation enabled (rfm_parfile=$rfm_parfile)"
-                @error "Must also provide rfm_wn_min AND rfm_wn_max"
+                @error "Config: RFM calculation enabled (rfm_parfile=$rfm_parfile)"
+                @error "        You must also provide `rfm_wn_min` AND `rfm_wn_max`"
             end
         end
 
@@ -389,6 +416,7 @@ module AGNI
                                 mf_dict, mf_path;
 
                                 condensates=condensates,
+                                metallicities=metallicities,
                                 flag_gcontinuum   = cfg["execution"]["continua"],
                                 flag_rayleigh     = cfg["execution"]["rayleigh"],
                                 flag_cloud        = cfg["execution"]["cloud"],
