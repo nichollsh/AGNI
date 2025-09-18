@@ -1,0 +1,69 @@
+# AGNI configuration file
+title = "TRAPPIST-1 b"
+
+[planet]
+    tmp_surf        = 700.0
+    instellation    = 5652.233
+    albedo_b        = 0.0
+    s0_fact         = 0.25
+    zenith_angle    = 54.74
+    surface_material= "res/surface_albedos/lunarmarebasalt.dat"
+    albedo_s        = 0.0
+    mass            = 8.21e24
+    radius          = 7.11e6
+    flux_int        = 0.1
+    turb_coeff      = 1.0e-2
+    wind_speed      = 10.0
+
+[files]
+    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"
+    input_star      = "res/stellar_spectra/trappist-1.txt"
+    output_dir      = "out/"
+
+[composition]
+    p_surf          = 1.0
+    p_top           = 1e-5
+    vmr_dict        = { CO2=1.0 }
+    chemistry       = 0
+    condensates     = []
+
+
+[execution]
+    clean_output    = true
+    verbosity       = 1
+    max_steps       = 200
+    max_runtime     = 400
+    num_levels      = 50
+    continua        = true
+    rayleigh        = true
+    cloud           = false
+    overlap_method  = "ee"
+    real_gas        = true
+    thermo_funct    = true
+    sensible_heat   = true
+    conduction      = true
+    latent_heat     = true
+    convection      = true
+    convection_crit = "s"
+    rainout         = false
+    solution_type   = 3
+    solver          = "newton"
+    dx_max          = 300.0
+    initial_state   = ["iso", "500"]
+    linesearch      = 2
+    easy_start      = false
+    converge_atol   = 1e-1
+    converge_rtol   = 1.0e-3
+    perturb_all     = false
+
+[plots]
+    at_runtime      = true
+    temperature     = true
+    fluxes          = true
+    contribution    = true
+    emission        = true
+    albedo          = true
+    mixing_ratios   = true
+    animate         = false
+    height          = false
+    cloud           = false
