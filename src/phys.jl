@@ -340,9 +340,15 @@ module phys
     """
     Get number of atoms from formula, returning a dictionary
     """
-    function count_atoms(m::String)::Dict
+    function count_atoms(m::String)::Dict{String,Int}
+
+        # Pre-defined molecules
+        if haskey(_lookup_count_atoms, m)
+            return _lookup_count_atoms[m]
+        end
+
         # Setup
-        out = Dict()
+        out::Dict{String,Int} = Dict{String,Int}()
         nchar::Int = length(m)
         i::Int = 1
         elem::String = ""
