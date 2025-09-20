@@ -556,14 +556,20 @@ module chemistry
         # Do not renormalise mixing ratios, since this is done by fastchem
         # If we are missing gases then that's okay.
 
-        # Find where we truncated the temperature profile,
-        #      and make sure that regions above that use the same gas_vmr values
+        # Find where T(p) drops below fastchem_floor temperature.
+        # Make sure that regions above that use the reasonable VMR values
+        i_trunc::Int = 0
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
             if atmos.tmp[i] < atmos.fastchem_floor
-                for g in atmos.gas_names
-                    atmos.gas_vmr[g][1:i] .= atmos.gas_vmr[g][i+1]
-                end
-                break
+               i_trunc = i
+               break
+            end
+        end
+        if i_trunc > 0
+            @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
+            i_trunc = min(i_trunc, atmos.nlev_c-1)
+            for g in atmos.gas_names
+                atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc+1]
             end
         end
 

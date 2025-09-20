@@ -25,16 +25,20 @@ grid::Dict = Dict((
     # "metal_C"       => 10 .^ range(start=-3,    stop=2,     length=2),
     # "metal_S"       => 10 .^ range(start=-3,    stop=2,     length=2),
     # "metal_O"       => 10 .^ range(start=-3,    stop=2,     length=2),
-    # "instellation"  => 10 .^ range(start=-0.5,  stop=3.5,   length=3)
+    "instellation"  => 10 .^ range(start=-0.5,  stop=3.5,   length=3)
 ))
 
 # Variables to record
 output_keys = ["succ", "p_surf", "t_surf", "r_surf", "μ_surf", "r_phot", "μ_phot", "t_phot",  "Kzz_max"]
 
-# Other options
+# Grid management options
 save_netcdfs = false        # NetCDF file for each case
 save_plots   = false        # plots for each case
 save_ncdf_tp = true         # a NetCDF containing all T(p) solutions
+
+# Runtime options
+transspec_p   = 2e3    # Pa
+fc_floor      = 80.0   # K
 
 # =============================================================================
 # Parse keys and flatten grid
@@ -73,8 +77,6 @@ mf_dict          = cfg["composition"]["vmr_dict"]
 star_Teff        = cfg["planet"]["star_Teff"]
 stellar_spectrum = cfg["files"]["input_star"]
 nlev_c           = cfg["execution"]["num_levels"]
-
-transspec_p      = 2e3 # Pa
 
 # Intial values for interior structure
 radius   = cfg["planet"]["radius"]
@@ -143,6 +145,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                                 thermo_functions  = cfg["execution"]["thermo_funct"],
                                 use_all_gases     = true,
                                 C_d=turb_coeff, U=wind_speed,
+                                fastchem_floor = fc_floor,
                                 Kzz_floor = 0.0,
                                 flux_int=flux_int,
                                 surface_material=surface_mat,
@@ -243,7 +246,7 @@ for (i,p) in enumerate(grid_flat)
             update_structure!(atmos, mass_tot, frac_atm, frac_core)
 
         elseif key == "instellation"
-            atmos.instellation = val
+            atmos.instellation = val * 1361.0 # W/m^2
 
         elseif startswith(key, "vmr_")
             gas = split(key,"_")[2]
