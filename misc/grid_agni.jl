@@ -22,10 +22,10 @@ grid::Dict = Dict((
     "mass_tot"      =>       range(start=1.00,  stop=10.00, length=4),  # M_earth
     "frac_atm"      =>       range(start=0.01,  stop=0.10,  length=4),
     "frac_core"     =>       range(start=0.10,  stop=0.80,  length=4),
-    "metal_C"       => 10 .^ range(start=-3,    stop=2,     length=2),
-    "metal_S"       => 10 .^ range(start=-3,    stop=2,     length=2),
-    "metal_O"       => 10 .^ range(start=-3,    stop=2,     length=2),
-    "instellation"  => 10 .^ range(start=-0.5,  stop=3.5,   length=2)
+    # "metal_C"       => 10 .^ range(start=-3,    stop=2,     length=2),
+    # "metal_S"       => 10 .^ range(start=-3,    stop=2,     length=2),
+    # "metal_O"       => 10 .^ range(start=-3,    stop=2,     length=2),
+    # "instellation"  => 10 .^ range(start=-0.5,  stop=3.5,   length=3)
 ))
 
 # Variables to record
