@@ -13,15 +13,19 @@ const M_earth::Float64 = 5.972e24
 # -------------------------------
 
 # Base parameters
-cfg_base = "res/config/greygas.toml"
+cfg_base = "res/config/structure_grid.toml"
 @info "Using base config: $cfg_base"
 cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 
 # Define grid
 grid::Dict = Dict((
-    "mass_tot"  => range(start=1.00,  stop=6.00,  length=4),  # M_earth
-    "frac_atm"  => range(start=0.01,  stop=0.10,  length=4),
-    "frac_core" => range(start=0.10,  stop=0.80,  length=4),
+    "mass_tot"      =>       range(start=1.00,  stop=10.00, length=4),  # M_earth
+    "frac_atm"      =>       range(start=0.01,  stop=0.10,  length=4),
+    "frac_core"     =>       range(start=0.10,  stop=0.80,  length=4),
+    "metal_C"       => 10 .^ range(start=-3,    stop=2,     length=2),
+    "metal_S"       => 10 .^ range(start=-3,    stop=2,     length=2),
+    "metal_O"       => 10 .^ range(start=-3,    stop=2,     length=2),
+    "instellation"  => 10 .^ range(start=-0.5,  stop=3.5,   length=2)
 ))
 
 # Variables to record
@@ -244,6 +248,10 @@ for (i,p) in enumerate(grid_flat)
         elseif startswith(key, "vmr_")
             gas = split(key,"_")[2]
             atmos.gas_vmr[gas][:]  .= val
+
+        elseif startswith(k, "metal_")
+            gas = split(k,"_")[2]
+            atmos.metal_orig[k] = val
 
         else
             @error "Unhandled parameter: $key"
