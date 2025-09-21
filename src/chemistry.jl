@@ -325,31 +325,21 @@ module chemistry
 
         count_elem_nonzero::Int = 0
 
-        # Paths
-        execpath::String = joinpath(atmos.FC_DIR,       "fastchem")      # Executable file
-        confpath::String = joinpath(atmos.fastchem_work,"config.input")  # Configuration by AGNI
-        elempath::String = joinpath(atmos.fastchem_work,"elements.dat")  # Elements by AGNI
-        chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat") # Chemistry by FastChem
-
-        # Check file exists
-        write_cfg = write_cfg || !isfile(confpath) || !isfile(elempath)
-
-        # Write config, elements
-        if write_cfg
-            # Write config (fastchem is quite particular about the format)
-            open(confpath,"w") do f
+        # Write config (fastchem is quite particular about the format)
+        if write_cfg || !isfile(atmos.fastchem_conf)
+            open(atmos.fastchem_conf,"w") do f
                 write(f,"#Atmospheric profile input file \n")
-                write(f,joinpath(atmos.fastchem_work,"pt.dat")*" \n\n")
+                write(f,atmos.fastchem_prof*" \n\n")
 
                 type_char = ["g","ce","cr"]
                 write(f,"#Chemistry calculation type (gas phase only = g, equilibrium condensation = ce, rainout condensation = cr) \n")
                 write(f,"$(type_char[chem_type]) \n\n")
 
                 write(f,"#Chemistry output file \n")
-                write(f,joinpath(atmos.fastchem_work,"chemistry.dat")*" "*joinpath(atmos.fastchem_work,"condensates.dat")*" \n\n")
+                write(f,atmos.fastchem_chem*" "*atmos.fastchem_cond*" \n\n")
 
                 write(f,"#Monitor output file \n")
-                write(f,joinpath(atmos.fastchem_work,"monitor.dat")*" \n\n")
+                write(f,atmos.fastchem_moni*" \n\n")
 
                 write(f,"#FastChem console verbose level (1 - 4); 1 = almost silent, 4 = detailed console output \n")
                 write(f,"1 \n\n")
@@ -358,7 +348,7 @@ module chemistry
                 write(f,"ND \n\n")
 
                 write(f,"#Element abundance file  \n")
-                write(f,joinpath(atmos.fastchem_work,"elements.dat")*" \n\n")
+                write(f,atmos.fastchem_elem*" \n\n")
 
                 write(f,"#Species data files    \n")
                 logK = joinpath(atmos.FC_DIR, "input/","logK/")
@@ -376,6 +366,10 @@ module chemistry
                 write(f,"#Max number internal solver iterations  \n")
                 write(f,@sprintf("%d \n\n", atmos.fastchem_maxiter))
             end
+        end # end write config
+
+        # Write metallicites
+        if write_cfg || !isfile(atmos.fastchem_elem)
 
             # Reset metallicities
             atmos.metal_calc = Dict{String,Float64}()
@@ -424,11 +418,10 @@ module chemistry
                 end
             end
 
-
             # Write metallicities to FC input file in the required format
             #     number densities normalised relative to hydrogen
             #     for each element `e`, value = log10(N_e/N_H) + 12
-            open(elempath,"w") do f
+            open(atmos.fastchem_elem,"w") do f
                 write(f,"# Elemental abundances file written by AGNI \n")
                 for e in phys.elems_standard
 
@@ -443,10 +436,10 @@ module chemistry
                 end
             end
 
-        end # end write_cfg
+        end # end write metallicities
 
-        # Write PT profile
-        open(joinpath(atmos.fastchem_work,"pt.dat"),"w") do f
+        # Write PT profile every time
+        open(atmos.fastchem_prof,"w") do f
             write(f,"# AGNI temperature structure \n")
             write(f,"# bar, kelvin \n")
             for i in 1:atmos.nlev_c
@@ -460,11 +453,10 @@ module chemistry
         end
 
         # Run fastchem
-        run(pipeline(`$execpath $confpath`, stdout=devnull))
+        run(pipeline(`$(atmos.fastchem_exec) $(atmos.fastchem_conf)`, stdout=devnull))
 
         # Check monitor output
-        monitorpath::String = joinpath(atmos.fastchem_work,"monitor.dat")
-        data = readdlm(monitorpath, '\t', String)
+        data = readdlm(atmos.fastchem_moni, '\t', String)
         fail_elem::String = ""
         fail_conv::String = ""
         for i in 1:atmos.nlev_c
@@ -489,11 +481,11 @@ module chemistry
         end
 
         # Get gas chemistry output
-        if !isfile(chempath)
+        if !isfile(atmos.fastchem_chem)
             @error "Could not find fastchem output"
             return 1
         end
-        (data,head) = readdlm(chempath, '\t', Float64, header=true)
+        (data,head) = readdlm(atmos.fastchem_chem, '\t', Float64, header=true)
         data = transpose(data)  # convert to: gas, level
 
         # Clear VMRs
