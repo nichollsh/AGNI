@@ -22,7 +22,7 @@ grid::Dict = Dict((
     "mass_tot"      =>       range(start=1.00,  stop=10.00, length=4),  # M_earth
     "frac_atm"      =>       range(start=0.01,  stop=0.10,  length=4),
     "frac_core"     =>       range(start=0.10,  stop=0.80,  length=4),
-    # "metal_C"       => 10 .^ range(start=-3,    stop=2,     length=2),
+    "metal_C"       => 10 .^ range(start=-3,    stop=2,     length=2),
     # "metal_S"       => 10 .^ range(start=-3,    stop=2,     length=2),
     # "metal_O"       => 10 .^ range(start=-3,    stop=2,     length=2),
     "instellation"  => 10 .^ range(start=-0.5,  stop=3.5,   length=3)
@@ -68,6 +68,7 @@ p_top            = cfg["composition"]["p_top"]
 real_gas         = cfg["execution"]["real_gas"]
 chem_type        = cfg["composition"]["chemistry"]
 condensates      = cfg["composition"]["condensates"]
+metallicities    = cfg["composition"]["metallicities"]
 turb_coeff       = cfg["planet"]["turb_coeff"]
 wind_speed       = cfg["planet"]["wind_speed"]
 flux_int         = cfg["planet"]["flux_int"]
@@ -95,6 +96,7 @@ grid_flat = [
     for values_combination in Iterators.product(values(grid)...)
 ]
 gridsize = length(grid_flat)
+numfails = 0
 
 # Write combinations to file
 open(joinpath(output_dir,"gridpoints.csv"), "w") do hdl
@@ -137,6 +139,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                                 mf_dict, "";
 
                                 condensates=condensates,
+                                metallicities=metallicities,
                                 flag_gcontinuum   = cfg["execution"]["continua"],
                                 flag_rayleigh     = cfg["execution"]["rayleigh"],
                                 flag_cloud        = cfg["execution"]["cloud"],
@@ -219,45 +222,48 @@ for (i,p) in enumerate(grid_flat)
     # end
 
     # Update parameters
-    for (key,val) in p
-        @info "    set $key = $val"
-        if key == "p_surf"
+    for (k,val) in p
+        @info "    set $k = $val"
+        if k == "p_surf"
             atmos.p_boa = val * 1e5 # convert bar to Pa
             atmosphere.generate_pgrid!(atmos)
 
-        elseif key == "mass"
+        elseif k == "mass"
             atmos.interior_mass = val * M_earth
             atmos.grav_surf = phys.grav_accel(val, atmos.rp)
 
-        elseif key == "radius"
+        elseif k == "radius"
             atmos.rp = val
             atmos.grav_surf = phys.grav_accel(atmos.interior_mass, atmos.rp)
 
-        elseif key == "frac_atm"
+        elseif k == "frac_atm"
             global frac_atm = val
             update_structure!(atmos, mass_tot, frac_atm, frac_core)
 
-        elseif key == "frac_core"
+        elseif k == "frac_core"
             global frac_core = val
             update_structure!(atmos, mass_tot, frac_atm, frac_core)
 
-        elseif key == "mass_tot"
+        elseif k == "mass_tot"
             global mass_tot = val * M_earth
             update_structure!(atmos, mass_tot, frac_atm, frac_core)
 
-        elseif key == "instellation"
+        elseif k == "instellation"
             atmos.instellation = val * 1361.0 # W/m^2
 
-        elseif startswith(key, "vmr_")
-            gas = split(key,"_")[2]
+        elseif startswith(k, "vmr_")
+            gas = split(k,"_")[2]
             atmos.gas_vmr[gas][:]  .= val
 
         elseif startswith(k, "metal_")
             gas = split(k,"_")[2]
-            atmos.metal_orig[k] = val
+            atmos.metal_orig[gas] = val
+
+            # remove FC input file to force update
+            rm(atmos.fastchem_elem, force=true)
 
         else
-            @error "Unhandled parameter: $key"
+            @error "Unhandled parameter: $k"
             succ = false
         end
     end
@@ -329,6 +335,7 @@ for (i,p) in enumerate(grid_flat)
             if succ
                 result_table[i][k] = 1.0 # success
             else
+                global numfails += 1
                 result_table[i][k] = -1.0 # failure
             end
         elseif k == "p_surf"
@@ -368,6 +375,10 @@ atmosphere.deallocate!(atmos)
 # =============================================================================
 # Write result_table to CSV, result_profs to NetCDF, and exit
 # -------------------------------
+
+if numfails >0
+    @warn "Number of failed grid points: $numfails"
+end
 
 # Write results
 @info "Writing result_table to CSV..."

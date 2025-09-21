@@ -265,8 +265,14 @@ module atmosphere
         fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
         fastchem_maxiter::Int           # Maximum FC iterations
         fastchem_xtol::Float64          # FC solver tolerance
-        fastchem_exec::String           # Path to fastchem executable
-        fastchem_work::String           # Path to fastchem working directory
+        fastchem_exec::String           # Path to executable
+        fastchem_work::String           # Path to working directory
+        fastchem_conf::String           # Path to input config file
+        fastchem_elem::String           # Path to input metallicities file
+        fastchem_prof::String           # Path to input T(p) profile
+        fastchem_chem::String           # Path to output gas composition
+        fastchem_cond::String           # Path to output condensate phases
+        fastchem_moni::String           # Path to output monitor file
 
         # RFM radiative transfer
         flag_rfm::Bool                  # RFM enabled?
@@ -886,6 +892,12 @@ module atmosphere
         atmos.fastchem_maxiter = fastchem_maxiter
         atmos.fastchem_floor   = fastchem_floor
         atmos.fastchem_xtol    = fastchem_xtol
+        atmos.fastchem_conf    = joinpath(atmos.fastchem_work,"config.input")
+        atmos.fastchem_elem    = joinpath(atmos.fastchem_work,"elements.dat")
+        atmos.fastchem_chem    = joinpath(atmos.fastchem_work,"chemistry.dat")
+        atmos.fastchem_cond    = joinpath(atmos.fastchem_work,"condensates.dat")
+        atmos.fastchem_prof    = joinpath(atmos.fastchem_work,"pt.dat")
+        atmos.fastchem_moni    = joinpath(atmos.fastchem_work,"monitor.dat")
 
         # RFM
         atmos.flag_rfm = !isempty(rfm_parfile)
