@@ -284,7 +284,7 @@ module energy
         for i in 1:atmos.nlev_c
             # Downward LW flux at bottom of layer
             trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.layer_grav[i] )
-            atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * trans + (phys.σSB * atmos.tmpl[i]^4) * (1 - trans)
+            atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
 
             # Downward SW flux at bottom of layer
             trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_sw / atmos.layer_grav[i] )
@@ -295,7 +295,7 @@ module energy
         atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4 * (1-atmos.albedo_s)
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
             trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.layer_grav[i] )
-            atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * trans + (phys.σSB * atmos.tmpl[i+1]^4) * (1 - trans)
+            atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
         end
 
         # Set other arrays to zero
@@ -733,7 +733,7 @@ module energy
     """
     function restore_composition!(atmos::atmosphere.Atmos_t)
         for g in atmos.gas_names
-            @turbo @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
         end
     end
 

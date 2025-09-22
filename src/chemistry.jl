@@ -325,31 +325,21 @@ module chemistry
 
         count_elem_nonzero::Int = 0
 
-        # Paths
-        execpath::String = joinpath(atmos.FC_DIR,       "fastchem")      # Executable file
-        confpath::String = joinpath(atmos.fastchem_work,"config.input")  # Configuration by AGNI
-        elempath::String = joinpath(atmos.fastchem_work,"elements.dat")  # Elements by AGNI
-        chempath::String = joinpath(atmos.fastchem_work,"chemistry.dat") # Chemistry by FastChem
-
-        # Check file exists
-        write_cfg = write_cfg || !isfile(confpath) || !isfile(elempath)
-
-        # Write config, elements
-        if write_cfg
-            # Write config (fastchem is quite particular about the format)
-            open(confpath,"w") do f
+        # Write config (fastchem is quite particular about the format)
+        if write_cfg || !isfile(atmos.fastchem_conf)
+            open(atmos.fastchem_conf,"w") do f
                 write(f,"#Atmospheric profile input file \n")
-                write(f,joinpath(atmos.fastchem_work,"pt.dat")*" \n\n")
+                write(f,atmos.fastchem_prof*" \n\n")
 
                 type_char = ["g","ce","cr"]
                 write(f,"#Chemistry calculation type (gas phase only = g, equilibrium condensation = ce, rainout condensation = cr) \n")
                 write(f,"$(type_char[chem_type]) \n\n")
 
                 write(f,"#Chemistry output file \n")
-                write(f,joinpath(atmos.fastchem_work,"chemistry.dat")*" "*joinpath(atmos.fastchem_work,"condensates.dat")*" \n\n")
+                write(f,atmos.fastchem_chem*" "*atmos.fastchem_cond*" \n\n")
 
                 write(f,"#Monitor output file \n")
-                write(f,joinpath(atmos.fastchem_work,"monitor.dat")*" \n\n")
+                write(f,atmos.fastchem_moni*" \n\n")
 
                 write(f,"#FastChem console verbose level (1 - 4); 1 = almost silent, 4 = detailed console output \n")
                 write(f,"1 \n\n")
@@ -358,7 +348,7 @@ module chemistry
                 write(f,"ND \n\n")
 
                 write(f,"#Element abundance file  \n")
-                write(f,joinpath(atmos.fastchem_work,"elements.dat")*" \n\n")
+                write(f,atmos.fastchem_elem*" \n\n")
 
                 write(f,"#Species data files    \n")
                 logK = joinpath(atmos.FC_DIR, "input/","logK/")
@@ -376,44 +366,80 @@ module chemistry
                 write(f,"#Max number internal solver iterations  \n")
                 write(f,@sprintf("%d \n\n", atmos.fastchem_maxiter))
             end
+        end # end write config
 
-            # Calculate elemental abundances
-            # number densities normalised relative to hydrogen
-            # for each element X, value = log10(N_X/N_H) + 12
-            # N = X(P/(K*T) , where X is the VMR and K is boltz-const
-            N_t = zeros(Float64, length(phys.elems_standard))      # total atoms in all gases
-            N_g = zeros(Float64, length(phys.elems_standard))      # atoms in current gas
-            for gas in atmos.gas_names
-                d = phys.count_atoms(gas)
-                fill!(N_g, 0.0)
-                for (i,e) in enumerate(phys.elems_standard)
-                    if e in keys(d)
-                        N_g[i] += d[e]
-                    end
+        # Write metallicites
+        if write_cfg || !isfile(atmos.fastchem_elem)
+
+            # Reset metallicities
+            atmos.metal_calc = Dict{String,Float64}()
+
+            # Metallicities provided by user
+            if !isempty(atmos.metal_orig)
+                @debug "Elements set by user-provided metallicities"
+
+                # copy original to calculated; set elem to zero if it was not provided
+                for e in phys.elems_standard
+                    atmos.metal_calc[e] = get(atmos.metal_orig, e, 0.0)
                 end
-                # Get gas abundance from original VMR value, since the running
-                #    one will be updated using FastChem's output. These will
-                #    be normalised later in this function.
-                N_g *= atmos.gas_ovmr[gas][atmos.nlev_c] * atmos.p[end] / (phys.k_B * atmos.tmp[end])  # gas contribution
-                N_t += N_g  # add atoms in this gas to total atoms
+                atmos.metal_calc["H"] = 1.0
+
+            # Not provided -- calculate from composition at surface
+            else
+                @debug "Elements set by surface gas composition"
+
+                # Calculate elemental abundances from surface mixing ratios [molecules/m^3]
+                #   assuming ideal gas: N/V = P*x/(Kb*T) , where x is the VMR
+                N_t = zeros(Float64, length(phys.elems_standard)) # total atoms in all gases
+                N_g = zeros(Float64, length(phys.elems_standard)) # atoms in current gas
+                #    loop over gases
+                for gas in atmos.gas_names
+                    fill!(N_g, 0.0)
+
+                    # count atoms in this gas
+                    d = phys.count_atoms(gas)
+                    for (i,e) in enumerate(phys.elems_standard)
+                        if haskey(d, e)
+                            N_g[i] += d[e] # N_g stores num of atoms in this gas
+                        end
+                    end
+
+                    # Get gas abundance from original VMR value
+                    #    scale number of atoms by the abundance of the gas
+                    N_g *= atmos.gas_ovmr[gas][end] * atmos.p[end] / (phys.k_B * atmos.tmp[end])
+
+                    # Add atoms from this gas to total atoms in the mixture
+                    N_t += N_g
+                end
+
+                # Convert elemental abundances to metallicity number ratios, rel to hydrogen
+                for (i,e) in enumerate(phys.elems_standard)
+                    atmos.metal_calc[e] = N_t[i]/N_t[1]
+                end
             end
 
-            # Write elemental abundances
-            open(elempath,"w") do f
-                write(f,"# Elemental abundances derived from AGNI volatiles \n")
-                for (i,e) in enumerate(phys.elems_standard)
-                    if N_t[i] > 1.0e-30
-                        # skip this element if its abundance is too small
-                        # normalise relative to hydrogen
-                        write(f, @sprintf("%s    %.3f \n",e,log10(N_t[i]/N_t[1]) + 12.0))
-                        count_elem_nonzero += 1
+            # Write metallicities to FC input file in the required format
+            #     number densities normalised relative to hydrogen
+            #     for each element `e`, value = log10(N_e/N_H) + 12
+            open(atmos.fastchem_elem,"w") do f
+                write(f,"# Elemental abundances file written by AGNI \n")
+                for e in phys.elems_standard
+
+                    # skip this element if its abundance is too small
+                    if atmos.metal_calc[e] < 1.0e-30
+                        continue
                     end
+
+                    # normalise abundance relative to hydrogen
+                    write(f, @sprintf("%s    %.3f \n",e,log10(atmos.metal_calc[e]) + 12.0))
+                    count_elem_nonzero += 1
                 end
             end
-        end
 
-        # Write PT profile
-        open(joinpath(atmos.fastchem_work,"pt.dat"),"w") do f
+        end # end write metallicities
+
+        # Write PT profile every time
+        open(atmos.fastchem_prof,"w") do f
             write(f,"# AGNI temperature structure \n")
             write(f,"# bar, kelvin \n")
             for i in 1:atmos.nlev_c
@@ -427,11 +453,10 @@ module chemistry
         end
 
         # Run fastchem
-        run(pipeline(`$execpath $confpath`, stdout=devnull))
+        run(pipeline(`$(atmos.fastchem_exec) $(atmos.fastchem_conf)`, stdout=devnull))
 
         # Check monitor output
-        monitorpath::String = joinpath(atmos.fastchem_work,"monitor.dat")
-        data = readdlm(monitorpath, '\t', String)
+        data = readdlm(atmos.fastchem_moni, '\t', String)
         fail_elem::String = ""
         fail_conv::String = ""
         for i in 1:atmos.nlev_c
@@ -456,11 +481,11 @@ module chemistry
         end
 
         # Get gas chemistry output
-        if !isfile(chempath)
+        if !isfile(atmos.fastchem_chem)
             @error "Could not find fastchem output"
             return 1
         end
-        (data,head) = readdlm(chempath, '\t', Float64, header=true)
+        (data,head) = readdlm(atmos.fastchem_chem, '\t', Float64, header=true)
         data = transpose(data)  # convert to: gas, level
 
         # Clear VMRs
@@ -477,7 +502,7 @@ module chemistry
 
         for (i,h) in enumerate(head)  # for each column (gas)
 
-            # skip T and P
+            # skip columns (p, T, ntot, ngas, mu, and elemental abundances)
             if i <= 5+count_elem_nonzero
                 continue
             end
@@ -523,14 +548,20 @@ module chemistry
         # Do not renormalise mixing ratios, since this is done by fastchem
         # If we are missing gases then that's okay.
 
-        # Find where we truncated the temperature profile,
-        #      and make sure that regions above that use the same gas_vmr values
+        # Find where T(p) drops below fastchem_floor temperature.
+        # Make sure that regions above that use the reasonable VMR values
+        i_trunc::Int = 0
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
             if atmos.tmp[i] < atmos.fastchem_floor
-                for g in atmos.gas_names
-                    atmos.gas_vmr[g][1:i] .= atmos.gas_vmr[g][i+1]
-                end
-                break
+               i_trunc = i
+               break
+            end
+        end
+        if i_trunc > 0
+            @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
+            i_trunc = min(i_trunc, atmos.nlev_c-1)
+            for g in atmos.gas_names
+                atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc+1]
             end
         end
 
