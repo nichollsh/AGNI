@@ -34,7 +34,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String    = "1.7.5"  # current agni version
+    const AGNI_VERSION::String    = "1.7.6"  # current agni version
     const HYDROGRAV_STEPS::Int64  = 40       # num of sub-layers in hydrostatic integration
     const SOCVER_minimum::Float64 = 2407.2   # minimum required socrates version
 
@@ -129,15 +129,21 @@ module atmosphere
         skin_k::Float64                 # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
         tmp_magma::Float64              # Mantle temperature [K]
 
-        # Gas variables (incl gases which are not in spectralfile)
+        # Gas tracking variables (incl gases which are not in spectralfile)
         gas_num::Int                                # Number of gases
         gas_names::Array{String,1}                  # List of gas names
+        gas_dat::Dict{String, phys.Gas_t}           # Struct variables containing thermodynamic data for each gas
+
+        # Chemistry and composition
         gas_vmr::Dict{String, Array{Float64,1}}     # Layer volume mixing ratios in dict, (key,value) = (gas_name,array)
-        gas_sat::Dict{String, Array{Bool, 1}}       # Layer is saturated or cold-trapped
-        gas_dat::Dict{String, phys.Gas_t}           # struct variables containing thermodynamic data
+        gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
+        metal_orig::Dict{String, Float64}           # user-provided metallicity ratios (elem num density rel to hydrogen)
+        metal_calc::Dict{String, Float64}           # ^ calculated values from gas mixing ratios at surface
+
+        # Condensation variables
+        gas_sat::Dict{String, Array{Bool, 1}}       # Gas is saturated or cold-trapped in each layer?
         cond_yield::Dict{String, Array{Float64,1}}  # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
         cond_surf::Dict{String, Float64}            # condensate accumulation left after evaporation (implicit surface liquid) [kg/m^2]
-        gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
 
@@ -259,8 +265,14 @@ module atmosphere
         fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
         fastchem_maxiter::Int           # Maximum FC iterations
         fastchem_xtol::Float64          # FC solver tolerance
-        fastchem_exec::String           # Path to fastchem executable
-        fastchem_work::String           # Path to fastchem working directory
+        fastchem_exec::String           # Path to executable
+        fastchem_work::String           # Path to working directory
+        fastchem_conf::String           # Path to input config file
+        fastchem_elem::String           # Path to input metallicities file
+        fastchem_prof::String           # Path to input T(p) profile
+        fastchem_chem::String           # Path to output gas composition
+        fastchem_cond::String           # Path to output condensate phases
+        fastchem_moni::String           # Path to output monitor file
 
         # RFM radiative transfer
         flag_rfm::Bool                  # RFM enabled?
@@ -271,6 +283,8 @@ module atmosphere
         # Observing properties
         transspec_p::Float64            # Pressure level probed in transmission [Pa]
         transspec_r::Float64            # planet radius probed in transmission [m]
+        transspec_μ::Float64            # mmw probed in transmission [kg mol-1]
+        transspec_tmp::Float64          # temperature probed in transmission [K]
         transspec_m::Float64            # mass [kg] enclosed by transspec_r
         transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
         interior_rho::Float64           # interior density [kg m-3]
@@ -368,12 +382,13 @@ module atmosphere
                     mf_dict, mf_path::String;
 
                     condensates =               String[],
+                    metallicities::Dict =       Dict{String,Float64}(),
                     surface_material::String =  "greybody",
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        2.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
-                    Kzz_floor::Float64 =        1e5,
+                    Kzz_floor::Float64 =        0.0,
                     mlt_asymptotic::Bool =      true,
                     mlt_criterion::Char =       's',
                     tmp_magma::Float64 =        3000.0,
@@ -534,6 +549,10 @@ module atmosphere
         atmos.interior_mass =   atmos.grav_surf * atmos.rp^2 / phys.G_grav
         atmos.interior_rho  =   3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
         atmos.transspec_p   =   2e3     # 20 mbar = 2000 Pa
+        atmos.transspec_μ   =   0.0
+        atmos.transspec_rho =   0.0
+        atmos.transspec_tmp =   0.0
+        atmos.transspec_r   =   0.0
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -600,12 +619,15 @@ module atmosphere
 
         # The values will be stored in a dict of arrays
         atmos.gas_names =   Array{String}(undef, 0)           # list of names
-        atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of data structures
+        atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of gas data structs
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
+        atmos.metal_orig =  metallicities                     # input metallicities rel to H
+        atmos.metal_calc =  Dict{String, Array{Float64,1}}()  # calculated metallicities
+
         atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation
         atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # dict of condensate yield
-        atmos.cond_surf =  Dict{String, Float64}()           # dict of ocean masses
+        atmos.cond_surf =  Dict{String, Float64}()            # dict of ocean masses
         atmos.gas_num   =   0                                 # number of gases
         atmos.condensates   =   Array{String}(undef, 0)       # list of condensates
 
@@ -707,6 +729,12 @@ module atmosphere
 
         end # end read VMR from file
 
+        # If providing metallicities, must set use_all_gases=true
+        if !isempty(atmos.metal_orig) && !use_all_gases
+            @error "Must set `use_all_gases=true` if providing metallicities"
+            return false
+        end
+
         # add extra gases if required
         if use_all_gases
             for gas in phys.gases_standard
@@ -721,7 +749,7 @@ module atmosphere
         # backup mixing ratios from current state
         for k in keys(atmos.gas_vmr)
             atmos.gas_ovmr[k] = zeros(Float64, atmos.nlev_c)
-            @turbo @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
+            @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
         end
 
         # set condensation mask and yield values [kg]
@@ -799,7 +827,7 @@ module atmosphere
         atmos.ocean_maxdepth  = 0.0
         atmos.ocean_areacov   = 0.0
         atmos.ocean_topliq    = "_unset"
-        atmos.ocean_layers    = Tuple[(1,"_unset",0.0,0.0),]
+        atmos.ocean_layers    = Tuple[(1,"_unset",0.0,0.0),]  # array of tuples
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to
@@ -864,6 +892,12 @@ module atmosphere
         atmos.fastchem_maxiter = fastchem_maxiter
         atmos.fastchem_floor   = fastchem_floor
         atmos.fastchem_xtol    = fastchem_xtol
+        atmos.fastchem_conf    = joinpath(atmos.fastchem_work,"config.input")
+        atmos.fastchem_elem    = joinpath(atmos.fastchem_work,"elements.dat")
+        atmos.fastchem_chem    = joinpath(atmos.fastchem_work,"chemistry.dat")
+        atmos.fastchem_cond    = joinpath(atmos.fastchem_work,"condensates.dat")
+        atmos.fastchem_prof    = joinpath(atmos.fastchem_work,"pt.dat")
+        atmos.fastchem_moni    = joinpath(atmos.fastchem_work,"monitor.dat")
 
         # RFM
         atmos.flag_rfm = !isempty(rfm_parfile)
@@ -961,7 +995,9 @@ module atmosphere
 
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
-        atmos.transspec_r = atmos.r[idx]
+        atmos.transspec_r   = atmos.r[idx]
+        atmos.transspec_μ   = atmos.layer_μ[idx]
+        atmos.transspec_tmp = atmos.tmp[idx]
 
         # get mass of whole atmosphere, assuming hydrostatic
         atmos.transspec_m = atmos.p_boa * 4 * pi * atmos.rp^2 / atmos.grav_surf
@@ -1146,7 +1182,7 @@ module atmosphere
     function calc_profile_mmw!(atmos::atmosphere.Atmos_t)
         fill!(atmos.layer_μ, 0.0)
         for gas in atmos.gas_names
-            @turbo @. atmos.layer_μ += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
+            @. atmos.layer_μ += atmos.gas_vmr[gas] * atmos.gas_dat[gas].mmw
         end
         return nothing
     end
@@ -1274,8 +1310,8 @@ module atmosphere
         atmos.p[1] = atmos.pl[1]*p_fact + atmos.p[1]*(1-p_fact)
 
         # Finally, convert arrays to actual pressure units [Pa]
-        @turbo @. atmos.p  = 10.0 ^ atmos.p
-        @turbo @. atmos.pl = 10.0 ^ atmos.pl
+        @. atmos.p  = 10.0 ^ atmos.p
+        @. atmos.pl = 10.0 ^ atmos.pl
 
         return nothing
     end
@@ -1617,8 +1653,16 @@ module atmosphere
         # VMRs are provided to SOCRATES when radtrans is called
         # For now, they are just stored inside the atmos struct
 
+        # Metallicities provided?
+        if !isempty(atmos.metal_orig)
+            @info "Composition will be set by metallicity ratios:"
+            for e in keys(atmos.metal_orig)
+                @info @sprintf("    %-4s %.5f",e,atmos.metal_orig[e])
+            end
+        end
+
         # Print info on the gases
-        @info "Allocating atmosphere with composition:"
+        @info "Allocating atmosphere with initial composition:"
         gas_flags::String = ""
         g::String = ""
         for i in 1:atmos.gas_num
@@ -1642,7 +1686,6 @@ module atmosphere
             end
             @info @sprintf("    %3d %-7s %6.2e %s", i, g, atmos.gas_vmr[g][end], gas_flags)
         end
-
 
         # Calc layer properties using initial temperature profile.
         #    Can generate weird issues since the TOA temperature may be large
@@ -1789,7 +1832,7 @@ module atmosphere
             push!(_srf_v, _srf_v[end])
 
             # convert wl array from [nm] to [m]
-            @turbo @. _srf_w = _srf_w / 1e9
+            @. _srf_w = _srf_w / 1e9
 
             # sort data
             _srf_mask = sortperm(_srf_w)
@@ -1805,14 +1848,14 @@ module atmosphere
                 for i in 1:atmos.nbands
                     atmos.surf_r_arr[i] = _srf_i(atmos.bands_cen[i])
                 end
-                @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
+                @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
 
             elseif _srf_head[1] == "e"
                 @debug "Reading surface data, hemispherical emissivity (e_h)"
                 for i in 1:atmos.nbands
                     atmos.surf_e_arr[i] = _srf_i(atmos.bands_cen[i])
                 end
-                @turbo @. atmos.surf_r_arr = 1.0 - atmos.surf_e_arr
+                @. atmos.surf_r_arr = 1.0 - atmos.surf_e_arr
 
 
             elseif _srf_head[1] == "w"
@@ -1822,7 +1865,7 @@ module atmosphere
                     γ = sqrt( 1 - _srf_i(atmos.bands_cen[i]) )
                     atmos.surf_r_arr[i] = (1−γ)/(1+γ) *(1 - γ/(3+3γ) )
                 end
-                @turbo @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
+                @. atmos.surf_e_arr = 1.0 - atmos.surf_r_arr
 
             else
                 @error "Unexpected format for surface data"
