@@ -781,7 +781,7 @@ module atmosphere
 
         # Load gas thermodynamic data
         gas_fail = false
-        @info "Loading thermodyamic data"
+        @info "Loading thermodynamic data"
         for g in atmos.gas_names
             atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
                                                 atmos.thermo_funct, atmos.real_gas;
