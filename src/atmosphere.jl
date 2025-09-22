@@ -388,7 +388,7 @@ module atmosphere
                     tmp_floor::Float64 =        2.0,
                     C_d::Float64 =              0.001,
                     U::Float64 =                2.0,
-                    Kzz_floor::Float64 =        0.0,
+                    Kzz_floor::Float64 =        1e5,
                     mlt_asymptotic::Bool =      true,
                     mlt_criterion::Char =       's',
                     tmp_magma::Float64 =        3000.0,
