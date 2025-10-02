@@ -26,7 +26,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     condensates     = []
 
 [execution]
-    clean_output    = false
+    clean_output    = true
     verbosity       = 1
     max_steps       = 20000
     max_runtime     = 400

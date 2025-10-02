@@ -276,8 +276,15 @@ module solver
             # Set new temperatures
             _set_tmps!(x)
 
-            # Calculate composition (only do chemistry here if perturb_chem=true)
-            chemistry.calc_composition!(atmos, perturb_chem ? chem_type : 0)
+            # Calculate composition
+            if perturb_chem
+                # Do chemistry and condensation
+                chemistry.calc_composition!(atmos, chem_type)
+            else
+                # Don't do chemistry here, but do condensation still.
+                # Avoid reset that calc_fluxes uses chemistry calculated at start of step
+                chemistry.calc_composition!(atmos, 0, reset=false)
+            end
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, true,
@@ -526,7 +533,7 @@ module solver
 
             # Calculate atmospheric composition based on this new temperature profile
             @debug "        composition and chemistry"
-            fc_retcode = chemistry.calc_composition!(atmos, chem_type)
+            fc_retcode = chemistry.calc_composition!(atmos, chem_type; reset=true)
             if fc_retcode == 0
                 stepflags *= "Cs-"  # chemistry success
             elseif fc_retcode > 0
@@ -819,6 +826,7 @@ module solver
         end
 
         # perform one last evaluation to set `atmos` given the final `x_cur`
+        chemistry.calc_composition!(atmos, chem_type)
         _fev!(x_cur, zeros(Float64, arr_len))
 
         # calc kzz profile

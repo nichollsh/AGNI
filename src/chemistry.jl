@@ -586,6 +586,7 @@ module chemistry
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `chem_type::Int`                  chemistry type (see wiki)
     - `evap_enabled::Bool`              enable re-evaporation of falling condensate
+    - `reset::Bool`                     reset to original VMRs if chemistry is disabled
     - `write_cfg::Bool`                 write config and elements
 
     Returns:
@@ -593,23 +594,27 @@ module chemistry
 
     """
     function calc_composition!(atmos::atmosphere.Atmos_t, chem_type::Int;
-                                evap_enabled::Bool=true,
+                                evap_enabled::Bool=true, reset::Bool=true,
                                 write_cfg::Bool=false)::Int
 
         # Status tracking
         state::Int = -1
 
-        # Reset working mixing ratios to original values
-        for g in atmos.gas_names
-            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+        # Set working mixing ratios to original values
+        if reset
+            for g in atmos.gas_names
+                @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+            end
         end
 
-        # Handle equilibrium chemistry
+        # Handle chemistry
         if chem_type in [1,2,3]
+            # Do eqm thermochemistry - only option for now
             state = fastchem_eqm!(atmos, chem_type, write_cfg)
         end
 
-        # Backup post-chemistry composition from gas_vmr to gas_cvmr
+        # Backup post-chemistry composition. From working `gas_vmr`, stored as `gas_cvmr`.
+        #    This allows disabling the effect of rainout, for debugging.
         for g in atmos.gas_names
             @. atmos.gas_cvmr[g] = atmos.gas_vmr[g]
         end
