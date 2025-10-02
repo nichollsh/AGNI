@@ -114,9 +114,10 @@ module solver
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
     - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
-    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `ls_increase::Bool`               factor by which the cost can increase from last step before triggering linesearch
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
+    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
+    - `perturb_chem::Bool`              include chemistry calculation during finite-difference construction of jacobian
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
     - `modprint::Int`                   iteration frequency at which to print info
@@ -138,6 +139,7 @@ module solver
                             method::Int=1, ls_method::Int=1, easy_start::Bool=false,
                             ls_increase::Float64=1.08,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
+                            perturb_chem::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=true,
                             conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
@@ -272,6 +274,13 @@ module solver
 
             # Set new temperatures
             _set_tmps!(x)
+
+            # Do chemistry?
+            if perturb_chem && (chem_type in [1,2,3])
+                if chemistry.fastchem_eqm!(atmos, chem_type, false) != 0
+                    return false
+                end
+            end
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, true,
