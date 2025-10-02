@@ -115,6 +115,8 @@ module solver
     - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
     - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
     - `ls_increase::Bool`               factor by which the cost can increase from last step before triggering linesearch
+    - `ls_max_steps::Int`               maximum steps undertaken by linesearch routine
+    - `ls_min_scale::Float64`           minimum step scale allowed after linesearch
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `perturb_chem::Bool`              include chemistry calculation during finite-difference construction of jacobian
@@ -138,6 +140,7 @@ module solver
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, ls_method::Int=1, easy_start::Bool=false,
                             ls_increase::Float64=1.08,
+                            ls_max_steps::Int=20, ls_min_scale::Float64 = 1.0e-5,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
                             perturb_chem::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
@@ -189,8 +192,6 @@ module solver
 
         #    linesearch
         ls_tau::Float64    =    0.7     # backtracking downscale size
-        ls_max_steps::Int  =    20      # maximum steps
-        ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
         #    plateau
         plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
