@@ -306,6 +306,10 @@ module chemistry
     """
     function fastchem_eqm!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool)::Int
 
+        if chem_type == 0
+            return 0
+        end 
+
         @debug "Running equilibrium chemistry"
 
         # Return code

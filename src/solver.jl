@@ -114,9 +114,12 @@ module solver
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
     - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
-    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `ls_increase::Bool`               factor by which the cost can increase from last step before triggering linesearch
+    - `ls_max_steps::Int`               maximum steps undertaken by linesearch routine
+    - `ls_min_scale::Float64`           minimum step scale allowed after linesearch
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
+    - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
+    - `perturb_chem::Bool`              include chemistry calculation during finite-difference construction of jacobian
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
     - `modprint::Int`                   iteration frequency at which to print info
@@ -137,7 +140,9 @@ module solver
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, ls_method::Int=1, easy_start::Bool=false,
                             ls_increase::Float64=1.08,
+                            ls_max_steps::Int=20, ls_min_scale::Float64 = 1.0e-5,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
+                            perturb_chem::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=true,
                             conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
@@ -187,8 +192,6 @@ module solver
 
         #    linesearch
         ls_tau::Float64    =    0.7     # backtracking downscale size
-        ls_max_steps::Int  =    20      # maximum steps
-        ls_min_scale::Float64 = 1.0e-5  # minimum scale
 
         #    plateau
         plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
@@ -272,6 +275,13 @@ module solver
 
             # Set new temperatures
             _set_tmps!(x)
+
+            # Do chemistry?
+            if perturb_chem && (chem_type in [1,2,3])
+                if chemistry.fastchem_eqm!(atmos, chem_type, false) != 0
+                    return false
+                end
+            end
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, true,

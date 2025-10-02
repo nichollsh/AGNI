@@ -5,8 +5,8 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     tmp_surf        = 2700.0
     instellation    = 3.3231e6
     albedo_b        = 0.0
-    s0_fact         = 0.6652
-    zenith_angle    = 60.0
+    s0_fact         = 1.0 #0.6652
+    zenith_angle    = 0.0 #60.0
     surface_material= "res/surface_albedos/basalttuff.dat"
     radius          = 1.1959e7
     gravity         = 22.304
@@ -26,7 +26,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     condensates     = []
 
 [execution]
-    clean_output    = true
+    clean_output    = false
     verbosity       = 1
     max_steps       = 20000
     max_runtime     = 400
@@ -46,7 +46,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     solution_type   = 3
     solver          = "newton"
     dx_max          = 400.0
-    initial_state   = ["iso", "2700"]
+    initial_state   = ["iso","2000"] #["ncdf", "out/atm.nc"]
     linesearch      = 0
     easy_start      = false
     converge_atol   = 1.0e-2
