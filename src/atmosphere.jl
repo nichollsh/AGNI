@@ -136,7 +136,8 @@ module atmosphere
 
         # Chemistry and composition
         gas_vmr::Dict{String, Array{Float64,1}}     # Layer volume mixing ratios in dict, (key,value) = (gas_name,array)
-        gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
+        gas_ovmr::Dict{String, Array{Float64,1}}    # VMR values at model initialisation
+        gas_cvmr::Dict{String, Array{Float64,1}}    # VMR values after chemistry, but before rainout/evaporation
         metal_orig::Dict{String, Float64}           # user-provided metallicity ratios (elem num density rel to hydrogen)
         metal_calc::Dict{String, Float64}           # ^ calculated values from gas mixing ratios at surface
 
@@ -620,8 +621,11 @@ module atmosphere
         # The values will be stored in a dict of arrays
         atmos.gas_names =   Array{String}(undef, 0)           # list of names
         atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of gas data structs
-        atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
-        atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
+
+        atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # dict of initial VMR arrays
+        atmos.gas_cvmr  =   Dict{String, Array{Float64,1}}()  # dict of post-chem VMR arrays
+        atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of working VMR arrays
+
         atmos.metal_orig =  metallicities                     # input metallicities rel to H
         atmos.metal_calc =  Dict{String, Array{Float64,1}}()  # calculated metallicities
 
@@ -748,8 +752,13 @@ module atmosphere
 
         # backup mixing ratios from current state
         for k in keys(atmos.gas_vmr)
+            # original values
             atmos.gas_ovmr[k] = zeros(Float64, atmos.nlev_c)
             @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
+
+            # post-chemistry values
+            atmos.gas_cvmr[k] = zeros(Float64, atmos.nlev_c)
+            @. atmos.gas_cvmr[k] = atmos.gas_vmr[k]
         end
 
         # set condensation mask and yield values [kg]

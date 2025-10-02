@@ -276,12 +276,8 @@ module solver
             # Set new temperatures
             _set_tmps!(x)
 
-            # Do chemistry?
-            if perturb_chem && (chem_type in [1,2,3])
-                if chemistry.fastchem_eqm!(atmos, chem_type, false) != 0
-                    return false
-                end
-            end
+            # Calculate composition (only do chemistry here if perturb_chem=true)
+            chemistry.calc_composition!(atmos, perturb_chem ? chem_type : 0)
 
             # Calculate fluxes
             energy.calc_fluxes!(atmos, true,
@@ -528,16 +524,14 @@ module solver
             clamp!(x_cur, atmos.tmp_floor+tmp_pad, atmos.tmp_ceiling-tmp_pad)
             _set_tmps!(x_cur)
 
-            # Run chemistry scheme
-            if chem_type in [1,2,3]
-                @debug "        chemistry"
-                fc_retcode = chemistry.fastchem_eqm!(atmos, chem_type, false)
-                if fc_retcode == 0
-                    stepflags *= "Cs-"  # chemistry success
-                else
-                    stepflags *= "Cf-"  # chemistry failure
-                    step_ok = false
-                end
+            # Calculate atmospheric composition based on this new temperature profile
+            @debug "        composition and chemistry"
+            fc_retcode = chemistry.calc_composition!(atmos, chem_type)
+            if fc_retcode == 0
+                stepflags *= "Cs-"  # chemistry success
+            elseif fc_retcode > 0
+                stepflags *= "Cf-"  # chemistry failure
+                step_ok = false
             end
 
             # Check convective modulation
@@ -871,26 +865,27 @@ module solver
         return atmos.is_converged
     end # end solve_energy
 
+    """
+    **Solve for energy balance with a transparent atmosphere.**
+
+    This will use an isothermal temperature profile, and only modify T_surf.
+
+    Arguments:
+    - `atmos::Atmos_t`         the atmosphere struct instance to be used.
+    - `sol_type::Int`          solution types, same as solve_energy
+    - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
+    - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
+    - `max_steps::Int`         maximum number of solver steps
+
+    Returns:
+    - `Bool` indicating success
+    """
     function solve_transparent!(atmos::atmosphere.Atmos_t;
                                     sol_type::Int=1,
                                     conv_atol::Float64=1.0e-3,
                                     conv_rtol::Float64=1.0e-5,
                                     max_steps::Int=300)::Bool
-        """
-        **Solve for energy balance with a transparent atmosphere.**
 
-        This will use an isothermal temperature profile, and only modify T_surf.
-
-        Arguments:
-        - `atmos::Atmos_t`         the atmosphere struct instance to be used.
-        - `sol_type::Int`          solution types, same as solve_energy
-        - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
-        - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
-        - `max_steps::Int`         maximum number of solver steps
-
-        Returns:
-        - `Bool` indicating success
-        """
 
         # Validate sol_type
         if (sol_type < 1) || (sol_type > 4)

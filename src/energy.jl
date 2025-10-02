@@ -728,14 +728,6 @@ module energy
         fill!(atmos.flux_tot, 0.0)
     end
 
-    """
-    **Reset mixing ratios to their original values**
-    """
-    function restore_composition!(atmos::atmosphere.Atmos_t)
-        for g in atmos.gas_names
-            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
-        end
-    end
 
     """
     **Calculate energy flux at each level.**
@@ -753,7 +745,7 @@ module energy
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
-    - `rainout::Bool`                   allow rainout ( do not reset VMRs to dry values )
+    - `rainout::Bool`                   false: disable impact of rainout on VMR
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t,
                           radiative::Bool,
@@ -765,30 +757,21 @@ module energy
         reset_fluxes!(atmos)
 
         # +Condensation and evaporation
-        if atmos.condense_any && (latent || rainout)
+        if atmos.condense_any && latent
 
-            # Restore mixing ratios
-            restore_composition!(atmos)
-            atmosphere.calc_layer_props!(atmos)
+            # Calculate latent heat energy transport flux
+            condense_diffuse!(atmos)                    # Calculate latent heat flux
+            atmos.flux_l *= latent_sf                   # Modulate for stability?
+            @turbo @. atmos.flux_tot += atmos.flux_l    # Add to total flux
 
-            # Handle rainout
-            chemistry.handle_saturation!(atmos)
-
-            # Calculate latent heat flux
-            if latent
-                condense_diffuse!(atmos)                    # Calculate latent heat flux
-                atmos.flux_l *= latent_sf                   # Modulate for stability?
-                @turbo @. atmos.flux_tot += atmos.flux_l    # Add to total flux
-            end
-
-            # Restore mixing ratios - do not allow rainout
+            # Restore mixing ratios to post-chemistry? Mostly for debugging.
             if !rainout
-                restore_composition!(atmos)
+                for g in atmos.gas_names
+                    @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
+                end
+                atmosphere.calc_layer_props!(atmos)
             end
         end
-
-        # Recalculate layer properties
-        atmosphere.calc_layer_props!(atmos)
 
         # +Radiation
         if radiative

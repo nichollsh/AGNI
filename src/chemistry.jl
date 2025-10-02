@@ -89,6 +89,8 @@ module chemistry
                                      evap_enabled::Bool=true,
                                      )
 
+        @debug "Running rainout/evaporation scheme"
+
         # Single gas case does not apply here
         if atmos.gas_num == 1
             return
@@ -308,7 +310,7 @@ module chemistry
 
         if chem_type == 0
             return 0
-        end 
+        end
 
         @debug "Running equilibrium chemistry"
 
@@ -573,5 +575,52 @@ module chemistry
         return state
     end
 
+
+    """
+    **Perform chemistry, rainout, and evaporation calculations to determine composition.**
+
+    This function is a generic entry point for calculating the atmospheric composition.
+    Chemistry calculations are performed before condensation and evaporation.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `chem_type::Int`                  chemistry type (see wiki)
+    - `evap_enabled::Bool`              enable re-evaporation of falling condensate
+    - `write_cfg::Bool`                 write config and elements
+
+    Returns:
+    - `state::Int`                      fastchem state (0 or -1: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
+
+    """
+    function calc_composition!(atmos::atmosphere.Atmos_t, chem_type::Int;
+                                evap_enabled::Bool=true,
+                                write_cfg::Bool=false)::Int
+
+        # Status tracking
+        state::Int = -1
+
+        # Reset working mixing ratios to original values
+        for g in atmos.gas_names
+            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+        end
+
+        # Handle equilibrium chemistry
+        if chem_type in [1,2,3]
+            state = fastchem_eqm!(atmos, chem_type, write_cfg)
+        end
+
+        # Backup post-chemistry composition from gas_vmr to gas_cvmr
+        for g in atmos.gas_names
+            @. atmos.gas_cvmr[g] = atmos.gas_vmr[g]
+        end
+
+        # Recalculate layer properties
+        atmosphere.calc_layer_props!(atmos)
+
+        # Handle rainout and evaporation
+        chemistry.handle_saturation!(atmos; evap_enabled=evap_enabled)
+
+        return state
+    end
 
 end # end module
