@@ -229,7 +229,7 @@ module atmosphere
         flux_cdct::Array{Float64,1}         # Conductive flux [W m-2]
 
         # Phase change
-        phs_tau_mix::Float64                # Time scale (mixed composition)
+        phs_timescale::Float64                # Time scale (mixed composition)
         evap_efficiency::Float64            # Base evaporation efficiency of rain (0 to 1)
         phs_wrk_df::Array{Float64,1}        # work array: flux difference
         phs_wrk_fl::Array{Float64,1}        # work array: edge fluxes
@@ -357,6 +357,8 @@ module atmosphere
     - `flag_continuum::Bool`            include continuum absorption?
     - `flag_aerosol::Bool`              include aersols?
     - `flag_cloud::Bool`                include clouds?
+    - `phs_timescale::Float64`          phase change timescale [s]
+    - `evap_efficiency::Float64`        re-evaporatione efficiency compared to saturating amount
     - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
@@ -403,6 +405,9 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
+
+                    phs_timescale::Float64 =    1e6,
+                    evap_efficiency::Float64 =  0.05,
 
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
@@ -508,6 +513,9 @@ module atmosphere
         atmos.flux_int =        flux_int
         atmos.target_olr =      max(1.0e-10, target_olr)
 
+        atmos.phs_timescale =   max(phs_timescale, 0.0)
+        atmos.evap_efficiency = max(min(evap_efficiency, 1.0),0.0)
+
         atmos.C_d =             max(0.0, C_d)
         atmos.U =               max(0.0, U)
 
@@ -591,7 +599,7 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_tau_mix = 1.0e6   # mixed composition case
+        atmos.phs_timescale = 1.0e6   # mixed composition case
 
         # Evaporation efficiency
         atmos.evap_efficiency = 0.05

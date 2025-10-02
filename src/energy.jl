@@ -651,7 +651,7 @@ module energy
                 # Calculate latent heat release at this level from the contributions
                 #   of condensation (+) and evaporation (-), and a fixed timescale.
                 atmos.phs_wrk_df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) *
-                                    (atmos.cond_yield[c][i] / atmos.phs_tau_mix)
+                                    (atmos.cond_yield[c][i] / atmos.phs_timescale)
 
             end # go to next level
 
