@@ -34,7 +34,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String    = "1.7.7"  # current agni version
+    const AGNI_VERSION::String    = "1.7.8"  # current agni version
     const HYDROGRAV_STEPS::Int64  = 40       # num of sub-layers in hydrostatic integration
     const SOCVER_minimum::Float64 = 2407.2   # minimum required socrates version
 
