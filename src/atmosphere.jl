@@ -903,7 +903,6 @@ module atmosphere
             @debug "FastChem env variable not set"
         end
         # other parameters for FC
-        atmos.fastchem_maxiter      = fastchem_maxiter
         atmos.fastchem_floor        = fastchem_floor
         atmos.fastchem_maxiter_chem = fastchem_maxiter_chem
         atmos.fastchem_maxiter_solv = fastchem_maxiter_solv
