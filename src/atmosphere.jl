@@ -34,7 +34,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String    = "1.7.7"  # current agni version
+    const AGNI_VERSION::String    = "1.7.8"  # current agni version
     const HYDROGRAV_STEPS::Int64  = 40       # num of sub-layers in hydrostatic integration
     const SOCVER_minimum::Float64 = 2407.2   # minimum required socrates version
 
@@ -263,8 +263,10 @@ module atmosphere
         # FastChem equilibrium chemistry
         flag_fastchem::Bool             # Fastchem enabled?
         fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
-        fastchem_maxiter::Int           # Maximum FC iterations
-        fastchem_xtol::Float64          # FC solver tolerance
+        fastchem_maxiter_chem::Int      # Maximum FC iterations (chemistry)
+        fastchem_maxiter_solv::Int      # Maximum FC iterations (internal solver)
+        fastchem_xtol_chem::Float64     # FC solver tolerance (chemistry)
+        fastchem_xtol_elem::Float64     # FC solver tolerance (elemental)
         fastchem_exec::String           # Path to executable
         fastchem_work::String           # Path to working directory
         fastchem_conf::String           # Path to input config file
@@ -367,9 +369,11 @@ module atmosphere
     - `κ_grey_sw::Float64`              gas opacity when using grey-gas RT scheme, shortwave
     - `fastchem_work::String`           working directory for fastchem
     - `fastchem_floor::Float64`         temperature floor on profile provided to fastchem
-    - `fastchem_maxiter::Float64`       maximum solver iterations allowed by fastchem
-    - `fastchem_xtol::Float64`          solution tolerance required of fastchem
-    - `rfm_parfile::String`             path to LbL .par file provided to RFM
+    - `fastchem_maxiter_chem::Float64`  maximum chemical iterations allowed by fastchem
+    - `fastchem_maxiter_solv:Float64`   maximum solver iterations allowed by fastchem
+    - `fastchem_xtol_chem::Float64`     solution tolerance required of fastchem (chemical)
+    - `fastchem_xtol_elem::Float64`     solution tolerance required of fastchem (elemental)
+    - `rfm_parfile::String`             path to HITRAN-formatted .par file provided to RFM
 
     Returns:
         Nothing
@@ -417,10 +421,12 @@ module atmosphere
                     κ_grey_lw::Float64  =       1e-4,
                     κ_grey_sw::Float64  =       1e-5,
 
-                    fastchem_work::String =     "",
-                    fastchem_floor::Float64 =   273.0,
-                    fastchem_maxiter::Float64 = 2e4,
-                    fastchem_xtol::Float64 =    1.0e-4,
+                    fastchem_work::String       =  "",
+                    fastchem_floor::Float64     =  273.0,
+                    fastchem_maxiter_chem::Int  =  60000,
+                    fastchem_maxiter_solv::Int  =  20000,
+                    fastchem_xtol_chem::Float64 =  1.0e-4,
+                    fastchem_xtol_elem::Float64 =  1.0e-4,
 
                     rfm_parfile::String =       "",
 
@@ -897,15 +903,17 @@ module atmosphere
             @debug "FastChem env variable not set"
         end
         # other parameters for FC
-        atmos.fastchem_maxiter = fastchem_maxiter
-        atmos.fastchem_floor   = fastchem_floor
-        atmos.fastchem_xtol    = fastchem_xtol
-        atmos.fastchem_conf    = joinpath(atmos.fastchem_work,"config.input")
-        atmos.fastchem_elem    = joinpath(atmos.fastchem_work,"elements.dat")
-        atmos.fastchem_chem    = joinpath(atmos.fastchem_work,"chemistry.dat")
-        atmos.fastchem_cond    = joinpath(atmos.fastchem_work,"condensates.dat")
-        atmos.fastchem_prof    = joinpath(atmos.fastchem_work,"pt.dat")
-        atmos.fastchem_moni    = joinpath(atmos.fastchem_work,"monitor.dat")
+        atmos.fastchem_floor        = fastchem_floor
+        atmos.fastchem_maxiter_chem = fastchem_maxiter_chem
+        atmos.fastchem_maxiter_solv = fastchem_maxiter_solv
+        atmos.fastchem_xtol_chem    = fastchem_xtol_chem
+        atmos.fastchem_xtol_elem    = fastchem_xtol_elem
+        atmos.fastchem_conf         = joinpath(atmos.fastchem_work,"config.input")
+        atmos.fastchem_elem         = joinpath(atmos.fastchem_work,"elements.dat")
+        atmos.fastchem_chem         = joinpath(atmos.fastchem_work,"chemistry.dat")
+        atmos.fastchem_cond         = joinpath(atmos.fastchem_work,"condensates.dat")
+        atmos.fastchem_prof         = joinpath(atmos.fastchem_work,"pt.dat")
+        atmos.fastchem_moni         = joinpath(atmos.fastchem_work,"monitor.dat")
 
         # RFM
         atmos.flag_rfm = !isempty(rfm_parfile)

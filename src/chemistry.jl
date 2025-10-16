@@ -308,7 +308,7 @@ module chemistry
 
         if chem_type == 0
             return 0
-        end 
+        end
 
         @debug "Running equilibrium chemistry"
 
@@ -359,16 +359,16 @@ module chemistry
                 write(f,joinpath(logK,"logK.dat")*" "*joinpath(logK,"logK_condensates.dat")*" \n\n")
 
                 write(f,"#Accuracy of chemistry iteration \n")
-                write(f,@sprintf("%.3e \n\n", atmos.fastchem_xtol))
+                write(f,@sprintf("%.3e \n\n", atmos.fastchem_xtol_chem))
 
                 write(f,"#Accuracy of element conservation \n")
-                write(f,@sprintf("%.3e \n\n", atmos.fastchem_xtol))
+                write(f,@sprintf("%.3e \n\n", atmos.fastchem_xtol_elem))
 
                 write(f,"#Max number of chemistry iterations  \n")
-                write(f,@sprintf("%d \n\n", atmos.fastchem_maxiter*2.5))
+                write(f,@sprintf("%d \n\n", atmos.fastchem_maxiter_chem))
 
                 write(f,"#Max number internal solver iterations  \n")
-                write(f,@sprintf("%d \n\n", atmos.fastchem_maxiter))
+                write(f,@sprintf("%d \n\n", atmos.fastchem_maxiter_solv))
             end
         end # end write config
 
