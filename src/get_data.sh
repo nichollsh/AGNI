@@ -221,7 +221,7 @@ function handle_request {
             echo $help_basic
 
             anyspec Oak 318
-            anyspec Dayspring 16
+            # anyspec Dayspring 16
             anyspec Dayspring 48
             anyspec Honeyside 256
 
