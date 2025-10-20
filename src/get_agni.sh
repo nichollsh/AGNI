@@ -21,7 +21,7 @@ fi
 
 # Install
 echo "Installing AGNI..."
-rm -f Manifest.tomlear
+rm -f Manifest.toml
 julia "$root/deps/build.jl"
 julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'
 
