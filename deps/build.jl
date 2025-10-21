@@ -22,8 +22,10 @@ cd(abspath(RAD_DIR,"julia","lib")) do
 end
 
 # Download basic data
-println("Get data")
-get_data = abspath(ROOT_DIR,"src","get_data.sh")
-run(`bash $get_data basic`)
+if !("nodata" in ARGS)
+    println("Get data")
+    get_data = abspath(ROOT_DIR,"src","get_data.sh")
+    run(`bash $get_data basic`)
+end
 
 println("Build completed")
