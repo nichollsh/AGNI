@@ -3,6 +3,13 @@
 
 set -e
 
+# User arguments
+if [ -z "$1" ]; then
+    testsuite="all" # default
+else
+    testsuite="$1" # requested test suite
+fi
+
 # Update from GitHub
 echo "Updating from GitHub..."
 git pull
@@ -26,16 +33,10 @@ julia "$root/deps/build.jl"
 julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'
 
 # Run tests (suite set by CLI argument)
-if [ -z "$1" ]; then
-    suite="all"
-else
-    suite="$1"
-fi
-
 echo "Running tests..."
 dir=$(pwd)
 cd $root/test/
-julia runtests.jl "$suite"
+julia runtests.jl "$testsuite"
 cd $dir
 
 echo "Done!"
