@@ -15,7 +15,7 @@ if [ -n "$RAD_DIR" ]; then
 else
     echo "Found SOCRATES path: no"
     echo "You need to install SOCRATES AND set the RAD_DIR environment variable"
-    echo "Check the docs: https://nichollsh.github.io/AGNI/"
+    echo "Check the docs: https://www.h-nicholls.space/AGNI/"
     exit 1
 fi
 
@@ -25,11 +25,17 @@ rm -f Manifest.toml
 julia "$root/deps/build.jl"
 julia -e 'using Pkg; Pkg.activate("."); Pkg.instantiate()'
 
-# Run tests
+# Run tests (suite set by CLI argument)
+if [ -z "$1" ]; then
+    suite="all"
+else
+    suite="$1"
+fi
+
 echo "Running tests..."
 dir=$(pwd)
 cd $root/test/
-julia runtests.jl fast
+julia runtests.jl "$suite"
 cd $dir
 
 echo "Done!"
