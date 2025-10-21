@@ -102,15 +102,25 @@ function zenodo {
     mkdir -p $2
     wget -qO $tgt $url
 
-    # check if command failed
+    # check if command failed or if file does not exist
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to download $1. Issue with wget command"
-        wget -O - $url
-        exit 1
+    elif [[ ! -f "$tgt" ]]; then
+        echo "ERROR: Failed to download $1. File not found on disk."
+    else
+        return 0
     fi
 
-    # check file exists
-    if [[ ! -f "$tgt" ]]; then
+    # try again at downloading the file?
+    echo "Trying again to download the file"
+    sleep 1 
+    wget -qO $tgt $url
+
+    # check if command failed or if file does not exist
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command"
+        exit 1
+    elif [[ ! -f "$tgt" ]]; then
         echo "ERROR: Failed to download $1. File not found on disk."
         exit 1
     fi
@@ -223,7 +233,7 @@ function handle_request {
             anyspec Oak 318
             # anyspec Dayspring 16
             anyspec Dayspring 48
-            anyspec Honeyside 256
+            # anyspec Honeyside 256
 
             zenodo 15721440 $stellar sun.txt
 
