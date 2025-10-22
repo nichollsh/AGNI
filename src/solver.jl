@@ -884,6 +884,7 @@ module solver
     - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
     - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
     - `max_steps::Int`         maximum number of solver steps
+    - `tmp_upper::Float64`     upper-bound on Tsurf for golden-section search [K]
 
     Returns:
     - `Bool` indicating success
@@ -893,7 +894,8 @@ module solver
                                     atm_type::Int=1,
                                     conv_atol::Float64=1.0e-3,
                                     conv_rtol::Float64=1.0e-5,
-                                    max_steps::Int=300)::Bool
+                                    max_steps::Int=300,
+                                    tmp_upper::Float64=5000.0)::Bool
 
         # Validate sol_type (does not allow type=1 here)
         if (sol_type < 1) || (sol_type > 4)
@@ -911,9 +913,6 @@ module solver
             return false
         end
 
-
-        # Parameters
-        tmp_upper::Float64 = 5000.0     # Initial upper bracket on Tsurf [K]
 
         # Function to set atmosphere according to the desired prescription
         function _prescribe!(atmos::atmosphere.Atmos_t, atm_type::Int, _tsurf::Float64)
@@ -968,6 +967,8 @@ module solver
 
                 # Residual = radiative flux minus desired flux
                 energy.calc_fluxes!(atmos, true, false, false, false, false)
+
+                @debug "    flux_tot = $(atmos.flux_tot[1])"
                 return (atmos.flux_tot[1] - atmos.flux_int)^2
             end
 
@@ -1029,6 +1030,7 @@ module solver
     - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
     - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
     - `max_steps::Int`         maximum number of solver steps
+    - `tmp_upper::Float64`     upper-bound on Tsurf for golden-section search [K]
 
     Returns:
     - `Bool` indicating success
@@ -1037,7 +1039,8 @@ module solver
                                     sol_type::Int=1,
                                     conv_atol::Float64=1.0e-3,
                                     conv_rtol::Float64=1.0e-5,
-                                    max_steps::Int=300)::Bool
+                                    max_steps::Int=300,
+                                    tmp_upper::Float64=5000.0)::Bool
 
 
         # Validate sol_type
@@ -1052,9 +1055,6 @@ module solver
             @error "    Cannot use `solve_transparent`"
             return false
         end
-
-        # Parameters
-        tmp_upper::Float64 = 5000.0     # Initial upper bracket on Tsurf [K]
 
         # Handle different solution types
         if sol_type == 1
