@@ -919,7 +919,7 @@ module solver
             # set tsurf
             atmos.tmp_surf  = deepcopy(_tsurf)
             atmos.tmpl[end] = deepcopy(_tsurf)
-            @debug "    try tmp_surf = $_tsurf K"
+            # @debug "    try tmp_surf = $_tsurf K"
 
             # set profile
             if atm_type == 1
