@@ -20,7 +20,7 @@ makedocs(
         "examples/index.md",
         "troubleshooting.md",
         "Development" => "manual/index.md",
-        "Other codes" => "ecosystem.md"
+        "Related codes" => "ecosystem.md"
     ]
 )
 
