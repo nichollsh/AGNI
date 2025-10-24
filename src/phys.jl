@@ -840,4 +840,36 @@ module phys
         return k / (ρ * cp)
     end
 
+    """
+    **Calculate planetary equilibrium temperature.**
+
+    https://en.wikipedia.org/wiki/Planetary_equilibrium_temperature?useskin=vector
+
+    Arguments:
+    - `S::Float64`       Bolometric instellation [W m-2]
+    - `α::Float64`       Bond albedo
+
+    Returns:
+    - `Teq::Float64`     Planetary equilibrium temperature [K]
+    """
+    function calc_Teq(S::Float64, α::Float64)::Float64
+        return (S*(1-α)/(4*consts.σSB))^0.25
+    end
+
+    """
+    **Calculate planetary *skin* temperature.**
+
+    https://en.wikipedia.org/wiki/Skin_temperature_(atmosphere)?useskin=vector
+
+    Arguments:
+    - `S::Float64`       Bolometric instellation [W m-2]
+    - `α::Float64`       Bond albedo
+
+    Returns:
+    - `Tskin::Float64`   Planetary skin temperature [K]
+    """
+    function calc_Tskin(S::Float64, α::Float64)::Float64
+        return calc_Teq(S, α) * (0.5^0.25)
+    end
+
 end # end module
