@@ -12,7 +12,6 @@ module energy
     using Printf
     using LinearAlgebra
     using Logging
-    using LoopVectorization
 
     # Local files
     import ..atmosphere
@@ -672,7 +671,7 @@ module energy
             end
 
             # add energy from this gas to total
-            @turbo @. atmos.flux_l += atmos.phs_wrk_fl
+            @. atmos.flux_l += atmos.phs_wrk_fl
 
             # calculate mask
             @. atmos.mask_l = (abs(atmos.flux_l) > 1.0e-30)
@@ -778,7 +777,7 @@ module energy
             if latent
                 condense_diffuse!(atmos)                    # Calculate latent heat flux
                 atmos.flux_l *= latent_sf                   # Modulate for stability?
-                @turbo @. atmos.flux_tot += atmos.flux_l    # Add to total flux
+                @. atmos.flux_tot += atmos.flux_l    # Add to total flux
             end
 
             # Restore mixing ratios - do not allow rainout
@@ -794,14 +793,14 @@ module energy
         if radiative
             radtrans!(atmos, true, calc_cf=calc_cf)   # Longwave
             radtrans!(atmos, false)                   # Shortwave
-            @turbo @. atmos.flux_tot += atmos.flux_n  # Add to total flux
+            @. atmos.flux_tot += atmos.flux_n  # Add to total flux
         end
 
         # +Dry convection
         if convect
             convection!(atmos)                          # Calc dry convection heat flux
             atmos.flux_cdry *= convect_sf               # Modulate for stability?
-            @turbo @. atmos.flux_tot += atmos.flux_cdry # Add to total flux
+            @. atmos.flux_tot += atmos.flux_cdry # Add to total flux
         end
 
         # +Surface turbulence
@@ -813,7 +812,7 @@ module energy
         # +Conduction
         if conduct
             conduct!(atmos)
-            @turbo @. atmos.flux_tot += atmos.flux_cdct
+            @. atmos.flux_tot += atmos.flux_cdct
         end
 
         # Flux difference across each level

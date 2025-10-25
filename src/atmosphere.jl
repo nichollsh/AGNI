@@ -20,7 +20,6 @@ module atmosphere
     using Printf
     using LinearAlgebra
     using Logging
-    using LoopVectorization
     import Statistics
     import Interpolations: interpolate, Gridded, Linear, Flat, Line, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
@@ -34,7 +33,7 @@ module atmosphere
     import ..spectrum
 
     # Constants
-    const AGNI_VERSION::String    = "1.7.10"  # current agni version
+    const AGNI_VERSION::String    = "1.7.11"  # current agni version
     const HYDROGRAV_STEPS::Int64  = 40       # num of sub-layers in hydrostatic integration
     const SOCVER_minimum::Float64 = 2407.2   # minimum required socrates version
 

@@ -1,5 +1,5 @@
 {
-  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.json",
   "@type": "Code",
   "author": [
     {
@@ -19,5 +19,5 @@
   "keywords": "physics, radiative transfer, exoplanets, astronomy, convection, radiation, planets, atmospheres",
   "license": "GPL v3.0",
   "title": "AGNI",
-  "version": "1.7.10"
+  "version": "1.7.11"
 }
