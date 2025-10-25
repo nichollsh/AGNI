@@ -562,7 +562,7 @@ module chemistry
             end
         end
         if i_trunc > 0
-            @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
+            # @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
             i_trunc = min(i_trunc, atmos.nlev_c-1)
             for g in atmos.gas_names
                 atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc+1]
