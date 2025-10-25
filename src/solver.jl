@@ -278,9 +278,10 @@ module solver
 
             # Do chemistry?
             if perturb_chem && (chem_type in [1,2,3])
-                if chemistry.fastchem_eqm!(atmos, chem_type, false) != 0
-                    return false
-                end
+                _fev_fc = chemistry.fastchem_eqm!(atmos, chem_type, false)
+                # if _fev_fc != 0
+                #     return false
+                # end
             end
 
             # Calculate fluxes
@@ -609,14 +610,14 @@ module solver
                 # use central difference if:
                 #    requested, at the start, or insufficient cost decrease
                 if !_calc_jac_res!(x_cur, b, r_cur, true, fdo, perturb)
-                    code = 99
+                    code = 6
                     break
                 end
                 stepflags *= "C$fdo-"
             else
                 # otherwise, use forward difference
                 if !_calc_jac_res!(x_cur, b, r_cur, false, fdo, perturb)
-                    code = 99
+                    code = 6
                     break
                 end
                 stepflags *= "F$fdo-"
@@ -725,7 +726,7 @@ module solver
 
                     else
                         @error "Invalid linesearch algorithm $ls_method"
-                        code = 99
+                        code = 5
                         break
                     end
 
@@ -820,6 +821,10 @@ module solver
             @error "    failure (maximum time)"
         elseif code == 4
             @error "    failure (NaN values)"
+        elseif code == 5
+            @error "    failure (configuration)"
+        elseif code == 6
+            @error "    failure (objective function)"
         else
             @error "    failure (other)"
         end
