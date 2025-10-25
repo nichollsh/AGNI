@@ -1,6 +1,19 @@
 # Troubleshooting
 This page may be useful if you are having problems. However, I would suggest that you also double check that you followed all of the [Getting started](@ref) instructions.
 
+## Julia version is incompatible / Errors about OpenSSL library
+You must use Julia version 1.11 because there are incompatibilities between the OpenSSL library required by Julia1.12 and Python. 
+
+Switch Julia versions using the `juliaup` command. E.g:
+```bash
+juliaup status        # Show the versions you have installed
+juliaup add 1.11      # Install Julia 1.11
+juliaup default 1.11  # Make 1.11 your default version of Julia
+julia --version       # This should say 1.11.something
+```
+
+After following these steps, try installing AGNI again.
+
 ## Wget is not installed
 You need to install [wget](https://www.gnu.org/software/wget/). This is a tool for tranferring files over a network. Wget is used by AGNI to obtain lookup data files from Zenodo. Most Linux distributions come with wget; otherwise see [this page](https://www.tecmint.com/install-wget-in-linux/).
 
