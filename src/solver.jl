@@ -12,7 +12,6 @@ module solver
     using LoggingExtras
     using Statistics
     using LinearAlgebra
-    using LoopVectorization
 
     import ..atmosphere
     import ..setpt
@@ -345,7 +344,7 @@ module solver
                 end
 
                 # Reset all levels
-                @turbo @. x_s = x
+                @. x_s = x
 
                 # Reset residuals
                 fill!(rf1, 0.0)
@@ -605,7 +604,7 @@ module solver
             end
 
             # Evaluate residuals and estimate Jacobian matrix where required
-            @turbo @. r_old = r_cur
+            @. r_old = r_cur
             if fdc || (step == 1) || (c_cur/c_old > fdr)
                 # use central difference if:
                 #    requested, at the start, or insufficient cost decrease
@@ -631,7 +630,7 @@ module solver
             end
 
             # Model step
-            @turbo @. x_old = x_cur
+            @. x_old = x_cur
             if (method == 1)
                 # Newton-Raphson step
                 # @debug "        NR step"
@@ -664,7 +663,7 @@ module solver
             #    Otherwise, this perturbation can still help.
             plateau_apply = (plateau_i > plateau_n)
             if plateau_apply
-                @turbo @. x_dif *= plateau_s
+                @. x_dif *= plateau_s
                 plateau_i = 0
                 stepflags *= "X-"
             end
@@ -683,7 +682,7 @@ module solver
 
                 # Internal function minimised by linesearch method
                 function _ls_func(scale::Float64)::Float64
-                    @turbo @. x_cur = x_old + scale * x_dif
+                    @. x_cur = x_old + scale * x_dif
                     _fev!(x_cur,r_tst)
                     return _cost(r_tst)
                 end
@@ -738,7 +737,7 @@ module solver
             end # end linesearch
 
             # Take the step
-            @turbo @. x_cur = x_old + x_dif
+            @. x_cur = x_old + x_dif
             clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
             _fev!(x_cur, r_cur)
 

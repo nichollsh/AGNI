@@ -1,7 +1,7 @@
 name = "AGNI"
 uuid = "ede838c1-9ec3-4ebe-8ae8-da4091b3f21c"
 authors = ["Harrison Nicholls <harrison.nicholls@physics.ox.ac.uk>"]
-version = "1.7.10"
+version = "1.7.11"
 
 [deps]
 ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
@@ -15,10 +15,9 @@ LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 LoggingExtras = "e6f89c97-d47a-5376-807f-9c37f3926c36"
-LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
-OpenSSL_jll = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
+# OpenSSL_jll = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -27,6 +26,6 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [compat]
-OpenSSL_jll = "= 3.0.16"
+# OpenSSL_jll = "= 3.0.16"
 SpecialFunctions = "2.5.0"
 julia = ">= 1.10"
