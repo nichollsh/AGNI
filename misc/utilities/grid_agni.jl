@@ -4,7 +4,7 @@ using LoggingExtras
 using Printf
 using NCDatasets
 
-const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../")
+const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
 const R_earth::Float64 = 6.371e6
 const M_earth::Float64 = 5.972e24
 
@@ -18,14 +18,15 @@ cfg_base = "res/config/structure_grid.toml"
 cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 
 # Define grid
-grid::Dict = Dict((
-    "mass_tot"      =>       range(start=1.00,  stop=10.00, length=4),  # M_earth
-    "frac_atm"      =>       range(start=0.01,  stop=0.10,  length=4),
-    "frac_core"     =>       range(start=0.10,  stop=0.80,  length=4),
-    "metal_C"       => 10 .^ range(start=-3,    stop=2,     length=2),
-    # "metal_S"       => 10 .^ range(start=-3,    stop=2,     length=2),
-    # "metal_O"       => 10 .^ range(start=-3,    stop=2,     length=2),
-    "instellation"  => 10 .^ range(start=-0.5,  stop=3.5,   length=3)
+grid::Dict = Dict{String,Array{Float64,1}}((
+    "mass_tot"      =>       range(start=0.25,  stop=5.00,  step=0.25),  # M_earth
+    "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
+    "frac_atm"      =>       range(start=0.01,  stop=0.25,  step=0.05),
+    # "metal_C"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
+    # "metal_S"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
+    # "metal_O"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
+    # "instellation"  => 10 .^ range(start= 0.0,  stop=3.4,   length=5),
+    # "Teff"          =>       range(start=2500,  stop=6000,  step=700.0)
 ))
 
 # Variables to record
@@ -90,7 +91,31 @@ frac_atm  = 0.01
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
 
+# Warn about size of grid
+gz_est = prod([length(_v) for _v in values(grid)])
+if gz_est > 1e6
+    @info "Grid has $(gz_est/1e6)M points"
+elseif gz_est > 1e3
+    @info "Grid has $(gz_est/1e3)k points"
+else
+    @info "Grid has $gz_est points"
+end
+rt_est = gz_est * 15.0 # seconds
+if rt_est > 60*60
+    rt_est /= 60*60 # hrs
+    if rt_est > 24
+        rt_est /= 24 # days
+        @info "Single-core runtime will be approximately $(rt_est) days"
+    else
+        @info "Single-core runtime will be approximately $(rt_est) hours"
+    end
+else
+    @info "Single-core runtime will be approximately $(rt_est) seconds"
+end
+
+
 # Create a vector of dictionaries for all parameter combinations
+@info "Flattening grid"
 grid_flat = [
     Dict(zip(input_keys, values_combination))
     for values_combination in Iterators.product(values(grid)...)
@@ -99,7 +124,10 @@ gridsize = length(grid_flat)
 numfails = 0
 
 # Write combinations to file
-open(joinpath(output_dir,"gridpoints.csv"), "w") do hdl
+@info "Writing flattened grid to file"
+gpfile = joinpath(output_dir,"gridpoints.csv")
+@info "    $gpfile"
+open(gpfile, "w") do hdl
     # Header
     head = "index," * join(input_keys, ",") * "\n"
     write(hdl,head)
@@ -116,6 +144,7 @@ result_table::Array{Dict, 1}  = [Dict{String,Float64}() for _ in 1:gridsize]
 result_profs::Array{Dict, 1}  = [Dict{String,Array}()    for _ in 1:gridsize] # array of dicts (p, t, r)
 
 @info "Generated grid of $(length(input_keys)) dimensions, with $gridsize points"
+sleep(3)
 
 # =============================================================================
 # Setup atmosphere object
@@ -172,13 +201,13 @@ Calc interior radius as a function of: interior mass, interior core mass fractio
 """
 function calc_Rint(m, c)
     # fit coefficients
-    m0 = 1.10190624
-    m1 = 0.27968094
-    c0 = -0.20955757
-    c1 = 2.07892259
-    e0 = -0.08667749
-    e1 = 0.66494823
-    o1 = -0.0593633
+    m0 =  1.12666889
+    m1 =  0.28661847
+    c0 = -0.17211226
+    c1 =  1.9857877
+    e0 = -0.1198025
+    e1 =  0.61781006
+    o1 = -0.07491575
 
     # evaluate fit
     return  m0*m^m1 + c0*c^c1 + e0*(m*c)^e1  + o1
@@ -211,7 +240,7 @@ function update_structure!(atmos, mass_tot, frac_atm, frac_core)
 end
 
 for (i,p) in enumerate(grid_flat)
-    @info @sprintf("Grid point %d / %-d = %.1f%%",i,gridsize,100*i/gridsize)
+    @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
 
     succ = true
 
