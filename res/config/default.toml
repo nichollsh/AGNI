@@ -43,6 +43,8 @@ title = "Default"                       # Name for this configuration file
     rayleigh        = true                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
+    grey_lw         = 1e-4                      # Grey longwave opacity, used when `input_sf="greygas"`
+    grey_sw         = 1e-5                      # Grey shortwave opacity, used when `input_sf="greygas"`
     real_gas        = true                      # Use real gas equation of state where possible?
     thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?

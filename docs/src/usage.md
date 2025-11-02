@@ -135,6 +135,8 @@ Parameters that tell the model what to do.
 | `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false) |
 | `cloud         `  | Include cloud scattering and opacity in radiative transfer (true/false) |
 | `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see below) |
+| `grey_lw`         | Grey opacity [m2/kg] of longwave (thermal) radiation. Used when `input_sf="greygas"` |
+| `grey_sw`         | Grey opacity [m2/kg] of shortwave (stellar) radiation. Used when `input_sf="greygas"` |
 | `real_gas      `  | Use real-gas equation(s) of state where possible (true/false) |
 | `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
 | `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false) |
