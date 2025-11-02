@@ -31,7 +31,7 @@ grid::Dict = Dict{String,Array{Float64,1}}((
 ))
 
 # Variables to record
-output_keys = ["succ", "p_surf", "t_surf", "r_surf", "μ_surf", "r_phot", "μ_phot", "t_phot",  "Kzz_max"]
+output_keys = ["succ", "p_surf", "t_surf", "r_surf", "μ_surf", "t_phot", "r_phot", "μ_phot", "g_phot",  "Kzz_max"]
 
 # Grid management options
 save_netcdfs = false        # NetCDF file for each case
@@ -321,8 +321,8 @@ for (i,p) in enumerate(grid_flat)
             rm(atmos.fastchem_elem, force=true)
 
         else
-            @error "Unhandled parameter: $k"
-            succ = false
+            @error "Unhandled input parameter: $k"
+            exit(1)
         end
     end
     if !succ
@@ -414,11 +414,13 @@ for (i,p) in enumerate(grid_flat)
             result_table[i][k] = atmos.transspec_μ
         elseif k == "t_phot"
             result_table[i][k] = atmos.transspec_tmp
+        elseif k == "g_phot"
+            result_table[i][k] = atmos.transspec_grav
         elseif k == "Kzz_max"
             result_table[i][k] = maximum(atmos.Kzz)
         else
-            @error "Unhandled variable: $k"
-            result_table[i][k]  = 0.0
+            @error "Unhandled output variable: $k"
+            exit(1)
         end
     end
 
