@@ -346,6 +346,19 @@ module AGNI
             end
         end
 
+        #    double grey radtrans opacities
+        κ_grey_lw::Float64 = 1e-4  # this will be over-written
+        κ_grey_sw::Float64 = 1e-5  # ^
+        if lowercase(cfg["input"]["input_sf"]) == "greygas"
+            if haskey(cfg["execution"],"grey_lw") && haskey(cfg["execution"],"grey_sw")
+                κ_grey_lw = Float64(cfg["execution"]["grey_lw"])
+                κ_grey_sw = Float64(cfg["execution"]["grey_sw"])
+            else
+                @error "Config: Grey-gas calculation enabled but opacities not set"
+                @error "        You must also provide `grey_lw` AND `grey_sw`"
+            end
+        end
+
         # star stuff
         star_file::String   = cfg["files" ]["input_star"]
         star_Teff::Float64  = -1.0
@@ -430,7 +443,9 @@ module AGNI
                                 flux_int=flux_int,
                                 surface_material=surface_mat, albedo_s=albedo_s,
                                 mlt_criterion=only(cfg["execution"]["convection_crit"][1]),
-                                rfm_parfile=rfm_parfile
+                                rfm_parfile=rfm_parfile,
+                                κ_grey_lw=κ_grey_lw,
+                                κ_grey_sw=κ_grey_sw
                         ) || return false
 
         # Allocate atmosphere

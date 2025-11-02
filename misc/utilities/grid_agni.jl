@@ -3,6 +3,7 @@ using .Iterators
 using LoggingExtras
 using Printf
 using NCDatasets
+using Dates
 
 const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
 const R_earth::Float64 = 6.371e6
@@ -21,8 +22,8 @@ cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 grid::Dict = Dict{String,Array{Float64,1}}((
     "mass_tot"      =>       range(start=0.5,  stop=10.00,  step=0.5),  # M_earth
     "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_atm"      =>       range(start=0.0,  stop=0.25,  step=0.05),
-    "metal_C"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
+    "frac_atm"      =>       range(start=0.01,  stop=0.16,  step=0.03),
+    # "metal_C"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
     # "metal_S"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
     # "metal_O"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
     # "instellation"  => 10 .^ range(start= 0.0,  stop=3.4,   length=5),
@@ -35,7 +36,7 @@ output_keys = ["succ", "p_surf", "t_surf", "r_surf", "μ_surf", "r_phot", "μ_ph
 # Grid management options
 save_netcdfs = false        # NetCDF file for each case
 save_plots   = false        # plots for each case
-save_ncdf_tp = true         # a NetCDF containing all T(p) solutions
+save_ncdf_tp = true         # a single NetCDF containing all T(p) solutions
 
 # Runtime options
 mass_atm_min::Float64  = 0.005
@@ -81,6 +82,8 @@ mf_dict          = cfg["composition"]["vmr_dict"]
 star_Teff        = cfg["planet"]["star_Teff"]
 stellar_spectrum = cfg["files"]["input_star"]
 nlev_c           = cfg["execution"]["num_levels"]
+grey_lw          = cfg["execution"]["grey_lw"]
+grey_sw          = cfg["execution"]["grey_sw"]
 
 # Intial values for interior structure
 radius   = cfg["planet"]["radius"]
@@ -117,8 +120,13 @@ end
 
 
 # Ensure that mass of atmosphere is not zero
+@info "Grid axes:"
 if "mass_atm" in keys(grid)
-    grid["mass_atm"] = clamp(collect(grid["mass_atm"]), mass_atm_min, mass_atm_max)
+    grid["mass_atm"] = clamp(collect(Float64, grid["mass_atm"]), mass_atm_min, mass_atm_max)
+end
+for k in keys(grid)
+    grid[k] = collect(Float64, grid[k])
+    @info "  $k : $(grid[k])"
 end
 
 # Create a vector of dictionaries for all parameter combinations
@@ -175,6 +183,8 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                                 mf_dict, "";
 
                                 condensates=condensates,
+                                κ_grey_lw=grey_lw,
+                                κ_grey_sw=grey_sw,
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["execution"]["continua"],
                                 flag_rayleigh     = cfg["execution"]["rayleigh"],
@@ -364,12 +374,16 @@ for (i,p) in enumerate(grid_flat)
                                             perturb_all=perturb_all
                                             )
 
-    # Write NetCDF file
+    # Report radius
+    atmosphere.calc_observed_rho!(atmos)
+    @info @sprintf("    found r_phot = %.3f R_earth",atmos.transspec_r/R_earth)
+
+    # Write NetCDF file for this case
     if save_netcdfs
         save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d.nc",i)))
     end
 
-    # Make plot
+    # Make plot for this case
     if save_plots
         plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d_pt.png",i)))
     end
