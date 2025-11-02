@@ -19,10 +19,10 @@ cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 
 # Define grid
 grid::Dict = Dict{String,Array{Float64,1}}((
-    "mass_tot"      =>       range(start=0.25,  stop=5.00,  step=0.25),  # M_earth
+    "mass_tot"      =>       range(start=0.5,  stop=10.00,  step=0.5),  # M_earth
     "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_atm"      =>       range(start=0.01,  stop=0.25,  step=0.05),
-    # "metal_C"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
+    "frac_atm"      =>       range(start=0.0,  stop=0.25,  step=0.05),
+    "metal_C"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
     # "metal_S"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
     # "metal_O"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
     # "instellation"  => 10 .^ range(start= 0.0,  stop=3.4,   length=5),
@@ -38,8 +38,10 @@ save_plots   = false        # plots for each case
 save_ncdf_tp = true         # a NetCDF containing all T(p) solutions
 
 # Runtime options
-transspec_p   = 2e3    # Pa
-fc_floor      = 80.0   # K
+mass_atm_min::Float64  = 0.005
+mass_atm_max::Float64  = 1.0
+transspec_p::Float64   = 2e3    # Pa
+fc_floor::Float64      = 80.0   # K
 
 # =============================================================================
 # Parse keys and flatten grid
@@ -114,6 +116,11 @@ else
 end
 
 
+# Ensure that mass of atmosphere is not zero
+if "mass_atm" in keys(grid)
+    grid["mass_atm"] = clamp(collect(grid["mass_atm"]), mass_atm_min, mass_atm_max)
+end
+
 # Create a vector of dictionaries for all parameter combinations
 @info "Flattening grid"
 grid_flat = [
@@ -141,7 +148,7 @@ end
 
 # Create output variables to record results in
 result_table::Array{Dict, 1}  = [Dict{String,Float64}() for _ in 1:gridsize]
-result_profs::Array{Dict, 1}  = [Dict{String,Array}()    for _ in 1:gridsize] # array of dicts (p, t, r)
+result_profs::Array{Dict, 1}  = [Dict{String,Array}()   for _ in 1:gridsize] # array of dicts (p, t, r)
 
 @info "Generated grid of $(length(input_keys)) dimensions, with $gridsize points"
 sleep(3)
@@ -188,6 +195,12 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
 atmosphere.allocate!(atmos, stellar_spectrum; stellar_Teff=star_Teff)
 atmos.transspec_p = transspec_p
 
+# Check ok
+if !atmos.is_alloc
+    @error "Could not allocate atmosphere struct"
+    exit(1)
+end
+
 # Set PT
 setpt.request!(atmos, cfg["execution"]["initial_state"])
 
@@ -201,13 +214,13 @@ Calc interior radius as a function of: interior mass, interior core mass fractio
 """
 function calc_Rint(m, c)
     # fit coefficients
-    m0 =  1.12666889
-    m1 =  0.28661847
-    c0 = -0.17211226
-    c1 =  1.9857877
-    e0 = -0.1198025
-    e1 =  0.61781006
-    o1 = -0.07491575
+    m0 =  1.204294203
+    m1 =  0.2636659626
+    c0 = -0.2116187596
+    c1 =  1.9934641771
+    e0 = -0.1030231538
+    e1 =  0.5903312114
+    o1 = -0.1512426729
 
     # evaluate fit
     return  m0*m^m1 + c0*c^c1 + e0*(m*c)^e1  + o1
@@ -236,6 +249,7 @@ function update_structure!(atmos, mass_tot, frac_atm, frac_core)
 
     # surface pressure
     atmos.p_boa = mass_atm * atmos.grav_surf / (4 * pi * atmos.rp^2)
+    atmos.p_boa = max(atmos.p_boa, atmos.transspec_p * 2)
     atmosphere.generate_pgrid!(atmos)
 end
 
