@@ -253,6 +253,11 @@ function update_structure!(atmos, mass_tot, frac_atm, frac_core)
     atmosphere.generate_pgrid!(atmos)
 end
 
+# Get start time [seconds]
+time_start::Float64 = time()
+@info "Start time: $(now())"
+
+# Run the grid of models in series
 for (i,p) in enumerate(grid_flat)
     @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
 
@@ -413,6 +418,14 @@ for (i,p) in enumerate(grid_flat)
     @info "  "
 end
 
+@info "===================================="
+@info " "
+
+# Get end time
+time_end::Float64 = time()
+@info "Finish time: $(now())"
+
+# Tidy up
 atmosphere.deallocate!(atmos)
 
 # =============================================================================
@@ -421,6 +434,19 @@ atmosphere.deallocate!(atmos)
 
 if numfails >0
     @warn "Number of failed grid points: $numfails"
+else
+    @info "No failures recorded"
+end
+
+# Print model statistics
+duration = (time_end - time_start)
+@info "Average iteration duration: $(duration/gridsize) seconds"
+
+duration /= 60 # minutes
+if duration > 60
+    @info "Total runtime: $(duration/60) hours"
+else
+    @info "Total runtime: $duration minutes"
 end
 
 # Write results
