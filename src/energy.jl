@@ -522,7 +522,7 @@ module energy
                 atmos.w_conv[i] = atmos.λ_conv[i] * sqrt(grav/Hp * staby)
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (atmos.λ_conv[i]/Hp) * staby
+                atmos.flux_cdry[i] = 0.5*rho*c_p*atmos.w_conv[i] * atmos.tmpl[i] * (atmos.λ_conv[i]/Hp) * staby
 
                 # Convection eddy diffusion coefficient [m2 s-1]
                 atmos.Kzz[i] =  atmos.w_conv[i] * atmos.λ_conv[i]
