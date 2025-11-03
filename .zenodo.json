@@ -1,0 +1,38 @@
+{
+    "creators": [
+        {
+            "name": "Harrison Nicholls",
+            "orcid": "0000-0002-8368-4641",
+            "affiliation": "University of Oxford",
+            "type": "ProjectMember"
+        }
+    ],
+    "contributors": [
+    ],
+    "title": "AGNI: An open-source model for extreme atmospheres on rocky exoplanets",
+    "version": "1.7.11",
+    "access_right": "open",
+    "related_identifiers": [
+        {
+            "identifier": "https://doi.org/10.1093/mnras/stae2772",
+            "relation": "isDescribedBy",
+            "resource_type": "publication-article"
+        }
+    ],
+    "keywords": [
+        "exoplanets",
+        "radiation",
+        "atmosphere",
+        "optimization",
+        "julia",
+        "fortran",
+        "convection",
+        "chemistry",
+        "magma",
+        "planetary"
+    ],
+    "license": "GPL-3.0",
+    "upload_type": "software",
+    "language": "eng"
+}
+
