@@ -449,11 +449,11 @@ module energy
         fill!(atmos.w_conv,     0.0)
 
         # Work variables
-        Hp::Float64 = 0.0; λ::Float64 = 0.0; w::Float64 = 0.0
+        Hp::Float64 = 0.0; hgt::Float64 = 0.0
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
         grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
         ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0; ∇_μ::Float64 = 0.0; staby::Float64 = 0.0
-        hgt::Float64 = 0.0
+
 
         # Loop from bottom upwards (over cell-edges)
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
@@ -522,7 +522,7 @@ module energy
                 atmos.w_conv[i] = atmos.λ_conv[i] * sqrt(grav/Hp * staby)
 
                 # Dry convective flux
-                atmos.flux_cdry[i] = 0.5*rho*c_p*w * atmos.tmpl[i] * (atmos.λ_conv[i]/Hp) * staby
+                atmos.flux_cdry[i] = 0.5*rho*c_p*atmos.w_conv[i] * atmos.tmpl[i] * (atmos.λ_conv[i]/Hp) * staby
 
                 # Convection eddy diffusion coefficient [m2 s-1]
                 atmos.Kzz[i] =  atmos.w_conv[i] * atmos.λ_conv[i]
