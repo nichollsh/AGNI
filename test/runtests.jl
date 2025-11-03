@@ -681,6 +681,8 @@ if suite > 15
     @info " "
     @info "Testing model with energy-conserving TP solver"
     cfg = AGNI.open_config(joinpath(TEST_DIR, "test.toml"))
+
+    # check return code is fine
     succ = AGNI.run_from_config(cfg)
     if succ
         @info "Pass"
