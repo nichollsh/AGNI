@@ -1,3 +1,8 @@
+#!/usr/bin/env -S julia --color=yes --startup-file=no
+
+# Run inside AGNI root directory
+# Run as: julia --project=. misc/utilities/grid_agni.jl
+
 using AGNI
 using .Iterators
 using LoggingExtras
@@ -17,9 +22,15 @@ const M_earth::Float64 = 5.972e24
 cfg_base = "res/config/structure_grid.toml"
 @info "Using base config: $cfg_base"
 
+# Mass array
+mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(4.5),   length=7),
+                                            range(start=log10(5.0),  stop=log10(10.0),  length=9)
+                                          )
+
+
 # Define grid
 grid::Dict = Dict{String,Array{Float64,1}}((
-    "mass_tot"      => 10 .^ range(start=log10(0.5),  stop=log10(10.0),  length=18),  # M_earth
+    "mass_tot"      =>       mass_arr,  # M_earth
     "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
     "frac_atm"      =>       range(start=0.01,  stop=0.16,  step=0.03),
     "metal_C"       => 10 .^ range(start=-3.0,  stop=3.0,   step=3.0),
