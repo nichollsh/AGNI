@@ -16,17 +16,16 @@ const M_earth::Float64 = 5.972e24
 # Base parameters
 cfg_base = "res/config/structure_grid.toml"
 @info "Using base config: $cfg_base"
-cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 
 # Define grid
 grid::Dict = Dict{String,Array{Float64,1}}((
-    "mass_tot"      =>       range(start=0.5,  stop=10.00,  step=0.5),  # M_earth
+    "mass_tot"      => 10 .^ range(start=log10(0.5),  stop=log10(10.0),  length=18),  # M_earth
     "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
     "frac_atm"      =>       range(start=0.01,  stop=0.16,  step=0.03),
-    "metal_C"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
-    # "metal_S"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
-    # "metal_O"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
-    "instellation"  => 10 .^ range(start= 0.0,  stop=3.4,   length=5),
+    "metal_C"       => 10 .^ range(start=-3.0,  stop=3.0,   step=3.0),
+    # "metal_S"       => 10 .^ range(start=-3.0,  stop=3.0,     step=3.0),
+    # "metal_O"       => 10 .^ range(start=-3.0,  stop=3.0,     step=3.0),
+    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
     # "Teff"          =>       range(start=2500,  stop=6000,  step=700.0)
 ))
 
@@ -48,14 +47,20 @@ fc_floor::Float64      = 80.0   # K
 # Parse keys and flatten grid
 # -------------------------------
 
+# Parse config file
+cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
+
 # Output folder
 output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
 @info "Output folder: $output_dir"
 rm(output_dir,force=true,recursive=true)
 mkdir(output_dir)
 
+# Backup config to output dir
+cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
+
 # Logging
-AGNI.setup_logging(joinpath(output_dir, "runner.log"), cfg["execution"]["verbosity"])
+AGNI.setup_logging(joinpath(output_dir, "manager.log"), cfg["execution"]["verbosity"])
 
 # Parse parameters
 incl_convect     = cfg["execution"]["convection"]
@@ -105,7 +110,7 @@ elseif gz_est > 1e3
 else
     @info "Grid has $gz_est points"
 end
-rt_est = gz_est * 15.0 # seconds
+rt_est = gz_est * 5.0 # seconds
 if rt_est > 60*60
     rt_est /= 60*60 # hrs
     if rt_est > 24
@@ -121,12 +126,20 @@ end
 
 # Tidy grid
 @info "Grid axes:"
-if "mass_atm" in keys(grid)  # limit mass range
+#    round total mass to 2dp
+if "mass_tot" in keys(grid)
+    grid["mass_tot"] = round.(grid["mass_tot"]; digits=2)
+end
+#    limit atmosphere mass fraction
+if "mass_atm" in keys(grid)
     grid["mass_atm"] = clamp(collect(Float64, grid["mass_atm"]), mass_atm_min, mass_atm_max)
 end
-if "instellation" in keys(grid)  # round instellation to 1 dp
+#    round instellation to 1dp
+if "instellation" in keys(grid)
     grid["instellation"] = round.(grid["instellation"]; digits=1)
 end
+
+# Print  gridpoints for user
 for k in keys(grid)
     grid[k] = collect(Float64, grid[k])
     @info "  $k : $(grid[k])"

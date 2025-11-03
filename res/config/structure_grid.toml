@@ -31,7 +31,7 @@ title = "Grey gas"
 
 
 [execution]
-    clean_output    = true
+    clean_output    = false
     verbosity       = 1
     max_steps       = 200
     max_runtime     = 400
@@ -52,13 +52,13 @@ title = "Grey gas"
     rainout         = false
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 400.0
+    dx_max          = 200.0
     initial_state   = ["iso","1500"]
     linesearch      = 2
     easy_start      = false
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-4
-    perturb_all     = false
+    perturb_all     = true
 
 [plots]
     at_runtime      = true
