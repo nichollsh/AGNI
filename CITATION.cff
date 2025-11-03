@@ -3,9 +3,27 @@ message: "If you use this software, please cite it as below."
 authors:
 - family-names: "Nicholls"
   given-names: "Harrison"
+  affiliation: "University of Oxford"
   orcid: "https://orcid.org/0000-0002-8368-4641"
-title: "Convective shutdown in the atmospheres of lava worlds"
-version: 1.7.8
-doi: 10.1093/mnras/stae2772
-date-released: 2025-10-21
-url: "https://doi.org/10.1093/mnras/stae2772"
+
+title: "AGNI: An open-source model for extreme atmospheres on rocky exoplanets"
+doi: 10.21105/joss.07726
+date-released: 2025-11-03
+
+version: 1.7.11
+url: "https://github.com/nichollsh/AGNI"
+type: software
+license: "GPL-3.0"
+
+keywords:
+- exoplanets
+- radiation
+- atmosphere
+- optimization
+- julia
+- fortran
+- convection
+- chemistry
+- magma
+- planetary
+
