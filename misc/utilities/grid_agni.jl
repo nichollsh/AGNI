@@ -23,10 +23,10 @@ grid::Dict = Dict{String,Array{Float64,1}}((
     "mass_tot"      =>       range(start=0.5,  stop=10.00,  step=0.5),  # M_earth
     "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
     "frac_atm"      =>       range(start=0.01,  stop=0.16,  step=0.03),
-    # "metal_C"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
+    "metal_C"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
     # "metal_S"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
     # "metal_O"       => 10 .^ range(start=-4.0,  stop=2,     step=3.0),
-    # "instellation"  => 10 .^ range(start= 0.0,  stop=3.4,   length=5),
+    "instellation"  => 10 .^ range(start= 0.0,  stop=3.4,   length=5),
     # "Teff"          =>       range(start=2500,  stop=6000,  step=700.0)
 ))
 
@@ -119,10 +119,13 @@ else
 end
 
 
-# Ensure that mass of atmosphere is not zero
+# Tidy grid
 @info "Grid axes:"
-if "mass_atm" in keys(grid)
+if "mass_atm" in keys(grid)  # limit mass range
     grid["mass_atm"] = clamp(collect(Float64, grid["mass_atm"]), mass_atm_min, mass_atm_max)
+end
+if "instellation" in keys(grid)  # round instellation to 1 dp
+    grid["instellation"] = round.(grid["instellation"]; digits=1)
 end
 for k in keys(grid)
     grid[k] = collect(Float64, grid[k])
