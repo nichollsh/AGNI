@@ -13,7 +13,7 @@ date-released: 2025-11-03
 version: 1.7.11
 url: "https://github.com/nichollsh/AGNI"
 type: software
-license: "GPLv3"
+license: "GPL-3.0"
 
 keywords:
 - exoplanets
