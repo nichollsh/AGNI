@@ -349,7 +349,7 @@ module AGNI
         #    double grey radtrans opacities
         κ_grey_lw::Float64 = 1e-4  # this will be over-written
         κ_grey_sw::Float64 = 1e-5  # ^
-        if lowercase(cfg["input"]["input_sf"]) == "greygas"
+        if lowercase(cfg["files"]["input_sf"]) == "greygas"
             if haskey(cfg["execution"],"grey_lw") && haskey(cfg["execution"],"grey_sw")
                 κ_grey_lw = Float64(cfg["execution"]["grey_lw"])
                 κ_grey_sw = Float64(cfg["execution"]["grey_sw"])

@@ -1,5 +1,5 @@
 # AGNI configuration file
-title = "Grey gas"
+title = "Base config for structure calcs"
 
 [planet]
     tmp_surf        = 2000.0
@@ -17,14 +17,13 @@ title = "Grey gas"
     star_Teff       = 3415.0
 
 [files]
-    input_sf        = "greygas"
+    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf" #"greygas"
     input_star      = "blackbody"
     output_dir      = "out/"
 
 [composition]
     p_surf          = 6000.0
     p_top           = 1e-5
-    vmr_dict        = { H2 = 0.6, H2O=0.1, CO=0.1, H2S=0.1, S2=0.1  }
     metallicities   = {"C"=0.1, "S"=0.1, "O"=0.1}
     chemistry       = 1
     condensates     = []
@@ -35,7 +34,7 @@ title = "Grey gas"
     verbosity       = 1
     max_steps       = 200
     max_runtime     = 400
-    num_levels      = 50
+    num_levels      = 40
     continua        = true
     rayleigh        = false
     cloud           = false
@@ -52,13 +51,13 @@ title = "Grey gas"
     rainout         = false
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 200.0
-    initial_state   = ["iso","1500"]
+    dx_max          = 400.0
+    initial_state   = ["iso","2000"]
     linesearch      = 2
     easy_start      = false
-    converge_atol   = 1.0e-2
-    converge_rtol   = 1.0e-4
-    perturb_all     = true
+    converge_atol   = 0.5
+    converge_rtol   = 1.0e-2
+    perturb_all     = false
 
 [plots]
     at_runtime      = true

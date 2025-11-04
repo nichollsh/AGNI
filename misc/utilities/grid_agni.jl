@@ -85,7 +85,6 @@ perturb_all      = cfg["execution"]["perturb_all"]
 plt_tmp          = cfg["plots"]["temperature"]
 plt_ani          = cfg["plots"]["animate"]
 p_top            = cfg["composition"]["p_top"]
-real_gas         = cfg["execution"]["real_gas"]
 chem_type        = cfg["composition"]["chemistry"]
 condensates      = cfg["composition"]["condensates"]
 metallicities    = cfg["composition"]["metallicities"]
@@ -94,7 +93,6 @@ wind_speed       = cfg["planet"]["wind_speed"]
 flux_int         = cfg["planet"]["flux_int"]
 surface_mat      = cfg["planet"]["surface_material"]
 p_surf           = cfg["composition"]["p_surf"]
-mf_dict          = cfg["composition"]["vmr_dict"]
 star_Teff        = cfg["planet"]["star_Teff"]
 stellar_spectrum = cfg["files"]["input_star"]
 nlev_c           = cfg["execution"]["num_levels"]
@@ -108,6 +106,7 @@ gravity  = phys.grav_accel(mass, radius)
 mass_tot  = mass * 1.1
 frac_core = 0.325
 frac_atm  = 0.01
+mf_dict = Dict("H2"=>0.6, "H2O"=>0.1, "CO2"=>0.1, "N2"=>0.1, "H2S"=>0.1)
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
@@ -217,7 +216,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                                 flag_rayleigh     = cfg["execution"]["rayleigh"],
                                 flag_cloud        = cfg["execution"]["cloud"],
                                 overlap_method    = cfg["execution"]["overlap_method"],
-                                real_gas          = real_gas,
+                                real_gas          = cfg["execution"]["real_gas"],
                                 thermo_functions  = cfg["execution"]["thermo_funct"],
                                 use_all_gases     = true,
                                 C_d=turb_coeff, U=wind_speed,
@@ -446,7 +445,7 @@ for (i,p) in enumerate(grid_flat)
             result_table[i][k] = atmos.transspec_μ
         elseif k == "g_phot"
             result_table[i][k] = atmos.transspec_grav
-            
+
         elseif k == "Kzz_max"
             result_table[i][k] = maximum(atmos.Kzz)
         else
