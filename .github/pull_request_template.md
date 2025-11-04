@@ -1,7 +1,7 @@
 ## Description
 A short summary of the changes made in this pull-request.
 
-Tag the [related issue](https://github.com/FormingWorlds/PROTEUS/issues); e.g. closes #xxx
+Tag the [related issue](https://github.com/nichollsh/AGNI/issues); e.g. closes #xxx
 
 Include screenshots or log files if appropriate.
 
@@ -13,7 +13,7 @@ Outline your test configuration; e.g. MacOS with Python 3.13.
 
 ## Checklist
 
-- [ ] I have followed the [contributing guidelines](https://fwl-proteus.readthedocs.io/en/latest/CONTRIBUTING.html#how-do-i-contribute)
+- [ ] I have followed the [contributing guidelines](https://www.h-nicholls.space/AGNI/dev/contributing/)
 - [ ] My code follows the style guidelines of this project
 - [ ] I have performed a self-review of my code
 - [ ] My changes generate no new warnings or errors
