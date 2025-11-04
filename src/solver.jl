@@ -178,7 +178,7 @@ module solver
         # Execution parameters
         # --------------------
         #    padding
-        tmp_pad::Float64 =  10.0        # do not allow the solver to get closer than this to tmp_floor
+        tmp_pad::Float64 =  5.0        # do not allow the solver to get closer than this to tmp_floor
 
         #    easy_start
         easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
@@ -251,7 +251,6 @@ module solver
         # Calculate the (remaining) temperatures from known temperatures
         function _set_tmps!(_x::Array{Float64,1})
             # Read new guess
-            clamp!(_x, atmos.tmp_floor+1.0, atmos.tmp_ceiling-1.0)
             for i in 1:atmos.nlev_c
                 atmos.tmp[i] = _x[i]
             end
