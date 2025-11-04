@@ -68,10 +68,19 @@ jobs:
           export LD_LIBRARY_PATH=""
           julia --project=. -e 'using Pkg; Pkg.build()'
 
+      # Run the tests
       - name: Test AGNI
         run: |
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export LD_LIBRARY_PATH=""
           julia --project=. -e 'using Pkg; Pkg.test()'
 
+      # Upload result if tests fail
+      - name: Upload result as artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-failure-artifact
+          path: |
+            out/*
 
