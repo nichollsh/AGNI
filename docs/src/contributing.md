@@ -6,7 +6,7 @@
 
 * If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/nichollsh/AGNI/issues/new). Be sure to include a **title and clear description**, as much relevant information as possible, and a **code sample** or an **executable test case** demonstrating the expected behavior that is not occurring.
 
-* For more general information on submitting a bug report, visit our [this page](https://www.chiark.greenend.org.uk/~sgtatham/bugs.html).
+* For more general information on submitting a bug report, visit [this page](https://www.chiark.greenend.org.uk/~sgtatham/bugs.html).
 
 ### Bug fixing
 
