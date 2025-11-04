@@ -22,7 +22,7 @@ title = "Unit tests configuration"
 [files]
     input_sf        = "../res/spectral_files/Dayspring/48/Dayspring.sf"
     input_star      = "blackbody"
-    output_dir      = "out/"
+    output_dir      = "../out/"
 
 [composition]
     p_surf          = 7000.0
@@ -62,8 +62,8 @@ title = "Unit tests configuration"
 
 [plots]
     at_runtime      = false
-    temperature     = false
-    fluxes          = false
+    temperature     = true
+    fluxes          = true
     contribution    = false
     emission        = false
     albedo          = false
