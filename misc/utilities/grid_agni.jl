@@ -435,14 +435,18 @@ for (i,p) in enumerate(grid_flat)
             result_table[i][k] = atmos.rp
         elseif k == "μ_surf"
             result_table[i][k] = atmos.layer_μ[end]
+        elseif k == "g_surf"
+            result_table[i][k] = atmos.grav_surf
+
+        elseif k == "t_phot"
+            result_table[i][k] = atmos.transspec_tmp
         elseif k == "r_phot"
             result_table[i][k] = atmos.transspec_r
         elseif k == "μ_phot"
             result_table[i][k] = atmos.transspec_μ
-        elseif k == "t_phot"
-            result_table[i][k] = atmos.transspec_tmp
         elseif k == "g_phot"
             result_table[i][k] = atmos.transspec_grav
+            
         elseif k == "Kzz_max"
             result_table[i][k] = maximum(atmos.Kzz)
         else
