@@ -15,7 +15,7 @@ title = "TOI-561 b"
     wind_speed      = 2.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"
+    input_sf        = "greygas"
     input_star      = "res/stellar_spectra/sun.txt"
     output_dir      = "out/"
 
@@ -33,7 +33,7 @@ title = "TOI-561 b"
     max_runtime     = 400
     num_levels      = 45
     continua        = true
-    rayleigh        = true
+    rayleigh        = false
     cloud           = false
     overlap_method  = "ee"
     real_gas        = false
@@ -46,10 +46,10 @@ title = "TOI-561 b"
     rainout         = false
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 400.0
-    initial_state   = ["iso","2000"] #["ncdf", "out/atm.nc"]
-    linesearch      = 0
-    easy_start      = false
+    dx_max          = 300.0
+    initial_state   = ["iso","3000"] #["ncdf", "out/atm.nc"]
+    linesearch      = 2
+    easy_start      = true
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3
     perturb_all     = false
