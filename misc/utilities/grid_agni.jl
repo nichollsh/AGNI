@@ -32,8 +32,8 @@ mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(
 grid::Dict = Dict{String,Array{Float64,1}}((
     "mass_tot"      =>       mass_arr,  # M_earth
     "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_atm"      =>       range(start=0.01,  stop=0.16,  step=0.03),
-    "metal_C"       => 10 .^ range(start=-3.0,  stop=3.0,   step=3.0),
+    "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
+    # "metal_C"       => 10 .^ range(start=-3.0,  stop=3.0,   step=3.0),
     # "metal_S"       => 10 .^ range(start=-3.0,  stop=3.0,     step=3.0),
     # "metal_O"       => 10 .^ range(start=-3.0,  stop=3.0,     step=3.0),
     "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
@@ -49,7 +49,9 @@ save_plots   = false        # plots for each case
 save_ncdf_tp = true         # a single NetCDF containing all T(p) solutions
 
 # Runtime options
-mass_atm_min::Float64  = 0.005
+ls_increase::Float64   = 1.1
+modplot::Int           = 0            # Plot during runtime (debug)
+mass_atm_min::Float64  = 0.001
 mass_atm_max::Float64  = 1.0
 transspec_p::Float64   = 2e3    # Pa
 fc_floor::Float64      = 80.0   # K
@@ -145,8 +147,9 @@ if "mass_atm" in keys(grid)
     grid["mass_atm"] = clamp(collect(Float64, grid["mass_atm"]), mass_atm_min, mass_atm_max)
 end
 #    round instellation to 1dp
+#    sort in descending order
 if "instellation" in keys(grid)
-    grid["instellation"] = round.(grid["instellation"]; digits=1)
+    grid["instellation"] = reverse(sort(round.(grid["instellation"]; digits=1)))
 end
 
 # Print  gridpoints for user
@@ -391,11 +394,12 @@ for (i,p) in enumerate(grid_flat)
                                             conv_atol=conv_atol,
                                             conv_rtol=conv_rtol,
                                             method=1,
+                                            ls_increase=ls_increase,
                                             rainout=Bool(cfg["execution"]["rainout"]),
                                             dx_max=Float64(cfg["execution"]["dx_max"]),
                                             ls_method=Int(cfg["execution"]["linesearch"]),
                                             easy_start=Bool(cfg["execution"]["easy_start"]),
-                                            modplot=0,
+                                            modplot=modplot,
                                             save_frames=false,
                                             perturb_all=perturb_all
                                             )
