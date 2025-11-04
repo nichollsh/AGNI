@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     name: install_and_test
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       # Setup system
       - name: NetCDF
@@ -42,7 +43,8 @@ jobs:
           repository: 'nichollsh/SOCRATES'
           path: 'SOCRATES'
 
-      - uses: actions/cache@v4
+      - name: Restore SOCRATES from cache
+        uses: actions/cache@v4
         id: cache-socrates
         with:
           path: |
@@ -51,7 +53,7 @@ jobs:
             SOCRATES/set_rad_env
           key: socrates-${{ hashFiles('SOCRATES/version') }}
 
-      - name: Build SOCRATES
+      - name: Build SOCRATES if required
         if: steps.cache-socrates.outputs.cache-hit != 'true'
         run: |
           export LD_LIBRARY_PATH=""
@@ -69,18 +71,17 @@ jobs:
           julia --project=. -e 'using Pkg; Pkg.build()'
 
       # Run the tests
-      - name: Test AGNI
+      - name: Run AGNI test suite
         run: |
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export LD_LIBRARY_PATH=""
           julia --project=. -e 'using Pkg; Pkg.test()'
 
-      # Upload result if tests fail
+      # Upload output dir for inspection by user
       - name: Upload result as artifact
-        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-failure-artifact
+          name: test-artifact
           path: |
             out/*
 
