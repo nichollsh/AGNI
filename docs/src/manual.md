@@ -1,7 +1,7 @@
 # Software manual
 
 ## Contributing
-If you are interested in contributing to the model, please see the [contributing](@ref) page
+If you are interested in contributing to the model, please see the [contributing](contributing.md) page
 
 ## Code reference (API)
 

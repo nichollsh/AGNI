@@ -319,7 +319,7 @@ module solver
 
             # Check that residuals are real numbers
             if !all(isfinite, resid)
-                display(resid)
+                show(resid)
                 @error "Residual array contains NaNs and/or Infs"
                 code = 4
                 return false
