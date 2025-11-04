@@ -32,8 +32,8 @@ title = "Base config for structure calcs"
 [execution]
     clean_output    = false
     verbosity       = 1
-    max_steps       = 200
-    max_runtime     = 400
+    max_steps       = 70
+    max_runtime     = 200
     num_levels      = 40
     continua        = true
     rayleigh        = false
@@ -41,7 +41,7 @@ title = "Base config for structure calcs"
     overlap_method  = "ee"
     grey_lw         = 5e-3
     grey_sw         = 2e-4
-    real_gas        = true
+    real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
     conduction      = false
@@ -51,13 +51,13 @@ title = "Base config for structure calcs"
     rainout         = false
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 400.0
+    dx_max          = 200.0
     initial_state   = ["iso","2000"]
-    linesearch      = 2
+    linesearch      = 1
     easy_start      = false
-    converge_atol   = 0.5
+    converge_atol   = 5.0
     converge_rtol   = 1.0e-2
-    perturb_all     = false
+    perturb_all     = true
 
 [plots]
     at_runtime      = true
