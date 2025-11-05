@@ -3,7 +3,7 @@ title = "Base config for structure calcs"
 
 [planet]
     tmp_surf        = 2000.0
-    instellation    = 6818.61
+    instellation    = 1361.0
     albedo_b        = 0.18
     s0_fact         = 0.25
     zenith_angle    = 54.74
@@ -22,7 +22,7 @@ title = "Base config for structure calcs"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 6000.0
+    p_surf          = 100.0
     p_top           = 1e-5
     metallicities   = {"C"=0.1, "S"=0.1, "O"=0.1}
     chemistry       = 1
