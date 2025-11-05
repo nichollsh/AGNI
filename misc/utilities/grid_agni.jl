@@ -1,12 +1,13 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
-# Run inside AGNI root directory
+# To be run from within the AGNI root directory
 # Run as: julia --project=. misc/utilities/grid_agni.jl
 
 using AGNI
 using .Iterators
 using LoggingExtras
 using Printf
+using DataStructures
 using NCDatasets
 using Dates
 
@@ -22,26 +23,35 @@ const M_earth::Float64 = 5.972e24
 cfg_base = "res/config/structure_grid.toml"
 @info "Using base config: $cfg_base"
 
-# Mass array
+# Mass array with custom spacing
 mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(4.5),   length=7),
                                             range(start=log10(5.0),  stop=log10(10.0),  length=9)
                                           )
 
 
 # Define grid
-grid::Dict = Dict{String,Array{Float64,1}}((
-    "mass_tot"      =>       mass_arr,  # M_earth
-    "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
+#    parameters will be varied in the same order as these keys
+#    enter the least-important parameters first
+grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
+
     # "metal_C"       => 10 .^ range(start=-3.0,  stop=3.0,   step=3.0),
     # "metal_S"       => 10 .^ range(start=-3.0,  stop=3.0,     step=3.0),
     # "metal_O"       => 10 .^ range(start=-3.0,  stop=3.0,     step=3.0),
-    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
-    # "Teff"          =>       range(start=2500,  stop=6000,  step=700.0)
+
+    "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
+    "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
+
+    # "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
+    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(250.0),  length=5), # S_earth
+
+    "mass_tot"      =>       mass_arr,  # M_earth
 ))
 
 # Variables to record
-output_keys = ["succ", "p_surf", "t_surf", "r_surf", "μ_surf", "t_phot", "r_phot", "μ_phot", "g_phot",  "Kzz_max"]
+output_keys =  ["succ", "flux_loss",
+                "p_surf", "t_surf", "r_surf", "μ_surf",
+                "t_phot", "r_phot", "μ_phot", "g_phot",
+                "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
 save_netcdfs = false        # NetCDF file for each case
@@ -49,13 +59,13 @@ save_plots   = false        # plots for each case
 save_ncdf_tp = true         # a single NetCDF containing all T(p) solutions
 
 # Runtime options
-ls_increase::Float64   = 1.1
-modwrite::Int          = 1           # frequency to write CSV file
-modplot::Int           = 0            # Plot during runtime (debug)
+ls_increase::Float64   = 1.02
+modwrite::Int          = 10           # frequency to write CSV file
+modplot::Int           = 2            # Plot during runtime (debug)
 frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
 transspec_p::Float64   = 2e3    # Pa
-fc_floor::Float64      = 80.0   # K
+fc_floor::Float64      = 273.0   # K
 
 # =============================================================================
 # Parse keys and flatten grid
@@ -88,6 +98,7 @@ sol_type         = cfg["execution"]["solution_type"]
 conv_atol        = cfg["execution"]["converge_atol"]
 conv_rtol        = cfg["execution"]["converge_rtol"]
 perturb_all      = cfg["execution"]["perturb_all"]
+perturb_chem     = false
 plt_tmp          = cfg["plots"]["temperature"]
 plt_ani          = cfg["plots"]["animate"]
 p_top            = cfg["composition"]["p_top"]
@@ -169,7 +180,7 @@ end
 # Create a vector of dictionaries for all parameter combinations
 @info "Flattening grid"
 grid_flat = [
-    Dict(zip(input_keys, values_combination))
+    OrderedDict(zip(input_keys, values_combination))
     for values_combination in Iterators.product(values(grid)...)
 ]
 gridsize = length(grid_flat)
@@ -186,7 +197,7 @@ open(gpfile, "w") do hdl
 
     # Each row
     for (i,p) in enumerate(grid_flat)
-        row = @sprintf("%07d,",i) * join([@sprintf("%.6e",v) for v in values(p)], ",") * "\n"
+        row = @sprintf("%08d,",i) * join([@sprintf("%.6e",v) for v in values(p)], ",") * "\n"
         write(hdl,row)
     end
 end
@@ -218,7 +229,7 @@ function write_table(res_tab::Array{Dict,1}, fpath::String, nrows::Int)
 
         # Each row
         for i in 1:nrows
-            row = @sprintf("%07d",i)
+            row = @sprintf("%08d",i)
             for k in output_keys
                 row *= @sprintf(",%.6e",res_tab[i][k])
             end
@@ -333,10 +344,14 @@ time_start::Float64 = time()
 @info "Start time: $(now())"
 
 # Run the grid of models in series
+succ = true
+succ_last = true
 for (i,p) in enumerate(grid_flat)
     @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
 
-    succ = true
+    global succ_last
+    global succ
+    succ_last = succ
 
     # Set all VMRs to zero
     # for gas in atmos.gas_names
@@ -390,9 +405,6 @@ for (i,p) in enumerate(grid_flat)
             exit(1)
         end
     end
-    if !succ
-        break
-    end
 
     # Ensure VMRs sum to unity
     tot_vmr::Float64 = 0.0
@@ -420,14 +432,28 @@ for (i,p) in enumerate(grid_flat)
         # end
     end
 
-    @info @sprintf("    using p_surf = %.3f bar",atmos.pl[end]/1e5)
+    @info @sprintf("    using p_surf = %.2e bar",atmos.pl[end]/1e5)
+
+    # Set temperature array based on interpolation from last solution
+    max_steps = Int(cfg["execution"]["max_steps"])
+    easy_start = Bool(cfg["execution"]["easy_start"])
+    if i > 1
+        if succ_last
+            # last iter was successful
+            setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
+        else
+            # last iter failed -> restore initial guess for T(p)
+            setpt.request!(atmos, cfg["execution"]["initial_state"])
+            easy_start = true
+        end
+    end
 
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=sol_type,
                                             conduct=incl_conduct, chem_type=chem_type,
                                             convect=incl_convect, latent=incl_latent,
                                             sens_heat=incl_sens,
-                                            max_steps=Int(cfg["execution"]["max_steps"]),
+                                            max_steps=max_steps,
                                             max_runtime=Float64(cfg["execution"]["max_runtime"]),
                                             conv_atol=conv_atol,
                                             conv_rtol=conv_rtol,
@@ -436,24 +462,24 @@ for (i,p) in enumerate(grid_flat)
                                             rainout=Bool(cfg["execution"]["rainout"]),
                                             dx_max=Float64(cfg["execution"]["dx_max"]),
                                             ls_method=Int(cfg["execution"]["linesearch"]),
-                                            easy_start=Bool(cfg["execution"]["easy_start"]),
+                                            easy_start=easy_start,
                                             modplot=modplot,
                                             save_frames=false,
-                                            perturb_all=perturb_all
+                                            perturb_all=perturb_all,
+                                            perturb_chem=perturb_chem
                                             )
 
     # Report radius
-    atmosphere.calc_observed_rho!(atmos)
     @info @sprintf("    found r_phot = %.3f R_earth",atmos.transspec_r/R_earth)
 
     # Write NetCDF file for this case
     if save_netcdfs
-        save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d.nc",i)))
+        save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,@sprintf("%08d.nc",i)))
     end
 
     # Make plot for this case
     if save_plots
-        plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,@sprintf("%07d_pt.png",i)))
+        plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,@sprintf("%08d_pt.png",i)))
     end
 
     # Record keys (all in SI)
@@ -461,6 +487,7 @@ for (i,p) in enumerate(grid_flat)
         field = Symbol(k)
         if hasfield(atmosphere.Atmos_t, field)
             result_table[i][k] = Float64(getfield(atmos, Symbol(k)))
+
         elseif k == "succ"
             if succ
                 result_table[i][k] = 1.0 # success
@@ -468,6 +495,9 @@ for (i,p) in enumerate(grid_flat)
                 global numfails += 1
                 result_table[i][k] = -1.0 # failure
             end
+        elseif k == "flux_loss"
+            result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+
         elseif k == "p_surf"
             result_table[i][k] = atmos.p_boa
         elseif k == "t_surf"
@@ -490,6 +520,10 @@ for (i,p) in enumerate(grid_flat)
 
         elseif k == "Kzz_max"
             result_table[i][k] = maximum(atmos.Kzz)
+        elseif k == "conv_ptop"
+            result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[1]
+        elseif k == "conv_pbot"
+            result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[2]
         else
             @error "Unhandled output variable: $k"
             exit(1)

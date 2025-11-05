@@ -18,6 +18,7 @@ license: "GPL-3.0"
 keywords:
 - exoplanets
 - radiation
+- astronomy
 - atmosphere
 - optimization
 - julia
@@ -26,4 +27,5 @@ keywords:
 - chemistry
 - magma
 - planetary
+- physics
 

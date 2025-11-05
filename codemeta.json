@@ -7,7 +7,7 @@
       "@type": "Person",
       "email": "harrison.nicholls@physics.ox.ac.uk",
       "name": "Harrison Nicholls",
-      "affiliation": "Department of Physics, University of Oxford, Parks Road, Oxford OX1 3PU, UK"
+      "affiliation": "University of Oxford"
     }
   ],
   "identifier": "",
@@ -16,8 +16,8 @@
   "dateModified": "2025-10-21",
   "dateCreated": "2024-09-13",
   "description": "An open-source model for extreme atmospheres on rocky exoplanets.",
-  "keywords": "physics, radiative transfer, exoplanets, astronomy, convection, radiation, planets, atmospheres",
-  "license": "GPL v3.0",
+  "keywords": "exoplanets, radiation, astronomy, atmosphere, optimization, julia, fortran, convection, chemistry, magma, planetary, physics",
+  "license": "GPL-3.0",
   "title": "AGNI",
   "version": "1.7.12"
 }

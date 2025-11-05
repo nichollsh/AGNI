@@ -34,8 +34,9 @@ module atmosphere
 
     # Constants
     const AGNI_VERSION::String    = "1.7.12"  # current agni version
-    const HYDROGRAV_STEPS::Int64  = 40       # num of sub-layers in hydrostatic integration
-    const SOCVER_minimum::Float64 = 2407.2   # minimum required socrates version
+    const HYDROGRAV_STEPS::Int64  = 40        # num of sub-layers in hydrostatic integration
+    const SOCVER_minimum::Float64 = 2407.2    # minimum required socrates version
+    const NLEV_minimum::Int       = 25        # minimum allowed number of levels
 
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
@@ -499,8 +500,8 @@ module atmosphere
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     2.0e4
 
-        if nlev_centre < 25
-            nlev_centre = 25
+        if nlev_centre < NLEV_minimum
+            nlev_centre = NLEV_minimum
             @warn "Adjusted number of levels to $nlev_centre"
         end
         atmos.nlev_c         =  nlev_centre
@@ -1029,6 +1030,42 @@ module atmosphere
 
         # also return the value
         return atmos.transspec_rho
+    end
+
+    """
+    **Get pressure at top and bottom of convective zone**
+
+    Arguments:
+        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+        - `p_top::Float64`          pressure [Pa] at top of convective zone
+        - `p_bot::Float64`          pressure [Pa] at bottom of convective zone
+    """
+    function estimate_convective_zone(atmos::atmosphere.Atmos_t)::Tuple{Float64,Float64}
+
+        # Defaults to zero, if there's no convection
+        p_top::Float64 = 0.0
+        p_bot::Float64 = 0.0
+
+        # Loop from top-down to find p_top
+        for i in 1:atmos.nlev_l
+            if atmos.mask_c[i]
+                p_top = atmos.pl[i]
+                break
+            end
+        end
+
+        # Loop from bottom-up to find p_bot
+        for i in range(start=atmos.nlev_l, stop=1, step=-1)
+            if atmos.mask_c[i]
+                p_bot = atmos.pl[i]
+                break
+            end
+        end
+
+        # Return top, bot
+        return (p_top, p_bot)
     end
 
     """
