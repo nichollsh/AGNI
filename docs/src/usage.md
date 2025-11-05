@@ -59,6 +59,19 @@ Potential flags for each species are:
 * `NO_THERMO` - no thermodynamic data available, so will be treated as a diatomic ideal gas
 * `COND` - this gas is allowed to condense
 
+## Grids of models
+
+The code is not explicitly parallelised. However, there is functionality to run a grid
+of models using by the script located at `misc/utilities/grid_agni.jl`.
+
+This script can be run on your local machine. However, it could also be dispatched to a node
+within a compute cluster by using Slurm. For example, with a 24 hr and 3 GB memory limit:
+
+```console
+sbatch --mem-per-cpu=3G --time=1440 --wrap "julia --project=. misc/utilities/grid_agni.jl"
+```
+
+
 ## Configuration
 AGNI configuration files are formatted using [TOML](https://toml.io/en/). There
 are examples in `res/config/`. The default configuration file contains comments
