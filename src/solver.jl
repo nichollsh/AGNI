@@ -178,7 +178,7 @@ module solver
         # Execution parameters
         # --------------------
         #    padding
-        tmp_pad::Float64 =  10.0        # do not allow the solver to get closer than this to tmp_floor
+        tmp_pad::Float64 =  5.0        # do not allow the solver to get closer than this to tmp_floor
 
         #    easy_start
         easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
@@ -222,6 +222,7 @@ module solver
         lml::Float64             = 2.0                  # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
+        dx_max_step::Float64     = Float64(dx_max)      # dx_max allowed in current step
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost
@@ -354,7 +355,8 @@ module solver
                 fill!(rb2, 0.0)
 
                 # Calculate perturbation at this level
-                fd_s = x[i] * fdw
+                #    This must be less than tmp_pad/2
+                fd_s = min(x[i] * fdw, tmp_pad/2)
 
                 # Forward part (1 step)
                 x_s[i] = x[i] + fd_s
@@ -526,7 +528,6 @@ module solver
                 code = 4
                 break
             end
-            clamp!(x_cur, atmos.tmp_floor+tmp_pad, atmos.tmp_ceiling-tmp_pad)
             _set_tmps!(x_cur)
 
             # Run chemistry scheme
@@ -669,8 +670,17 @@ module solver
                 stepflags *= "X-"
             end
 
-            # Limit step size, without changing direction of dx vector
-            x_dif *= min(1.0, dx_max / maximum(abs.(x_dif[:])))
+            # Max step size
+            #    limit by user requirement
+            dx_max_step = dx_max
+            #    limit by distance to tmp_ceil
+            dx_max_step = min(dx_max_step, atmos.tmp_ceiling-tmp_pad - maximum(x_cur) )
+            #    limit by distance to tmp_floor
+            dx_max_step = min(dx_max_step, minimum(x_cur) - atmos.tmp_floor+tmp_pad)
+
+            # Limit step size by dx_max_step, without changing direction of dx vector
+            x_dif *= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
+
 
             # Linesearch
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
@@ -739,7 +749,6 @@ module solver
 
             # Take the step
             @. x_cur = x_old + x_dif
-            clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
             _fev!(x_cur, r_cur)
 
             # New cost value from this step
