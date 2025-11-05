@@ -67,11 +67,23 @@ module consts
 
     # Standard species
     const gases_standard::Array{String, 1} = [
-        "C2H4", "CO", "H2O", "H2SO4", "N2", "O2", "OH", "SO", "SiO", "CH4", "CO2", "H2",
-        "H2S", "HCN", "NH3", "OCS", "S2", "S8", "SO2", "SiO2", "O3", "N2O", "NO", "NO2",
-        "HNO3", "FeH", "PH3", "C2H2", "NO3", "N2O5", "HONO", "HO2NO2", "H2O2", "C2H6",
-        "CH3", "H2CO", "HO2", "C", "Fe", "FeO", "H", "Mg2", "Mg", "MgO", "N", "O", "Si",
-        "S", "SO", "CS2","He",
+        # volatile elems
+        "H", "N", "O", "C", "S", "He",
+        # basic
+        "CH4", "CO2", "CO", "H2", "H2O", "O2", "OH", "O3",
+        # hydrocarbon
+        "H2O2", "C2H6", "C2H4","C2H2",  "CH3", "H2CO", "HO2",
+        # sulfur bearing
+        "SO", "S2", "S8", "SO2",  "H2SO4", "H2S", "S", "CS2", "OCS",
+        # nitrogen
+        "N2", "HCN", "NH3",  "HNO3", "N2O5", "HONO", "HO2NO2",
+        "NO3", "N2O", "NO", "NO2",
+        # phosphorous
+        "PH3",
+        # refractory
+        # "SiO2", "Si", "SiO",
+        # "Fe", "FeO", "FeH",
+        # "Mg2", "Mg", "MgO",
     ]
     export gases_standard
 

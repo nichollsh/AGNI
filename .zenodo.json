@@ -39,6 +39,7 @@
     "keywords": [
         "exoplanets",
         "radiation",
+        "astronomy",
         "atmosphere",
         "optimization",
         "julia",
@@ -46,7 +47,8 @@
         "convection",
         "chemistry",
         "magma",
-        "planetary"
+        "planetary",
+        "physics"
     ],
     "license": "GPL-3.0",
     "upload_type": "software",

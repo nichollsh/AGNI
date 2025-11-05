@@ -876,7 +876,7 @@ module solver
         end
         @info @sprintf("    total flux at TOA  = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    total flux at BOA  = %+.2e W m-2     ", atmos.flux_tot[end])
-        @info @sprintf("    column max loss    = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
+        @info @sprintf("    total flux lost    = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
         @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
 
