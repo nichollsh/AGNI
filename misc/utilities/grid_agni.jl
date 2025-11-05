@@ -42,7 +42,7 @@ grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
 
     # "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
-    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(250.0),  length=5), # S_earth
+    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
 
     "mass_tot"      =>       mass_arr,  # M_earth
 ))
@@ -465,6 +465,7 @@ for (i,p) in enumerate(grid_flat)
                                             easy_start=easy_start,
                                             modplot=modplot,
                                             save_frames=false,
+                                            radiative_Kzz=false,
                                             perturb_all=perturb_all,
                                             perturb_chem=perturb_chem
                                             )

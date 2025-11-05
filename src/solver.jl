@@ -125,6 +125,7 @@ module solver
     - `save_frames::Bool`               save plotting frames
     - `modprint::Int`                   iteration frequency at which to print info
     - `plot_jacobian::Bool`             plot jacobian too?
+    - `radiative_Kzz::Bool`             estimate Kzz in radiative zones? Otherwise left at Kzz=0 in these regions.
     - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
 
@@ -146,7 +147,8 @@ module solver
                             perturb_chem::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=true,
-                            conv_atol::Float64=1.0e-1, conv_rtol::Float64=1.0e-3
+                            radiative_Kzz::Bool=true,
+                            conv_atol::Float64=1.0e-1, conv_rtol::Float64=1.0e-3,
                             )::Bool
 
         # Validate sol_type
@@ -841,7 +843,9 @@ module solver
         _fev!(x_cur, zeros(Float64, arr_len))
 
         # calc kzz profile
-        energy.fill_Kzz!(atmos)
+        if radiative_Kzz
+            energy.fill_Kzz!(atmos)
+        end
 
         # calc heating rate profile
         energy.calc_hrates!(atmos)
