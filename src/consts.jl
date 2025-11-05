@@ -275,6 +275,7 @@ module consts
     ])
 
     # Solar metallicities taken from FastChem source files
+    # These are log10 molar (number) ratios relative to hydrogen, offset by 12 dex
     # https://www.aanda.org/articles/aa/pdf/2021/09/aa40445-21.pdf
     const _solar_metallicity::Dict{String, Float64} = Dict([
         ("Al" , 6.43),
