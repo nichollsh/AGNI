@@ -50,9 +50,10 @@ save_ncdf_tp = true         # a single NetCDF containing all T(p) solutions
 
 # Runtime options
 ls_increase::Float64   = 1.1
+modwrite::Int          = 1           # frequency to write CSV file
 modplot::Int           = 0            # Plot during runtime (debug)
-mass_atm_min::Float64  = 0.001
-mass_atm_max::Float64  = 1.0
+frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
+frac_max::Float64      = 1.0
 transspec_p::Float64   = 2e3    # Pa
 fc_floor::Float64      = 80.0   # K
 
@@ -71,6 +72,9 @@ mkdir(output_dir)
 
 # Backup config to output dir
 cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
+
+# Results path
+result_table_path::String = joinpath(output_dir,"result_table.csv")
 
 # Logging
 AGNI.setup_logging(joinpath(output_dir, "manager.log"), cfg["execution"]["verbosity"])
@@ -143,8 +147,12 @@ if "mass_tot" in keys(grid)
     grid["mass_tot"] = round.(grid["mass_tot"]; digits=2)
 end
 #    limit atmosphere mass fraction
-if "mass_atm" in keys(grid)
-    grid["mass_atm"] = clamp(collect(Float64, grid["mass_atm"]), mass_atm_min, mass_atm_max)
+if "frac_atm" in keys(grid)
+    grid["frac_atm"] = clamp.(grid["frac_atm"], frac_min, frac_max)
+end
+#    limit core mass fraction
+if "frac_core" in keys(grid)
+    grid["frac_core"] = clamp.(grid["frac_core"], frac_min, frac_max)
 end
 #    round instellation to 1dp
 #    sort in descending order
@@ -184,11 +192,40 @@ open(gpfile, "w") do hdl
 end
 
 # Create output variables to record results in
-result_table::Array{Dict, 1}  = [Dict{String,Float64}() for _ in 1:gridsize]
-result_profs::Array{Dict, 1}  = [Dict{String,Array}()   for _ in 1:gridsize] # array of dicts (p, t, r)
+result_table::Array{Dict, 1}  = [Dict{String,Float64}(k => Float64(-1.0) for k in output_keys)   for _ in 1:gridsize]
+result_profs::Array{Dict, 1}  = [Dict{String,Array}()                    for _ in 1:gridsize] # array of dicts (p, t, r)
 
 @info "Generated grid of $(length(input_keys)) dimensions, with $gridsize points"
 sleep(3)
+
+# Write results table to disk
+function write_table(res_tab::Array{Dict,1}, fpath::String, nrows::Int)
+
+    global output_keys
+
+    @info "Writing results table '$fpath' (nrows=$nrows)"
+
+    # Remove old file
+    if isfile(fpath)
+        rm(fpath)
+    end
+
+    # Write file
+    open(fpath, "w") do hdl
+        # Header
+        head = "index," * join(output_keys, ",") * "\n"
+        write(hdl,head)
+
+        # Each row
+        for i in 1:nrows
+            row = @sprintf("%07d",i)
+            for k in output_keys
+                row *= @sprintf(",%.6e",res_tab[i][k])
+            end
+            write(hdl,row*"\n")
+        end
+    end
+end
 
 # =============================================================================
 # Setup atmosphere object
@@ -288,7 +325,6 @@ function update_structure!(atmos, mass_tot, frac_atm, frac_core)
 
     # surface pressure
     atmos.p_boa = mass_atm * atmos.grav_surf / (4 * pi * atmos.rp^2)
-    atmos.p_boa = max(atmos.p_boa, atmos.transspec_p * 2)
     atmosphere.generate_pgrid!(atmos)
 end
 
@@ -384,6 +420,8 @@ for (i,p) in enumerate(grid_flat)
         # end
     end
 
+    @info @sprintf("    using p_surf = %.3f bar",atmos.pl[end]/1e5)
+
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=sol_type,
                                             conduct=incl_conduct, chem_type=chem_type,
@@ -464,6 +502,12 @@ for (i,p) in enumerate(grid_flat)
                             "r"=>deepcopy(atmos.r)
                         )
 
+
+    # Update results file on the go?
+    if mod(i,modwrite) == 0
+        write_table(result_table, result_table_path, i)
+    end
+
     # Iterate
     @info "  "
 end
@@ -500,21 +544,8 @@ else
 end
 
 # Write results
-@info "Writing result_table to CSV..."
-open(joinpath(output_dir,"result_table.csv"), "w") do hdl
-    # Header
-    head = "index," * join(output_keys, ",") * "\n"
-    write(hdl,head)
-
-    # Each row
-    for i in 1:gridsize
-        row = @sprintf("%07d",i)
-        for k in output_keys
-            row *= @sprintf(",%.6e",result_table[i][k])
-        end
-        write(hdl,row*"\n")
-    end
-end
+@info "Writing final results table to CSV..."
+write_table(result_table, result_table_path, gridsize)
 
 # Write NetCDF of profiles
 @info "Writing result_profs to NetCDF.."

@@ -106,6 +106,7 @@ module solver
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
     - `dx_max::Float64`                 maximum step size [K]
+    - `tmp_pad::Float64`                padding around hard limits on temperature floor & ceiling values
     - `max_steps::Int`                  maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
     - `fdw::Float64`                    finite difference: relative width (dx/x) of the "difference"
@@ -135,7 +136,7 @@ module solver
                             chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=true,
                             conduct::Bool=true, latent::Bool=true, rainout::Bool=true,
-                            dx_max::Float64=400.0,
+                            dx_max::Float64=400.0,  tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, ls_method::Int=1, easy_start::Bool=false,
@@ -145,7 +146,7 @@ module solver
                             perturb_chem::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=true,
-                            conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
+                            conv_atol::Float64=1.0e-1, conv_rtol::Float64=1.0e-3
                             )::Bool
 
         # Validate sol_type
@@ -177,8 +178,6 @@ module solver
         # --------------------
         # Execution parameters
         # --------------------
-        #    padding
-        tmp_pad::Float64 =  5.0        # do not allow the solver to get closer than this to tmp_floor
 
         #    easy_start
         easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
