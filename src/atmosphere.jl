@@ -137,8 +137,8 @@ module atmosphere
         # Chemistry and composition
         gas_vmr::Dict{String, Array{Float64,1}}     # Layer volume mixing ratios in dict, (key,value) = (gas_name,array)
         gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
-        metal_orig::Dict{String, Float64}           # user-provided metallicity ratios (elem num density rel to hydrogen)
-        metal_calc::Dict{String, Float64}           # ^ calculated values from gas mixing ratios at surface
+        metal_orig::Dict{String, Float64}           # input elem ratios (elem num density rel to hydrogen)
+        metal_calc::Dict{String, Float64}           # calc'd elem ratios, from gas mixing ratios at surface
 
         # Condensation variables
         gas_sat::Dict{String, Array{Bool, 1}}       # Gas is saturated or cold-trapped in each layer?
@@ -340,6 +340,7 @@ module atmosphere
 
     Optional arguments:
     - `condensates`                     list of condensates (gas names).
+    - `metallicities::Dict`             dictionary of elemental metallicities (mass ratio rel to hydrogen)
     - `surface_material::String`        surface material (default is "greybody", but can point to file instead).
     - `albedo_s::Float64`               grey surface albedo used when `surface_material="greybody"`.
     - `tmp_floor::Float64`              temperature floor [K].
@@ -638,14 +639,20 @@ module atmosphere
         atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of gas data structs
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
-        atmos.metal_orig =  metallicities                     # input metallicities rel to H
-        atmos.metal_calc =  Dict{String, Array{Float64,1}}()  # calculated metallicities
+
+        # Convert metallicities from mass to mole fraction here
+        atmos.metal_orig =  Dict{String, Float64}()          # input metallicities rel to H
+        atmos.metal_calc =  Dict{String, Float64}()          # calculated metallicities (empty for now)
+        for k in keys(metallicities)
+            # mass -> mole, by scaling factor 1/mu
+            atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
+        end
 
         atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation
         atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # dict of condensate yield
-        atmos.cond_surf =  Dict{String, Float64}()            # dict of ocean masses
+        atmos.cond_surf =   Dict{String, Float64}()           # dict of ocean masses
         atmos.gas_num   =   0                                 # number of gases
-        atmos.condensates   =   Array{String}(undef, 0)       # list of condensates
+        atmos.condensates = Array{String}(undef, 0)           # list of condensates
 
         # Dict input case
         if mf_source == 0
@@ -1710,7 +1717,7 @@ module atmosphere
 
         # Metallicities provided?
         if !isempty(atmos.metal_orig)
-            @info "Composition will be set by metallicity ratios:"
+            @info "Composition will be set by metallicity. Elem molar ratios:"
             for e in keys(atmos.metal_orig)
                 @info @sprintf("    %-4s %.5f",e,atmos.metal_orig[e])
             end

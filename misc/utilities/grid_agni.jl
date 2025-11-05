@@ -34,7 +34,8 @@ mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(
 #    enter the least-important parameters first
 grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    # "metal_C"       => 10 .^ range(start=-3.0,  stop=3.0,   step=3.0),
+    # metallicities here are by MASS fraction relative to hydrogen (converted to mole below)
+    "metal_C"       => 10 .^ range(start=-3.0,  stop=3.0,   step=3.0),
     # "metal_S"       => 10 .^ range(start=-3.0,  stop=3.0,     step=3.0),
     # "metal_O"       => 10 .^ range(start=-3.0,  stop=3.0,     step=3.0),
 
@@ -394,8 +395,11 @@ for (i,p) in enumerate(grid_flat)
             atmos.gas_vmr[gas][:]  .= val
 
         elseif startswith(k, "metal_")
+
+            # metallicity key is by mass frac, but atmosphere stores value by mol frac
+            # convert these via scaling with factor mu_H/mu_gas
             gas = split(k,"_")[2]
-            atmos.metal_orig[gas] = val
+            atmos.metal_orig[gas] = val * phys._get_mmw("H") / phys._get_mmw(gas)
 
             # remove FC input file to force update
             rm(atmos.fastchem_elem, force=true)
