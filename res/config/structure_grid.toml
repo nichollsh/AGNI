@@ -17,14 +17,14 @@ title = "Base config for structure calcs"
     star_Teff       = 3415.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf" #"greygas"
+    input_sf        = "res/spectral_files/Honeyside/48/Honeyside.sf" #"greygas"
     input_star      = "blackbody"
     output_dir      = "out/"
 
 [composition]
     p_surf          = 100.0
     p_top           = 1e-5
-    metallicities   = {"C"=10.0, "S"=10.0, "O"=10.0}
+    metallicities   = {"C"=10.0, "S"=10.0, "O"=10.0}  # mass fraction
     chemistry       = 1
     condensates     = []
 

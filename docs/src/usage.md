@@ -121,14 +121,16 @@ Input/output files and other paths.
 
 ### `[composition]`
 Atmospheric composition and chemistry.
+There are three main ways to set the composition: partial pressures (`p_dict`), mixing ratios (`vmr_dict` or `vmr_file`), or by metallicities (`metallicities`).
 
 | Parameter         | Description   |
 | ----------------: | :------------ |
 | `p_top         `  | Total top-of-atmosphere pressure [bar]. |
 | `p_dict        `  | Dictionary of gas partial surface pressures [bar]. Summed to obtain `p_surf`. |
 | `p_surf        `  | Total surface pressure [bar]. Incompatible with `p_dict`.|
-| `vmr_dict      `  | Gas volume mixing ratios (=mole fractions) at the surface. Must be set alongside `p_surf`. |
-| `vmr_file      `  | Path to a file containing mixing ratio profiles. Replaces `vmr_dict`. Must be set alongside `p_surf`. |
+| `vmr_dict      `  | Gas volume mixing ratios (=mole fractions) at the surface. Must also set `p_surf`. |
+| `vmr_file      `  | Path to a file containing mixing ratio profiles.  Must also set `p_surf`. |
+| `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
 | `chemistry     `  | Type of chemistry to be used (see below). |
 | `condensates   `  | List of volatiles which are allowed to condense. Incompatible with `chemistry > 0`. |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
