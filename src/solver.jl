@@ -419,17 +419,18 @@ module solver
 
             # Info string
             plt_info::String = ""
-            plt_info *= @sprintf("Iteration  %d \n",step)
-            plt_info *= @sprintf("Runtime    %.1f s \n",runtime)
-            plt_info *= @sprintf("Cost       %.2e  \n",c_cur)
+            plt_info *= @sprintf("Iteration:%d,  ",step)
+            plt_info *= @sprintf("Runtime:%.1f s,  ",runtime)
+            plt_info *= @sprintf("Cost:%.2e  ",c_cur)
 
             # Make subplots (don't save to file)
             plt_pt = plotting.plot_pt(atmos,     "", incl_magma=(sol_type==2))
             plt_fl = plotting.plot_fluxes(atmos, "", incl_eff=(sol_type==3), incl_cdct=conduct, incl_latent=latent)
             plt_mr = plotting.plot_vmr(atmos,    "")
+            plt_ra = plotting.plot_radius(atmos, "")
 
             # Combined plot
-            plotting.combined(plt_pt, plt_fl, plt_mr, plt_info, path_plt)
+            plotting.combined(plt_pt, plt_fl, plt_mr, plt_ra, plt_info, path_plt)
 
             if save_frames
                 cp(path_plt,@sprintf("%s/%04d.png",atmos.FRAMES_DIR,step))

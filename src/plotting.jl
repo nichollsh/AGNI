@@ -636,13 +636,14 @@ module plotting
     """
     Combined plot used for tracking behaviour of the solver
     """
-    function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String;
-                        size_x::Int=800, size_y::Int=650)
+    function combined(plt_pt, plt_fl, plt_mr, plt_ra, info::String, fname::String;
+                        size_x::Int=800, size_y::Int=700)
 
-        plt_info = plot(legend=false, showaxis=false, grid=false)
-        annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
+        # plt_info = plot(legend=false, showaxis=false, grid=false)
+        # annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
 
-        plt = plot(plt_pt, plt_fl, plt_mr, plt_info,
+        plt = plot(plt_pt, plt_fl, plt_mr, plt_ra,
+                        plot_title=info,
                         layout=(2,2), size=(size_x, size_y); plt_default...)
 
         if !isempty(fname)
