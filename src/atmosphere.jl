@@ -424,11 +424,11 @@ module atmosphere
                     κ_grey_sw::Float64  =       1e-5,
 
                     fastchem_work::String       =  "",
-                    fastchem_floor::Float64     =  273.0,
-                    fastchem_maxiter_chem::Int  =  60000,
-                    fastchem_maxiter_solv::Int  =  20000,
-                    fastchem_xtol_chem::Float64 =  1.0e-4,
-                    fastchem_xtol_elem::Float64 =  1.0e-4,
+                    fastchem_floor::Float64     =  500.0,
+                    fastchem_maxiter_chem::Int  =  80000,
+                    fastchem_maxiter_solv::Int  =  40000,
+                    fastchem_xtol_chem::Float64 =  1.0e-3,
+                    fastchem_xtol_elem::Float64 =  1.0e-3,
 
                     rfm_parfile::String =       "",
 
@@ -1105,16 +1105,6 @@ module atmosphere
 
         # Perform hydrostatic integration
         ok = ok && calc_profile_radius!(atmos, ignore_errors=ignore_errors)
-
-        # Pass arrays to SOCRATES
-        if atmos.rt_scheme == RT_SOCRATES
-            atmos.atm.p[1, :]           .= atmos.p[:]
-            atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-            atmos.atm.r_layer[1,:]      .= atmos.r[:]
-            atmos.atm.r_level[1,0:end]  .= atmos.rl[:]
-            atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
-            atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
-        end
 
         return ok
     end
