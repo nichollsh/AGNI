@@ -11,7 +11,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     radius          = 1.1959e7
     gravity         = 22.304
     flux_int        = 0.0
-    turb_coeff      = 0.001
+    roughness       = 1.0e-2
     wind_speed      = 2.0
 
 [files]

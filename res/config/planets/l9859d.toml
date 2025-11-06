@@ -12,7 +12,7 @@ title = "L 98-59 d"
     radius          = 8064561.9164
     mass            = 9.79e24
     flux_int        = 0.58586427102
-    turb_coeff      = 1.0e-2
+    roughness       = 1.0e-2
     wind_speed      = 10.0
     star_Teff       = 3415.0
 

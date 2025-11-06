@@ -215,9 +215,11 @@ module atmosphere
         rfm_npts::Int                       # number of points
 
         # Sensible heating
-        C_d::Float64                        # Turbulent exchange coefficient [dimensionless]
-        U::Float64                          # Wind speed [m s-1]
-        flux_sens::Float64                  # Turbulent flux
+        C_d::Float64                        # Turbulent exchange coefficient, to be calc'd
+        surf_windspeed::Float64             # Surface wind speed [m s-1]
+        surf_roughness::Float64             # Surface roughness scale [m]
+        flux_sens::Float64                  # Turbulent flux [W m-2]
+
 
         # Convection
         mlt_asymptotic::Bool                # INPUT: Mixing length scales asymptotically, but ~0 near ground
@@ -351,8 +353,8 @@ module atmosphere
     - `surface_material::String`        surface material (default is "greybody", but can point to file instead).
     - `albedo_s::Float64`               grey surface albedo used when `surface_material="greybody"`.
     - `tmp_floor::Float64`              temperature floor [K].
-    - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].
-    - `U::Float64`                      surface wind speed [m s-1].
+    - `surf_roughness::Float64`         surface roughness length scale [m]
+    - `surf_windspeed::Float64`         surface wind speed [m s-1].
     - `Kzz_floor::Float64`              min eddy diffusion coefficient, cgs units [cm2 s-1]
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
@@ -401,7 +403,7 @@ module atmosphere
                     surface_material::String =  "greybody",
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        2.0,
-                    C_d::Float64 =              0.001,
+                    surf_roughness::Float64 =   0.01,
                     U::Float64 =                2.0,
                     Kzz_floor::Float64 =        1e5,
                     mlt_asymptotic::Bool =      true,
@@ -531,8 +533,9 @@ module atmosphere
         atmos.phs_timescale =   max(phs_timescale, 0.0)
         atmos.evap_efficiency = max(min(evap_efficiency, 1.0),0.0)
 
-        atmos.C_d =             max(0.0, C_d)
-        atmos.U =               max(0.0, U)
+        atmos.surf_roughness =  max(1e-5, surf_roughness)   # meters
+        atmos.surf_windspeed =  max(0.0, surf_windspeed)  # m/s
+        atmos.C_d =             0.001  # placeholder
 
         atmos.κ_grey_lw =       max(0.0, κ_grey_lw)
         atmos.κ_grey_sw =       max(0.0, κ_grey_sw)

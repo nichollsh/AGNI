@@ -12,7 +12,7 @@ title = "Base config for structure calcs"
     radius          = 6e6 #5.0567e6
     mass            = 6e24 #2.986e24
     flux_int        = 0.0
-    turb_coeff      = 1.0e-2
+    roughness       = 1.0e-2
     wind_speed      = 10.0
     star_Teff       = 3415.0
 
@@ -24,7 +24,7 @@ title = "Base config for structure calcs"
 [composition]
     p_surf          = 100.0
     p_top           = 1e-5
-    metallicities   = {"C"=5.0, "S"=0.1, "O"=0.1}  # mass fraction
+    metallicities   = {"C"=10.0, "S"=0.1, "O"=0.1}  # mass fraction
     chemistry       = 1
     condensates     = []
 
@@ -34,7 +34,7 @@ title = "Base config for structure calcs"
     verbosity       = 1
     max_steps       = 50
     max_runtime     = 200
-    num_levels      = 40
+    num_levels      = 30
     continua        = true
     rayleigh        = true
     cloud           = false

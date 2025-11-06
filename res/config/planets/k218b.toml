@@ -12,7 +12,7 @@ title = "K2-18 b, mixed"
     radius          = 16628310.0
     gravity         = 12.43
     flux_int        = 0.0
-    turb_coeff      = 1.0e-2
+    roughness       = 1.0e-2
     wind_speed      = 10.0
 
 [files]
