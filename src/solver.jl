@@ -132,7 +132,8 @@ module solver
     - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
     - `ls_increase::Bool`               factor by which the cost can increase from last step before triggering linesearch
     - `ls_max_steps::Int`               maximum steps undertaken by linesearch routine
-    - `ls_min_scale::Float64`           minimum step scale allowed after linesearch
+    - `ls_min_scale::Float64`           minimum step scale allowed by linesearch
+    - `ls_max_scale::Float64`           maximum step scale allowed by linesearch
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `perturb_chem::Bool`              include chemistry calculation during finite-difference construction of jacobian
@@ -157,7 +158,8 @@ module solver
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
                             method::Int=1, ls_method::Int=1, easy_start::Bool=false,
                             ls_increase::Float64=1.08,
-                            ls_max_steps::Int=20, ls_min_scale::Float64 = 1.0e-5,
+                            ls_max_steps::Int=20,
+                            ls_min_scale::Float64 = 1.0e-5, ls_max_scale::Float64 = 0.99,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
                             perturb_chem::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
@@ -687,7 +689,7 @@ module solver
             if plateau_apply
                 @. x_dif *= plateau_s
                 plateau_i = 0
-                stepflags *= "X-"
+                stepflags *= "P-"
             end
 
             # Max step size
@@ -708,8 +710,8 @@ module solver
                 @debug "        linesearch"
 
                 # Reset
-                ls_alpha = 1.0      # Greater than 1 => search beyond NL method step
-                ls_cost  = 1.0e99   # big number
+                ls_alpha = ls_max_scale   # Greater than 1 => extension of step
+                ls_cost  = 1.0e99   # a big number
 
                 # Internal function minimised by linesearch method
                 function _ls_func(scale::Float64)::Float64
@@ -731,7 +733,7 @@ module solver
 
                     if (ls_method == 1) || (ls_cost*0.1 < conv_atol + conv_rtol * c_max)
                         # Use golden-section search method
-                        ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha,
+                        ls_alpha = gs_search(_ls_func, ls_min_scale, ls_max_scale,
                                                 1.0e-9, ls_min_scale, ls_max_steps)
 
                     elseif ls_method == 2
@@ -754,6 +756,7 @@ module solver
                             end
                         end
 
+
                     else
                         @error "Invalid linesearch algorithm $ls_method"
                         code = CODE_CFG
@@ -761,7 +764,8 @@ module solver
                     end
 
                     # Apply best scale from linesearch
-                    ls_alpha = max(ls_alpha, ls_min_scale)
+                    ls_alpha = min(max(ls_alpha, ls_min_scale), ls_max_scale)
+                    @debug "Using linesearch scale, ls_alpha = $ls_alpha"
                     x_dif *= ls_alpha
                 end
 
@@ -774,6 +778,7 @@ module solver
             if ! atmosphere.calc_layer_props!(atmos)
                 code = CODE_HYD
                 step_ok = false
+                stepflags *= "U-"
             end
 
             # Evaluate fluxes
