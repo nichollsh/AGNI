@@ -2,7 +2,7 @@
 title = "Base config for structure calcs"
 
 [planet]
-    tmp_surf        = 2000.0
+    tmp_surf        = 1800.0
     instellation    = 1361.0
     albedo_b        = 0.18
     s0_fact         = 0.25
@@ -17,14 +17,14 @@ title = "Base config for structure calcs"
     star_Teff       = 3415.0
 
 [files]
-    input_sf        = "res/spectral_files/Honeyside/48/Honeyside.sf" #"greygas"
+    input_sf        = "res/spectral_files/Honeyside/48/Honeyside.sf" #
     input_star      = "blackbody"
     output_dir      = "out/"
 
 [composition]
     p_surf          = 100.0
     p_top           = 1e-5
-    metallicities   = {"C"=10.0, "S"=10.0, "O"=10.0}  # mass fraction
+    metallicities   = {"C"=0.1, "S"=0.1, "O"=0.1}  # mass fraction
     chemistry       = 1
     condensates     = []
 
@@ -32,7 +32,7 @@ title = "Base config for structure calcs"
 [execution]
     clean_output    = false
     verbosity       = 1
-    max_steps       = 30
+    max_steps       = 50
     max_runtime     = 200
     num_levels      = 30
     continua        = true
@@ -52,7 +52,7 @@ title = "Base config for structure calcs"
     solution_type   = 3
     solver          = "newton"
     dx_max          = 200.0
-    initial_state   = ["iso","2000"]
+    initial_state   = ["iso","1500"]
     linesearch      = 1
     easy_start      = false
     converge_atol   = 5.0
