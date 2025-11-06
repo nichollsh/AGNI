@@ -135,13 +135,19 @@ module energy
         end
 
         ####################################################
-        # Temperature
+        # Temperature, pressure, radius, etc.
         ###################################################
 
-        atmos.atm.p[1, :] .= atmos.p[:]
-        atmos.atm.t[1, :] .= atmos.tmp[:]
+        atmos.atm.p[1, :]           .= atmos.p[:]
+        atmos.atm.r_layer[1,:]      .= atmos.r[:]
+        atmos.atm.t[1, :]           .= atmos.tmp[:]
+
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+        atmos.atm.r_level[1, 0:end] .= atmos.rl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
+
+        atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
+        atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
 
         if lw
             atmos.bound.t_ground[1] = atmos.tmp_surf

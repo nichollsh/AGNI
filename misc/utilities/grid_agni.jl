@@ -66,7 +66,7 @@ modplot::Int           = 2            # Plot during runtime (debug)
 frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
 transspec_p::Float64   = 2e3    # Pa
-fc_floor::Float64      = 273.0   # K
+fc_floor::Float64      = 500.0   # K
 
 # =============================================================================
 # Parse keys and flatten grid
