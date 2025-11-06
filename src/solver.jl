@@ -89,6 +89,21 @@ module solver
         return midp
     end
 
+    # Status codes for solver
+    @enum STATUSCODE begin
+        CODE_SUC = 0  # success
+        CODE_ITE = 1  # max iters
+        CODE_SIN = 2  # singular jacobian
+        CODE_TIM = 3  # max time
+        CODE_NAN = 4  # NaN values returned from objective
+        CODE_CFG = 5  # configuration
+        CODE_OBJ = 6  # objective function did not succeed
+        CODE_STP = 7  # last step not ok
+        CODE_HYD = 8  # hydrostatic integration
+
+        CODE_99  = 99 # default code (failure)
+    end
+
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
 
@@ -232,7 +247,7 @@ module solver
 
         #     tracking
         step::Int =             0       # Step number
-        code::Int =             99      # Status code
+        code::STATUSCODE =      CODE_99 # Status code
         runtime::Float64  =     0.0     # Model runtime [s]
         fc_retcode::Int  =      0       # Fastchem return code
         step_ok::Bool =         true    # Current step was fine
@@ -287,7 +302,7 @@ module solver
             end
 
             # Calculate fluxes
-            energy.calc_fluxes!(atmos, true,
+            step_ok &= energy.calc_fluxes!(atmos, true,
                                 latent, convect, sens_heat, conduct,
                                 convect_sf=easy_sf, latent_sf=easy_sf,
                                 rainout=rainout)
@@ -321,9 +336,10 @@ module solver
 
             # Check that residuals are real numbers
             if !all(isfinite, resid)
-                show(resid)
                 @error "Residual array contains NaNs and/or Infs"
-                code = 4
+                @error "resid: $resid"
+                @error "flux_n: $(atmos.flux_n)"
+                code = CODE_NAN
                 return false
             end
 
@@ -512,7 +528,7 @@ module solver
             # Check time
             runtime = time()-wct_start
             if runtime > max_runtime
-                code = 3
+                code = CODE_TIM
                 break
             end
 
@@ -520,14 +536,14 @@ module solver
             @debug "        iterate"
             step += 1
             if step > max_steps
-                code = 1
+                code = CODE_ITE
                 break
             end
             info_str *= @sprintf("    %4d  ", step)
 
             # Check status of guess
             if !all(isfinite, x_cur)
-                code = 4
+                code = CODE_NAN
                 break
             end
             _set_tmps!(x_cur)
@@ -613,22 +629,24 @@ module solver
                 # use central difference if:
                 #    requested, at the start, or insufficient cost decrease
                 if !_calc_jac_res!(x_cur, b, r_cur, true, fdo, perturb)
-                    code = 6
+                    code = CODE_OBJ
                     break
                 end
                 stepflags *= "C$fdo-"
             else
                 # otherwise, use forward difference
                 if !_calc_jac_res!(x_cur, b, r_cur, false, fdo, perturb)
-                    code = 6
+                    code = CODE_OBJ
                     break
                 end
                 stepflags *= "F$fdo-"
             end
 
             # Check if jacobian is singular
+            #    Diagonal elements are usually negative
+            #    Off-diagonals are usually positive
             if abs(det(b)) < floatmin()*10.0
-                code = 2
+                code = CODE_SIN
                 step_ok = false
                 break
             end
@@ -674,11 +692,11 @@ module solver
 
             # Max step size
             #    limit by user requirement
-            dx_max_step = dx_max
+            dx_max_step = Float64(dx_max)
             #    limit by distance to tmp_ceil
-            dx_max_step = min(dx_max_step, atmos.tmp_ceiling-tmp_pad - maximum(x_cur) )
+            dx_max_step = min(dx_max_step, abs(atmos.tmp_ceiling-tmp_pad - maximum(x_cur)) )
             #    limit by distance to tmp_floor
-            dx_max_step = min(dx_max_step, minimum(x_cur) - atmos.tmp_floor+tmp_pad)
+            dx_max_step = min(dx_max_step, abs(minimum(x_cur) - atmos.tmp_floor+tmp_pad))
 
             # Limit step size by dx_max_step, without changing direction of dx vector
             x_dif *= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
@@ -738,7 +756,7 @@ module solver
 
                     else
                         @error "Invalid linesearch algorithm $ls_method"
-                        code = 5
+                        code = CODE_CFG
                         break
                     end
 
@@ -751,6 +769,14 @@ module solver
 
             # Take the step
             @. x_cur = x_old + x_dif
+
+            # Recalculate layer properties
+            if ! atmosphere.calc_layer_props!(atmos)
+                code = CODE_HYD
+                step_ok = false
+            end
+
+            # Evaluate fluxes
             _fev!(x_cur, r_cur)
 
             # New cost value from this step
@@ -801,7 +827,7 @@ module solver
             # Converged?
             @debug "        check convergence"
             if (c_cur < conv_atol + conv_rtol * c_max) && !easy_start
-                code = 0
+                code = CODE_SUC
                 break
             end
 
@@ -811,6 +837,11 @@ module solver
                 @debug @sprintf("Average RT time: %.3f ms", rt_avg)
             end
 
+            # Record that this step not ok
+            if (code == 0) && !step_ok
+                code = CODE_STP
+            end
+
         end # end solver loop
 
         # ----------------------------------------------------------
@@ -818,24 +849,28 @@ module solver
         # ----------------------------------------------------------
         atmos.is_solved = true
         atmos.is_converged = false
-        if code == 0
+        if code == CODE_SUC
             @info "    success in $step steps"
             atmos.is_converged = true
             rm(path_plt, force=true)
             rm(path_jac, force=true)
-        elseif code == 1
+        elseif code == CODE_ITE
             @error "    failure (maximum iterations)"
-        elseif code == 2
+        elseif code == CODE_SIN
             @error "    failure (singular jacobian)"
             plotting.jacobian(b, path_jac)
-        elseif code == 3
+        elseif code == CODE_TIM
             @error "    failure (maximum time)"
-        elseif code == 4
+        elseif code == CODE_NAN
             @error "    failure (NaN values)"
-        elseif code == 5
+        elseif code == CODE_CFG
             @error "    failure (configuration)"
-        elseif code == 6
+        elseif code == CODE_OBJ
             @error "    failure (objective function)"
+        elseif code == CODE_STP
+            @error "    failure (last step not ok)"
+        elseif code == CODE_HYD
+            @error "    failure (hydrostatic integration)"
         else
             @error "    failure (other)"
         end

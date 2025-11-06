@@ -19,6 +19,19 @@ module energy
     import ..chemistry
     import ..spectrum
 
+    const FILL_FINITE_FLUX::Float64 = 1.0
+
+    """
+    **Set non-finite values in an array equal to a given fill value**.
+
+    Arguments:
+    - `arr`      array potentially containing non-finite values
+    - `fill`     replacement value to fill with
+    """
+    function make_finite!(arr, val)
+        arr[findall(x -> !isfinite(x), arr)] .= val
+    end
+
     """
     **Solve radiative transfer using SOCRATES**
 
@@ -35,12 +48,20 @@ module energy
         # Set the two-stream approximation to be used (-t f)
         if lw
             atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_infra_red
-            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
+
+            # Eddington's approximation
+            # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
+
             # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
+            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
         else
             atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_solar
-            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
+
+            # Eddington's approximation
+            # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
+
             # Practical improved flux method (original form of 1980)
+            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
         end
 
         # Check files are acceptable and set instellation if doing SW flux
@@ -84,11 +105,16 @@ module energy
         # The internal SOCRATES solver used for the two-stream calculations (-v flag)
         if atmos.control.l_cloud
             # 16 is recommended for cloudy-sky (ip_solver_mix_direct_hogan)
-            # 17 is recommended for cloud with separate stratiform and convective regions
             atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_mix_direct_hogan
+
+            # 17 is recommended for cloud with separate stratiform and convective regions
+            # atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_triple_hogan
         else
-            # 13 is recommended for clear-sky (ip_solver_homogen_direct)
+            # 13 is recommended for clear-sky (Direct solution in a homogeneous column)
             atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_homogen_direct
+
+            # 1 is also possible (Pentadiagonal solver for homogeneous column)
+            # atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_pentadiagonal
         end
 
 
@@ -193,6 +219,9 @@ module energy
             end
         end
 
+        # Ensure all VMRs are between 0 and 1
+        clamp!(atmos.atm.gas_mix_ratio, 0.0, 1.0)
+
         # Do radiative transfer
         atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control,
                                                      atmos.dimen, atmos.spectrum,
@@ -206,6 +235,7 @@ module energy
             else
                 @error "Non-finite value in SW DN flux array"
             end
+            make_finite!(atmos.radout.flux_down, FILL_FINITE_FLUX)
         end
         if !all(isfinite, atmos.radout.flux_up)
             if lw
@@ -213,6 +243,7 @@ module energy
             else
                 @error "Non-finite value in SW UP flux array"
             end
+            make_finite!(atmos.radout.flux_up, FILL_FINITE_FLUX)
         end
 
         # Store new fluxes in atmos struct
@@ -759,22 +790,27 @@ module energy
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
     - `rainout::Bool`                   allow rainout ( do not reset VMRs to dry values )
+
+    Returns:
+    - `ok::Bool`                        calculation performed ok?
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t,
                           radiative::Bool,
                           latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
-                          calc_cf::Bool=false, rainout::Bool=true)
+                          calc_cf::Bool=false, rainout::Bool=true)::Bool
 
         # Reset fluxes
         reset_fluxes!(atmos)
+
+        ok::Bool = true
 
         # +Condensation and evaporation
         if atmos.condense_any && (latent || rainout)
 
             # Restore mixing ratios
             restore_composition!(atmos)
-            atmosphere.calc_layer_props!(atmos)
+            ok &= atmosphere.calc_layer_props!(atmos)
 
             # Handle rainout
             chemistry.handle_saturation!(atmos)
@@ -793,7 +829,8 @@ module energy
         end
 
         # Recalculate layer properties
-        atmosphere.calc_layer_props!(atmos)
+        #    Returns false if atmosphere becomes non-hydrostatic
+        ok &= atmosphere.calc_layer_props!(atmos)
 
         # +Radiation
         if radiative
@@ -825,7 +862,7 @@ module energy
         # Positive value => heating
         atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
 
-        return nothing
+        return ok
     end
 
     """
