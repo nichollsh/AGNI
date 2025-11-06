@@ -59,6 +59,20 @@ Potential flags for each species are:
 * `NO_THERMO` - no thermodynamic data available, so will be treated as a diatomic ideal gas
 * `COND` - this gas is allowed to condense
 
+## Solver flags
+
+During each step of the iteration, AGNI will flag the solver status to indicate what was
+done and if any problems arose. These flags are separated by a hyphen (`-`).
+
+Potential solver flags are:
+* `Cs` or `Cf` - 1D chemistry was performed and it either succeeded or failed
+* `M` or `Mr`  - convective fluxes are being modulated for stability
+* `C2` or `C4` or `F2` or `F4`- a central or forward finite-difference scheme was used (at 2nd or 4th order)
+* `Nr`, `Gn`, `Lm` - indicates which optimisation method was used (Newton, Gauss, or Levenberg)
+* `Ls` - a linesearch method was applied
+* `P` - step was forcibly extrapolated because the solver is not making good progress
+* `U` - the atmosphere has become unbound (non-hydrostatic)
+
 ## Grids of models
 
 The code is not explicitly parallelised. However, there is functionality to run a grid
