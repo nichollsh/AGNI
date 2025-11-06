@@ -33,7 +33,7 @@ module atmosphere
     import ..spectrum
 
     # Code versions
-    const AGNI_VERSION::String     = "1.7.12"  # current agni version
+    const AGNI_VERSION::String     = "1.7.13"  # current agni version
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic and gravity calc (constants and limits)
