@@ -79,7 +79,7 @@ module setpt
                 return false
             end
 
-            atmosphere.calc_layer_props!(atmos, ignore_errors=true)
+            atmosphere.calc_layer_props!(atmos)
 
             # iterate
             idx_req += 1

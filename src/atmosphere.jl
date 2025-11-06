@@ -32,11 +32,18 @@ module atmosphere
     import ..phys
     import ..spectrum
 
-    # Constants
-    const AGNI_VERSION::String    = "1.7.12"  # current agni version
-    const HYDROGRAV_STEPS::Int64  = 40        # num of sub-layers in hydrostatic integration
-    const SOCVER_minimum::Float64 = 2407.2    # minimum required socrates version
-    const NLEV_minimum::Int       = 25        # minimum allowed number of levels
+    # Code versions
+    const AGNI_VERSION::String     = "1.7.12"  # current agni version
+    const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
+
+    # Hydrostatic and gravity calc (constants and limits)
+    const HYDROGRAV_STEPS::Int64   = 30        # num of sub-layers in hydrostatic integration
+    const HYDROGRAV_maxdr::Float64 = 1e6       # maximum dz across each layer [m]
+    const HYDROGRAV_ming::Float64  = 1e-3      # minimum allowed gravity [m/s^2]
+    const HYDROGRAV_constg::Bool   = false     # constant gravity with height?
+
+    # Configuration limits
+    const NLEV_minimum::Int        = 25        # minimum allowed number of levels
 
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
@@ -346,7 +353,7 @@ module atmosphere
     - `tmp_floor::Float64`              temperature floor [K].
     - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].
     - `U::Float64`                      surface wind speed [m s-1].
-    - `Kzz_floor::Float64`              eddy diffusion coefficient, min value [cm2 s-1]
+    - `Kzz_floor::Float64`              min eddy diffusion coefficient, cgs units [cm2 s-1]
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
@@ -533,7 +540,7 @@ module atmosphere
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
         atmos.Kzz_pbreak =      1e5 # 1 bar as default location for break point
-        atmos.Kzz_kbreak =      max(0.0, Kzz_floor)
+        atmos.Kzz_kbreak =      max(0.0, atmos.Kzz_floor)
         atmos.mlt_asymptotic =  mlt_asymptotic
         atmos.mlt_criterion =   mlt_criterion
 
@@ -1078,14 +1085,16 @@ module atmosphere
     """
     **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
 
+    Function will return false if hydrostatic calculcation fails. This is usually when
+    the atmosphere becomes unbound.
+
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-        - `ignore_errors::Bool`     do not generate errors from hydrostatic integrator.
 
     Returns:
         - `ok::Bool`                function result is ok
     """
-    function calc_layer_props!(atmos::atmosphere.Atmos_t; ignore_errors::Bool=false)::Bool
+    function calc_layer_props!(atmos::atmosphere.Atmos_t)::Bool
         if !atmos.is_param
             @error("Atmosphere struct has not been setup")
             return false
@@ -1104,7 +1113,7 @@ module atmosphere
         calc_profile_density!(atmos)
 
         # Perform hydrostatic integration
-        ok = ok && calc_profile_radius!(atmos, ignore_errors=ignore_errors)
+        ok = ok && calc_profile_radius!(atmos)
 
         return ok
     end
@@ -1117,13 +1126,11 @@ module atmosphere
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-        - `ignore_errors::Bool`     do not generate errors from hydrostatic integrator.
 
     Returns:
         - `ok::Bool`                function result is ok
     """
-    function calc_profile_radius!(atmos::atmosphere.Atmos_t;
-                                    ignore_errors::Bool=false)::Bool
+    function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
 
         # Reset arrays
         fill!(atmos.r         ,   atmos.rp)
@@ -1133,6 +1140,7 @@ module atmosphere
         fill!(atmos.layer_mass ,  1.0)
 
         # Temporary values
+        ok::Bool            = true
         grav::Float64       = atmos.grav_surf   # gravity at current level
         mass_encl::Float64  = atmos.interior_mass # mass enclosed within current level
 
@@ -1140,16 +1148,36 @@ module atmosphere
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
             # Calculate gravity at lower edge
-            grav = phys.G_grav * mass_encl / atmos.rl[i+1]^2
+            if !HYDROGRAV_constg
+                grav = phys.G_grav * mass_encl / atmos.rl[i+1]^2
+            end
+            if grav < HYDROGRAV_ming
+                grav = HYDROGRAV_ming
+                ok = false
+            end
 
             # Integrate from lower edge to centre
             atmos.r[i] = integrate_hydrograv(atmos.rl[i+1], grav, atmos.pl[i+1], atmos.p[i], atmos.layer_ρ[i])
+            if atmos.r[i] > atmos.rl[i+1] + HYDROGRAV_maxdr
+                atmos.r[i] = atmos.rl[i+1] + HYDROGRAV_maxdr
+                ok = false
+            end
 
             # Calculate gravity at cell centre
-            grav = phys.G_grav * mass_encl / atmos.r[i]^2
+            if !HYDROGRAV_constg
+                grav = phys.G_grav * mass_encl / atmos.r[i]^2
+            end
+            if grav < HYDROGRAV_ming
+                grav = HYDROGRAV_ming
+                ok = false
+            end
 
             # Integrate from centre to upper edge
             atmos.rl[i] = integrate_hydrograv(atmos.r[i], grav, atmos.p[i], atmos.pl[i], atmos.layer_ρ[i])
+            if atmos.rl[i] > atmos.r[i] + HYDROGRAV_maxdr
+                atmos.rl[i] = atmos.r[i] + HYDROGRAV_maxdr
+                ok = false
+            end
 
             # Store: Layer-centre gravity [m s-2]
             atmos.layer_grav[i] = grav
@@ -1164,7 +1192,7 @@ module atmosphere
             mass_encl += atmos.layer_mass[i] * 4 * pi * atmos.r[i]^2
         end
 
-        return true
+        return ok
     end
 
     """
@@ -1744,8 +1772,8 @@ module atmosphere
         #    large but pressure small, which gives it a low density. With the
         #    hydrostatic integrator, this can cause dr to blow up, especially
         #    with a low MMW gas. Should be okay as long as the T(p) provided
-        #    by the user is more reasonable. Silence errors *in this case*.
-        calc_layer_props!(atmos, ignore_errors=true)
+        #    by the user is more reasonable.
+        calc_layer_props!(atmos)
 
         ################################
         # Aerosol processes
