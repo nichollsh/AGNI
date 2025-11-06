@@ -383,9 +383,9 @@ module AGNI
 
         # Read OPTIONAL configuration options from dict
         #     sensible heat at the surface
-        turb_coeff::Float64 = 0.0; wind_speed::Float64 = 0.0
+        roughness::Float64 = 0.001; wind_speed::Float64 = 0.0
         if incl_sens && !transparent
-            turb_coeff = cfg["planet"]["turb_coeff"]
+            roughness  = cfg["planet"]["roughness"]
             wind_speed = cfg["planet"]["wind_speed"]
         end
         #     conductive skin case
@@ -437,7 +437,7 @@ module AGNI
                                 real_gas          = real_gas,
                                 thermo_functions  = cfg["execution"]["thermo_funct"],
                                 use_all_gases     = Bool(chem_type > 0),
-                                C_d=turb_coeff, U=wind_speed,
+                                surf_roughness=roughness, surf_windspeed=wind_speed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
                                 flux_int=flux_int,

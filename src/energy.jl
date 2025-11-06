@@ -406,11 +406,18 @@ module energy
 
     # Calculate sensible heat flux (turbulence at surface boundary)
     function sensible!(atmos::atmosphere.Atmos_t)
+
+        # Calculate exchange coefficient
+        #    Based on Monin–Obukhov similarity theory, from roughness length scale.
+        #    See eq 9 in Nicholson & Benn (2009)
+        atmos.C_d = phys.k_vk^2 / log(atmos.z[end]/atmos.surf_roughness)
+
+
         # TKE scheme for this 1D case
         # transports energy from the surface to the bottom node
         atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_μ[end]*
                             atmos.p[end]/(phys.R_gas*atmos.tmp[end]) *
-                            atmos.C_d * atmos.U *
+                            atmos.C_d * atmos.surf_windspeed *
                             (atmos.tmp_surf-atmos.tmp[end])
         return nothing
     end
