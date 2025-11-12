@@ -128,8 +128,9 @@ module solver
     - `fdc::Bool`                       finite difference: ALWAYS use central difference?
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
+    - `easy_start::Bool`                improve convergence reliability; introduce convection and latent heat gradually
+    - `grey_start::Bool`                improve convergence reliability; obtain double-grey solution first
     - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
-    - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
     - `ls_increase::Bool`               factor by which the cost can increase from last step before triggering linesearch
     - `ls_max_steps::Int`               maximum steps undertaken by linesearch routine
     - `ls_min_scale::Float64`           minimum step scale allowed by linesearch
@@ -156,7 +157,9 @@ module solver
                             dx_max::Float64=400.0,  tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
                             fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
-                            method::Int=1, ls_method::Int=1, easy_start::Bool=false,
+                            method::Int=1,
+                            easy_start::Bool=false, grey_start::Bool=false,
+                            ls_method::Int=1,
                             ls_increase::Float64=1.08,
                             ls_max_steps::Int=20,
                             ls_min_scale::Float64 = 1.0e-5, ls_max_scale::Float64 = 0.99,
@@ -198,7 +201,15 @@ module solver
         # Execution parameters
         # --------------------
 
+        #    grey_start
+        rt_default::atmosphere.RTSCHEME = atmos.rt_scheme  # record default selection for RT scheme
+        if grey_start
+            @debug "Starting with double-grey RT scheme"
+            atmos.rt_scheme = atmosphere.RT_GREYGAS
+        end
+
         #    easy_start
+        easy_start         = Bool(easy_start)
         easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
         easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
 
@@ -253,6 +264,7 @@ module solver
         runtime::Float64  =     0.0     # Model runtime [s]
         fc_retcode::Int  =      0       # Fastchem return code
         step_ok::Bool =         true    # Current step was fine
+        grey_step::Bool = grey_start    # double-grey RT enabled in this step
         easy_step::Bool =       false   # easy_start sf increased in this step
         plateau_i::Int =        0       # Number of iterations for which step was small
 
@@ -562,6 +574,17 @@ module solver
                 end
             end
 
+            # Switch RT scheme?
+            if grey_start
+                if grey_step
+                    # continue using grey RT
+                    stepflags *= "G-"
+                else
+                    # switch to default scheme
+                    atmos.rt_scheme = rt_default
+                end
+            end
+
             # Check convective modulation
             easy_step = false
             if easy_start
@@ -832,8 +855,15 @@ module solver
             # Converged?
             @debug "        check convergence"
             if (c_cur < conv_atol + conv_rtol * c_max) && !easy_start
-                code = CODE_SUC
-                break
+                # still using grey RT?
+                if grey_step
+                    # switch to preferred RT scheme
+                    grey_step = false
+                else
+                    # done!
+                    code = CODE_SUC
+                    break
+                end
             end
 
             # Show benchmark

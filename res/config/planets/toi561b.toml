@@ -50,6 +50,7 @@ title = "TOI-561 b"
     initial_state   = ["iso","3000"] #["ncdf", "out/atm.nc"]
     linesearch      = 2
     easy_start      = true
+    grey_start      = true
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3
     perturb_all     = false

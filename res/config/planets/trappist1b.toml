@@ -52,6 +52,7 @@ title = "TRAPPIST-1 b"
     initial_state   = ["iso", "500"]
     linesearch      = 2
     easy_start      = false
+    grey_start      = false
     converge_atol   = 1e-1
     converge_rtol   = 1.0e-3
     perturb_all     = false
