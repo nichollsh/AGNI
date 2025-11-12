@@ -303,7 +303,7 @@ module energy
 
     Uses two opacity values to represent the LW and SW components of the flux field.
 
-    Loosely following this tutorial:
+    Loosely following this tutorial, which is based on Pierrehumbert (2010).
     https://brian-rose.github.io/ClimateLaboratoryBook/courseware/radiative-transfer/
 
     Arguments:
@@ -410,7 +410,8 @@ module energy
         # Calculate exchange coefficient
         #    Based on Monin–Obukhov similarity theory, from roughness length scale.
         #    See eq 9 in Nicholson & Benn (2009)
-        atmos.C_d = phys.k_vk^2 / log(atmos.z[end]/atmos.surf_roughness)
+        #    Added small epsilon-factor to ensure that this does not blow-up
+        atmos.C_d = phys.k_vk^2 / log(max(atmos.r[end]-atmos.rp, 1e-30)/atmos.surf_roughness)
 
 
         # TKE scheme for this 1D case

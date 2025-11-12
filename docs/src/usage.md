@@ -66,12 +66,13 @@ done and if any problems arose. These flags are separated by a hyphen (`-`).
 
 Potential solver flags are:
 * `Cs` or `Cf` - 1D chemistry was performed and it either succeeded or failed
+* `Gg` - radiative transfer performed with double-grey scheme
 * `M` or `Mr`  - convective fluxes are being modulated for stability
 * `C2` or `C4` or `F2` or `F4`- a central or forward finite-difference scheme was used (at 2nd or 4th order)
 * `Nr`, `Gn`, `Lm` - indicates which optimisation method was used (Newton, Gauss, or Levenberg)
 * `Ls` - a linesearch method was applied
 * `P` - step was forcibly extrapolated because the solver is not making good progress
-* `U` - the atmosphere has become unbound (non-hydrostatic)
+* `Ub` - the atmosphere has become unbound (non-hydrostatic)
 
 ## Grids of models
 
@@ -117,9 +118,9 @@ General properties of the planet.
 | `skin_k          ` | Conductivity of the conductive boundary layer [W m-1 K-1]. Used when `solution_type=2`. |
 | `tmp_magma       ` | Temperature of the topmost layer of the planet's mantle [K]. Used when `solution_type=2`. |
 | `flux_int        ` | Internal flux [W m-2] to be solved-for when `solution_type=3`. |
-| `turb_coeff      ` | Turbulent exchange coefficient for sensible heat transport. |
+| `roughness       ` | Surface roughness length scale [m] |
 | `wind_speed      ` | Effective wind speed for sensible heat transport [m s-1]. |
-| `star_Teff      `  | Stellar photospheric temperature [K] used if `files.input_star=="blackbody"`. |
+| `star_Teff       ` | Stellar photospheric temperature [K] used if `files.input_star=="blackbody"`. |
 
 
 ### `[files]`
@@ -178,7 +179,8 @@ Parameters that tell the model what to do.
 | `solver        `  | Solver to use (see below). |
 | `dx_max        `  | Maximum step size [kelvin] allowed to be taken by the solver during each step. |
 | `linesearch    `  | Linesearch method to be used (0: None, 1: Golden section, 2: Backtracking) |
-| `easy_start    `  | Initially down-scale convective/condensation fluxes, if initial guess is poor/unknown. **Enable if the model is struggling.** |
+| `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
+| `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
 | `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
 | `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
 | `perturb_all`     | Perturb all rows of jacobian matrix at each solver iteration? True=stable, False=fast. |
