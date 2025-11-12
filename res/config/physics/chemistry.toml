@@ -1,5 +1,5 @@
 # AGNI configuration file
-title = "Test setting composition by metallicity"
+title = "Chemistry by metallicity"
 
 [planet]
     tmp_surf        = 1900.0
@@ -50,7 +50,9 @@ title = "Test setting composition by metallicity"
     initial_state   = ["loglin", "800"]
     linesearch      = 1
     easy_start      = false
-    grey_start      = false 
+    grey_start      = false
+    grey_lw         = 5e-2
+    grey_sw         = 2e-2
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3
     perturb_all     = true

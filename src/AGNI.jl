@@ -343,19 +343,21 @@ module AGNI
             else
                 @error "Config: RFM calculation enabled (rfm_parfile=$rfm_parfile)"
                 @error "        You must also provide `rfm_wn_min` AND `rfm_wn_max`"
+                return false
             end
         end
 
         #    double grey radtrans opacities
-        κ_grey_lw::Float64 = 1e-4  # this will be over-written
-        κ_grey_sw::Float64 = 1e-5  # ^
-        if lowercase(cfg["files"]["input_sf"]) == "greygas"
+        κ_grey_lw::Float64 = 1e-2  # this will be over-written
+        κ_grey_sw::Float64 = 1e-2  # ^
+        if (lowercase(cfg["files"]["input_sf"]) == "greygas") || cfg["execution"]["grey_start"]
             if haskey(cfg["execution"],"grey_lw") && haskey(cfg["execution"],"grey_sw")
                 κ_grey_lw = Float64(cfg["execution"]["grey_lw"])
                 κ_grey_sw = Float64(cfg["execution"]["grey_sw"])
             else
-                @error "Config: Grey-gas calculation enabled but opacities not set"
+                @error "Config: Grey-gas calculation enabled but opacities are not set"
                 @error "        You must also provide `grey_lw` AND `grey_sw`"
+                return false 
             end
         end
 

@@ -120,11 +120,13 @@ module solver
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
+    - `dx_min::Float64`                 minimum step size [K]
     - `dx_max::Float64`                 maximum step size [K]
     - `tmp_pad::Float64`                padding around hard limits on temperature floor & ceiling values
     - `max_steps::Int`                  maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
-    - `fdw::Float64`                    finite difference: relative width (dx/x) of the "difference"
+    - `fdw::Float64`                    finite difference: relative width (dx/x) of the difference (rtol)
+    - `fda::Float64`                    finite difference: absolute width (dx) of the difference (atol)
     - `fdc::Bool`                       finite difference: ALWAYS use central difference?
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
@@ -154,9 +156,11 @@ module solver
                             chem_type::Int=0,
                             convect::Bool=true, sens_heat::Bool=true,
                             conduct::Bool=true, latent::Bool=true, rainout::Bool=true,
-                            dx_max::Float64=400.0,  tmp_pad::Float64 = 5.0,
+                            dx_min::Float64=1e-5, dx_max::Float64=400.0,
+                            tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
-                            fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
+                            fdw::Float64=3.0e-5, fda::Float64=1e-5,
+                            fdc::Bool=true, fdo::Int=2,
                             method::Int=1,
                             easy_start::Bool=false, grey_start::Bool=false,
                             ls_method::Int=1,
@@ -173,7 +177,13 @@ module solver
 
         # Validate sol_type
         if (sol_type < 1) || (sol_type > 4)
-            @error "Invalid solution type ($sol_type)"
+            @error "Invalid solution type ($sol_type)."
+            return false
+        end
+
+        # Validate fdo
+        if !(fdo in [2,4])
+            @error "Invalid finite-difference order ($fdo). Must be 2 or 4."
             return false
         end
 
@@ -386,8 +396,8 @@ module solver
                 fill!(rb2, 0.0)
 
                 # Calculate perturbation at this level
-                #    This must be less than tmp_pad/2
-                fd_s = min(x[i] * fdw, tmp_pad/2)
+                #    - must be less than tmp_pad/2
+                fd_s = min(x[i] * fdw + fda, tmp_pad/2)
 
                 # Forward part (1 step)
                 x_s[i] = x[i] + fd_s
@@ -575,14 +585,11 @@ module solver
             end
 
             # Switch RT scheme?
-            if grey_start
-                if grey_step
-                    # continue using grey RT
-                    stepflags *= "G-"
-                else
-                    # switch to default scheme
-                    atmos.rt_scheme = rt_default
-                end
+            if grey_start & !grey_step
+                atmos.rt_scheme = rt_default
+            end
+            if atmos.rt_scheme == atmosphere.RT_GREYGAS
+                stepflags *= "Gg-"
             end
 
             # Check convective modulation
@@ -682,13 +689,13 @@ module solver
                 # Newton-Raphson step
                 # @debug "        NR step"
                 x_dif = -b\r_cur
-                stepflags *= "Nr-"
+                # stepflags *= "Nr-"
 
             elseif method == 2
                 # Gauss-Newton step
                 # @debug "        GN step"
                 x_dif = -(b'*b) \ (b'*r_cur)
-                stepflags *= "Gn-"
+                # stepflags *= "Gn-"
 
             elseif method == 3
                 # Levenberg-Marquardt step
@@ -702,17 +709,7 @@ module solver
 
                 #    Update our estimate of the solution
                 x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
-                stepflags *= "Lm-"
-            end
-
-            # Extrapolate step if on plateau.
-            #    This acts to give the solver a 'nudge' in (hopefully) the right direction.
-            #    Otherwise, this perturbation can still help.
-            plateau_apply = (plateau_i > plateau_n)
-            if plateau_apply
-                @. x_dif *= plateau_s
-                plateau_i = 0
-                stepflags *= "P-"
+                # stepflags *= "Lm-"
             end
 
             # Max step size
@@ -726,6 +723,15 @@ module solver
             # Limit step size by dx_max_step, without changing direction of dx vector
             x_dif *= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
 
+            # Extrapolate step if on plateau.
+            #    This acts to give the solver a 'nudge' in (hopefully) the right direction.
+            #    Otherwise, this perturbation can still help.
+            plateau_apply = (plateau_i > plateau_n)
+            if plateau_apply
+                @. x_dif *= plateau_s
+                plateau_i = 0
+                stepflags *= "P-"
+            end
 
             # Linesearch
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
@@ -779,7 +785,6 @@ module solver
                             end
                         end
 
-
                     else
                         @error "Invalid linesearch algorithm $ls_method"
                         code = CODE_CFG
@@ -794,6 +799,10 @@ module solver
 
             end # end linesearch
 
+            # Limit step size by dx_min
+            x_dif[x_dif.<0.0] .= clamp.(x_dif[x_dif.<0.0], -dx_max_step, -dx_min)
+            x_dif[x_dif.>0.0] .= clamp.(x_dif[x_dif.>0.0], dx_min, dx_max_step)
+
             # Take the step
             @. x_cur = x_old + x_dif
 
@@ -801,7 +810,7 @@ module solver
             if ! atmosphere.calc_layer_props!(atmos)
                 code = CODE_HYD
                 step_ok = false
-                stepflags *= "U-"
+                stepflags *= "Ub-"
             end
 
             # Evaluate fluxes
