@@ -30,7 +30,6 @@ title = "Default"                       # Name for this configuration file
     p_surf          = 270.0                     # Total surface pressure [bar].
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
     vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
-    chemistry       = 0                         # Chemistry type (see wiki).
     condensates     = []                        # List of volatiles which are allowed to condense.
 
 [execution]
@@ -39,6 +38,19 @@ title = "Default"                       # Name for this configuration file
     max_steps       = 20000                     # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
     num_levels      = 200                       # Number of model levels.
+    converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
+    converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
+    solution_type   = 0                         # Solution type (see wiki).
+    solver          = ""                        # Solver to use (see wiki).
+    dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
+    initial_state   = ["dry", "sat", "H2O"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    linesearch      = 0                         # Linesearch method to be used (0: None, 1: Golden, 2: Backtracking)
+    easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.
+    grey_start      = false                     # Initially solve for RCE using double-grey rad trans.
+    perturb_all     = false                     # Perturb all rows of jacobin matrix?
+
+[physics]
+    chemistry       = 0                         # Chemistry type (see wiki).
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
@@ -53,16 +65,6 @@ title = "Default"                       # Name for this configuration file
     convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
     convection      = true                      # Include heat transport by convection
     rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
-    solution_type   = 0                         # Solution type (see wiki).
-    solver          = ""                        # Solver to use (see wiki).
-    dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
-    initial_state   = ["dry", "sat", "H2O"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
-    linesearch      = 0                         # Linesearch method to be used (0: None, 1: Golden, 2: Backtracking)
-    easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.
-    grey_start      = false                     # Initially solve for RCE using double-grey rad trans.
-    converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
-    converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
-    perturb_all     = false                     # Perturb all rows of jacobin matrix?
 
 [plots]
     at_runtime      = true                      # Make some plots at runtime?

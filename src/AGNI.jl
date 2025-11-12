@@ -248,8 +248,8 @@ module AGNI
         # not transparent
         else
             p_top = Float64(cfg["composition"]["p_top"])
-            real_gas = Bool(cfg["execution"]["real_gas"])
-            chem_type = Int(cfg["composition"]["chemistry"])
+            real_gas = Bool(cfg["physics"]["real_gas"])
+            chem_type = Int(cfg["physics"]["chemistry"])
             condensates = cfg["composition"]["condensates"]
 
             comp_set_by::Int = 0
@@ -351,13 +351,13 @@ module AGNI
         κ_grey_lw::Float64 = 1e-2  # this will be over-written
         κ_grey_sw::Float64 = 1e-2  # ^
         if (lowercase(cfg["files"]["input_sf"]) == "greygas") || cfg["execution"]["grey_start"]
-            if haskey(cfg["execution"],"grey_lw") && haskey(cfg["execution"],"grey_sw")
-                κ_grey_lw = Float64(cfg["execution"]["grey_lw"])
-                κ_grey_sw = Float64(cfg["execution"]["grey_sw"])
+            if haskey(cfg["physics"],"grey_lw") && haskey(cfg["physics"],"grey_sw")
+                κ_grey_lw = Float64(cfg["physics"]["grey_lw"])
+                κ_grey_sw = Float64(cfg["physics"]["grey_sw"])
             else
                 @error "Config: Grey-gas calculation enabled but opacities are not set"
                 @error "        You must also provide `grey_lw` AND `grey_sw`"
-                return false 
+                return false
             end
         end
 
@@ -369,10 +369,10 @@ module AGNI
         end
 
         #    solver stuff
-        incl_convect::Bool     = cfg["execution"]["convection"]
-        incl_conduct::Bool     = cfg["execution"]["conduction"]
-        incl_sens::Bool        = cfg["execution"]["sensible_heat"]
-        incl_latent::Bool      = cfg["execution"]["latent_heat"]
+        incl_convect::Bool     = cfg["physics"]["convection"]
+        incl_conduct::Bool     = cfg["physics"]["conduction"]
+        incl_sens::Bool        = cfg["physics"]["sensible_heat"]
+        incl_latent::Bool      = cfg["physics"]["latent_heat"]
         sol_type::Int          = cfg["execution"]["solution_type"]
         conv_atol::Float64     = cfg["execution"]["converge_atol"]
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
@@ -432,19 +432,19 @@ module AGNI
 
                                 condensates=condensates,
                                 metallicities=metallicities,
-                                flag_gcontinuum   = cfg["execution"]["continua"],
-                                flag_rayleigh     = cfg["execution"]["rayleigh"],
-                                flag_cloud        = cfg["execution"]["cloud"],
-                                overlap_method    = cfg["execution"]["overlap_method"],
+                                flag_gcontinuum   = cfg["physics"]["continua"],
+                                flag_rayleigh     = cfg["physics"]["rayleigh"],
+                                flag_cloud        = cfg["physics"]["cloud"],
+                                overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
-                                thermo_functions  = cfg["execution"]["thermo_funct"],
+                                thermo_functions  = cfg["physics"]["thermo_funct"],
                                 use_all_gases     = Bool(chem_type > 0),
                                 surf_roughness=roughness, surf_windspeed=wind_speed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
                                 flux_int=flux_int,
                                 surface_material=surface_mat, albedo_s=albedo_s,
-                                mlt_criterion=only(cfg["execution"]["convection_crit"][1]),
+                                mlt_criterion=only(cfg["physics"]["convection_crit"][1]),
                                 rfm_parfile=rfm_parfile,
                                 κ_grey_lw=κ_grey_lw,
                                 κ_grey_sw=κ_grey_sw
@@ -504,7 +504,7 @@ module AGNI
             energy.calc_fluxes!(atmos, true, incl_latent,
                                 incl_convect, incl_sens, incl_conduct;
                                 calc_cf=Bool(cfg["plots"]["contribution"]),
-                                rainout=Bool(cfg["execution"]["rainout"]))
+                                rainout=Bool(cfg["physics"]["rainout"]))
 
         # Transparent atmosphere solver
         elseif sol == "transparent"
@@ -529,7 +529,7 @@ module AGNI
                                 conv_atol=conv_atol,
                                 conv_rtol=conv_rtol,
                                 method=Int(method_idx),
-                                rainout=Bool(cfg["execution"]["rainout"]),
+                                rainout=Bool(cfg["physics"]["rainout"]),
                                 dx_max=Float64(cfg["execution"]["dx_max"]),
                                 ls_method=Int(cfg["execution"]["linesearch"]),
                                 easy_start=Bool(cfg["execution"]["easy_start"]),

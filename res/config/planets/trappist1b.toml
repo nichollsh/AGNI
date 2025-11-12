@@ -24,9 +24,7 @@ title = "TRAPPIST-1 b"
     p_surf          = 1.0
     p_top           = 1e-5
     vmr_dict        = { CO2=1.0 }
-    chemistry       = 0
     condensates     = []
-
 
 [execution]
     clean_output    = true
@@ -34,6 +32,19 @@ title = "TRAPPIST-1 b"
     max_steps       = 200
     max_runtime     = 400
     num_levels      = 50
+    solution_type   = 3
+    solver          = "newton"
+    dx_max          = 300.0
+    initial_state   = ["iso", "500"]
+    linesearch      = 2
+    easy_start      = false
+    grey_start      = false
+    converge_atol   = 1e-1
+    converge_rtol   = 1.0e-3
+    perturb_all     = false
+
+[physics]
+    chemistry       = 0
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -46,16 +57,6 @@ title = "TRAPPIST-1 b"
     convection      = true
     convection_crit = "s"
     rainout         = false
-    solution_type   = 3
-    solver          = "newton"
-    dx_max          = 300.0
-    initial_state   = ["iso", "500"]
-    linesearch      = 2
-    easy_start      = false
-    grey_start      = false
-    converge_atol   = 1e-1
-    converge_rtol   = 1.0e-3
-    perturb_all     = false
 
 [plots]
     at_runtime      = true

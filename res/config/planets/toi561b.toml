@@ -23,7 +23,6 @@ title = "TOI-561 b"
     p_top           = 1e-5
     p_surf          = 1e2
     vmr_dict        = {H2O = 0.1, CO2 = 0.8, CO = 0.1}
-    chemistry       = 0
     condensates     = []
 
 [execution]
@@ -32,6 +31,19 @@ title = "TOI-561 b"
     max_steps       = 20000
     max_runtime     = 400
     num_levels      = 45
+    solution_type   = 3
+    solver          = "newton"
+    dx_max          = 300.0
+    initial_state   = ["iso","3000"] #["ncdf", "out/atm.nc"]
+    linesearch      = 2
+    easy_start      = true
+    grey_start      = true
+    converge_atol   = 1.0e-2
+    converge_rtol   = 1.0e-3
+    perturb_all     = false
+
+[physics]
+    chemistry       = 0
     continua        = true
     rayleigh        = false
     cloud           = false
@@ -44,16 +56,6 @@ title = "TOI-561 b"
     convection      = true
     convection_crit = "l"
     rainout         = false
-    solution_type   = 3
-    solver          = "newton"
-    dx_max          = 300.0
-    initial_state   = ["iso","3000"] #["ncdf", "out/atm.nc"]
-    linesearch      = 2
-    easy_start      = true
-    grey_start      = true
-    converge_atol   = 1.0e-2
-    converge_rtol   = 1.0e-3
-    perturb_all     = false
 
 [plots]
     at_runtime      = true

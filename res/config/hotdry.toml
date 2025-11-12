@@ -24,9 +24,7 @@ title = "Hot and dry"
     p_surf          = 2700.0
     p_top           = 1e-5
     vmr_dict        = { H2O = 1.0}
-    chemistry       = 0
     condensates     = []
-
 
 [execution]
     clean_output    = true
@@ -34,6 +32,19 @@ title = "Hot and dry"
     max_steps       = 200
     max_runtime     = 400
     num_levels      = 35
+    solution_type   = 3
+    solver          = "newton"
+    dx_max          = 400.0
+    initial_state   = ["iso","2300"]
+    linesearch      = 0
+    easy_start      = false
+    grey_start      = false
+    converge_atol   = 1.0e-2
+    converge_rtol   = 1.0e-4
+    perturb_all     = false
+
+[physics]
+    chemistry       = 0
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -46,18 +57,8 @@ title = "Hot and dry"
     convection      = true
     convection_crit = "l"
     rainout         = false
-    solution_type   = 3
-    solver          = "newton"
-    dx_max          = 400.0
-    initial_state   = ["iso","2300"]
-    linesearch      = 0
-    easy_start      = false
-    grey_start      = false
     grey_lw         = 5e-3
     grey_sw         = 2e-3
-    converge_atol   = 1.0e-2
-    converge_rtol   = 1.0e-4
-    perturb_all     = false
 
 [plots]
     at_runtime      = true
