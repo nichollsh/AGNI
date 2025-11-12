@@ -52,6 +52,7 @@ title = "Line-by-line validation tests"
     initial_state   = ["dry", "sat", "H2O"]
     linesearch      = 0
     easy_start      = false
+    grey_start      = false 
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-3
     rfm_wn_min      = 1000.0

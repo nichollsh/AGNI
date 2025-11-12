@@ -52,6 +52,7 @@ title = "Hot and dry"
     initial_state   = ["iso","2300"]
     linesearch      = 0
     easy_start      = false
+    grey_start      = false 
     converge_atol   = 1.0e-2
     converge_rtol   = 1.0e-4
     perturb_all     = false

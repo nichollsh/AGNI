@@ -531,6 +531,7 @@ module AGNI
                                 dx_max=Float64(cfg["execution"]["dx_max"]),
                                 ls_method=Int(cfg["execution"]["linesearch"]),
                                 easy_start=Bool(cfg["execution"]["easy_start"]),
+                                grey_start=Bool(cfg["execution"]["grey_start"]),
                                 modplot=modplot,
                                 save_frames=plt_ani,
                                 perturb_all=perturb_all

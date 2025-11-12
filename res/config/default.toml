@@ -59,6 +59,7 @@ title = "Default"                       # Name for this configuration file
     initial_state   = ["dry", "sat", "H2O"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     linesearch      = 0                         # Linesearch method to be used (0: None, 1: Golden, 2: Backtracking)
     easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.
+    grey_start      = false                     # Initially solve for RCE using double-grey rad trans.
     converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
     perturb_all     = false                     # Perturb all rows of jacobin matrix?
