@@ -146,7 +146,6 @@ There are three main ways to set the composition: partial pressures (`p_dict`), 
 | `vmr_dict      `  | Gas volume mixing ratios (=mole fractions) at the surface. Must also set `p_surf`. |
 | `vmr_file      `  | Path to a file containing mixing ratio profiles.  Must also set `p_surf`. |
 | `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
-| `chemistry     `  | Type of chemistry to be used (see below). |
 | `condensates   `  | List of volatiles which are allowed to condense. Incompatible with `chemistry > 0`. |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
 
@@ -160,7 +159,25 @@ Parameters that tell the model what to do.
 | `verbosity     `  | Logging verbosity (0: quiet, 1: normal, 2: extra logging) |
 | `max_steps     `  | Maximum number of steps the solver should take before giving up (typically <200). |
 | `max_runtime   `  | Maximum wall-clock runtime [s] before giving up. |
-| `num_levels    `  | Number of model levels. Typically ~50, and ideally less than 150.  |
+| `num_levels    `  | Number of model levels. Typically ~50, and ideally less than 100.  |
+| `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
+| `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
+| `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |
+| `solution_type `  | Solution type (see below). |
+| `solver        `  | Solver to use (see below). |
+| `dx_max        `  | Maximum step size [kelvin] allowed to be taken by the solver during each step. |
+| `linesearch    `  | Linesearch method to be used (0: None, 1: Golden section, 2: Backtracking) |
+| `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
+| `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
+| `perturb_all`     | Perturb all rows of jacobian matrix at each solver iteration? True=stable, False=fast. |
+| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] |
+| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] |
+
+### `[physics]`
+Parameters that describe how the model should treat the physics.
+| Parameter         | Description   |
+| ----------------: | :------------ |
+| `chemistry     `  | Type of chemistry to be used (see below). |
 | `continua      `  | Include collisional/continuum absorption in radiative transfer (true/false) |
 | `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false) |
 | `cloud         `  | Include cloud scattering and opacity in radiative transfer (true/false) |
@@ -174,18 +191,6 @@ Parameters that tell the model what to do.
 | `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
 | `rainout       `  | Enable compositional rainout of condensables. If disabled, phase change does not impact composition. |
-| `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |
-| `solution_type `  | Solution type (see below). |
-| `solver        `  | Solver to use (see below). |
-| `dx_max        `  | Maximum step size [kelvin] allowed to be taken by the solver during each step. |
-| `linesearch    `  | Linesearch method to be used (0: None, 1: Golden section, 2: Backtracking) |
-| `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
-| `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
-| `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
-| `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
-| `perturb_all`     | Perturb all rows of jacobian matrix at each solver iteration? True=stable, False=fast. |
-| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] |
-| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] |
 
 ### `[plots]`
 Configure plotting routines all of these should be `true` or `false`.
@@ -232,7 +237,7 @@ Configure plotting routines all of these should be `true` or `false`.
 
     For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model.
 
-* `composition.chemistry` describes the type of chemistry to implement within the model. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. The allowed values (integers) are...
+* `physics.chemistry` describes the type of chemistry to implement within the model. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. The allowed values (integers) are...
      - 0 : Disabled
      - 1 : Equilibrium, gas phase only
      - 2 : Equilibrium, with condensation (condensates retained)
@@ -240,7 +245,7 @@ Configure plotting routines all of these should be `true` or `false`.
 
      More information on the chemistry is available on the [Equilibrium chemistry](@ref) page
 
-* `execution.overlap_method` tells SOCRATES which algorithm to use to combine gas opacities. The spectral files contain k-tables for pure gases, and combining these coefficients can be done in several ways. See Amundsen+[2017](https://www.aanda.org/articles/aa/full_html/2017/02/aa29322-16/aa29322-16.html) for a nice comparison of overlap methods. Allowed options are...
+* `physics.overlap_method` tells SOCRATES which algorithm to use to combine gas opacities. The spectral files contain k-tables for pure gases, and combining these coefficients can be done in several ways. See Amundsen+[2017](https://www.aanda.org/articles/aa/full_html/2017/02/aa29322-16/aa29322-16.html) for a nice comparison of overlap methods. Allowed options are...
      - `"ee"`   : equivalent extinction (fastest)
      - `"rorr"` : random overlap, with resorting and re-binning
      - `"ro"`   : random overlap (most accurate, slowest)

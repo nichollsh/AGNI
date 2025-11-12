@@ -25,7 +25,6 @@ title = "Line-by-line validation tests"
     p_surf          = 270.0
     p_top           = 1e-6
     vmr_dict        = { H2O = 0.9, CO2=0.1 }
-    chemistry       = 0
     condensates     = []
 
 [execution]
@@ -34,6 +33,21 @@ title = "Line-by-line validation tests"
     max_steps       = 20000
     max_runtime     = 400
     num_levels      = 100
+    solution_type   = 1
+    solver          = ""
+    dx_max          = 400.0
+    initial_state   = ["dry", "sat", "H2O"]
+    linesearch      = 0
+    easy_start      = false
+    grey_start      = false
+    converge_atol   = 1.0e-2
+    converge_rtol   = 1.0e-3
+    rfm_wn_min      = 1000.0
+    rfm_wn_max      = 6000.0
+    perturb_all     = false
+
+[physics]
+    chemistry       = 0
     continua        = false
     rayleigh        = false
     cloud           = false
@@ -46,18 +60,6 @@ title = "Line-by-line validation tests"
     convection      = false
     convection_crit = "s"
     rainout         = false
-    solution_type   = 1
-    solver          = ""
-    dx_max          = 400.0
-    initial_state   = ["dry", "sat", "H2O"]
-    linesearch      = 0
-    easy_start      = false
-    grey_start      = false 
-    converge_atol   = 1.0e-2
-    converge_rtol   = 1.0e-3
-    rfm_wn_min      = 1000.0
-    rfm_wn_max      = 6000.0
-    perturb_all     = false
 
 [plots]
     at_runtime      = true
