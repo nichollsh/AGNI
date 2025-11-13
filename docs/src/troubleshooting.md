@@ -57,6 +57,18 @@ If this does not help, it's possible that you are using a Julia distribution pro
 your system package manager. It's important that you only use Julia distributed from the
 official website.
 
+## Fill error when compiling SOCRATES
+For example, an error which looks something like:
+```log
+...
+Cgen_null.c:52:13: error: too many arguments to function 'fill'; expected 0, have 6
+   52 |             fill(&np, p, p1, p2, divisi
+...
+```
+This is caused by using an incompatible C compiler. The compilation has been tested with gcc version 12.2.0
+
+This can occur when compiling SOCRATES while you have a conda environment activated, if
+one of the Python packages provides gcc. Try deactivating conda.
 
 
 ## Cannot find SOCRATES
