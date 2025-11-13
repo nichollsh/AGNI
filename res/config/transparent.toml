@@ -42,6 +42,7 @@ title = "Transparent atmosphere"
     perturb_all     = true
 
 [physics]
+    chemistry       = false
     continua        = true
     rayleigh        = false
     cloud           = false

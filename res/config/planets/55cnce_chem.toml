@@ -42,7 +42,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     perturb_all     = false
 
 [physics]
-    chemistry       = 1
+    chemistry       = true
     continua        = true
     rayleigh        = true
     cloud           = false

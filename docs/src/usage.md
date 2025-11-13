@@ -177,7 +177,7 @@ Parameters that tell the model what to do.
 Parameters that describe how the model should treat the physics.
 | Parameter         | Description   |
 | ----------------: | :------------ |
-| `chemistry     `  | Type of chemistry to be used (see below). |
+| `chemistry     `  | Include 1D equilibrium chemistry in the atmosphere (true/false) |
 | `continua      `  | Include collisional/continuum absorption in radiative transfer (true/false) |
 | `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false) |
 | `cloud         `  | Include cloud scattering and opacity in radiative transfer (true/false) |
@@ -237,13 +237,7 @@ Configure plotting routines all of these should be `true` or `false`.
 
     For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model.
 
-* `physics.chemistry` describes the type of chemistry to implement within the model. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. The allowed values (integers) are...
-     - 0 : Disabled
-     - 1 : Equilibrium, gas phase only
-     - 2 : Equilibrium, with condensation (condensates retained)
-     - 3 : Equilibrium, with condensation (condensates rained out)
-
-     More information on the chemistry is available on the [Equilibrium chemistry](@ref) page
+* `physics.chemistry` enables a calculation of equilibrium thermochemistry in the atmosphere. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. More information on the chemistry is available on the [Equilibrium chemistry](@ref) page.
 
 * `physics.overlap_method` tells SOCRATES which algorithm to use to combine gas opacities. The spectral files contain k-tables for pure gases, and combining these coefficients can be done in several ways. See Amundsen+[2017](https://www.aanda.org/articles/aa/full_html/2017/02/aa29322-16/aa29322-16.html) for a nice comparison of overlap methods. Allowed options are...
      - `"ee"`   : equivalent extinction (fastest)

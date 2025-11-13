@@ -47,7 +47,7 @@ title = "Line-by-line validation tests"
     perturb_all     = false
 
 [physics]
-    chemistry       = 0
+    chemistry       = false
     continua        = false
     rayleigh        = false
     cloud           = false

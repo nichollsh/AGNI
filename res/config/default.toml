@@ -50,7 +50,7 @@ title = "Default"                       # Name for this configuration file
     perturb_all     = false                     # Perturb all rows of jacobin matrix?
 
 [physics]
-    chemistry       = 0                         # Chemistry type (see wiki).
+    chemistry       = false                     # Solve for thermochemistry in atmosphere?
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
     cloud           = false                     # Include water cloud radiative properties?
