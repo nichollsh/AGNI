@@ -114,7 +114,7 @@ module solver
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
-    - `chemistry::Bool`                 include eqm thermochemistry when solving for RCE?
+    - `chem::Bool`                      include eqm thermochemistry when solving for RCE?
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
@@ -153,7 +153,7 @@ module solver
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1,
-                            chemistry::Bool=false,
+                            chem::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
                             conduct::Bool=true, latent::Bool=true, rainout::Bool=true,
                             dx_min::Float64=1e-5, dx_max::Float64=400.0,
@@ -318,7 +318,7 @@ module solver
             _set_tmps!(x)
 
             # Do chemistry?
-            if perturb_chem && chemistry
+            if perturb_chem && chem
                 _fev_fc = chemistry.fastchem_eqm!(atmos, false)
                 # if _fev_fc != 0
                 #     return false
@@ -572,7 +572,7 @@ module solver
             _set_tmps!(x_cur)
 
             # Run chemistry scheme
-            if chemistry
+            if chem
                 @debug "        chemistry"
                 fc_retcode = chemistry.fastchem_eqm!(atmos, false)
                 if fc_retcode == 0
