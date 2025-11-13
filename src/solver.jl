@@ -127,7 +127,7 @@ module solver
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
     - `fd_rel::Float64`                 finite difference: relative width (dx/x) of the difference (rtol)
     - `fd_abs::Float64`                 finite difference: absolute width (dx) of the difference (atol)
-    - `fdc::Bool`                       finite difference: ALWAYS use central difference?
+    - `fdc::Bool`                       finite difference: central difference? otherwise use forward difference
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `easy_start::Bool`                improve convergence reliability; introduce convection and latent heat gradually
@@ -165,7 +165,7 @@ module solver
                             easy_start::Bool=false, grey_start::Bool=false,
                             ls_method::Int=1,
                             ls_increase::Float64=1.08,
-                            ls_max_steps::Int=20,
+                            ls_max_steps::Int=10,
                             ls_min_scale::Float64 = 1.0e-5, ls_max_scale::Float64 = 0.99,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
                             perturb_chem::Bool=false,
@@ -175,22 +175,32 @@ module solver
                             conv_atol::Float64=1.0e-1, conv_rtol::Float64=1.0e-3,
                             )::Bool
 
+        # --------------------
+        # Prepare to run the solver
+        # --------------------
+
         # Validate sol_type
         if (sol_type < 1) || (sol_type > 4)
             @error "Invalid solution type ($sol_type)."
             return false
         end
 
-        # Validate fdo
+        # Validate finite difference fdo option
         if !(fdo in [2,4])
             @error "Invalid finite-difference order ($fdo). Must be 2 or 4."
             return false
         end
 
-        # Check if transparent
+        # Validate if transparent
         if atmos.transparent
             @error "Atmosphere is configured to be transparent."
             @error "    Cannot use `solve_energy`. Use `solve_transparent` instead."
+            return false
+        end
+
+        # Validate options for rainout (required for latent heat)
+        if latent && !rainout
+            @error "Must enable rainout if also including latent heating"
             return false
         end
 
@@ -224,7 +234,6 @@ module solver
         easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
 
         #    finite difference
-        fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
         perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
         perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
         perturb_mod::Int =      5       # Do full jacobian at least this frequently
@@ -659,7 +668,7 @@ module solver
 
             # Evaluate residuals and estimate Jacobian matrix where required
             @. r_old = r_cur
-            if fdc || (step == 1) || (c_cur/c_old > fdr)
+            if fdc || (step == 1)
                 # use central difference if:
                 #    requested, at the start, or insufficient cost decrease
                 if !_calc_jac_res!(x_cur, b, r_cur, true, fdo, perturb)
