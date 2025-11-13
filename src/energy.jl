@@ -772,20 +772,15 @@ module energy
         fill!(atmos.flux_tot, 0.0)
     end
 
-    """
-    **Reset mixing ratios to their original values**
-    """
-    function restore_composition!(atmos::atmosphere.Atmos_t)
-        for g in atmos.gas_names
-            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
-        end
-    end
 
     """
     **Calculate energy flux at each level.**
 
     Calculates flux components (radtrans, convection, etc.) and sums them to get total flux.
     Also updates thermodynamic properties (heat capacity, density, etc.) at each layer.
+
+    Assumes that chemistry functions have already been called, if wanted. Does not call
+    fastchem here.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
@@ -816,28 +811,20 @@ module energy
         # +Condensation and evaporation
         if atmos.condense_any && (latent || rainout)
 
-            # Restore mixing ratios
-            restore_composition!(atmos)
-            ok &= atmosphere.calc_layer_props!(atmos)
-
             # Handle rainout
             chemistry.handle_saturation!(atmos)
 
             # Calculate latent heat flux
             if latent
-                condense_diffuse!(atmos)                    # Calculate latent heat flux
-                atmos.flux_l *= latent_sf                   # Modulate for stability?
-                @. atmos.flux_tot += atmos.flux_l    # Add to total flux
-            end
-
-            # Restore mixing ratios - do not allow rainout
-            if !rainout
-                restore_composition!(atmos)
+                condense_diffuse!(atmos)            # Calculate latent heat flux
+                atmos.flux_l *= latent_sf           # Modulate for stability?
+                @. atmos.flux_tot += atmos.flux_l   # Add to total flux
             end
         end
 
-        # Recalculate layer properties
-        #    Returns false if atmosphere becomes non-hydrostatic
+        # Recalculate layer properties after chemistry and/or rainout.
+        #    Returns false if atmosphere becomes non-hydrostatic, so user is warned,
+        #    but function will continue to run anyway.
         ok &= atmosphere.calc_layer_props!(atmos)
 
         # +Radiation

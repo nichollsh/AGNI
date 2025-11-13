@@ -125,8 +125,8 @@ module solver
     - `tmp_pad::Float64`                padding around hard limits on temperature floor & ceiling values
     - `max_steps::Int`                  maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
-    - `fdw::Float64`                    finite difference: relative width (dx/x) of the difference (rtol)
-    - `fda::Float64`                    finite difference: absolute width (dx) of the difference (atol)
+    - `fd_rel::Float64`                 finite difference: relative width (dx/x) of the difference (rtol)
+    - `fd_abs::Float64`                 finite difference: absolute width (dx) of the difference (atol)
     - `fdc::Bool`                       finite difference: ALWAYS use central difference?
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
@@ -156,10 +156,10 @@ module solver
                             chem::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
                             conduct::Bool=true, latent::Bool=true, rainout::Bool=true,
-                            dx_min::Float64=1e-5, dx_max::Float64=400.0,
+                            dx_min::Float64=1e-7, dx_max::Float64=400.0,
                             tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
-                            fdw::Float64=3.0e-5, fda::Float64=1e-5,
+                            fd_rel::Float64=3.0e-5, fd_abs::Float64=1e-5,
                             fdc::Bool=true, fdo::Int=2,
                             method::Int=1,
                             easy_start::Bool=false, grey_start::Bool=false,
@@ -332,7 +332,10 @@ module solver
                                 rainout=rainout)
 
             # Energy divergence term
-            @. atmos.flux_dif -= atmos.ediv_add
+            #   Negative offset, so that other fluxes are larger (hotter) to
+            #   maintain the same energy balance
+            #   flux_dif -= (dF/dp) * dp
+            atmos.flux_dif[:] .-= atmos.flux_div_add[:] .* (atmos.pl[2:end] .- atmos.pl[1:end-1])
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
@@ -397,7 +400,7 @@ module solver
 
                 # Calculate perturbation at this level
                 #    - must be less than tmp_pad/2
-                fd_s = min(x[i] * fdw + fda, tmp_pad/2)
+                fd_s = min(x[i] * fd_rel + fd_abs, tmp_pad/2)
 
                 # Forward part (1 step)
                 x_s[i] = x[i] + fd_s

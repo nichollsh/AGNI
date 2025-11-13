@@ -375,6 +375,9 @@ module AGNI
         star_Teff::Float64  = -1.0
         if "star_Teff" in keys(cfg["planet"])
             star_Teff = Float64(cfg["planet"]["star_Teff"])
+            if !(lowercase(cfg["files"]["input_star"]) == "blackbody") && (star_Teff>1)
+                @warn "Stellar temperature is set by user, but blackbody star isn't enabled"
+            end
         end
 
         #    solver stuff
