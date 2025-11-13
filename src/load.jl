@@ -101,7 +101,6 @@ module load
                 g = input_gases[i]
                 atmos.gas_vmr[g]      = zeros(Float64, nlev_c)
                 atmos.gas_vmr[g][:]  .= raw_vmrs[i, :]
-                atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
             end
 
             # recalculate remaining layer properties
@@ -111,6 +110,11 @@ module load
 
         end # suppress output
         @debug "ALL DEBUG RESTORED"
+
+        for g in atmos.gas_names
+            @. atmos.gas_ovmr[g] .= atmos.gas_vmr[g]
+            @. atmos.gas_cvmr[g] .= atmos.gas_vmr[g]
+        end
 
         return true
     end # end read_ncdf

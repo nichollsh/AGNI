@@ -191,6 +191,8 @@ module plotting
 
         # X-axis minimum allowed left-hand-side limit (log units)
         minmin_x::Float64 = -10
+        lw = 2.5
+        la = 0.7
 
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
@@ -214,6 +216,8 @@ module plotting
         arr_x::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
         min_x::Float64 = -3
         for i in reverse(sortperm(gas_xsurf))
+            gas = atmos.gas_names[i]
+            col = atmos.gas_dat[gas].plot_color
             # Plot gases in order of descending abundance, so that the legend
             #    shows the most interesting gases at the top of the list.
 
@@ -221,25 +225,36 @@ module plotting
             if num_plotted > 20
                 break
             end
+            num_plotted += 1
 
-            # Get data
-            gas = atmos.gas_names[i]
+            # Plot post-chemistry values
+            @. arr_x = atmos.gas_cvmr[gas]
+            if minimum(arr_x) < eps(0.0)
+                continue
+            end
+            @. arr_x = log10(arr_x)
+            min_x = min(min_x, minimum(arr_x))
+            plot!(arr_x, arr_P, linestyle=:dash,
+                    lw=lw, linealpha=la, color=col)
+
+
+
+            # Plot runtime values
             @. arr_x = atmos.gas_vmr[gas]
             if minimum(arr_x) < eps(0.0)
                 continue
             end
             @. arr_x = log10(arr_x)
+            min_x = min(min_x, minimum(arr_x))
+            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label, linestyle=:solid,
+                    lw=lw, linealpha=la, color=col)
 
-            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label,
-                    lw=2.5, linealpha=0.7, color=atmos.gas_dat[gas].plot_color)
 
+
+            # Plot original value as surface scatter point
             scatter!([log10(atmos.gas_ovmr[gas][end])], [arr_P[end]],
                         opacity=0.9, markersize=2, msw=0.5,
                         color=atmos.gas_dat[gas].plot_color, label="")
-
-            num_plotted += 1
-
-            min_x = min(min_x, minimum(arr_x))
         end
 
         xlims  = (max(min_x, minmin_x)-0.1, 0.1)

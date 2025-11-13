@@ -419,7 +419,7 @@ module setpt
 
                 # Reduce amount of volatile until reaches phase curve
                 atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.gas_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa
+                atmos.gas_vmr[gas][end] = psat / atmos.p_boa
 
                 # Check that p_boa is still reasonable
                 if atmos.p_boa <= 10.0 * atmos.p_toa

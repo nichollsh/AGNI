@@ -142,7 +142,8 @@ module atmosphere
         gas_dat::Dict{String, phys.Gas_t}           # Struct variables containing thermodynamic data for each gas
 
         # Chemistry and composition
-        gas_vmr::Dict{String, Array{Float64,1}}     # Layer volume mixing ratios in dict, (key,value) = (gas_name,array)
+        gas_vmr::Dict{String, Array{Float64,1}}     # runtime calculated VMRs in dict, (key,value) = (gas_name,array)
+        gas_cvmr::Dict{String, Array{Float64,1}}    # runtime calculated VMR values after chemistry calculation, before rainout
         gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
         metal_orig::Dict{String, Float64}           # input elem ratios (elem num density rel to hydrogen)
         metal_calc::Dict{String, Float64}           # calc'd elem ratios, from gas mixing ratios at surface
@@ -255,10 +256,10 @@ module atmosphere
         cloud_val_f::Float64                # /
 
         # Cell-internal heating
-        ediv_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-3] (e.g. from advection)
+        flux_div_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-2 Pa-1] (e.g. from advection)
 
         # Total energy flux
-        flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2]
+        flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2] (positive is heating up)
         flux_tot::Array{Float64,1}      # Total upward-directed flux at cell edges [W m-2]
 
         # Heating rate felt at each level [K/day]
@@ -649,6 +650,7 @@ module atmosphere
         atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of gas data structs
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
+        atmos.gas_cvmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
 
         # Convert metallicities from mass to mole fraction here
         atmos.metal_orig =  Dict{String, Float64}()          # input metallicities rel to H
@@ -781,8 +783,8 @@ module atmosphere
 
         # backup mixing ratios from current state
         for k in keys(atmos.gas_vmr)
-            atmos.gas_ovmr[k] = zeros(Float64, atmos.nlev_c)
-            @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
+            atmos.gas_ovmr[k] = deepcopy(atmos.gas_vmr[k])
+            atmos.gas_cvmr[k] = deepcopy(atmos.gas_vmr[k])
         end
 
         # set condensation mask and yield values [kg]
@@ -2007,7 +2009,7 @@ module atmosphere
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
-        atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
+        atmos.flux_div_add =      zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
         atmos.timescale_conv =    zeros(Float64, atmos.nlev_c)
         atmos.timescale_rad =     zeros(Float64, atmos.nlev_c)
