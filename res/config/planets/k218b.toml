@@ -44,7 +44,7 @@ title = "K2-18 b, mixed"
     perturb_all     = true
 
 [physics]
-    chemistry       = 0
+    chemistry       = false
     continua        = true
     rayleigh        = true
     cloud           = false

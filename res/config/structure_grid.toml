@@ -45,7 +45,7 @@ title = "Base config for structure calcs"
     perturb_all     = true
 
 [physics]
-    chemistry       = 1
+    chemistry       = true
     continua        = true
     rayleigh        = true
     cloud           = false

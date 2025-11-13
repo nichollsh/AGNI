@@ -298,17 +298,12 @@ module chemistry
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `chem_type::Int`                  chemistry type (see wiki)
     - `write_cfg::Bool`                 write config and elements
 
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function fastchem_eqm!(atmos::atmosphere.Atmos_t, chem_type::Int, write_cfg::Bool)::Int
-
-        if chem_type == 0
-            return 0
-        end
+    function fastchem_eqm!(atmos::atmosphere.Atmos_t, write_cfg::Bool)::Int
 
         @debug "Running equilibrium chemistry"
 
@@ -335,9 +330,8 @@ module chemistry
                 write(f,"#Atmospheric profile input file \n")
                 write(f,atmos.fastchem_prof*" \n\n")
 
-                type_char = ["g","ce","cr"]
                 write(f,"#Chemistry calculation type (gas phase only = g, equilibrium condensation = ce, rainout condensation = cr) \n")
-                write(f,"$(type_char[chem_type]) \n\n")
+                write(f,"g \n\n")
 
                 write(f,"#Chemistry output file \n")
                 write(f,atmos.fastchem_chem*" "*atmos.fastchem_cond*" \n\n")

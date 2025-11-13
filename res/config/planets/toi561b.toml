@@ -43,7 +43,7 @@ title = "TOI-561 b"
     perturb_all     = false
 
 [physics]
-    chemistry       = 0
+    chemistry       = false
     continua        = true
     rayleigh        = false
     cloud           = false

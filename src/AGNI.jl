@@ -219,9 +219,9 @@ module AGNI
             albedo_s = cfg["planet"]["albedo_s"]
         end
 
-        #    composition stuff
+        #    composition stuff (defaults to be overwritten)
         condensates::Array{String,1}        = String[]
-        chem_type::Int                      = 0
+        chemistry::Bool                     = false
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
         pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
@@ -249,7 +249,7 @@ module AGNI
         else
             p_top = Float64(cfg["composition"]["p_top"])
             real_gas = Bool(cfg["physics"]["real_gas"])
-            chem_type = Int(cfg["physics"]["chemistry"])
+            chemistry = Bool(cfg["physics"]["chemistry"])
             condensates = cfg["composition"]["condensates"]
 
             comp_set_by::Int = 0
@@ -277,7 +277,7 @@ module AGNI
                     metallicities = cfg["composition"]["metallicities"]
 
                     # this requires fastchem to be used, to determine the VMRs
-                    if !(chem_type in [1,2,3])
+                    if !chemistry
                         @error "Config: must enable FastChem if providing metallicities"
                         return false
                     end
@@ -320,11 +320,9 @@ module AGNI
         end
 
         #    chemistry
-        if chem_type in [1,2,3]
-            if transparent
-                @error "Config: chemistry is incompatible with transparent atmosphere mode"
-                return false
-            end
+        if chemistry && transparent
+            @error "Config: chemistry is incompatible with transparent atmosphere mode"
+            return false
         end
 
         #    RFM radtrans
@@ -434,7 +432,7 @@ module AGNI
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
-                                use_all_gases     = Bool(chem_type > 0),
+                                use_all_gases     = chemistry,
                                 surf_roughness=roughness, surf_windspeed=wind_speed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
@@ -466,7 +464,7 @@ module AGNI
         save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
         # Do chemistry on initial composition
-        if chem_type in [1,2,3]
+        if chemistry
             @debug "Initial chemistry"
 
             # check we found fastchem
@@ -475,7 +473,7 @@ module AGNI
                 return false
             end
 
-            chemistry.fastchem_eqm!(atmos, chem_type, true)
+            chemistry.fastchem_eqm!(atmos, true)
         end
 
         # Frame dir
@@ -517,7 +515,7 @@ module AGNI
             end
             method_idx = findfirst(==(sol), allowed_solvers)
             solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
-                                conduct=incl_conduct, chem_type=chem_type,
+                                conduct=incl_conduct, chemistry=chemistry,
                                 convect=incl_convect, latent=incl_latent,
                                 sens_heat=incl_sens,
                                 max_steps=Int(cfg["execution"]["max_steps"]),
