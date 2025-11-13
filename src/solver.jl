@@ -114,7 +114,7 @@ module solver
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
-    - `chem_type::Int`                  chemistry type (see wiki)
+    - `chemistry::Bool`                 include eqm thermochemistry when solving for RCE?
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
@@ -153,7 +153,7 @@ module solver
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1,
-                            chem_type::Int=0,
+                            chemistry::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
                             conduct::Bool=true, latent::Bool=true, rainout::Bool=true,
                             dx_min::Float64=1e-5, dx_max::Float64=400.0,
@@ -318,8 +318,8 @@ module solver
             _set_tmps!(x)
 
             # Do chemistry?
-            if perturb_chem && (chem_type in [1,2,3])
-                _fev_fc = chemistry.fastchem_eqm!(atmos, chem_type, false)
+            if perturb_chem && chemistry
+                _fev_fc = chemistry.fastchem_eqm!(atmos, false)
                 # if _fev_fc != 0
                 #     return false
                 # end
@@ -481,7 +481,6 @@ module solver
         # ----------------------------------------------------------
         # Setup initial guess
         # ----------------------------------------------------------
-            @info @sprintf("    chem_type = %d", chem_type)
             @info @sprintf("    sol_type  = %d", sol_type)
         if (sol_type == 1)
             @info @sprintf("    tmp_surf  = %.2f K", atmos.tmp_surf)
@@ -573,9 +572,9 @@ module solver
             _set_tmps!(x_cur)
 
             # Run chemistry scheme
-            if chem_type in [1,2,3]
+            if chemistry
                 @debug "        chemistry"
-                fc_retcode = chemistry.fastchem_eqm!(atmos, chem_type, false)
+                fc_retcode = chemistry.fastchem_eqm!(atmos, false)
                 if fc_retcode == 0
                     stepflags *= "Cs-"  # chemistry success
                 else

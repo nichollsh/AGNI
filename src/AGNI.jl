@@ -153,7 +153,7 @@ module AGNI
         cfg_dict = parsefile(cfg_path)
 
         # check headers
-        headers = ["plots", "planet", "files", "execution", "title"]
+        headers = ["plots", "planet", "files", "execution", "physics", "title"]
         for h in headers
             if !haskey(cfg_dict, h)
                 error("Key $h is missing from configuration file at '$cfg_path'")
@@ -202,7 +202,7 @@ module AGNI
             mass = cfg["planet"]["mass"]
             if gravity > 0.0
                 # overspecified
-                @error "Config: provide `mass` OR `gravity`, not both"
+                @error "Config: provide `planet.mass` OR `planet.gravity`, not both"
                 return false
             end
             # convert mass to gravity
@@ -345,7 +345,7 @@ module AGNI
         κ_grey_lw::Float64 = 1e-2  # this will be over-written
         κ_grey_sw::Float64 = 1e-2  # ^
         if (lowercase(cfg["files"]["input_sf"]) == "greygas") || cfg["execution"]["grey_start"]
-            if haskey(cfg["physics"],"grey_lw") && haskey(cfg["physics"],"grey_sw")
+            if all(k in keys(cfg["physics"]) for k in ["grey_sw","grey_lw"])
                 κ_grey_lw = Float64(cfg["physics"]["grey_lw"])
                 κ_grey_sw = Float64(cfg["physics"]["grey_sw"])
             else
@@ -358,7 +358,7 @@ module AGNI
         # star stuff
         star_file::String   = cfg["files" ]["input_star"]
         star_Teff::Float64  = -1.0
-        if haskey(cfg["planet"],"star_Teff")
+        if "star_Teff" in keys(cfg["planet"])
             star_Teff = Float64(cfg["planet"]["star_Teff"])
         end
 
@@ -381,12 +381,22 @@ module AGNI
         #     sensible heat at the surface
         roughness::Float64 = 0.001; wind_speed::Float64 = 0.0
         if incl_sens && !transparent
+            if ! all(k in keys(cfg["planet"]) for k in ["roughness","wind_speed"])
+                @error "Config: sensible heating included"
+                @error "        you must provide `planet.roughness` and `planet.wind_speed`"
+                return false
+            end
             roughness  = cfg["planet"]["roughness"]
             wind_speed = cfg["planet"]["wind_speed"]
         end
         #     conductive skin case
         skin_k::Float64=0.0; skin_d::Float64=0.0; tmp_magma::Float64=0.0
         if sol_type == 2
+            if ! all(k in keys(cfg["planet"]) for k in ["skin_k","skin_d","tmp_magma"])
+                @error "Config: solution type $sol_type selected"
+                @error "        you must provide `planet.skin_k`, `skin_d`, `tmp_magma`"
+                return false
+            end
             skin_k      = cfg["planet"]["skin_k"]
             skin_d      = cfg["planet"]["skin_d"]
             tmp_magma   = cfg["planet"]["tmp_magma"]
@@ -394,12 +404,37 @@ module AGNI
         #     effective temperature case
         flux_int::Float64 = 0.0
         if sol_type == 3
+            if ! haskey(cfg["planet"],"flux_int")
+                @error "Config: solution type $sol_type selected"
+                @error "        you must provide `planet.flux_int`"
+                return false
+            end
             flux_int = cfg["planet"]["flux_int"]
         end
         #     target OLR case
         target_olr::Float64 = 0.0
         if sol_type == 4
+            if ! haskey(cfg["planet"],"target_olr")
+                @error "Config: solution type $sol_type selected"
+                @error "        you must provide `planet.target_olr`"
+                return false
+            end
             target_olr = cfg["planet"]["target_olr"]
+        end
+
+        # Check other required keys
+        req_keys = Dict()
+        req_keys["files"] = ["output_dir","input_sf"]
+        req_keys["planet"] = ["instellation","s0_fact","albedo_b","zenith_angle","tmp_surf"]
+        req_keys["execution"] = ["num_levels","solver"]
+        req_keys["physics"] = ["continua", "rayleigh","cloud","rainout","overlap_method","thermo_funct","convection_crit"]
+        for (k,v) in req_keys
+            for kk in v
+                if !haskey(cfg[k],kk)
+                    @error "Config: missing required key `$k.$kk`"
+                    return false
+                end
+            end
         end
 
         # Output folder
