@@ -48,6 +48,10 @@ module atmosphere
     const PHS_TIMESCALE_MIN::Float64    = 0.01      # minimum phase change timescale [s]
     const SURF_ROUGHNESS_MIN::Float64   = 1e-5      # [m]
     const SURF_WINDSPEED_MIN::Float64   = 1e-5      # [m/s]
+    const RP_MIN::Float64               = 1e4       # [m]
+    const SKIN_D_MIN::Float64           = 1e-6      # [m]
+    const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
+    const COND_DISALLOWED::Array        = ["H2","He"]
 
     # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
@@ -329,6 +333,23 @@ module atmosphere
         return nothing
     end
 
+    # Check parameter is within valid range
+    function _check_range(name, val; min=nothing, max=nothing)::Bool
+        if !isnothing(min) && !isnothing(max) && ((val<min) || (val>max))
+            @error "$name is out of range"
+            @error "    Got: $min < $val < $max"
+        elseif !isnothing(min) && (val < min)
+            @error "$name is too small"
+            @error "    Got: $val < $min"
+        elseif !isnothing(max) && (val > max)
+            @error "$name is too large"
+            @error "    Got: $val > $max"
+        else
+            return true
+        end
+        return false
+    end
+
     """
     **Set parameters of the atmosphere.**
 
@@ -438,11 +459,11 @@ module atmosphere
                     use_all_gases::Bool =       false,
                     check_integrity::Bool =     true,
 
-                    κ_grey_lw::Float64  =       1e-4,
-                    κ_grey_sw::Float64  =       1e-5,
+                    κ_grey_lw::Float64  =       8e-4,
+                    κ_grey_sw::Float64  =       2e-4,
 
                     fastchem_work::String       =  UNSET_STR,
-                    fastchem_floor::Float64     =  500.0,
+                    fastchem_floor::Float64     =  400.0,
                     fastchem_maxiter_chem::Int  =  80000,
                     fastchem_maxiter_solv::Int  =  40000,
                     fastchem_xtol_chem::Float64 =  1.0e-3,
@@ -525,7 +546,6 @@ module atmosphere
                 return false
             end
 
-
         else
             atmos.rt_scheme = RT_SOCRATES
             atmos.spectral_file = abspath(spfile)
@@ -569,20 +589,22 @@ module atmosphere
         atmos.tmp_floor =       max(0.1,tmp_floor)
         atmos.tmp_ceiling =     2.0e4
 
-        if nlev_centre < NLEV_minimum
-            nlev_centre = NLEV_minimum
-            @warn "Adjusted number of levels to $nlev_centre"
-        end
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
+        _check_range("Number of levels", atmos.nlev_c; min=25) || return false
+
         atmos.tmp_surf =        max(tmp_surf, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-7, gravity)
-        atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.surface_material= surface_material
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
-        atmos.instellation =    max(instellation, 0.0)
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
-        atmos.s0_fact =         max(s0_fact,0.0)
+        atmos.zenith_degrees =  zenith_degrees
+        _check_range("Zenith angle", atmos.zenith_degrees; min=0.2, max=89.8) || return false
+        atmos.instellation =    instellation
+        _check_range("Instellation", atmos.instellation; min=0) || return false
+        atmos.s0_fact =         s0_fact
+        _check_range("Stellar s0 factor", atmos.s0_fact; min=0, max=1) || return false
+
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) *
                                     s0_fact * cosd(atmos.zenith_degrees)
 
@@ -603,18 +625,10 @@ module atmosphere
         atmos.mlt_criterion =   mlt_criterion
 
         atmos.surf_roughness = surf_roughness
-        if atmos.surf_roughness < SURF_ROUGHNESS_MIN
-            @error "Surface roughness too small"
-            @error "    $(atmos.surf_roughness) < $SURF_ROUGHNESS_MIN metres"
-            return false
-        end
+        _check_range("Surface roughness", atmos.surf_roughness; min=SURF_ROUGHNESS_MIN) || return false
         atmos.surf_windspeed = surf_windspeed
-        if atmos.surf_windspeed < SURF_WINDSPEED_MIN
-            @error "Surface windspeed too small"
-            @error "    $(atmos.surf_windspeed) < $SURF_WINDSPEED_MIN metres"
-            return false
-        end
-        atmos.C_d =             0.001  # placeholder, will be overwritten
+        _check_range("Surface windspeed", atmos.surf_windspeed; min=SURF_WINDSPEED_MIN) || return false
+        atmos.C_d =  0.001  # placeholder, will be overwritten
 
         if atmos.real_gas && (atmos.mlt_criterion == 'l')
             @warn "Ledoux criterion not supported for real gases"
@@ -627,17 +641,25 @@ module atmosphere
             return false
         end
 
-        atmos.tmp_magma =       max(atmos.tmp_floor, tmp_magma)
-        atmos.skin_d =          max(1.0e-9, skin_d)
-        atmos.skin_k =          max(1.0e-9, skin_k)
+        atmos.tmp_magma =  max(atmos.tmp_floor, tmp_magma)
+        atmos.skin_d = skin_d
+        _check_range("Surface CBL thickness", atmos.skin_d; min=SKIN_D_MIN) || return false
+        atmos.skin_k = skin_k
+        _check_range("Surface CBL conductivity", atmos.skin_k; min=SKIN_K_MIN) || return false
 
-        atmos.p_toa =           p_top * 1.0e5 # Convert bar -> Pa
-        atmos.p_boa =           p_surf * 1.0e5
-        atmos.rp =              max(1.0, radius)
+        # pressure boundaries
+        atmos.p_toa = p_top * 1.0e5 # Convert bar -> Pa
+        atmos.p_boa = p_surf * 1.0e5
         if atmos.p_toa > atmos.p_boa
-            @error "p_top must be less than p_surf"
+            @error "Top pressure must be less than surface pressure"
+            @error "    p_top  = $p_top bar"
+            @error "    p_surf = $p_surf bar"
             return false
         end
+
+        # interior radius
+        atmos.rp = radius
+        _check_range("Planet surface radius", atmos.rp; min=RP_MIN) || return false
 
         # derived statistics
         atmos.interior_mass  =  atmos.grav_surf * atmos.rp^2 / phys.G_grav
@@ -691,18 +713,11 @@ module atmosphere
 
         # Phase change timescales [seconds]
         atmos.phs_timescale = phs_timescale
-        if atmos.phs_timescale < PHS_TIMESCALE_MIN
-            @error "Phase change timescale too small"
-            @error "    $(atmos.phs_timescale) < $PHS_TIMESCALE_MIN seconds"
-            return false
-        end
+        _check_range("Phase change timescale", atmos.phs_timescale; min=PHS_TIMESCALE_MIN) || return false
 
         # Evaporation efficiency
         atmos.evap_efficiency = evap_efficiency
-        if (atmos.evap_efficiency < 0) || (atmos.evap_efficiency > 1)
-            @error "Evaporation efficiency must be between 0 and 1"
-            return false
-        end
+        _check_range("Evaporation efficiency", atmos.evap_efficiency; min=0, max=1) || return false
 
         # Hardcoded cloud properties
         atmos.cloud_alpha   = 0.01    # 1% of condensed water forms substantial clouds
