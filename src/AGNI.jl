@@ -167,7 +167,7 @@ module AGNI
         out_path = abspath(cfg_dict["files"]["output_dir"])
 
         # check if this is a dangerous path
-        if ispath(joinpath(out_path, ".git")) || (joinpath(out_path) == pwd())
+        if ispath(joinpath(out_path, ".git")) || (joinpath(out_path) == pwd()) || samefile(out_path, ROOT_DIR)
             error("Output directory is unsafe")
         end
 
@@ -341,7 +341,7 @@ module AGNI
         end
 
         #    RFM radtrans
-        rfm_parfile::String = ""
+        rfm_parfile::String = atmosphere.UNSET_STR
         rfm_wn_min::Float64 = 4000.0
         rfm_wn_max::Float64 = 4020.0
         if haskey(cfg["files"],"rfm_parfile")
@@ -655,7 +655,7 @@ module AGNI
         tbegin = time()
 
         # Variables
-        output_dir::String = ""
+        output_dir::String = atmosphere.UNSET_STR
         clean_output::Bool = false
 
         # Open and validate config file
