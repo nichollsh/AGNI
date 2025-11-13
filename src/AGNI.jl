@@ -321,10 +321,6 @@ module AGNI
 
         #    chemistry
         if chem_type in [1,2,3]
-            if length(condensates)>0
-                @error "Config: chemistry is incompatible with condensation"
-                return false
-            end
             if transparent
                 @error "Config: chemistry is incompatible with transparent atmosphere mode"
                 return false
