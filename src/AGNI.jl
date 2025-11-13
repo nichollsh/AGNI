@@ -191,6 +191,21 @@ module AGNI
         # Read configuration options from dict
         @info "Using configuration '$(cfg["title"])'"
 
+        # Check that config has these always-required keys
+        req_keys = Dict()
+        req_keys["files"] = ["output_dir","input_sf"]
+        req_keys["planet"] = ["radius","surface_material","instellation","s0_fact","albedo_b","zenith_angle","tmp_surf"]
+        req_keys["execution"] = ["num_levels","solver"]
+        req_keys["physics"] = ["continua", "rayleigh","cloud","rainout","overlap_method","thermo_funct","convection_crit"]
+        for (k,v) in req_keys
+            for kk in v
+                if !haskey(cfg[k],kk)
+                    @error "Config: missing required key `$k.$kk`"
+                    return false
+                end
+            end
+        end
+
         #    planet structure
         radius::Float64        = cfg["planet"]["radius"]
         gravity::Float64       = 0.0
@@ -221,7 +236,7 @@ module AGNI
 
         #    composition stuff (defaults to be overwritten)
         condensates::Array{String,1}        = String[]
-        chemistry::Bool                     = false
+        chem::Bool                          = false
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
         pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
@@ -249,7 +264,7 @@ module AGNI
         else
             p_top = Float64(cfg["composition"]["p_top"])
             real_gas = Bool(cfg["physics"]["real_gas"])
-            chemistry = Bool(cfg["physics"]["chemistry"])
+            chem = Bool(cfg["physics"]["chemistry"])
             condensates = cfg["composition"]["condensates"]
 
             comp_set_by::Int = 0
@@ -277,7 +292,7 @@ module AGNI
                     metallicities = cfg["composition"]["metallicities"]
 
                     # this requires fastchem to be used, to determine the VMRs
-                    if !chemistry
+                    if !chem
                         @error "Config: must enable FastChem if providing metallicities"
                         return false
                     end
@@ -320,7 +335,7 @@ module AGNI
         end
 
         #    chemistry
-        if chemistry && transparent
+        if chem && transparent
             @error "Config: chemistry is incompatible with transparent atmosphere mode"
             return false
         end
@@ -422,20 +437,6 @@ module AGNI
             target_olr = cfg["planet"]["target_olr"]
         end
 
-        # Check other required keys
-        req_keys = Dict()
-        req_keys["files"] = ["output_dir","input_sf"]
-        req_keys["planet"] = ["instellation","s0_fact","albedo_b","zenith_angle","tmp_surf"]
-        req_keys["execution"] = ["num_levels","solver"]
-        req_keys["physics"] = ["continua", "rayleigh","cloud","rainout","overlap_method","thermo_funct","convection_crit"]
-        for (k,v) in req_keys
-            for kk in v
-                if !haskey(cfg[k],kk)
-                    @error "Config: missing required key `$k.$kk`"
-                    return false
-                end
-            end
-        end
 
         # Output folder
         output_dir = abspath(cfg["files"]["output_dir"])
@@ -467,7 +468,7 @@ module AGNI
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
-                                use_all_gases     = chemistry,
+                                use_all_gases     = chem,
                                 surf_roughness=roughness, surf_windspeed=wind_speed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
@@ -499,7 +500,7 @@ module AGNI
         save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
         # Do chemistry on initial composition
-        if chemistry
+        if chem
             @debug "Initial chemistry"
 
             # check we found fastchem
@@ -550,7 +551,7 @@ module AGNI
             end
             method_idx = findfirst(==(sol), allowed_solvers)
             solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
-                                conduct=incl_conduct, chemistry=chemistry,
+                                conduct=incl_conduct, chem=chem,
                                 convect=incl_convect, latent=incl_latent,
                                 sens_heat=incl_sens,
                                 max_steps=Int(cfg["execution"]["max_steps"]),
