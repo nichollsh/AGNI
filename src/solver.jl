@@ -104,6 +104,12 @@ module solver
         CODE_99  = 99 # default code (failure)
     end
 
+    # Solver constants and parameters 
+    #    plateau parameters
+    plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
+    plateau_s::Float64 =    3.0     # Scale factor applied to x_dif when plateau_i > plateau_n
+    plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
+
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
 
@@ -241,10 +247,6 @@ module solver
         #    linesearch
         ls_tau::Float64    =    0.7     # backtracking downscale size
 
-        #    plateau
-        plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    3.0     # Scale factor applied to x_dif when plateau_i > plateau_n
-        plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
         # Execution variables

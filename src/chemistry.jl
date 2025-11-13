@@ -503,9 +503,9 @@ module chemistry
         end
 
         # Parse gas chemistry
-        g_fc::String = "_unset"
+        g_fc::String = atmosphere.UNSET_STR
         d_fc::Dict = Dict{String, Int}()
-        g_in::String = "_unset"
+        g_in::String = atmosphere.UNSET_STR
         match::Bool = false
         N_t = data[4,:] # at each level: sum of gas number densities
 

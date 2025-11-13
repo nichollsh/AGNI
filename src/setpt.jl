@@ -23,7 +23,7 @@ module setpt
     function request!(atmos::atmosphere.Atmos_t, request::Array{String,1})::Bool
         num_req::Int = length(request)          # Number of requests
         idx_req::Int = 1                        # Index of current request
-        str_req::String = "_unset"              # String of current request
+        str_req::String = atmosphere.UNSET_STR  # String of current request
         prt_req::String = "Setting T(p): "
         while idx_req <= num_req
             # get command
