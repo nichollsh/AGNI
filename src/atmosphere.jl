@@ -42,9 +42,14 @@ module atmosphere
     const HYDROGRAV_ming::Float64  = 1e-3      # minimum allowed gravity [m/s^2]
     const HYDROGRAV_constg::Bool   = false     # constant gravity with height?
 
-    # Configuration limits
-    const NLEV_minimum::Int        = 25        # minimum allowed number of levels
+    # Other constants
+    const UNSET_STR::String             = "__AGNI_UNSET_STR"
+    const NLEV_minimum::Int             = 25        # minimum allowed number of levels
+    const PHS_TIMESCALE_MIN::Float64    = 0.01      # minimum phase change timescale [s]
+    const SURF_ROUGHNESS_MIN::Float64   = 1e-5      # [m]
+    const SURF_WINDSPEED_MIN::Float64   = 1e-5      # [m/s]
 
+    # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -68,6 +73,7 @@ module atmosphere
         FC_DIR::String          # path to fastchem install folder
         RFM_DIR::String         # path to RFM install folder
         FRAMES_DIR::String      # path to frames of animation
+        IO_DIR::String          # path to temporary directory, for fast I/O
 
         # SOCRATES objects
         SOCRATES_VERSION::String
@@ -349,6 +355,7 @@ module atmosphere
     - `mf_path::String`                 path to file containing VMRs at each level.
 
     Optional arguments:
+    - `IO_DIR::String`                  directory used for fast file operations.
     - `condensates`                     list of condensates (gas names).
     - `metallicities::Dict`             dictionary of elemental metallicities (mass ratio rel to hydrogen)
     - `surface_material::String`        surface material (default is "greybody", but can point to file instead).
@@ -399,6 +406,7 @@ module atmosphere
                     nlev_centre::Int, p_surf::Float64, p_top::Float64,
                     mf_dict, mf_path::String;
 
+                    IO_DIR::String   =          UNSET_STR,
                     condensates =               String[],
                     metallicities::Dict =       Dict{String,Float64}(),
                     surface_material::String =  "greybody",
@@ -433,61 +441,118 @@ module atmosphere
                     κ_grey_lw::Float64  =       1e-4,
                     κ_grey_sw::Float64  =       1e-5,
 
-                    fastchem_work::String       =  "",
+                    fastchem_work::String       =  UNSET_STR,
                     fastchem_floor::Float64     =  500.0,
                     fastchem_maxiter_chem::Int  =  80000,
                     fastchem_maxiter_solv::Int  =  40000,
                     fastchem_xtol_chem::Float64 =  1.0e-3,
                     fastchem_xtol_elem::Float64 =  1.0e-3,
 
-                    rfm_parfile::String =       "",
+                    rfm_parfile::String =       UNSET_STR,
 
                     ocean_calc::Bool =          true,
                     ocean_ob_frac::Float64 =    0.6,
                     ocean_cs_height::Float64 =  3000.0
                     )::Bool
 
-        if !isdir(OUT_DIR) && !isfile(OUT_DIR)
-            mkdir(OUT_DIR)
-        end
-
+        # Say hello
         @info  "Setting-up a new atmosphere struct"
-
-        # Code versions
-        atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         atmos.AGNI_VERSION = AGNI_VERSION
         @debug "AGNI VERSION = "*AGNI_VERSION
-        @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
-        @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
+        # -------------------------
+        # Directories
+        # -------------------------
 
+        # Set AGNI root directory
+        atmos.ROOT_DIR = abspath(ROOT_DIR)
+        if !isfile(joinpath(atmos.ROOT_DIR,"agni.jl"))
+            @error "Cannot find `agni.jl` in the root directory provided"
+            @error "     ROOT_DIR=$(atmos.ROOT_DIR)"
+            return false
+        end
+
+        # Locate thermodynamics dir
+        atmos.THERMO_DIR = joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
+
+        # Make output directory if does not exist
+        atmos.OUT_DIR = abspath(OUT_DIR)
+        show(atmos.OUT_DIR)
+        exit(1)
+        if samefile(atmos.OUT_DIR, atmos.ROOT_DIR)
+            @error "Output directory cannot be the AGNI root directory"
+            return false
+        end
+        if !isdir(atmos.OUT_DIR) && !isfile(atmos.OUT_DIR)
+            mkdir(atmos.OUT_DIR)
+        end
+        @debug "Using OUT_DIR='$(atmos.OUT_DIR)'"
+
+        # Directory used for fast I/O
+        if IO_DIR == UNSET_STR
+            # not set, so use output directory
+            atmos.IO_DIR = OUT_DIR
+        else
+            # set, user provided
+            atmos.IO_DIR = abspath(IO_DIR)
+            if !isdir(atmos.IO_DIR) && !isfile(atmos.IO_DIR)
+                mkdir(atmos.IO_DIR)
+            end
+        end
+        @debug "Using IO_DIR='$(atmos.IO_DIR)'"
+
+        # Directory used for writing animation frames
+        atmos.FRAMES_DIR  =  joinpath(atmos.IO_DIR, "frames")
+
+        # -------------------------
+        # Set other parameters
+        # -------------------------
+
+        # Set parameters for benchmarking
         atmos.benchmark   = false
         atmos.num_rt_eval = 0
         atmos.tim_rt_eval = 0.0
 
+        # Work out which RT scheme is going to be used
         if strip(lowercase(spfile)) == "greygas"
             atmos.rt_scheme = RT_GREYGAS
             atmos.spectral_file = "greygas"
-            @info "Using double-grey radiative transfer scheme"
+            atmos.SOCRATES_VERSION = "0000"
+            @info "Using grey-gas radiative transfer scheme"
 
             # check options
             if flag_rayleigh || flag_cloud
-                @error "Scattering not supported by grey-gas RT scheme"
+                @error "Scattering not supported by grey-gas RT scheme!"
+                @error "    In this case, disable rayleigh scattering and clouds"
                 return false
             end
+
 
         else
             atmos.rt_scheme = RT_SOCRATES
             atmos.spectral_file = abspath(spfile)
+
+            @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
+
+            # Get SOCRATES version
+            atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
+            @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
             # Check SOCRATES version is valid
             if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
                 @error "SOCRATES is out of date and cannot be used!"
                 @error "    found at $(ENV["RAD_DIR"])"
                 @error "    version is "*atmos.SOCRATES_VERSION
+                return false
             end
         end
 
+        # --------------------------------------
+        # Allocate arrays
+        # --------------------------------------
+
+
+        # Allocate SOCRATES structs
         atmos.dimen =       SOCRATES.StrDim()
         atmos.control =     SOCRATES.StrCtrl()
         atmos.spectrum =    SOCRATES.StrSpecData()
@@ -497,11 +562,6 @@ module atmosphere
         atmos.bound =       SOCRATES.StrBound()
         atmos.radout =      SOCRATES.StrOut()
 
-        # Set the parameters (and make sure that they're reasonable)
-        atmos.ROOT_DIR =        abspath(ROOT_DIR)
-        atmos.OUT_DIR =         abspath(OUT_DIR)
-        atmos.FRAMES_DIR  =     joinpath(atmos.OUT_DIR, "frames")
-        atmos.THERMO_DIR  =     joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
 
@@ -531,12 +591,8 @@ module atmosphere
         atmos.flux_int =        flux_int
         atmos.target_olr =      max(1.0e-10, target_olr)
 
-        atmos.phs_timescale =   max(phs_timescale, 0.0)
+        atmos.phs_timescale =   phs_timescale
         atmos.evap_efficiency = max(min(evap_efficiency, 1.0),0.0)
-
-        atmos.surf_roughness =  max(1e-5, surf_roughness)   # meters
-        atmos.surf_windspeed =  max(0.0, surf_windspeed)  # m/s
-        atmos.C_d =             0.001  # placeholder
 
         atmos.κ_grey_lw =       max(0.0, κ_grey_lw)
         atmos.κ_grey_sw =       max(0.0, κ_grey_sw)
@@ -547,6 +603,20 @@ module atmosphere
         atmos.Kzz_kbreak =      max(0.0, atmos.Kzz_floor)
         atmos.mlt_asymptotic =  mlt_asymptotic
         atmos.mlt_criterion =   mlt_criterion
+
+        atmos.surf_roughness = surf_roughness
+        if atmos.surf_roughness < SURF_ROUGHNESS_MIN
+            @error "Surface roughness too small"
+            @error "    $(atmos.surf_roughness) < $SURF_ROUGHNESS_MIN metres"
+            return false
+        end
+        atmos.surf_windspeed = surf_windspeed
+        if atmos.surf_windspeed < SURF_WINDSPEED_MIN
+            @error "Surface windspeed too small"
+            @error "    $(atmos.surf_windspeed) < $SURF_WINDSPEED_MIN metres"
+            return false
+        end
+        atmos.C_d =             0.001  # placeholder, will be overwritten
 
         if atmos.real_gas && (atmos.mlt_criterion == 'l')
             @warn "Ledoux criterion not supported for real gases"
@@ -563,24 +633,27 @@ module atmosphere
         atmos.skin_d =          max(1.0e-9, skin_d)
         atmos.skin_k =          max(1.0e-9, skin_k)
 
-        if p_top > p_surf
+        atmos.p_toa =           p_top * 1.0e5 # Convert bar -> Pa
+        atmos.p_boa =           p_surf * 1.0e5
+        atmos.rp =              max(1.0, radius)
+        if atmos.p_toa > atmos.p_boa
             @error "p_top must be less than p_surf"
             return false
         end
 
-        atmos.p_toa =           p_top * 1.0e5 # Convert bar -> Pa
-        atmos.p_boa =           p_surf * 1.0e5
-        atmos.rp =              max(1.0, radius)
-
         # derived statistics
         atmos.interior_mass  =  atmos.grav_surf * atmos.rp^2 / phys.G_grav
         atmos.interior_rho   =  3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
-        atmos.transspec_p    =  2e3     # 20 mbar = 2000 Pa
         atmos.transspec_μ    =  0.0
         atmos.transspec_rho  =  0.0
         atmos.transspec_tmp  =  0.0
         atmos.transspec_grav =  0.0
         atmos.transspec_r    =  0.0
+        atmos.transspec_p    =  2e3     # 20 mbar = 2000 Pa
+        if atmos.p_toa > atmos.transspec_p
+            @error "p_top must be less than transspec_p"
+            return false
+        end
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -619,10 +692,19 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_timescale = 1.0e6   # mixed composition case
+        atmos.phs_timescale = phs_timescale
+        if atmos.phs_timescale < PHS_TIMESCALE_MIN
+            @error "Phase change timescale too small"
+            @error "    $(atmos.phs_timescale) < $PHS_TIMESCALE_MIN seconds"
+            return false
+        end
 
         # Evaporation efficiency
-        atmos.evap_efficiency = 0.05
+        atmos.evap_efficiency = evap_efficiency
+        if (atmos.evap_efficiency < 0) || (atmos.evap_efficiency > 1)
+            @error "Evaporation efficiency must be between 0 and 1"
+            return false
+        end
 
         # Hardcoded cloud properties
         atmos.cloud_alpha   = 0.01    # 1% of condensed water forms substantial clouds
@@ -826,13 +908,15 @@ module atmosphere
         end
         if gas_fail
             @error "Problem when loading thermodynamic data"
-            @error "Try downloading them again and/or updating AGNI."
+            @error "    Try downloading them again and/or updating AGNI."
             return false
         end
 
         # store condensates
         for c in condensates
-            if !atmos.gas_dat[c].stub && !atmos.gas_dat[c].no_sat && !(c == "H2")
+            if atmos.gas_dat[c].stub || atmos.gas_dat[c].no_sat || (c in COND_DISALLOWED)
+                @warn "$c is marked as condensable, but this is disallowed"
+            else
                 push!(atmos.condensates, c)
             end
         end
@@ -856,13 +940,19 @@ module atmosphere
         end
 
         # Ocean params
+        #    inputs
         atmos.ocean_calc  =     ocean_calc && atmos.condense_any
-        atmos.ocean_ob_frac  =  max(0.0, min(1.0, ocean_ob_frac))
         atmos.ocean_cs_height = max(0.0, ocean_cs_height)
+        atmos.ocean_ob_frac  =  ocean_ob_frac
+        if (atmos.ocean_ob_frac < 0) || (atmos.ocean_ob_frac > 1)
+            @error "Ocean basin area fraction must be between 0 and 1"
+            return false
+        end
+        #    outputs
         atmos.ocean_maxdepth  = 0.0
         atmos.ocean_areacov   = 0.0
-        atmos.ocean_topliq    = "_unset"
-        atmos.ocean_layers    = Tuple[(1,"_unset",0.0,0.0),]  # array of tuples
+        atmos.ocean_topliq    = UNSET_STR
+        atmos.ocean_layers    = Tuple[(1,UNSET_STR,0.0,0.0),]  # array of tuples
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to
@@ -885,16 +975,24 @@ module atmosphere
 
         # Fastchem
         atmos.flag_fastchem = false
-        atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")  # default path
-        if ("FC_DIR" in keys(ENV))
+        if fastchem_work == UNSET_STR
+            # default
+            atmos.fastchem_work = joinpath(atmos.IO_DIR, "fastchem")  # default path
+            @debug "Fastchem working dir defaulting to $(atmos.fastchem_work)"
+        else
+            # user-provided
+            atmos.fastchem_work = abspath(fastchem_work)
+            @debug "Fastchem working dir set to $(atmos.fastchem_work)"
+        end
+        if "FC_DIR" in keys(ENV)
 
             @debug "FastChem env has been set"
 
             # check fastchem installation folder
             atmos.FC_DIR = abspath(ENV["FC_DIR"])
             if !isdir(atmos.FC_DIR)
-                @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
-                @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
+                @error "Could not find FastChem installed at FC_DIR='$(atmos.FC_DIR)'"
+                @error "    Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             end
 
@@ -903,25 +1001,17 @@ module atmosphere
             atmos.flag_fastchem = isfile(atmos.fastchem_exec)
             if !atmos.flag_fastchem
                 @error "Could not find fastchem executable inside '$(atmos.FC_DIR)'"
-                @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
+                @error "    Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             else
-                @debug "Found FastChem executable"
+                @debug "Found FastChem executable at $(atmos.fastchem_exec)"
             end
 
-            # working directory for FC runtime files
-            if !isempty(fastchem_work)
-                atmos.fastchem_work = abspath(fastchem_work)
-                @debug "Fastchem working dir set to $(atmos.fastchem_work)"
-            else
-                @debug "Fastchem working dir defaulting to $(atmos.fastchem_work)"
-            end
-
-            # make working directory
+            # re-make FC working directory
             rm(atmos.fastchem_work,force=true,recursive=true)
             mkdir(atmos.fastchem_work)
         else
-            @debug "FastChem env variable not set"
+            @debug "FastChem env variable not set, so FC won't be available for use"
         end
         # other parameters for FC
         atmos.fastchem_floor        = fastchem_floor
@@ -937,12 +1027,19 @@ module atmosphere
         atmos.fastchem_moni         = joinpath(atmos.fastchem_work,"monitor.dat")
 
         # RFM
-        atmos.flag_rfm = !isempty(rfm_parfile)
+        atmos.flag_rfm = !(rfm_parfile == UNSET_STR)
         if atmos.flag_rfm
             atmos.rfm_parfile = abspath(rfm_parfile)
             @debug "RFM parfile set: $(atmos.rfm_parfile)"
+            if !isfile(atmos.rfm_parfile)
+                @error "Could not find parfile required for running RFM calculation"
+                @error "    atmos.rfm_parfile=$(atmos.rfm_parfile)"
+                return false
+            end
 
-            atmos.rfm_work = joinpath(atmos.OUT_DIR, "rfm/")
+            atmos.rfm_work = joinpath(atmos.IO_DIR, "rfm")
+
+            # re-make working directory
             rm(atmos.rfm_work,force=true,recursive=true)
             mkdir(atmos.rfm_work)
         end
@@ -1452,7 +1549,7 @@ module atmosphere
             spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])
 
             # Setup spectral file
-            socstar::String = joinpath([atmos.OUT_DIR, "socstar.dat"])
+            socstar::String = joinpath([atmos.IO_DIR, "socstar.dat"])
             if !isempty(stellar_spectrum)
                 @debug "Inserting stellar spectrum into spectral file"
 
@@ -2067,8 +2164,8 @@ module atmosphere
         # Turn off oceans
         atmos.ocean_maxdepth  = 0.0
         atmos.ocean_areacov   = 0.0
-        atmos.ocean_topliq    = "_unset"
-        atmos.ocean_layers    = Tuple[(1,"_unset",0.0,0.0),]
+        atmos.ocean_topliq    = UNSET_STR
+        atmos.ocean_layers    = Tuple[(1,UNSET_STR,0.0,0.0),]
 
         # Flag as transparent
         atmos.transparent = true

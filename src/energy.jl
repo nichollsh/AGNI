@@ -38,9 +38,11 @@ module energy
     Imports SOCRATES wrapper from the atmosphere module, rather than loading it twice.
 
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `lw::Bool`                        longwave calculation? Else: shortwave
-    - `calc_cf::Bool=false`             also calculate contribution function?
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `lw::Bool`                True: longwave calculation. False: shortwave calculation.
+
+    Optional arguments:
+    - `calc_cf::Bool`           also calculate contribution function?
     """
     function _radtrans_socrates!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
 
@@ -403,15 +405,36 @@ module energy
         return nothing
     end # end of radtrans
 
+    """
+    **Calculate turbulent kinetic energy (TKE) exchange coefficient**.
 
-    # Calculate sensible heat flux (turbulence at surface boundary)
+    Based on Monin–Obukhov similarity theory, from roughness length scale.
+    See eq 9 in Nicholson & Benn (2009). Added small epsilon-factor to avoid function
+    blowing-up around regime where height ≈ roughness.
+
+    Arguments:
+    - `height::Float64`     Height above surface [m]
+    - `roughness::Float64`  Roughness length scale [m]
+
+    Returns:
+    - `C_d::Float64`        TKE exchange coefficient [dimensionless]
+    """
+    function eval_exchange_coeff(height::Float64, roughness::Float64)::Float64
+        return phys.k_vk^2 / log(max(height, roughness+1e-3)/roughness)
+    end
+
+    """
+    **Calculate sensible heat flux from turbulent kinetic energy (TKE)**
+
+    Updates the values of `atmos.C_d` and `atmos.flux_sens`.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used
+    """
     function sensible!(atmos::atmosphere.Atmos_t)
 
-        # Calculate exchange coefficient
-        #    Based on Monin–Obukhov similarity theory, from roughness length scale.
-        #    See eq 9 in Nicholson & Benn (2009)
-        #    Added small epsilon-factor to ensure that this does not blow-up
-        atmos.C_d = phys.k_vk^2 / log(max(atmos.r[end]-atmos.rp, 1e-30)/atmos.surf_roughness)
+        # Set TKE exchange coefficient
+        atmos.C_d = eval_exchange_coeff(atmos.r[end]-atmos.rp, atmos.surf_roughness)
 
 
         # TKE scheme for this 1D case
@@ -424,7 +447,14 @@ module energy
     end
 
 
-    # Calculate conductive fluxes
+    """
+    **Calculate conductive heat fluxes using Fourier's law**
+
+    Updates array of `atmos.flux_cdct` at each layer of the atmosphere.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used
+    """
     function conduct!(atmos::atmosphere.Atmos_t)
         # top layer
         atmos.flux_cdct[1] = 0.0
@@ -482,6 +512,8 @@ module energy
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Optional arguments:
     - `pmin::Float64`           pressure [bar] below which convection is disabled
     """
     function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4)
@@ -738,7 +770,7 @@ module energy
     """
     function reset_fluxes!(atmos::atmosphere.Atmos_t)
 
-        # scalar fluxes
+        # sensible heating
         atmos.flux_sens = 0.0
 
         # conduct
@@ -747,7 +779,10 @@ module energy
         # convect
         fill!(atmos.flux_cdry, 0.0)
 
-        # radiative grey
+        # latent heating
+        fill!(atmos.flux_l, 0.0)
+
+        # radiative (bolometric)
         fill!(atmos.flux_u, 0.0)
         fill!(atmos.flux_d, 0.0)
         fill!(atmos.flux_n, 0.0)
@@ -759,7 +794,7 @@ module energy
         fill!(atmos.flux_d_sw, 0.0)
         fill!(atmos.flux_d_lw, 0.0)
 
-        # radiative band
+        # radiative (per band)
         fill!(atmos.band_u_lw, 0.0)
         fill!(atmos.band_d_lw, 0.0)
         fill!(atmos.band_n_lw, 0.0)
@@ -767,9 +802,11 @@ module energy
         fill!(atmos.band_d_sw, 0.0)
         fill!(atmos.band_n_sw, 0.0)
 
-        # total fluxes
-        fill!(atmos.flux_dif, 0.0)
+        # total fluxes, and difference across each layer
         fill!(atmos.flux_tot, 0.0)
+        fill!(atmos.flux_dif, 0.0)
+
+        return nothing
     end
 
 

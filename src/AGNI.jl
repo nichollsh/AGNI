@@ -397,7 +397,7 @@ module AGNI
 
         # Read OPTIONAL configuration options from dict
         #     sensible heat at the surface
-        roughness::Float64 = 0.001; wind_speed::Float64 = 0.0
+        roughness::Float64 = 0.001; windspeed::Float64 = 2.0
         if incl_sens && !transparent
             if ! all(k in keys(cfg["planet"]) for k in ["roughness","wind_speed"])
                 @error "Config: sensible heating included"
@@ -405,7 +405,7 @@ module AGNI
                 return false
             end
             roughness  = cfg["planet"]["roughness"]
-            wind_speed = cfg["planet"]["wind_speed"]
+            windspeed = cfg["planet"]["wind_speed"]
         end
         #     conductive skin case
         skin_k::Float64=0.0; skin_d::Float64=0.0; tmp_magma::Float64=0.0
@@ -440,9 +440,14 @@ module AGNI
             target_olr = cfg["planet"]["target_olr"]
         end
 
-
         # Output folder
         output_dir = abspath(cfg["files"]["output_dir"])
+
+        # Optional IO folder
+        io_dir::String = atmosphere.UNSET_STR
+        if haskey(cfg["files"], "io_dir")
+            io_dir = cfg["files"]["io_dir"]
+        end
 
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
@@ -463,6 +468,7 @@ module AGNI
                                 p_top,
                                 mf_dict, mf_path;
 
+                                IO_DIR=io_dir,
                                 condensates=condensates,
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["physics"]["continua"],
@@ -472,7 +478,7 @@ module AGNI
                                 real_gas          = real_gas,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
                                 use_all_gases     = chem,
-                                surf_roughness=roughness, surf_windspeed=wind_speed,
+                                surf_roughness=roughness, surf_windspeed=windspeed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
                                 flux_int=flux_int,
