@@ -43,54 +43,64 @@ module energy
 
     Optional arguments:
     - `calc_cf::Bool`           also calculate contribution function?
+    - `gauss_ir::Bool`          using gaussian angular integration in IR, otherwise uses two-stream approximation
+    - `rescale_pf::Bool`        perform rescaling on phase function
     """
-    function _radtrans_socrates!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
+    function _radtrans_socrates!(atmos::atmosphere.Atmos_t, lw::Bool;
+                                            calc_cf::Bool=false,
+                                            gauss_ir::Bool=false,
+                                            rescale_pf::Bool=false)
 
         # Longwave or shortwave calculation?
-        # Set the two-stream approximation to be used (-t f)
         if lw
+            # Set source function
             atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_infra_red
 
+            # Angular integration can be gauss or two-stream for LW
+            if gauss_ir
+                atmos.control.i_angular_integration = atmosphere.SOCRATES.rad_pcf.ip_ir_gauss
+            else
+                atmos.control.i_angular_integration = atmosphere.SOCRATES.rad_pcf.ip_two_stream
+            end
+
             # Eddington's approximation
             # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
-
             # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
             atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
-        else
-            atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_solar
 
-            # Eddington's approximation
-            # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
 
-            # Practical improved flux method (original form of 1980)
-            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
-        end
-
-        # Check files are acceptable and set instellation if doing SW flux
-        if lw
+            # Check spectral file is ok
             if !Bool(atmos.spectrum.Basic.l_present[6])
                 error("The spectral file contains no data for the Planck function.
                        Check that the file contains a stellar spectrum.")
             end
-
             if Bool(atmos.spectrum.Basic.l_present[2])
                 atmos.control.l_solar_tail_flux = true
             end
-
         else
+            # Set source function
+            atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_solar
+
+            # Angular integration is always two-stream for SW
+            atmos.control.i_angular_integration = atmosphere.SOCRATES.rad_pcf.ip_two_stream
+
+            # Eddington's approximation
+            # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
+            # Practical improved flux method (original form of 1980)
+            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
+
+            # SOCRATES requires this to be passed as two variables, since it
+            #       needs to know the angle of the direct beam.
+            #   - Convert the zenith angles to secants.
+            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)
+            #   - Pass effective solar constant
+            atmos.bound.solar_irrad[1] = atmos.instellation *
+                                            (1.0 - atmos.albedo_b) * atmos.s0_fact
+
+            # Check spectral file is ok
             if !Bool(atmos.spectrum.Basic.l_present[2])
                 error("The spectral file contains no solar spectral data.")
             end
-
-            # SOCRATES requires this to be passed as two variables, since it
-            #     needs to know the angle of the direct beam.
-
-            # Convert the zenith angles to secants.
-            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)
-
-            # Pass effective solar constant
-            atmos.bound.solar_irrad[1] = atmos.instellation *
-                                            (1.0 - atmos.albedo_b) * atmos.s0_fact
         end
 
         #####################################
@@ -99,10 +109,8 @@ module energy
         #####################################
 
         # Cl_run_cdf +R flag
-        atmos.control.l_rescale = false
-        if atmos.control.l_rescale
-            atmos.control.l_henyey_greenstein_pf = true
-        end
+        atmos.control.l_rescale = rescale_pf
+        atmos.control.l_henyey_greenstein_pf = rescale_pf
 
         # The internal SOCRATES solver used for the two-stream calculations (-v flag)
         if atmos.control.l_cloud
@@ -783,6 +791,8 @@ module energy
         fill!(atmos.flux_l, 0.0)
 
         # radiative (bolometric)
+        atmos.is_out_sw = false
+        atmos.is_out_lw = false
         fill!(atmos.flux_u, 0.0)
         fill!(atmos.flux_d, 0.0)
         fill!(atmos.flux_n, 0.0)
