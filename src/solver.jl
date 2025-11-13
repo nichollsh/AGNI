@@ -221,7 +221,7 @@ module solver
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c
-        if (sol_type >= 2)  # states 2,3,4 also solve for tmp_surf
+        if sol_type in [2,3,4]  # states 2,3,4 also solve for tmp_surf
             arr_len += 1
         end
 

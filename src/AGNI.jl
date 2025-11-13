@@ -408,7 +408,7 @@ module AGNI
             windspeed = cfg["planet"]["wind_speed"]
         end
         #     conductive skin case
-        skin_k::Float64=0.0; skin_d::Float64=0.0; tmp_magma::Float64=0.0
+        skin_k::Float64=2.0; skin_d::Float64=0.1; tmp_magma::Float64=3000.0  # will be overwritten
         if sol_type == 2
             if ! all(k in keys(cfg["planet"]) for k in ["skin_k","skin_d","tmp_magma"])
                 @error "Config: solution type $sol_type selected"
@@ -430,7 +430,7 @@ module AGNI
             flux_int = cfg["planet"]["flux_int"]
         end
         #     target OLR case
-        target_olr::Float64 = 0.0
+        target_olr::Float64 = 250.0
         if sol_type == 4
             if ! haskey(cfg["planet"],"target_olr")
                 @error "Config: solution type $sol_type selected"
@@ -613,7 +613,7 @@ module AGNI
         # Save plots
         @info "Plotting results"
         if !transparent
-            plt_ani && plotting.animate(atmos)
+            plt_ani && plotting.animate(atmos.OUT_DIR, atmos.FRAMES_DIR)
             cfg["plots"]["cloud"] && \
                 plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
             cfg["plots"]["mixing_ratios"] && \
