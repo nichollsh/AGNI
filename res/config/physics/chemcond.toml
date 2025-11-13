@@ -1,5 +1,5 @@
 # AGNI configuration file
-title = "Condensation test"
+title = "Chemistry and condensation together"
 
 [planet]
     tmp_surf        = 2200.0
@@ -41,14 +41,14 @@ title = "Condensation test"
     dx_max          = 300.0
     initial_state   = ["loglin","800"]
     linesearch      = 1
-    easy_start      = true
+    easy_start      = false
     grey_start      = false
     converge_atol   = 1.0
     converge_rtol   = 1.0e-2
     perturb_all     = true
 
 [physics]
-    chemistry       = false
+    chemistry       = true
     continua        = true
     rayleigh        = false
     cloud           = false
@@ -57,10 +57,10 @@ title = "Condensation test"
     thermo_funct    = true
     sensible_heat   = true
     conduction      = true
-    latent_heat     = true
     convection      = true
     convection_crit = "s"
-    rainout         = false
+    rainout         = true
+    latent_heat     = false
 
 
 [plots]
