@@ -478,7 +478,6 @@ module atmosphere
         # Make output directory if does not exist
         atmos.OUT_DIR = abspath(OUT_DIR)
         show(atmos.OUT_DIR)
-        exit(1)
         if samefile(atmos.OUT_DIR, atmos.ROOT_DIR)
             @error "Output directory cannot be the AGNI root directory"
             return false
@@ -973,7 +972,7 @@ module atmosphere
             end
         end
 
-        # Fastchem
+        # Fastchem directory
         atmos.flag_fastchem = false
         if fastchem_work == UNSET_STR
             # default
@@ -984,6 +983,12 @@ module atmosphere
             atmos.fastchem_work = abspath(fastchem_work)
             @debug "Fastchem working dir set to $(atmos.fastchem_work)"
         end
+        if samefile(atmos.fastchem_work, atmos.ROOT_DIR)
+            @error "FastChem working directory cannot be the AGNI root directory"
+            return false
+        end
+
+        # Fastchem enabled by environment?
         if "FC_DIR" in keys(ENV)
 
             @debug "FastChem env has been set"
@@ -1028,6 +1033,11 @@ module atmosphere
 
         # RFM
         atmos.flag_rfm = !(rfm_parfile == UNSET_STR)
+        atmos.rfm_work = joinpath(atmos.IO_DIR, "rfm")
+        if samefile(atmos.rfm_work, atmos.ROOT_DIR)
+            @error "RFM working directory cannot be the AGNI root directory"
+            return false
+        end
         if atmos.flag_rfm
             atmos.rfm_parfile = abspath(rfm_parfile)
             @debug "RFM parfile set: $(atmos.rfm_parfile)"
@@ -1036,8 +1046,6 @@ module atmosphere
                 @error "    atmos.rfm_parfile=$(atmos.rfm_parfile)"
                 return false
             end
-
-            atmos.rfm_work = joinpath(atmos.IO_DIR, "rfm")
 
             # re-make working directory
             rm(atmos.rfm_work,force=true,recursive=true)
@@ -1553,7 +1561,7 @@ module atmosphere
             if !isempty(stellar_spectrum)
                 @debug "Inserting stellar spectrum into spectral file"
 
-                # Spectral file to be loaded, created in output folder
+                # Remove if already exists
                 rm(spectral_file_run , force=true)
                 rm(spectral_file_runk, force=true)
 
