@@ -477,7 +477,6 @@ module atmosphere
 
         # Make output directory if does not exist
         atmos.OUT_DIR = abspath(OUT_DIR)
-        show(atmos.OUT_DIR)
         if samefile(atmos.OUT_DIR, atmos.ROOT_DIR)
             @error "Output directory cannot be the AGNI root directory"
             return false
@@ -1548,13 +1547,13 @@ module atmosphere
             # Validate files
             if !isfile(atmos.spectral_file)
                 @error "Spectral file '$(atmos.spectral_file)' does not exist"
-                @error "Try running `\$ ./src/get_data.sh`"
-                @error "    e.g. to get CodenameXX you would run `\$ ./src/get_data.sh anyspec Codename XX`"
+                @error "    Try using: \$ ./src/get_data.sh"
+                @error "    e.g. to get CodenameXX: \$ ./src/get_data.sh anyspec Codename XX"
                 return false
             end
 
-            spectral_file_run::String  = joinpath([atmos.OUT_DIR, "runtime.sf"])
-            spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])
+            spectral_file_run::String  = joinpath([atmos.IO_DIR, "runtime.sf"])
+            spectral_file_runk::String = joinpath([atmos.IO_DIR, "runtime.sf_k"])
 
             # Setup spectral file
             socstar::String = joinpath([atmos.IO_DIR, "socstar.dat"])
@@ -1588,7 +1587,7 @@ module atmosphere
 
                     if !isfile(stellar_spectrum)
                         @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
-                        @error "Try running `\$ ./src/get_data.sh stellar`"
+                        @error "    Try using: \$ ./src/get_data.sh stellar"
                         return false
                     end
                     atmos.star_file = abspath(stellar_spectrum)
@@ -1961,8 +1960,6 @@ module atmosphere
                 atmos.cld.n_condensed  = 0
                 atmos.cld.n_cloud_type = 0
             end
-
-            atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
         end # end socrates only
 
         ###########################################
@@ -2002,7 +1999,7 @@ module atmosphere
             atmos.surface_material = abspath(atmos.surface_material)
             if !isfile(atmos.surface_material)
                 @error "Could not find surface albedo file '$(atmos.surface_material)'"
-                @error "Get these data with `\$ ./src/get_data.sh surfaces`"
+                @error "    Get it by running: \$ ./src/get_data.sh surfaces"
                 return false
             end
 

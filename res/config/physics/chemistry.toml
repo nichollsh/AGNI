@@ -18,6 +18,7 @@ title = "Chemistry by metallicity"
     input_sf        = "res/spectral_files/Honeyside/48/Honeyside.sf"
     input_star      = "res/stellar_spectra/hd97658.txt"
     output_dir      = "out/"
+    io_dir          = "/tmp/agni/"
 
 [composition]
     p_surf          = 5000.0
@@ -26,7 +27,7 @@ title = "Chemistry by metallicity"
     condensates     = []
 
 [execution]
-    clean_output    = false
+    clean_output    = true
     verbosity       = 1
     max_steps       = 20000
     max_runtime     = 400
@@ -54,7 +55,7 @@ title = "Chemistry by metallicity"
     thermo_funct    = true
     sensible_heat   = false
     conduction      = true
-    latent_heat     = true
+    latent_heat     = false
     convection      = true
     convection_crit = "l"
     rainout         = false

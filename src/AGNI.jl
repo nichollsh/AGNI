@@ -580,11 +580,11 @@ module AGNI
 
         # Invalid selection
         else
-            @error "Invalid solver"
+            @error "Invalid solver '$sol'"
             return_success = false
         end
 
-        return_success = return_success && solver_success
+        return_success &= solver_success
         @info "    done"
         @info "Total radiative transfer evaluations: $(atmos.num_rt_eval)"
 
@@ -668,10 +668,10 @@ module AGNI
         end
         cfg = open_config(cfg_path)
 
-        # Output folder
+        # Output folder (make if doesn't exist)
         output_dir = abspath(cfg["files"]["output_dir"])
         clean_output = Bool(cfg["execution"]["clean_output"])
-        if clean_output || !(ispath(output_dir) && isdir(output_dir))
+        if clean_output || !isdir(output_dir)
             rm(output_dir,force=true,recursive=true)
             mkdir(output_dir)
         end
