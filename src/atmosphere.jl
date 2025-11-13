@@ -1042,7 +1042,7 @@ module atmosphere
             atmos.rfm_parfile = abspath(rfm_parfile)
             @debug "RFM parfile set: $(atmos.rfm_parfile)"
             if !isfile(atmos.rfm_parfile)
-                @error "Could not find parfile required for running RFM calculation"
+                @error "Could not find parfile provided by user, for running RFM"
                 @error "    atmos.rfm_parfile=$(atmos.rfm_parfile)"
                 return false
             end

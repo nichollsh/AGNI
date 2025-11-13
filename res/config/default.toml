@@ -26,6 +26,7 @@ title = "Default"                       # Name for this configuration file
     input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum. Set to "blackbody" to use `planet.stellar_Teff`.
     output_dir      = "out/"                                            # Path to output directory.
+    io_dir          = "out/"
 
 [composition]
     p_surf          = 270.0                     # Total surface pressure [bar].
