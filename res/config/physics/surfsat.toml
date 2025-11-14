@@ -1,0 +1,70 @@
+# AGNI configuration file
+title = "Surface saturation test"
+
+[planet]
+    tmp_surf        = 500.0
+    instellation    = 2000.0
+    albedo_b        = 0.0
+    s0_fact         = 0.375
+    zenith_angle    = 48.19
+    surface_material= "greybody"
+    albedo_s        = 0.2
+    radius          = 6.37e6
+    gravity         = 9.81
+    flux_int        = 0.0
+
+[files]
+    input_sf        = "greygas"
+    input_star      = "res/stellar_spectra/sun.txt"
+    output_dir      = "out/"
+
+[composition]
+    p_top           = 1e-6
+    p_dict          = { H2O=300.0, CO2=100.0, N2=100.0} # H2O=26.38 bar, at 500 K
+    condensates     = ["H2O"]
+
+[execution]
+    clean_output    = true
+    verbosity       = 2
+    max_steps       = 300
+    max_runtime     = 400
+    num_levels      = 100
+    solution_type   = 3
+    solver          = ""
+    dx_max          = 200.0
+    initial_state   = ["surfsat", "dry","sat","H2O","str","5"]
+    linesearch      = 2
+    easy_start      = true
+    grey_start      = false
+    converge_atol   = 0.1
+    converge_rtol   = 1.0e-3
+    perturb_all     = false
+
+[physics]
+    chemistry       = false
+    continua        = true
+    rayleigh        = false
+    cloud           = false
+    overlap_method  = "ro"
+    real_gas        = false
+    thermo_funct    = true
+    sensible_heat   = false
+    conduction      = true
+    latent_heat     = false
+    convection      = true
+    convection_crit = "s"
+    grey_lw         = 1e-3
+    grey_sw         = 1e-4
+    rainout         = false
+
+[plots]
+    at_runtime      = true
+    temperature     = true
+    fluxes          = true
+    contribution    = true
+    emission        = true
+    albedo          = true
+    mixing_ratios   = true
+    animate         = false
+    height          = true
+    cloud           = true

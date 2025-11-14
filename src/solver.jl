@@ -186,6 +186,7 @@ module solver
         # --------------------
         # Prepare to run the solver
         # --------------------
+        @debug "Reticulating splines..."
 
         # Validate sol_type
         if (sol_type < 1) || (sol_type > 4)
@@ -953,11 +954,13 @@ module solver
         atmosphere.calc_observed_rho!(atmos)
 
         # calc ocean scalar quantities
-        if atmos.ocean_calc
-            atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
-            atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
-            atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
-        end
+        atmos.ocean_layers = ocean.dist_surf_liq(atmos.cond_total,
+                                                    atmos.ocean_ob_frac,
+                                                    atmos.ocean_cs_height,
+                                                    atmos.rp)
+        atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
+        atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
+        atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
 
 
         # ----------------------------------------------------------

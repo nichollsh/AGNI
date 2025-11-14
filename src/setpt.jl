@@ -10,6 +10,7 @@ module setpt
 
     import ..phys
     import ..atmosphere
+    import ..chemistry
 
     include("guillot.jl")
     import .guillot
@@ -64,6 +65,10 @@ module setpt
                 # add X kelvin from the currently stored T(p)
                 idx_req += 1
                 setpt.add!(atmos,parse(Float64, request[idx_req]))
+
+            elseif str_req == "surfsat"
+                # ensure surface is not super-saturated
+                chemistry.regrid_saturated_surf!(atmos)
 
             elseif str_req == "sat"
                 # condensing a volatile
@@ -386,62 +391,6 @@ module setpt
     end
 
 
-    # Ensure that the surface isn't supersaturated
-    function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)::Bool
-        if !(atmos.is_alloc && atmos.is_param)
-            @error "setpt: Atmosphere is not setup or allocated"
-            return
-        end
-
-        x::Float64      = 0.0
-        psat::Float64   = 0.0
-        rained::Bool    = false
-
-        # For each condensable volatile
-        for gas in atmos.gas_names
-            # Get VMR at surface
-            x = atmos.gas_vmr[gas][atmos.nlev_c]
-            if x < 1.0e-10
-                continue
-            end
-
-            # Check criticality
-            if (atmos.tmp_surf > atmos.gas_dat[gas].T_crit)
-                continue
-            end
-
-            # Check surface pressure (should not be supersaturated)
-            psat = phys.get_Psat(atmos.gas_dat[gas], atmos.tmp_surf)
-            if x*atmos.pl[end] > psat
-
-                # Set flag
-                rained = true
-
-                # Reduce amount of volatile until reaches phase curve
-                atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.gas_vmr[gas][end] = psat / atmos.p_boa
-
-                # Check that p_boa is still reasonable
-                if atmos.p_boa <= 10.0 * atmos.p_toa
-                    @error "setpt: Supersaturation check ($gas) resulted in an unreasonably small surface pressure"
-                end
-            end
-        end
-
-        # Renormalise VMRs
-        tot_vmr = 0.0
-        for g in atmos.gas_names
-            tot_vmr += atmos.gas_vmr[g][atmos.nlev_c]
-        end
-        for g in atmos.gas_names
-            atmos.gas_vmr[g][atmos.nlev_c] /= tot_vmr
-        end
-
-        # Generate new pressure grid
-        atmosphere.generate_pgrid!(atmos)
-
-        return rained
-    end
 
 
     """

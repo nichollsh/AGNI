@@ -490,7 +490,6 @@ module AGNI
                         ) || return false
 
         # Allocate atmosphere
-        @debug "Reticulating splines..."
         atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
 
         # Set temperatures as appropriate
@@ -597,14 +596,19 @@ module AGNI
 
         # Print information about ocean formation, if any
         for c in atmos.condensates
-            if atmos.cond_surf[c] > eps(0.0)
-                @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.cond_surf[c])
+            if atmos.cond_total[c] > eps(0.0)
+                @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.cond_total[c])
             end
         end
-        if atmos.ocean_calc
-            @info @sprintf("Oceans cover %d%% of area, max depth of %g km",
-                                atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
-        end
+        atmos.ocean_layers = ocean.dist_surf_liq(atmos.cond_total,
+                                                    atmos.ocean_ob_frac,
+                                                    atmos.ocean_cs_height,
+                                                    atmos.rp)
+        atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
+        atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
+        atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
+        @info @sprintf("Oceans cover %d%% area, max depth %g km",
+                            atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
 
         # Write arrays
         @info "Writing results"

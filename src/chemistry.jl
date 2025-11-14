@@ -6,6 +6,15 @@ if (abspath(PROGRAM_FILE) == @__FILE__)
     error("The file '$thisfile' is not for direct execution")
 end
 
+"""
+This module handles chemistry, condensation, and evaporation.
+
+Note the important distinctions between the variables which store atmospheric composition.
+ * `gas_ovmr` stores VMRs inputted by the user, which are usually constant in height.
+ * `gas_cvmr` stores VMRs after chemistry is calculated but before rainout/evaporation.
+ * `gas_vmr` stores the runtime gas volume mixing ratios, after all calculations are performed.
+
+"""
 module chemistry
 
     # System libraries
@@ -17,6 +26,79 @@ module chemistry
     import ..atmosphere
     import ..phys
     import ..ocean
+
+
+    """
+    **Reduce or increase surface pressure according to saturation**
+
+    If a condensable is supersaturated at the surface, its partial surface pressure is
+    reduced to exactly saturation. The condensed mass is added to the ocean reservoir.
+    If a condensable is subsaturated at the surface, its partial pressure is increased
+    to exactly saturation, subject to the amount of ocean available.
+
+    This function operates on the 'primary' reservoir of condensables.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    """
+    function regrid_saturated_surf!(atmos::atmosphere.Atmos_t)
+
+        p_gas::Dict{String, Float64} = Dict()
+        p_sat::Float64  = 0.0
+        dp::Float64 = 0.0
+
+        # Populate partial pressure dictionary for ALL gases
+        for gas in atmos.gas_names
+            p_gas[gas] =  atmos.gas_vmr[gas][end] * atmos.p_boa
+        end
+
+        # For each condensable volatile
+        for c in atmos.condensates
+
+            # If supercritical, skip for now
+            if (atmos.tmp_surf > atmos.gas_dat[c].T_crit)
+                continue
+            end
+
+            # Calculate partial pressure and saturation pressure for this condensable
+            p_sat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp_surf)
+
+            # Work out amount of sub(-) or super(+) saturation
+            dp = p_gas[c] - p_sat
+
+            # Super-saturated at the surface...
+            if dp > 0
+                @debug "Surface $c is supersaturated"
+
+            # Sub-saturated at the surface...
+            #     work out change in partial pressure based on availability
+            else
+                @debug "Surface $c is subsaturated"
+                dp = max(dp, -atmos.cond_reservoir[c]*atmos.grav_surf)
+            end
+
+            # Reduce or increase total pressure and partial pressure
+            atmos.p_boa -= dp
+            p_gas[c] -= dp
+            @debug @sprintf("    adjusted pressure by %+.3f bar", dp/1e5)
+
+            # Add or remove condensate from primary condensate reservoir
+            atmos.cond_reservoir[c] += dp/atmos.grav_surf
+
+            # Update total condensate to this value
+            atmos.cond_total[c] = atmos.cond_reservoir[c]
+        end
+
+        # Recalculate all surface VMRs from partial pressures
+        for gas in atmos.gas_names
+            atmos.gas_vmr[gas][end] = p_gas[gas]/atmos.p_boa
+        end
+
+        # Generate new pressure grid with updated p_boa
+        @debug @sprintf("New surface pressure: %+.3f bar",atmos.p_boa/1e5)
+        atmosphere.generate_pgrid!(atmos)
+    end
 
     """
     **Reset mixing ratios to their original values**
@@ -97,7 +179,7 @@ module chemistry
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
-    function handle_saturation!(atmos::atmosphere.Atmos_t)
+    function rainout_and_evaporate!(atmos::atmosphere.Atmos_t)
 
         # Single gas case does not apply here
         if atmos.gas_num == 1
@@ -182,12 +264,11 @@ module chemistry
             clamp!(atmos.cond_yield[c], 0.0, Inf)
         end
 
-        # Handle evaporation into lower layers
-        #    for each condensable...
+        # Work out total condensate yield  and do evaporation in lower layers
         for c in atmos.condensates
 
             # set to zero at TOA
-            atmos.cond_surf[c] = 0.0
+            atmos.cond_accum[c] = 0.0
 
             # no rain? go to next condensable
             if sum(atmos.cond_yield[c]) < eps(1.0)
@@ -200,20 +281,20 @@ module chemistry
                 # raining in this layer...
                 #     don't evaporate
                 if atmos.cond_yield[c][j] > 0.0
-                    atmos.cond_surf[c] += atmos.cond_yield[c][j]
+                    atmos.cond_accum[c] += atmos.cond_yield[c][j]
                     continue
                 end
 
                 # in a dry layer...
 
                 # skip if no rain entering from above
-                if atmos.cond_surf[c] < eps(1.0)
+                if atmos.cond_accum[c] < eps(1.0)
                     continue
                 end
 
                 # exit loop if supercritical, because then condensate mixes miscibly
                 if atmos.tmp[j] >= atmos.gas_dat[c].T_crit
-                    atmos.cond_surf[c] = 0.0
+                    atmos.cond_accum[c] = 0.0
                     break
                 end
 
@@ -232,7 +313,7 @@ module chemistry
                 dm_sat *= atmos.evap_efficiency
 
                 # don't evaporate more rain than the total available
-                dm_sat = min(dm_sat, atmos.cond_surf[c])
+                dm_sat = min(dm_sat, atmos.cond_accum[c])
 
                 # offset condensate yield at this level by the evaporation
                 atmos.cond_yield[c][j] -= dm_sat
@@ -254,12 +335,15 @@ module chemistry
                 end
 
                 # recalculate total rain correspondingly
-                atmos.cond_surf[c] -= dm_sat
+                atmos.cond_accum[c] -= dm_sat
 
             end # go to next j level (below)
 
             # recalculate layer properties after re-evaporating this species
             atmosphere.calc_layer_props!(atmos)
+
+            # calculate total condensate from primary+secondary reservoirs
+            atmos.cond_total[c] = atmos.cond_reservoir[c] + atmos.cond_accum[c]
 
         end # end loop over condensates
 
@@ -276,19 +360,6 @@ module chemistry
                     atmos.cloud_arr_f[i] = atmos.cloud_val_f
                 end
             end
-        end
-
-        # Calculate layering structure of surface liquid distribution.
-        # Liquids start in ocean basins, then cover entire surface once basins fill up.
-        if atmos.ocean_calc
-            # work out surface liq layering structure
-            atmos.ocean_layers = ocean.dist_surf_liq(atmos.cond_surf,
-                                                        atmos.ocean_ob_frac,
-                                                        atmos.ocean_cs_height,
-                                                        atmos.rp)
-
-            # Ocean properties can be synthesised from `ocean_layers` in a later step.
-            # For now, leave atmos.ocean_maxdepth (etc) unset to improve performance.
         end
 
         return nothing
@@ -330,7 +401,7 @@ module chemistry
         end
 
         # Reset composition to original values
-        restore_composition!(atmos)
+        # restore_composition!(atmos)
 
         count_elem_nonzero::Int = 0
 

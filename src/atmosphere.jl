@@ -161,12 +161,13 @@ module atmosphere
         # Condensation variables
         gas_sat::Dict{String, Array{Bool, 1}}       # Gas is saturated or cold-trapped in each layer?
         cond_yield::Dict{String, Array{Float64,1}}  # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
-        cond_surf::Dict{String, Float64}            # condensate accumulation left after evaporation (implicit surface liquid) [kg/m^2]
+        cond_accum::Dict{String, Float64}           # secondary reservoir; condensate accumulation left after evaporation (implicit surface liquid) [kg/m^2]
+        cond_reservoir::Dict{String, Float64}       # primary reservoir; input from user + surface saturation
+        cond_total::Dict{String, Float64}           # total amount of surface cond; primary + secondary
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
 
         # Ocean variables (surface liquid layering)
-        ocean_calc::Bool                # INPUT: enable ocean calculations
         ocean_ob_frac::Float64          # INPUT: ocean basin area, as fraction of planet surface
         ocean_cs_height::Float64        # INPUT: continental shelf height [m]
         ocean_layers::Array{Tuple,1}    # OUTPUT: layer structure of surface liquids
@@ -471,7 +472,6 @@ module atmosphere
 
                     rfm_parfile::String =       UNSET_STR,
 
-                    ocean_calc::Bool =          true,
                     ocean_ob_frac::Float64 =    0.6,
                     ocean_cs_height::Float64 =  3000.0
                     )::Bool
@@ -497,9 +497,14 @@ module atmosphere
         atmos.THERMO_DIR = joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
 
         # Make output directory if does not exist
+        if isempty(OUT_DIR)
+            @error "Output directory cannot be an empty path"
+            return false
+        end
         atmos.OUT_DIR = abspath(OUT_DIR)
         if samefile(atmos.OUT_DIR, atmos.ROOT_DIR)
             @error "Output directory cannot be the AGNI root directory"
+            @error "    Got: $(atmos.OUT_DIR)"
             return false
         end
         if !isdir(atmos.OUT_DIR) && !isfile(atmos.OUT_DIR)
@@ -513,6 +518,10 @@ module atmosphere
             atmos.IO_DIR = OUT_DIR
         else
             # set, user provided
+            if isempty(OUT_DIR)
+                @error "I/O directory cannot be an empty path"
+                return false
+            end
             atmos.IO_DIR = abspath(IO_DIR)
             if !isdir(atmos.IO_DIR) && !isfile(atmos.IO_DIR)
                 mkdir(atmos.IO_DIR)
@@ -755,9 +764,11 @@ module atmosphere
             atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
         end
 
-        atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation
-        atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # dict of condensate yield
-        atmos.cond_surf =   Dict{String, Float64}()           # dict of ocean masses
+        atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # mask for saturation
+        atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # cond/evap yield at each layer
+        atmos.cond_accum =  Dict{String, Float64}()           # sum of each yield in atmosphere
+        atmos.cond_reservoir = Dict{String,Float64}()         # primary surface reservoir
+        atmos.cond_total =  Dict{String,Float64}()            # total surface condensate
         atmos.gas_num   =   0                                 # number of gases
         atmos.condensates = Array{String}(undef, 0)           # list of condensates
 
@@ -882,11 +893,21 @@ module atmosphere
             atmos.gas_cvmr[k] = deepcopy(atmos.gas_vmr[k])
         end
 
-        # set condensation mask and yield values [kg]
+        # set phase change quantities for each gas
         for g in atmos.gas_names
+            # layers at which it is saturated
             atmos.gas_sat[g]    = falses(atmos.nlev_c)
+
+            # production/removal of condensate at each layer
             atmos.cond_yield[g] = zeros(Float64, atmos.nlev_c)
-            atmos.cond_surf[g] = 0.0
+
+            # total yield of condensate from rain/evap within atmosphere
+            #     to be calculated as: sum(cond_yield[g])
+            atmos.cond_accum[g] = 0.0
+
+            # amount of condensate at the surface
+            atmos.cond_reservoir[g]  = 0.0  # surface liquid in eqm with atmosphere
+            atmos.cond_total[g]      = 0.0  # = cond_reservoir[g] + cond_accum[g]
         end
 
         # Check that we actually stored some values
@@ -954,7 +975,6 @@ module atmosphere
 
         # Ocean params
         #    inputs
-        atmos.ocean_calc  =     ocean_calc && atmos.condense_any
         atmos.ocean_cs_height = max(0.0, ocean_cs_height)
         atmos.ocean_ob_frac  =  ocean_ob_frac
         if (atmos.ocean_ob_frac < 0) || (atmos.ocean_ob_frac > 1)
@@ -2168,7 +2188,8 @@ module atmosphere
         end
 
         # Set surface pressure to be very small, but still larger than TOA pressure
-        atmos.transspec_p = atmos.p_boa
+        atmos.p_boa       = atmos.p_toa*1.10
+        atmos.transspec_p = atmos.p_toa*1.05
         generate_pgrid!(atmos)
 
         # Set temperatures to be small, except the surface
@@ -2180,6 +2201,7 @@ module atmosphere
         atmos.control.l_cont_gen  = false
         atmos.control.l_gas       = false
         atmos.control.l_rayleigh  = false
+        atmos.control.l_cloud     = false
 
         # Turn off oceans
         atmos.ocean_maxdepth  = 0.0
