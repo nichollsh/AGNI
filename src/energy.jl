@@ -694,21 +694,22 @@ module energy
     """
     **Analytical diffusion scheme for condensation and evaporation energy.**
 
-    Updates fluxes. Requires `chemistry.handle_saturation` to be called first.
+    Updates fluxes. Requires `chemistry.rainout_and_evaporate` to be called first.
 
     Integrates from bottom of model upwards. Based on the amount of
     phase change at each level, a phase change flux is calculated by assuming
     a fixed condensation timescale.
 
     If evaporation is enabled, then integrates from top downwards to determine flux from
-    re-evaporation of droplets
+    re-evaporation of droplets. Any droplets which reach the ground go towards forming an ocean.
 
-    Any droplets which reach the ground go towards forming an ocean.
+    Should ideally perform a microphysical treatment; e.g. by following this paper:
+    https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2020JE006653
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
-    function condense_diffuse!(atmos::atmosphere.Atmos_t)
+    function latent!(atmos::atmosphere.Atmos_t)
 
         # Check if there are no condensates enabled
         if !atmos.condense_any
@@ -755,7 +756,7 @@ module energy
                 end
             end
 
-            # add energy from this gas to total
+            # add energy from this condesable to total energy from all condensables
             @. atmos.flux_l += atmos.phs_wrk_fl
 
             # calculate mask
@@ -859,11 +860,11 @@ module energy
         if atmos.condense_any && (latent || rainout)
 
             # Handle rainout
-            chemistry.handle_saturation!(atmos)
+            chemistry.rainout_and_evaporate!(atmos)
 
             # Calculate latent heat flux
             if latent
-                condense_diffuse!(atmos)            # Calculate latent heat flux
+                latent!(atmos)           # Calculate latent heat fluxes
                 atmos.flux_l *= latent_sf           # Modulate for stability?
                 @. atmos.flux_tot += atmos.flux_l   # Add to total flux
             end

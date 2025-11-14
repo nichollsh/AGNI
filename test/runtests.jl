@@ -361,7 +361,7 @@ if suite > 7
                             real_gas=false
                     )
     atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
-    setpt.prevent_surfsupersat!(atmos)
+    chemistry.regrid_saturated_surf!(atmos)
     setpt.dry_adiabat!(atmos)
     setpt.saturation!(atmos, "H2O")
     atmosphere.calc_layer_props!(atmos)
