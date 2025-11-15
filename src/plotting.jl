@@ -25,7 +25,7 @@ module plotting
                              :grid       => true,
                              :guidefontsize => 9,
                              :titlefontsize => 9,
-                             :dpi => 280)
+                             :dpi => 220)
 
     # Symmetric log
     function _symlog(v::Float64)::Float64
@@ -191,6 +191,8 @@ module plotting
 
         # X-axis minimum allowed left-hand-side limit (log units)
         minmin_x::Float64 = -10
+        lw = 2.5
+        la = 0.7
 
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
         ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
@@ -214,32 +216,46 @@ module plotting
         arr_x::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
         min_x::Float64 = -3
         for i in reverse(sortperm(gas_xsurf))
+            gas = atmos.gas_names[i]
+            col = atmos.gas_dat[gas].plot_color
             # Plot gases in order of descending abundance, so that the legend
             #    shows the most interesting gases at the top of the list.
 
-            # Avoid plotting too many gases, since this makes it unreadable
+            # Too many gases makes legend and plot unreadable
             if num_plotted > 20
                 break
             end
+            num_plotted += 1
 
-            # Get data
-            gas = atmos.gas_names[i]
+            # Plot post-chemistry values, before rainout
+            if atmos.condense_any
+                @. arr_x = atmos.gas_cvmr[gas]
+                if minimum(arr_x) < eps(0.0)
+                    continue
+                end
+                @. arr_x = log10(arr_x)
+                min_x = min(min_x, minimum(arr_x))
+                plot!(arr_x, arr_P, label=nothing, linestyle=:dot,
+                        lw=lw, linealpha=la, color=col)
+            end
+
+
+            # Plot runtime values, after rainout
             @. arr_x = atmos.gas_vmr[gas]
             if minimum(arr_x) < eps(0.0)
                 continue
             end
             @. arr_x = log10(arr_x)
+            min_x = min(min_x, minimum(arr_x))
+            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label, linestyle=:solid,
+                    lw=lw, linealpha=la, color=col)
 
-            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label,
-                    lw=2.5, linealpha=0.7, color=atmos.gas_dat[gas].plot_color)
 
+
+            # Plot original value as surface scatter point
             scatter!([log10(atmos.gas_ovmr[gas][end])], [arr_P[end]],
                         opacity=0.9, markersize=2, msw=0.5,
                         color=atmos.gas_dat[gas].plot_color, label="")
-
-            num_plotted += 1
-
-            min_x = min(min_x, minimum(arr_x))
         end
 
         xlims  = (max(min_x, minmin_x)-0.1, 0.1)
@@ -636,13 +652,14 @@ module plotting
     """
     Combined plot used for tracking behaviour of the solver
     """
-    function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String;
-                        size_x::Int=800, size_y::Int=650)
+    function combined(plt_pt, plt_fl, plt_mr, plt_ra, info::String, fname::String;
+                        size_x::Int=800, size_y::Int=700)
 
-        plt_info = plot(legend=false, showaxis=false, grid=false)
-        annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
+        # plt_info = plot(legend=false, showaxis=false, grid=false)
+        # annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
 
-        plt = plot(plt_pt, plt_fl, plt_mr, plt_info,
+        plt = plot(plt_pt, plt_fl, plt_mr, plt_ra,
+                        plot_title=info,
                         layout=(2,2), size=(size_x, size_y); plt_default...)
 
         if !isempty(fname)
@@ -652,21 +669,35 @@ module plotting
     end
 
     """
-    Animate output frames from solver, using ffmpeg
+    **Convert still-frame images into an animation**
+
+    Uses FFMPEG provided by Julia library.
+
+    Arguments:
+    - `output_dir::String`          folder in which to save the animation
+    - `frames_dir::String`          folder containing the frames
+
+    Optional arguments:
+    - `output_fmt::String`          output file format: mp4, mov, ...
+    - `frames_fmt::String`          input frame format: png, jpg, ...
+    - `duration::Float64`           animation duration [seconds]
     """
-    function animate(atmos::atmosphere.Atmos_t, duration::Float64=12.0)
+    function animate(output_dir::String, frames_dir::String;
+                            output_fmt::String="mp4",
+                            frames_fmt::String="png",
+                            duration::Float64=12.0)
 
         # Find output files
-        out::String = atmos.OUT_DIR
-        frames = glob("*.png",atmos.FRAMES_DIR)
+        frames = glob("*.$frames_fmt",frames_dir)
         nframes::Int = length(frames)
 
         # Create animation
         if nframes < 1
-            @warn "Cannot animate solver because no output frames were found"
+            @warn "Cannot create animation from solver"
+            @warn "    No frames found: $frames_dir"
         else
-            fps::Float64 = nframes/duration*1.0
-            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$(atmos.FRAMES_DIR)/*.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/animation.mp4`)
+            fps = Float64(nframes)/duration
+            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$frames_dir/*.$frames_fmt" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $output_dir/animation.$output_fmt`)
         end
 
         return nothing

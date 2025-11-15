@@ -39,6 +39,7 @@ out/*
 runtime.sf
 runtime.sf_k
 socstar.dat
+slurm*.out
 
 # Misc files
 .DS_Store

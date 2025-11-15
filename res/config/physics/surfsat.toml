@@ -1,8 +1,8 @@
 # AGNI configuration file
-title = "Condensation test"
+title = "Surface saturation test"
 
 [planet]
-    tmp_surf        = 2200.0
+    tmp_surf        = 500.0
     instellation    = 2000.0
     albedo_b        = 0.0
     s0_fact         = 0.375
@@ -12,53 +12,50 @@ title = "Condensation test"
     radius          = 6.37e6
     gravity         = 9.81
     flux_int        = 0.0
-    turb_coeff      = 1.0e-4
-    wind_speed      = 10.0
-    skin_k          = 2.0
-    skin_d          = 0.01
-    tmp_magma       = 1700.0
-    star_Teff       = 5000.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"
-    input_star      = "blackbody"
+    input_sf        = "greygas"
+    input_star      = "res/stellar_spectra/sun.txt"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 7000.0
-    p_top           = 1e-5
-    vmr_dict        = { H2O=0.8, CO2=0.19, N2=0.01}
-    chemistry       = 0
+    p_top           = 1e-6
+    p_dict          = { H2O=300.0, CO2=100.0, N2=100.0} # H2O=26.38 bar, at 500 K
     condensates     = ["H2O"]
 
 [execution]
     clean_output    = true
-    verbosity       = 1
+    verbosity       = 2
     max_steps       = 300
     max_runtime     = 400
-    num_levels      = 44
+    num_levels      = 100
+    solution_type   = 3
+    solver          = ""
+    dx_max          = 200.0
+    initial_state   = ["surfsat", "dry","sat","H2O","str","5"]
+    linesearch      = 2
+    easy_start      = true
+    grey_start      = false
+    converge_atol   = 0.1
+    converge_rtol   = 1.0e-3
+    perturb_all     = false
+
+[physics]
+    chemistry       = false
     continua        = true
     rayleigh        = false
     cloud           = false
-    overlap_method  = "ee"
+    overlap_method  = "ro"
     real_gas        = false
     thermo_funct    = true
-    sensible_heat   = true
+    sensible_heat   = false
     conduction      = true
-    latent_heat     = true
+    latent_heat     = false
     convection      = true
     convection_crit = "s"
+    grey_lw         = 1e-3
+    grey_sw         = 1e-4
     rainout         = false
-    solution_type   = 3
-    solver          = "newton"
-    dx_max          = 300.0
-    initial_state   = ["loglin","800"]
-    linesearch      = 1
-    easy_start      = true
-    converge_atol   = 1.0
-    converge_rtol   = 1.0e-2
-    perturb_all     = true
-
 
 [plots]
     at_runtime      = true
@@ -68,6 +65,6 @@ title = "Condensation test"
     emission        = true
     albedo          = true
     mixing_ratios   = true
-    animate         = true
+    animate         = false
     height          = true
     cloud           = true
