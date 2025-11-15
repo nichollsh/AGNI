@@ -434,6 +434,7 @@ module atmosphere
                     surface_material::String =  "greybody",
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        2.0,
+                    tmp_ceiling::Float64 =      2e4,
                     surf_roughness::Float64 =   0.001,
                     surf_windspeed::Float64 =   2.0,
                     Kzz_floor::Float64 =        1e5,
@@ -595,8 +596,13 @@ module atmosphere
         atmos.real_gas      =   real_gas
         atmos.thermo_funct  =   thermo_functions
 
-        atmos.tmp_floor =       max(0.1,tmp_floor)
-        atmos.tmp_ceiling =     2.0e4
+        atmos.tmp_floor =       max(1,tmp_floor)
+        atmos.tmp_ceiling =     tmp_ceiling
+        if atmos.tmp_ceiling <= atmos.tmp_floor+100
+            @warn "The temperature limits provided are probably invalid"
+            @warn "    Got: tmp_floor   = $(atmos.tmp_floor) K"
+            @warn "    Got: tmp_ceiling = $(atmos.tmp_ceiling) K"
+        end
 
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
@@ -623,8 +629,10 @@ module atmosphere
         atmos.phs_timescale =   phs_timescale
         atmos.evap_efficiency = max(min(evap_efficiency, 1.0),0.0)
 
-        atmos.κ_grey_lw =       max(0.0, κ_grey_lw)
-        atmos.κ_grey_sw =       max(0.0, κ_grey_sw)
+        atmos.κ_grey_lw = κ_grey_lw
+        _check_range("Grey LW opacity", atmos.κ_grey_lw; min=0) || return false
+        atmos.κ_grey_sw = κ_grey_sw
+        _check_range("Grey SW opacity", atmos.κ_grey_sw; min=0) || return false
 
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
@@ -949,7 +957,7 @@ module atmosphere
         # store condensates
         for c in condensates
             if atmos.gas_dat[c].stub || atmos.gas_dat[c].no_sat || (c in COND_DISALLOWED)
-                @warn "$c is marked as condensable, but this is disallowed"
+                @warn "$c is disallowed from being condensable; will treat $c as a dry gas"
             else
                 push!(atmos.condensates, c)
             end
@@ -976,11 +984,10 @@ module atmosphere
         # Ocean params
         #    inputs
         atmos.ocean_cs_height = max(0.0, ocean_cs_height)
-        atmos.ocean_ob_frac  =  ocean_ob_frac
-        if (atmos.ocean_ob_frac < 0) || (atmos.ocean_ob_frac > 1)
-            @error "Ocean basin area fraction must be between 0 and 1"
-            return false
-        end
+        _check_range("Continent shelf height", atmos.ocean_cs_height; min=0) || return false
+        atmos.ocean_ob_frac = ocean_ob_frac
+        _check_range("Ocean basin fraction", atmos.ocean_ob_frac; min=0, max=1) || return false
+
         #    outputs
         atmos.ocean_maxdepth  = 0.0
         atmos.ocean_areacov   = 0.0
@@ -1872,6 +1879,13 @@ module atmosphere
                 atmos.gas_soc_names[i_gas] =
                     SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
             end
+
+            # Warn user if all absorbers are condensable, which risks opacity going to zero
+            if issubset(atmos.gas_soc_names, atmos.condensates)
+                @warn "All absorbers are marked as condensable!"
+                @warn "    Opacity will be zero if they all rainout of the atmosphere."
+            end
+
         end # end socrates-only
 
         # VMRs are provided to SOCRATES when radtrans is called

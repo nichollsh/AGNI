@@ -31,7 +31,7 @@ directory. This will also have downloaded some basic input data and run the test
     This is so that AGNI can locate the SOCRATES libraries.
 
 !!! tip
-    Visit the [troubleshooting](@ref) page if you encounter any problems. This page can
+    Visit the [Troubleshooting](@ref) page if you encounter any problems. This page can
     usually resolve your problem.
 
 ## Testing
