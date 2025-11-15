@@ -327,6 +327,11 @@ module solver
             # Set new temperatures
             _set_tmps!(x)
 
+            # Surface saturation
+            if rainout
+                chemistry.regrid_saturated_surf!(atmos)
+            end
+
             # Do chemistry?
             if perturb_chem && chem
                 _fev_fc = chemistry.fastchem_eqm!(atmos, false)
@@ -623,7 +628,7 @@ module solver
 
                         easy_sf = min(1.0, easy_sf*easy_incr)
                         easy_step = true
-                        @debug "easy_sf = $easy_sf"
+                        @debug "    updated easy_sf = $easy_sf"
 
                         # done modulating
                         if easy_sf > 0.99
@@ -805,7 +810,7 @@ module solver
 
                     # Apply best scale from linesearch
                     ls_alpha = min(max(ls_alpha, ls_min_scale), ls_max_scale)
-                    @debug "Using linesearch scale, ls_alpha = $ls_alpha"
+                    @debug "    linesearch scale ls_alpha = $ls_alpha"
                     x_dif *= ls_alpha
                 end
 

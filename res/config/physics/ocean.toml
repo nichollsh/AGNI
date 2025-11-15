@@ -32,7 +32,7 @@ title = "Ocean formation test"
 
 [execution]
     clean_output    = true
-    verbosity       = 1
+    verbosity       = 2
     max_steps       = 300
     max_runtime     = 400
     num_levels      = 44
