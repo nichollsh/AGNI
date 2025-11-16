@@ -51,6 +51,7 @@ title = "Surface saturation test"
     sensible_heat   = false
     conduction      = true
     latent_heat     = false
+    advection       = false
     convection      = true
     convection_crit = "s"
     grey_lw         = 1e-3

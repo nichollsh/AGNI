@@ -55,6 +55,7 @@ title = "Line-by-line validation tests"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = false
+    advection       = false
     conduction      = true
     latent_heat     = false
     convection      = false

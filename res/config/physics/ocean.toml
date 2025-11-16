@@ -56,6 +56,7 @@ title = "Ocean formation test"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
+    advection       = false
     conduction      = true
     latent_heat     = true
     convection      = true

@@ -52,6 +52,7 @@ title = "TOI-561 b"
     thermo_funct    = true
     sensible_heat   = false
     conduction      = true
+    advection       = false
     latent_heat     = true
     convection      = true
     convection_crit = "l"

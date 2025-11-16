@@ -52,6 +52,7 @@ title = "Cloud radiative properties test"
     sensible_heat   = false
     conduction      = true
     latent_heat     = false
+    advection       = false
     convection      = true
     convection_crit = "s"
     rainout         = false

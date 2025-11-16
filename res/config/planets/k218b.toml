@@ -52,6 +52,7 @@ title = "K2-18 b, mixed"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
+    advection       = false
     conduction      = true
     latent_heat     = false
     convection      = true
