@@ -53,6 +53,11 @@ module atmosphere
     const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
     const COND_DISALLOWED::Array        = ["H2","He"]
 
+    # Pressure grid
+    const PRESSURE_RATIO_MIN::Float64   = 1.001     # minimum p_boa/p_boa ratio
+    const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
+    const PRESSURE_FACT_TOP::Float64    = 0.8       # Pressure factor at top layer
+
     # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
@@ -122,7 +127,8 @@ module atmosphere
         # Pressure-temperature grid (with i=1 at the top of the model)
         nlev_c::Int             # Cell centre (count)
         nlev_l::Int             # Cell edge (count)
-        p_boa::Float64          # Pressure at bottom [Pa]
+        p_oboa::Float64         # Pressure at bottom [Pa], original
+        p_boa::Float64          # Pressure at bottom [Pa], calculated
         p_toa::Float64          # Pressure at top [Pa]
         tmp::Array{Float64,1}   # cc temperature [K]
         tmpl::Array{Float64,1}  # ce temperature [K]
@@ -158,26 +164,31 @@ module atmosphere
         metal_orig::Dict{String, Float64}           # input elem ratios (elem num density rel to hydrogen)
         metal_calc::Dict{String, Float64}           # calc'd elem ratios, from gas mixing ratios at surface
 
-        # Condensation variables
+        # Whether each gas is reliably 'safe', in terms of the physics modelled
+        gas_safe::Dict{String, Bool}
+
+        # Condensation and evaporation aloft
         gas_sat::Dict{String, Array{Bool, 1}}       # Gas is saturated or cold-trapped in each layer?
         cond_yield::Dict{String, Array{Float64,1}}  # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
-        cond_accum::Dict{String, Float64}           # secondary reservoir; condensate accumulation left after evaporation (implicit surface liquid) [kg/m^2]
-        cond_reservoir::Dict{String, Float64}       # primary reservoir; input from user + surface saturation
-        cond_total::Dict{String, Float64}           # total amount of surface cond; primary + secondary
+        cond_accum::Dict{String, Float64}           # condensate accumulation left after evaporation aloft (implicit surface liquid) [kg/m^2]
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
 
-        # Ocean variables (surface liquid layering)
-        ocean_ob_frac::Float64          # INPUT: ocean basin area, as fraction of planet surface
-        ocean_cs_height::Float64        # INPUT: continental shelf height [m]
-        ocean_layers::Array{Tuple,1}    # OUTPUT: layer structure of surface liquids
-        ocean_maxdepth::Float64         # OUTPUT: ocean depth at deepest part [m]
-        ocean_areacov::Float64          # OUTPUT: fraction of planet surface covered by oceans
-        ocean_topliq::String            # OUTPUT: name of top-most ocean component
+        # Ocean tracking variables
+        ocean_ini::Dict{String, Float64}    # INPUT: ocean reservoir from user [kg/m^2] - does not change
+        ocean_tot::Dict{String, Float64}    # OUTPUT: ocean reservoir [kg/m^2] - after cond/evap, both from surf and aloft
 
-        # Gases (only those in spectralfile)
-        gas_soc_num::Int
-        gas_soc_names::Array{String,1}
+        # Ocean layering variables (surface liquid layering)
+        ocean_ob_frac::Float64              # INPUT: ocean basin area, as fraction of planet surface
+        ocean_cs_height::Float64            # INPUT: continental shelf height [m]
+        ocean_layers::Array{Tuple,1}        # OUTPUT: layer structure of surface liquids
+        ocean_maxdepth::Float64             # OUTPUT: ocean depth at deepest part [m]
+        ocean_areacov::Float64              # OUTPUT: fraction of planet surface covered by oceans
+        ocean_topliq::String                # OUTPUT: name of top-most ocean component
+
+        # Gases (only those in SOCRATES spectralfile)
+        gas_soc_num::Int                    # number of gases
+        gas_soc_names::Array{String,1}      # names of each gas (as a list)
 
         # Layers' average properties
         real_gas::Bool                      # use real-gas equations of state where possible
@@ -267,7 +278,7 @@ module atmosphere
         cloud_val_f::Float64                # /
 
         # Cell-internal heating
-        flux_div_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-2 Pa-1] (e.g. from advection)
+        flux_advect::Array{Float64, 1}     # Energy flux advected into each cell [W m-2], treated as entering into its bottom edge
 
         # Total energy flux
         flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2] (positive is heating up)
@@ -673,6 +684,7 @@ module atmosphere
             @error "    p_surf = $p_surf bar"
             return false
         end
+        atmos.p_oboa = atmos.p_boa
 
         # interior radius
         atmos.rp = radius
@@ -775,8 +787,8 @@ module atmosphere
         atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # mask for saturation
         atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # cond/evap yield at each layer
         atmos.cond_accum =  Dict{String, Float64}()           # sum of each yield in atmosphere
-        atmos.cond_reservoir = Dict{String,Float64}()         # primary surface reservoir
-        atmos.cond_total =  Dict{String,Float64}()            # total surface condensate
+        atmos.ocean_ini =   Dict{String,Float64}()            # initial ocean reservoir [kg/m^2]
+        atmos.ocean_tot =   Dict{String,Float64}()            # final ocean reservoir [kg/m^2]
         atmos.gas_num   =   0                                 # number of gases
         atmos.condensates = Array{String}(undef, 0)           # list of condensates
 
@@ -914,8 +926,8 @@ module atmosphere
             atmos.cond_accum[g] = 0.0
 
             # amount of condensate at the surface
-            atmos.cond_reservoir[g]  = 0.0  # surface liquid in eqm with atmosphere
-            atmos.cond_total[g]      = 0.0  # = cond_reservoir[g] + cond_accum[g]
+            atmos.ocean_ini[g]       = 0.0  # TODO: make this input from user
+            atmos.ocean_tot[g]       = 0.0  # to be calculated
         end
 
         # Check that we actually stored some values
@@ -975,11 +987,6 @@ module atmosphere
             atmos.condense_any = true
         end
 
-        # Must have at least one non-condensable gas
-        if (length(condensates) == atmos.gas_num)
-            @error "There must be at least one non-condensable gas"
-            return false
-        end
 
         # Ocean params
         #    inputs
@@ -1501,14 +1508,20 @@ module atmosphere
     """
     **Generate pressure grid.**
 
-    Almost-equally log-spaced between p_boa and p_boa. The near-surface layers
-    are smaller than they would be on an equally log-spaced grid, to avoid f
-    numerical weirdness at the bottom boundary.
+    Almost equally log-spaced between p_boa and p_boa. The near-boundary layers
+    are smaller than they would be on an equally log-spaced grid, to avoid numerics.
 
     Arguments:
     - `atmos::Atmos_t`              the atmosphere struct instance to be used.
     """
     function generate_pgrid!(atmos::atmosphere.Atmos_t)
+
+        # Ensure pressures are in bounds
+        if atmos.p_boa/atmos.p_toa < PRESSURE_RATIO_MIN
+            @warn "Bottom/top pressure ratio is too small"
+            @debug "   Got pressure ratio bot/top = $(atmos.p_boa/atmos.p_toa)"
+            atmos.p_boa = PRESSURE_RATIO_MIN * atmos.p_toa
+        end
 
         # Allocate arrays
         atmos.p  = zeros(Float64, atmos.nlev_c)
@@ -1527,8 +1540,7 @@ module atmosphere
                                                             length=atmos.nlev_l-1))
 
         # Shrink near-surface layers by stretching all layers above
-        p_fact::Float64 = 0.6
-        p_mid::Float64 = atmos.pl[end-1]*p_fact + atmos.pl[end-2]*(1.0-p_fact)
+        p_mid::Float64 = atmos.pl[end-1]*PRESSURE_FACT_BOT + atmos.pl[end-2]*(1.0-PRESSURE_FACT_BOT)
         atmos.pl[1:end-2] .= collect(Float64, range( start=atmos.pl[1],
                                                             stop=p_mid,
                                                             length=atmos.nlev_l-2))
@@ -1537,8 +1549,7 @@ module atmosphere
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
         # Shrink top-most layer to avoid doing too much extrapolation
-        p_fact = 0.8
-        atmos.p[1] = atmos.pl[1]*p_fact + atmos.p[1]*(1-p_fact)
+        atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
 
         # Finally, convert arrays to actual pressure units [Pa]
         @. atmos.p  = 10.0 ^ atmos.p
@@ -1899,30 +1910,49 @@ module atmosphere
             end
         end
 
-        # Print info on the gases
-        @info "Allocating atmosphere with initial composition:"
+        # Print info on the gases, and check whether they are 'safe' or not
         gas_flags::String = ""
         g::String = ""
+        @info "Allocating atmosphere with initial composition:"
         for i in 1:atmos.gas_num
             g = atmos.gas_names[i]
             gas_flags = ""
+            atmos.gas_safe[g] = true
+
+            # flag as not included in radtrans
             if (atmos.rt_scheme == RT_SOCRATES) && !(g in atmos.gas_soc_names)
-                # flag as not included in radtrans
                 gas_flags *= "NO_OPACITY "
+                atmos.gas_safe[g] = false
             end
+
+            # flag as condensable
             if g in atmos.condensates
-                 # flag as condensable
                 gas_flags *= "COND "
+                atmos.gas_safe[g] = false
             end
+
+            # flag as containing stub thermo data
             if atmos.gas_dat[g].stub
-                # flag as containing stub thermo data
                 gas_flags *= "NO_THERMO "
+                atmos.gas_safe[g] = false
             end
+
+            # print info for this gas
             gas_flags *= String(Symbol(atmos.gas_dat[g].eos))*" "
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
             end
             @info @sprintf("    %3d %-7s %6.2e %s", i, g, atmos.gas_vmr[g][end], gas_flags)
+        end
+
+        # There must be at least one 'safe' gas
+        if !any(keys(atmos.gas_safe))
+            @error "None of the supplied gases are considered 'safe'"
+            @error "There must be at least one gas which satisfies criteria:"
+            @error "    a) is dry, i.e. non-condensable"
+            @error "    b) has opacity"
+            @error "    c) has thermodynamic data"
+            return false
         end
 
         # Calc layer properties using initial temperature profile.
@@ -2158,9 +2188,10 @@ module atmosphere
         atmos.w_conv =            zeros(Float64, atmos.nlev_l)  # convective velocity [m s-1]
         atmos.λ_conv =            zeros(Float64, atmos.nlev_l)  # mixing length [m]
 
+        atmos.flux_advect =       zeros(Float64, atmos.nlev_l)  # advective heat flux 
+
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
-        atmos.flux_div_add =      zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
         atmos.timescale_conv =    zeros(Float64, atmos.nlev_c)
         atmos.timescale_rad =     zeros(Float64, atmos.nlev_c)

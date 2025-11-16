@@ -121,12 +121,15 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+
+    Optional arguments:
     - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
     - `chem::Bool`                      include eqm thermochemistry when solving for RCE?
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
+    - `advect::Bool`                    include advective heat exchange (dynamics)
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
     - `dx_min::Float64`                 minimum step size [K]
     - `dx_max::Float64`                 maximum step size [K]
@@ -147,7 +150,6 @@ module solver
     - `ls_max_scale::Float64`           maximum step scale allowed by linesearch
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
-    - `perturb_chem::Bool`              include chemistry calculation during finite-difference construction of jacobian
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
     - `modprint::Int`                   iteration frequency at which to print info
@@ -163,7 +165,8 @@ module solver
                             sol_type::Int=1,
                             chem::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
-                            conduct::Bool=true, latent::Bool=true, rainout::Bool=true,
+                            conduct::Bool=true, latent::Bool=true, advect::Bool=true,
+                            rainout::Bool=true,
                             dx_min::Float64=1e-7, dx_max::Float64=400.0,
                             tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
@@ -176,7 +179,6 @@ module solver
                             ls_max_steps::Int=10,
                             ls_min_scale::Float64 = 1.0e-5, ls_max_scale::Float64 = 0.99,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
-                            perturb_chem::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=true,
                             radiative_Kzz::Bool=true,
@@ -327,30 +329,15 @@ module solver
             # Set new temperatures
             _set_tmps!(x)
 
-            # Surface saturation
-            if rainout
-                chemistry.regrid_saturated_surf!(atmos)
-            end
-
-            # Do chemistry?
-            if perturb_chem && chem
-                _fev_fc = chemistry.fastchem_eqm!(atmos, false)
-                # if _fev_fc != 0
-                #     return false
-                # end
-            end
+            # Do condensation and chemistry
+            chemistry.calc_composition!(atmos, rainout, chem, rainout)
 
             # Calculate fluxes
-            step_ok &= energy.calc_fluxes!(atmos, true,
-                                latent, convect, sens_heat, conduct,
+            step_ok &= energy.calc_fluxes!(atmos, radiative=true,
+                                latent=latent, convect=convect, sens_heat=sens_heat,
+                                conduct=conduct, advect=advect,
                                 convect_sf=easy_sf, latent_sf=easy_sf,
                                 rainout=rainout)
-
-            # Energy divergence term
-            #   Negative offset, so that other fluxes are larger (hotter) to
-            #   maintain the same energy balance
-            #   flux_dif -= (dF/dp) * dp
-            atmos.flux_dif[:] .-= atmos.flux_div_add[:] .* (atmos.pl[2:end] .- atmos.pl[1:end-1])
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
@@ -1059,7 +1046,7 @@ module solver
                 _prescribe!(atmos, atm_type, _tsurf)
 
                 # Residual = radiative flux minus skin flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_tot[1] - energy.skin_flux(atmos))^2
             end
 
@@ -1081,7 +1068,7 @@ module solver
                 _prescribe!(atmos, atm_type, _tsurf)
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
 
                 @debug "    flux_tot = $(atmos.flux_tot[1])"
                 return (atmos.flux_tot[1] - atmos.flux_int)^2
@@ -1105,7 +1092,7 @@ module solver
                 _prescribe!(atmos, atm_type, _tsurf)
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_u_lw[1] - atmos.target_olr)^2
             end
 
@@ -1174,7 +1161,7 @@ module solver
         # Handle different solution types
         if sol_type == 1
             # Fixed temperature case => just calculate radiative fluxes
-            energy.calc_fluxes!(atmos, true, false, false, false, false)
+            energy.calc_fluxes!(atmos, radiative=true)
 
         elseif sol_type == 2
             # Conductive boundary layer => find Tsurf based on Tmagma
@@ -1187,7 +1174,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus skin flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_tot[end-1] - energy.skin_flux(atmos))^2
             end
 
@@ -1209,7 +1196,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_tot[end-1] - atmos.flux_int)^2
             end
 
@@ -1231,7 +1218,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_u_lw[end-1] - atmos.target_olr)^2
             end
 

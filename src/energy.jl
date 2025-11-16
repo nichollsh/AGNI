@@ -832,48 +832,43 @@ module energy
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+
+    Optional arguments:
     - `radiative::Bool`                 include radiation fluxes
     - `latent::Bool`                    include condensation flux
     - `convect::Bool`                   include MLT convection flux
-    - `sens_heat::Bool`                 include TKE sensible heat transport
-    - `conduct::Bool`                   include conductive heat transport
+    - `sens_heat::Bool`                 include TKE sensible heat flux
+    - `conduct::Bool`                   include conductive heat flux
+    - `advect::Bool`                    include advective heat flux
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
-    - `rainout::Bool`                   allow rainout ( do not reset VMRs to dry values )
 
     Returns:
     - `ok::Bool`                        calculation performed ok?
     """
-    function calc_fluxes!(atmos::atmosphere.Atmos_t,
-                          radiative::Bool,
-                          latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
+    function calc_fluxes!(atmos::atmosphere.Atmos_t;
+                          radiative::Bool=false, latent::Bool=false, convect::Bool=false,
+                          sens_heat::Bool=false, conduct::Bool=false, advect::Bool=false;
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
-                          calc_cf::Bool=false, rainout::Bool=true)::Bool
+                          calc_cf::Bool=false)::Bool
 
         # Reset fluxes
         reset_fluxes!(atmos)
-
         ok::Bool = true
 
-        # +Condensation and evaporation
-        if atmos.condense_any && (latent || rainout)
-
-            # Handle rainout
-            chemistry.rainout_and_evaporate!(atmos)
-
-            # Calculate latent heat flux
-            if latent
-                latent!(atmos)           # Calculate latent heat fluxes
-                atmos.flux_l *= latent_sf           # Modulate for stability?
-                @. atmos.flux_tot += atmos.flux_l   # Add to total flux
-            end
+        # Warn if no flux terms are enabled
+        if !(radiative || latent || convect || sens_heat || conduct || advect)
+            @warn "No flux terms enabled in call to `calc_fluxes!`"
+            ok = false
         end
 
-        # Recalculate layer properties after chemistry and/or rainout.
-        #    Returns false if atmosphere becomes non-hydrostatic, so user is warned,
-        #    but function will continue to run anyway.
-        ok &= atmosphere.calc_layer_props!(atmos)
+        # +Latent heating
+        if latent
+            latent!(atmos)           # Calculate latent heat fluxes
+            atmos.flux_l *= latent_sf           # Modulate for stability?
+            @. atmos.flux_tot += atmos.flux_l   # Add to total flux
+        end
 
         # +Radiation
         if radiative
@@ -899,6 +894,11 @@ module energy
         if conduct
             conduct!(atmos)
             @. atmos.flux_tot += atmos.flux_cdct
+        end
+
+        # +Advection
+        if advect
+            @. atmos.flux_tot += atmos.flux_advect
         end
 
         # Flux difference across each level

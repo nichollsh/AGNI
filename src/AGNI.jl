@@ -383,6 +383,7 @@ module AGNI
         #    solver stuff
         incl_convect::Bool     = cfg["physics"]["convection"]
         incl_conduct::Bool     = cfg["physics"]["conduction"]
+        incl_advect::Bool      = cfg["physics"]["advection"]
         incl_sens::Bool        = cfg["physics"]["sensible_heat"]
         incl_latent::Bool      = cfg["physics"]["latent_heat"]
         sol_type::Int          = cfg["execution"]["solution_type"]
@@ -539,8 +540,9 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
-            energy.calc_fluxes!(atmos, true, incl_latent,
-                                incl_convect, incl_sens, incl_conduct;
+            energy.calc_fluxes!(atmos, radiative=true, latent=incl_latent,
+                                convect=incl_convect, sens_heat=incl_sens,
+                                conduct=incl_conduct, avect=incl_advect;
                                 calc_cf=Bool(cfg["plots"]["contribution"]),
                                 rainout=Bool(cfg["physics"]["rainout"]))
 
@@ -561,7 +563,7 @@ module AGNI
             solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
                                 conduct=incl_conduct, chem=chem,
                                 convect=incl_convect, latent=incl_latent,
-                                sens_heat=incl_sens,
+                                sens_heat=incl_sens, advect=incl_advect,
                                 max_steps=Int(cfg["execution"]["max_steps"]),
                                 max_runtime=Float64(cfg["execution"]["max_runtime"]),
                                 conv_atol=conv_atol,
@@ -630,7 +632,10 @@ module AGNI
         plt_tmp && \
             plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
         cfg["plots"]["fluxes"] && \
-            plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"), incl_mlt=incl_convect, incl_eff=(sol_type==3), incl_cdct=incl_conduct, incl_latent=incl_latent)
+            plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"),
+                                    incl_mlt=incl_convect, incl_eff=(sol_type==3),
+                                    incl_cdct=incl_conduct, incl_latent=incl_latent,
+                                    incl_advect=incl_advect)
         cfg["plots"]["emission"] && \
             plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
         cfg["plots"]["albedo"] && \
