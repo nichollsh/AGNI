@@ -52,6 +52,7 @@ title = "TRAPPIST-1 b"
     real_gas        = true
     thermo_funct    = true
     sensible_heat   = true
+    advection       = false
     conduction      = true
     latent_heat     = true
     convection      = true

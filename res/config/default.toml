@@ -65,6 +65,7 @@ title = "Default"                       # Name for this configuration file
     conduction      = true                      # Include thermal conductive heat transport?
     rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
     latent_heat     = false                     # Include heat release from phase change
+    advection       = false                     # Include advective heat flux from dynamics
     convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
     convection      = true                      # Include heat transport by convection
 

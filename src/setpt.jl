@@ -68,7 +68,8 @@ module setpt
 
             elseif str_req == "surfsat"
                 # ensure surface is not super-saturated
-                chemistry.regrid_saturated_surf!(atmos)
+                chemistry.restore_composition!(atmos)
+                chemistry._sat_surf!(atmos)
 
             elseif str_req == "sat"
                 # condensing a volatile

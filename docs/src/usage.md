@@ -69,7 +69,6 @@ Potential solver flags are:
 * `Gg` - radiative transfer performed with double-grey scheme
 * `M` or `Mr`  - convective fluxes are being modulated for stability
 * `C2` or `C4` or `F2` or `F4`- a central or forward finite-difference scheme was used (at 2nd or 4th order)
-* `Nr`, `Gn`, `Lm` - indicates which optimisation method was used (Newton, Gauss, or Levenberg)
 * `Ls` - a linesearch method was applied
 * `P` - step was forcibly extrapolated because the solver is not making good progress
 * `Ub` - the atmosphere has become unbound (non-hydrostatic)
@@ -187,10 +186,11 @@ Parameters that describe how the model should treat the physics.
 | `real_gas      `  | Use real-gas equation(s) of state where possible (true/false) |
 | `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
 | `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false) |
+| `advection `      | Include advective heat transport into each cell (true/false) |
 | `convection    `  | Include vertical heat transport associated with convection (true/false) |
 | `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
-| `rainout       `  | Enable compositional rainout of condensables. If disabled, phase change does not impact composition. |
+| `rainout       `  | Enable rainout and/or evaporation of condensables. Required for `latent_heat=true`. |
 
 ### `[plots]`
 Configure plotting routines all of these should be `true` or `false`.

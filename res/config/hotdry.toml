@@ -54,6 +54,7 @@ title = "Hot and dry"
     sensible_heat   = true
     conduction      = true
     latent_heat     = false
+    advection       = false   
     convection      = true
     convection_crit = "l"
     rainout         = false
