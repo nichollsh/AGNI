@@ -27,89 +27,6 @@ module chemistry
     import ..phys
     import ..ocean
 
-
-    """
-    **Reduce or increase surface pressure according to saturation**
-
-    If a condensable is supersaturated at the surface, its partial surface pressure is
-    reduced to exactly saturation. The condensed mass is added to the ocean reservoir.
-    If a condensable is subsaturated at the surface, its partial pressure is increased
-    to exactly saturation, subject to the amount of ocean available.
-
-    This function operates on the 'primary' reservoir of condensables.
-
-    Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-
-    """
-    function regrid_saturated_surf!(atmos::atmosphere.Atmos_t)
-
-        p_gas::Dict{String, Float64} = Dict()
-        p_sat::Float64  = 0.0
-        dp::Float64 = 0.0
-
-        # Populate partial pressure dictionary for ALL gases
-        for gas in atmos.gas_names
-            p_gas[gas] =  atmos.gas_vmr[gas][end] * atmos.p_boa
-        end
-
-        # For each condensable volatile
-        for c in atmos.condensates
-
-            # If supercritical, skip for now
-            if (atmos.tmp_surf > atmos.gas_dat[c].T_crit)
-                continue
-            end
-
-            # Calculate partial pressure and saturation pressure for this condensable
-            p_sat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp_surf)
-
-            # Work out amount of sub(-) or super(+) saturation
-            dp = p_gas[c] - p_sat
-
-            # Super-saturated at the surface...
-            if dp > 0
-                @debug "Surface $c is supersaturated"
-
-            # Sub-saturated at the surface...
-            #     work out change in partial pressure based on availability
-            else
-                @debug "Surface $c is subsaturated"
-                dp = max(dp, -atmos.cond_reservoir[c]*atmos.grav_surf)
-            end
-
-            # Reduce or increase total pressure and partial pressure
-            atmos.p_boa -= dp
-            p_gas[c] -= dp
-            @debug @sprintf("    adjusted pressure by %+.3f bar", dp/1e5)
-
-            # Add or remove condensate from primary condensate reservoir
-            atmos.cond_reservoir[c] += dp/atmos.grav_surf
-
-            # Update total condensate to this value
-            atmos.cond_total[c] = atmos.cond_reservoir[c]
-        end
-
-        # Recalculate all surface VMRs from partial pressures
-        for gas in atmos.gas_names
-            atmos.gas_vmr[gas][end] = p_gas[gas]/atmos.p_boa
-        end
-
-        # Generate new pressure grid with updated p_boa
-        @debug @sprintf("New surface pressure: %+.3f bar",atmos.p_boa/1e5)
-        atmosphere.generate_pgrid!(atmos)
-    end
-
-    """
-    **Reset mixing ratios to their original values**
-    """
-    function restore_composition!(atmos::atmosphere.Atmos_t)
-        for g in atmos.gas_names
-            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
-            @. atmos.gas_cvmr[g] = atmos.gas_ovmr[g]
-        end
-    end
-
     """
     **Normalise gas VMRs, keeping condensates unchanged**
 
@@ -161,8 +78,127 @@ module chemistry
         return nothing
     end
 
+
     """
-    **Adjust gas VMRs according to saturation and cold-trap requirements**
+    **Reset mixing ratios, pressures, and oceans to their original values**
+    """
+    function restore_composition!(atmos::atmosphere.Atmos_t)
+
+        # Mixing ratios to original values
+        for g in atmos.gas_names
+            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+            @. atmos.gas_cvmr[g] = atmos.gas_ovmr[g]
+        end
+
+        # Pressure grid
+        atmos.p_boa = atmos.p_oboa
+        atmosphere.generate_pgrid!(atmos)
+
+        # Reset oceans
+        atmos.ocean_tot[:] .= atmos.ocean_ini[:]
+
+        # Layer properties
+        atmosphere.calc_layer_props!(atmos)
+    end
+
+
+    """
+    **Handle sub/super-saturation at the surface, forming oceans.**
+
+    NOTE: this function does not reset to `atmos` to its original state before operating.
+
+    If a condensable is supersaturated at the surface, its partial surface pressure is
+    reduced to exactly saturation. The condensed mass is added to the ocean reservoir.
+    If a condensable is subsaturated at the surface, its partial pressure is increased
+    to exactly saturation, subject to the amount of ocean available. Reduces or increases
+    the total surface pressure accordingly.
+
+    Accounts for mmw ratio when converting from partial pressures to masses:
+        m_i = (p_i/g) * (mu_i / mu_tot)
+    where m_i has units [kg/m^2] and mu_tot is the total mixture MMW.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+    - `any_changed::Bool`       did any component condense or evaporate?
+    """
+    function _sat_surf!(atmos::atmosphere.Atmos_t)::Bool
+
+        # Define work variables
+        any_changed::Bool = false
+        dp::Float64 = 0.0  # change in surface partial pressure [Pa]
+
+        # Populate partial pressure dictionary for ALL gases
+        p_gas::Dict{String, Float64} = Dict()
+        for gas in atmos.gas_names
+            p_gas[gas] =  atmos.gas_vmr[gas][end] * atmos.p_boa
+        end
+
+        # For each condensable volatile...
+        for c in atmos.condensates
+
+            # If supercritical, skip
+            if atmos.tmp_surf > atmos.gas_dat[c].T_crit
+                continue
+            end
+
+            # Calculate partial pressure and saturation pressure for this condensable
+            #     Work out amount of sub(+) or super(-) saturation
+            dp = phys.get_Psat(atmos.gas_dat[c], atmos.tmp_surf) - p_gas[c]
+
+            # Negligible
+            if abs(dp) < 1e-10
+                continue
+
+            # Super-saturated at the surface...
+            elseif dp < 0
+                @debug "Surface $c is supersaturated, dp is negative"
+
+            # Sub-saturated at the surface...
+            #     work out change in partial pressure based on initial reservoir amount
+            else
+                @debug "Surface $c is subsaturated, dp is positive"
+                dp = min(dp, atmos.ocean_ini[c] * atmos.grav_surf / (atmos.gas_dat[c].mmw/atmos.layer_μ[end]))
+            end
+
+            # Record that at least one component has as changed
+            any_changed = true
+
+            # Reduce or increase total pressure and partial pressure
+            atmos.p_boa += dp
+            p_gas[c] += dp
+            @debug @sprintf("    adjusted partial prssure by %+.3f bar", dp/1e5)
+
+            # Change in surface reservoir, with opposite sign to change in pressure
+            atmos.ocean_tot[c] -= (dp / atmos.grav_surf) * (atmos.gas_dat[g].mmw/atmos.layer_μ[end])
+        end
+
+        # Exit now if nothing needs to be done
+        if !any_changed
+            return nothing
+        end
+
+        # Recalculate all surface VMRs from partial pressures
+        for gas in atmos.gas_names
+            atmos.gas_vmr[gas][end] = p_gas[gas]/atmos.p_boa
+        end
+
+        # Generate new pressure grid with updated p_boa
+        @debug @sprintf("New surface pressure: %+.3f bar",atmos.p_boa/1e5)
+        atmosphere.generate_pgrid!(atmos)
+
+        # Calculate new values for layer properties
+        atmos.calc_layer_props!(atmos)
+
+        return nothing
+    end
+
+
+    """
+    **Handle sub/super-saturation aloft; required for latent heat flux calcaulation**
+
+    Adjust gas VMRs according to saturation and cold-trap requirements.
 
     Volatiles which are allowed to condense are rained-out at condensing levels
     until the gas is exactly saturated, not supersaturated. If evaporation is enabled here,
@@ -179,12 +215,7 @@ module chemistry
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
-    function rainout_and_evaporate!(atmos::atmosphere.Atmos_t)
-
-        # Single gas case does not apply here
-        if atmos.gas_num == 1
-            return
-        end
+    function _sat_aloft!(atmos::atmosphere.Atmos_t)
 
         # Work arrays
         maxvmr::Dict{String, Float64} = Dict{String, Float64}() # max running VMR for each condensable
@@ -342,8 +373,8 @@ module chemistry
             # recalculate layer properties after re-evaporating this species
             atmosphere.calc_layer_props!(atmos)
 
-            # calculate total condensate from primary+secondary reservoirs
-            atmos.cond_total[c] = atmos.cond_reservoir[c] + atmos.cond_accum[c]
+            # sum total condensate as surface + aloft
+            atmos.ocean_tot[c] += atmos.cond_accum[c]
 
         end # end loop over condensates
 
@@ -367,7 +398,7 @@ module chemistry
 
 
     """
-    **Calculate composition assuming chemical equilibrium at each level.**
+    **Calculate gas-phase composition at dry thermochemical equilibrium.**
 
     Uses FastChem to calculate the gas composition at each level of the atmosphere.
     Volatiles are converted to bulk elemental abundances, which are then provided to
@@ -381,7 +412,7 @@ module chemistry
     Returns:
     - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
-    function fastchem_eqm!(atmos::atmosphere.Atmos_t, write_cfg::Bool)::Int
+    function _chem_gas!(atmos::atmosphere.Atmos_t, write_cfg::Bool)::Int
 
         @debug "Running equilibrium chemistry"
 
@@ -399,9 +430,6 @@ module chemistry
             @warn "Temperature profile is entirely too cold for FastChem. Not doing chemistry."
             return 1
         end
-
-        # Reset composition to original values
-        # restore_composition!(atmos)
 
         count_elem_nonzero::Int = 0
 
@@ -654,6 +682,51 @@ module chemistry
         atmosphere.calc_layer_props!(atmos)
 
         # See docstring for return codes
+        return state
+    end
+
+    """
+    **Run condensation and chemistry schemes as required.**
+
+    This function is designed as a wrapper for appropriately handling these three
+    schemes together in the correct order, so that variables are appropriately updated.
+    Steps:
+    1. call `_sat_surf!` to handle saturation at the surface, and adjust the pressure grid
+    2. call `_chem_gas!` to handle gas-phase chemistry in the column
+    3. call `_sat_aloft!` to handle saturation aloft, above the surface.
+
+    Arguments:
+    - `atmos::Atmos_t`       the atmosphere struct instance to be used.
+    - `do_surf::Bool`        do saturation cond/evap at surface
+    - `do_chem::Bool`        do thermochemistry in the column
+    - `do_aloft::Bool`       do saturation cond/evap aloft
+
+    Returns:
+    - `state::Int`           fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
+    """
+    function calc_composition!(atmos::atmosphere.Atmos_t,
+                            do_surf::Bool, do_chem::Bool, do_aloft::Bool)::Int
+
+        state::Int = 0
+
+        # reset composition
+        restore_composition!(atmos)
+
+        # surface saturation
+        if do_surf
+            _sat_surf!(atmos)
+        end
+
+        # aloft gas-phase chemistry
+        if do_chem
+            state = _chem_gas!(atmos, true)
+        end
+
+        # aloft saturation
+        if do_aloft
+            _sat_aloft!(atmos)
+        end
+
         return state
     end
 
