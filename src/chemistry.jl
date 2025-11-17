@@ -171,12 +171,12 @@ module chemistry
             @debug @sprintf("    adjusted partial prssure by %+.3f bar", dp/1e5)
 
             # Change in surface reservoir, with opposite sign to change in pressure
-            atmos.ocean_tot[c] -= (dp / atmos.grav_surf) * (atmos.gas_dat[g].mmw/atmos.layer_μ[end])
+            atmos.ocean_tot[c] -= (dp / atmos.grav_surf) * (atmos.gas_dat[c].mmw/atmos.layer_μ[end])
         end
 
         # Exit now if nothing needs to be done
         if !any_changed
-            return nothing
+            return any_changed
         end
 
         # Recalculate all surface VMRs from partial pressures
@@ -189,9 +189,9 @@ module chemistry
         atmosphere.generate_pgrid!(atmos)
 
         # Calculate new values for layer properties
-        atmos.calc_layer_props!(atmos)
+        atmosphere.calc_layer_props!(atmos)
 
-        return nothing
+        return any_changed
     end
 
 
@@ -421,14 +421,13 @@ module chemistry
 
         # Check fastchem enabled
         if !atmos.flag_fastchem
-            @warn "Fastchem is not enabled but `fastchem_eqm!` was called. Have you set FC_DIR?"
+            @warn "Fastchem is not enabled but chemistry was called. Have you set FC_DIR?"
             return 1
         end
 
         # Check minimum temperature
         if maximum(atmos.tmpl) < atmos.fastchem_floor
-            @warn "Temperature profile is entirely too cold for FastChem. Not doing chemistry."
-            return 1
+            @warn "The entire temperature profile is too cold for FastChem"
         end
 
         count_elem_nonzero::Int = 0

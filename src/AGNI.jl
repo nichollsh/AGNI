@@ -336,15 +336,9 @@ module AGNI
         end
 
         #    chemistry
-        if chem
-            if transparent
-                @error "Config: chemistry is incompatible with transparent atmosphere mode"
-                return false
-            end
-            if !atmos.flag_fastchem
-                @error "Chemistry enabled but could not find FastChem. Have you set FC_DIR?"
-                return false
-            end
+        if chem &&  transparent
+            @error "Config: chemistry is incompatible with transparent atmosphere mode"
+            return false
         end
 
         #    RFM radtrans
@@ -515,6 +509,7 @@ module AGNI
         # Write initial state
         save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
+        # Run chemistry in the first instance
         chemistry.calc_composition!(atmos, rainout, chem, rainout)
 
         # Frame dir
@@ -536,7 +531,7 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
-            energy.calc_fluxes!(atmos, radiative=true, latent=incl_latent,
+            energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
                                 convective=incl_convect, sens_heat=incl_sens,
                                 conductive=incl_conduct, advective=incl_advect,
                                 calc_cf=Bool(cfg["plots"]["contribution"]))

@@ -1,4 +1,5 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
+# Run this function from inside the `test/` folder
 
 # Get AGNI root directory
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
@@ -355,13 +356,11 @@ if suite > 7
                             flag_gcontinuum=true,
                             flag_rayleigh=false,
                             overlap_method="ee",
-                            condensates=["H2O"],
                             surface_material="greybody",
                             albedo_s=0.5,
                             real_gas=false
                     )
     atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
-    chemistry.regrid_saturated_surf!(atmos)
     setpt.dry_adiabat!(atmos)
     setpt.saturation!(atmos, "H2O")
     atmosphere.calc_layer_props!(atmos)

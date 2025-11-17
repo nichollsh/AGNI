@@ -54,7 +54,7 @@ module atmosphere
     const COND_DISALLOWED::Array        = ["H2","He"]
 
     # Pressure grid
-    const PRESSURE_RATIO_MIN::Float64   = 1.001     # minimum p_boa/p_boa ratio
+    const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
     const PRESSURE_FACT_TOP::Float64    = 0.8       # Pressure factor at top layer
 
@@ -1555,6 +1555,12 @@ module atmosphere
         # Finally, convert arrays to actual pressure units [Pa]
         @. atmos.p  = 10.0 ^ atmos.p
         @. atmos.pl = 10.0 ^ atmos.pl
+
+        # Ensure pressure grid is strictly increasing
+        for i in 1:atmos.nlev_c
+            atmos.p[i]    = max(atmos.p[i],    atmos.pl[i]*PRESSURE_RATIO_MIN)
+            atmos.pl[i+1] = max(atmos.pl[i+1], atmos.p[i]*PRESSURE_RATIO_MIN)
+        end
 
         return nothing
     end
