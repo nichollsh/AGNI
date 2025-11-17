@@ -152,13 +152,13 @@ module chemistry
 
             # Super-saturated at the surface...
             elseif dp < 0
-                @debug "Surface $c is supersaturated, dp is negative"
+                @debug @sprintf("            %s super-saturated, partial pressure += %+.3f bar", c, dp/1e5)
 
             # Sub-saturated at the surface...
             #     work out change in partial pressure based on initial reservoir amount
             else
-                @debug "Surface $c is subsaturated, dp is positive"
                 dp = min(dp, atmos.ocean_ini[c] * atmos.grav_surf / (atmos.gas_dat[c].mmw/atmos.layer_μ[end]))
+                @debug @sprintf("            %s sub-saturated, partial pressure += %+.3f bar", c, dp/1e5)
             end
 
             # Record that at least one component has as changed
@@ -167,7 +167,6 @@ module chemistry
             # Reduce or increase total pressure and partial pressure
             atmos.p_boa += dp
             p_gas[c] += dp
-            @debug @sprintf("    adjusted partial prssure by %+.3f bar", dp/1e5)
 
             # Change in surface reservoir, with opposite sign to change in pressure
             atmos.ocean_tot[c] -= (dp / atmos.grav_surf) * (atmos.gas_dat[c].mmw/atmos.layer_μ[end])
@@ -185,7 +184,7 @@ module chemistry
         end
 
         # Generate new pressure grid with updated p_boa
-        @debug @sprintf("New surface pressure: %+.3f bar",atmos.p_boa/1e5)
+        @debug @sprintf("            new p_boa = %.3f bar",atmos.p_boa/1e5)
         atmosphere.generate_pgrid!(atmos)
 
         # Calculate new values for layer properties
