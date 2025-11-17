@@ -45,7 +45,7 @@ module plotting
         return (1e-5*atmos.pl[1]/1.5, 1e-5*max(atmos.p_oboa, atmos.p_boa)*1.5 )
     end
 
-    # Gey y-axis ticks for log10 axis scale
+    # Get y-axis ticks for log10 axis scale
     function _get_yticks(atmos::atmosphere.Atmos_t)::Array
         ylims = _get_ylims(atmos)
         return 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))

@@ -71,7 +71,7 @@ Potential solver flags are:
 * `C2` or `C4` or `F2` or `F4`- a central or forward finite-difference scheme was used (at 2nd or 4th order)
 * `Ls` - a linesearch method was applied
 * `P` - step was forcibly extrapolated because the solver is not making good progress
-* `Ub` - the atmosphere has become unbound (non-hydrostatic)
+* `Ub` - the atmosphere has become gravitationally unbound
 
 ## Grids of models
 
