@@ -1558,10 +1558,10 @@ module atmosphere
         @. atmos.p  = 10.0 ^ atmos.p
         @. atmos.pl = 10.0 ^ atmos.pl
 
-        # Ensure pressure grid is strictly increasing
-        for i in 1:atmos.nlev_c
-            atmos.p[i]    = max(atmos.p[i],    atmos.pl[i]*PRESSURE_RATIO_MIN)
-            atmos.pl[i+1] = max(atmos.pl[i+1], atmos.p[i]*PRESSURE_RATIO_MIN)
+        # Ensure pressure grid is strictly decreasing (from surface upwards)
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
+            atmos.p[i]  = min(atmos.p[i],  atmos.pl[i+1]/PRESSURE_RATIO_MIN)
+            atmos.pl[i] = min(atmos.pl[i], atmos.p[i]/PRESSURE_RATIO_MIN)
         end
 
         return nothing
