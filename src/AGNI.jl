@@ -237,6 +237,7 @@ module AGNI
         #    composition stuff (defaults to be overwritten)
         condensates::Array{String,1}        = String[]
         chem::Bool                          = false
+        rainout::Bool                       = false
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
         pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
@@ -257,8 +258,6 @@ module AGNI
             mf_dict  = Dict("H2"=>1.0)
             p_surf   = 1e-3
             p_top    = 1e-5
-            real_gas = false
-
 
         # not transparent
         else
@@ -396,6 +395,12 @@ module AGNI
         plt_tmp::Bool          = cfg["plots"]["temperature"]
         plt_ani::Bool          = cfg["plots"]["animate"]
         plt_ani = plt_ani && plt_tmp
+
+        #    latent heating
+        if incl_latent && !rainout
+            @error "Config: must enable rainout if also including latent heating"
+            return false
+        end
 
         # Read OPTIONAL configuration options from dict
         #     sensible heat at the surface
