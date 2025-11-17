@@ -73,10 +73,6 @@ module plotting
         plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos), legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
 
-        # Plot current surface pressure and original
-        @_plt_pboa
-        @_plt_poboa
-
         # Plot phase boundary
         if atmos.condense_any
             sat_t::Array{Float64,1} = zeros(Float64, atmos.nlev_c)
@@ -112,6 +108,10 @@ module plotting
         # Plot profile
         plot!(plt, atmos.tmpl, atmos.pl/1e5, lc="black", lw=2, label=L"T(p)")
 
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
+
         # Decorate
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
@@ -139,16 +139,16 @@ module plotting
                         legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
 
-        # Plot current surface pressure and original
-        @_plt_pboa
-        @_plt_poboa
-
         # Plot surface
         scatter!(plt, [atmos.rp*1e-3], [atmos.pl[end]*1e-5], color="brown3", label=L"P_s")
 
         # Plot cell-centres and cell-edges
         scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Centres")
         scatter!(plt, atmos.rl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Edges")
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Decorate
         xlabel!(plt, "Radius [km]")
@@ -223,10 +223,6 @@ module plotting
                         size=(size_x,size_y); plt_default...)
 
 
-        # Plot current surface pressure and original
-        @_plt_pboa
-        @_plt_poboa
-
         # Plot log10 VMRs for each gas
         gas_xsurf::Array = zeros(Float64, atmos.gas_num)
         gas::String = ""
@@ -283,6 +279,10 @@ module plotting
                         color=atmos.gas_dat[gas].plot_color, label="")
         end
 
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
+
         xlims  = (max(min_x, minmin_x)-0.1, 0.1)
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
 
@@ -323,10 +323,6 @@ module plotting
                     ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
                     xticks=(xticks, xticklabels), xlims=xlims,
                     size=(size_x,size_y); plt_default...)
-
-        # Plot current surface pressure and original
-        @_plt_pboa
-        @_plt_poboa
 
 
         col_r::String = "#c0c0c0"
@@ -409,6 +405,10 @@ module plotting
                 scatter!(plt, [0.2], [arr_P[i]], opacity=0.9, markersize=2, msw=0.5, color=col_p, label="")
             end
         end
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Labels
         annotate!(plt, xlims[1]/2.0, arr_P[1]/0.8, text("Downward", :black, :center, 9))
