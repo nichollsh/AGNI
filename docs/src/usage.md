@@ -65,7 +65,7 @@ During each step of the iteration, AGNI will flag the solver status to indicate 
 done and if any problems arose. These flags are separated by a hyphen (`-`).
 
 Potential solver flags are:
-* `Cs` or `Cf` - 1D chemistry was performed and it either succeeded or failed
+* `Cs` or `Cf` - chemistry and condensation schemes either (s)ucceeded or (f)ailed
 * `Gg` - radiative transfer performed with double-grey scheme
 * `M` or `Mr`  - convective fluxes are being modulated for stability
 * `C2` or `C4` or `F2` or `F4`- a central or forward finite-difference scheme was used (at 2nd or 4th order)

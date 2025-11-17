@@ -284,7 +284,7 @@ module solver
         step::Int =             0       # Step number
         code::STATUSCODE =      CODE_99 # Status code
         runtime::Float64  =     0.0     # Model runtime [s]
-        fc_retcode::Int  =      0       # Fastchem return code
+        compose_retcode::Int =  0       # Composition calculation return code
         step_ok::Bool =         true    # Current step was fine
         grey_step::Bool = grey_start    # double-grey RT enabled in this step
         easy_step::Bool =       false   # easy_start sf increased in this step
@@ -334,7 +334,7 @@ module solver
 
             # Calculate fluxes
             step_ok &= energy.calc_fluxes!(atmos, radiative=true,
-                                latent=latent, convective=convect, sens_heat=sens_heat,
+                                latent_heat=latent, convective=convect, sens_heat=sens_heat,
                                 conductive=conduct, advective=advect,
                                 convect_sf=easy_sf, latent_sf=easy_sf)
 
@@ -575,14 +575,14 @@ module solver
             end
             _set_tmps!(x_cur)
 
-            # Run chemistry scheme
-            if chem
-                @debug "        chemistry"
-                fc_retcode = chemistry.fastchem_eqm!(atmos, false)
-                if fc_retcode == 0
-                    stepflags *= "Cs-"  # chemistry success
+            # Run chemistry and condensation schemes
+            if chem || rainout
+                @debug "        composition"
+                compose_retcode = chemistry.calc_composition!(atmos, rainout, chem, rainout)
+                if compose_retcode == 0
+                    stepflags *= "Cs-"  # success
                 else
-                    stepflags *= "Cf-"  # chemistry failure
+                    stepflags *= "Cf-"  # failure
                     step_ok = false
                 end
             end
@@ -1109,13 +1109,14 @@ module solver
         atmos.is_solved = true
 
         # Print info
-        @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
+        # @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
         if (sol_type == 2)
             F_skin = energy.skin_flux(atmos)
             @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", F_skin)
         end
         @info @sprintf("    total flux         = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
+        @info @sprintf("    surf pressure      = %.1e bar      ", atmos.p_boa/1e5)
 
         return atmos.is_converged
     end # end solve_prescribed
