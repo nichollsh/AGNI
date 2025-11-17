@@ -11,7 +11,6 @@ This module handles chemistry, condensation, and evaporation.
 
 Note the important distinctions between the variables which store atmospheric composition.
  * `gas_ovmr` stores VMRs inputted by the user, which are usually constant in height.
- * `gas_cvmr` stores VMRs after chemistry is calculated but before rainout/evaporation.
  * `gas_vmr` stores the runtime gas volume mixing ratios, after all calculations are performed.
 
 """
@@ -179,9 +178,10 @@ module chemistry
             return any_changed
         end
 
-        # Recalculate all surface VMRs from partial pressures
+        # Recalculate VMRs from partial pressures (dalton's law)
+        #     Sets to well-mixed composition
         for gas in atmos.gas_names
-            atmos.gas_vmr[gas][end] = p_gas[gas]/atmos.p_boa
+            fill!(atmos.gas_vmr[gas], p_gas[gas]/atmos.p_boa)
         end
 
         # Generate new pressure grid with updated p_boa
@@ -209,8 +209,7 @@ module chemistry
     Disabling evaporation will lead to unclosed energy budget when calculation of latent
     heat fluxes is performed.
 
-    This function can be called *after* the fastchem calculation. It takes `gas_cvmr` as
-    input, does not modify it, and writes post-rainout compositions to `gas_vmr`.
+    This function can be called *after* the fastchem calculation.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -226,9 +225,8 @@ module chemistry
         # Reset phase change flags
         # Reset condensation yield values
         for g in atmos.gas_names
-           @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
-           fill!(atmos.gas_sat[g],          false)
-           fill!(atmos.cond_yield[g],       0.0)  # kg/m2 of condensate produced at levels
+           fill!(atmos.gas_sat[g],    false)
+           fill!(atmos.cond_yield[g], 0.0)  # kg/m2 of condensate produced at levels
         end
 
         # Set initial maximum value as surface composition (for cold trapping)
@@ -373,9 +371,6 @@ module chemistry
             # recalculate layer properties after re-evaporating this species
             atmosphere.calc_layer_props!(atmos)
 
-            # sum total condensate as surface + aloft
-            atmos.ocean_tot[c] += atmos.cond_accum[c]
-
         end # end loop over condensates
 
         # Set water clouds at levels where condensation occurs
@@ -512,7 +507,7 @@ module chemistry
 
                     # Get gas abundance from original VMR value
                     #    scale number of atoms by the abundance of the gas
-                    N_g *= atmos.gas_ovmr[gas][end] * atmos.p[end] / (phys.k_B * atmos.tmp[end])
+                    N_g *= atmos.gas_vmr[gas][end] * atmos.p[end] / (phys.k_B * atmos.tmp[end])
 
                     # Add atoms from this gas to total atoms in the mixture
                     N_t += N_g
@@ -597,7 +592,6 @@ module chemistry
         # Clear VMRs
         for g in atmos.gas_names
             fill!(atmos.gas_vmr[g],  0.0)
-            fill!(atmos.gas_cvmr[g], 0.0)
         end
 
         # Parse gas chemistry
@@ -648,7 +642,7 @@ module chemistry
             # matched?
             if match
                 N_g = data[i,:]  # number densities for this gas
-                @. atmos.gas_cvmr[g_in] += N_g / N_t    # VMR for this gas
+                @. atmos.gas_vmr[g_in] += N_g / N_t    # VMR for this gas
             end
         end
 
@@ -668,13 +662,13 @@ module chemistry
             # @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
             i_trunc = min(i_trunc, atmos.nlev_c-1)
             for g in atmos.gas_names
-                atmos.gas_cvmr[g][1:i_trunc] .= atmos.gas_cvmr[g][i_trunc+1]
+                atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc+1]
             end
         end
 
-        # Also update result in gas_vmr dictionary
+        # Also record this result in gas_cvmr dictionary
         for g in atmos.gas_names
-            @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
+            @. atmos.gas_cvmr[g] = atmos.gas_vmr[g]
         end
 
         # recalculate layer properties
@@ -704,7 +698,7 @@ module chemistry
     - `state::Int`           fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
     function calc_composition!(atmos::atmosphere.Atmos_t,
-                            do_surf::Bool, do_chem::Bool, do_aloft::Bool)::Int
+                                    do_surf::Bool, do_chem::Bool, do_aloft::Bool)::Int
 
         state::Int = 0
 
@@ -724,6 +718,11 @@ module chemistry
         # aloft saturation
         if do_aloft
             _sat_aloft!(atmos)
+
+            # sum total condensate as surface + aloft
+            for c in atmos.condensates
+                atmos.ocean_tot[c] += atmos.cond_accum[c]
+            end
         end
 
         return state

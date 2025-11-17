@@ -170,7 +170,7 @@ module solver
                             dx_min::Float64=1e-7, dx_max::Float64=400.0,
                             tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
-                            fd_rel::Float64=3.0e-5, fd_abs::Float64=1e-5,
+                            fd_rel::Float64=1e-4, fd_abs::Float64=1e-5,
                             fdc::Bool=true, fdo::Int=2,
                             method::Int=1,
                             easy_start::Bool=false, grey_start::Bool=false,
@@ -329,8 +329,15 @@ module solver
             # Set new temperatures
             _set_tmps!(x)
 
-            # Do condensation and chemistry
-            chemistry.calc_composition!(atmos, rainout, chem, rainout)
+            # Do saturation aloft here, only
+            # chemistry.calc_composition!(atmos, rainout, chem, rainout)
+            if rainout
+                # reset back to post-chemistry value
+                for g in atmos.gas_names
+                    @. atmos.gas_vmr[g] = atmos.gas_cvmr
+                end
+                _sat_aloft!(atmos)
+            end
 
             # Calculate fluxes
             step_ok &= energy.calc_fluxes!(atmos, radiative=true,
@@ -341,7 +348,7 @@ module solver
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
                 # Zero loss with constant tmp_surf
-                resid[1:end] .= atmos.flux_dif[1:end]
+                @. resid = atmos.flux_dif
 
             elseif (sol_type == 2)
                 # Zero loss
@@ -351,14 +358,14 @@ module solver
 
             elseif (sol_type == 3)
                 # Zero loss
-                resid[2:end] .= atmos.flux_dif[1:end]
-                resid[1] = atmos.flux_tot[1] - atmos.flux_int
+                resid[1:end-1] .= atmos.flux_dif[1:end]
+                resid[end] = atmos.flux_tot[end] - atmos.flux_int
 
             elseif (sol_type == 4)
                 # Zero loss
-                resid[2:end] .= atmos.flux_dif[1:end]
+                resid[1:end-1] .= atmos.flux_dif[1:end]
                 # OLR is equal to target_olr
-                resid[1] = atmos.target_olr - atmos.flux_u_lw[1]
+                resid[end] = atmos.target_olr - atmos.flux_u_lw[1]
 
             end
 
