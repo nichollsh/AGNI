@@ -332,11 +332,11 @@ module solver
             # Do saturation aloft here, only
             # chemistry.calc_composition!(atmos, rainout, chem, rainout)
             if rainout
-                # reset back to post-chemistry value
+                # reset back to post-chemistry mixing ratios
                 for g in atmos.gas_names
-                    @. atmos.gas_vmr[g] = atmos.gas_cvmr
+                    @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
                 end
-                _sat_aloft!(atmos)
+                chemistry._sat_aloft!(atmos)
             end
 
             # Calculate fluxes
@@ -621,7 +621,7 @@ module solver
 
                         easy_sf = min(1.0, easy_sf*easy_incr)
                         easy_step = true
-                        @debug "    updated easy_sf = $easy_sf"
+                        @debug "        updated easy_sf = $easy_sf"
 
                         # done modulating
                         if easy_sf > 0.99
@@ -803,7 +803,7 @@ module solver
 
                     # Apply best scale from linesearch
                     ls_alpha = min(max(ls_alpha, ls_min_scale), ls_max_scale)
-                    @debug "    linesearch scale ls_alpha = $ls_alpha"
+                    @debug "            ls_alpha = $ls_alpha"
                     x_dif *= ls_alpha
                 end
 
@@ -930,6 +930,7 @@ module solver
         end
 
         # perform one last evaluation to set `atmos` given the final `x_cur`
+        chemistry.calc_composition!(atmos, rainout, chem, rainout)
         _fev!(x_cur, zeros(Float64, arr_len))
 
         # calc kzz profile
@@ -966,15 +967,20 @@ module solver
         # ----------------------------------------------------------
         loss = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
         loss_pct = 100.0*loss/maximum(abs.(atmos.flux_tot))
-        @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
-        if (sol_type == 2)
+        if sol_type == 4
+            @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
+        end
+        if sol_type == 2
             @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", energy.skin_flux(atmos))
         end
         @info @sprintf("    total flux at TOA  = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    total flux at BOA  = %+.2e W m-2     ", atmos.flux_tot[end])
-        @info @sprintf("    total flux lost    = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
-        @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
+        @info @sprintf("    global flux loss   = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
+        # @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
+        if rainout
+            @info @sprintf("    surf pressure      = %-9.3e bar      ", atmos.p_boa/1e5)
+        end
 
 
         return atmos.is_converged

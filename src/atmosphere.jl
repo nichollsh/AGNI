@@ -1283,6 +1283,8 @@ module atmosphere
     Performs hydrostatic integration from the ground upwards.
     Requires density, temperature, pressure to have already been set.
 
+    Does not account for ocean thickness.
+
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
 

@@ -40,6 +40,27 @@ module plotting
         return @sprintf("%d",v)
     end
 
+    # Get y-axis limits
+    function _get_ylims(atmos::atmosphere.Atmos_t)::Tuple
+        return (1e-5*atmos.pl[1]/1.5, 1e-5*max(atmos.p_oboa, atmos.p_boa)*1.5 )
+    end
+
+    # Gey y-axis ticks for log10 axis scale
+    function _get_yticks(atmos::atmosphere.Atmos_t)::Array
+        ylims = _get_ylims(atmos)
+        return 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+    end
+
+    # Reusable plotting snippets
+    macro _plt_pboa()
+        return esc(:(hline!(plt, [atmos.p_boa/1e5 ], color="black", label=L"p_s",   ls=:solid)))
+    end
+    macro _plt_poboa()
+        return esc(:(hline!(plt, [atmos.p_oboa/1e5], color="black", label=L"p_s^o", ls=:dot)))
+    end
+
+
+
     """
     Plot the temperature-pressure profile.
     """
@@ -48,12 +69,13 @@ module plotting
                             incl_magma::Bool=false,
                             title::String="")
 
-        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range(log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
+        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos), legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Plot phase boundary
         if atmos.condense_any
@@ -80,15 +102,15 @@ module plotting
 
         # Plot tmp_magma
         if incl_magma
-            scatter!(plt, [atmos.tmp_magma], [atmos.pl[end]*1e-5],
+            scatter!(plt, [atmos.tmp_magma], [atmos.p_boa/1e5],
                         color="cornflowerblue", label=L"T_m")
         end
 
         # Plot tmp_surf
-        scatter!(plt, [atmos.tmp_surf], [atmos.pl[end]*1e-5], color="brown3", label=L"T_s")
+        scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=2, label=L"T(p)")
+        plot!(plt, atmos.tmpl, atmos.pl/1e5, lc="black", lw=2, label=L"T(p)")
 
         # Decorate
         xlabel!(plt, "Temperature [K]")
@@ -112,12 +134,14 @@ module plotting
                                 size_x::Int=500, size_y::Int=400,
                                 title::String="")
 
-        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
+        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
+                        legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Plot surface
         scatter!(plt, [atmos.rp*1e-3], [atmos.pl[end]*1e-5], color="brown3", label=L"P_s")
@@ -151,12 +175,9 @@ module plotting
         xlims = (-1, 101)
         xticks = collect(range(start=0.0, stop=100.0, step=10.0))
 
-        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
         # Create plot
         plt = plot( xlims=xlims, xticks=xticks,
-                    ylims=ylims, yticks=yticks,
+                    ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
                     legend=:outertopright, size=(size_x,size_y); plt_default...)
 
         # Temperature profile for reference
@@ -195,12 +216,16 @@ module plotting
         la = 0.7
 
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
-        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
+        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
+                        legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
+
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Plot log10 VMRs for each gas
         gas_xsurf::Array = zeros(Float64, atmos.gas_num)
@@ -287,8 +312,6 @@ module plotting
                         )
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
-        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         max_fl = log10(max(100.0, maximum(abs.(atmos.flux_tot)), maximum(atmos.flux_u), maximum(atmos.flux_d)))
         xticks_pos = unique(ceil.(Int, range( start=1, stop=max_fl+1, step=1)))
@@ -296,9 +319,15 @@ module plotting
         xlims = (-xticks_pos[end], xticks_pos[end])
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
-        plt = plot(legend=:outertopright, ylims=ylims, yticks=yticks,
+        plt = plot(legend=:outertopright,
+                    ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
                     xticks=(xticks, xticklabels), xlims=xlims,
                     size=(size_x,size_y); plt_default...)
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
+
 
         col_r::String = "#c0c0c0"
         col_n::String = "#000000"
