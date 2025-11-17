@@ -85,17 +85,17 @@ module chemistry
     function restore_composition!(atmos::atmosphere.Atmos_t)
 
         # Mixing ratios to original values
+        # Oceans to original values
         for g in atmos.gas_names
             @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
             @. atmos.gas_cvmr[g] = atmos.gas_ovmr[g]
+
+            atmos.ocean_tot[g] = atmos.ocean_ini[g]
         end
 
         # Pressure grid
         atmos.p_boa = atmos.p_oboa
         atmosphere.generate_pgrid!(atmos)
-
-        # Reset oceans
-        atmos.ocean_tot[:] .= atmos.ocean_ini[:]
 
         # Layer properties
         atmosphere.calc_layer_props!(atmos)

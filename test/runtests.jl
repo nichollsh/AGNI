@@ -614,7 +614,7 @@ if suite > 9
     # -------------
     @info " "
     @info "Testing fluxes"
-    energy.calc_fluxes!(atmos, radiative=true, convect=true, conduct=true, sens_heat=true, latent_heat=true, advect=true)
+    energy.calc_fluxes!(atmos, radiative=true, convective=true, conductive=true, sens_heat=true, latent_heat=true, advective=true)
     val_e = 8602.78747109532  # from previous tests
     val_o = atmos.flux_tot[atmos.nlev_c-10]
     @info "Expected value = $(val_e) W m-2"

@@ -282,6 +282,7 @@ module plotting
                             size_x::Int=550, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
+                            incl_advect::Bool=true,
                             title::String=""
                         )
 
@@ -305,6 +306,7 @@ module plotting
         col_t::String = "#ff4400"
         col_o::String = "#66CD00"
         col_p::String = "#ecb000"
+        col_a::String = "#7700bd"
 
         alpha = 0.7
         w = 2.0
@@ -352,9 +354,14 @@ module plotting
             plot!(plt, _symlog.(atmos.flux_cdct), arr_P, label="Conduct", lw=w*1.2, lc=col_o, ls=:solid, linealpha=alpha)
         end
 
-        # Condensation
+        # Latent heating
         if incl_latent
             plot!(plt, _symlog.(atmos.flux_l), arr_P, label="Latent", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+        end
+
+        # Advection
+        if incl_advect
+            plot!(plt, _symlog.(atmos.flux_advect), arr_P, label="Advect", lw=w*1.2, lc=col_a, ls=:solid, linealpha=alpha)
         end
 
         # Sensible heat

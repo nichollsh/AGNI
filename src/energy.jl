@@ -836,10 +836,10 @@ module energy
     Optional arguments:
     - `radiative::Bool`                 include radiation fluxes
     - `latent::Bool`                    include condensation flux
-    - `convect::Bool`                   include MLT convection flux
+    - `convective::Bool`                include MLT convection flux
     - `sens_heat::Bool`                 include TKE sensible heat flux
-    - `conduct::Bool`                   include conductive heat flux
-    - `advect::Bool`                    include advective heat flux
+    - `conductive::Bool`                include conductive heat flux
+    - `advective::Bool`                 include advective heat flux
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
@@ -848,8 +848,8 @@ module energy
     - `ok::Bool`                        calculation performed ok?
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t;
-                          radiative::Bool=false, latent::Bool=false, convect::Bool=false,
-                          sens_heat::Bool=false, conduct::Bool=false, advect::Bool=false,
+                          radiative::Bool=false, latent::Bool=false, convective::Bool=false,
+                          sens_heat::Bool=false, conductive::Bool=false, advective::Bool=false,
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
                           calc_cf::Bool=false)::Bool
 
@@ -858,7 +858,7 @@ module energy
         ok::Bool = true
 
         # Warn if no flux terms are enabled
-        if !(radiative || latent || convect || sens_heat || conduct || advect)
+        if !(radiative || latent || convective || sens_heat || conductive || advective)
             @warn "No flux terms enabled in call to `calc_fluxes!`"
             ok = false
         end
@@ -878,7 +878,7 @@ module energy
         end
 
         # +Dry convection
-        if convect
+        if convective
             convection!(atmos)                          # Calc dry convection heat flux
             atmos.flux_cdry *= convect_sf               # Modulate for stability?
             @. atmos.flux_tot += atmos.flux_cdry # Add to total flux
@@ -891,13 +891,13 @@ module energy
         end
 
         # +Conduction
-        if conduct
+        if conductive
             conduct!(atmos)
             @. atmos.flux_tot += atmos.flux_cdct
         end
 
         # +Advection
-        if advect
+        if advective
             @. atmos.flux_tot += atmos.flux_advect
         end
 
