@@ -265,6 +265,7 @@ module AGNI
             p_top = Float64(cfg["composition"]["p_top"])
             real_gas = Bool(cfg["physics"]["real_gas"])
             chem = Bool(cfg["physics"]["chemistry"])
+            rainout = Bool(cfg["physics"]["rainout"])
             condensates = cfg["composition"]["condensates"]
 
             comp_set_by::Int = 0
@@ -335,9 +336,15 @@ module AGNI
         end
 
         #    chemistry
-        if chem && transparent
-            @error "Config: chemistry is incompatible with transparent atmosphere mode"
-            return false
+        if chem
+            if transparent
+                @error "Config: chemistry is incompatible with transparent atmosphere mode"
+                return false
+            end
+            if !atmos.flag_fastchem
+                @error "Chemistry enabled but could not find FastChem. Have you set FC_DIR?"
+                return false
+            end
         end
 
         #    RFM radtrans
@@ -508,18 +515,7 @@ module AGNI
         # Write initial state
         save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
-        # Do chemistry on initial composition
-        if chem
-            @debug "Initial chemistry"
-
-            # check we found fastchem
-            if !atmos.flag_fastchem
-                @error "Chemistry enabled but could not find FastChem. Have you set FC_DIR?"
-                return false
-            end
-
-            chemistry.fastchem_eqm!(atmos, true)
-        end
+        chemistry.calc_composition!(atmos, rainout, chem, rainout)
 
         # Frame dir
         if plt_ani
@@ -541,10 +537,9 @@ module AGNI
         # No solve - just calc fluxes at the end
         if sol == "none"
             energy.calc_fluxes!(atmos, radiative=true, latent=incl_latent,
-                                convect=incl_convect, sens_heat=incl_sens,
-                                conduct=incl_conduct, avect=incl_advect;
-                                calc_cf=Bool(cfg["plots"]["contribution"]),
-                                rainout=Bool(cfg["physics"]["rainout"]))
+                                convective=incl_convect, sens_heat=incl_sens,
+                                conductive=incl_conduct, advective=incl_advect,
+                                calc_cf=Bool(cfg["plots"]["contribution"]))
 
         # Transparent atmosphere solver
         elseif sol == "transparent"
@@ -569,7 +564,7 @@ module AGNI
                                 conv_atol=conv_atol,
                                 conv_rtol=conv_rtol,
                                 method=Int(method_idx),
-                                rainout=Bool(cfg["physics"]["rainout"]),
+                                rainout=rainout,
                                 dx_max=Float64(cfg["execution"]["dx_max"]),
                                 ls_method=Int(cfg["execution"]["linesearch"]),
                                 easy_start=Bool(cfg["execution"]["easy_start"]),
@@ -598,11 +593,11 @@ module AGNI
 
         # Print information about ocean formation, if any
         for c in atmos.condensates
-            if atmos.cond_total[c] > eps(0.0)
-                @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.cond_total[c])
+            if atmos.ocean_tot[c] > eps(0.0)
+                @info @sprintf("Surface liquid %s mass: %.2e kg/m^2", c, atmos.ocean_tot[c])
             end
         end
-        atmos.ocean_layers = ocean.dist_surf_liq(atmos.cond_total,
+        atmos.ocean_layers = ocean.dist_surf_liq(atmos.ocean_tot,
                                                     atmos.ocean_ob_frac,
                                                     atmos.ocean_cs_height,
                                                     atmos.rp)

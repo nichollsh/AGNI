@@ -334,10 +334,9 @@ module solver
 
             # Calculate fluxes
             step_ok &= energy.calc_fluxes!(atmos, radiative=true,
-                                latent=latent, convect=convect, sens_heat=sens_heat,
-                                conduct=conduct, advect=advect,
-                                convect_sf=easy_sf, latent_sf=easy_sf,
-                                rainout=rainout)
+                                latent=latent, convective=convect, sens_heat=sens_heat,
+                                conductive=conduct, advective=advect,
+                                convect_sf=easy_sf, latent_sf=easy_sf)
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
@@ -946,7 +945,7 @@ module solver
         atmosphere.calc_observed_rho!(atmos)
 
         # calc ocean scalar quantities
-        atmos.ocean_layers = ocean.dist_surf_liq(atmos.cond_total,
+        atmos.ocean_layers = ocean.dist_surf_liq(atmos.ocean_tot,
                                                     atmos.ocean_ob_frac,
                                                     atmos.ocean_cs_height,
                                                     atmos.rp)

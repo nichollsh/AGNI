@@ -769,14 +769,17 @@ module atmosphere
             mf_source = 0
         end
 
-        # The values will be stored in a dict of arrays
+        # Gas variables
+        atmos.gas_num   =   0                                 # number of gases
         atmos.gas_names =   Array{String}(undef, 0)           # list of names
         atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of gas data structs
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
         atmos.gas_cvmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
+        atmos.gas_safe  =   Dict{String, Bool}()              # considered 'safe'?
+        atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # mask for saturation
 
-        # Convert metallicities from mass to mole fraction here
+        # Metallicities
         atmos.metal_orig =  Dict{String, Float64}()          # input metallicities rel to H
         atmos.metal_calc =  Dict{String, Float64}()          # calculated metallicities (empty for now)
         for k in keys(metallicities)
@@ -784,13 +787,20 @@ module atmosphere
             atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
         end
 
-        atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # mask for saturation
+        # Phase change compositional variables
+        #    condensation aloft
+        atmos.condensates = Array{String}(undef, 0)           # list of condensates
         atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # cond/evap yield at each layer
         atmos.cond_accum =  Dict{String, Float64}()           # sum of each yield in atmosphere
+        #    ocean reservoirs
         atmos.ocean_ini =   Dict{String,Float64}()            # initial ocean reservoir [kg/m^2]
         atmos.ocean_tot =   Dict{String,Float64}()            # final ocean reservoir [kg/m^2]
-        atmos.gas_num   =   0                                 # number of gases
-        atmos.condensates = Array{String}(undef, 0)           # list of condensates
+        #    ocean layers
+        atmos.ocean_maxdepth  = 0.0
+        atmos.ocean_areacov   = 0.0
+        atmos.ocean_topliq    = UNSET_STR
+        atmos.ocean_layers    = Tuple[(1,UNSET_STR,0.0,0.0),]  # array of tuples
+
 
         # Dict input case
         if mf_source == 0
@@ -810,10 +820,9 @@ module atmosphere
                     atmos.gas_num += 1
                 end
             end
-        end # end read VMR from dict
 
-        # File input case
-        if mf_source == 1
+        # CSV file case
+        elseif mf_source == 1
             # check file
             if !isfile(mf_path)
                 @error "Could not read VMR file '$mf_path'"
@@ -888,11 +897,9 @@ module atmosphere
                 end
             end
 
-        end # end read VMR from file
-
-        # If providing metallicities, must set use_all_gases=true
-        if !isempty(atmos.metal_orig) && !use_all_gases
-            @error "Must set `use_all_gases=true` if providing metallicities"
+        else
+            @error "Invalid value for setting mole fraction source"
+            @error "    Got mf_source=$mf_source"
             return false
         end
 
@@ -904,6 +911,11 @@ module atmosphere
                     push!(atmos.gas_names, gas)
                     atmos.gas_num += 1
                 end
+            end
+        else
+            if !isempty(atmos.metal_orig)
+                @error "Must set `use_all_gases=true` if providing metallicities"
+                return false
             end
         end
 
@@ -951,19 +963,17 @@ module atmosphere
         end
 
         # Load gas thermodynamic data
-        gas_fail = false
         @info "Loading thermodynamic data"
         for g in atmos.gas_names
             atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
                                                 atmos.thermo_funct, atmos.real_gas;
                                                 check_integrity=check_integrity)
 
-            gas_fail = gas_fail || atmos.gas_dat[g].fail
-        end
-        if gas_fail
-            @error "Problem when loading thermodynamic data"
-            @error "    Try downloading them again and/or updating AGNI."
-            return false
+            if atmos.gas_dat[g].fail
+                @error "Problem when loading thermodynamic data"
+                @error "    Try downloading them again and/or updating AGNI."
+                return false
+            end
         end
 
         # store condensates
@@ -976,30 +986,21 @@ module atmosphere
         end
 
         # Validate condensate names
-        atmos.condense_any = false
-        if length(condensates) > 0
+        atmos.condense_any = length(condensates) > 0
+        if atmos.condense_any
             for c in condensates
                 if !(c in atmos.gas_names)
-                    @error "Invalid condensate '$c'"
+                    @error "Invalid condensate. '$c' is not in gas list"
                     return false
                 end
             end
-            atmos.condense_any = true
         end
 
-
         # Ocean params
-        #    inputs
         atmos.ocean_cs_height = max(0.0, ocean_cs_height)
         _check_range("Continent shelf height", atmos.ocean_cs_height; min=0) || return false
         atmos.ocean_ob_frac = ocean_ob_frac
         _check_range("Ocean basin fraction", atmos.ocean_ob_frac; min=0, max=1) || return false
-
-        #    outputs
-        atmos.ocean_maxdepth  = 0.0
-        atmos.ocean_areacov   = 0.0
-        atmos.ocean_topliq    = UNSET_STR
-        atmos.ocean_layers    = Tuple[(1,UNSET_STR,0.0,0.0),]  # array of tuples
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to
@@ -1599,8 +1600,9 @@ module atmosphere
 
             # Validate files
             if !isfile(atmos.spectral_file)
-                @error "Spectral file '$(atmos.spectral_file)' does not exist"
-                @error "    Try using: \$ ./src/get_data.sh"
+                @error "Spectral file not found"
+                @error "    Got: '$(atmos.spectral_file)'"
+                @error "To download, try using the `get_data.sh` script"
                 @error "    e.g. to get CodenameXX: \$ ./src/get_data.sh anyspec Codename XX"
                 return false
             end
@@ -1946,7 +1948,7 @@ module atmosphere
         end
 
         # There must be at least one 'safe' gas
-        if !any(keys(atmos.gas_safe))
+        if !any(values(atmos.gas_safe))
             @error "None of the supplied gases are considered 'safe'"
             @error "There must be at least one gas which satisfies criteria:"
             @error "    a) is dry, i.e. non-condensable"
@@ -2188,7 +2190,7 @@ module atmosphere
         atmos.w_conv =            zeros(Float64, atmos.nlev_l)  # convective velocity [m s-1]
         atmos.λ_conv =            zeros(Float64, atmos.nlev_l)  # mixing length [m]
 
-        atmos.flux_advect =       zeros(Float64, atmos.nlev_l)  # advective heat flux 
+        atmos.flux_advect =       zeros(Float64, atmos.nlev_l)  # advective heat flux
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
@@ -2247,12 +2249,6 @@ module atmosphere
         atmos.control.l_gas       = false
         atmos.control.l_rayleigh  = false
         atmos.control.l_cloud     = false
-
-        # Turn off oceans
-        atmos.ocean_maxdepth  = 0.0
-        atmos.ocean_areacov   = 0.0
-        atmos.ocean_topliq    = UNSET_STR
-        atmos.ocean_layers    = Tuple[(1,UNSET_STR,0.0,0.0),]
 
         # Flag as transparent
         atmos.transparent = true
