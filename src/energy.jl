@@ -849,7 +849,7 @@ module energy
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t;
                           radiative::Bool=false, latent::Bool=false, convect::Bool=false,
-                          sens_heat::Bool=false, conduct::Bool=false, advect::Bool=false;
+                          sens_heat::Bool=false, conduct::Bool=false, advect::Bool=false,
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
                           calc_cf::Bool=false)::Bool
 
