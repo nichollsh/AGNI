@@ -55,7 +55,7 @@ title = "Cloud radiative properties test"
     advection       = false
     convection      = true
     convection_crit = "s"
-    rainout         = false
+    rainout         = true
 
 [plots]
     at_runtime      = true

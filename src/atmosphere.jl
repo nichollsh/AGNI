@@ -624,8 +624,8 @@ module atmosphere
         atmos.surface_material= surface_material
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
-        atmos.zenith_degrees =  zenith_degrees
-        _check_range("Zenith angle", atmos.zenith_degrees; min=0.2, max=89.8) || return false
+        atmos.zenith_degrees =  min(zenith_degrees, 89.9)
+        _check_range("Zenith angle", atmos.zenith_degrees; min=0.0, max=90.0) || return false
         atmos.instellation =    instellation
         _check_range("Instellation", atmos.instellation; min=0) || return false
         atmos.s0_fact =         s0_fact
