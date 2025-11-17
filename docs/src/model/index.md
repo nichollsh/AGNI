@@ -28,23 +28,30 @@ MLT directly calculates the energy flux associated with convective heat transpor
 
 When evaluating convective energy fluxes, AGNI first calculates the temperature gradient across each layer of the atmosphere. Convection occurs within each layer that has a lapse rate $dT/dP$ greater than the critical lapse rate for triggering convection. Equations 2 to 6 of Nicholls+[2025](https://academic.oup.com/mnras/article/536/3/2957/7926963) describe the calculation of the convective energy flux under the Schwarzschild criterion. AGNI can also check against the Ledoux criterion for convective stability, which accounts for vertical gradients in the gas MMW. The atmosphere is not explicitly split into convecting and non-convecting regions, thereby allowing disconnected regions of convection.
 
-## Surface saturation and oceans
+## Condensation, evaporation, and oceans
 AGNI incorporates a simple ocean model, which is tied to the atmosphere rainout and evaporation schemes. This is divided into two reservoirs for each condensable component:
 * An initial reservoir of surface condensate, provided by the user.
 * A total reservoir of surface condensate, based on the calculated chemistry and temperature profile.
 
-The primary reservoir is adjusted consistently with the surface pressure. So if a gas is saturated, its partial pressure (and VMR) are decreased, and the primary reservoir is increased correspondingly with mass conservation. In this sense the model is non-hydrostatic because the surface pressure is adjusted on the fly. The secondary reservoir does not relate to the surface pressure, and will zero if evaporation of falling droplets is efficient.
+The condensation and chemistry calculations then operate together. At each solver step, the following actions occur:
+1. The *surface* temperature and partial pressures are checked against saturation, for each condensable
+    - Super-saturated condensables have their partial pressures decreased, and the mass is added to the ocean resevoir
+    - Sub-saturated condensables have their partial pressures increased based on the availablity of surface condensate
+2. Chemistry is then performed to calculated the gas phase speciation; see [Equilibrium chemistry](@ref) below
+3. Rainout is calculated aloft, based on sub/super-saturation at *every* atmosphere level.
 
-The sum of primary and secondary reservoirs goes towards forming a surface ocean. The ocean layer structure is calculated according to liquid density. Two parameters (ocean basin area, contentinental shelf height) determine the filling fraction of the basins; i.e. whether the planet is a 'desert planet', a 'contentinental planet', or an 'aqua planet'.
+In the first step, the model is effectively non-hydrostatic because the surface pressure (and whole pressure grid) is adjusted according to *surface* sub/super-saturation. The sum of condensation at the surface and aloft  go towards modulating the surface ocean content. The ocean layer structure is calculated according to liquid density. Two parameters (ocean basin area, contentinental shelf height) determine the filling fraction of the basins; i.e. whether the planet is a 'desert planet', a 'contentinental planet', or an 'aqua planet'.
+
+During the third step, where phase change happens aloft, the mixing ratios of dry species are increased in order to satisfy the total pressure at condensing levels. This is treated as a hydrostatic processes. The total accumulated amount of condensation (for each volatile) is then re-evaporated in the deeper atmosphere where possible. Rain reaching the surface contributes to the ocean.
 
 ## Phase change in the atmosphere
-Gases release energy ("latent heat" or "enthalpy") into their surroundings when condensing into a liquid or solid. This is included in the model through a diffusive condensation scheme, which assumes a fixed condensation timescale. This takes place as follows... firstly, the mixing ratios of the gases are updated according to the temperature profile, where rainout occurs at each level until all condensables are saturated or sub-saturated. The mixing ratios of dry species are increased in order to satisfy the total pressure at condensing levels. The total accumulated amount of condensation (for each volatile) is then re-evaporated in the deeper atmosphere where possible. Any rain which is not re-evaporated before reaching the surface is considered to contribute towards forming an ocean (secondary reservoir).
+Gases release energy "latent heat" into their surroundings when condensing into a liquid or solid. This is included in the model through a diffusive condensation scheme, which assumes a fixed condensation timescale. Any rain which is not re-evaporated before reaching the surface is considered to contribute towards forming an ocean (secondary reservoir).
 
 The latent heating associated with the change in partial pressure of condensable gases in the atmosphere is used to calculate a latent heating rate at each level of the model (positive where condensing, negative where evaporating). The heating rates in each layer are then integrated (from the TOA downwards) to provide a latent heat transport *flux* at cell-edges, which the assumption being that condensation occurs by updrafts. The integrated condensable heat flux is balanced by evaporation at deeper layers which closes the energy balance.
 
-Latent heats are temperature-dependent, using values derived from Coker (2007) and Wagner & Pruß ([2001](https://doi.org/10.1063/1.1461829)). Heat capacities are also temperature-dependent, using values derived from the JANAF database. See the [ThermoTools repo](https://github.com/nichollsh/ThermoTools) for scripts.
+Latent heats are temperature-dependent, using values derived from Coker (2007) and Wagner & Pruß ([2001](https://doi.org/10.1063/1.1461829)). Heat capacities are also temperature-dependent, using values derived from the JANAF database. See the [ThermoTools repo](https://github.com/nichollsh/ThermoTools) for scripts. This method is conceptually similar to Derras-Chouk+[2025](https://arxiv.org/abs/2508.16750).
 
-This method is conceptually similar to Derras-Chouk+[2025](https://arxiv.org/abs/2508.16750).
+AGNI assumes that no work is done during phase changes aloft, $p dV \approx 0$, so enthalpy and latent heat become equivalent.
 
 ## Stellar flux
 A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, an artificial additional albedo factor, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
@@ -54,7 +61,7 @@ By default, AGNI assumes that the atmosphere composition is "well-mixed". This m
 
 With condensation turned off, AGNI can couple to [FastChem](https://newstrangeworlds.github.io/FastChem/) - a fast numerical model of equilibrium gas-phase chemistry. FastChem takes metallicities (elemental ratios), pressures, and temperatures as input variables. It outputs the partial pressures of a wide range of volatile species, with their mixing ratios set by the equilibrium of their collective thermochemical reactions.
 
-AGNI uses the inputted gas partial pressures (or mixing ratios) to calculate the atmosphere's metallicity. When the configuration variable `composition.chemistry` is set to a value of 1, 2, or 3 FastChem will be enabled. At each step of the solver loop, the metallicity and T-P profile will be provided to FastChem in order to calculate the atmospheric composition at each layer. This new composition is applied when calculating energy fluxes, emission spectra, etc.
+AGNI uses the inputted gas partial pressures (or mixing ratios) to calculate the atmosphere's metallicity. When the configuration variable `composition.chemistry=true` FastChem will be enabled. At each step of the solver loop, the metallicity and T-P profile will be provided to FastChem in order to calculate the atmospheric composition at each layer. This new composition is applied when calculating energy fluxes, emission spectra, etc.
 
 ## Transparent atmospheres
 It is useful to run AGNI with a transparent atmosphere in various scenarios. For example, in the calculation of reflectance or emission spectra of 'bare rock' planets. Or alternatively to determine a planet's surface temperature in the absence of an overlying atmosphere. AGNI incorporates this functionality through the configuration variable `composition.transparent=true`. This will set the atmosphere surface pressure to be small and disable the gas opacity, continuum opacity, and other absorption processes in SOCRATES.
