@@ -71,7 +71,7 @@ Potential solver flags are:
 * `C2` or `C4` or `F2` or `F4`- a central or forward finite-difference scheme was used (at 2nd or 4th order)
 * `Ls` - a linesearch method was applied
 * `P` - step was forcibly extrapolated because the solver is not making good progress
-* `Ub` - the atmosphere has become gravitationally unbound
+* `U` - the atmosphere has become gravitationally unbound
 
 ## Grids of models
 
@@ -190,7 +190,8 @@ Parameters that describe how the model should treat the physics.
 | `convection    `  | Include vertical heat transport associated with convection (true/false) |
 | `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
-| `rainout       `  | Enable rainout and/or evaporation of condensables. Required for `latent_heat=true`. |
+| `rainout       `  | Enable condensation and evaporation of condensables aloft. Required for `latent_heat=true`. |
+| `oceans        `  | Enable condensation and evaporation of condensables at the surface. |
 
 ### `[plots]`
 Configure plotting routines all of these should be `true` or `false`.
