@@ -63,6 +63,7 @@ title = "Chemistry and condensation together"
     grey_lw         = 5e-2
     grey_sw         = 1e-2
     rainout         = true
+    oceans          = true
     latent_heat     = false
 
 

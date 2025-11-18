@@ -56,6 +56,7 @@ title = "Cloud radiative properties test"
     convection      = true
     convection_crit = "s"
     rainout         = true
+    oceans          = true
 
 [plots]
     at_runtime      = true

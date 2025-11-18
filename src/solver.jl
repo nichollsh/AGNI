@@ -145,6 +145,7 @@ module solver
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
     - `advect::Bool`                    include advective heat exchange (dynamics)
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
+    - `oceans::Bool`                    check surface saturation (ocean formation)
 
     Optional solver arguments:
     - `dx_min::Float64`                 minimum step size [K]
@@ -176,7 +177,7 @@ module solver
                             chem::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
                             conduct::Bool=true, latent::Bool=true, advect::Bool=true,
-                            rainout::Bool=true,
+                            rainout::Bool=true, oceans::Bool=true,
                             dx_min::Float64=1e-7, dx_max::Float64=400.0,
                             tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
@@ -577,9 +578,9 @@ module solver
             _set_tmps!(x_cur)
 
             # Run chemistry and condensation schemes
-            if chem || rainout
+            if chem || rainout || oceans
                 @debug "        composition"
-                compose_retcode = chemistry.calc_composition!(atmos, rainout, chem, rainout)
+                compose_retcode = chemistry.calc_composition!(atmos, oceans, chem, rainout)
                 if compose_retcode == 0
                     stepflags *= "Cs-"  # success
                 else
@@ -911,7 +912,7 @@ module solver
         end
 
         # perform one last evaluation to set `atmos` given the final `x_cur`
-        chemistry.calc_composition!(atmos, rainout, chem, rainout)
+        chemistry.calc_composition!(atmos, oceans, chem, rainout)
         _fev!(x_cur, zeros(Float64, arr_len))
 
         # calc kzz profile
@@ -959,7 +960,7 @@ module solver
         @info @sprintf("    global flux loss   = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
         # @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
-        if rainout
+        if rainout || oceans
             @info @sprintf("    surf pressure      = %-9.3e bar      ", atmos.p_boa/1e5)
         end
 
