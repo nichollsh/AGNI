@@ -617,7 +617,7 @@ module atmosphere
 
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
-        _check_range("Number of levels", atmos.nlev_c; min=25) || return false
+        _check_range("Number of levels", atmos.nlev_c; min=NLEV_minimum) || return false
 
         atmos.tmp_surf =        max(tmp_surf, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-7, gravity)
@@ -979,7 +979,7 @@ module atmosphere
         # store condensates
         for c in condensates
             if atmos.gas_dat[c].stub || atmos.gas_dat[c].no_sat || (c in COND_DISALLOWED)
-                @warn "$c is disallowed from being condensable; will treat $c as a dry gas"
+                @warn "$c disallowed from being condensable; treated as dry"
             else
                 push!(atmos.condensates, c)
             end

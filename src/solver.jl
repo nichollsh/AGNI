@@ -243,6 +243,7 @@ module solver
         easy_start         = Bool(easy_start)
         easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
         easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
+        easy_sf::Float64   = 3e-4       # Convective & phase change flux scale factor
 
         #    finite difference
         perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
@@ -277,7 +278,6 @@ module solver
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost
-        easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor
         plateau_apply::Bool      = false                # Plateau declared in this iteration?
 
         #     tracking
@@ -609,35 +609,22 @@ module solver
                 stepflags *= "M"
 
                 # Check if sf needs to be increased
-                if c_cur*easy_trig < conv_atol + conv_rtol * c_max
-                    if easy_sf < 1.0
-                        # increase sf => reduce modulation by easy_incr
-                        stepflags *= "r"
-
-                        # starting from sf=0
-                        if easy_sf < 1.0e-10
-                            easy_sf = 3e-4
-                        end
-
-                        easy_sf = min(1.0, easy_sf*easy_incr)
-                        easy_step = true
-                        @debug "        updated easy_sf = $easy_sf"
-
-                        # done modulating
-                        if easy_sf > 0.99
-                            easy_start = false
-                        end
-                    else
-                        easy_sf = 1.0
-                    end
+                if (c_cur*easy_trig < conv_atol + conv_rtol * c_max) && !grey_step
+                    stepflags *= "r"
+                    easy_sf = min(1.0, easy_sf*easy_incr)
+                    easy_step = true
+                    @debug "        updated easy_sf = $easy_sf"
                 end
 
-                if stepflags[end] == "M"
-                    stepflags *= "c"
+                # done modulating
+                if easy_sf > 0.99
+                    easy_start = false
+                    easy_sf = 1.0
                 end
+
                 stepflags *= "-"
             else
-                # No modulation at this point
+                # No more modulation
                 easy_sf = 1.0
             end
 
@@ -873,12 +860,12 @@ module solver
 
             # Converged?
             @debug "        check convergence"
-            if (c_cur < conv_atol + conv_rtol * c_max) && !easy_start
+            if (c_cur < conv_atol + conv_rtol * c_max)
                 # still using grey RT?
                 if grey_step
                     # switch to preferred RT scheme
                     grey_step = false
-                else
+                elseif !easy_start
                     # done!
                     code = CODE_SUC
                     break
