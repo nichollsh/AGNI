@@ -60,7 +60,7 @@ save_plots   = false        # plots for each case
 save_ncdf_tp = true         # a single NetCDF containing all T(p) solutions
 
 # Runtime options
-ls_increase::Float64   = 1.02
+AGNI.solver.ls_increase= 1.02
 modwrite::Int          = 10           # frequency to write CSV file
 modplot::Int           = 2            # Plot during runtime (debug)
 frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
@@ -91,22 +91,23 @@ result_table_path::String = joinpath(output_dir,"result_table.csv")
 AGNI.setup_logging(joinpath(output_dir, "manager.log"), cfg["execution"]["verbosity"])
 
 # Parse parameters
-incl_convect     = cfg["execution"]["convection"]
-incl_conduct     = cfg["execution"]["conduction"]
-incl_sens        = cfg["execution"]["sensible_heat"]
-incl_latent      = cfg["execution"]["latent_heat"]
+incl_convect     = cfg["physics"]["convection"]
+incl_conduct     = cfg["physics"]["conduction"]
+incl_sens        = cfg["physics"]["sensible_heat"]
+incl_latent      = cfg["physics"]["latent_heat"]
 sol_type         = cfg["execution"]["solution_type"]
 conv_atol        = cfg["execution"]["converge_atol"]
 conv_rtol        = cfg["execution"]["converge_rtol"]
 perturb_all      = cfg["execution"]["perturb_all"]
-perturb_chem     = false
 plt_tmp          = cfg["plots"]["temperature"]
 plt_ani          = cfg["plots"]["animate"]
 p_top            = cfg["composition"]["p_top"]
-chem_type        = cfg["composition"]["chemistry"]
+chem             = cfg["physics"]["chemistry"]
+roughness        = cfg["planet"]["roughness"]
+windspeed        = cfg["planet"]["wind_speed"]
 condensates      = cfg["composition"]["condensates"]
 metallicities    = cfg["composition"]["metallicities"]
-turb_coeff       = cfg["planet"]["turb_coeff"]
+roughness        = cfg["planet"]["roughness"]
 wind_speed       = cfg["planet"]["wind_speed"]
 flux_int         = cfg["planet"]["flux_int"]
 surface_mat      = cfg["planet"]["surface_material"]
@@ -114,8 +115,8 @@ p_surf           = cfg["composition"]["p_surf"]
 star_Teff        = cfg["planet"]["star_Teff"]
 stellar_spectrum = cfg["files"]["input_star"]
 nlev_c           = cfg["execution"]["num_levels"]
-grey_lw          = cfg["execution"]["grey_lw"]
-grey_sw          = cfg["execution"]["grey_sw"]
+grey_lw          = cfg["physics"]["grey_lw"]
+grey_sw          = cfg["physics"]["grey_sw"]
 
 # Intial values for interior structure
 radius   = cfg["planet"]["radius"]
@@ -264,19 +265,19 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                                 κ_grey_lw=grey_lw,
                                 κ_grey_sw=grey_sw,
                                 metallicities=metallicities,
-                                flag_gcontinuum   = cfg["execution"]["continua"],
-                                flag_rayleigh     = cfg["execution"]["rayleigh"],
-                                flag_cloud        = cfg["execution"]["cloud"],
-                                overlap_method    = cfg["execution"]["overlap_method"],
-                                real_gas          = cfg["execution"]["real_gas"],
-                                thermo_functions  = cfg["execution"]["thermo_funct"],
+                                flag_gcontinuum   = cfg["physics"]["continua"],
+                                flag_rayleigh     = cfg["physics"]["rayleigh"],
+                                flag_cloud        = cfg["physics"]["cloud"],
+                                overlap_method    = cfg["physics"]["overlap_method"],
+                                real_gas          = cfg["physics"]["real_gas"],
+                                thermo_functions  = cfg["physics"]["thermo_funct"],
                                 use_all_gases     = true,
-                                C_d=turb_coeff, U=wind_speed,
+                                surf_roughness=roughness, surf_windspeed=windspeed,
                                 fastchem_floor = fc_floor,
                                 Kzz_floor = 0.0,
                                 flux_int=flux_int,
                                 surface_material=surface_mat,
-                                mlt_criterion=only(cfg["execution"]["convection_crit"][1]),
+                                mlt_criterion=only(cfg["physics"]["convection_crit"][1]),
                         )
 
 # AGNI struct, allocate
@@ -454,7 +455,7 @@ for (i,p) in enumerate(grid_flat)
 
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=sol_type,
-                                            conduct=incl_conduct, chem_type=chem_type,
+                                            conduct=incl_conduct, chem=chem,
                                             convect=incl_convect, latent=incl_latent,
                                             sens_heat=incl_sens,
                                             max_steps=max_steps,
@@ -462,8 +463,8 @@ for (i,p) in enumerate(grid_flat)
                                             conv_atol=conv_atol,
                                             conv_rtol=conv_rtol,
                                             method=1,
-                                            ls_increase=ls_increase,
-                                            rainout=Bool(cfg["execution"]["rainout"]),
+                                            rainout=Bool(cfg["physics"]["rainout"]),
+                                            oceans=Bool(cfg["physics"]["oceans"]),
                                             dx_max=Float64(cfg["execution"]["dx_max"]),
                                             ls_method=Int(cfg["execution"]["linesearch"]),
                                             easy_start=easy_start,
@@ -471,7 +472,7 @@ for (i,p) in enumerate(grid_flat)
                                             save_frames=false,
                                             radiative_Kzz=false,
                                             perturb_all=perturb_all,
-                                            perturb_chem=perturb_chem
+
                                             )
 
     # Report radius
