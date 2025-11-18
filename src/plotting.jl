@@ -53,10 +53,10 @@ module plotting
 
     # Reusable plotting snippets
     macro _plt_pboa()
-        return esc(:(hline!(plt, [atmos.p_boa/1e5 ], color="black", label=L"p_s",   ls=:solid)))
+        return esc(:(hline!(plt, [atmos.p_boa/1e5 ], color="black",  ls=:solid)))
     end
     macro _plt_poboa()
-        return esc(:(hline!(plt, [atmos.p_oboa/1e5], color="black", label=L"p_s^o", ls=:dot)))
+        return esc(:(hline!(plt, [atmos.p_oboa/1e5], color="black", ls=:dot)))
     end
 
 

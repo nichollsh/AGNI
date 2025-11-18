@@ -177,6 +177,12 @@ module chemistry
             return any_changed
         end
 
+        # Do now allow p_boa to become smaller than p_toa
+        if atmos.p_boa < atmos.p_toa * atmosphere.PRESSURE_RATIO_MIN
+            @warn @sprintf("Surface pressure too low! Calculated %.3f bar",atmos.p_boa/1e5)
+            atmos.p_boa = atmos.p_toa * atmosphere.PRESSURE_RATIO_MIN
+        end
+
         # Recalculate VMRs from partial pressures (dalton's law)
         #     Sets to well-mixed composition
         for gas in atmos.gas_names
