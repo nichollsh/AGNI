@@ -57,6 +57,7 @@ title = "TOI-561 b"
     convection      = true
     convection_crit = "l"
     rainout         = false
+    oceans          = false
 
 [plots]
     at_runtime      = true

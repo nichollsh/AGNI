@@ -63,6 +63,7 @@ title = "Default"                       # Name for this configuration file
     thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     conduction      = true                      # Include thermal conductive heat transport?
+    oceans          = false                     # Model ocean formation - check saturation at surface
     rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
     latent_heat     = false                     # Include heat release from phase change
     advection       = false                     # Include advective heat flux from dynamics

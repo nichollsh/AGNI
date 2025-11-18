@@ -196,7 +196,7 @@ module AGNI
         req_keys["files"] = ["output_dir","input_sf"]
         req_keys["planet"] = ["radius","surface_material","instellation","s0_fact","albedo_b","zenith_angle","tmp_surf"]
         req_keys["execution"] = ["num_levels","solver"]
-        req_keys["physics"] = ["continua", "rayleigh","cloud","rainout","overlap_method","thermo_funct","convection_crit"]
+        req_keys["physics"] = ["continua", "rayleigh","cloud","rainout","oceans","overlap_method","thermo_funct","convection_crit"]
         for (k,v) in req_keys
             for kk in v
                 if !haskey(cfg[k],kk)
@@ -238,6 +238,7 @@ module AGNI
         condensates::Array{String,1}        = String[]
         chem::Bool                          = false
         rainout::Bool                       = false
+        oceans::Bool                        = false
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
         pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
@@ -265,6 +266,7 @@ module AGNI
             real_gas = Bool(cfg["physics"]["real_gas"])
             chem = Bool(cfg["physics"]["chemistry"])
             rainout = Bool(cfg["physics"]["rainout"])
+            oceans  = Bool(cfg["physics"]["oceans"])
             condensates = cfg["composition"]["condensates"]
 
             comp_set_by::Int = 0
@@ -515,7 +517,7 @@ module AGNI
         save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
         # Run chemistry in the first instance
-        chemistry.calc_composition!(atmos, rainout, chem, rainout)
+        chemistry.calc_composition!(atmos, oceans, chem, rainout)
 
         # Frame dir
         if plt_ani
@@ -565,6 +567,7 @@ module AGNI
                                 conv_rtol=conv_rtol,
                                 method=Int(method_idx),
                                 rainout=rainout,
+                                oceans=oceans,
                                 dx_max=Float64(cfg["execution"]["dx_max"]),
                                 ls_method=Int(cfg["execution"]["linesearch"]),
                                 easy_start=Bool(cfg["execution"]["easy_start"]),

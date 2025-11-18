@@ -58,6 +58,7 @@ title = "K2-18 b, mixed"
     convection      = true
     convection_crit = "l"
     rainout         = true
+    oceans          = false
 
 [plots]
     at_runtime      = true

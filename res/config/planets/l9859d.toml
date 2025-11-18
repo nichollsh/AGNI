@@ -59,6 +59,7 @@ title = "L 98-59 d"
     convection      = true
     convection_crit = "s"
     rainout         = false
+    oceans          = false
 
 [plots]
     at_runtime      = true

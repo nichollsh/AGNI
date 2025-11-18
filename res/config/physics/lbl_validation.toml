@@ -61,6 +61,7 @@ title = "Line-by-line validation tests"
     convection      = false
     convection_crit = "s"
     rainout         = false
+    oceans          = false
 
 [plots]
     at_runtime      = true

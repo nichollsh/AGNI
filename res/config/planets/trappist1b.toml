@@ -58,6 +58,7 @@ title = "TRAPPIST-1 b"
     convection      = true
     convection_crit = "s"
     rainout         = false
+    oceans          = false
 
 [plots]
     at_runtime      = true

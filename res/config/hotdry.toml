@@ -54,10 +54,11 @@ title = "Hot and dry"
     sensible_heat   = true
     conduction      = true
     latent_heat     = false
-    advection       = false   
+    advection       = false
     convection      = true
     convection_crit = "l"
     rainout         = false
+    oceans          = false 
     grey_lw         = 5e-3
     grey_sw         = 2e-3
 

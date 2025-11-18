@@ -60,6 +60,7 @@ title = "Chemistry by metallicity"
     convection      = true
     convection_crit = "l"
     rainout         = false
+    oceans          = false
 
 [plots]
     at_runtime      = true
