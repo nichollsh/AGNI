@@ -2,7 +2,7 @@
 title = "Base config for structure calcs"
 
 [planet]
-    tmp_surf        = 1200.0
+    tmp_surf        = 2500.0
     instellation    = 1e6 #3.402500e6
     albedo_b        = 0.18
     s0_fact         = 0.25
