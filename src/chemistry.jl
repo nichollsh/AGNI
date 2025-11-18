@@ -26,6 +26,10 @@ module chemistry
     import ..phys
     import ..ocean
 
+    # Constants
+    const COND_EPS::Float64     = 1e-10     # negligible amount of condesate [kg/m^2]
+    const SMOOTH_SCALE::Float64 = 12.0      # smoothing scale for fastchem floor
+
     """
     **Normalise gas VMRs, keeping condensates unchanged**
 
@@ -286,14 +290,14 @@ module chemistry
                 end # end saturation check
 
                 # recalculate layer properties after raining-out this species
-                atmosphere.calc_layer_props!(atmos)
+                # atmosphere.calc_layer_props!(atmos)
 
             end # end condensate
 
             normalise_vmrs!(atmos, i)
         end # end i levels
 
-        # Ensure that all yields are positive, at this point
+        # Ensure that all yields are positive at this point
         for c in atmos.condensates
             clamp!(atmos.cond_yield[c], 0.0, Inf)
         end
@@ -305,15 +309,21 @@ module chemistry
             atmos.cond_accum[c] = 0.0
 
             # no rain? go to next condensable
-            if sum(atmos.cond_yield[c]) < eps(1.0)
+            if sum(atmos.cond_yield[c]) < COND_EPS
                 continue
             end
 
             # loop from top down (rain always goes downwards)
             for j in 1:atmos.nlev_c
 
+                # set negligible rain to zero
+                if atmos.cond_yield[c][j] < COND_EPS
+                    atmos.cond_yield[c][j] = 0.0
+                end
+
                 # raining in this layer...
                 #     don't evaporate
+                #     add condensate to total budget
                 if atmos.cond_yield[c][j] > 0.0
                     atmos.cond_accum[c] += atmos.cond_yield[c][j]
                     continue
@@ -341,9 +351,8 @@ module chemistry
                                         (atmos.layer_grav[j] * atmos.layer_μ[j])
 
                 # Evaporation efficiency factor
-                #   This fraction of the rain that *could* be evaporated
-                #   at this layer *is* converted to vapour in this layer.
-                #   In reality, this depends on a bunch of microphysical processes.
+                #   This is how close the layer can be brought to saturation by evap.
+                #   In reality, this would depend on the microphysical processes.
                 dm_sat *= atmos.evap_efficiency
 
                 # don't evaporate more rain than the total available
@@ -373,9 +382,6 @@ module chemistry
 
             end # go to next j level (below)
 
-            # recalculate layer properties after re-evaporating this species
-            atmosphere.calc_layer_props!(atmos)
-
         end # end loop over condensates
 
         # Set water clouds at levels where condensation occurs
@@ -392,6 +398,9 @@ module chemistry
                 end
             end
         end
+
+        # Layer properties
+        atmosphere.calc_layer_props!(atmos)
 
         return nothing
     end
@@ -544,6 +553,18 @@ module chemistry
 
         end # end write metallicities
 
+        """
+        **Smoothly transform temperature around floor**
+
+        Approximately returns _x for _x > atmos.fastchem_floor.
+        Approximately returns atmos.fastchem_floor for _x < atmos.fastchem_floor.
+        Transitions discontinuously for a->Inf
+        """
+        function _transform_floor(_x::Float64)::Float64
+            d = 1.0 / ( 1.0 + exp(-SMOOTH_SCALE*(_x-atmos.fastchem_floor)/atmos.fastchem_floor) )
+            return _x*d + atmos.fastchem_floor*(1-d)
+        end
+
         # Write PT profile every time
         open(atmos.fastchem_prof,"w") do f
             write(f,"# AGNI temperature structure \n")
@@ -552,7 +573,7 @@ module chemistry
                 write(  f,
                         @sprintf("%.6e    %.6e \n",
                             atmos.p[i]*1e-5,
-                            max(atmos.fastchem_floor,atmos.tmp[i])
+                            _transform_floor(atmos.tmp[i])
                             )
                      )
             end

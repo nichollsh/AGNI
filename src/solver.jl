@@ -119,12 +119,12 @@ module solver
     ls_tau::Float64    =    0.7     # backtracking downscale size
     ls_increase::Float64 =  1.08    # factor by which the cost can increase from last step before triggering linesearch
     ls_max_steps::Int    =  10      # maximum steps undertaken by linesearch routine
-    ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
-    ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
+    ls_min_scale::Float64 = 1.0e-4  # minimum step scale allowed by linesearch
+    ls_max_scale::Float64 = 1.1     # maximum step scale allowed by linesearch
     #    easy start
     easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
     easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
-    easy_ini::Float64  = 3e-4       # Initial value for easy_sf
+    easy_ini::Float64  = 1e-3       # Initial value for easy_sf
 
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
@@ -325,7 +325,7 @@ module solver
             _set_tmps!(x)
 
             # Do saturation aloft here, only
-            # chemistry.calc_composition!(atmos, rainout, chem, rainout)
+            # chemistry.calc_composition!(atmos, oceans, chem, rainout)
             if rainout
                 # reset back to post-chemistry mixing ratios
                 for g in atmos.gas_names
