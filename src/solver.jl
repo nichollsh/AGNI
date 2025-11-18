@@ -105,12 +105,26 @@ module solver
     end
 
     # Solver constants and parameters
+    #    jacobian
+    perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
+    perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
+    perturb_mod::Int =      5       # Do full jacobian at least this frequently
+    fd_rel::Float64=        1e-4    # finite difference: relative width (dx/x) of the difference (rtol)
+    fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
     #    plateau parameters
     plateau_n::Int     =    4       # Plateau declared when plateau_i > plateau_n
     plateau_s::Float64 =    3.0     # Scale factor applied to x_dif when plateau_i > plateau_n
     plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
     #    linesearch
     ls_tau::Float64    =    0.7     # backtracking downscale size
+    ls_increase::Float64 =  1.08    # factor by which the cost can increase from last step before triggering linesearch
+    ls_max_steps::Int    =  10      # maximum steps undertaken by linesearch routine
+    ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
+    ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
+    #    easy start
+    easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
+    easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
+    easy_ini::Float64  = 3e-4       # Initial value for easy_sf
 
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
@@ -122,7 +136,7 @@ module solver
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
 
-    Optional arguments:
+    Optional physics arguments:
     - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
     - `chem::Bool`                      include eqm thermochemistry when solving for RCE?
     - `convect::Bool`                   include convection
@@ -131,23 +145,19 @@ module solver
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
     - `advect::Bool`                    include advective heat exchange (dynamics)
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
+
+    Optional solver arguments:
     - `dx_min::Float64`                 minimum step size [K]
     - `dx_max::Float64`                 maximum step size [K]
     - `tmp_pad::Float64`                padding around hard limits on temperature floor & ceiling values
     - `max_steps::Int`                  maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
-    - `fd_rel::Float64`                 finite difference: relative width (dx/x) of the difference (rtol)
-    - `fd_abs::Float64`                 finite difference: absolute width (dx) of the difference (atol)
     - `fdc::Bool`                       finite difference: central difference? otherwise use forward difference
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `easy_start::Bool`                improve convergence reliability; introduce convection and latent heat gradually
     - `grey_start::Bool`                improve convergence reliability; obtain double-grey solution first
     - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
-    - `ls_increase::Bool`               factor by which the cost can increase from last step before triggering linesearch
-    - `ls_max_steps::Int`               maximum steps undertaken by linesearch routine
-    - `ls_min_scale::Float64`           minimum step scale allowed by linesearch
-    - `ls_max_scale::Float64`           maximum step scale allowed by linesearch
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `modplot::Int`                    iteration frequency at which to make plots
@@ -170,14 +180,10 @@ module solver
                             dx_min::Float64=1e-7, dx_max::Float64=400.0,
                             tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
-                            fd_rel::Float64=1e-4, fd_abs::Float64=1e-5,
                             fdc::Bool=true, fdo::Int=2,
                             method::Int=1,
                             easy_start::Bool=false, grey_start::Bool=false,
                             ls_method::Int=1,
-                            ls_increase::Float64=1.08,
-                            ls_max_steps::Int=10,
-                            ls_min_scale::Float64 = 1.0e-5, ls_max_scale::Float64 = 0.99,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=true,
@@ -228,10 +234,10 @@ module solver
             arr_len += 1
         end
 
-        # --------------------
-        # Execution parameters
-        # --------------------
 
+        # --------------------
+        # Execution variables
+        # --------------------
         #    grey_start
         rt_default::atmosphere.RTSCHEME = atmos.rt_scheme  # record default selection for RT scheme
         if grey_start
@@ -239,20 +245,6 @@ module solver
             atmos.rt_scheme = atmosphere.RT_GREYGAS
         end
 
-        #    easy_start
-        easy_start         = Bool(easy_start)
-        easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
-        easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
-        easy_sf::Float64   = 3e-4       # Convective & phase change flux scale factor
-
-        #    finite difference
-        perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
-        perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
-        perturb_mod::Int =      5       # Do full jacobian at least this frequently
-
-        # --------------------
-        # Execution variables
-        # --------------------
         #     finite difference
         rf1::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference  (+1 dx)
         rb1::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (-1 dx)
@@ -278,6 +270,8 @@ module solver
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost
+        easy_start               = Bool(easy_start)     # make copy of variable - don't modify parameter
+        easy_sf::Float64         = easy_ini             # Convective & phase change flux scale factor
         plateau_apply::Bool      = false                # Plateau declared in this iteration?
 
         #     tracking
