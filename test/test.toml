@@ -62,6 +62,7 @@ title = "Unit tests configuration"
     convection      = true
     convection_crit = "l"
     rainout         = true
+    oceans          = true
 
 [plots]
     at_runtime      = false
