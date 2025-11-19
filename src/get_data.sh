@@ -98,7 +98,7 @@ function zenodo {
     url="https://zenodo.org/records/$1/files/$3"
 
     # get data
-    echo "    $1 > $tgt"
+    echo "    zenodo/$1 > $tgt"
     mkdir -p $2
     wget -qO $tgt $url
 
@@ -113,7 +113,7 @@ function zenodo {
 
     # try again at downloading the file?
     echo "Trying again to download the file"
-    sleep 1 
+    sleep 1
     wget -qO $tgt $url
 
     # check if command failed or if file does not exist

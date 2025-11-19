@@ -30,6 +30,10 @@ directory. This will also have downloaded some basic input data and run the test
     The `RAD_DIR` environment variable must be set to your SOCRATES path whenever AGNI is being used.
     This is so that AGNI can locate the SOCRATES libraries.
 
+!!! tip
+    Visit the [Troubleshooting](@ref) page if you encounter any problems. This page can
+    usually resolve your problem.
+
 ## Testing
 If you want to run the tests manually, simply use the script in the `test/` folder...
 ```bash

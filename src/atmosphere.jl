@@ -32,11 +32,33 @@ module atmosphere
     import ..phys
     import ..spectrum
 
-    # Constants
-    const AGNI_VERSION::String    = "1.7.12"  # current agni version
-    const HYDROGRAV_STEPS::Int64  = 40       # num of sub-layers in hydrostatic integration
-    const SOCVER_minimum::Float64 = 2407.2   # minimum required socrates version
+    # Code versions
+    const AGNI_VERSION::String     = "1.8.0"  # current agni version
+    const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
+    # Hydrostatic and gravity calc (constants and limits)
+    const HYDROGRAV_STEPS::Int64   = 30        # num of sub-layers in hydrostatic integration
+    const HYDROGRAV_maxdr::Float64 = 1e6       # maximum dz across each layer [m]
+    const HYDROGRAV_ming::Float64  = 1e-3      # minimum allowed gravity [m/s^2]
+    const HYDROGRAV_constg::Bool   = false     # constant gravity with height?
+
+    # Other constants
+    const UNSET_STR::String             = "__AGNI_UNSET_STR"
+    const NLEV_minimum::Int             = 25        # minimum allowed number of levels
+    const PHS_TIMESCALE_MIN::Float64    = 0.01      # minimum phase change timescale [s]
+    const SURF_ROUGHNESS_MIN::Float64   = 1e-5      # [m]
+    const SURF_WINDSPEED_MIN::Float64   = 1e-5      # [m/s]
+    const RP_MIN::Float64               = 1e4       # [m]
+    const SKIN_D_MIN::Float64           = 1e-6      # [m]
+    const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
+    const COND_DISALLOWED::Array        = ["H2","He"]
+
+    # Pressure grid
+    const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
+    const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
+    const PRESSURE_FACT_TOP::Float64    = 0.8       # Pressure factor at top layer
+
+    # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
@@ -60,6 +82,7 @@ module atmosphere
         FC_DIR::String          # path to fastchem install folder
         RFM_DIR::String         # path to RFM install folder
         FRAMES_DIR::String      # path to frames of animation
+        IO_DIR::String          # path to temporary directory, for fast I/O
 
         # SOCRATES objects
         SOCRATES_VERSION::String
@@ -104,7 +127,8 @@ module atmosphere
         # Pressure-temperature grid (with i=1 at the top of the model)
         nlev_c::Int             # Cell centre (count)
         nlev_l::Int             # Cell edge (count)
-        p_boa::Float64          # Pressure at bottom [Pa]
+        p_oboa::Float64         # Pressure at bottom [Pa], original
+        p_boa::Float64          # Pressure at bottom [Pa], calculated
         p_toa::Float64          # Pressure at top [Pa]
         tmp::Array{Float64,1}   # cc temperature [K]
         tmpl::Array{Float64,1}  # ce temperature [K]
@@ -134,30 +158,37 @@ module atmosphere
         gas_dat::Dict{String, phys.Gas_t}           # Struct variables containing thermodynamic data for each gas
 
         # Chemistry and composition
-        gas_vmr::Dict{String, Array{Float64,1}}     # Layer volume mixing ratios in dict, (key,value) = (gas_name,array)
+        gas_vmr::Dict{String, Array{Float64,1}}     # runtime calculated VMRs in dict, (key,value) = (gas_name,array)
+        gas_cvmr::Dict{String, Array{Float64,1}}    # runtime calculated VMR values after chemistry calculation, before rainout
         gas_ovmr::Dict{String, Array{Float64,1}}    # original VMR values at model initialisation
-        metal_orig::Dict{String, Float64}           # user-provided metallicity ratios (elem num density rel to hydrogen)
-        metal_calc::Dict{String, Float64}           # ^ calculated values from gas mixing ratios at surface
+        metal_orig::Dict{String, Float64}           # input elem ratios (elem num density rel to hydrogen)
+        metal_calc::Dict{String, Float64}           # calc'd elem ratios, from gas mixing ratios at surface
 
-        # Condensation variables
+        # Whether each gas is reliably 'safe', in terms of the physics modelled
+        gas_safe::Dict{String, Bool}
+
+        # Condensation and evaporation aloft
         gas_sat::Dict{String, Array{Bool, 1}}       # Gas is saturated or cold-trapped in each layer?
         cond_yield::Dict{String, Array{Float64,1}}  # condensate yield [kg/m^2] at each level (can be negative, representing evaporation)
-        cond_surf::Dict{String, Float64}            # condensate accumulation left after evaporation (implicit surface liquid) [kg/m^2]
+        cond_accum::Dict{String, Float64}           # condensate accumulation left after evaporation aloft (implicit surface liquid) [kg/m^2]
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
 
-        # Ocean variables (surface liquid layering)
-        ocean_calc::Bool                # INPUT: enable ocean calculations
-        ocean_ob_frac::Float64          # INPUT: ocean basin area, as fraction of planet surface
-        ocean_cs_height::Float64        # INPUT: continental shelf height [m]
-        ocean_layers::Array{Tuple,1}    # OUTPUT: layer structure of surface liquids
-        ocean_maxdepth::Float64         # OUTPUT: ocean depth at deepest part [m]
-        ocean_areacov::Float64          # OUTPUT: fraction of planet surface covered by oceans
-        ocean_topliq::String            # OUTPUT: name of top-most ocean component
+        # Ocean tracking variables
+        ocean_ini::Dict{String, Float64}    # INPUT: ocean reservoir from user [kg/m^2] - does not change
+        ocean_tot::Dict{String, Float64}    # OUTPUT: ocean reservoir [kg/m^2] - after cond/evap, both from surf and aloft
 
-        # Gases (only those in spectralfile)
-        gas_soc_num::Int
-        gas_soc_names::Array{String,1}
+        # Ocean layering variables (surface liquid layering)
+        ocean_ob_frac::Float64              # INPUT: ocean basin area, as fraction of planet surface
+        ocean_cs_height::Float64            # INPUT: continental shelf height [m]
+        ocean_layers::Array{Tuple,1}        # OUTPUT: layer structure of surface liquids
+        ocean_maxdepth::Float64             # OUTPUT: ocean depth at deepest part [m]
+        ocean_areacov::Float64              # OUTPUT: fraction of planet surface covered by oceans
+        ocean_topliq::String                # OUTPUT: name of top-most ocean component
+
+        # Gases (only those in SOCRATES spectralfile)
+        gas_soc_num::Int                    # number of gases
+        gas_soc_names::Array{String,1}      # names of each gas (as a list)
 
         # Layers' average properties
         real_gas::Bool                      # use real-gas equations of state where possible
@@ -207,9 +238,11 @@ module atmosphere
         rfm_npts::Int                       # number of points
 
         # Sensible heating
-        C_d::Float64                        # Turbulent exchange coefficient [dimensionless]
-        U::Float64                          # Wind speed [m s-1]
-        flux_sens::Float64                  # Turbulent flux
+        C_d::Float64                        # Turbulent exchange coefficient, to be calc'd
+        surf_windspeed::Float64             # Surface wind speed [m s-1]
+        surf_roughness::Float64             # Surface roughness scale [m]
+        flux_sens::Float64                  # Turbulent flux [W m-2]
+
 
         # Convection
         mlt_asymptotic::Bool                # INPUT: Mixing length scales asymptotically, but ~0 near ground
@@ -245,10 +278,10 @@ module atmosphere
         cloud_val_f::Float64                # /
 
         # Cell-internal heating
-        ediv_add::Array{Float64, 1}     # Additional energy dissipation inside each cell [W m-3] (e.g. from advection)
+        flux_advect::Array{Float64, 1}     # Energy flux advected into each cell [W m-2], treated as entering into its bottom edge
 
         # Total energy flux
-        flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2]
+        flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2] (positive is heating up)
         flux_tot::Array{Float64,1}      # Total upward-directed flux at cell edges [W m-2]
 
         # Heating rate felt at each level [K/day]
@@ -286,6 +319,7 @@ module atmosphere
         transspec_r::Float64            # planet radius probed in transmission [m]
         transspec_μ::Float64            # mmw probed in transmission [kg mol-1]
         transspec_tmp::Float64          # temperature probed in transmission [K]
+        transspec_grav::Float64         # gravity at layer probed in transmission [m s-2]
         transspec_m::Float64            # mass [kg] enclosed by transspec_r
         transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
         interior_rho::Float64           # interior density [kg m-3]
@@ -309,6 +343,23 @@ module atmosphere
 
         atmos.is_alloc = false
         return nothing
+    end
+
+    # Check parameter is within valid range
+    function _check_range(name, val; min=nothing, max=nothing)::Bool
+        if !isnothing(min) && !isnothing(max) && ((val<min) || (val>max))
+            @error "$name is out of range"
+            @error "    Got: $min < $val < $max"
+        elseif !isnothing(min) && (val < min)
+            @error "$name is too small"
+            @error "    Got: $val < $min"
+        elseif !isnothing(max) && (val > max)
+            @error "$name is too large"
+            @error "    Got: $val > $max"
+        else
+            return true
+        end
+        return false
     end
 
     """
@@ -337,13 +388,15 @@ module atmosphere
     - `mf_path::String`                 path to file containing VMRs at each level.
 
     Optional arguments:
+    - `IO_DIR::String`                  directory used for fast file operations.
     - `condensates`                     list of condensates (gas names).
+    - `metallicities::Dict`             dictionary of elemental metallicities (mass ratio rel to hydrogen)
     - `surface_material::String`        surface material (default is "greybody", but can point to file instead).
     - `albedo_s::Float64`               grey surface albedo used when `surface_material="greybody"`.
     - `tmp_floor::Float64`              temperature floor [K].
-    - `C_d::Float64`                    turbulent heat exchange coefficient [dimensionless].
-    - `U::Float64`                      surface wind speed [m s-1].
-    - `Kzz_floor::Float64`              eddy diffusion coefficient, min value [cm2 s-1]
+    - `surf_roughness::Float64`         surface roughness length scale [m]
+    - `surf_windspeed::Float64`         surface wind speed [m s-1].
+    - `Kzz_floor::Float64`              min eddy diffusion coefficient, cgs units [cm2 s-1]
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
@@ -386,13 +439,15 @@ module atmosphere
                     nlev_centre::Int, p_surf::Float64, p_top::Float64,
                     mf_dict, mf_path::String;
 
+                    IO_DIR::String   =          UNSET_STR,
                     condensates =               String[],
                     metallicities::Dict =       Dict{String,Float64}(),
                     surface_material::String =  "greybody",
                     albedo_s::Float64 =         0.0,
                     tmp_floor::Float64 =        2.0,
-                    C_d::Float64 =              0.001,
-                    U::Float64 =                2.0,
+                    tmp_ceiling::Float64 =      2e4,
+                    surf_roughness::Float64 =   0.001,
+                    surf_windspeed::Float64 =   2.0,
                     Kzz_floor::Float64 =        1e5,
                     mlt_asymptotic::Bool =      true,
                     mlt_criterion::Char =       's',
@@ -417,49 +472,98 @@ module atmosphere
                     use_all_gases::Bool =       false,
                     check_integrity::Bool =     true,
 
-                    κ_grey_lw::Float64  =       1e-4,
-                    κ_grey_sw::Float64  =       1e-5,
+                    κ_grey_lw::Float64  =       8e-4,
+                    κ_grey_sw::Float64  =       2e-4,
 
-                    fastchem_work::String       =  "",
-                    fastchem_floor::Float64     =  273.0,
-                    fastchem_maxiter_chem::Int  =  60000,
-                    fastchem_maxiter_solv::Int  =  20000,
-                    fastchem_xtol_chem::Float64 =  1.0e-4,
-                    fastchem_xtol_elem::Float64 =  1.0e-4,
+                    fastchem_work::String       =  UNSET_STR,
+                    fastchem_floor::Float64     =  400.0,
+                    fastchem_maxiter_chem::Int  =  80000,
+                    fastchem_maxiter_solv::Int  =  40000,
+                    fastchem_xtol_chem::Float64 =  1.0e-3,
+                    fastchem_xtol_elem::Float64 =  1.0e-3,
 
-                    rfm_parfile::String =       "",
+                    rfm_parfile::String =       UNSET_STR,
 
-                    ocean_calc::Bool =          true,
                     ocean_ob_frac::Float64 =    0.6,
                     ocean_cs_height::Float64 =  3000.0
                     )::Bool
 
-        if !isdir(OUT_DIR) && !isfile(OUT_DIR)
-            mkdir(OUT_DIR)
-        end
-
+        # Say hello
         @info  "Setting-up a new atmosphere struct"
-
-        # Code versions
-        atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
         atmos.AGNI_VERSION = AGNI_VERSION
         @debug "AGNI VERSION = "*AGNI_VERSION
-        @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
-        @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
+        # -------------------------
+        # Directories
+        # -------------------------
 
+        # Set AGNI root directory
+        atmos.ROOT_DIR = abspath(ROOT_DIR)
+        if !isfile(joinpath(atmos.ROOT_DIR,"agni.jl"))
+            @error "Cannot find `agni.jl` in the root directory provided"
+            @error "     ROOT_DIR=$(atmos.ROOT_DIR)"
+            return false
+        end
+
+        # Locate thermodynamics dir
+        atmos.THERMO_DIR = joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
+
+        # Make output directory if does not exist
+        if isempty(OUT_DIR)
+            @error "Output directory cannot be an empty path"
+            return false
+        end
+        atmos.OUT_DIR = abspath(OUT_DIR)
+        if samefile(atmos.OUT_DIR, atmos.ROOT_DIR)
+            @error "Output directory cannot be the AGNI root directory"
+            @error "    Got: $(atmos.OUT_DIR)"
+            return false
+        end
+        if !isdir(atmos.OUT_DIR) && !isfile(atmos.OUT_DIR)
+            mkdir(atmos.OUT_DIR)
+        end
+        @debug "Using OUT_DIR='$(atmos.OUT_DIR)'"
+
+        # Directory used for fast I/O
+        if IO_DIR == UNSET_STR
+            # not set, so use output directory
+            atmos.IO_DIR = OUT_DIR
+        else
+            # set, user provided
+            if isempty(OUT_DIR)
+                @error "I/O directory cannot be an empty path"
+                return false
+            end
+            atmos.IO_DIR = abspath(IO_DIR)
+            if !isdir(atmos.IO_DIR) && !isfile(atmos.IO_DIR)
+                mkdir(atmos.IO_DIR)
+            end
+        end
+        @debug "Using IO_DIR='$(atmos.IO_DIR)'"
+
+        # Directory used for writing animation frames
+        atmos.FRAMES_DIR  =  joinpath(atmos.IO_DIR, "frames")
+
+        # -------------------------
+        # Set other parameters
+        # -------------------------
+
+        # Set parameters for benchmarking
         atmos.benchmark   = false
         atmos.num_rt_eval = 0
         atmos.tim_rt_eval = 0.0
 
+        # Work out which RT scheme is going to be used
         if strip(lowercase(spfile)) == "greygas"
             atmos.rt_scheme = RT_GREYGAS
             atmos.spectral_file = "greygas"
-            @info "Using double-grey radiative transfer scheme"
+            atmos.SOCRATES_VERSION = "0000"
+            @info "Using grey-gas radiative transfer scheme"
 
             # check options
             if flag_rayleigh || flag_cloud
-                @error "Scattering not supported by grey-gas RT scheme"
+                @error "Scattering not supported by grey-gas RT scheme!"
+                @error "    In this case, disable rayleigh scattering and clouds"
                 return false
             end
 
@@ -467,14 +571,27 @@ module atmosphere
             atmos.rt_scheme = RT_SOCRATES
             atmos.spectral_file = abspath(spfile)
 
+            @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
+
+            # Get SOCRATES version
+            atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
+            @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
+
             # Check SOCRATES version is valid
             if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
                 @error "SOCRATES is out of date and cannot be used!"
                 @error "    found at $(ENV["RAD_DIR"])"
                 @error "    version is "*atmos.SOCRATES_VERSION
+                return false
             end
         end
 
+        # --------------------------------------
+        # Allocate arrays
+        # --------------------------------------
+
+
+        # Allocate SOCRATES structs
         atmos.dimen =       SOCRATES.StrDim()
         atmos.control =     SOCRATES.StrCtrl()
         atmos.spectrum =    SOCRATES.StrSpecData()
@@ -484,55 +601,62 @@ module atmosphere
         atmos.bound =       SOCRATES.StrBound()
         atmos.radout =      SOCRATES.StrOut()
 
-        # Set the parameters (and make sure that they're reasonable)
-        atmos.ROOT_DIR =        abspath(ROOT_DIR)
-        atmos.OUT_DIR =         abspath(OUT_DIR)
-        atmos.FRAMES_DIR  =     joinpath(atmos.OUT_DIR, "frames")
-        atmos.THERMO_DIR  =     joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
 
         atmos.real_gas      =   real_gas
         atmos.thermo_funct  =   thermo_functions
 
-        atmos.tmp_floor =       max(0.1,tmp_floor)
-        atmos.tmp_ceiling =     2.0e4
-
-        if nlev_centre < 25
-            nlev_centre = 25
-            @warn "Adjusted number of levels to $nlev_centre"
+        atmos.tmp_floor =       max(1,tmp_floor)
+        atmos.tmp_ceiling =     tmp_ceiling
+        if atmos.tmp_ceiling <= atmos.tmp_floor+100
+            @warn "The temperature limits provided are probably invalid"
+            @warn "    Got: tmp_floor   = $(atmos.tmp_floor) K"
+            @warn "    Got: tmp_ceiling = $(atmos.tmp_ceiling) K"
         end
+
         atmos.nlev_c         =  nlev_centre
         atmos.nlev_l         =  atmos.nlev_c + 1
+        _check_range("Number of levels", atmos.nlev_c; min=NLEV_minimum) || return false
+
         atmos.tmp_surf =        max(tmp_surf, atmos.tmp_floor)
         atmos.grav_surf =       max(1.0e-7, gravity)
-        atmos.zenith_degrees =  max(min(zenith_degrees,89.8), 0.2)
         atmos.surface_material= surface_material
         atmos.albedo_s =        max(min(albedo_s, 1.0 ), 0.0)
-        atmos.instellation =    max(instellation, 0.0)
         atmos.albedo_b =        max(min(albedo_b,1.0), 0.0)
-        atmos.s0_fact =         max(s0_fact,0.0)
+        atmos.zenith_degrees =  min(zenith_degrees, 89.9)
+        _check_range("Zenith angle", atmos.zenith_degrees; min=0.0, max=90.0) || return false
+        atmos.instellation =    instellation
+        _check_range("Instellation", atmos.instellation; min=0) || return false
+        atmos.s0_fact =         s0_fact
+        _check_range("Stellar s0 factor", atmos.s0_fact; min=0, max=1) || return false
+
         atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) *
                                     s0_fact * cosd(atmos.zenith_degrees)
 
         atmos.flux_int =        flux_int
         atmos.target_olr =      max(1.0e-10, target_olr)
 
-        atmos.phs_timescale =   max(phs_timescale, 0.0)
+        atmos.phs_timescale =   phs_timescale
         atmos.evap_efficiency = max(min(evap_efficiency, 1.0),0.0)
 
-        atmos.C_d =             max(0.0, C_d)
-        atmos.U =               max(0.0, U)
-
-        atmos.κ_grey_lw =       max(0.0, κ_grey_lw)
-        atmos.κ_grey_sw =       max(0.0, κ_grey_sw)
+        atmos.κ_grey_lw = κ_grey_lw
+        _check_range("Grey LW opacity", atmos.κ_grey_lw; min=0) || return false
+        atmos.κ_grey_sw = κ_grey_sw
+        _check_range("Grey SW opacity", atmos.κ_grey_sw; min=0) || return false
 
         atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
         atmos.Kzz_ceiling =     1.0e20 / 1e4
         atmos.Kzz_pbreak =      1e5 # 1 bar as default location for break point
-        atmos.Kzz_kbreak =      max(0.0, Kzz_floor)
+        atmos.Kzz_kbreak =      max(0.0, atmos.Kzz_floor)
         atmos.mlt_asymptotic =  mlt_asymptotic
         atmos.mlt_criterion =   mlt_criterion
+
+        atmos.surf_roughness = surf_roughness
+        _check_range("Surface roughness", atmos.surf_roughness; min=SURF_ROUGHNESS_MIN) || return false
+        atmos.surf_windspeed = surf_windspeed
+        _check_range("Surface windspeed", atmos.surf_windspeed; min=SURF_WINDSPEED_MIN) || return false
+        atmos.C_d =  0.001  # placeholder, will be overwritten
 
         if atmos.real_gas && (atmos.mlt_criterion == 'l')
             @warn "Ledoux criterion not supported for real gases"
@@ -545,27 +669,40 @@ module atmosphere
             return false
         end
 
-        atmos.tmp_magma =       max(atmos.tmp_floor, tmp_magma)
-        atmos.skin_d =          max(1.0e-9, skin_d)
-        atmos.skin_k =          max(1.0e-9, skin_k)
+        atmos.tmp_magma =  max(atmos.tmp_floor, tmp_magma)
+        atmos.skin_d = skin_d
+        _check_range("Surface CBL thickness", atmos.skin_d; min=SKIN_D_MIN) || return false
+        atmos.skin_k = skin_k
+        _check_range("Surface CBL conductivity", atmos.skin_k; min=SKIN_K_MIN) || return false
 
-        if p_top > p_surf
-            @error "p_top must be less than p_surf"
+        # pressure boundaries
+        atmos.p_toa = p_top * 1.0e5 # Convert bar -> Pa
+        atmos.p_boa = p_surf * 1.0e5
+        if atmos.p_toa > atmos.p_boa
+            @error "Top pressure must be less than surface pressure"
+            @error "    p_top  = $p_top bar"
+            @error "    p_surf = $p_surf bar"
             return false
         end
+        atmos.p_oboa = atmos.p_boa
 
-        atmos.p_toa =           p_top * 1.0e5 # Convert bar -> Pa
-        atmos.p_boa =           p_surf * 1.0e5
-        atmos.rp =              max(1.0, radius)
+        # interior radius
+        atmos.rp = radius
+        _check_range("Planet surface radius", atmos.rp; min=RP_MIN) || return false
 
         # derived statistics
-        atmos.interior_mass =   atmos.grav_surf * atmos.rp^2 / phys.G_grav
-        atmos.interior_rho  =   3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
-        atmos.transspec_p   =   2e3     # 20 mbar = 2000 Pa
-        atmos.transspec_μ   =   0.0
-        atmos.transspec_rho =   0.0
-        atmos.transspec_tmp =   0.0
-        atmos.transspec_r   =   0.0
+        atmos.interior_mass  =  atmos.grav_surf * atmos.rp^2 / phys.G_grav
+        atmos.interior_rho   =  3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
+        atmos.transspec_μ    =  0.0
+        atmos.transspec_rho  =  0.0
+        atmos.transspec_tmp  =  0.0
+        atmos.transspec_grav =  0.0
+        atmos.transspec_r    =  0.0
+        atmos.transspec_p    =  2e3     # 20 mbar = 2000 Pa
+        if atmos.p_toa > atmos.transspec_p
+            @error "p_top must be less than transspec_p"
+            return false
+        end
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -604,10 +741,12 @@ module atmosphere
         atmos.cloud_arr_f   = zeros(Float64, atmos.nlev_c)
 
         # Phase change timescales [seconds]
-        atmos.phs_timescale = 1.0e6   # mixed composition case
+        atmos.phs_timescale = phs_timescale
+        _check_range("Phase change timescale", atmos.phs_timescale; min=PHS_TIMESCALE_MIN) || return false
 
         # Evaporation efficiency
-        atmos.evap_efficiency = 0.05
+        atmos.evap_efficiency = evap_efficiency
+        _check_range("Evaporation efficiency", atmos.evap_efficiency; min=0, max=1) || return false
 
         # Hardcoded cloud properties
         atmos.cloud_alpha   = 0.01    # 1% of condensed water forms substantial clouds
@@ -630,19 +769,38 @@ module atmosphere
             mf_source = 0
         end
 
-        # The values will be stored in a dict of arrays
+        # Gas variables
+        atmos.gas_num   =   0                                 # number of gases
         atmos.gas_names =   Array{String}(undef, 0)           # list of names
         atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of gas data structs
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
-        atmos.metal_orig =  metallicities                     # input metallicities rel to H
-        atmos.metal_calc =  Dict{String, Array{Float64,1}}()  # calculated metallicities
+        atmos.gas_cvmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
+        atmos.gas_safe  =   Dict{String, Bool}()              # considered 'safe'?
+        atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # mask for saturation
 
-        atmos.gas_sat  =    Dict{String, Array{Bool, 1}}()    # dict for saturation
-        atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # dict of condensate yield
-        atmos.cond_surf =  Dict{String, Float64}()            # dict of ocean masses
-        atmos.gas_num   =   0                                 # number of gases
-        atmos.condensates   =   Array{String}(undef, 0)       # list of condensates
+        # Metallicities
+        atmos.metal_orig =  Dict{String, Float64}()          # input metallicities rel to H
+        atmos.metal_calc =  Dict{String, Float64}()          # calculated metallicities (empty for now)
+        for k in keys(metallicities)
+            # mass -> mole, by scaling factor 1/mu
+            atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
+        end
+
+        # Phase change compositional variables
+        #    condensation aloft
+        atmos.condensates = Array{String}(undef, 0)           # list of condensates
+        atmos.cond_yield =  Dict{String, Array{Float64,1}}()  # cond/evap yield at each layer
+        atmos.cond_accum =  Dict{String, Float64}()           # sum of each yield in atmosphere
+        #    ocean reservoirs
+        atmos.ocean_ini =   Dict{String,Float64}()            # initial ocean reservoir [kg/m^2]
+        atmos.ocean_tot =   Dict{String,Float64}()            # final ocean reservoir [kg/m^2]
+        #    ocean layers
+        atmos.ocean_maxdepth  = 0.0
+        atmos.ocean_areacov   = 0.0
+        atmos.ocean_topliq    = UNSET_STR
+        atmos.ocean_layers    = Tuple[(1,UNSET_STR,0.0,0.0),]  # array of tuples
+
 
         # Dict input case
         if mf_source == 0
@@ -662,10 +820,9 @@ module atmosphere
                     atmos.gas_num += 1
                 end
             end
-        end # end read VMR from dict
 
-        # File input case
-        if mf_source == 1
+        # CSV file case
+        elseif mf_source == 1
             # check file
             if !isfile(mf_path)
                 @error "Could not read VMR file '$mf_path'"
@@ -740,11 +897,9 @@ module atmosphere
                 end
             end
 
-        end # end read VMR from file
-
-        # If providing metallicities, must set use_all_gases=true
-        if !isempty(atmos.metal_orig) && !use_all_gases
-            @error "Must set `use_all_gases=true` if providing metallicities"
+        else
+            @error "Invalid value for setting mole fraction source"
+            @error "    Got mf_source=$mf_source"
             return false
         end
 
@@ -757,19 +912,34 @@ module atmosphere
                     atmos.gas_num += 1
                 end
             end
+        else
+            if !isempty(atmos.metal_orig)
+                @error "Must set `use_all_gases=true` if providing metallicities"
+                return false
+            end
         end
 
         # backup mixing ratios from current state
         for k in keys(atmos.gas_vmr)
-            atmos.gas_ovmr[k] = zeros(Float64, atmos.nlev_c)
-            @. atmos.gas_ovmr[k] = atmos.gas_vmr[k]
+            atmos.gas_ovmr[k] = deepcopy(atmos.gas_vmr[k])
+            atmos.gas_cvmr[k] = deepcopy(atmos.gas_vmr[k])
         end
 
-        # set condensation mask and yield values [kg]
+        # set phase change quantities for each gas
         for g in atmos.gas_names
+            # layers at which it is saturated
             atmos.gas_sat[g]    = falses(atmos.nlev_c)
+
+            # production/removal of condensate at each layer
             atmos.cond_yield[g] = zeros(Float64, atmos.nlev_c)
-            atmos.cond_surf[g] = 0.0
+
+            # total yield of condensate from rain/evap within atmosphere
+            #     to be calculated as: sum(cond_yield[g])
+            atmos.cond_accum[g] = 0.0
+
+            # amount of condensate at the surface
+            atmos.ocean_ini[g]       = 0.0  # TODO: make this input from user
+            atmos.ocean_tot[g]       = 0.0  # to be calculated
         end
 
         # Check that we actually stored some values
@@ -793,54 +963,44 @@ module atmosphere
         end
 
         # Load gas thermodynamic data
-        gas_fail = false
         @info "Loading thermodynamic data"
         for g in atmos.gas_names
             atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
                                                 atmos.thermo_funct, atmos.real_gas;
                                                 check_integrity=check_integrity)
 
-            gas_fail = gas_fail || atmos.gas_dat[g].fail
-        end
-        if gas_fail
-            @error "Problem when loading thermodynamic data"
-            @error "Try downloading them again and/or updating AGNI."
-            return false
+            if atmos.gas_dat[g].fail
+                @error "Problem when loading thermodynamic data"
+                @error "    Try downloading them again and/or updating AGNI."
+                return false
+            end
         end
 
         # store condensates
         for c in condensates
-            if !atmos.gas_dat[c].stub && !atmos.gas_dat[c].no_sat && !(c == "H2")
+            if atmos.gas_dat[c].stub || atmos.gas_dat[c].no_sat || (c in COND_DISALLOWED)
+                @warn "$c disallowed from being condensable; treated as dry"
+            else
                 push!(atmos.condensates, c)
             end
         end
 
         # Validate condensate names
-        atmos.condense_any = false
-        if length(condensates) > 0
+        atmos.condense_any = length(condensates) > 0
+        if atmos.condense_any
             for c in condensates
                 if !(c in atmos.gas_names)
-                    @error "Invalid condensate '$c'"
+                    @error "Invalid condensate. '$c' is not in gas list"
                     return false
                 end
             end
-            atmos.condense_any = true
-        end
-
-        # Must have at least one non-condensable gas
-        if (length(condensates) == atmos.gas_num)
-            @error "There must be at least one non-condensable gas"
-            return false
         end
 
         # Ocean params
-        atmos.ocean_calc  =     ocean_calc && atmos.condense_any
-        atmos.ocean_ob_frac  =  max(0.0, min(1.0, ocean_ob_frac))
         atmos.ocean_cs_height = max(0.0, ocean_cs_height)
-        atmos.ocean_maxdepth  = 0.0
-        atmos.ocean_areacov   = 0.0
-        atmos.ocean_topliq    = "_unset"
-        atmos.ocean_layers    = Tuple[(1,"_unset",0.0,0.0),]  # array of tuples
+        _check_range("Continent shelf height", atmos.ocean_cs_height; min=0) || return false
+        atmos.ocean_ob_frac = ocean_ob_frac
+        _check_range("Ocean basin fraction", atmos.ocean_ob_frac; min=0, max=1) || return false
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to
@@ -861,18 +1021,32 @@ module atmosphere
             end
         end
 
-        # Fastchem
+        # Fastchem directory
         atmos.flag_fastchem = false
-        atmos.fastchem_work = joinpath(atmos.OUT_DIR, "fastchem/")  # default path
-        if ("FC_DIR" in keys(ENV))
+        if fastchem_work == UNSET_STR
+            # default
+            atmos.fastchem_work = joinpath(atmos.IO_DIR, "fastchem")  # default path
+            @debug "Fastchem working dir defaulting to $(atmos.fastchem_work)"
+        else
+            # user-provided
+            atmos.fastchem_work = abspath(fastchem_work)
+            @debug "Fastchem working dir set to $(atmos.fastchem_work)"
+        end
+        if samefile(atmos.fastchem_work, atmos.ROOT_DIR)
+            @error "FastChem working directory cannot be the AGNI root directory"
+            return false
+        end
+
+        # Fastchem enabled by environment?
+        if "FC_DIR" in keys(ENV)
 
             @debug "FastChem env has been set"
 
             # check fastchem installation folder
             atmos.FC_DIR = abspath(ENV["FC_DIR"])
             if !isdir(atmos.FC_DIR)
-                @error "Could not find fastchem folder at '$(atmos.FC_DIR)'"
-                @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
+                @error "Could not find FastChem installed at FC_DIR='$(atmos.FC_DIR)'"
+                @error "    Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             end
 
@@ -881,25 +1055,17 @@ module atmosphere
             atmos.flag_fastchem = isfile(atmos.fastchem_exec)
             if !atmos.flag_fastchem
                 @error "Could not find fastchem executable inside '$(atmos.FC_DIR)'"
-                @error "Install FastChem with `\$ ./src/get_fastchem.sh`"
+                @error "    Install FastChem with `\$ ./src/get_fastchem.sh`"
                 return false
             else
-                @debug "Found FastChem executable"
+                @debug "Found FastChem executable at $(atmos.fastchem_exec)"
             end
 
-            # working directory for FC runtime files
-            if !isempty(fastchem_work)
-                atmos.fastchem_work = abspath(fastchem_work)
-                @debug "Fastchem working dir set to $(atmos.fastchem_work)"
-            else
-                @debug "Fastchem working dir defaulting to $(atmos.fastchem_work)"
-            end
-
-            # make working directory
+            # re-make FC working directory
             rm(atmos.fastchem_work,force=true,recursive=true)
             mkdir(atmos.fastchem_work)
         else
-            @debug "FastChem env variable not set"
+            @debug "FastChem env variable not set, so FC won't be available for use"
         end
         # other parameters for FC
         atmos.fastchem_floor        = fastchem_floor
@@ -915,12 +1081,22 @@ module atmosphere
         atmos.fastchem_moni         = joinpath(atmos.fastchem_work,"monitor.dat")
 
         # RFM
-        atmos.flag_rfm = !isempty(rfm_parfile)
+        atmos.flag_rfm = !(rfm_parfile == UNSET_STR)
+        atmos.rfm_work = joinpath(atmos.IO_DIR, "rfm")
+        if samefile(atmos.rfm_work, atmos.ROOT_DIR)
+            @error "RFM working directory cannot be the AGNI root directory"
+            return false
+        end
         if atmos.flag_rfm
             atmos.rfm_parfile = abspath(rfm_parfile)
             @debug "RFM parfile set: $(atmos.rfm_parfile)"
+            if !isfile(atmos.rfm_parfile)
+                @error "Could not find parfile provided by user, for running RFM"
+                @error "    atmos.rfm_parfile=$(atmos.rfm_parfile)"
+                return false
+            end
 
-            atmos.rfm_work = joinpath(atmos.OUT_DIR, "rfm/")
+            # re-make working directory
             rm(atmos.rfm_work,force=true,recursive=true)
             mkdir(atmos.rfm_work)
         end
@@ -1010,9 +1186,10 @@ module atmosphere
 
         # get the observed height
         idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
-        atmos.transspec_r   = atmos.r[idx]
-        atmos.transspec_μ   = atmos.layer_μ[idx]
-        atmos.transspec_tmp = atmos.tmp[idx]
+        atmos.transspec_r    = atmos.r[idx]
+        atmos.transspec_μ    = atmos.layer_μ[idx]
+        atmos.transspec_tmp  = atmos.tmp[idx]
+        atmos.transspec_grav = atmos.layer_grav[idx]
 
         # get mass of whole atmosphere, assuming hydrostatic
         atmos.transspec_m = atmos.p_boa * 4 * pi * atmos.rp^2 / atmos.grav_surf
@@ -1029,16 +1206,54 @@ module atmosphere
     end
 
     """
-    **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
+    **Get pressure at top and bottom of convective zone**
 
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-        - `ignore_errors::Bool`     do not generate errors from hydrostatic integrator.
+
+    Returns:
+        - `p_top::Float64`          pressure [Pa] at top of convective zone
+        - `p_bot::Float64`          pressure [Pa] at bottom of convective zone
+    """
+    function estimate_convective_zone(atmos::atmosphere.Atmos_t)::Tuple{Float64,Float64}
+
+        # Defaults to zero, if there's no convection
+        p_top::Float64 = 0.0
+        p_bot::Float64 = 0.0
+
+        # Loop from top-down to find p_top
+        for i in 1:atmos.nlev_l
+            if atmos.mask_c[i]
+                p_top = atmos.pl[i]
+                break
+            end
+        end
+
+        # Loop from bottom-up to find p_bot
+        for i in range(start=atmos.nlev_l, stop=1, step=-1)
+            if atmos.mask_c[i]
+                p_bot = atmos.pl[i]
+                break
+            end
+        end
+
+        # Return top, bot
+        return (p_top, p_bot)
+    end
+
+    """
+    **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
+
+    Function will return false if hydrostatic calculcation fails. This is usually when
+    the atmosphere becomes unbound.
+
+    Arguments:
+        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
 
     Returns:
         - `ok::Bool`                function result is ok
     """
-    function calc_layer_props!(atmos::atmosphere.Atmos_t; ignore_errors::Bool=false)::Bool
+    function calc_layer_props!(atmos::atmosphere.Atmos_t)::Bool
         if !atmos.is_param
             @error("Atmosphere struct has not been setup")
             return false
@@ -1057,17 +1272,7 @@ module atmosphere
         calc_profile_density!(atmos)
 
         # Perform hydrostatic integration
-        ok = ok && calc_profile_radius!(atmos, ignore_errors=ignore_errors)
-
-        # Pass arrays to SOCRATES
-        if atmos.rt_scheme == RT_SOCRATES
-            atmos.atm.p[1, :]           .= atmos.p[:]
-            atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
-            atmos.atm.r_layer[1,:]      .= atmos.r[:]
-            atmos.atm.r_level[1,0:end]  .= atmos.rl[:]
-            atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
-            atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
-        end
+        ok = ok && calc_profile_radius!(atmos)
 
         return ok
     end
@@ -1078,15 +1283,15 @@ module atmosphere
     Performs hydrostatic integration from the ground upwards.
     Requires density, temperature, pressure to have already been set.
 
+    Does not account for ocean thickness.
+
     Arguments:
         - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-        - `ignore_errors::Bool`     do not generate errors from hydrostatic integrator.
 
     Returns:
         - `ok::Bool`                function result is ok
     """
-    function calc_profile_radius!(atmos::atmosphere.Atmos_t;
-                                    ignore_errors::Bool=false)::Bool
+    function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
 
         # Reset arrays
         fill!(atmos.r         ,   atmos.rp)
@@ -1096,6 +1301,7 @@ module atmosphere
         fill!(atmos.layer_mass ,  1.0)
 
         # Temporary values
+        ok::Bool            = true
         grav::Float64       = atmos.grav_surf   # gravity at current level
         mass_encl::Float64  = atmos.interior_mass # mass enclosed within current level
 
@@ -1103,16 +1309,36 @@ module atmosphere
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
             # Calculate gravity at lower edge
-            grav = phys.G_grav * mass_encl / atmos.rl[i+1]^2
+            if !HYDROGRAV_constg
+                grav = phys.G_grav * mass_encl / atmos.rl[i+1]^2
+            end
+            if grav < HYDROGRAV_ming
+                grav = HYDROGRAV_ming
+                ok = false
+            end
 
             # Integrate from lower edge to centre
             atmos.r[i] = integrate_hydrograv(atmos.rl[i+1], grav, atmos.pl[i+1], atmos.p[i], atmos.layer_ρ[i])
+            if atmos.r[i] > atmos.rl[i+1] + HYDROGRAV_maxdr
+                atmos.r[i] = atmos.rl[i+1] + HYDROGRAV_maxdr
+                ok = false
+            end
 
             # Calculate gravity at cell centre
-            grav = phys.G_grav * mass_encl / atmos.r[i]^2
+            if !HYDROGRAV_constg
+                grav = phys.G_grav * mass_encl / atmos.r[i]^2
+            end
+            if grav < HYDROGRAV_ming
+                grav = HYDROGRAV_ming
+                ok = false
+            end
 
             # Integrate from centre to upper edge
             atmos.rl[i] = integrate_hydrograv(atmos.r[i], grav, atmos.p[i], atmos.pl[i], atmos.layer_ρ[i])
+            if atmos.rl[i] > atmos.r[i] + HYDROGRAV_maxdr
+                atmos.rl[i] = atmos.r[i] + HYDROGRAV_maxdr
+                ok = false
+            end
 
             # Store: Layer-centre gravity [m s-2]
             atmos.layer_grav[i] = grav
@@ -1127,7 +1353,7 @@ module atmosphere
             mass_encl += atmos.layer_mass[i] * 4 * pi * atmos.r[i]^2
         end
 
-        return true
+        return ok
     end
 
     """
@@ -1285,14 +1511,20 @@ module atmosphere
     """
     **Generate pressure grid.**
 
-    Almost-equally log-spaced between p_boa and p_boa. The near-surface layers
-    are smaller than they would be on an equally log-spaced grid, to avoid f
-    numerical weirdness at the bottom boundary.
+    Almost equally log-spaced between p_boa and p_boa. The near-boundary layers
+    are smaller than they would be on an equally log-spaced grid, to avoid numerics.
 
     Arguments:
     - `atmos::Atmos_t`              the atmosphere struct instance to be used.
     """
     function generate_pgrid!(atmos::atmosphere.Atmos_t)
+
+        # Ensure pressures are in bounds
+        if atmos.p_boa/atmos.p_toa < PRESSURE_RATIO_MIN
+            @warn "Bottom/top pressure ratio is too small"
+            @debug "   Got pressure ratio bot/top = $(atmos.p_boa/atmos.p_toa)"
+            atmos.p_boa = PRESSURE_RATIO_MIN * atmos.p_toa
+        end
 
         # Allocate arrays
         atmos.p  = zeros(Float64, atmos.nlev_c)
@@ -1311,8 +1543,7 @@ module atmosphere
                                                             length=atmos.nlev_l-1))
 
         # Shrink near-surface layers by stretching all layers above
-        p_fact::Float64 = 0.6
-        p_mid::Float64 = atmos.pl[end-1]*p_fact + atmos.pl[end-2]*(1.0-p_fact)
+        p_mid::Float64 = atmos.pl[end-1]*PRESSURE_FACT_BOT + atmos.pl[end-2]*(1.0-PRESSURE_FACT_BOT)
         atmos.pl[1:end-2] .= collect(Float64, range( start=atmos.pl[1],
                                                             stop=p_mid,
                                                             length=atmos.nlev_l-2))
@@ -1321,12 +1552,17 @@ module atmosphere
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
         # Shrink top-most layer to avoid doing too much extrapolation
-        p_fact = 0.8
-        atmos.p[1] = atmos.pl[1]*p_fact + atmos.p[1]*(1-p_fact)
+        atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
 
         # Finally, convert arrays to actual pressure units [Pa]
         @. atmos.p  = 10.0 ^ atmos.p
         @. atmos.pl = 10.0 ^ atmos.pl
+
+        # Ensure pressure grid is strictly decreasing (from surface upwards)
+        for i in range(start=atmos.nlev_c, stop=1, step=-1)
+            atmos.p[i]  = min(atmos.p[i],  atmos.pl[i+1]/PRESSURE_RATIO_MIN)
+            atmos.pl[i] = min(atmos.pl[i], atmos.p[i]/PRESSURE_RATIO_MIN)
+        end
 
         return nothing
     end
@@ -1372,21 +1608,22 @@ module atmosphere
 
             # Validate files
             if !isfile(atmos.spectral_file)
-                @error "Spectral file '$(atmos.spectral_file)' does not exist"
-                @error "Try running `\$ ./src/get_data.sh`"
-                @error "    e.g. to get CodenameXX you would run `\$ ./src/get_data.sh anyspec Codename XX`"
+                @error "Spectral file not found"
+                @error "    Got: '$(atmos.spectral_file)'"
+                @error "To download, try using the `get_data.sh` script"
+                @error "    e.g. to get CodenameXX: \$ ./src/get_data.sh anyspec Codename XX"
                 return false
             end
 
-            spectral_file_run::String  = joinpath([atmos.OUT_DIR, "runtime.sf"])
-            spectral_file_runk::String = joinpath([atmos.OUT_DIR, "runtime.sf_k"])
+            spectral_file_run::String  = joinpath([atmos.IO_DIR, "runtime.sf"])
+            spectral_file_runk::String = joinpath([atmos.IO_DIR, "runtime.sf_k"])
 
             # Setup spectral file
-            socstar::String = joinpath([atmos.OUT_DIR, "socstar.dat"])
+            socstar::String = joinpath([atmos.IO_DIR, "socstar.dat"])
             if !isempty(stellar_spectrum)
                 @debug "Inserting stellar spectrum into spectral file"
 
-                # Spectral file to be loaded, created in output folder
+                # Remove if already exists
                 rm(spectral_file_run , force=true)
                 rm(spectral_file_runk, force=true)
 
@@ -1413,7 +1650,7 @@ module atmosphere
 
                     if !isfile(stellar_spectrum)
                         @error "Stellar spectrum file '$(stellar_spectrum)' does not exist"
-                        @error "Try running `\$ ./src/get_data.sh stellar`"
+                        @error "    Try using: \$ ./src/get_data.sh stellar"
                         return false
                     end
                     atmos.star_file = abspath(stellar_spectrum)
@@ -1663,6 +1900,13 @@ module atmosphere
                 atmos.gas_soc_names[i_gas] =
                     SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
             end
+
+            # Warn user if all absorbers are condensable, which risks opacity going to zero
+            if issubset(atmos.gas_soc_names, atmos.condensates)
+                @warn "All absorbers are marked as condensable!"
+                @warn "    Opacity will be zero if they all rainout of the atmosphere."
+            end
+
         end # end socrates-only
 
         # VMRs are provided to SOCRATES when radtrans is called
@@ -1670,31 +1914,40 @@ module atmosphere
 
         # Metallicities provided?
         if !isempty(atmos.metal_orig)
-            @info "Composition will be set by metallicity ratios:"
+            @info "Composition will be set by metallicity. Elem molar ratios:"
             for e in keys(atmos.metal_orig)
                 @info @sprintf("    %-4s %.5f",e,atmos.metal_orig[e])
             end
         end
 
-        # Print info on the gases
-        @info "Allocating atmosphere with initial composition:"
+        # Print info on the gases, and check whether they are 'safe' or not
         gas_flags::String = ""
         g::String = ""
+        @info "Allocating atmosphere with initial composition:"
         for i in 1:atmos.gas_num
             g = atmos.gas_names[i]
             gas_flags = ""
+            atmos.gas_safe[g] = true
+
+            # flag as not included in radtrans
             if (atmos.rt_scheme == RT_SOCRATES) && !(g in atmos.gas_soc_names)
-                # flag as not included in radtrans
                 gas_flags *= "NO_OPACITY "
+                atmos.gas_safe[g] = false
             end
+
+            # flag as condensable
             if g in atmos.condensates
-                 # flag as condensable
                 gas_flags *= "COND "
+                atmos.gas_safe[g] = false
             end
+
+            # flag as containing stub thermo data
             if atmos.gas_dat[g].stub
-                # flag as containing stub thermo data
                 gas_flags *= "NO_THERMO "
+                atmos.gas_safe[g] = false
             end
+
+            # print info for this gas
             gas_flags *= String(Symbol(atmos.gas_dat[g].eos))*" "
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
@@ -1702,13 +1955,23 @@ module atmosphere
             @info @sprintf("    %3d %-7s %6.2e %s", i, g, atmos.gas_vmr[g][end], gas_flags)
         end
 
+        # There must be at least one 'safe' gas
+        if !any(values(atmos.gas_safe))
+            @error "None of the supplied gases are considered 'safe'"
+            @error "There must be at least one gas which satisfies criteria:"
+            @error "    a) is dry, i.e. non-condensable"
+            @error "    b) has opacity"
+            @error "    c) has thermodynamic data"
+            return false
+        end
+
         # Calc layer properties using initial temperature profile.
         #    Can generate weird issues since the TOA temperature may be large
         #    large but pressure small, which gives it a low density. With the
         #    hydrostatic integrator, this can cause dr to blow up, especially
         #    with a low MMW gas. Should be okay as long as the T(p) provided
-        #    by the user is more reasonable. Silence errors *in this case*.
-        calc_layer_props!(atmos, ignore_errors=true)
+        #    by the user is more reasonable.
+        calc_layer_props!(atmos)
 
         ################################
         # Aerosol processes
@@ -1786,8 +2049,6 @@ module atmosphere
                 atmos.cld.n_condensed  = 0
                 atmos.cld.n_cloud_type = 0
             end
-
-            atmos.control.i_angular_integration = SOCRATES.rad_pcf.ip_two_stream
         end # end socrates only
 
         ###########################################
@@ -1827,7 +2088,7 @@ module atmosphere
             atmos.surface_material = abspath(atmos.surface_material)
             if !isfile(atmos.surface_material)
                 @error "Could not find surface albedo file '$(atmos.surface_material)'"
-                @error "Get these data with `\$ ./src/get_data.sh surfaces`"
+                @error "    Get it by running: \$ ./src/get_data.sh surfaces"
                 return false
             end
 
@@ -1937,9 +2198,10 @@ module atmosphere
         atmos.w_conv =            zeros(Float64, atmos.nlev_l)  # convective velocity [m s-1]
         atmos.λ_conv =            zeros(Float64, atmos.nlev_l)  # mixing length [m]
 
+        atmos.flux_advect =       zeros(Float64, atmos.nlev_l)  # advective heat flux
+
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
-        atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
         atmos.timescale_conv =    zeros(Float64, atmos.nlev_c)
         atmos.timescale_rad =     zeros(Float64, atmos.nlev_c)
@@ -1981,7 +2243,8 @@ module atmosphere
         end
 
         # Set surface pressure to be very small, but still larger than TOA pressure
-        atmos.transspec_p = atmos.p_boa
+        atmos.p_boa       = atmos.p_toa*1.10
+        atmos.transspec_p = atmos.p_toa*1.05
         generate_pgrid!(atmos)
 
         # Set temperatures to be small, except the surface
@@ -1993,12 +2256,7 @@ module atmosphere
         atmos.control.l_cont_gen  = false
         atmos.control.l_gas       = false
         atmos.control.l_rayleigh  = false
-
-        # Turn off oceans
-        atmos.ocean_maxdepth  = 0.0
-        atmos.ocean_areacov   = 0.0
-        atmos.ocean_topliq    = "_unset"
-        atmos.ocean_layers    = Tuple[(1,"_unset",0.0,0.0),]
+        atmos.control.l_cloud     = false
 
         # Flag as transparent
         atmos.transparent = true
