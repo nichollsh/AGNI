@@ -2,7 +2,7 @@
 title = "Chemistry and condensation together"
 
 [planet]
-    tmp_surf        = 1500.0
+    tmp_surf        = 1000.0
     instellation    = 1500.0
     albedo_b        = 0.0
     s0_fact         = 0.375
@@ -35,13 +35,13 @@ title = "Chemistry and condensation together"
     verbosity       = 1
     max_steps       = 300
     max_runtime     = 400
-    num_levels      = 45
+    num_levels      = 40
     solution_type   = 3
     solver          = "newton"
     dx_max          = 300.0
-    initial_state   = ["iso","1500"]
-    linesearch      = 1
-    easy_start      = true
+    initial_state   = ["iso","1000"]
+    linesearch      = 2
+    easy_start      = false
     grey_start      = false
     converge_atol   = 1.0
     converge_rtol   = 1.0e-2
@@ -59,7 +59,7 @@ title = "Chemistry and condensation together"
     advection       = false
     conduction      = true
     convection      = true
-    convection_crit = "l"
+    convection_crit = "s"
     grey_lw         = 5e-2
     grey_sw         = 1e-2
     rainout         = true

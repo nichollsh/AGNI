@@ -621,9 +621,6 @@ module energy
         atmos.λ_conv[end] = atmos.λ_conv[end-1]
 
         # Check for spurious shallow convection occuring ABOVE condensing regions
-        #    If found, reset convective flux to zero AT THIS LAYER ONLY.
-        #    This is okay because this shouldn't physically happen, and will only occur
-        #    because of weird numerical issues which only act to make solving difficult.
         # @inbounds for i in 1:atmos.nlev_l-1
         #     if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
         #         atmos.mask_c[i] = false
