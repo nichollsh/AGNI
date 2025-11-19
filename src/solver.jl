@@ -109,7 +109,7 @@ module solver
     perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
     perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
     perturb_mod::Int =      5       # Do full jacobian at least this frequently
-    fd_rel::Float64=        1e-4    # finite difference: relative width (dx/x) of the difference (rtol)
+    fd_rel::Float64=        2e-5    # finite difference: relative width (dx/x) of the difference (rtol)
     fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
     #    plateau parameters
     plateau_n::Int     =    4       # Plateau declared when plateau_i > plateau_n
