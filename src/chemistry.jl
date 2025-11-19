@@ -27,7 +27,6 @@ module chemistry
     import ..ocean
 
     # Constants
-    const COND_EPS::Float64     = 1e-10     # negligible amount of condesate [kg/m^2]
     const SMOOTH_SCALE::Float64 = 12.0      # smoothing scale for fastchem floor
 
     """
@@ -290,7 +289,7 @@ module chemistry
                 end # end saturation check
 
                 # recalculate layer properties after raining-out this species
-                # atmosphere.calc_layer_props!(atmos)
+                atmosphere.calc_layer_props!(atmos)
 
             end # end condensate
 
@@ -309,17 +308,12 @@ module chemistry
             atmos.cond_accum[c] = 0.0
 
             # no rain? go to next condensable
-            if sum(atmos.cond_yield[c]) < COND_EPS
+            if sum(atmos.cond_yield[c]) < eps(1.0)
                 continue
             end
 
             # loop from top down (rain always goes downwards)
             for j in 1:atmos.nlev_c
-
-                # set negligible rain to zero
-                if atmos.cond_yield[c][j] < COND_EPS
-                    atmos.cond_yield[c][j] = 0.0
-                end
 
                 # raining in this layer...
                 #     don't evaporate
@@ -382,6 +376,9 @@ module chemistry
 
             end # go to next j level (below)
 
+            # Layer properties
+            atmosphere.calc_layer_props!(atmos)
+
         end # end loop over condensates
 
         # Set water clouds at levels where condensation occurs
@@ -399,8 +396,8 @@ module chemistry
             end
         end
 
-        # Layer properties
-        atmosphere.calc_layer_props!(atmos)
+        # # Layer properties
+        # atmosphere.calc_layer_props!(atmos)
 
         return nothing
     end

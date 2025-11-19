@@ -113,18 +113,18 @@ module solver
     fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
     #    plateau parameters
     plateau_n::Int     =    4       # Plateau declared when plateau_i > plateau_n
-    plateau_s::Float64 =    3.0     # Scale factor applied to x_dif when plateau_i > plateau_n
+    plateau_s::Float64 =    10.0     # Scale factor applied to x_dif when plateau_i > plateau_n
     plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
     #    linesearch
     ls_tau::Float64    =    0.7     # backtracking downscale size
     ls_increase::Float64 =  1.08    # factor by which the cost can increase from last step before triggering linesearch
     ls_max_steps::Int    =  10      # maximum steps undertaken by linesearch routine
-    ls_min_scale::Float64 = 1.0e-4  # minimum step scale allowed by linesearch
-    ls_max_scale::Float64 = 1.1     # maximum step scale allowed by linesearch
+    ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
+    ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
     #    easy start
     easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
     easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
-    easy_ini::Float64  = 1e-3       # Initial value for easy_sf
+    easy_ini::Float64  = 3e-4       # Initial value for easy_sf
 
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
@@ -262,9 +262,8 @@ module solver
         r_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i)
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)              # Test for rejection residuals
-        dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))    # Damping matrix for LM method
         perturb::Array{Bool,1}   = falses(arr_len)      # Mask for levels which should be perturbed
-        lml::Float64             = 2.0                  # Levenberg-Marquardt lambda parameter
+        lml::Float64             = 1.0                 # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
         dx_max_step::Float64     = Float64(dx_max)      # dx_max allowed in current step
@@ -272,7 +271,7 @@ module solver
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost
         easy_start               = Bool(easy_start)     # make copy of variable - don't modify parameter
-        easy_sf::Float64         = easy_ini             # Convective & phase change flux scale factor
+        easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor
         plateau_apply::Bool      = false                # Plateau declared in this iteration?
 
         #     tracking
@@ -384,15 +383,18 @@ module solver
             ok::Bool = true
 
             # Evalulate residuals at x
+            # chemistry.calc_composition!(atmos, oceans, chem, rainout)
             ok = ok && _fev!(x, resid)
 
             # For each level...
             for i in 1:arr_len
+
+                # Should this column be updated?
                 if !which[i]
                     continue
                 end
 
-                # Reset all levels
+                # Reset temperature at all levels
                 @. x_s = x
 
                 # Reset residuals
@@ -454,7 +456,7 @@ module solver
         end # end jr_cd
 
         # Cost function to minimise
-        function _cost(_r::Array)
+        function _cost(_r::Array)::Float64
             return norm(_r,3)
         end
 
@@ -516,9 +518,6 @@ module solver
 
         # Final setup
         @. x_cur = x_ini
-        for di in 1:arr_len
-            dtd[di,di] = 1.0
-        end
         fill!(r_cur, 1.0e99)            # reset residual arrays
         fill!(r_old, 1.0e98)            # ^
         energy.reset_fluxes!(atmos)     # reset energy fluxes
@@ -606,6 +605,7 @@ module solver
                 # Check if sf needs to be increased
                 if (c_cur*easy_trig < conv_atol + conv_rtol * c_max) && !grey_step
                     stepflags *= "r"
+                    easy_sf = max(easy_sf, easy_ini)
                     easy_sf = min(1.0, easy_sf*easy_incr)
                     easy_step = true
                     @debug "        updated easy_sf = $easy_sf"
@@ -631,6 +631,7 @@ module solver
                 # Update whole matrix when any of these are true:
                 #    - first step
                 #    - it was requested by the user
+                #    - easy_sf was increased
                 #    - we are near global convergence
                 fill!(perturb, true)
             else
@@ -694,14 +695,21 @@ module solver
                 # @debug "        LM step"
                 #    Calculate damping parameter ("delayed gratification")
                 if r_cur_2nm < r_old_2nm
+                    # got better
                     lml /= 5.0
                 else
-                    lml *= 2.5
+                    # got worse
+                    lml *= 1.5
                 end
 
                 #    Update our estimate of the solution
                 x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
                 # stepflags *= "Lm-"
+
+            elseif method == 4
+                # Newton-Raphson with jacobi preconditioning
+                x_dif = - (b' * b) \ (b' * r_cur)
+
             end
 
             # Max step size
@@ -909,6 +917,12 @@ module solver
             @error "    failure (hydrostatic integration)"
         else
             @error "    failure (other)"
+        end
+
+        # timeout
+        if (code in [CODE_ITE, CODE_TIM]) && easy_start
+            @warn "Solver timed-out before easy_start stage had finished."
+            @warn "    Try `easy_start=false`, increasing max_runtime, or increasing max_steps."
         end
 
         # perform one last evaluation to set `atmos` given the final `x_cur`
