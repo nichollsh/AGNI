@@ -100,7 +100,7 @@ module save
         # into PROTEUS without compatibility issues.
 
         # Absorb output from these calls, because they spam the Debug logger
-        with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
+        with_logger(MinLevelLogger(current_logger(), Logging.Error)) do
 
             ds = Dataset(fname,"c")
 
@@ -381,6 +381,5 @@ module save
 
         return nothing
     end # end write_ncdf
-
 
 end

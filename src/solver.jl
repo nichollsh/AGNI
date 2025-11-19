@@ -89,6 +89,43 @@ module solver
         return midp
     end
 
+    # Status codes for solver
+    @enum STATUSCODE begin
+        CODE_SUC = 0  # success
+        CODE_ITE = 1  # max iters
+        CODE_SIN = 2  # singular jacobian
+        CODE_TIM = 3  # max time
+        CODE_NAN = 4  # NaN values returned from objective
+        CODE_CFG = 5  # configuration
+        CODE_OBJ = 6  # objective function did not succeed
+        CODE_STP = 7  # last step not ok
+        CODE_HYD = 8  # hydrostatic integration
+
+        CODE_99  = 99 # default code (failure)
+    end
+
+    # Solver constants and parameters
+    #    jacobian
+    perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
+    perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
+    perturb_mod::Int =      5       # Do full jacobian at least this frequently
+    fd_rel::Float64=        1e-4    # finite difference: relative width (dx/x) of the difference (rtol)
+    fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
+    #    plateau parameters
+    plateau_n::Int     =    4       # Plateau declared when plateau_i > plateau_n
+    plateau_s::Float64 =    10.0     # Scale factor applied to x_dif when plateau_i > plateau_n
+    plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
+    #    linesearch
+    ls_tau::Float64    =    0.7     # backtracking downscale size
+    ls_increase::Float64 =  1.08    # factor by which the cost can increase from last step before triggering linesearch
+    ls_max_steps::Int    =  10      # maximum steps undertaken by linesearch routine
+    ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
+    ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
+    #    easy start
+    easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
+    easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
+    easy_ini::Float64  = 3e-4       # Initial value for easy_sf
+
     """
     **Obtain radiative-convective equilibrium using a matrix method.**
 
@@ -98,32 +135,37 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+
+    Optional physics arguments:
     - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
-    - `chem_type::Int`                  chemistry type (see wiki)
+    - `chem::Bool`                      include eqm thermochemistry when solving for RCE?
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
+    - `advect::Bool`                    include advective heat exchange (dynamics)
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
+    - `oceans::Bool`                    check surface saturation (ocean formation)
+
+    Optional solver arguments:
+    - `dx_min::Float64`                 minimum step size [K]
     - `dx_max::Float64`                 maximum step size [K]
+    - `tmp_pad::Float64`                padding around hard limits on temperature floor & ceiling values
     - `max_steps::Int`                  maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
-    - `fdw::Float64`                    finite difference: relative width (dx/x) of the "difference"
-    - `fdc::Bool`                       finite difference: ALWAYS use central difference?
+    - `fdc::Bool`                       finite difference: central difference? otherwise use forward difference
     - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
     - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
+    - `easy_start::Bool`                improve convergence reliability; introduce convection and latent heat gradually
+    - `grey_start::Bool`                improve convergence reliability; obtain double-grey solution first
     - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
-    - `easy_start::Bool`                improve convergence by introducing convection and phase change gradually
-    - `ls_increase::Bool`               factor by which the cost can increase from last step before triggering linesearch
-    - `ls_max_steps::Int`               maximum steps undertaken by linesearch routine
-    - `ls_min_scale::Float64`           minimum step scale allowed after linesearch
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
-    - `perturb_chem::Bool`              include chemistry calculation during finite-difference construction of jacobian
     - `modplot::Int`                    iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
     - `modprint::Int`                   iteration frequency at which to print info
     - `plot_jacobian::Bool`             plot jacobian too?
+    - `radiative_Kzz::Bool`             estimate Kzz in radiative zones? Otherwise left at Kzz=0 in these regions.
     - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
 
@@ -132,32 +174,51 @@ module solver
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int=1,
-                            chem_type::Int=0,
+                            chem::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
-                            conduct::Bool=true, latent::Bool=true, rainout::Bool=true,
-                            dx_max::Float64=400.0,
+                            conduct::Bool=true, latent::Bool=true, advect::Bool=true,
+                            rainout::Bool=true, oceans::Bool=true,
+                            dx_min::Float64=1e-7, dx_max::Float64=400.0,
+                            tmp_pad::Float64 = 5.0,
                             max_steps::Int=400, max_runtime::Float64=900.0,
-                            fdw::Float64=3.0e-5, fdc::Bool=true, fdo::Int=2,
-                            method::Int=1, ls_method::Int=1, easy_start::Bool=false,
-                            ls_increase::Float64=1.08,
-                            ls_max_steps::Int=20, ls_min_scale::Float64 = 1.0e-5,
+                            fdc::Bool=true, fdo::Int=2,
+                            method::Int=1,
+                            easy_start::Bool=false, grey_start::Bool=false,
+                            ls_method::Int=1,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
-                            perturb_chem::Bool=false,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=true,
-                            conv_atol::Float64=1.0e-2, conv_rtol::Float64=1.0e-3
+                            radiative_Kzz::Bool=true,
+                            conv_atol::Float64=1.0e-1, conv_rtol::Float64=1.0e-3,
                             )::Bool
+
+        # --------------------
+        # Prepare to run the solver
+        # --------------------
+        @debug "Reticulating splines..."
 
         # Validate sol_type
         if (sol_type < 1) || (sol_type > 4)
-            @error "Invalid solution type ($sol_type)"
+            @error "Invalid solution type ($sol_type)."
             return false
         end
 
-        # Check if transparent
+        # Validate finite difference fdo option
+        if !(fdo in [2,4])
+            @error "Invalid finite-difference order ($fdo). Must be 2 or 4."
+            return false
+        end
+
+        # Validate if transparent
         if atmos.transparent
             @error "Atmosphere is configured to be transparent."
             @error "    Cannot use `solve_energy`. Use `solve_transparent` instead."
+            return false
+        end
+
+        # Validate options for rainout (required for latent heat)
+        if latent && !rainout
+            @error "Must enable rainout if also including latent heating"
             return false
         end
 
@@ -170,37 +231,21 @@ module solver
 
         # Dimensionality
         arr_len::Int = atmos.nlev_c
-        if (sol_type >= 2)  # states 2,3,4 also solve for tmp_surf
+        if sol_type in [2,3,4]  # states 2,3,4 also solve for tmp_surf
             arr_len += 1
         end
 
-        # --------------------
-        # Execution parameters
-        # --------------------
-        #    padding
-        tmp_pad::Float64 =  5.0        # do not allow the solver to get closer than this to tmp_floor
-
-        #    easy_start
-        easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
-        easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
-
-        #    finite difference
-        fdr::Float64        =   0.01    # Use forward difference if cost ratio is below this value
-        perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
-        perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
-        perturb_mod::Int =      5       # Do full jacobian at least this frequently
-
-        #    linesearch
-        ls_tau::Float64    =    0.7     # backtracking downscale size
-
-        #    plateau
-        plateau_n::Int =        4       # Plateau declared when plateau_i > plateau_n
-        plateau_s::Float64 =    3.0     # Scale factor applied to x_dif when plateau_i > plateau_n
-        plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
 
         # --------------------
         # Execution variables
         # --------------------
+        #    grey_start
+        rt_default::atmosphere.RTSCHEME = atmos.rt_scheme  # record default selection for RT scheme
+        if grey_start
+            @debug "Starting with double-grey RT scheme"
+            atmos.rt_scheme = atmosphere.RT_GREYGAS
+        end
+
         #     finite difference
         rf1::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference  (+1 dx)
         rb1::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (-1 dx)
@@ -217,23 +262,25 @@ module solver
         r_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i)
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)              # Test for rejection residuals
-        dtd::Array{Float64,2}    = zeros(Float64, (arr_len,arr_len))    # Damping matrix for LM method
         perturb::Array{Bool,1}   = falses(arr_len)      # Mask for levels which should be perturbed
-        lml::Float64             = 2.0                  # Levenberg-Marquardt lambda parameter
+        lml::Float64             = 1.0                 # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
+        dx_max_step::Float64     = Float64(dx_max)      # dx_max allowed in current step
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost
+        easy_start               = Bool(easy_start)     # make copy of variable - don't modify parameter
         easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor
         plateau_apply::Bool      = false                # Plateau declared in this iteration?
 
         #     tracking
         step::Int =             0       # Step number
-        code::Int =             99      # Status code
+        code::STATUSCODE =      CODE_99 # Status code
         runtime::Float64  =     0.0     # Model runtime [s]
-        fc_retcode::Int  =      0       # Fastchem return code
+        compose_retcode::Int =  0       # Composition calculation return code
         step_ok::Bool =         true    # Current step was fine
+        grey_step::Bool = grey_start    # double-grey RT enabled in this step
         easy_step::Bool =       false   # easy_start sf increased in this step
         plateau_i::Int =        0       # Number of iterations for which step was small
 
@@ -251,6 +298,7 @@ module solver
         # Calculate the (remaining) temperatures from known temperatures
         function _set_tmps!(_x::Array{Float64,1})
             # Read new guess
+            clamp!(_x, atmos.tmp_floor+1.0, atmos.tmp_ceiling-1.0)
             for i in 1:atmos.nlev_c
                 atmos.tmp[i] = _x[i]
             end
@@ -275,27 +323,26 @@ module solver
             # Set new temperatures
             _set_tmps!(x)
 
-            # Do chemistry?
-            if perturb_chem && (chem_type in [1,2,3])
-                _fev_fc = chemistry.fastchem_eqm!(atmos, chem_type, false)
-                # if _fev_fc != 0
-                #     return false
-                # end
+            # Do saturation aloft here, only
+            # chemistry.calc_composition!(atmos, oceans, chem, rainout)
+            if rainout
+                # reset back to post-chemistry mixing ratios
+                for g in atmos.gas_names
+                    @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
+                end
+                chemistry._sat_aloft!(atmos)
             end
 
             # Calculate fluxes
-            energy.calc_fluxes!(atmos, true,
-                                latent, convect, sens_heat, conduct,
-                                convect_sf=easy_sf, latent_sf=easy_sf,
-                                rainout=rainout)
-
-            # Energy divergence term
-            @. atmos.flux_dif -= atmos.ediv_add
+            step_ok &= energy.calc_fluxes!(atmos, radiative=true,
+                                latent_heat=latent, convective=convect, sens_heat=sens_heat,
+                                conductive=conduct, advective=advect,
+                                convect_sf=easy_sf, latent_sf=easy_sf)
 
             # Calculate residuals subject to the solution type
             if (sol_type == 1)
                 # Zero loss with constant tmp_surf
-                resid[1:end] .= atmos.flux_dif[1:end]
+                @. resid = atmos.flux_dif
 
             elseif (sol_type == 2)
                 # Zero loss
@@ -305,22 +352,23 @@ module solver
 
             elseif (sol_type == 3)
                 # Zero loss
-                resid[2:end] .= atmos.flux_dif[1:end]
-                resid[1] = atmos.flux_tot[1] - atmos.flux_int
+                resid[1:end-1] .= atmos.flux_dif[1:end]
+                resid[end] = atmos.flux_tot[end] - atmos.flux_int
 
             elseif (sol_type == 4)
                 # Zero loss
-                resid[2:end] .= atmos.flux_dif[1:end]
+                resid[1:end-1] .= atmos.flux_dif[1:end]
                 # OLR is equal to target_olr
-                resid[1] = atmos.target_olr - atmos.flux_u_lw[1]
+                resid[end] = atmos.target_olr - atmos.flux_u_lw[1]
 
             end
 
             # Check that residuals are real numbers
             if !all(isfinite, resid)
-                show(resid)
                 @error "Residual array contains NaNs and/or Infs"
-                code = 4
+                @error "resid: $resid"
+                @error "flux_n: $(atmos.flux_n)"
+                code = CODE_NAN
                 return false
             end
 
@@ -335,15 +383,18 @@ module solver
             ok::Bool = true
 
             # Evalulate residuals at x
+            # chemistry.calc_composition!(atmos, oceans, chem, rainout)
             ok = ok && _fev!(x, resid)
 
             # For each level...
             for i in 1:arr_len
+
+                # Should this column be updated?
                 if !which[i]
                     continue
                 end
 
-                # Reset all levels
+                # Reset temperature at all levels
                 @. x_s = x
 
                 # Reset residuals
@@ -353,7 +404,8 @@ module solver
                 fill!(rb2, 0.0)
 
                 # Calculate perturbation at this level
-                fd_s = x[i] * fdw
+                #    - must be less than tmp_pad/2
+                fd_s = min(x[i] * fd_rel + fd_abs, tmp_pad/2)
 
                 # Forward part (1 step)
                 x_s[i] = x[i] + fd_s
@@ -404,7 +456,7 @@ module solver
         end # end jr_cd
 
         # Cost function to minimise
-        function _cost(_r::Array)
+        function _cost(_r::Array)::Float64
             return norm(_r,3)
         end
 
@@ -415,17 +467,18 @@ module solver
 
             # Info string
             plt_info::String = ""
-            plt_info *= @sprintf("Iteration  %d \n",step)
-            plt_info *= @sprintf("Runtime    %.1f s \n",runtime)
-            plt_info *= @sprintf("Cost       %.2e  \n",c_cur)
+            plt_info *= @sprintf("Iteration:%d,  ",step)
+            plt_info *= @sprintf("Runtime:%.1f s,  ",runtime)
+            plt_info *= @sprintf("Cost:%.2e  ",c_cur)
 
             # Make subplots (don't save to file)
             plt_pt = plotting.plot_pt(atmos,     "", incl_magma=(sol_type==2))
             plt_fl = plotting.plot_fluxes(atmos, "", incl_eff=(sol_type==3), incl_cdct=conduct, incl_latent=latent)
             plt_mr = plotting.plot_vmr(atmos,    "")
+            plt_ra = plotting.plot_radius(atmos, "")
 
             # Combined plot
-            plotting.combined(plt_pt, plt_fl, plt_mr, plt_info, path_plt)
+            plotting.combined(plt_pt, plt_fl, plt_mr, plt_ra, plt_info, path_plt)
 
             if save_frames
                 cp(path_plt,@sprintf("%s/%04d.png",atmos.FRAMES_DIR,step))
@@ -436,7 +489,6 @@ module solver
         # ----------------------------------------------------------
         # Setup initial guess
         # ----------------------------------------------------------
-            @info @sprintf("    chem_type = %d", chem_type)
             @info @sprintf("    sol_type  = %d", sol_type)
         if (sol_type == 1)
             @info @sprintf("    tmp_surf  = %.2f K", atmos.tmp_surf)
@@ -466,9 +518,6 @@ module solver
 
         # Final setup
         @. x_cur = x_ini
-        for di in 1:arr_len
-            dtd[di,di] = 1.0
-        end
         fill!(r_cur, 1.0e99)            # reset residual arrays
         fill!(r_old, 1.0e98)            # ^
         energy.reset_fluxes!(atmos)     # reset energy fluxes
@@ -507,7 +556,7 @@ module solver
             # Check time
             runtime = time()-wct_start
             if runtime > max_runtime
-                code = 3
+                code = CODE_TIM
                 break
             end
 
@@ -515,29 +564,36 @@ module solver
             @debug "        iterate"
             step += 1
             if step > max_steps
-                code = 1
+                code = CODE_ITE
                 break
             end
             info_str *= @sprintf("    %4d  ", step)
 
             # Check status of guess
             if !all(isfinite, x_cur)
-                code = 4
+                code = CODE_NAN
                 break
             end
-            clamp!(x_cur, atmos.tmp_floor+tmp_pad, atmos.tmp_ceiling-tmp_pad)
             _set_tmps!(x_cur)
 
-            # Run chemistry scheme
-            if chem_type in [1,2,3]
-                @debug "        chemistry"
-                fc_retcode = chemistry.fastchem_eqm!(atmos, chem_type, false)
-                if fc_retcode == 0
-                    stepflags *= "Cs-"  # chemistry success
+            # Run chemistry and condensation schemes
+            if chem || rainout || oceans
+                @debug "        composition"
+                compose_retcode = chemistry.calc_composition!(atmos, oceans, chem, rainout)
+                if compose_retcode == 0
+                    stepflags *= "Cs-"  # success
                 else
-                    stepflags *= "Cf-"  # chemistry failure
+                    stepflags *= "Cf-"  # failure
                     step_ok = false
                 end
+            end
+
+            # Switch RT scheme?
+            if grey_start & !grey_step
+                atmos.rt_scheme = rt_default
+            end
+            if atmos.rt_scheme == atmosphere.RT_GREYGAS
+                stepflags *= "Gg-"
             end
 
             # Check convective modulation
@@ -547,35 +603,23 @@ module solver
                 stepflags *= "M"
 
                 # Check if sf needs to be increased
-                if c_cur*easy_trig < conv_atol + conv_rtol * c_max
-                    if easy_sf < 1.0
-                        # increase sf => reduce modulation by easy_incr
-                        stepflags *= "r"
-
-                        # starting from sf=0
-                        if easy_sf < 1.0e-10
-                            easy_sf = 3e-4
-                        end
-
-                        easy_sf = min(1.0, easy_sf*easy_incr)
-                        easy_step = true
-                        @debug "easy_sf = $easy_sf"
-
-                        # done modulating
-                        if easy_sf > 0.99
-                            easy_start = false
-                        end
-                    else
-                        easy_sf = 1.0
-                    end
+                if (c_cur*easy_trig < conv_atol + conv_rtol * c_max) && !grey_step
+                    stepflags *= "r"
+                    easy_sf = max(easy_sf, easy_ini)
+                    easy_sf = min(1.0, easy_sf*easy_incr)
+                    easy_step = true
+                    @debug "        updated easy_sf = $easy_sf"
                 end
 
-                if stepflags[end] == "M"
-                    stepflags *= "c"
+                # done modulating
+                if easy_sf > 0.99
+                    easy_start = false
+                    easy_sf = 1.0
                 end
+
                 stepflags *= "-"
             else
-                # No modulation at this point
+                # No more modulation
                 easy_sf = 1.0
             end
 
@@ -587,6 +631,7 @@ module solver
                 # Update whole matrix when any of these are true:
                 #    - first step
                 #    - it was requested by the user
+                #    - easy_sf was increased
                 #    - we are near global convergence
                 fill!(perturb, true)
             else
@@ -605,26 +650,28 @@ module solver
 
             # Evaluate residuals and estimate Jacobian matrix where required
             @. r_old = r_cur
-            if fdc || (step == 1) || (c_cur/c_old > fdr)
+            if fdc || (step == 1)
                 # use central difference if:
                 #    requested, at the start, or insufficient cost decrease
                 if !_calc_jac_res!(x_cur, b, r_cur, true, fdo, perturb)
-                    code = 6
+                    code = CODE_OBJ
                     break
                 end
                 stepflags *= "C$fdo-"
             else
                 # otherwise, use forward difference
                 if !_calc_jac_res!(x_cur, b, r_cur, false, fdo, perturb)
-                    code = 6
+                    code = CODE_OBJ
                     break
                 end
                 stepflags *= "F$fdo-"
             end
 
             # Check if jacobian is singular
+            #    Diagonal elements are usually negative
+            #    Off-diagonals are usually positive
             if abs(det(b)) < floatmin()*10.0
-                code = 2
+                code = CODE_SIN
                 step_ok = false
                 break
             end
@@ -635,28 +682,46 @@ module solver
                 # Newton-Raphson step
                 # @debug "        NR step"
                 x_dif = -b\r_cur
-                stepflags *= "Nr-"
+                # stepflags *= "Nr-"
 
             elseif method == 2
                 # Gauss-Newton step
                 # @debug "        GN step"
                 x_dif = -(b'*b) \ (b'*r_cur)
-                stepflags *= "Gn-"
+                # stepflags *= "Gn-"
 
             elseif method == 3
                 # Levenberg-Marquardt step
                 # @debug "        LM step"
                 #    Calculate damping parameter ("delayed gratification")
                 if r_cur_2nm < r_old_2nm
+                    # got better
                     lml /= 5.0
                 else
-                    lml *= 2.5
+                    # got worse
+                    lml *= 1.5
                 end
 
                 #    Update our estimate of the solution
                 x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
-                stepflags *= "Lm-"
+                # stepflags *= "Lm-"
+
+            elseif method == 4
+                # Newton-Raphson with jacobi preconditioning
+                x_dif = - (b' * b) \ (b' * r_cur)
+
             end
+
+            # Max step size
+            #    limit by user requirement
+            dx_max_step = Float64(dx_max)
+            #    limit by distance to tmp_ceil
+            dx_max_step = min(dx_max_step, abs(atmos.tmp_ceiling-tmp_pad - maximum(x_cur)) )
+            #    limit by distance to tmp_floor
+            dx_max_step = min(dx_max_step, abs(minimum(x_cur) - atmos.tmp_floor+tmp_pad))
+
+            # Limit step size by dx_max_step, without changing direction of dx vector
+            x_dif *= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
 
             # Extrapolate step if on plateau.
             #    This acts to give the solver a 'nudge' in (hopefully) the right direction.
@@ -665,11 +730,8 @@ module solver
             if plateau_apply
                 @. x_dif *= plateau_s
                 plateau_i = 0
-                stepflags *= "X-"
+                stepflags *= "P-"
             end
-
-            # Limit step size, without changing direction of dx vector
-            x_dif *= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
             # Linesearch
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
@@ -677,8 +739,8 @@ module solver
                 @debug "        linesearch"
 
                 # Reset
-                ls_alpha = 1.0      # Greater than 1 => search beyond NL method step
-                ls_cost  = 1.0e99   # big number
+                ls_alpha = ls_max_scale   # Greater than 1 => extension of step
+                ls_cost  = 1.0e99   # a big number
 
                 # Internal function minimised by linesearch method
                 function _ls_func(scale::Float64)::Float64
@@ -700,7 +762,7 @@ module solver
 
                     if (ls_method == 1) || (ls_cost*0.1 < conv_atol + conv_rtol * c_max)
                         # Use golden-section search method
-                        ls_alpha = gs_search(_ls_func, ls_min_scale, ls_alpha,
+                        ls_alpha = gs_search(_ls_func, ls_min_scale, ls_max_scale,
                                                 1.0e-9, ls_min_scale, ls_max_steps)
 
                     elseif ls_method == 2
@@ -725,20 +787,33 @@ module solver
 
                     else
                         @error "Invalid linesearch algorithm $ls_method"
-                        code = 5
+                        code = CODE_CFG
                         break
                     end
 
                     # Apply best scale from linesearch
-                    ls_alpha = max(ls_alpha, ls_min_scale)
+                    ls_alpha = min(max(ls_alpha, ls_min_scale), ls_max_scale)
+                    @debug "            ls_alpha = $ls_alpha"
                     x_dif *= ls_alpha
                 end
 
             end # end linesearch
 
+            # Limit step size by dx_min
+            x_dif[x_dif.<0.0] .= clamp.(x_dif[x_dif.<0.0], -dx_max_step, -dx_min)
+            x_dif[x_dif.>0.0] .= clamp.(x_dif[x_dif.>0.0], dx_min, dx_max_step)
+
             # Take the step
             @. x_cur = x_old + x_dif
-            clamp!(x_cur, atmos.tmp_floor+10.0, atmos.tmp_ceiling-10.0)
+
+            # Recalculate layer properties
+            if ! atmosphere.calc_layer_props!(atmos)
+                code = CODE_HYD
+                step_ok = false
+                stepflags *= "Ub-"
+            end
+
+            # Evaluate fluxes
             _fev!(x_cur, r_cur)
 
             # New cost value from this step
@@ -788,15 +863,27 @@ module solver
 
             # Converged?
             @debug "        check convergence"
-            if (c_cur < conv_atol + conv_rtol * c_max) && !easy_start
-                code = 0
-                break
+            if (c_cur < conv_atol + conv_rtol * c_max)
+                # still using grey RT?
+                if grey_step
+                    # switch to preferred RT scheme
+                    grey_step = false
+                elseif !easy_start
+                    # done!
+                    code = CODE_SUC
+                    break
+                end
             end
 
             # Show benchmark
             if atmos.benchmark
                 rt_avg = atmos.tim_rt_eval / atmos.num_rt_eval / 1e9 * 1e3
                 @debug @sprintf("Average RT time: %.3f ms", rt_avg)
+            end
+
+            # Record that this step not ok
+            if (code == 0) && !step_ok
+                code = CODE_STP
             end
 
         end # end solver loop
@@ -806,33 +893,46 @@ module solver
         # ----------------------------------------------------------
         atmos.is_solved = true
         atmos.is_converged = false
-        if code == 0
+        if code == CODE_SUC
             @info "    success in $step steps"
             atmos.is_converged = true
             rm(path_plt, force=true)
             rm(path_jac, force=true)
-        elseif code == 1
+        elseif code == CODE_ITE
             @error "    failure (maximum iterations)"
-        elseif code == 2
+        elseif code == CODE_SIN
             @error "    failure (singular jacobian)"
             plotting.jacobian(b, path_jac)
-        elseif code == 3
+        elseif code == CODE_TIM
             @error "    failure (maximum time)"
-        elseif code == 4
+        elseif code == CODE_NAN
             @error "    failure (NaN values)"
-        elseif code == 5
+        elseif code == CODE_CFG
             @error "    failure (configuration)"
-        elseif code == 6
+        elseif code == CODE_OBJ
             @error "    failure (objective function)"
+        elseif code == CODE_STP
+            @error "    failure (last step not ok)"
+        elseif code == CODE_HYD
+            @error "    failure (hydrostatic integration)"
         else
             @error "    failure (other)"
         end
 
+        # timeout
+        if (code in [CODE_ITE, CODE_TIM]) && easy_start
+            @warn "Solver timed-out before easy_start stage had finished."
+            @warn "    Try `easy_start=false`, increasing max_runtime, or increasing max_steps."
+        end
+
         # perform one last evaluation to set `atmos` given the final `x_cur`
+        chemistry.calc_composition!(atmos, oceans, chem, rainout)
         _fev!(x_cur, zeros(Float64, arr_len))
 
         # calc kzz profile
-        energy.fill_Kzz!(atmos)
+        if radiative_Kzz
+            energy.fill_Kzz!(atmos)
+        end
 
         # calc heating rate profile
         energy.calc_hrates!(atmos)
@@ -849,11 +949,13 @@ module solver
         atmosphere.calc_observed_rho!(atmos)
 
         # calc ocean scalar quantities
-        if atmos.ocean_calc
-            atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
-            atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
-            atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
-        end
+        atmos.ocean_layers = ocean.dist_surf_liq(atmos.ocean_tot,
+                                                    atmos.ocean_ob_frac,
+                                                    atmos.ocean_cs_height,
+                                                    atmos.rp)
+        atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
+        atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
+        atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
 
 
         # ----------------------------------------------------------
@@ -861,15 +963,20 @@ module solver
         # ----------------------------------------------------------
         loss = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
         loss_pct = 100.0*loss/maximum(abs.(atmos.flux_tot))
-        @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
-        if (sol_type == 2)
+        if sol_type == 4
+            @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
+        end
+        if sol_type == 2
             @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", energy.skin_flux(atmos))
         end
         @info @sprintf("    total flux at TOA  = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    total flux at BOA  = %+.2e W m-2     ", atmos.flux_tot[end])
-        @info @sprintf("    column max loss    = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
-        @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
+        @info @sprintf("    global flux loss   = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
+        # @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
+        if rainout || oceans
+            @info @sprintf("    surf pressure      = %-9.3e bar      ", atmos.p_boa/1e5)
+        end
 
 
         return atmos.is_converged
@@ -947,7 +1054,7 @@ module solver
                 _prescribe!(atmos, atm_type, _tsurf)
 
                 # Residual = radiative flux minus skin flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_tot[1] - energy.skin_flux(atmos))^2
             end
 
@@ -969,7 +1076,7 @@ module solver
                 _prescribe!(atmos, atm_type, _tsurf)
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
 
                 @debug "    flux_tot = $(atmos.flux_tot[1])"
                 return (atmos.flux_tot[1] - atmos.flux_int)^2
@@ -993,7 +1100,7 @@ module solver
                 _prescribe!(atmos, atm_type, _tsurf)
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_u_lw[1] - atmos.target_olr)^2
             end
 
@@ -1011,13 +1118,14 @@ module solver
         atmos.is_solved = true
 
         # Print info
-        @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
+        # @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
         if (sol_type == 2)
             F_skin = energy.skin_flux(atmos)
             @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", F_skin)
         end
         @info @sprintf("    total flux         = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
+        @info @sprintf("    surf pressure      = %.1e bar      ", atmos.p_boa/1e5)
 
         return atmos.is_converged
     end # end solve_prescribed
@@ -1062,7 +1170,7 @@ module solver
         # Handle different solution types
         if sol_type == 1
             # Fixed temperature case => just calculate radiative fluxes
-            energy.calc_fluxes!(atmos, true, false, false, false, false)
+            energy.calc_fluxes!(atmos, radiative=true)
 
         elseif sol_type == 2
             # Conductive boundary layer => find Tsurf based on Tmagma
@@ -1075,7 +1183,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus skin flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_tot[end-1] - energy.skin_flux(atmos))^2
             end
 
@@ -1097,7 +1205,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_tot[end-1] - atmos.flux_int)^2
             end
 
@@ -1119,7 +1227,7 @@ module solver
                 atmos.tmp_surf = _tsurf
 
                 # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, true, false, false, false, false)
+                energy.calc_fluxes!(atmos, radiative=true)
                 return (atmos.flux_u_lw[end-1] - atmos.target_olr)^2
             end
 

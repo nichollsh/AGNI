@@ -25,7 +25,7 @@ module plotting
                              :grid       => true,
                              :guidefontsize => 9,
                              :titlefontsize => 9,
-                             :dpi => 280)
+                             :dpi => 220)
 
     # Symmetric log
     function _symlog(v::Float64)::Float64
@@ -40,6 +40,27 @@ module plotting
         return @sprintf("%d",v)
     end
 
+    # Get y-axis limits
+    function _get_ylims(atmos::atmosphere.Atmos_t)::Tuple
+        return (1e-5*atmos.pl[1]/1.5, 1e-5*max(atmos.p_oboa, atmos.p_boa)*1.5 )
+    end
+
+    # Get y-axis ticks for log10 axis scale
+    function _get_yticks(atmos::atmosphere.Atmos_t)::Array
+        ylims = _get_ylims(atmos)
+        return 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+    end
+
+    # Reusable plotting snippets
+    macro _plt_pboa()
+        return esc(:(hline!(plt, [atmos.p_boa/1e5 ], label="", color="black",  ls=:solid)))
+    end
+    macro _plt_poboa()
+        return esc(:(hline!(plt, [atmos.p_oboa/1e5], label="", color="black", ls=:dot)))
+    end
+
+
+
     """
     Plot the temperature-pressure profile.
     """
@@ -48,11 +69,8 @@ module plotting
                             incl_magma::Bool=false,
                             title::String="")
 
-        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range(log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
+        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos), legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
 
         # Plot phase boundary
@@ -80,15 +98,19 @@ module plotting
 
         # Plot tmp_magma
         if incl_magma
-            scatter!(plt, [atmos.tmp_magma], [atmos.pl[end]*1e-5],
+            scatter!(plt, [atmos.tmp_magma], [atmos.p_boa/1e5],
                         color="cornflowerblue", label=L"T_m")
         end
 
         # Plot tmp_surf
-        scatter!(plt, [atmos.tmp_surf], [atmos.pl[end]*1e-5], color="brown3", label=L"T_s")
+        scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=2, label=L"T(p)")
+        plot!(plt, atmos.tmpl, atmos.pl/1e5, lc="black", lw=2, label=L"T(p)")
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Decorate
         xlabel!(plt, "Temperature [K]")
@@ -112,11 +134,9 @@ module plotting
                                 size_x::Int=500, size_y::Int=400,
                                 title::String="")
 
-        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
+        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
+                        legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
 
         # Plot surface
@@ -125,6 +145,10 @@ module plotting
         # Plot cell-centres and cell-edges
         scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Centres")
         scatter!(plt, atmos.rl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Edges")
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Decorate
         xlabel!(plt, "Radius [km]")
@@ -151,12 +175,9 @@ module plotting
         xlims = (-1, 101)
         xticks = collect(range(start=0.0, stop=100.0, step=10.0))
 
-        ylims  = (1e-5*atmos.pl[1]/1.5, 1e-5*atmos.pl[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-
         # Create plot
         plt = plot( xlims=xlims, xticks=xticks,
-                    ylims=ylims, yticks=yticks,
+                    ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
                     legend=:outertopright, size=(size_x,size_y); plt_default...)
 
         # Temperature profile for reference
@@ -191,14 +212,16 @@ module plotting
 
         # X-axis minimum allowed left-hand-side limit (log units)
         minmin_x::Float64 = -10
+        lw = 2.5
+        la = 0.7
 
         arr_P = atmos.p .* 1.0e-5 # Convert Pa to bar
-        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         # Create plot
-        plt = plot(ylims=ylims, yticks=yticks, legend=:outertopright,
+        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
+                        legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
+
 
         # Plot log10 VMRs for each gas
         gas_xsurf::Array = zeros(Float64, atmos.gas_num)
@@ -214,33 +237,51 @@ module plotting
         arr_x::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
         min_x::Float64 = -3
         for i in reverse(sortperm(gas_xsurf))
+            gas = atmos.gas_names[i]
+            col = atmos.gas_dat[gas].plot_color
             # Plot gases in order of descending abundance, so that the legend
             #    shows the most interesting gases at the top of the list.
 
-            # Avoid plotting too many gases, since this makes it unreadable
+            # Too many gases makes legend and plot unreadable
             if num_plotted > 20
                 break
             end
+            num_plotted += 1
 
-            # Get data
-            gas = atmos.gas_names[i]
+            # Plot post-chemistry values, before rainout
+            if atmos.condense_any
+                @. arr_x = atmos.gas_cvmr[gas]
+                if minimum(arr_x) < eps(0.0)
+                    continue
+                end
+                @. arr_x = log10(arr_x)
+                min_x = min(min_x, minimum(arr_x))
+                plot!(arr_x, arr_P, label=nothing, linestyle=:dot,
+                        lw=lw, linealpha=la, color=col)
+            end
+
+
+            # Plot runtime values, after rainout
             @. arr_x = atmos.gas_vmr[gas]
             if minimum(arr_x) < eps(0.0)
                 continue
             end
             @. arr_x = log10(arr_x)
+            min_x = min(min_x, minimum(arr_x))
+            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label, linestyle=:solid,
+                    lw=lw, linealpha=la, color=col)
 
-            plot!(arr_x, arr_P,  label=atmos.gas_dat[gas].plot_label,
-                    lw=2.5, linealpha=0.7, color=atmos.gas_dat[gas].plot_color)
 
+
+            # Plot original value as surface scatter point
             scatter!([log10(atmos.gas_ovmr[gas][end])], [arr_P[end]],
                         opacity=0.9, markersize=2, msw=0.5,
                         color=atmos.gas_dat[gas].plot_color, label="")
-
-            num_plotted += 1
-
-            min_x = min(min_x, minimum(arr_x))
         end
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         xlims  = (max(min_x, minmin_x)-0.1, 0.1)
         xticks = round.(Int,range( xlims[1], stop=0, step=1))
@@ -266,12 +307,11 @@ module plotting
                             size_x::Int=550, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
+                            incl_advect::Bool=true,
                             title::String=""
                         )
 
         arr_P = atmos.pl .* 1.0e-5 # Convert Pa to bar
-        ylims  = (arr_P[1]/1.5, arr_P[end]*1.5)
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
         max_fl = log10(max(100.0, maximum(abs.(atmos.flux_tot)), maximum(atmos.flux_u), maximum(atmos.flux_d)))
         xticks_pos = unique(ceil.(Int, range( start=1, stop=max_fl+1, step=1)))
@@ -279,9 +319,11 @@ module plotting
         xlims = (-xticks_pos[end], xticks_pos[end])
         xticklabels = _intstr.(round.(Int, abs.(xticks)))
 
-        plt = plot(legend=:outertopright, ylims=ylims, yticks=yticks,
+        plt = plot(legend=:outertopright,
+                    ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
                     xticks=(xticks, xticklabels), xlims=xlims,
                     size=(size_x,size_y); plt_default...)
+
 
         col_r::String = "#c0c0c0"
         col_n::String = "#000000"
@@ -289,6 +331,7 @@ module plotting
         col_t::String = "#ff4400"
         col_o::String = "#66CD00"
         col_p::String = "#ecb000"
+        col_a::String = "#7700bd"
 
         alpha = 0.7
         w = 2.0
@@ -336,9 +379,14 @@ module plotting
             plot!(plt, _symlog.(atmos.flux_cdct), arr_P, label="Conduct", lw=w*1.2, lc=col_o, ls=:solid, linealpha=alpha)
         end
 
-        # Condensation
+        # Latent heating
         if incl_latent
             plot!(plt, _symlog.(atmos.flux_l), arr_P, label="Latent", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+        end
+
+        # Advection
+        if incl_advect
+            plot!(plt, _symlog.(atmos.flux_advect), arr_P, label="Advect", lw=w*1.2, lc=col_a, ls=:solid, linealpha=alpha)
         end
 
         # Sensible heat
@@ -357,6 +405,10 @@ module plotting
                 scatter!(plt, [0.2], [arr_P[i]], opacity=0.9, markersize=2, msw=0.5, color=col_p, label="")
             end
         end
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Labels
         annotate!(plt, xlims[1]/2.0, arr_P[1]/0.8, text("Downward", :black, :center, 9))
@@ -636,13 +688,14 @@ module plotting
     """
     Combined plot used for tracking behaviour of the solver
     """
-    function combined(plt_pt, plt_fl, plt_mr, info::String, fname::String;
-                        size_x::Int=800, size_y::Int=650)
+    function combined(plt_pt, plt_fl, plt_mr, plt_ra, info::String, fname::String;
+                        size_x::Int=800, size_y::Int=700)
 
-        plt_info = plot(legend=false, showaxis=false, grid=false)
-        annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
+        # plt_info = plot(legend=false, showaxis=false, grid=false)
+        # annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
 
-        plt = plot(plt_pt, plt_fl, plt_mr, plt_info,
+        plt = plot(plt_pt, plt_fl, plt_mr, plt_ra,
+                        plot_title=info,
                         layout=(2,2), size=(size_x, size_y); plt_default...)
 
         if !isempty(fname)
@@ -652,21 +705,35 @@ module plotting
     end
 
     """
-    Animate output frames from solver, using ffmpeg
+    **Convert still-frame images into an animation**
+
+    Uses FFMPEG provided by Julia library.
+
+    Arguments:
+    - `output_dir::String`          folder in which to save the animation
+    - `frames_dir::String`          folder containing the frames
+
+    Optional arguments:
+    - `output_fmt::String`          output file format: mp4, mov, ...
+    - `frames_fmt::String`          input frame format: png, jpg, ...
+    - `duration::Float64`           animation duration [seconds]
     """
-    function animate(atmos::atmosphere.Atmos_t, duration::Float64=12.0)
+    function animate(output_dir::String, frames_dir::String;
+                            output_fmt::String="mp4",
+                            frames_fmt::String="png",
+                            duration::Float64=12.0)
 
         # Find output files
-        out::String = atmos.OUT_DIR
-        frames = glob("*.png",atmos.FRAMES_DIR)
+        frames = glob("*.$frames_fmt",frames_dir)
         nframes::Int = length(frames)
 
         # Create animation
         if nframes < 1
-            @warn "Cannot animate solver because no output frames were found"
+            @warn "Cannot create animation from solver"
+            @warn "    No frames found: $frames_dir"
         else
-            fps::Float64 = nframes/duration*1.0
-            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$(atmos.FRAMES_DIR)/*.png" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $out/animation.mp4`)
+            fps = Float64(nframes)/duration
+            @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$frames_dir/*.$frames_fmt" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $output_dir/animation.$output_fmt`)
         end
 
         return nothing

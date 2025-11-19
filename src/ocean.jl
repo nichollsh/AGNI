@@ -22,7 +22,9 @@ module ocean
     import ..phys
 
     """
-    **Determine the layering structure of surface liquids**
+    **Determine the layering structure of surface condensates**
+
+    Liquids start in ocean basins, then cover entire surface once basins fill up.
 
     Output is an array of length=4 tuples, one tuple per liquid. 1st tuple index is the
     location of the liquid (i=1 is bottom of ocean). 2nd index is the liquid name.
@@ -144,4 +146,5 @@ module ocean
             end
         end
     end
+
 end

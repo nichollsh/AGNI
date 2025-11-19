@@ -10,6 +10,7 @@ module setpt
 
     import ..phys
     import ..atmosphere
+    import ..chemistry
 
     include("guillot.jl")
     import .guillot
@@ -23,7 +24,7 @@ module setpt
     function request!(atmos::atmosphere.Atmos_t, request::Array{String,1})::Bool
         num_req::Int = length(request)          # Number of requests
         idx_req::Int = 1                        # Index of current request
-        str_req::String = "_unset"              # String of current request
+        str_req::String = atmosphere.UNSET_STR  # String of current request
         prt_req::String = "Setting T(p): "
         while idx_req <= num_req
             # get command
@@ -65,6 +66,11 @@ module setpt
                 idx_req += 1
                 setpt.add!(atmos,parse(Float64, request[idx_req]))
 
+            elseif str_req == "surfsat"
+                # ensure surface is not super-saturated
+                chemistry.restore_composition!(atmos)
+                chemistry._sat_surf!(atmos)
+
             elseif str_req == "sat"
                 # condensing a volatile
                 idx_req += 1
@@ -79,7 +85,7 @@ module setpt
                 return false
             end
 
-            atmosphere.calc_layer_props!(atmos, ignore_errors=true)
+            atmosphere.calc_layer_props!(atmos)
 
             # iterate
             idx_req += 1
@@ -88,12 +94,57 @@ module setpt
         return true
     end
 
+    # Set by interpolating from T,P arrays
+    function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array)
+
+        if !atmos.is_param
+            @error "setpt: Atmosphere parameters not set"
+            return
+        end
+
+        # Check if arrays are flipped
+        #      Pressure must be increasing with index
+        if pl[1] > pl[2]
+            pl = reverse(pl)
+            tmpl = reverse(tmpl)
+        end
+
+        # Check that pressure is monotonic
+        for i in 1:length(pl)-1
+            if pl[i] > pl[i+1]
+                @error "setpt: input array of pressures is not monotonically increasing"
+                return
+            end
+        end
+
+        # Extrapolate loaded grid to lower pressures (prevent domain error)
+        if (atmos.pl[1] < pl[1])
+            pushfirst!(pl,   atmos.pl[1]/1.1)
+            pushfirst!(tmpl, tmpl[1])
+        end
+
+        # Extrapolate loaded grid to higher pressures
+        if (atmos.pl[end] > pl[end])
+            push!(pl,   atmos.pl[end]*1.1)
+            push!(tmpl, tmpl[end])
+        end
+
+        # Interpolate from the loaded grid to the required one
+        #   This uses log-pressures in order to make the interpolation behave
+        #   reasonably across the entire grid.
+        itp::Extrapolation = extrapolate(interpolate((log10.(pl),),tmpl, Gridded(Linear())), Flat())
+        @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
+        @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
+
+        return
+    end
+
     # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
 
         # Check file exists
         if !isfile(fpath)
-            @error "setpt: The file '$fpath' does not exist"
+            @error "setpt: file '$fpath' does not exist"
             return
         end
 
@@ -111,10 +162,9 @@ module setpt
 
         # Validate
         if nlev_l < 3
-            @error "setpt: CSV file contains too few levels (contains $nlev_l edge values)"
+            @error "setpt: file contains too few levels (contains $nlev_l edge values)"
             return
         end
-        nlev_c = nlev_l - 1
 
         # Allocate temporary T and P arrays
         tmpl = zeros(Float64,nlev_l)
@@ -151,42 +201,8 @@ module setpt
             idx += 1
         end
 
-        # Check if arrays are flipped
-        if pl[1] > pl[2]
-            pl = reverse(pl)
-            tmpl = reverse(tmpl)
-        end
-
-        # Check that pressure is monotonic
-        for i in 1:nlev_c
-            if pl[i] > pl[i+1]
-                @error "setpt: Pressure is not monotonic in csv file"
-                return
-            end
-        end
-
-        # Extrapolate loaded grid to lower pressures (prevent domain error)
-        if (atmos.pl[1] < pl[1])
-            p_ext = atmos.pl[1]/1.1
-            t_ext = (tmpl[1] - tmpl[3])/(pl[1] - pl[3]) * (p_ext - pl[1])
-            pushfirst!(pl,   p_ext)
-            pushfirst!(tmpl, t_ext)
-        end
-
-        # Extrapolate loaded grid to higher pressures
-        if (atmos.pl[end] > pl[end])
-            p_ext = atmos.pl[end]*1.1
-            t_ext = (tmpl[end] - tmpl[end-2])/(pl[end] - pl[end-2]) * (p_ext - pl[end])
-            push!(pl,   p_ext)
-            push!(tmpl, t_ext)
-        end
-
-        # Interpolate from the loaded grid to the required one
-        #   This uses log-pressures in order to make the interpolation behave
-        #   reasonably across the entire grid.
-        itp::Extrapolation = extrapolate(interpolate((log10.(pl),),tmpl, Gridded(Linear())), Flat())
-        @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
-        @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
+        # Use fromarrays function to do the rest
+        fromarrays!(atmos, pl, tmpl)
 
         return
     end
@@ -376,62 +392,6 @@ module setpt
     end
 
 
-    # Ensure that the surface isn't supersaturated
-    function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)::Bool
-        if !(atmos.is_alloc && atmos.is_param)
-            @error "setpt: Atmosphere is not setup or allocated"
-            return
-        end
-
-        x::Float64      = 0.0
-        psat::Float64   = 0.0
-        rained::Bool    = false
-
-        # For each condensable volatile
-        for gas in atmos.gas_names
-            # Get VMR at surface
-            x = atmos.gas_vmr[gas][atmos.nlev_c]
-            if x < 1.0e-10
-                continue
-            end
-
-            # Check criticality
-            if (atmos.tmp_surf > atmos.gas_dat[gas].T_crit)
-                continue
-            end
-
-            # Check surface pressure (should not be supersaturated)
-            psat = phys.get_Psat(atmos.gas_dat[gas], atmos.tmp_surf)
-            if x*atmos.pl[end] > psat
-
-                # Set flag
-                rained = true
-
-                # Reduce amount of volatile until reaches phase curve
-                atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.gas_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa
-
-                # Check that p_boa is still reasonable
-                if atmos.p_boa <= 10.0 * atmos.p_toa
-                    @error "setpt: Supersaturation check ($gas) resulted in an unreasonably small surface pressure"
-                end
-            end
-        end
-
-        # Renormalise VMRs
-        tot_vmr = 0.0
-        for g in atmos.gas_names
-            tot_vmr += atmos.gas_vmr[g][atmos.nlev_c]
-        end
-        for g in atmos.gas_names
-            atmos.gas_vmr[g][atmos.nlev_c] /= tot_vmr
-        end
-
-        # Generate new pressure grid
-        atmosphere.generate_pgrid!(atmos)
-
-        return rained
-    end
 
 
     """

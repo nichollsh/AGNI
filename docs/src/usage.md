@@ -59,6 +59,33 @@ Potential flags for each species are:
 * `NO_THERMO` - no thermodynamic data available, so will be treated as a diatomic ideal gas
 * `COND` - this gas is allowed to condense
 
+## Solver flags
+
+During each step of the iteration, AGNI will flag the solver status to indicate what was
+done and if any problems arose. These flags are separated by a hyphen (`-`).
+
+Potential solver flags are:
+* `Cs` or `Cf` - chemistry and condensation schemes either (s)ucceeded or (f)ailed
+* `Gg` - radiative transfer performed with double-grey scheme
+* `M` or `Mr`  - convective fluxes are being modulated for stability
+* `C2` or `C4` or `F2` or `F4`- a central or forward finite-difference scheme was used (at 2nd or 4th order)
+* `Ls` - a linesearch method was applied
+* `P` - step was forcibly extrapolated because the solver is not making good progress
+* `U` - the atmosphere has become gravitationally unbound
+
+## Grids of models
+
+The code is not explicitly parallelised. However, there is functionality to run a grid
+of models using by the script located at `misc/utilities/grid_agni.jl`.
+
+This script can be run on your local machine. However, it could also be dispatched to a node
+within a compute cluster by using Slurm. For example, with a 24 hr and 3 GB memory limit:
+
+```console
+sbatch --mem-per-cpu=3G --time=1440 --wrap "julia --project=. misc/utilities/grid_agni.jl"
+```
+
+
 ## Configuration
 AGNI configuration files are formatted using [TOML](https://toml.io/en/). There
 are examples in `res/config/`. The default configuration file contains comments
@@ -90,9 +117,9 @@ General properties of the planet.
 | `skin_k          ` | Conductivity of the conductive boundary layer [W m-1 K-1]. Used when `solution_type=2`. |
 | `tmp_magma       ` | Temperature of the topmost layer of the planet's mantle [K]. Used when `solution_type=2`. |
 | `flux_int        ` | Internal flux [W m-2] to be solved-for when `solution_type=3`. |
-| `turb_coeff      ` | Turbulent exchange coefficient for sensible heat transport. |
+| `roughness       ` | Surface roughness length scale [m] |
 | `wind_speed      ` | Effective wind speed for sensible heat transport [m s-1]. |
-| `star_Teff      `  | Stellar photospheric temperature [K] used if `files.input_star=="blackbody"`. |
+| `star_Teff       ` | Stellar photospheric temperature [K] used if `files.input_star=="blackbody"`. |
 
 
 ### `[files]`
@@ -108,15 +135,16 @@ Input/output files and other paths.
 
 ### `[composition]`
 Atmospheric composition and chemistry.
+There are three main ways to set the composition: partial pressures (`p_dict`), mixing ratios (`vmr_dict` or `vmr_file`), or by metallicities (`metallicities`).
 
 | Parameter         | Description   |
 | ----------------: | :------------ |
 | `p_top         `  | Total top-of-atmosphere pressure [bar]. |
 | `p_dict        `  | Dictionary of gas partial surface pressures [bar]. Summed to obtain `p_surf`. |
 | `p_surf        `  | Total surface pressure [bar]. Incompatible with `p_dict`.|
-| `vmr_dict      `  | Gas volume mixing ratios (=mole fractions) at the surface. Must be set alongside `p_surf`. |
-| `vmr_file      `  | Path to a file containing mixing ratio profiles. Replaces `vmr_dict`. Must be set alongside `p_surf`. |
-| `chemistry     `  | Type of chemistry to be used (see below). |
+| `vmr_dict      `  | Gas volume mixing ratios (=mole fractions) at the surface. Must also set `p_surf`. |
+| `vmr_file      `  | Path to a file containing mixing ratio profiles.  Must also set `p_surf`. |
+| `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
 | `condensates   `  | List of volatiles which are allowed to condense. Incompatible with `chemistry > 0`. |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
 
@@ -130,29 +158,40 @@ Parameters that tell the model what to do.
 | `verbosity     `  | Logging verbosity (0: quiet, 1: normal, 2: extra logging) |
 | `max_steps     `  | Maximum number of steps the solver should take before giving up (typically <200). |
 | `max_runtime   `  | Maximum wall-clock runtime [s] before giving up. |
-| `num_levels    `  | Number of model levels. Typically ~50, and ideally less than 150.  |
-| `continua      `  | Include collisional/continuum absorption in radiative transfer (true/false) |
-| `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false) |
-| `cloud         `  | Include cloud scattering and opacity in radiative transfer (true/false) |
-| `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see below) |
-| `real_gas      `  | Use real-gas equation(s) of state where possible (true/false) |
-| `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
-| `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false) |
-| `convection    `  | Include vertical heat transport associated with convection (true/false) |
-| `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux |
-| `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
-| `rainout       `  | Enable compositional rainout of condensables. If disabled, phase change does not impact composition. |
+| `num_levels    `  | Number of model levels. Typically ~50, and ideally less than 100.  |
+| `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
+| `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
 | `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |
 | `solution_type `  | Solution type (see below). |
 | `solver        `  | Solver to use (see below). |
 | `dx_max        `  | Maximum step size [kelvin] allowed to be taken by the solver during each step. |
 | `linesearch    `  | Linesearch method to be used (0: None, 1: Golden section, 2: Backtracking) |
-| `easy_start    `  | Initially down-scale convective/condensation fluxes, if initial guess is poor/unknown. **Enable if the model is struggling.** |
-| `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
-| `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
+| `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
+| `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
 | `perturb_all`     | Perturb all rows of jacobian matrix at each solver iteration? True=stable, False=fast. |
 | `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] |
 | `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] |
+
+### `[physics]`
+Parameters that describe how the model should treat the physics.
+| Parameter         | Description   |
+| ----------------: | :------------ |
+| `chemistry     `  | Include 1D equilibrium chemistry in the atmosphere (true/false) |
+| `continua      `  | Include collisional/continuum absorption in radiative transfer (true/false) |
+| `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false) |
+| `cloud         `  | Include cloud scattering and opacity in radiative transfer (true/false) |
+| `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see below) |
+| `grey_lw`         | Grey opacity [m2/kg] of longwave (thermal) radiation. Used when `input_sf="greygas"` |
+| `grey_sw`         | Grey opacity [m2/kg] of shortwave (stellar) radiation. Used when `input_sf="greygas"` |
+| `real_gas      `  | Use real-gas equation(s) of state where possible (true/false) |
+| `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
+| `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false) |
+| `advection `      | Include advective heat transport into each cell (true/false) |
+| `convection    `  | Include vertical heat transport associated with convection (true/false) |
+| `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux |
+| `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
+| `rainout       `  | Enable condensation and evaporation of condensables aloft. Required for `latent_heat=true`. |
+| `oceans        `  | Enable condensation and evaporation of condensables at the surface. |
 
 ### `[plots]`
 Configure plotting routines all of these should be `true` or `false`.
@@ -199,15 +238,9 @@ Configure plotting routines all of these should be `true` or `false`.
 
     For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model.
 
-* `composition.chemistry` describes the type of chemistry to implement within the model. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. The allowed values (integers) are...
-     - 0 : Disabled
-     - 1 : Equilibrium, gas phase only
-     - 2 : Equilibrium, with condensation (condensates retained)
-     - 3 : Equilibrium, with condensation (condensates rained out)
+* `physics.chemistry` enables a calculation of equilibrium thermochemistry in the atmosphere. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. More information on the chemistry is available on the [Equilibrium chemistry](@ref) page.
 
-     More information on the chemistry is available on the [Equilibrium chemistry](@ref) page
-
-* `execution.overlap_method` tells SOCRATES which algorithm to use to combine gas opacities. The spectral files contain k-tables for pure gases, and combining these coefficients can be done in several ways. See Amundsen+[2017](https://www.aanda.org/articles/aa/full_html/2017/02/aa29322-16/aa29322-16.html) for a nice comparison of overlap methods. Allowed options are...
+* `physics.overlap_method` tells SOCRATES which algorithm to use to combine gas opacities. The spectral files contain k-tables for pure gases, and combining these coefficients can be done in several ways. See Amundsen+[2017](https://www.aanda.org/articles/aa/full_html/2017/02/aa29322-16/aa29322-16.html) for a nice comparison of overlap methods. Allowed options are...
      - `"ee"`   : equivalent extinction (fastest)
      - `"rorr"` : random overlap, with resorting and re-binning
      - `"ro"`   : random overlap (most accurate, slowest)

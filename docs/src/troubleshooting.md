@@ -2,7 +2,7 @@
 This page may be useful if you are having problems. However, I would suggest that you also double check that you followed all of the [Getting started](@ref) instructions.
 
 ## Julia version is incompatible / Errors about OpenSSL library
-You must use Julia version 1.11 because there are incompatibilities between the OpenSSL library required by Julia1.12 and Python.
+You must use Julia version 1.11 because there are incompatibilities between the OpenSSL library required by Julia 1.12 and Python.
 
 Switch Julia versions using the `juliaup` command. E.g:
 ```bash
@@ -13,6 +13,7 @@ julia --version       # This should say 1.11.something
 ```
 
 After following these steps, try installing AGNI again.
+You will now also need to create a new Python environment, so that conda is aware that 1.11 is the desired Julia version
 
 ## Wget is not installed
 You need to install [wget](https://www.gnu.org/software/wget/). This is a tool for tranferring files over a network. Wget is used by AGNI to obtain lookup data files from Zenodo. Most Linux distributions come with wget; otherwise see [this page](https://www.tecmint.com/install-wget-in-linux/).
@@ -57,6 +58,18 @@ If this does not help, it's possible that you are using a Julia distribution pro
 your system package manager. It's important that you only use Julia distributed from the
 official website.
 
+## Fill error when compiling SOCRATES
+For example, an error which looks something like:
+```log
+...
+Cgen_null.c:52:13: error: too many arguments to function 'fill'; expected 0, have 6
+   52 |             fill(&np, p, p1, p2, divisi
+...
+```
+This is caused by using an incompatible C compiler. The compilation has been tested with gcc version 12.2.0
+
+This can occur when compiling SOCRATES while you have a conda environment activated, if
+one of the Python packages provides gcc. Try deactivating conda.
 
 
 ## Cannot find SOCRATES

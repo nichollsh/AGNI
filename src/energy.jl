@@ -19,55 +19,88 @@ module energy
     import ..chemistry
     import ..spectrum
 
+    const FILL_FINITE_FLUX::Float64 = 1.0
+
+    """
+    **Set non-finite values in an array equal to a given fill value**.
+
+    Arguments:
+    - `arr`      array potentially containing non-finite values
+    - `fill`     replacement value to fill with
+    """
+    function make_finite!(arr, val)
+        arr[findall(x -> !isfinite(x), arr)] .= val
+    end
+
     """
     **Solve radiative transfer using SOCRATES**
 
     Imports SOCRATES wrapper from the atmosphere module, rather than loading it twice.
 
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
-    - `lw::Bool`                        longwave calculation? Else: shortwave
-    - `calc_cf::Bool=false`             also calculate contribution function?
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `lw::Bool`                True: longwave calculation. False: shortwave calculation.
+
+    Optional arguments:
+    - `calc_cf::Bool`           also calculate contribution function?
+    - `gauss_ir::Bool`          using gaussian angular integration in IR, otherwise uses two-stream approximation
+    - `rescale_pf::Bool`        perform rescaling on phase function
     """
-    function _radtrans_socrates!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
+    function _radtrans_socrates!(atmos::atmosphere.Atmos_t, lw::Bool;
+                                            calc_cf::Bool=false,
+                                            gauss_ir::Bool=false,
+                                            rescale_pf::Bool=false)
 
         # Longwave or shortwave calculation?
-        # Set the two-stream approximation to be used (-t f)
         if lw
+            # Set source function
             atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_infra_red
-            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
-            # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
-        else
-            atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_solar
-            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
-            # Practical improved flux method (original form of 1980)
-        end
 
-        # Check files are acceptable and set instellation if doing SW flux
-        if lw
+            # Angular integration can be gauss or two-stream for LW
+            if gauss_ir
+                atmos.control.i_angular_integration = atmosphere.SOCRATES.rad_pcf.ip_ir_gauss
+            else
+                atmos.control.i_angular_integration = atmosphere.SOCRATES.rad_pcf.ip_two_stream
+            end
+
+            # Eddington's approximation
+            # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
+            # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
+            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
+
+
+            # Check spectral file is ok
             if !Bool(atmos.spectrum.Basic.l_present[6])
                 error("The spectral file contains no data for the Planck function.
                        Check that the file contains a stellar spectrum.")
             end
-
             if Bool(atmos.spectrum.Basic.l_present[2])
                 atmos.control.l_solar_tail_flux = true
             end
-
         else
+            # Set source function
+            atmos.control.isolir = atmosphere.SOCRATES.rad_pcf.ip_solar
+
+            # Angular integration is always two-stream for SW
+            atmos.control.i_angular_integration = atmosphere.SOCRATES.rad_pcf.ip_two_stream
+
+            # Eddington's approximation
+            # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
+            # Practical improved flux method (original form of 1980)
+            atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
+
+            # SOCRATES requires this to be passed as two variables, since it
+            #       needs to know the angle of the direct beam.
+            #   - Convert the zenith angles to secants.
+            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)
+            #   - Pass effective solar constant
+            atmos.bound.solar_irrad[1] = atmos.instellation *
+                                            (1.0 - atmos.albedo_b) * atmos.s0_fact
+
+            # Check spectral file is ok
             if !Bool(atmos.spectrum.Basic.l_present[2])
                 error("The spectral file contains no solar spectral data.")
             end
-
-            # SOCRATES requires this to be passed as two variables, since it
-            #     needs to know the angle of the direct beam.
-
-            # Convert the zenith angles to secants.
-            atmos.bound.zen_0[1] = 1.0/cosd(atmos.zenith_degrees)
-
-            # Pass effective solar constant
-            atmos.bound.solar_irrad[1] = atmos.instellation *
-                                            (1.0 - atmos.albedo_b) * atmos.s0_fact
         end
 
         #####################################
@@ -76,19 +109,22 @@ module energy
         #####################################
 
         # Cl_run_cdf +R flag
-        atmos.control.l_rescale = false
-        if atmos.control.l_rescale
-            atmos.control.l_henyey_greenstein_pf = true
-        end
+        atmos.control.l_rescale = rescale_pf
+        atmos.control.l_henyey_greenstein_pf = rescale_pf
 
         # The internal SOCRATES solver used for the two-stream calculations (-v flag)
         if atmos.control.l_cloud
             # 16 is recommended for cloudy-sky (ip_solver_mix_direct_hogan)
-            # 17 is recommended for cloud with separate stratiform and convective regions
             atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_mix_direct_hogan
+
+            # 17 is recommended for cloud with separate stratiform and convective regions
+            # atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_triple_hogan
         else
-            # 13 is recommended for clear-sky (ip_solver_homogen_direct)
+            # 13 is recommended for clear-sky (Direct solution in a homogeneous column)
             atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_homogen_direct
+
+            # 1 is also possible (Pentadiagonal solver for homogeneous column)
+            # atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_pentadiagonal
         end
 
 
@@ -135,13 +171,19 @@ module energy
         end
 
         ####################################################
-        # Temperature
+        # Temperature, pressure, radius, etc.
         ###################################################
 
-        atmos.atm.p[1, :] .= atmos.p[:]
-        atmos.atm.t[1, :] .= atmos.tmp[:]
+        atmos.atm.p[1, :]           .= atmos.p[:]
+        atmos.atm.r_layer[1,:]      .= atmos.r[:]
+        atmos.atm.t[1, :]           .= atmos.tmp[:]
+
         atmos.atm.p_level[1, 0:end] .= atmos.pl[:]
+        atmos.atm.r_level[1, 0:end] .= atmos.rl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
+
+        atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
+        atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
 
         if lw
             atmos.bound.t_ground[1] = atmos.tmp_surf
@@ -187,6 +229,9 @@ module energy
             end
         end
 
+        # Ensure all VMRs are between 0 and 1
+        clamp!(atmos.atm.gas_mix_ratio, 0.0, 1.0)
+
         # Do radiative transfer
         atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control,
                                                      atmos.dimen, atmos.spectrum,
@@ -200,6 +245,7 @@ module energy
             else
                 @error "Non-finite value in SW DN flux array"
             end
+            make_finite!(atmos.radout.flux_down, FILL_FINITE_FLUX)
         end
         if !all(isfinite, atmos.radout.flux_up)
             if lw
@@ -207,6 +253,7 @@ module energy
             else
                 @error "Non-finite value in SW UP flux array"
             end
+            make_finite!(atmos.radout.flux_up, FILL_FINITE_FLUX)
         end
 
         # Store new fluxes in atmos struct
@@ -266,7 +313,7 @@ module energy
 
     Uses two opacity values to represent the LW and SW components of the flux field.
 
-    Loosely following this tutorial:
+    Loosely following this tutorial, which is based on Pierrehumbert (2010).
     https://brian-rose.github.io/ClimateLaboratoryBook/courseware/radiative-transfer/
 
     Arguments:
@@ -366,20 +413,56 @@ module energy
         return nothing
     end # end of radtrans
 
+    """
+    **Calculate turbulent kinetic energy (TKE) exchange coefficient**.
 
-    # Calculate sensible heat flux (turbulence at surface boundary)
+    Based on Monin–Obukhov similarity theory, from roughness length scale.
+    See eq 9 in Nicholson & Benn (2009). Added small epsilon-factor to avoid function
+    blowing-up around regime where height ≈ roughness.
+
+    Arguments:
+    - `height::Float64`     Height above surface [m]
+    - `roughness::Float64`  Roughness length scale [m]
+
+    Returns:
+    - `C_d::Float64`        TKE exchange coefficient [dimensionless]
+    """
+    function eval_exchange_coeff(height::Float64, roughness::Float64)::Float64
+        return phys.k_vk^2 / log(max(height, roughness+1e-3)/roughness)
+    end
+
+    """
+    **Calculate sensible heat flux from turbulent kinetic energy (TKE)**
+
+    Updates the values of `atmos.C_d` and `atmos.flux_sens`.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used
+    """
     function sensible!(atmos::atmosphere.Atmos_t)
+
+        # Set TKE exchange coefficient
+        atmos.C_d = eval_exchange_coeff(atmos.r[end]-atmos.rp, atmos.surf_roughness)
+
+
         # TKE scheme for this 1D case
         # transports energy from the surface to the bottom node
         atmos.flux_sens = atmos.layer_cp[end]*atmos.layer_μ[end]*
                             atmos.p[end]/(phys.R_gas*atmos.tmp[end]) *
-                            atmos.C_d * atmos.U *
+                            atmos.C_d * atmos.surf_windspeed *
                             (atmos.tmp_surf-atmos.tmp[end])
         return nothing
     end
 
 
-    # Calculate conductive fluxes
+    """
+    **Calculate conductive heat fluxes using Fourier's law**
+
+    Updates array of `atmos.flux_cdct` at each layer of the atmosphere.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used
+    """
     function conduct!(atmos::atmosphere.Atmos_t)
         # top layer
         atmos.flux_cdct[1] = 0.0
@@ -437,6 +520,8 @@ module energy
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Optional arguments:
     - `pmin::Float64`           pressure [bar] below which convection is disabled
     """
     function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4)
@@ -536,9 +621,6 @@ module energy
         atmos.λ_conv[end] = atmos.λ_conv[end-1]
 
         # Check for spurious shallow convection occuring ABOVE condensing regions
-        #    If found, reset convective flux to zero AT THIS LAYER ONLY.
-        #    This is okay because this shouldn't physically happen, and will only occur
-        #    because of weird numerical issues which only act to make solving difficult.
         # @inbounds for i in 1:atmos.nlev_l-1
         #     if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
         #         atmos.mask_c[i] = false
@@ -609,21 +691,22 @@ module energy
     """
     **Analytical diffusion scheme for condensation and evaporation energy.**
 
-    Updates fluxes. Requires `chemistry.handle_saturation` to be called first.
+    Updates fluxes. Requires `chemistry.rainout_and_evaporate` to be called first.
 
     Integrates from bottom of model upwards. Based on the amount of
     phase change at each level, a phase change flux is calculated by assuming
     a fixed condensation timescale.
 
     If evaporation is enabled, then integrates from top downwards to determine flux from
-    re-evaporation of droplets
+    re-evaporation of droplets. Any droplets which reach the ground go towards forming an ocean.
 
-    Any droplets which reach the ground go towards forming an ocean.
+    Should ideally perform a microphysical treatment; e.g. by following this paper:
+    https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2020JE006653
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
-    function condense_diffuse!(atmos::atmosphere.Atmos_t)
+    function latent!(atmos::atmosphere.Atmos_t)
 
         # Check if there are no condensates enabled
         if !atmos.condense_any
@@ -670,7 +753,7 @@ module energy
                 end
             end
 
-            # add energy from this gas to total
+            # add energy from this condesable to total energy from all condensables
             @. atmos.flux_l += atmos.phs_wrk_fl
 
             # calculate mask
@@ -693,7 +776,7 @@ module energy
     """
     function reset_fluxes!(atmos::atmosphere.Atmos_t)
 
-        # scalar fluxes
+        # sensible heating
         atmos.flux_sens = 0.0
 
         # conduct
@@ -702,7 +785,12 @@ module energy
         # convect
         fill!(atmos.flux_cdry, 0.0)
 
-        # radiative grey
+        # latent heating
+        fill!(atmos.flux_l, 0.0)
+
+        # radiative (bolometric)
+        atmos.is_out_sw = false
+        atmos.is_out_lw = false
         fill!(atmos.flux_u, 0.0)
         fill!(atmos.flux_d, 0.0)
         fill!(atmos.flux_n, 0.0)
@@ -714,7 +802,7 @@ module energy
         fill!(atmos.flux_d_sw, 0.0)
         fill!(atmos.flux_d_lw, 0.0)
 
-        # radiative band
+        # radiative (per band)
         fill!(atmos.band_u_lw, 0.0)
         fill!(atmos.band_d_lw, 0.0)
         fill!(atmos.band_n_lw, 0.0)
@@ -722,19 +810,13 @@ module energy
         fill!(atmos.band_d_sw, 0.0)
         fill!(atmos.band_n_sw, 0.0)
 
-        # total fluxes
-        fill!(atmos.flux_dif, 0.0)
+        # total fluxes, and difference across each layer
         fill!(atmos.flux_tot, 0.0)
+        fill!(atmos.flux_dif, 0.0)
+
+        return nothing
     end
 
-    """
-    **Reset mixing ratios to their original values**
-    """
-    function restore_composition!(atmos::atmosphere.Atmos_t)
-        for g in atmos.gas_names
-            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
-        end
-    end
 
     """
     **Calculate energy flux at each level.**
@@ -742,52 +824,48 @@ module energy
     Calculates flux components (radtrans, convection, etc.) and sums them to get total flux.
     Also updates thermodynamic properties (heat capacity, density, etc.) at each layer.
 
+    Assumes that chemistry functions have already been called, if wanted. Does not call
+    fastchem here.
+
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+
+    Optional arguments:
     - `radiative::Bool`                 include radiation fluxes
-    - `latent::Bool`                    include condensation flux
-    - `convect::Bool`                   include MLT convection flux
-    - `sens_heat::Bool`                 include TKE sensible heat transport
-    - `conduct::Bool`                   include conductive heat transport
+    - `latent_heat::Bool`               include condensation flux
+    - `convective::Bool`                include MLT convection flux
+    - `sens_heat::Bool`                 include TKE sensible heat flux
+    - `conductive::Bool`                include conductive heat flux
+    - `advective::Bool`                 include advective heat flux
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
-    - `rainout::Bool`                   allow rainout ( do not reset VMRs to dry values )
+
+    Returns:
+    - `ok::Bool`                        calculation performed ok?
     """
-    function calc_fluxes!(atmos::atmosphere.Atmos_t,
-                          radiative::Bool,
-                          latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool;
+    function calc_fluxes!(atmos::atmosphere.Atmos_t;
+                          radiative::Bool=false, latent_heat::Bool=false, convective::Bool=false,
+                          sens_heat::Bool=false, conductive::Bool=false, advective::Bool=false,
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
-                          calc_cf::Bool=false, rainout::Bool=true)
+                          calc_cf::Bool=false)::Bool
 
         # Reset fluxes
         reset_fluxes!(atmos)
+        ok::Bool = true
 
-        # +Condensation and evaporation
-        if atmos.condense_any && (latent || rainout)
-
-            # Restore mixing ratios
-            restore_composition!(atmos)
-            atmosphere.calc_layer_props!(atmos)
-
-            # Handle rainout
-            chemistry.handle_saturation!(atmos)
-
-            # Calculate latent heat flux
-            if latent
-                condense_diffuse!(atmos)                    # Calculate latent heat flux
-                atmos.flux_l *= latent_sf                   # Modulate for stability?
-                @. atmos.flux_tot += atmos.flux_l    # Add to total flux
-            end
-
-            # Restore mixing ratios - do not allow rainout
-            if !rainout
-                restore_composition!(atmos)
-            end
+        # Warn if no flux terms are enabled
+        if !(radiative || latent || convective || sens_heat || conductive || advective)
+            @warn "No flux terms enabled in call to `calc_fluxes!`"
+            ok = false
         end
 
-        # Recalculate layer properties
-        atmosphere.calc_layer_props!(atmos)
+        # +Latent heating
+        if latent_heat
+            latent!(atmos)           # Calculate latent heat fluxes
+            atmos.flux_l *= latent_sf           # Modulate for stability?
+            @. atmos.flux_tot += atmos.flux_l   # Add to total flux
+        end
 
         # +Radiation
         if radiative
@@ -797,7 +875,7 @@ module energy
         end
 
         # +Dry convection
-        if convect
+        if convective
             convection!(atmos)                          # Calc dry convection heat flux
             atmos.flux_cdry *= convect_sf               # Modulate for stability?
             @. atmos.flux_tot += atmos.flux_cdry # Add to total flux
@@ -810,16 +888,21 @@ module energy
         end
 
         # +Conduction
-        if conduct
+        if conductive
             conduct!(atmos)
             @. atmos.flux_tot += atmos.flux_cdct
+        end
+
+        # +Advection
+        if advective
+            @. atmos.flux_tot += atmos.flux_advect
         end
 
         # Flux difference across each level
         # Positive value => heating
         atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
 
-        return nothing
+        return ok
     end
 
     """
