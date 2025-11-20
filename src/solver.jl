@@ -117,7 +117,7 @@ module solver
     plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
     #    linesearch
     ls_tau::Float64    =    0.7     # backtracking downscale size
-    ls_increase::Float64 =  1.08    # factor by which the cost can increase from last step before triggering linesearch
+    ls_increase::Float64 =  0.9    # factor by which the cost can increase from last step before triggering linesearch
     ls_max_steps::Int    =  10      # maximum steps undertaken by linesearch routine
     ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
     ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
@@ -323,14 +323,15 @@ module solver
             # Set new temperatures
             _set_tmps!(x)
 
-            # Do saturation aloft here, only
-            # chemistry.calc_composition!(atmos, oceans, chem, rainout)
+            # Do saturation aloft here, only. Keep chemistry fixed.
             if rainout
                 # reset back to post-chemistry mixing ratios
                 for g in atmos.gas_names
                     @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
                 end
                 chemistry._sat_aloft!(atmos)
+            else
+                atmosphere.calc_layer_props!(atmos)
             end
 
             # Calculate fluxes
@@ -383,7 +384,6 @@ module solver
             ok::Bool = true
 
             # Evalulate residuals at x
-            # chemistry.calc_composition!(atmos, oceans, chem, rainout)
             ok = ok && _fev!(x, resid)
 
             # For each level...
@@ -779,7 +779,7 @@ module solver
                             end
 
                             ls_cost = _ls_func(ls_alpha)
-                            if ls_cost <= c_cur*ls_increase
+                            if ls_cost <= c_cur#*ls_increase
                                 # this scale is good enough
                                 break
                             end

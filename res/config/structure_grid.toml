@@ -36,7 +36,7 @@ title = "Base config for structure calcs"
     solution_type   = 3
     solver          = "newton"
     dx_max          = 100.0
-    initial_state   = ["loglin","800"]
+    initial_state   = ["iso","2000"]
     linesearch      = 1
     easy_start      = true
     grey_start      = false
@@ -47,7 +47,7 @@ title = "Base config for structure calcs"
 [physics]
     chemistry       = true
     continua        = true
-    rayleigh        = false
+    rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
     grey_lw         = 5e-3
