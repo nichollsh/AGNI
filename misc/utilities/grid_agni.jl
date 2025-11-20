@@ -267,7 +267,7 @@ function write_emits(emi_arr::Array, fpath::String, nrows::Int)
     # Write file
     open(fpath, "w") do hdl
         # Header of wavelength values
-        head = "index"
+        head = "0.0"
         for b in 1:bands
             head *= @sprintf(",%.6e",wlarr[b])
         end
