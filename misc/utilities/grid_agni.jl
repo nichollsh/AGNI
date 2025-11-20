@@ -61,7 +61,7 @@ save_ncdf_tp = true         # a single NetCDF containing all T(p) solutions
 
 # Runtime options
 AGNI.solver.ls_increase= 1.02
-modwrite::Int          = 10           # frequency to write CSV file
+modwrite::Int          = 1           # frequency to write CSV file
 modplot::Int           = 2            # Plot during runtime (debug)
 frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
@@ -86,6 +86,8 @@ cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
 
 # Results path
 result_table_path::String = joinpath(output_dir,"result_table.csv")
+result_emits_path::String = joinpath(output_dir,"result_emits.csv")
+result_profs_path::String = joinpath(output_dir,"result_profs.nc")
 
 # Logging
 AGNI.setup_logging(joinpath(output_dir, "manager.log"), cfg["execution"]["verbosity"])
@@ -117,6 +119,13 @@ stellar_spectrum = cfg["files"]["input_star"]
 nlev_c           = cfg["execution"]["num_levels"]
 grey_lw          = cfg["physics"]["grey_lw"]
 grey_sw          = cfg["physics"]["grey_sw"]
+
+# Get number of spectral bands
+bands::Int = 1
+if cfg["files"]["input_sf"] != "greygas"
+    bands = parse(Int,split(cfg["files"]["input_sf"],"/")[end-1])
+end
+@info "Spectral bands: $bands"
 
 # Intial values for interior structure
 radius   = cfg["planet"]["radius"]
@@ -205,8 +214,11 @@ open(gpfile, "w") do hdl
 end
 
 # Create output variables to record results in
-result_table::Array{Dict, 1}  = [Dict{String,Float64}(k => Float64(-1.0) for k in output_keys)   for _ in 1:gridsize]
-result_profs::Array{Dict, 1}  = [Dict{String,Array}()                    for _ in 1:gridsize] # array of dicts (p, t, r)
+result_table::Array{Dict,    1}  = [Dict{String,Float64}(k => Float64(-1.0) for k in output_keys)   for _ in 1:gridsize]
+result_profs::Array{Dict,    1}  = [Dict{String,Array}()                    for _ in 1:gridsize] # array of dicts (p, t, r)
+result_emits::Array{Float64, 2}  = zeros(Float64, (gridsize,bands)) # array of fluxes
+
+wlarr::Array{Float64,1} = zeros(Float64, bands)
 
 @info "Generated grid of $(length(input_keys)) dimensions, with $gridsize points"
 sleep(3)
@@ -239,6 +251,73 @@ function write_table(res_tab::Array{Dict,1}, fpath::String, nrows::Int)
         end
     end
 end
+
+# Write emission fluxes to disk
+function write_emits(emi_arr::Array, fpath::String, nrows::Int)
+
+    @info "Writing fluxes array '$fpath' (nrows=$nrows)"
+
+    global wlarr
+
+    # Remove old file
+    if isfile(fpath)
+        rm(fpath)
+    end
+
+    # Write file
+    open(fpath, "w") do hdl
+        # Header of wavelength values
+        head = "index"
+        for b in 1:bands
+            head *= @sprintf(",%.6e",wlarr[b])
+        end
+        head *= "\n"
+        write(hdl,head)
+
+        # Each row
+        for i in 1:nrows
+            row = @sprintf("%08d",i)
+            for b in 1:bands
+                row *= @sprintf(",%.6e",emi_arr[i,b])
+            end
+            write(hdl,row*"\n")
+        end
+    end
+end
+
+# Write P-T-R profiles to NetCDF file
+function write_profs(res_pro::Array, fpath::String)
+
+    if isfile(fpath)
+        rm(fpath)
+    end
+
+    ds = Dataset(fpath,"c")
+
+    ds.attrib["description"]        = "AGNI grid profiles (TPR)"
+    ds.attrib["hostname"]           = gethostname()
+    ds.attrib["username"]           = ENV["USER"]
+    ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
+    ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
+
+    defDim(ds, "nlev_c",   atmos.nlev_c)
+    defDim(ds, "gridsize", gridsize)
+
+    var_p = defVar(ds, "p", Float64, ("nlev_c","gridsize",) ) # saved in python dimension order
+    var_t = defVar(ds, "t", Float64, ("nlev_c","gridsize",) )
+    var_r = defVar(ds, "r", Float64, ("nlev_c","gridsize",) )
+
+    for i in 1:gridsize
+        for j in 1:nlev_c
+            var_p[j,i] = res_pro[i]["p"][j]
+            var_t[j,i] = res_pro[i]["t"][j]
+            var_r[j,i] = res_pro[i]["r"][j]
+        end
+    end
+
+    close(ds)
+end
+
 
 # =============================================================================
 # Setup atmosphere object
@@ -290,6 +369,8 @@ if !atmos.is_alloc
     exit(1)
 end
 
+wlarr[:] .= atmos.bands_cen[:]
+
 # Set PT
 setpt.request!(atmos, cfg["execution"]["initial_state"])
 
@@ -299,17 +380,17 @@ setpt.request!(atmos, cfg["execution"]["initial_state"])
 
 """
 Calc interior radius as a function of: interior mass, interior core mass fraction.
-    Earth units.
+All in Earth units, derived from Zalmoxis.
 """
 function calc_Rint(m, c)
     # fit coefficients
-    m0 =  1.204294203
-    m1 =  0.2636659626
-    c0 = -0.2116187596
-    c1 =  1.9934641771
-    e0 = -0.1030231538
-    e1 =  0.5903312114
-    o1 = -0.1512426729
+    m0 =  1.2034502662
+    m1 =  0.2638026977
+    c0 = -0.2115696893
+    c1 =  1.992280927
+    e0 = -0.1028476164
+    e1 =  0.5909898648
+    o1 = -0.1505066123
 
     # evaluate fit
     return  m0*m^m1 + c0*c^c1 + e0*(m*c)^e1  + o1
@@ -365,7 +446,8 @@ for (i,p) in enumerate(grid_flat)
     for (k,val) in p
         @info "    set $k = $val"
         if k == "p_surf"
-            atmos.p_boa = val * 1e5 # convert bar to Pa
+            atmos.p_oboa = val * 1e5 # convert bar to Pa
+            atmos.p_boa = atmos.p_oboa
             atmosphere.generate_pgrid!(atmos)
 
         elseif k == "mass"
@@ -536,6 +618,9 @@ for (i,p) in enumerate(grid_flat)
         end
     end
 
+    # Record fluxes
+    result_emits[i,:] .= atmos.band_u_lw[1, :] .+ atmos.band_u_sw[1, :]
+
     # Record profile (also in SI)
     result_profs[i] = Dict("p"=>deepcopy(atmos.p),
                             "t"=>deepcopy(atmos.tmp),
@@ -546,6 +631,7 @@ for (i,p) in enumerate(grid_flat)
     # Update results file on the go?
     if mod(i,modwrite) == 0
         write_table(result_table, result_table_path, i)
+        write_emits(result_emits, result_emits_path, i)
     end
 
     # Iterate
@@ -583,36 +669,16 @@ else
     @info "Total runtime: $duration minutes"
 end
 
-# Write results
+# Write results table
 @info "Writing final results table to CSV..."
 write_table(result_table, result_table_path, gridsize)
 
+@info "Writing final fluxes array to CSV..."
+write_emits(result_emits, result_emits_path, gridsize)
+
 # Write NetCDF of profiles
-@info "Writing result_profs to NetCDF.."
-ds = Dataset(joinpath(output_dir,"result_profs.nc"),"c")
-ds.attrib["description"]        = "AGNI grid profiles (TPR)"
-ds.attrib["hostname"]           = gethostname()
-ds.attrib["username"]           = ENV["USER"]
-ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
-ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
-
-defDim(ds, "nlev_c",   atmos.nlev_c)
-defDim(ds, "gridsize", gridsize)
-
-var_p = defVar(ds, "p", Float64, ("nlev_c","gridsize",) ) # saved in python dimension order
-var_t = defVar(ds, "t", Float64, ("nlev_c","gridsize",) )
-var_r = defVar(ds, "r", Float64, ("nlev_c","gridsize",) )
-
-for i in 1:gridsize
-    for j in 1:nlev_c
-        var_p[j,i] = result_profs[i]["p"][j]
-        var_t[j,i] = result_profs[i]["t"][j]
-        var_r[j,i] = result_profs[i]["r"][j]
-    end
-    # @info @sprintf("%d : Ri=%.3f",i,result_profs[i]["r"][end]/R_earth)
-end
-
-close(ds)
+@info "Writing final profiles to NetCDF.."
+write_profs(result_profs, result_profs_path)
 
 # Done
 @info "Done!"
