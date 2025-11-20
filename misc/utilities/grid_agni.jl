@@ -62,7 +62,7 @@ save_ncdf_tp = true         # a single NetCDF containing all T(p) solutions
 # Runtime options
 AGNI.solver.ls_increase= 1.02
 modwrite::Int          = 1           # frequency to write CSV file
-modplot::Int           = 2            # Plot during runtime (debug)
+modplot::Int           = 0            # Plot during runtime (debug)
 frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
 transspec_p::Float64   = 2e3    # Pa
@@ -523,16 +523,14 @@ for (i,p) in enumerate(grid_flat)
 
     # Set temperature array based on interpolation from last solution
     max_steps = Int(cfg["execution"]["max_steps"])
-    easy_start = Bool(cfg["execution"]["easy_start"])
-    if i > 1
-        if succ_last
-            # last iter was successful
-            setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
-        else
-            # last iter failed -> restore initial guess for T(p)
-            setpt.request!(atmos, cfg["execution"]["initial_state"])
-            easy_start = true
-        end
+    if succ_last && (i > 1)
+        # last iter was successful
+        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
+        easy_start = false
+    else
+        # last iter failed -> restore initial guess for T(p)
+        setpt.request!(atmos, cfg["execution"]["initial_state"])
+        easy_start = Bool(cfg["execution"]["easy_start"])
     end
 
     # Solve for RCE
