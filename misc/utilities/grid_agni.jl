@@ -92,7 +92,7 @@ IO_DIR = output_dir
 @info "IO folder: $IO_DIR"
 
 mkdir(joinpath(output_dir,"nc"))
-mkdir(joinpath(output_dir,"pt"))
+mkdir(joinpath(output_dir,"pl"))
 
 # Results path
 result_table_path::String = joinpath(output_dir,"result_table.csv")
@@ -429,7 +429,8 @@ function update_structure!(atmos, mass_tot, frac_atm, frac_core)
     atmos.grav_surf = phys.grav_accel(atmos.interior_mass, atmos.rp)
 
     # surface pressure
-    atmos.p_boa = mass_atm * atmos.grav_surf / (4 * pi * atmos.rp^2)
+    atmos.p_oboa = mass_atm * atmos.grav_surf / (4 * pi * atmos.rp^2)
+    atmos.p_boa = atmos.p_oboa
     atmosphere.generate_pgrid!(atmos)
 end
 
@@ -563,7 +564,6 @@ for (i,p) in enumerate(grid_flat)
                                             save_frames=false,
                                             radiative_Kzz=false,
                                             perturb_all=perturb_all,
-
                                             )
 
     # Report radius
@@ -576,7 +576,10 @@ for (i,p) in enumerate(grid_flat)
 
     # Make plot for this case
     if save_plots
-        plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"pt",@sprintf("%08d_pt.png",i)))
+        plotting.combined(plotting.plot_pt(atmos,""), plotting.plot_fluxes(atmos, ""),
+                            plotting.plot_vmr(atmos,""), plotting.plot_radius(atmos, ""),
+                            "Index = $i     Success = $succ",
+                            joinpath(atmos.OUT_DIR,"pl",@sprintf("%08d_pl.png",i)))
     end
 
     # Record keys (all in SI)
