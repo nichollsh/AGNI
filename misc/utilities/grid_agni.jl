@@ -34,18 +34,17 @@ mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(
 #    enter the least-important parameters first
 grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    # metallicities here are by MASS fraction relative to hydrogen (converted to mole below)
-    "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
-    # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
-    # "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
-
     "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
     "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
+    "mass_tot"      =>       mass_arr,  # M_earth
+
+    # metallicities here are by MASS fraction relative to hydrogen (converted to mole below)
+    # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
+    # "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
+    "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
 
     # "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
     "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
-
-    "mass_tot"      =>       mass_arr,  # M_earth
 ))
 
 # Variables to record
@@ -56,17 +55,16 @@ output_keys =  ["succ", "flux_loss",
 
 # Grid management options
 save_netcdfs = false        # NetCDF file for each case
-save_plots   = false        # plots for each case
-save_ncdf_tp = true         # a single NetCDF containing all T(p) solutions
+save_plots   = true         # plots for each case
 
 # Runtime options
-AGNI.solver.ls_increase= 1.02
-modwrite::Int          = 1           # frequency to write CSV file
+AGNI.solver.ls_increase= 1.1
+modwrite::Int          = 2            # frequency to write CSV file
 modplot::Int           = 0            # Plot during runtime (debug)
 frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
 transspec_p::Float64   = 2e3    # Pa
-fc_floor::Float64      = 500.0   # K
+fc_floor::Float64      = 300.0   # K
 
 # =============================================================================
 # Parse keys and flatten grid
@@ -85,12 +83,16 @@ mkdir(output_dir)
 cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
 
 # IO directory
-IO_DIR::String = "/tmp/"
-if haskey(ENV,"TMPDIR")
-    IO_DIR = abspath(ENV["TMPDIR"])
-end
-IO_DIR = joinpath(IO_DIR,"agni_grid") * "/"
+# IO_DIR::String = "/tmp/"
+# if haskey(ENV,"TMPDIR")
+#     IO_DIR = abspath(ENV["TMPDIR"])
+# end
+# IO_DIR = joinpath(IO_DIR,"agni_grid") * "/"
+IO_DIR = output_dir
 @info "IO folder: $IO_DIR"
+
+mkdir(joinpath(output_dir,"nc"))
+mkdir(joinpath(output_dir,"pt"))
 
 # Results path
 result_table_path::String = joinpath(output_dir,"result_table.csv")
@@ -569,12 +571,12 @@ for (i,p) in enumerate(grid_flat)
 
     # Write NetCDF file for this case
     if save_netcdfs
-        save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,@sprintf("%08d.nc",i)))
+        save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"nc",@sprintf("%08d.nc",i)))
     end
 
     # Make plot for this case
     if save_plots
-        plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,@sprintf("%08d_pt.png",i)))
+        plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"pt",@sprintf("%08d_pt.png",i)))
     end
 
     # Record keys (all in SI)
