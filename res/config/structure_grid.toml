@@ -24,7 +24,7 @@ title = "Base config for structure calcs"
 [composition]
     p_surf          = 100.0
     p_top           = 1e-5
-    metallicities   = {"C"=0.01, "S"=0.1, "O"=0.1}  # mass fraction
+    metallicities   = {"C"=0.1, "O"=10.0}  # mass fraction
     condensates     = []
 
 [execution]
@@ -32,10 +32,10 @@ title = "Base config for structure calcs"
     verbosity       = 1
     max_steps       = 50
     max_runtime     = 200
-    num_levels      = 35
+    num_levels      = 30
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 400.0
+    dx_max          = 300.0
     initial_state   = ["iso","2000"]
     linesearch      = 1
     easy_start      = false
@@ -47,7 +47,7 @@ title = "Base config for structure calcs"
 [physics]
     chemistry       = true
     continua        = true
-    rayleigh        = true
+    rayleigh        = false
     cloud           = false
     overlap_method  = "ee"
     grey_lw         = 5e-3
