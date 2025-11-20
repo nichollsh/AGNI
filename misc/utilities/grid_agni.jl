@@ -84,6 +84,14 @@ mkdir(output_dir)
 # Backup config to output dir
 cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
 
+# IO directory
+IO_DIR::String = "/tmp/"
+if haskey(ENV,"TMPDIR")
+    IO_DIR = abspath(ENV["TMPDIR"])
+end
+IO_DIR = joinpath(IO_DIR,"agni_grid") * "/"
+@info "IO folder: $IO_DIR"
+
 # Results path
 result_table_path::String = joinpath(output_dir,"result_table.csv")
 result_emits_path::String = joinpath(output_dir,"result_emits.csv")
@@ -340,6 +348,7 @@ atmosphere.setup!(atmos, ROOT_DIR, output_dir,
                                 p_top,
                                 mf_dict, "";
 
+                                IO_DIR=IO_DIR,
                                 condensates=condensates,
                                 κ_grey_lw=grey_lw,
                                 κ_grey_sw=grey_sw,
