@@ -59,27 +59,18 @@ module AGNI
     const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../")
 
     """
-    **Setup terminal logging and file logging**
+    **Create a logger object and return it**
 
     Arguments:
     - `outpath::String`     output file (empty to disable file logging)
-    - `verbosity::Int`      verbosity (0: silent, 1: normal, 2: debug)
+
+    Optional arguments:
+    - `to_term::Bool`       log to terminal?
+
+    Returns:
+    - `logger_both`         logger object
     """
-    function setup_logging(outpath::String, verbosity::Int)
-
-        # File logging?
-        to_file::Bool = !isempty(outpath)
-
-        # Remove old file
-        if to_file
-            rm(outpath, force=true)
-        end
-
-        # If silent
-        if verbosity==0
-            global_logger(MinLevelLogger(current_logger(), Logging.Error))
-            return nothing
-        end
+    function make_logger(outpath::String; to_term::Bool=true)
 
         # Formatting
         color::Int = 39
@@ -87,7 +78,12 @@ module AGNI
         term_io::IO = stdout
 
         # Setup file logger
+        to_file::Bool = !isempty(outpath)
         if to_file
+            # remove old file
+            rm(outpath, force=true)
+
+            # configure
             logger_file = FormatLogger(outpath; append=false) do io, args
                 if args.level == LoggingExtras.Info
                     level = "INFO"
@@ -103,36 +99,63 @@ module AGNI
         end
 
         # Setup terminal logger
-        logger_term = FormatLogger() do io, args
-            if args.level == LoggingExtras.Info
-                color = 32
-                level = "INFO"
-            elseif args.level == LoggingExtras.Warn
-                color = 93
-                level = "WARN"
-            elseif args.level == LoggingExtras.Debug
-                color = 96
-                level = "DEBUG"
-            elseif args.level == LoggingExtras.Error
-                color = 91
-                term_io = stderr
-                level = "ERROR"
-            end
-            # Set color, set bold, print level, unset bold, unset color, message
-            @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",
-                                color, level, args.message)
-        end;
-
-        # Combine and set
-        if to_file
-            logger_both = TeeLogger(logger_file, logger_term);
-        else
-            logger_both = logger_term
+        if to_term
+            logger_term = FormatLogger() do io, args
+                if args.level == LoggingExtras.Info
+                    color = 32
+                    level = "INFO"
+                elseif args.level == LoggingExtras.Warn
+                    color = 93
+                    level = "WARN"
+                elseif args.level == LoggingExtras.Debug
+                    color = 96
+                    level = "DEBUG"
+                elseif args.level == LoggingExtras.Error
+                    color = 91
+                    term_io = stderr
+                    level = "ERROR"
+                end
+                # Set color, set bold, print level, unset bold, unset color, message
+                @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",
+                                    color, level, args.message)
+            end;
         end
+
+        # Return logger object
+        if to_file && to_term
+            return TeeLogger(logger_file, logger_term)
+        elseif to_term
+            return logger_term
+        elseif to_file
+            return logger_file
+        else
+            println(stderr, "Warning: using NullLogger to log all messages")
+            return NullLogger()
+        end
+    end
+
+    """
+    **Setup terminal logging and file logging**
+
+    Arguments:
+    - `outpath::String`     output file (empty to disable file logging)
+    - `verbosity::Int`      verbosity (0: silent, 1: normal, 2: debug)
+    """
+    function setup_logging(outpath::String, verbosity::Int)
+
+        # If silent
+        if verbosity==0
+            global_logger(MinLevelLogger(current_logger(), Logging.Error))
+            return nothing
+        end
+
+        # Make the logger
+        logger_both = make_logger(outpath)
         global_logger(logger_both)
 
+        # Disable debug
         if verbosity == 1
-            disable_logging(Logging.Debug) # disable debug; info only
+            disable_logging(Logging.Debug)
         end
 
         return nothing
