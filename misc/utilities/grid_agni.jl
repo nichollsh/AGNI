@@ -65,6 +65,7 @@ frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
 transspec_p::Float64   = 2e3    # Pa
 fc_floor::Float64      = 300.0   # K
+num_workers::Int       = 4
 
 # =============================================================================
 # Parse keys and flatten grid
@@ -81,15 +82,6 @@ mkdir(output_dir)
 
 # Backup config to output dir
 cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
-
-# IO directory
-# IO_DIR::String = "/tmp/"
-# if haskey(ENV,"TMPDIR")
-#     IO_DIR = abspath(ENV["TMPDIR"])
-# end
-# IO_DIR = joinpath(IO_DIR,"agni_grid") * "/"
-IO_DIR = output_dir
-@info "IO folder: $IO_DIR"
 
 mkdir(joinpath(output_dir,"nc"))
 mkdir(joinpath(output_dir,"pl"))
@@ -137,14 +129,7 @@ if cfg["files"]["input_sf"] != "greygas"
 end
 @info "Spectral bands: $bands"
 
-# Intial values for interior structure
-radius   = cfg["planet"]["radius"]
-mass     = cfg["planet"]["mass"] # interior mass
-gravity  = phys.grav_accel(mass, radius)
-mass_tot  = mass * 1.1
-frac_core = 0.325
-frac_atm  = 0.01
-mf_dict = Dict("H2"=>0.6, "H2O"=>0.1, "CO2"=>0.1, "N2"=>0.1, "H2S"=>0.1)
+
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
@@ -205,7 +190,18 @@ grid_flat = [
     for values_combination in Iterators.product(values(grid)...)
 ]
 gridsize = length(grid_flat)
-numfails = 0
+
+# Assign workers to grid points
+#    Last worker will take the "remainder" points if chunks do not fit wholly
+chunksize = round(Int,gridsize/(num_workers),RoundDown)
+iwork = 1
+for i in eachindex(grid_flat)
+    global iwork
+    if mod(i,chunksize) == 0
+        iwork += 1
+    end
+    grid_flat[i]["worker"] = min(iwork,num_workers)
+end
 
 # Write combinations to file
 @info "Writing flattened grid to file"
@@ -213,12 +209,22 @@ gpfile = joinpath(output_dir,"gridpoints.csv")
 @info "    $gpfile"
 open(gpfile, "w") do hdl
     # Header
-    head = "index," * join(input_keys, ",") * "\n"
+    head = "index,worker," * join(input_keys, ",") * "\n"
     write(hdl,head)
 
     # Each row
     for (i,p) in enumerate(grid_flat)
-        row = @sprintf("%08d,",i) * join([@sprintf("%.6e",v) for v in values(p)], ",") * "\n"
+
+        # Index
+        row = @sprintf("%08d,",i)
+
+        # Worker
+        row *= @sprintf("%08d,",p["worker"])
+
+        # Other keys
+        row *= join([@sprintf("%.6e",p[k]) for k in input_keys], ",") * "\n"
+
+        # Write out
         write(hdl,row)
     end
 end
@@ -227,8 +233,12 @@ end
 result_table::Array{Dict,    1}  = [Dict{String,Float64}(k => Float64(-1.0) for k in output_keys)   for _ in 1:gridsize]
 result_profs::Array{Dict,    1}  = [Dict{String,Array}()                    for _ in 1:gridsize] # array of dicts (p, t, r)
 result_emits::Array{Float64, 2}  = zeros(Float64, (gridsize,bands)) # array of fluxes
-
 wlarr::Array{Float64,1} = zeros(Float64, bands)
+
+# Thread locks for these variables
+lock_table = ReentrantLock()
+lock_profs = ReentrantLock()
+lock_emits = ReentrantLock()
 
 @info "Generated grid of $(length(input_keys)) dimensions, with $gridsize points"
 sleep(3)
@@ -328,67 +338,6 @@ function write_profs(res_pro::Array, fpath::String)
     close(ds)
 end
 
-
-# =============================================================================
-# Setup atmosphere object
-# -------------------------------
-
-# AGNI struct, create
-atmos = atmosphere.Atmos_t()
-
-# AGNI struct, setup
-atmosphere.setup!(atmos, ROOT_DIR, output_dir,
-                                String(cfg["files" ]["input_sf"]),
-                                Float64(cfg["planet"]["instellation"]),
-                                Float64(cfg["planet"]["s0_fact"]),
-                                Float64(cfg["planet"]["albedo_b"]),
-                                Float64(cfg["planet"]["zenith_angle"]),
-                                Float64(cfg["planet"]["tmp_surf"]),
-                                gravity, radius,
-                                nlev_c,
-                                p_surf,
-                                p_top,
-                                mf_dict, "";
-
-                                IO_DIR=IO_DIR,
-                                condensates=condensates,
-                                κ_grey_lw=grey_lw,
-                                κ_grey_sw=grey_sw,
-                                metallicities=metallicities,
-                                flag_gcontinuum   = cfg["physics"]["continua"],
-                                flag_rayleigh     = cfg["physics"]["rayleigh"],
-                                flag_cloud        = cfg["physics"]["cloud"],
-                                overlap_method    = cfg["physics"]["overlap_method"],
-                                real_gas          = cfg["physics"]["real_gas"],
-                                thermo_functions  = cfg["physics"]["thermo_funct"],
-                                use_all_gases     = true,
-                                surf_roughness=roughness, surf_windspeed=windspeed,
-                                fastchem_floor = fc_floor,
-                                Kzz_floor = 0.0,
-                                flux_int=flux_int,
-                                surface_material=surface_mat,
-                                mlt_criterion=only(cfg["physics"]["convection_crit"][1]),
-                        )
-
-# AGNI struct, allocate
-atmosphere.allocate!(atmos, stellar_spectrum; stellar_Teff=star_Teff)
-atmos.transspec_p = transspec_p
-
-# Check ok
-if !atmos.is_alloc
-    @error "Could not allocate atmosphere struct"
-    exit(1)
-end
-
-wlarr[:] .= atmos.bands_cen[:]
-
-# Set PT
-setpt.request!(atmos, cfg["execution"]["initial_state"])
-
-# =============================================================================
-# Iterate over parameters
-# -------------------------------
-
 """
 Calc interior radius as a function of: interior mass, interior core mass fraction.
 All in Earth units, derived from Zalmoxis.
@@ -434,221 +383,341 @@ function update_structure!(atmos, mass_tot, frac_atm, frac_core)
     atmosphere.generate_pgrid!(atmos)
 end
 
-# Get start time [seconds]
+"""
+Inialise atmosphere object
+"""
+function init_atmos(OUT_DIR)
+
+    mf_dict = Dict("H2"=>0.6, "H2O"=>0.1, "CO2"=>0.1, "N2"=>0.1, "H2S"=>0.1)
+    radius   = cfg["planet"]["radius"]
+    mass     = cfg["planet"]["mass"]
+    gravity  = phys.grav_accel(mass, radius)
+
+    # AGNI struct, create
+    atmos = atmosphere.Atmos_t()
+
+    # AGNI struct, setup
+    atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                                    String(cfg["files" ]["input_sf"]),
+                                    Float64(cfg["planet"]["instellation"]),
+                                    Float64(cfg["planet"]["s0_fact"]),
+                                    Float64(cfg["planet"]["albedo_b"]),
+                                    Float64(cfg["planet"]["zenith_angle"]),
+                                    Float64(cfg["planet"]["tmp_surf"]),
+                                    gravity, radius,
+                                    nlev_c,
+                                    p_surf,
+                                    p_top,
+                                    mf_dict, "";
+
+                                    IO_DIR=OUT_DIR,
+                                    condensates=condensates,
+                                    κ_grey_lw=grey_lw,
+                                    κ_grey_sw=grey_sw,
+                                    metallicities=metallicities,
+                                    flag_gcontinuum   = cfg["physics"]["continua"],
+                                    flag_rayleigh     = cfg["physics"]["rayleigh"],
+                                    flag_cloud        = cfg["physics"]["cloud"],
+                                    overlap_method    = cfg["physics"]["overlap_method"],
+                                    real_gas          = cfg["physics"]["real_gas"],
+                                    thermo_functions  = cfg["physics"]["thermo_funct"],
+                                    use_all_gases     = true,
+                                    surf_roughness=roughness, surf_windspeed=windspeed,
+                                    fastchem_floor = fc_floor,
+                                    Kzz_floor = 0.0,
+                                    flux_int=flux_int,
+                                    surface_material=surface_mat,
+                                    mlt_criterion=only(cfg["physics"]["convection_crit"][1]),
+                            )
+
+    # AGNI struct, allocate
+    atmosphere.allocate!(atmos, stellar_spectrum; stellar_Teff=star_Teff)
+    atmos.transspec_p = transspec_p
+
+    # Check ok
+    if !atmos.is_alloc
+        @error "Could not allocate atmosphere struct"
+        exit(1)
+    end
+
+    global wlarr
+    wlarr[:] .= atmos.bands_cen[:]
+
+    # Set PT
+    setpt.request!(atmos, cfg["execution"]["initial_state"])
+
+    return atmos
+
+end
+
+# =============================================================================
+# Worker function which will find allocated jobs
+# -------------------------------
+function run_worker(id::Int)
+
+    @info "Starting worker $id"
+
+    # Variables shared between workers
+    global result_emits
+    global result_profs
+    global result_table
+    global output_dir
+    global gridsize
+    global save_netcdfs
+    global save_plots
+
+    # Intial values for interior structure
+    radius    = cfg["planet"]["radius"]
+    mass      = cfg["planet"]["mass"] # interior mass
+    gravity   = phys.grav_accel(mass, radius)
+    mass_tot  = mass * 1.1
+    frac_core = 0.325
+    frac_atm  = 0.01
+
+    # Output dir for this worker
+    OUT_DIR = joinpath(output_dir,"wk_$id")
+    rm(OUT_DIR, recursive=true, force=true)
+    mkdir(OUT_DIR)
+
+    # Initialise new atmosphere
+    atmos = init_atmos(OUT_DIR)
+
+    # Run the grid of models
+    succ = true
+    succ_last = true
+    for (i,p) in enumerate(grid_flat)
+
+        # Check that this worker is assigned to this grid point, by index
+        if p["worker"] != id
+            continue
+        end
+        @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
+
+        succ_last = succ
+
+        # Update parameters
+        for (k,val) in p
+            @info "    set $k = $val"
+            if k == "p_surf"
+                atmos.p_oboa = val * 1e5 # convert bar to Pa
+                atmos.p_boa = atmos.p_oboa
+                atmosphere.generate_pgrid!(atmos)
+
+            elseif k == "mass"
+                atmos.interior_mass = val * M_earth
+                atmos.grav_surf = phys.grav_accel(val, atmos.rp)
+
+            elseif k == "radius"
+                atmos.rp = val
+                atmos.grav_surf = phys.grav_accel(atmos.interior_mass, atmos.rp)
+
+            elseif k == "frac_atm"
+                frac_atm = val
+                update_structure!(atmos, mass_tot, frac_atm, frac_core)
+
+            elseif k == "frac_core"
+                frac_core = val
+                update_structure!(atmos, mass_tot, frac_atm, frac_core)
+
+            elseif k == "mass_tot"
+                mass_tot = val * M_earth
+                update_structure!(atmos, mass_tot, frac_atm, frac_core)
+
+            elseif k == "instellation"
+                atmos.instellation = val * 1361.0 # W/m^2
+
+            elseif startswith(k, "vmr_")
+                gas = split(k,"_")[2]
+                atmos.gas_vmr[gas][:]  .= val
+
+            elseif startswith(k, "metal_")
+
+                # metallicity key is by mass frac, but atmosphere stores value by mol frac
+                # convert these via scaling with factor mu_H/mu_gas
+                gas = String(split(k,"_")[2])
+                atmos.metal_orig[gas] = val * phys._get_mmw("H") / phys._get_mmw(gas)
+
+                # remove FC input file to force update
+                rm(atmos.fastchem_elem, force=true)
+
+            elseif k == "worker"
+                # do nothing
+
+            else
+                @error "Unhandled input parameter: $k"
+                exit(1)
+            end
+        end
+
+        # Ensure VMRs sum to unity
+        tot_vmr::Float64 = 0.0
+        for i in 1:atmos.nlev_c
+            # get total
+            tot_vmr = 0.0
+            for g in atmos.gas_names
+                tot_vmr += atmos.gas_vmr[g][i]
+            end
+
+            # normalise to 1 if greater than 1, otherwise fill with H2
+            if tot_vmr > 1
+                for g in atmos.gas_names
+                    atmos.gas_vmr[g][i] /= tot_vmr
+                end
+            else
+                atmos.gas_vmr["H2"][i] += 1-tot_vmr
+            end
+        end
+        # set original vmr arrays
+        for g in atmos.gas_names
+            atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
+        end
+
+        @info @sprintf("    using p_surf = %.2e bar",atmos.pl[end]/1e5)
+
+        # Set temperature array based on interpolation from last solution
+        max_steps = Int(cfg["execution"]["max_steps"])
+        if succ_last && (i>1) && haskey(result_profs[i-1],"p")
+            # last iter was successful
+            setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
+            easy_start = false
+        else
+            # last iter failed -> restore initial guess for T(p)
+            setpt.request!(atmos, cfg["execution"]["initial_state"])
+            easy_start = Bool(cfg["execution"]["easy_start"])
+        end
+
+        # Solve for RCE
+        succ = solver.solve_energy!(atmos, sol_type=sol_type,
+                                                conduct=incl_conduct, chem=chem,
+                                                convect=incl_convect, latent=incl_latent,
+                                                sens_heat=incl_sens,
+                                                max_steps=max_steps,
+                                                max_runtime=Float64(cfg["execution"]["max_runtime"]),
+                                                conv_atol=conv_atol,
+                                                conv_rtol=conv_rtol,
+                                                method=1,
+                                                rainout=Bool(cfg["physics"]["rainout"]),
+                                                oceans=Bool(cfg["physics"]["oceans"]),
+                                                dx_max=Float64(cfg["execution"]["dx_max"]),
+                                                ls_method=Int(cfg["execution"]["linesearch"]),
+                                                easy_start=easy_start,
+                                                modplot=modplot,
+                                                save_frames=false,
+                                                radiative_Kzz=false,
+                                                perturb_all=perturb_all,
+                                                )
+
+        # Report radius
+        @info @sprintf("    found r_phot = %.3f R_earth",atmos.transspec_r/R_earth)
+
+        # Write NetCDF file for this case
+        if save_netcdfs
+            save.write_ncdf(atmos, joinpath(output_dir,"nc",@sprintf("%08d.nc",i)))
+        end
+
+        # Make plot for this case
+        if save_plots
+            plotting.combined(plotting.plot_pt(atmos,""), plotting.plot_fluxes(atmos, ""),
+                                plotting.plot_vmr(atmos,""), plotting.plot_radius(atmos, ""),
+                                "Index = $i     Success = $succ",
+                                joinpath(output_dir,"pl",@sprintf("%08d_pl.png",i)))
+        end
+
+        # Record keys (all in SI)
+        lock(lock_table) do
+            for k in output_keys
+                field = Symbol(k)
+                if hasfield(atmosphere.Atmos_t, field)
+                    result_table[i][k] = Float64(getfield(atmos, Symbol(k)))
+
+                elseif k == "succ"
+                    if succ
+                        result_table[i][k] = 1.0 # success
+                    else
+                        result_table[i][k] = -1.0 # failure
+                    end
+                elseif k == "flux_loss"
+                    result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+
+                elseif k == "p_surf"
+                    result_table[i][k] = atmos.p_boa
+                elseif k == "t_surf"
+                    result_table[i][k] = atmos.tmp_surf
+                elseif k == "r_surf"
+                    result_table[i][k] = atmos.rp
+                elseif k == "μ_surf"
+                    result_table[i][k] = atmos.layer_μ[end]
+                elseif k == "g_surf"
+                    result_table[i][k] = atmos.grav_surf
+
+                elseif k == "t_phot"
+                    result_table[i][k] = atmos.transspec_tmp
+                elseif k == "r_phot"
+                    result_table[i][k] = atmos.transspec_r
+                elseif k == "μ_phot"
+                    result_table[i][k] = atmos.transspec_μ
+                elseif k == "g_phot"
+                    result_table[i][k] = atmos.transspec_grav
+
+                elseif k == "Kzz_max"
+                    result_table[i][k] = maximum(atmos.Kzz)
+                elseif k == "conv_ptop"
+                    result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[1]
+                elseif k == "conv_pbot"
+                    result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[2]
+                else
+                    @error "Unhandled output variable: $k"
+                    exit(1)
+                end
+            end # end keys  loop
+        end # end lock
+
+        # Record fluxes
+        lock(lock_emits) do
+            result_emits[i,:] .= atmos.band_u_lw[1, :] .+ atmos.band_u_sw[1, :]
+        end
+
+        # Record profile (also in SI)
+        lock(lock_profs) do
+            result_profs[i] = Dict("p"=>deepcopy(atmos.p),
+                                "t"=>deepcopy(atmos.tmp),
+                                "r"=>deepcopy(atmos.r)
+                                )
+        end
+
+
+        # Update results file on the go?
+        #    Only worker1 can write these files at runtime
+        if (mod(i,modwrite) == 0) && (id == 1)
+            write_table(result_table, result_table_path, gridsize)
+            write_emits(result_emits, result_emits_path, gridsize)
+        end
+
+        # Iterate
+        @info "  "
+    end
+
+    atmosphere.deallocate!(atmos)
+
+end # end worker
+
+# =============================================================================
+# Run the grid
+# -------------------------------
+
+# Get end time
 time_start::Float64 = time()
 @info "Start time: $(now())"
 
-# Run the grid of models in series
-succ = true
-succ_last = true
-for (i,p) in enumerate(grid_flat)
-    @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
-
-    global succ_last
-    global succ
-    succ_last = succ
-
-    # Set all VMRs to zero
-    # for gas in atmos.gas_names
-    #     atmos.gas_vmr[gas][:] .= 0.0
-    #     atmos.gas_ovmr[gas][:] .= 0.0
-    # end
-
-    # Update parameters
-    for (k,val) in p
-        @info "    set $k = $val"
-        if k == "p_surf"
-            atmos.p_oboa = val * 1e5 # convert bar to Pa
-            atmos.p_boa = atmos.p_oboa
-            atmosphere.generate_pgrid!(atmos)
-
-        elseif k == "mass"
-            atmos.interior_mass = val * M_earth
-            atmos.grav_surf = phys.grav_accel(val, atmos.rp)
-
-        elseif k == "radius"
-            atmos.rp = val
-            atmos.grav_surf = phys.grav_accel(atmos.interior_mass, atmos.rp)
-
-        elseif k == "frac_atm"
-            global frac_atm = val
-            update_structure!(atmos, mass_tot, frac_atm, frac_core)
-
-        elseif k == "frac_core"
-            global frac_core = val
-            update_structure!(atmos, mass_tot, frac_atm, frac_core)
-
-        elseif k == "mass_tot"
-            global mass_tot = val * M_earth
-            update_structure!(atmos, mass_tot, frac_atm, frac_core)
-
-        elseif k == "instellation"
-            atmos.instellation = val * 1361.0 # W/m^2
-
-        elseif startswith(k, "vmr_")
-            gas = split(k,"_")[2]
-            atmos.gas_vmr[gas][:]  .= val
-
-        elseif startswith(k, "metal_")
-
-            # metallicity key is by mass frac, but atmosphere stores value by mol frac
-            # convert these via scaling with factor mu_H/mu_gas
-            gas = String(split(k,"_")[2])
-            atmos.metal_orig[gas] = val * phys._get_mmw("H") / phys._get_mmw(gas)
-
-            # remove FC input file to force update
-            rm(atmos.fastchem_elem, force=true)
-
-        else
-            @error "Unhandled input parameter: $k"
-            exit(1)
-        end
+for id in 1:num_workers
+    @info "Starting worker $id"
+    wlogger = AGNI.make_logger(joinpath(output_dir,"wk_$id.log"), to_term=false)
+    with_logger(wlogger) do
+        run_worker(id)
     end
-
-    # Ensure VMRs sum to unity
-    tot_vmr::Float64 = 0.0
-    for i in 1:atmos.nlev_c
-        # get total
-        tot_vmr = 0.0
-        for g in atmos.gas_names
-            tot_vmr += atmos.gas_vmr[g][i]
-        end
-
-        # normalise to 1 if greater than 1, otherwise fill with H2
-        if tot_vmr > 1
-            for g in atmos.gas_names
-                atmos.gas_vmr[g][i] /= tot_vmr
-            end
-        else
-            atmos.gas_vmr["H2"][i] += 1-tot_vmr
-        end
-    end
-    # set original vmr arrays
-    for g in atmos.gas_names
-        atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
-        # if atmos.gas_vmr[g][end] > 0
-        #     println("$g: $(atmos.gas_vmr[g][end])")
-        # end
-    end
-
-    @info @sprintf("    using p_surf = %.2e bar",atmos.pl[end]/1e5)
-
-    # Set temperature array based on interpolation from last solution
-    max_steps = Int(cfg["execution"]["max_steps"])
-    if succ_last && (i > 1)
-        # last iter was successful
-        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
-        easy_start = false
-    else
-        # last iter failed -> restore initial guess for T(p)
-        setpt.request!(atmos, cfg["execution"]["initial_state"])
-        easy_start = Bool(cfg["execution"]["easy_start"])
-    end
-
-    # Solve for RCE
-    succ = solver.solve_energy!(atmos, sol_type=sol_type,
-                                            conduct=incl_conduct, chem=chem,
-                                            convect=incl_convect, latent=incl_latent,
-                                            sens_heat=incl_sens,
-                                            max_steps=max_steps,
-                                            max_runtime=Float64(cfg["execution"]["max_runtime"]),
-                                            conv_atol=conv_atol,
-                                            conv_rtol=conv_rtol,
-                                            method=1,
-                                            rainout=Bool(cfg["physics"]["rainout"]),
-                                            oceans=Bool(cfg["physics"]["oceans"]),
-                                            dx_max=Float64(cfg["execution"]["dx_max"]),
-                                            ls_method=Int(cfg["execution"]["linesearch"]),
-                                            easy_start=easy_start,
-                                            modplot=modplot,
-                                            save_frames=false,
-                                            radiative_Kzz=false,
-                                            perturb_all=perturb_all,
-                                            )
-
-    # Report radius
-    @info @sprintf("    found r_phot = %.3f R_earth",atmos.transspec_r/R_earth)
-
-    # Write NetCDF file for this case
-    if save_netcdfs
-        save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"nc",@sprintf("%08d.nc",i)))
-    end
-
-    # Make plot for this case
-    if save_plots
-        plotting.combined(plotting.plot_pt(atmos,""), plotting.plot_fluxes(atmos, ""),
-                            plotting.plot_vmr(atmos,""), plotting.plot_radius(atmos, ""),
-                            "Index = $i     Success = $succ",
-                            joinpath(atmos.OUT_DIR,"pl",@sprintf("%08d_pl.png",i)))
-    end
-
-    # Record keys (all in SI)
-    for k in output_keys
-        field = Symbol(k)
-        if hasfield(atmosphere.Atmos_t, field)
-            result_table[i][k] = Float64(getfield(atmos, Symbol(k)))
-
-        elseif k == "succ"
-            if succ
-                result_table[i][k] = 1.0 # success
-            else
-                global numfails += 1
-                result_table[i][k] = -1.0 # failure
-            end
-        elseif k == "flux_loss"
-            result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
-
-        elseif k == "p_surf"
-            result_table[i][k] = atmos.p_boa
-        elseif k == "t_surf"
-            result_table[i][k] = atmos.tmp_surf
-        elseif k == "r_surf"
-            result_table[i][k] = atmos.rp
-        elseif k == "μ_surf"
-            result_table[i][k] = atmos.layer_μ[end]
-        elseif k == "g_surf"
-            result_table[i][k] = atmos.grav_surf
-
-        elseif k == "t_phot"
-            result_table[i][k] = atmos.transspec_tmp
-        elseif k == "r_phot"
-            result_table[i][k] = atmos.transspec_r
-        elseif k == "μ_phot"
-            result_table[i][k] = atmos.transspec_μ
-        elseif k == "g_phot"
-            result_table[i][k] = atmos.transspec_grav
-
-        elseif k == "Kzz_max"
-            result_table[i][k] = maximum(atmos.Kzz)
-        elseif k == "conv_ptop"
-            result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[1]
-        elseif k == "conv_pbot"
-            result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[2]
-        else
-            @error "Unhandled output variable: $k"
-            exit(1)
-        end
-    end
-
-    # Record fluxes
-    result_emits[i,:] .= atmos.band_u_lw[1, :] .+ atmos.band_u_sw[1, :]
-
-    # Record profile (also in SI)
-    result_profs[i] = Dict("p"=>deepcopy(atmos.p),
-                            "t"=>deepcopy(atmos.tmp),
-                            "r"=>deepcopy(atmos.r)
-                        )
-
-
-    # Update results file on the go?
-    if mod(i,modwrite) == 0
-        write_table(result_table, result_table_path, i)
-        write_emits(result_emits, result_emits_path, i)
-    end
-
-    # Iterate
-    @info "  "
+    close(io)
 end
+
 
 @info "===================================="
 @info " "
@@ -657,18 +726,10 @@ end
 time_end::Float64 = time()
 @info "Finish time: $(now())"
 
-# Tidy up
-atmosphere.deallocate!(atmos)
 
 # =============================================================================
 # Write result_table to CSV, result_profs to NetCDF, and exit
 # -------------------------------
-
-if numfails >0
-    @warn "Number of failed grid points: $numfails"
-else
-    @info "No failures recorded"
-end
 
 # Print model statistics
 duration = (time_end - time_start)
