@@ -1,20 +1,24 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # To be run from within the AGNI root directory
-# Run as: julia --project=. misc/utilities/grid_agni.jl
+# e.g. to run with 4 threads, do...
+#   julia --project=. -t4 misc/utilities/grid_agni.jl
 
-using AGNI
 using .Iterators
 using LoggingExtras
 using Printf
 using DataStructures
 using NCDatasets
 using Dates
+using Base.Threads
+
+using AGNI
 
 const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
-const R_earth::Float64 = 6.371e6
-const M_earth::Float64 = 5.972e24
-const DEFAULT_FILL::Float64 = 0.0
+const R_earth::Float64 = 6.371e6    # m
+const M_earth::Float64 = 5.972e24   # kg
+const DEFAULT_FILL::Float64 = 0.0   # fill value for arrays
+const LOCK_WAIT::Float64 = 2.0      # seconds to wait for NetCDF lock
 
 # =============================================================================
 # User config
@@ -59,14 +63,14 @@ save_netcdfs = false        # NetCDF file for each case
 save_plots   = true         # plots for each case
 
 # Runtime options
-AGNI.solver.ls_increase= 1.1
+# AGNI.solver.ls_increase= 1.1
 modwrite::Int          = 2            # frequency to write CSV file
 modplot::Int           = 0            # Plot during runtime (debug)
 frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
 transspec_p::Float64   = 2e3    # Pa
 fc_floor::Float64      = 300.0   # K
-num_workers::Int       = 4
+num_workers::Int       = nthreads()   # Set equal for now
 
 # =============================================================================
 # Parse keys and flatten grid
@@ -81,28 +85,24 @@ output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
 rm(output_dir,force=true,recursive=true)
 mkdir(output_dir)
 
+# Setup logging ASAP
+AGNI.setup_logging(joinpath(output_dir, "manager.log"), cfg["execution"]["verbosity"])
+@info "Number of threads: $(nthreads())"
+@info "Number of workers: $num_workers"
+
 # Backup config to output dir
 cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
 
-mkdir(joinpath(output_dir,"nc"))
-mkdir(joinpath(output_dir,"pl"))
-
 # Results path
+save_netcdfs && mkdir(joinpath(output_dir,"nc"))
+save_plots && mkdir(joinpath(output_dir,"pl"))
 result_table_path::String = joinpath(output_dir,"result_table.csv")
 result_emits_path::String = joinpath(output_dir,"result_emits.csv")
 result_profs_path::String = joinpath(output_dir,"result_profs.nc")
 
-# Logging
-AGNI.setup_logging(joinpath(output_dir, "manager.log"), cfg["execution"]["verbosity"])
-
 # Parse parameters
 sol_type         = cfg["execution"]["solution_type"]
-conv_atol        = cfg["execution"]["converge_atol"]
-conv_rtol        = cfg["execution"]["converge_rtol"]
-perturb_all      = cfg["execution"]["perturb_all"]
-chem             = cfg["physics"]["chemistry"]
 metallicities    = cfg["composition"]["metallicities"]
-p_surf           = cfg["composition"]["p_surf"]
 star_Teff        = cfg["planet"]["star_Teff"]
 stellar_spectrum = cfg["files"]["input_star"]
 
@@ -137,7 +137,6 @@ if rt_est > 60*60
 else
     @info "Single-core runtime will be approximately $(rt_est) seconds"
 end
-
 
 # Tidy grid
 @info "Grid axes:"
@@ -216,6 +215,10 @@ result_table::Array{Dict,    1}  = [Dict{String,Float64}(k => Float64(DEFAULT_FI
 result_profs::Array{Dict,    1}  = [Dict{String,Array}()  for _ in 1:gridsize] # array of dicts (p, t, r)
 result_emits::Array{Float64, 2}  = fill(DEFAULT_FILL, (gridsize,bands)) # array of fluxes
 wlarr::Array{Float64,1}          = fill(DEFAULT_FILL, bands)
+
+# Lock on NetCDF operations
+ncdf_active::Int = 0
+lock_netcdf_active = ReentrantLock()
 
 # Thread locks for these variables
 lock_table = ReentrantLock()
@@ -372,12 +375,25 @@ Inialise atmosphere object
 """
 function init_atmos(OUT_DIR)
 
+    global ncdf_active
+
+    @info "Initialising new atmos struct"
+
     mf_dict = Dict("H2"=>0.6, "H2O"=>0.1, "CO2"=>0.1, "N2"=>0.1, "H2S"=>0.1)
     radius   = cfg["planet"]["radius"]
     mass     = cfg["planet"]["mass"]
     gravity  = phys.grav_accel(mass, radius)
 
-    # AGNI struct, create
+    # Check if NetCDF lock is enabled
+    while true
+        @info "    waiting for NetCDF lock, currently held by thread $ncdf_active"
+        sleep(LOCK_WAIT)
+        if ncdf_active==0
+            @lock lock_netcdf_active ncdf_active = threadid() # acquire lock
+            break
+        end
+    end
+
     atmos = atmosphere.Atmos_t()
 
     # AGNI struct, setup
@@ -390,7 +406,7 @@ function init_atmos(OUT_DIR)
                                     Float64(cfg["planet"]["tmp_surf"]),
                                     gravity, radius,
                                     cfg["execution"]["num_levels"],
-                                    p_surf,
+                                    cfg["composition"]["p_surf"],
                                     cfg["composition"]["p_top"],
                                     mf_dict, "";
 
@@ -425,8 +441,8 @@ function init_atmos(OUT_DIR)
         exit(1)
     end
 
-    global wlarr
-    wlarr[:] .= atmos.bands_cen[:]
+    # Release lock
+    @lock lock_netcdf_active ncdf_active = 0
 
     # Set PT
     setpt.request!(atmos, cfg["execution"]["initial_state"])
@@ -440,7 +456,7 @@ end
 # -------------------------------
 function run_worker(id::Int)
 
-    @info "Starting worker $id"
+    @info "Started worker $id on thread $(threadid())"
 
     # Variables shared between workers
     global result_emits
@@ -450,6 +466,7 @@ function run_worker(id::Int)
     global gridsize
     global save_netcdfs
     global save_plots
+    global wlarr
 
     # Intial values for interior structure
     radius    = cfg["planet"]["radius"]
@@ -466,6 +483,11 @@ function run_worker(id::Int)
 
     # Initialise new atmosphere
     atmos = init_atmos(OUT_DIR)
+
+    # First worker records wlarray
+    if id == 1
+        wlarr[:] .= atmos.bands_cen[:]
+    end
 
     # Run the grid of models
     succ = true
@@ -577,11 +599,11 @@ function run_worker(id::Int)
                                                 convect=cfg["physics"]["convection"],
                                                 latent=cfg["physics"]["latent_heat"],
                                                 sens_heat= cfg["physics"]["sensible_heat"],
-                                                chem=chem,
+                                                chem=cfg["physics"]["chemistry"],
                                                 max_steps=max_steps,
                                                 max_runtime=Float64(cfg["execution"]["max_runtime"]),
-                                                conv_atol=conv_atol,
-                                                conv_rtol=conv_rtol,
+                                                conv_atol= cfg["execution"]["converge_atol"],
+                                                conv_rtol=cfg["execution"]["converge_rtol"],
                                                 method=1,
                                                 rainout=Bool(cfg["physics"]["rainout"]),
                                                 oceans=Bool(cfg["physics"]["oceans"]),
@@ -591,15 +613,24 @@ function run_worker(id::Int)
                                                 modplot=modplot,
                                                 save_frames=false,
                                                 radiative_Kzz=false,
-                                                perturb_all=perturb_all,
+                                                perturb_all=cfg["execution"]["perturb_all"],
                                                 )
-
         # Report radius
         @info @sprintf("    found r_phot = %.3f R_earth",atmos.transspec_r/R_earth)
 
         # Write NetCDF file for this case
         if save_netcdfs
+            @info "    write netcdf file"
+            while true
+                @info "    waiting for NetCDF lock, currently held by thread $ncdf_active"
+                sleep(LOCK_WAIT)
+                if ncdf_active==0
+                    @lock lock_netcdf_active ncdf_active = threadid() # acquire lock
+                    break
+                end
+            end
             save.write_ncdf(atmos, joinpath(output_dir,"nc",@sprintf("%08d.nc",i)))
+            @lock lock_netcdf_active ncdf_active = 0 # release
         end
 
         # Make plot for this case
@@ -696,13 +727,13 @@ end # end worker
 time_start::Float64 = time()
 @info "Start time: $(now())"
 
-for id in 1:num_workers
+@threads for id in 1:num_workers
     @info "Starting worker $id"
     wlogger = AGNI.make_logger(joinpath(output_dir,"wk_$id.log"), to_term=false)
     with_logger(wlogger) do
         run_worker(id)
     end
-    close(io)
+
 end
 
 
