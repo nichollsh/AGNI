@@ -14,6 +14,7 @@ using Dates
 const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
 const R_earth::Float64 = 6.371e6
 const M_earth::Float64 = 5.972e24
+const DEFAULT_FILL::Float64 = 0.0
 
 # =============================================================================
 # User config
@@ -95,32 +96,15 @@ result_profs_path::String = joinpath(output_dir,"result_profs.nc")
 AGNI.setup_logging(joinpath(output_dir, "manager.log"), cfg["execution"]["verbosity"])
 
 # Parse parameters
-incl_convect     = cfg["physics"]["convection"]
-incl_conduct     = cfg["physics"]["conduction"]
-incl_sens        = cfg["physics"]["sensible_heat"]
-incl_latent      = cfg["physics"]["latent_heat"]
 sol_type         = cfg["execution"]["solution_type"]
 conv_atol        = cfg["execution"]["converge_atol"]
 conv_rtol        = cfg["execution"]["converge_rtol"]
 perturb_all      = cfg["execution"]["perturb_all"]
-plt_tmp          = cfg["plots"]["temperature"]
-plt_ani          = cfg["plots"]["animate"]
-p_top            = cfg["composition"]["p_top"]
 chem             = cfg["physics"]["chemistry"]
-roughness        = cfg["planet"]["roughness"]
-windspeed        = cfg["planet"]["wind_speed"]
-condensates      = cfg["composition"]["condensates"]
 metallicities    = cfg["composition"]["metallicities"]
-roughness        = cfg["planet"]["roughness"]
-wind_speed       = cfg["planet"]["wind_speed"]
-flux_int         = cfg["planet"]["flux_int"]
-surface_mat      = cfg["planet"]["surface_material"]
 p_surf           = cfg["composition"]["p_surf"]
 star_Teff        = cfg["planet"]["star_Teff"]
 stellar_spectrum = cfg["files"]["input_star"]
-nlev_c           = cfg["execution"]["num_levels"]
-grey_lw          = cfg["physics"]["grey_lw"]
-grey_sw          = cfg["physics"]["grey_sw"]
 
 # Get number of spectral bands
 bands::Int = 1
@@ -128,8 +112,6 @@ if cfg["files"]["input_sf"] != "greygas"
     bands = parse(Int,split(cfg["files"]["input_sf"],"/")[end-1])
 end
 @info "Spectral bands: $bands"
-
-
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
@@ -230,10 +212,10 @@ open(gpfile, "w") do hdl
 end
 
 # Create output variables to record results in
-result_table::Array{Dict,    1}  = [Dict{String,Float64}(k => Float64(-1.0) for k in output_keys)   for _ in 1:gridsize]
-result_profs::Array{Dict,    1}  = [Dict{String,Array}()                    for _ in 1:gridsize] # array of dicts (p, t, r)
-result_emits::Array{Float64, 2}  = zeros(Float64, (gridsize,bands)) # array of fluxes
-wlarr::Array{Float64,1} = zeros(Float64, bands)
+result_table::Array{Dict,    1}  = [Dict{String,Float64}(k => Float64(DEFAULT_FILL) for k in output_keys) for _ in 1:gridsize]
+result_profs::Array{Dict,    1}  = [Dict{String,Array}()  for _ in 1:gridsize] # array of dicts (p, t, r)
+result_emits::Array{Float64, 2}  = fill(DEFAULT_FILL, (gridsize,bands)) # array of fluxes
+wlarr::Array{Float64,1}          = fill(DEFAULT_FILL, bands)
 
 # Thread locks for these variables
 lock_table = ReentrantLock()
@@ -312,6 +294,8 @@ function write_profs(res_pro::Array, fpath::String)
         rm(fpath)
     end
 
+    nlev::Int = length(res_pro[1]["p"])
+
     ds = Dataset(fpath,"c")
 
     ds.attrib["description"]        = "AGNI grid profiles (TPR)"
@@ -320,7 +304,7 @@ function write_profs(res_pro::Array, fpath::String)
     ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
     ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
 
-    defDim(ds, "nlev_c",   atmos.nlev_c)
+    defDim(ds, "nlev_c",   nlev)
     defDim(ds, "gridsize", gridsize)
 
     var_p = defVar(ds, "p", Float64, ("nlev_c","gridsize",) ) # saved in python dimension order
@@ -328,7 +312,7 @@ function write_profs(res_pro::Array, fpath::String)
     var_r = defVar(ds, "r", Float64, ("nlev_c","gridsize",) )
 
     for i in 1:gridsize
-        for j in 1:nlev_c
+        for j in 1:nlev
             var_p[j,i] = res_pro[i]["p"][j]
             var_t[j,i] = res_pro[i]["t"][j]
             var_r[j,i] = res_pro[i]["r"][j]
@@ -405,15 +389,15 @@ function init_atmos(OUT_DIR)
                                     Float64(cfg["planet"]["zenith_angle"]),
                                     Float64(cfg["planet"]["tmp_surf"]),
                                     gravity, radius,
-                                    nlev_c,
+                                    cfg["execution"]["num_levels"],
                                     p_surf,
-                                    p_top,
+                                    cfg["composition"]["p_top"],
                                     mf_dict, "";
 
                                     IO_DIR=OUT_DIR,
-                                    condensates=condensates,
-                                    κ_grey_lw=grey_lw,
-                                    κ_grey_sw=grey_sw,
+                                    condensates=cfg["composition"]["condensates"],
+                                    κ_grey_lw=cfg["physics"]["grey_lw"],
+                                    κ_grey_sw=cfg["physics"]["grey_sw"],
                                     metallicities=metallicities,
                                     flag_gcontinuum   = cfg["physics"]["continua"],
                                     flag_rayleigh     = cfg["physics"]["rayleigh"],
@@ -422,11 +406,12 @@ function init_atmos(OUT_DIR)
                                     real_gas          = cfg["physics"]["real_gas"],
                                     thermo_functions  = cfg["physics"]["thermo_funct"],
                                     use_all_gases     = true,
-                                    surf_roughness=roughness, surf_windspeed=windspeed,
+                                    surf_roughness=cfg["planet"]["roughness"],
+                                    surf_windspeed=cfg["planet"]["wind_speed"],
                                     fastchem_floor = fc_floor,
                                     Kzz_floor = 0.0,
-                                    flux_int=flux_int,
-                                    surface_material=surface_mat,
+                                    flux_int=cfg["planet"]["flux_int"],
+                                    surface_material=cfg["planet"]["surface_material"],
                                     mlt_criterion=only(cfg["physics"]["convection_crit"][1]),
                             )
 
@@ -588,9 +573,11 @@ function run_worker(id::Int)
 
         # Solve for RCE
         succ = solver.solve_energy!(atmos, sol_type=sol_type,
-                                                conduct=incl_conduct, chem=chem,
-                                                convect=incl_convect, latent=incl_latent,
-                                                sens_heat=incl_sens,
+                                                conduct=cfg["physics"]["conduction"],
+                                                convect=cfg["physics"]["convection"],
+                                                latent=cfg["physics"]["latent_heat"],
+                                                sens_heat= cfg["physics"]["sensible_heat"],
+                                                chem=chem,
                                                 max_steps=max_steps,
                                                 max_runtime=Float64(cfg["execution"]["max_runtime"]),
                                                 conv_atol=conv_atol,
@@ -725,11 +712,6 @@ end
 # Get end time
 time_end::Float64 = time()
 @info "Finish time: $(now())"
-
-
-# =============================================================================
-# Write result_table to CSV, result_profs to NetCDF, and exit
-# -------------------------------
 
 # Print model statistics
 duration = (time_end - time_start)
