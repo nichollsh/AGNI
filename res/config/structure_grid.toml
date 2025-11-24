@@ -17,7 +17,7 @@ title = "Base config for structure calcs"
     star_Teff       = 3415.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf" #
+    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf" # "greygas" #
     input_star      = "blackbody"
     output_dir      = "out/"
 
@@ -28,7 +28,7 @@ title = "Base config for structure calcs"
     condensates     = []
 
 [execution]
-    clean_output    = false
+    clean_output    = true
     verbosity       = 1
     max_steps       = 50
     max_runtime     = 200

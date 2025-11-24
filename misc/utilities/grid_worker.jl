@@ -1,8 +1,12 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # To be run from within the AGNI root directory
-# e.g. to run with 4 threads, do...
-#   julia --project=. -t4 misc/utilities/grid_agni.jl
+
+# e.g. to run with 1 thread in a single process
+#   julia --project=. misc/utilities/grid_worker.jl
+
+# e.g. to dispatch 1 worker among many, such as when calling multiple times with SLURM
+#   julia --project=. misc/utilities/grid_worker.jl wk_1
 
 using .Iterators
 using LoggingExtras
@@ -10,8 +14,6 @@ using Printf
 using DataStructures
 using NCDatasets
 using Dates
-using Base.Threads
-
 using AGNI
 
 const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
@@ -21,8 +23,8 @@ const DEFAULT_FILL::Float64 = 0.0   # fill value for arrays
 const LOCK_WAIT::Float64 = 2.0      # seconds to wait for NetCDF lock
 
 # =============================================================================
-# User config
-# -------------------------------
+#                        ALL CONFIGURATION DONE HERE
+# -----------------------------------------------------------------------------
 
 # Base parameters
 cfg_base = "res/config/structure_grid.toml"
@@ -60,7 +62,7 @@ output_keys =  ["succ", "flux_loss",
 
 # Grid management options
 save_netcdfs = false        # NetCDF file for each case
-save_plots   = true         # plots for each case
+save_plots   = false         # plots for each case
 
 # Runtime options
 # AGNI.solver.ls_increase= 1.1
@@ -70,41 +72,65 @@ frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
 transspec_p::Float64   = 2e3    # Pa
 fc_floor::Float64      = 300.0   # K
-num_workers::Int       = nthreads()   # Set equal for now
+num_workers::Int       = 4  # NUM_WORKERS  <- do not change this comment!
+this_worker::Int       = 0  # for this process
 
 # =============================================================================
-# Parse keys and flatten grid
-# -------------------------------
+#                      GRID EXECUTION DONE BELOW
+# -----------------------------------------------------------------------------
 
 # Parse config file
 cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
-
-# Output folder
 output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
-@info "Output folder: $output_dir"
-rm(output_dir,force=true,recursive=true)
-mkdir(output_dir)
+
+# Define work requirements
+@info "Number of workers in grid: $num_workers"
+if length(ARGS) == 1
+    if startswith(ARGS[1], "wk_")
+        this_worker = parse(Int, split(ARGS[1],"_")[2])
+    else
+        @error "Got invalid command line arguments: $ARGS"
+        exit(1)
+    end
+    @info "User requested operation of worker with ID=$this_worker"
+elseif  length(ARGS) > 1
+    @error "Got invalid command line arguments: $ARGS"
+    exit(1)
+end
+
+# Root output folder
+if this_worker < 2
+    @info "Output folder: $output_dir"
+    rm(output_dir,force=true,recursive=true)
+    mkdir(output_dir)
+    @info "    folder cleaned"
+
+    # Backup config to output dir
+    cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
+else
+    pause = LOCK_WAIT * (this_worker - 1)
+    @info "Sleeping for $pause seconds "
+    sleep(pause)
+end
 
 # Setup logging ASAP
-AGNI.setup_logging(joinpath(output_dir, "manager.log"), cfg["execution"]["verbosity"])
-@info "Number of threads: $(nthreads())"
-@info "Number of workers: $num_workers"
+AGNI.setup_logging(
+    joinpath(output_dir, "wk_$(this_worker).log"),
+    cfg["execution"]["verbosity"]
+)
 
-# Backup config to output dir
-cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
+# Check that a worker is specified by the user, if >1 is being used
+if (num_workers > 1) && (this_worker == 0)
+    @error "Use command line argument to specify ID of the worker"
+    exit(1)
+end
 
 # Results path
 save_netcdfs && mkdir(joinpath(output_dir,"nc"))
 save_plots && mkdir(joinpath(output_dir,"pl"))
-result_table_path::String = joinpath(output_dir,"result_table.csv")
-result_emits_path::String = joinpath(output_dir,"result_emits.csv")
-result_profs_path::String = joinpath(output_dir,"result_profs.nc")
 
 # Parse parameters
-sol_type         = cfg["execution"]["solution_type"]
 metallicities    = cfg["composition"]["metallicities"]
-star_Teff        = cfg["planet"]["star_Teff"]
-stellar_spectrum = cfg["files"]["input_star"]
 
 # Get number of spectral bands
 bands::Int = 1
@@ -120,7 +146,7 @@ input_keys = collect(keys(grid))
 gz_est = prod([length(_v) for _v in values(grid)])
 if gz_est > 1e6
     @info "Grid has $(gz_est/1e6)M points"
-elseif gz_est > 1e3
+elseif gz_est > 1e4
     @info "Grid has $(gz_est/1e3)k points"
 else
     @info "Grid has $gz_est points"
@@ -185,28 +211,30 @@ for i in eachindex(grid_flat)
 end
 
 # Write combinations to file
-@info "Writing flattened grid to file"
-gpfile = joinpath(output_dir,"gridpoints.csv")
-@info "    $gpfile"
-open(gpfile, "w") do hdl
-    # Header
-    head = "index,worker," * join(input_keys, ",") * "\n"
-    write(hdl,head)
+if this_worker < 2
+    @info "Writing flattened grid to file"
+    gpfile = joinpath(output_dir,"gridpoints.csv")
+    @info "    $gpfile"
+    open(gpfile, "w") do hdl
+        # Header
+        head = "index,worker," * join(input_keys, ",") * "\n"
+        write(hdl,head)
 
-    # Each row
-    for (i,p) in enumerate(grid_flat)
+        # Each row
+        for (i,p) in enumerate(grid_flat)
 
-        # Index
-        row = @sprintf("%08d,",i)
+            # Index
+            row = @sprintf("%08d,",i)
 
-        # Worker
-        row *= @sprintf("%08d,",p["worker"])
+            # Worker
+            row *= @sprintf("%08d,",p["worker"])
 
-        # Other keys
-        row *= join([@sprintf("%.6e",p[k]) for k in input_keys], ",") * "\n"
+            # Other keys
+            row *= join([@sprintf("%.6e",p[k]) for k in input_keys], ",") * "\n"
 
-        # Write out
-        write(hdl,row)
+            # Write out
+            write(hdl,row)
+        end
     end
 end
 
@@ -217,8 +245,8 @@ result_emits::Array{Float64, 2}  = fill(DEFAULT_FILL, (gridsize,bands)) # array 
 wlarr::Array{Float64,1}          = fill(DEFAULT_FILL, bands)
 
 # Lock on NetCDF operations
-ncdf_active::Int = 0
-lock_netcdf_active = ReentrantLock()
+# ncdf_active::Int = 0
+# ncdf_lock = ReentrantLock()
 
 # Thread locks for these variables
 lock_table = ReentrantLock()
@@ -371,11 +399,13 @@ function update_structure!(atmos, mass_tot, frac_atm, frac_core)
 end
 
 """
-Inialise atmosphere object
-"""
-function init_atmos(OUT_DIR)
+Initialise atmosphere object
 
-    global ncdf_active
+Arguments:
+ - `OUT_DIR::String`    worker output folder
+"""
+function init_atmos(OUT_DIR::String)
+
 
     @info "Initialising new atmos struct"
 
@@ -383,16 +413,6 @@ function init_atmos(OUT_DIR)
     radius   = cfg["planet"]["radius"]
     mass     = cfg["planet"]["mass"]
     gravity  = phys.grav_accel(mass, radius)
-
-    # Check if NetCDF lock is enabled
-    while true
-        @info "    waiting for NetCDF lock, currently held by thread $ncdf_active"
-        sleep(LOCK_WAIT)
-        if ncdf_active==0
-            @lock lock_netcdf_active ncdf_active = threadid() # acquire lock
-            break
-        end
-    end
 
     atmos = atmosphere.Atmos_t()
 
@@ -432,7 +452,7 @@ function init_atmos(OUT_DIR)
                             )
 
     # AGNI struct, allocate
-    atmosphere.allocate!(atmos, stellar_spectrum; stellar_Teff=star_Teff)
+    atmosphere.allocate!(atmos, cfg["files"]["input_star"]; stellar_Teff=cfg["planet"]["star_Teff"])
     atmos.transspec_p = transspec_p
 
     # Check ok
@@ -440,9 +460,6 @@ function init_atmos(OUT_DIR)
         @error "Could not allocate atmosphere struct"
         exit(1)
     end
-
-    # Release lock
-    @lock lock_netcdf_active ncdf_active = 0
 
     # Set PT
     setpt.request!(atmos, cfg["execution"]["initial_state"])
@@ -456,7 +473,9 @@ end
 # -------------------------------
 function run_worker(id::Int)
 
-    @info "Started worker $id on thread $(threadid())"
+    @info "Started worker $id"
+
+
 
     # Variables shared between workers
     global result_emits
@@ -467,6 +486,8 @@ function run_worker(id::Int)
     global save_netcdfs
     global save_plots
     global wlarr
+    # global ncdf_lock
+    # global ncdf_active
 
     # Intial values for interior structure
     radius    = cfg["planet"]["radius"]
@@ -481,8 +502,19 @@ function run_worker(id::Int)
     rm(OUT_DIR, recursive=true, force=true)
     mkdir(OUT_DIR)
 
+    # Output files
+    result_table_path::String = joinpath(OUT_DIR,"result_table.csv")
+    result_emits_path::String = joinpath(OUT_DIR,"result_emits.csv")
+    result_profs_path::String = joinpath(OUT_DIR,"result_profs.nc")
+
     # Initialise new atmosphere
+    # while ncdf_active>0
+    #     @info "    waiting for NetCDF lock, currently held by thread $ncdf_active"
+    #     sleep(LOCK_WAIT)
+    # end
+    # @lock ncdf_lock ncdf_active = threadid() # acquire lock
     atmos = init_atmos(OUT_DIR)
+    # @lock ncdf_lock ncdf_active = 0
 
     # First worker records wlarray
     if id == 1
@@ -594,7 +626,7 @@ function run_worker(id::Int)
         end
 
         # Solve for RCE
-        succ = solver.solve_energy!(atmos, sol_type=sol_type,
+        succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
                                                 conduct=cfg["physics"]["conduction"],
                                                 convect=cfg["physics"]["convection"],
                                                 latent=cfg["physics"]["latent_heat"],
@@ -621,16 +653,13 @@ function run_worker(id::Int)
         # Write NetCDF file for this case
         if save_netcdfs
             @info "    write netcdf file"
-            while true
-                @info "    waiting for NetCDF lock, currently held by thread $ncdf_active"
-                sleep(LOCK_WAIT)
-                if ncdf_active==0
-                    @lock lock_netcdf_active ncdf_active = threadid() # acquire lock
-                    break
-                end
-            end
+            # while ncdf_active > 0
+            #     @info "    waiting for NetCDF lock, currently held by thread $ncdf_active"
+            #     sleep(LOCK_WAIT)
+            # end
+            # @lock ncdf_lock ncdf_active = threadid() # acquire lock
             save.write_ncdf(atmos, joinpath(output_dir,"nc",@sprintf("%08d.nc",i)))
-            @lock lock_netcdf_active ncdf_active = 0 # release
+            # @lock ncdf_lock ncdf_active = 0 # release
         end
 
         # Make plot for this case
@@ -705,8 +734,7 @@ function run_worker(id::Int)
 
 
         # Update results file on the go?
-        #    Only worker1 can write these files at runtime
-        if (mod(i,modwrite) == 0) && (id == 1)
+        if mod(i,modwrite) == 0
             write_table(result_table, result_table_path, gridsize)
             write_emits(result_emits, result_emits_path, gridsize)
         end
@@ -715,7 +743,22 @@ function run_worker(id::Int)
         @info "  "
     end
 
+    @info "Worker (ID=$id) completed all allocated points"
+    @info "------------------------------"
+    @info " "
+
+    @info "Deallocating atmosphere"
     atmosphere.deallocate!(atmos)
+
+    @info "Writing final results table to CSV..."
+    write_table(result_table, result_table_path, gridsize)
+
+    @info "Writing final fluxes array to CSV..."
+    write_emits(result_emits, result_emits_path, gridsize)
+
+    # Write NetCDF of profiles
+    @info "Writing final profiles to NetCDF.."
+    write_profs(result_profs, result_profs_path)
 
 end # end worker
 
@@ -727,15 +770,8 @@ end # end worker
 time_start::Float64 = time()
 @info "Start time: $(now())"
 
-@threads for id in 1:num_workers
-    @info "Starting worker $id"
-    wlogger = AGNI.make_logger(joinpath(output_dir,"wk_$id.log"), to_term=false)
-    with_logger(wlogger) do
-        run_worker(id)
-    end
-
-end
-
+@info "Operating worker $this_worker of $num_workers"
+run_worker(this_worker)
 
 @info "===================================="
 @info " "
@@ -745,26 +781,12 @@ time_end::Float64 = time()
 @info "Finish time: $(now())"
 
 # Print model statistics
-duration = (time_end - time_start)
-@info "Average iteration duration: $(duration/gridsize) seconds"
-
-duration /= 60 # minutes
+duration = (time_end - time_start) / 60 # minutes
 if duration > 60
     @info "Total runtime: $(duration/60) hours"
 else
     @info "Total runtime: $duration minutes"
 end
-
-# Write results table
-@info "Writing final results table to CSV..."
-write_table(result_table, result_table_path, gridsize)
-
-@info "Writing final fluxes array to CSV..."
-write_emits(result_emits, result_emits_path, gridsize)
-
-# Write NetCDF of profiles
-@info "Writing final profiles to NetCDF.."
-write_profs(result_profs, result_profs_path)
 
 # Done
 @info "Done!"

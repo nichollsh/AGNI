@@ -76,13 +76,13 @@ Potential solver flags are:
 ## Grids of models
 
 The code is not explicitly parallelised. However, there is functionality to run a grid
-of models using by the script located at `misc/utilities/grid_agni.jl`.
+of models using by the script located at `misc/utilities/grid_worker.jl`.
 
 This script can be run on your local machine. However, it could also be dispatched to a node
 within a compute cluster by using Slurm. For example, with a 24 hr and 3 GB memory limit:
 
 ```console
-sbatch --mem-per-cpu=3G --time=1440 --wrap "julia --project=. misc/utilities/grid_agni.jl"
+sbatch --mem-per-cpu=3G --time=1440 --wrap "julia --project=. misc/utilities/grid_worker.jl"
 ```
 
 
