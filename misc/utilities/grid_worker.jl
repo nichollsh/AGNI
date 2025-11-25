@@ -1,12 +1,10 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # To be run from within the AGNI root directory
+# First command line argument must be the worker ID
 
-# e.g. to run with 1 thread in a single process
-#   julia --project=. misc/utilities/grid_worker.jl
-
-# e.g. to dispatch 1 worker among many, such as when calling multiple times with SLURM
-#   julia --project=. misc/utilities/grid_worker.jl wk_1
+# e.g. to dispatch worker 1, of potentially many workers
+#   julia --project=. misc/utilities/grid_worker.jl 1
 
 using .Iterators
 using LoggingExtras
@@ -20,7 +18,8 @@ const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
 const R_earth::Float64 = 6.371e6    # m
 const M_earth::Float64 = 5.972e24   # kg
 const DEFAULT_FILL::Float64 = 0.0   # fill value for arrays
-const LOCK_WAIT::Float64 = 2.0      # seconds to wait for NetCDF lock
+
+println("Hello from grid_worker.jl")
 
 # =============================================================================
 #                        ALL CONFIGURATION DONE HERE
@@ -28,7 +27,7 @@ const LOCK_WAIT::Float64 = 2.0      # seconds to wait for NetCDF lock
 
 # Base parameters
 cfg_base = "res/config/structure_grid.toml"
-@info "Using base config: $cfg_base"
+println("Using base config: $cfg_base")
 
 # Mass array with custom spacing
 mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(4.5),   length=7),
@@ -61,19 +60,16 @@ output_keys =  ["succ", "flux_loss",
                 "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
-save_netcdfs = false        # NetCDF file for each case
-save_plots   = false         # plots for each case
-
-# Runtime options
-# AGNI.solver.ls_increase= 1.1
+save_netcdfs           = false        # NetCDF file for each case
+save_plots             = false        # plots for each case
 modwrite::Int          = 2            # frequency to write CSV file
 modplot::Int           = 0            # Plot during runtime (debug)
 frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 frac_max::Float64      = 1.0
-transspec_p::Float64   = 2e3    # Pa
-fc_floor::Float64      = 300.0   # K
-num_workers::Int       = 4  # NUM_WORKERS  <- do not change this comment!
-this_worker::Int       = 0  # for this process
+transspec_p::Float64   = 2e3          # Pa
+fc_floor::Float64      = 300.0        # K
+num_work::Int          = 4  # %NUM_WORKERS [do not change this comment]
+
 
 # =============================================================================
 #                      GRID EXECUTION DONE BELOW
@@ -84,53 +80,50 @@ cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
 
 # Define work requirements
-@info "Number of workers in grid: $num_workers"
+id_work::Int = 0
+println("Number of workers in grid: $num_work")
 if length(ARGS) == 1
-    if startswith(ARGS[1], "wk_")
-        this_worker = parse(Int, split(ARGS[1],"_")[2])
-    else
-        @error "Got invalid command line arguments: $ARGS"
-        exit(1)
-    end
-    @info "User requested operation of worker with ID=$this_worker"
-elseif  length(ARGS) > 1
-    @error "Got invalid command line arguments: $ARGS"
-    exit(1)
+    id_work = parse(Int, ARGS[1])
+    println("User requested operation of worker with ID=$id_work")
+else
+    raise("Got invalid command line arguments: $ARGS")
 end
 
 # Root output folder
-if this_worker < 2
-    @info "Output folder: $output_dir"
+if (id_work < 1) || (id_work > num_work)
+    raise("Invalid worker ID=$id_work")
+
+elseif id_work == 1
+    println("Creating output folder: $output_dir")
     rm(output_dir,force=true,recursive=true)
     mkdir(output_dir)
-    @info "    folder cleaned"
 
     # Backup config to output dir
     cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
-else
-    pause = LOCK_WAIT * (this_worker - 1)
-    @info "Sleeping for $pause seconds "
-    sleep(pause)
+
+    # Results path
+    save_netcdfs && mkdir(joinpath(output_dir,"nc"))
+    save_plots && mkdir(joinpath(output_dir,"pl"))
 end
 
 # Setup logging ASAP
 AGNI.setup_logging(
-    joinpath(output_dir, "wk_$(this_worker).log"),
+    joinpath(output_dir, "wk_$(id_work).log"),
     cfg["execution"]["verbosity"]
 )
 
-# Check that a worker is specified by the user, if >1 is being used
-if (num_workers > 1) && (this_worker == 0)
-    @error "Use command line argument to specify ID of the worker"
-    exit(1)
+# Output dir for this particular worker
+if !isdir(output_dir)
+    raise("Grid output folder not found: $output_dir")
 end
+OUT_DIR = joinpath(output_dir,"wk_$id_work")
+rm(OUT_DIR, recursive=true, force=true)
+mkdir(OUT_DIR)
 
-# Results path
-save_netcdfs && mkdir(joinpath(output_dir,"nc"))
-save_plots && mkdir(joinpath(output_dir,"pl"))
-
-# Parse parameters
-metallicities    = cfg["composition"]["metallicities"]
+# Output files
+result_table_path::String = joinpath(OUT_DIR,"result_table.csv")
+result_emits_path::String = joinpath(OUT_DIR,"result_emits.csv")
+result_profs_path::String = joinpath(OUT_DIR,"result_profs.nc")
 
 # Get number of spectral bands
 bands::Int = 1
@@ -138,6 +131,14 @@ if cfg["files"]["input_sf"] != "greygas"
     bands = parse(Int,split(cfg["files"]["input_sf"],"/")[end-1])
 end
 @info "Spectral bands: $bands"
+
+# Get shared structure variables
+radius    = cfg["planet"]["radius"]
+mass      = cfg["planet"]["mass"] # interior mass
+gravity   = phys.grav_accel(mass, radius)
+mass_tot  = mass * 1.1
+frac_core = 0.325
+frac_atm  = 0.01
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
@@ -184,7 +185,7 @@ if "instellation" in keys(grid)
     grid["instellation"] = reverse(sort(round.(grid["instellation"]; digits=1)))
 end
 
-# Print  gridpoints for user
+# Print gridpoints for user
 for k in keys(grid)
     grid[k] = collect(Float64, grid[k])
     @info "  $k : $(grid[k])"
@@ -200,18 +201,18 @@ gridsize = length(grid_flat)
 
 # Assign workers to grid points
 #    Last worker will take the "remainder" points if chunks do not fit wholly
-chunksize = round(Int,gridsize/(num_workers),RoundDown)
+chunksize = round(Int,gridsize/(num_work),RoundDown)
 iwork = 1
 for i in eachindex(grid_flat)
     global iwork
     if mod(i,chunksize) == 0
         iwork += 1
     end
-    grid_flat[i]["worker"] = min(iwork,num_workers)
+    grid_flat[i]["worker"] = min(iwork,num_work)
 end
 
 # Write combinations to file
-if this_worker < 2
+if id_work == 1
     @info "Writing flattened grid to file"
     gpfile = joinpath(output_dir,"gridpoints.csv")
     @info "    $gpfile"
@@ -244,41 +245,50 @@ result_profs::Array{Dict,    1}  = [Dict{String,Array}()  for _ in 1:gridsize] #
 result_emits::Array{Float64, 2}  = fill(DEFAULT_FILL, (gridsize,bands)) # array of fluxes
 wlarr::Array{Float64,1}          = fill(DEFAULT_FILL, bands)
 
-# Lock on NetCDF operations
-# ncdf_active::Int = 0
-# ncdf_lock = ReentrantLock()
-
-# Thread locks for these variables
-lock_table = ReentrantLock()
-lock_profs = ReentrantLock()
-lock_emits = ReentrantLock()
+# Initial values, to be updated by grid
+radius    = cfg["planet"]["radius"]
+mass      = cfg["planet"]["mass"] # interior mass
+gravity   = phys.grav_accel(mass, radius)
+mass_tot  = mass * 1.1
+frac_core = 0.325
+frac_atm  = 0.01
+stellar_Teff = cfg["planet"]["star_Teff"]
+input_star   = cfg["files"]["input_star"]
 
 @info "Generated grid of $(length(input_keys)) dimensions, with $gridsize points"
 sleep(3)
 
 # Write results table to disk
-function write_table(res_tab::Array{Dict,1}, fpath::String, nrows::Int)
+function write_table()
 
     global output_keys
+    global result_table_path
+    global result_table
 
-    @info "Writing results table '$fpath' (nrows=$nrows)"
+    @info "Writing results table '$result_table_path' (ID=$id_work)"
 
     # Remove old file
-    if isfile(fpath)
-        rm(fpath)
+    if isfile(result_table_path)
+        rm(result_table_path)
     end
 
     # Write file
-    open(fpath, "w") do hdl
+    open(result_table_path, "w") do hdl
         # Header
         head = "index," * join(output_keys, ",") * "\n"
         write(hdl,head)
 
         # Each row
-        for i in 1:nrows
+        for i in 1:gridsize
+
+            # this worker?
+            if grid_flat[i]["worker"] != id_work
+                continue
+            end
+
             row = @sprintf("%08d",i)
             for k in output_keys
-                row *= @sprintf(",%.6e",res_tab[i][k])
+                row *= @sprintf(",%.6e",result_table[i][k])
             end
             write(hdl,row*"\n")
         end
@@ -286,19 +296,21 @@ function write_table(res_tab::Array{Dict,1}, fpath::String, nrows::Int)
 end
 
 # Write emission fluxes to disk
-function write_emits(emi_arr::Array, fpath::String, nrows::Int)
+function write_emits()
 
-    @info "Writing fluxes array '$fpath' (nrows=$nrows)"
+    @info "Writing fluxes array '$result_emits_path' (ID=$id_work)"
 
     global wlarr
+    global result_emits
+    global result_emits_path
 
     # Remove old file
-    if isfile(fpath)
-        rm(fpath)
+    if isfile(result_emits_path)
+        rm(result_emits_path)
     end
 
     # Write file
-    open(fpath, "w") do hdl
+    open(result_emits_path, "w") do hdl
         # Header of wavelength values
         head = "0.0"
         for b in 1:bands
@@ -308,10 +320,16 @@ function write_emits(emi_arr::Array, fpath::String, nrows::Int)
         write(hdl,head)
 
         # Each row
-        for i in 1:nrows
+        for i in 1:gridsize
+
+            # this worker?
+            if grid_flat[i]["worker"] != id_work
+                continue
+            end
+
             row = @sprintf("%08d",i)
             for b in 1:bands
-                row *= @sprintf(",%.6e",emi_arr[i,b])
+                row *= @sprintf(",%.6e",result_emits[i,b])
             end
             write(hdl,row*"\n")
         end
@@ -319,21 +337,25 @@ function write_emits(emi_arr::Array, fpath::String, nrows::Int)
 end
 
 # Write P-T-R profiles to NetCDF file
-function write_profs(res_pro::Array, fpath::String)
+function write_profs()
 
-    if isfile(fpath)
-        rm(fpath)
+    global result_profs
+    global result_profs_path
+
+    if isfile(result_profs_path)
+        rm(result_profs_path)
     end
 
     nlev::Int = length(res_pro[1]["p"])
 
-    ds = Dataset(fpath,"c")
+    ds = Dataset(result_profs_path,"c")
 
-    ds.attrib["description"]        = "AGNI grid profiles (TPR)"
+    ds.attrib["description"]        = "AGNI grid worker profiles (t-p-r)"
     ds.attrib["hostname"]           = gethostname()
     ds.attrib["username"]           = ENV["USER"]
     ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
     ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
+    ds.attrib["id_work"]            = id_work
 
     defDim(ds, "nlev_c",   nlev)
     defDim(ds, "gridsize", gridsize)
@@ -343,6 +365,12 @@ function write_profs(res_pro::Array, fpath::String)
     var_r = defVar(ds, "r", Float64, ("nlev_c","gridsize",) )
 
     for i in 1:gridsize
+
+        # this worker?
+        if grid_flat[i]["worker"] != id_work
+            continue
+        end
+
         for j in 1:nlev
             var_p[j,i] = res_pro[i]["p"][j]
             var_t[j,i] = res_pro[i]["t"][j]
@@ -374,20 +402,20 @@ end
 """
 Update interior structure
 """
-function update_structure!(atmos, mass_tot, frac_atm, frac_core)
-    if frac_atm + frac_core > 1
-        @warn "Core fraction ($frac_core) and atm fraction ($frac_atm) sum to >1"
+function update_structure!(atmos, mtot, fatm, fcor)
+    if fatm + fcor > 1
+        @warn "Core fraction ($fcor) and atm fraction ($fatm) sum to >1"
     end
 
     # atmosphere mass
-    mass_atm = mass_tot * frac_atm
+    mass_atm = mtot * fatm
 
     # interior mass from remainder
-    atmos.interior_mass = mass_tot - mass_atm
+    atmos.interior_mass = mtot - mass_atm
 
     # get interior radius from fit to Zalmoxis
-    frac_core_int = frac_core / (1-frac_atm)
-    atmos.rp = calc_Rint(atmos.interior_mass/M_earth, frac_core_int) * R_earth
+    fcor_i = fcor / (1-fatm)
+    atmos.rp = calc_Rint(atmos.interior_mass/M_earth, fcor_i) * R_earth
 
     # surface gravity
     atmos.grav_surf = phys.grav_accel(atmos.interior_mass, atmos.rp)
@@ -406,14 +434,19 @@ Arguments:
 """
 function init_atmos(OUT_DIR::String)
 
+    global radius
+    global mass_tot
+    global gravity
+    global stellar_Teff
+    global input_star
 
     @info "Initialising new atmos struct"
 
+    # temp values
     mf_dict = Dict("H2"=>0.6, "H2O"=>0.1, "CO2"=>0.1, "N2"=>0.1, "H2S"=>0.1)
-    radius   = cfg["planet"]["radius"]
-    mass     = cfg["planet"]["mass"]
-    gravity  = phys.grav_accel(mass, radius)
+    gravity  = phys.grav_accel(mass_tot, radius)
 
+    # Instantiate
     atmos = atmosphere.Atmos_t()
 
     # AGNI struct, setup
@@ -434,7 +467,7 @@ function init_atmos(OUT_DIR::String)
                                     condensates=cfg["composition"]["condensates"],
                                     κ_grey_lw=cfg["physics"]["grey_lw"],
                                     κ_grey_sw=cfg["physics"]["grey_sw"],
-                                    metallicities=metallicities,
+                                    metallicities     = cfg["composition"]["metallicities"],
                                     flag_gcontinuum   = cfg["physics"]["continua"],
                                     flag_rayleigh     = cfg["physics"]["rayleigh"],
                                     flag_cloud        = cfg["physics"]["cloud"],
@@ -452,7 +485,7 @@ function init_atmos(OUT_DIR::String)
                             )
 
     # AGNI struct, allocate
-    atmosphere.allocate!(atmos, cfg["files"]["input_star"]; stellar_Teff=cfg["planet"]["star_Teff"])
+    atmosphere.allocate!(atmos, input_star; stellar_Teff=stellar_Teff)
     atmos.transspec_p = transspec_p
 
     # Check ok
@@ -468,16 +501,31 @@ function init_atmos(OUT_DIR::String)
 
 end
 
-# =============================================================================
-# Worker function which will find allocated jobs
-# -------------------------------
-function run_worker(id::Int)
+# Initialise new atmosphere
+atmos = init_atmos(OUT_DIR)
 
-    @info "Started worker $id"
+# Record wlarray
+wlarr[:] .= atmos.bands_cen[:]
 
+# Get start time
+@info "Operating worker $id_work of $num_work"
+time_start::Float64 = time()
+@info "Start time: $(now())"
 
+# Run the grid of models
+succ = true
+succ_last = true
+for (i,p) in enumerate(grid_flat)
 
-    # Variables shared between workers
+    # globals, defined outside the loop
+    global succ
+    global succ_last
+    global atmos
+    global mass_tot
+    global radius
+    global frac_core
+    global frac_atm
+    global gravity
     global result_emits
     global result_profs
     global result_table
@@ -486,292 +534,234 @@ function run_worker(id::Int)
     global save_netcdfs
     global save_plots
     global wlarr
-    # global ncdf_lock
-    # global ncdf_active
 
-    # Intial values for interior structure
-    radius    = cfg["planet"]["radius"]
-    mass      = cfg["planet"]["mass"] # interior mass
-    gravity   = phys.grav_accel(mass, radius)
-    mass_tot  = mass * 1.1
-    frac_core = 0.325
-    frac_atm  = 0.01
-
-    # Output dir for this worker
-    OUT_DIR = joinpath(output_dir,"wk_$id")
-    rm(OUT_DIR, recursive=true, force=true)
-    mkdir(OUT_DIR)
-
-    # Output files
-    result_table_path::String = joinpath(OUT_DIR,"result_table.csv")
-    result_emits_path::String = joinpath(OUT_DIR,"result_emits.csv")
-    result_profs_path::String = joinpath(OUT_DIR,"result_profs.nc")
-
-    # Initialise new atmosphere
-    # while ncdf_active>0
-    #     @info "    waiting for NetCDF lock, currently held by thread $ncdf_active"
-    #     sleep(LOCK_WAIT)
-    # end
-    # @lock ncdf_lock ncdf_active = threadid() # acquire lock
-    atmos = init_atmos(OUT_DIR)
-    # @lock ncdf_lock ncdf_active = 0
-
-    # First worker records wlarray
-    if id == 1
-        wlarr[:] .= atmos.bands_cen[:]
+    # Check that this worker is assigned to this grid point, by index
+    if p["worker"] != id_work
+        continue
     end
+    @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
 
-    # Run the grid of models
-    succ = true
-    succ_last = true
-    for (i,p) in enumerate(grid_flat)
+    succ_last = succ
 
-        # Check that this worker is assigned to this grid point, by index
-        if p["worker"] != id
+    # Update parameters
+    for (k,val) in p
+
+        # inform user
+        if k == "worker"
             continue
-        end
-        @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
-
-        succ_last = succ
-
-        # Update parameters
-        for (k,val) in p
-            @info "    set $k = $val"
-            if k == "p_surf"
-                atmos.p_oboa = val * 1e5 # convert bar to Pa
-                atmos.p_boa = atmos.p_oboa
-                atmosphere.generate_pgrid!(atmos)
-
-            elseif k == "mass"
-                atmos.interior_mass = val * M_earth
-                atmos.grav_surf = phys.grav_accel(val, atmos.rp)
-
-            elseif k == "radius"
-                atmos.rp = val
-                atmos.grav_surf = phys.grav_accel(atmos.interior_mass, atmos.rp)
-
-            elseif k == "frac_atm"
-                frac_atm = val
-                update_structure!(atmos, mass_tot, frac_atm, frac_core)
-
-            elseif k == "frac_core"
-                frac_core = val
-                update_structure!(atmos, mass_tot, frac_atm, frac_core)
-
-            elseif k == "mass_tot"
-                mass_tot = val * M_earth
-                update_structure!(atmos, mass_tot, frac_atm, frac_core)
-
-            elseif k == "instellation"
-                atmos.instellation = val * 1361.0 # W/m^2
-
-            elseif startswith(k, "vmr_")
-                gas = split(k,"_")[2]
-                atmos.gas_vmr[gas][:]  .= val
-
-            elseif startswith(k, "metal_")
-
-                # metallicity key is by mass frac, but atmosphere stores value by mol frac
-                # convert these via scaling with factor mu_H/mu_gas
-                gas = String(split(k,"_")[2])
-                atmos.metal_orig[gas] = val * phys._get_mmw("H") / phys._get_mmw(gas)
-
-                # remove FC input file to force update
-                rm(atmos.fastchem_elem, force=true)
-
-            elseif k == "worker"
-                # do nothing
-
-            else
-                @error "Unhandled input parameter: $k"
-                exit(1)
-            end
-        end
-
-        # Ensure VMRs sum to unity
-        tot_vmr::Float64 = 0.0
-        for i in 1:atmos.nlev_c
-            # get total
-            tot_vmr = 0.0
-            for g in atmos.gas_names
-                tot_vmr += atmos.gas_vmr[g][i]
-            end
-
-            # normalise to 1 if greater than 1, otherwise fill with H2
-            if tot_vmr > 1
-                for g in atmos.gas_names
-                    atmos.gas_vmr[g][i] /= tot_vmr
-                end
-            else
-                atmos.gas_vmr["H2"][i] += 1-tot_vmr
-            end
-        end
-        # set original vmr arrays
-        for g in atmos.gas_names
-            atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
-        end
-
-        @info @sprintf("    using p_surf = %.2e bar",atmos.pl[end]/1e5)
-
-        # Set temperature array based on interpolation from last solution
-        max_steps = Int(cfg["execution"]["max_steps"])
-        if succ_last && (i>1) && haskey(result_profs[i-1],"p")
-            # last iter was successful
-            setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
-            easy_start = false
         else
-            # last iter failed -> restore initial guess for T(p)
-            setpt.request!(atmos, cfg["execution"]["initial_state"])
-            easy_start = Bool(cfg["execution"]["easy_start"])
+            @info "    set $k = $val"
         end
 
-        # Solve for RCE
-        succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
-                                                conduct=cfg["physics"]["conduction"],
-                                                convect=cfg["physics"]["convection"],
-                                                latent=cfg["physics"]["latent_heat"],
-                                                sens_heat= cfg["physics"]["sensible_heat"],
-                                                chem=cfg["physics"]["chemistry"],
-                                                max_steps=max_steps,
-                                                max_runtime=Float64(cfg["execution"]["max_runtime"]),
-                                                conv_atol= cfg["execution"]["converge_atol"],
-                                                conv_rtol=cfg["execution"]["converge_rtol"],
-                                                method=1,
-                                                rainout=Bool(cfg["physics"]["rainout"]),
-                                                oceans=Bool(cfg["physics"]["oceans"]),
-                                                dx_max=Float64(cfg["execution"]["dx_max"]),
-                                                ls_method=Int(cfg["execution"]["linesearch"]),
-                                                easy_start=easy_start,
-                                                modplot=modplot,
-                                                save_frames=false,
-                                                radiative_Kzz=false,
-                                                perturb_all=cfg["execution"]["perturb_all"],
-                                                )
-        # Report radius
-        @info @sprintf("    found r_phot = %.3f R_earth",atmos.transspec_r/R_earth)
+        # set parameter
+        if k == "p_surf"
+            atmos.p_oboa = val * 1e5 # convert bar to Pa
+            atmos.p_boa = atmos.p_oboa
+            atmosphere.generate_pgrid!(atmos)
 
-        # Write NetCDF file for this case
-        if save_netcdfs
-            @info "    write netcdf file"
-            # while ncdf_active > 0
-            #     @info "    waiting for NetCDF lock, currently held by thread $ncdf_active"
-            #     sleep(LOCK_WAIT)
-            # end
-            # @lock ncdf_lock ncdf_active = threadid() # acquire lock
-            save.write_ncdf(atmos, joinpath(output_dir,"nc",@sprintf("%08d.nc",i)))
-            # @lock ncdf_lock ncdf_active = 0 # release
+        elseif k == "mass"
+            atmos.interior_mass = val * M_earth
+            atmos.grav_surf = phys.grav_accel(val, atmos.rp)
+
+        elseif k == "radius"
+            atmos.rp = val
+            atmos.grav_surf = phys.grav_accel(atmos.interior_mass, atmos.rp)
+
+        elseif k == "frac_atm"
+            frac_atm = val
+            update_structure!(atmos, mass_tot, frac_atm, frac_core)
+
+        elseif k == "frac_core"
+            frac_core = val
+            update_structure!(atmos, mass_tot, frac_atm, frac_core)
+
+        elseif k == "mass_tot"
+            mass_tot = val * M_earth
+            update_structure!(atmos, mass_tot, frac_atm, frac_core)
+
+        elseif k == "instellation"
+            atmos.instellation = val * 1361.0 # W/m^2
+
+        elseif startswith(k, "vmr_")
+            gas = split(k,"_")[2]
+            atmos.gas_vmr[gas][:]  .= val
+
+        elseif startswith(k, "metal_")
+
+            # metallicity key is by mass frac, but atmosphere stores value by mol frac
+            # convert these via scaling with factor mu_H/mu_gas
+            gas = String(split(k,"_")[2])
+            atmos.metal_orig[gas] = val * phys._get_mmw("H") / phys._get_mmw(gas)
+
+            # remove FC input file to force update
+            rm(atmos.fastchem_elem, force=true)
+
+        else
+            @error "Unhandled input parameter: $k"
+            exit(1)
         end
-
-        # Make plot for this case
-        if save_plots
-            plotting.combined(plotting.plot_pt(atmos,""), plotting.plot_fluxes(atmos, ""),
-                                plotting.plot_vmr(atmos,""), plotting.plot_radius(atmos, ""),
-                                "Index = $i     Success = $succ",
-                                joinpath(output_dir,"pl",@sprintf("%08d_pl.png",i)))
-        end
-
-        # Record keys (all in SI)
-        lock(lock_table) do
-            for k in output_keys
-                field = Symbol(k)
-                if hasfield(atmosphere.Atmos_t, field)
-                    result_table[i][k] = Float64(getfield(atmos, Symbol(k)))
-
-                elseif k == "succ"
-                    if succ
-                        result_table[i][k] = 1.0 # success
-                    else
-                        result_table[i][k] = -1.0 # failure
-                    end
-                elseif k == "flux_loss"
-                    result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
-
-                elseif k == "p_surf"
-                    result_table[i][k] = atmos.p_boa
-                elseif k == "t_surf"
-                    result_table[i][k] = atmos.tmp_surf
-                elseif k == "r_surf"
-                    result_table[i][k] = atmos.rp
-                elseif k == "μ_surf"
-                    result_table[i][k] = atmos.layer_μ[end]
-                elseif k == "g_surf"
-                    result_table[i][k] = atmos.grav_surf
-
-                elseif k == "t_phot"
-                    result_table[i][k] = atmos.transspec_tmp
-                elseif k == "r_phot"
-                    result_table[i][k] = atmos.transspec_r
-                elseif k == "μ_phot"
-                    result_table[i][k] = atmos.transspec_μ
-                elseif k == "g_phot"
-                    result_table[i][k] = atmos.transspec_grav
-
-                elseif k == "Kzz_max"
-                    result_table[i][k] = maximum(atmos.Kzz)
-                elseif k == "conv_ptop"
-                    result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[1]
-                elseif k == "conv_pbot"
-                    result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[2]
-                else
-                    @error "Unhandled output variable: $k"
-                    exit(1)
-                end
-            end # end keys  loop
-        end # end lock
-
-        # Record fluxes
-        lock(lock_emits) do
-            result_emits[i,:] .= atmos.band_u_lw[1, :] .+ atmos.band_u_sw[1, :]
-        end
-
-        # Record profile (also in SI)
-        lock(lock_profs) do
-            result_profs[i] = Dict("p"=>deepcopy(atmos.p),
-                                "t"=>deepcopy(atmos.tmp),
-                                "r"=>deepcopy(atmos.r)
-                                )
-        end
-
-
-        # Update results file on the go?
-        if mod(i,modwrite) == 0
-            write_table(result_table, result_table_path, gridsize)
-            write_emits(result_emits, result_emits_path, gridsize)
-        end
-
-        # Iterate
-        @info "  "
     end
 
-    @info "Worker (ID=$id) completed all allocated points"
-    @info "------------------------------"
-    @info " "
+    # Ensure VMRs sum to unity
+    tot_vmr::Float64 = 0.0
+    for i in 1:atmos.nlev_c
+        # get total
+        tot_vmr = 0.0
+        for g in atmos.gas_names
+            tot_vmr += atmos.gas_vmr[g][i]
+        end
 
-    @info "Deallocating atmosphere"
-    atmosphere.deallocate!(atmos)
+        # normalise to 1 if greater than 1, otherwise fill with H2
+        if tot_vmr > 1
+            for g in atmos.gas_names
+                atmos.gas_vmr[g][i] /= tot_vmr
+            end
+        else
+            atmos.gas_vmr["H2"][i] += 1-tot_vmr
+        end
+    end
+    # set original vmr arrays
+    for g in atmos.gas_names
+        atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
+    end
 
-    @info "Writing final results table to CSV..."
-    write_table(result_table, result_table_path, gridsize)
+    @info @sprintf("    using p_surf = %.2e bar",atmos.pl[end]/1e5)
 
-    @info "Writing final fluxes array to CSV..."
-    write_emits(result_emits, result_emits_path, gridsize)
+    # Set temperature array based on interpolation from last solution
+    max_steps = Int(cfg["execution"]["max_steps"])
+    if succ_last && (i>1) && haskey(result_profs[i-1],"p")
+        # last iter was successful
+        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
+        easy_start = false
+    else
+        # last iter failed -> restore initial guess for T(p)
+        setpt.request!(atmos, cfg["execution"]["initial_state"])
+        easy_start = Bool(cfg["execution"]["easy_start"])
+    end
 
-    # Write NetCDF of profiles
-    @info "Writing final profiles to NetCDF.."
-    write_profs(result_profs, result_profs_path)
+    # Solve for RCE
+    succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
+                                            conduct=cfg["physics"]["conduction"],
+                                            convect=cfg["physics"]["convection"],
+                                            latent=cfg["physics"]["latent_heat"],
+                                            sens_heat= cfg["physics"]["sensible_heat"],
+                                            chem=cfg["physics"]["chemistry"],
+                                            max_steps=max_steps,
+                                            max_runtime=Float64(cfg["execution"]["max_runtime"]),
+                                            conv_atol= cfg["execution"]["converge_atol"],
+                                            conv_rtol=cfg["execution"]["converge_rtol"],
+                                            method=1,
+                                            rainout=Bool(cfg["physics"]["rainout"]),
+                                            oceans=Bool(cfg["physics"]["oceans"]),
+                                            dx_max=Float64(cfg["execution"]["dx_max"]),
+                                            ls_method=Int(cfg["execution"]["linesearch"]),
+                                            easy_start=easy_start,
+                                            modplot=modplot,
+                                            save_frames=false,
+                                            radiative_Kzz=false,
+                                            perturb_all=cfg["execution"]["perturb_all"],
+                                            )
+    # Report radius
+    @info @sprintf("    found r_phot = %.3f R_earth",atmos.transspec_r/R_earth)
 
-end # end worker
+    # Write NetCDF file for this case
+    if save_netcdfs
+        @info "    write netcdf file"
+        save.write_ncdf(atmos, joinpath(output_dir,"nc",@sprintf("%08d.nc",i)))
+    end
 
-# =============================================================================
-# Run the grid
-# -------------------------------
+    # Make plot for this case
+    if save_plots
+        plotting.combined(plotting.plot_pt(atmos,""), plotting.plot_fluxes(atmos, ""),
+                            plotting.plot_vmr(atmos,""), plotting.plot_radius(atmos, ""),
+                            "Index = $i     Success = $succ",
+                            joinpath(output_dir,"pl",@sprintf("%08d_pl.png",i)))
+    end
 
-# Get end time
-time_start::Float64 = time()
-@info "Start time: $(now())"
+    # Record keys (all in SI)
+    for k in output_keys
+        field = Symbol(k)
+        if hasfield(atmosphere.Atmos_t, field)
+            result_table[i][k] = Float64(getfield(atmos, Symbol(k)))
 
-@info "Operating worker $this_worker of $num_workers"
-run_worker(this_worker)
+        elseif k == "succ"
+            if succ
+                result_table[i][k] = 1.0 # success
+            else
+                result_table[i][k] = -1.0 # failure
+            end
+        elseif k == "flux_loss"
+            result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+
+        elseif k == "p_surf"
+            result_table[i][k] = atmos.p_boa
+        elseif k == "t_surf"
+            result_table[i][k] = atmos.tmp_surf
+        elseif k == "r_surf"
+            result_table[i][k] = atmos.rp
+        elseif k == "μ_surf"
+            result_table[i][k] = atmos.layer_μ[end]
+        elseif k == "g_surf"
+            result_table[i][k] = atmos.grav_surf
+
+        elseif k == "t_phot"
+            result_table[i][k] = atmos.transspec_tmp
+        elseif k == "r_phot"
+            result_table[i][k] = atmos.transspec_r
+        elseif k == "μ_phot"
+            result_table[i][k] = atmos.transspec_μ
+        elseif k == "g_phot"
+            result_table[i][k] = atmos.transspec_grav
+
+        elseif k == "Kzz_max"
+            result_table[i][k] = maximum(atmos.Kzz)
+        elseif k == "conv_ptop"
+            result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[1]
+        elseif k == "conv_pbot"
+            result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[2]
+        else
+            @error "Unhandled output variable: $k"
+            exit(1)
+        end
+    end # end keys  loop
+
+    # Record fluxes
+    result_emits[i,:] .= atmos.band_u_lw[1, :] .+ atmos.band_u_sw[1, :]
+
+    # Record profile (also in SI)
+    result_profs[i] = Dict( "p"=>deepcopy(atmos.p),
+                            "t"=>deepcopy(atmos.tmp),
+                            "r"=>deepcopy(atmos.r)
+                          )
+
+
+    # Update results file on the go?
+    if mod(i,modwrite) == 0
+        write_table()
+        write_emits()
+        write_profs()
+    end
+
+    # Iterate
+    @info "  "
+end
+
+@info "Worker (ID=$id_work) completed all allocated points"
+@info "------------------------------"
+@info " "
+
+@info "Deallocating atmosphere"
+atmosphere.deallocate!(atmos)
+
+@info "Writing final results table to CSV..."
+write_table()
+
+@info "Writing final fluxes array to CSV..."
+write_emits()
+
+# Write NetCDF of profiles
+@info "Writing final profiles to NetCDF.."
+write_profs()
 
 @info "===================================="
 @info " "
