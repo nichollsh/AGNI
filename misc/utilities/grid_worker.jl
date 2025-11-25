@@ -40,17 +40,17 @@ mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(
 #    enter the least-important parameters first
 grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
-    "mass_tot"      =>       mass_arr,  # M_earth
+    # "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
+    # "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
+    # "mass_tot"      =>       mass_arr,  # M_earth
 
     # metallicities here are by MASS fraction relative to hydrogen (converted to mole below)
     # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
     # "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
-    "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
+    # "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
 
-    # "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
-    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
+    # "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
+    "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
 ))
 
 # Variables to record
@@ -60,15 +60,15 @@ output_keys =  ["succ", "flux_loss",
                 "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
-save_netcdfs           = false        # NetCDF file for each case
-save_plots             = false        # plots for each case
-modwrite::Int          = 2            # frequency to write CSV file
-modplot::Int           = 0            # Plot during runtime (debug)
-frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
-frac_max::Float64      = 1.0
-transspec_p::Float64   = 2e3          # Pa
-fc_floor::Float64      = 300.0        # K
-num_work::Int          = 4  # %NUM_WORKERS [do not change this comment]
+const save_netcdfs           = false        # NetCDF file for each case
+const save_plots             = false        # plots for each case
+const modwrite::Int          = 2            # frequency to write CSV file
+const modplot::Int           = 0            # Plot during runtime (debug)
+const frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
+const frac_max::Float64      = 1.0
+const transspec_p::Float64   = 2e3          # Pa
+const fc_floor::Float64      = 300.0        # K
+const num_work::Int          = 2  # %NUM_WORKERS [do not change this comment]
 
 
 # =============================================================================
@@ -202,13 +202,14 @@ gridsize = length(grid_flat)
 # Assign workers to grid points
 #    Last worker will take the "remainder" points if chunks do not fit wholly
 chunksize = round(Int,gridsize/(num_work),RoundDown)
-iwork = 1
-for i in eachindex(grid_flat)
-    global iwork
-    if mod(i,chunksize) == 0
-        iwork += 1
+@info "Chunk size is $chunksize"
+grid_flat[1]["worker"] = 1
+for i in 2:gridsize
+    if (mod(i-1,chunksize) == 0) && (i>1)
+        grid_flat[i]["worker"] = min(1+grid_flat[i-1]["worker"], num_work)
+    else
+        grid_flat[i]["worker"] = grid_flat[i-1]["worker"]
     end
-    grid_flat[i]["worker"] = min(iwork,num_work)
 end
 
 # Write combinations to file
@@ -265,7 +266,7 @@ function write_table()
     global result_table_path
     global result_table
 
-    @info "Writing results table '$result_table_path' (ID=$id_work)"
+    @info "Writing results table '$result_table_path'"
 
     # Remove old file
     if isfile(result_table_path)
@@ -298,11 +299,11 @@ end
 # Write emission fluxes to disk
 function write_emits()
 
-    @info "Writing fluxes array '$result_emits_path' (ID=$id_work)"
-
     global wlarr
     global result_emits
     global result_emits_path
+
+    @info "Writing fluxes array '$result_emits_path'"
 
     # Remove old file
     if isfile(result_emits_path)
@@ -337,16 +338,16 @@ function write_emits()
 end
 
 # Write P-T-R profiles to NetCDF file
-function write_profs()
+function write_profs(nlev::Int)
 
     global result_profs
     global result_profs_path
 
+    @info "Writing profiles netcdf '$result_profs_path'"
+
     if isfile(result_profs_path)
         rm(result_profs_path)
     end
-
-    nlev::Int = length(res_pro[1]["p"])
 
     ds = Dataset(result_profs_path,"c")
 
@@ -367,14 +368,14 @@ function write_profs()
     for i in 1:gridsize
 
         # this worker?
-        if grid_flat[i]["worker"] != id_work
+        if !haskey(result_profs[i],"p")
             continue
         end
 
         for j in 1:nlev
-            var_p[j,i] = res_pro[i]["p"][j]
-            var_t[j,i] = res_pro[i]["t"][j]
-            var_r[j,i] = res_pro[i]["r"][j]
+            var_p[j,i] = result_profs[i]["p"][j]
+            var_t[j,i] = result_profs[i]["t"][j]
+            var_r[j,i] = result_profs[i]["r"][j]
         end
     end
 
@@ -440,17 +441,15 @@ function init_atmos(OUT_DIR::String)
     global stellar_Teff
     global input_star
 
-    @info "Initialising new atmos struct"
-
     # temp values
     mf_dict = Dict("H2"=>0.6, "H2O"=>0.1, "CO2"=>0.1, "N2"=>0.1, "H2S"=>0.1)
     gravity  = phys.grav_accel(mass_tot, radius)
 
     # Instantiate
-    atmos = atmosphere.Atmos_t()
+    atm = atmosphere.Atmos_t()
 
     # AGNI struct, setup
-    atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+    atmosphere.setup!(atm, ROOT_DIR, OUT_DIR,
                                     String(cfg["files" ]["input_sf"]),
                                     Float64(cfg["planet"]["instellation"]),
                                     Float64(cfg["planet"]["s0_fact"]),
@@ -485,26 +484,24 @@ function init_atmos(OUT_DIR::String)
                             )
 
     # AGNI struct, allocate
-    atmosphere.allocate!(atmos, input_star; stellar_Teff=stellar_Teff)
-    atmos.transspec_p = transspec_p
+    atmosphere.allocate!(atm, input_star; stellar_Teff=stellar_Teff)
+    atm.transspec_p = transspec_p
 
     # Check ok
-    if !atmos.is_alloc
+    if !atm.is_alloc
         @error "Could not allocate atmosphere struct"
         exit(1)
     end
 
     # Set PT
-    setpt.request!(atmos, cfg["execution"]["initial_state"])
+    setpt.request!(atm, cfg["execution"]["initial_state"])
 
-    return atmos
+    return atm
 
 end
 
 # Initialise new atmosphere
 atmos = init_atmos(OUT_DIR)
-
-# Record wlarray
 wlarr[:] .= atmos.bands_cen[:]
 
 # Get start time
@@ -513,8 +510,8 @@ time_start::Float64 = time()
 @info "Start time: $(now())"
 
 # Run the grid of models
-succ = true
-succ_last = true
+succ = false
+succ_last = false
 for (i,p) in enumerate(grid_flat)
 
     # globals, defined outside the loop
@@ -536,7 +533,7 @@ for (i,p) in enumerate(grid_flat)
     global wlarr
 
     # Check that this worker is assigned to this grid point, by index
-    if p["worker"] != id_work
+    if grid_flat[i]["worker"] != id_work
         continue
     end
     @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
@@ -553,7 +550,20 @@ for (i,p) in enumerate(grid_flat)
             @info "    set $k = $val"
         end
 
-        # set parameter
+        # updating the stellar spectrum requires creating a whole new atmos object...
+        if "Teff" in keys(p)
+            if (i > 1) && (grid_flat[i-1]["Teff"] != val)
+                @info "Updating Teff parameter..."
+                stellar_Teff = Float64(val)
+
+                # make new atmosphere
+                atmosphere.deallocate!(atmos)
+                atmos = init_atmos(OUT_DIR)
+                wlarr[:] .= atmos.bands_cen[:]
+            end
+        end
+
+        # set other parameter...
         if k == "p_surf"
             atmos.p_oboa = val * 1e5 # convert bar to Pa
             atmos.p_boa = atmos.p_oboa
@@ -595,6 +605,9 @@ for (i,p) in enumerate(grid_flat)
 
             # remove FC input file to force update
             rm(atmos.fastchem_elem, force=true)
+
+        elseif k == "Teff"
+            # already handled
 
         else
             @error "Unhandled input parameter: $k"
@@ -739,7 +752,7 @@ for (i,p) in enumerate(grid_flat)
     if mod(i,modwrite) == 0
         write_table()
         write_emits()
-        write_profs()
+        write_profs(atmos.nlev_c)
     end
 
     # Iterate
@@ -750,18 +763,13 @@ end
 @info "------------------------------"
 @info " "
 
+@info "Writing final data..."
+write_table()
+write_emits()
+write_profs(atmos.nlev_c)
+
 @info "Deallocating atmosphere"
 atmosphere.deallocate!(atmos)
-
-@info "Writing final results table to CSV..."
-write_table()
-
-@info "Writing final fluxes array to CSV..."
-write_emits()
-
-# Write NetCDF of profiles
-@info "Writing final profiles to NetCDF.."
-write_profs()
 
 @info "===================================="
 @info " "
@@ -773,9 +781,9 @@ time_end::Float64 = time()
 # Print model statistics
 duration = (time_end - time_start) / 60 # minutes
 if duration > 60
-    @info "Total runtime: $(duration/60) hours"
+    @info @sprintf("Total runtime: %.2f hours", duration/60)
 else
-    @info "Total runtime: $duration minutes"
+    @info @sprintf("Total runtime: %.2f minutes", duration)
 end
 
 # Done

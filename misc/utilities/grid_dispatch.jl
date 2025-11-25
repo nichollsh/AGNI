@@ -1,8 +1,8 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
-# To be run from within the AGNI root directory
-# Dispatch multiple workers of `grid_worker.jl`, each as a separate process
-# No grid-configuration is done in this file. It's all done in `grid_worker.jl`
+# This script is used to dispatch multiple workers of `grid_worker.jl`
+# No grid-configuration is done in this file - all done in the worker script.
+# You must run this script with the same number of threads as there are workers.
 
 using Distributed
 using Base.Threads
@@ -50,3 +50,5 @@ end
         wait=true
     )
 end
+
+@info "All workers completed!"
