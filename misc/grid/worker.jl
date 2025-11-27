@@ -19,18 +19,15 @@ const R_earth::Float64 = 6.371e6    # m
 const M_earth::Float64 = 5.972e24   # kg
 const DEFAULT_FILL::Float64 = 0.0   # fill value for arrays
 
-println("Hello from grid/worker.jl")
-
 # =============================================================================
-#                        ALL CONFIGURATION DONE HERE
+#                        ALL CONFIGURATION HERE
 # -----------------------------------------------------------------------------
 
 # Base parameters
-cfg_base = "res/config/struct_grid.toml"
-println("Using base config: $cfg_base")
+const cfg_base = "res/config/struct_grid.toml"
 
 # Mass array with custom spacing
-mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(4.5),   length=7),
+const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(4.5),   length=7),
                                             range(start=log10(5.0),  stop=log10(10.0),  length=9)
                                           )
 
@@ -38,44 +35,42 @@ mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(
 # Define grid
 #    parameters will be varied in the same order as these keys
 #    enter the least-important parameters first
-grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
+const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    # "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
-    # "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
-    # "mass_tot"      =>       mass_arr,  # M_earth
+    "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
+    "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
+    "mass_tot"      =>       mass_arr,  # M_earth
 
     # metallicities here are by MASS fraction relative to hydrogen (converted to mole below)
     # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
     # "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
     # "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
 
-    # "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
+    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
     "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
 ))
 
 # Variables to record
-output_keys =  ["succ", "flux_loss",
-                "p_surf", "t_surf", "r_surf", "μ_surf",
-                "t_phot", "r_phot", "μ_phot", "g_phot",
-                "Kzz_max", "conv_ptop", "conv_pbot",]
+const output_keys =  ["succ", "flux_loss",
+                        "p_surf", "t_surf", "r_surf", "μ_surf",
+                        "t_phot", "r_phot", "μ_phot", "g_phot",
+                        "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
-const modwrite::Int          = 2            # frequency to write CSV file
+const modwrite::Int          = 10            # frequency to write CSV file
 const modplot::Int           = 0            # Plot during runtime (debug)
 const frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 1.0
 const transspec_p::Float64   = 2e3          # Pa
 const fc_floor::Float64      = 300.0        # K
 
+
 # =============================================================================
-#                      GRID EXECUTION DONE BELOW
+#                      WORKER EXECUTION BELOW
 # -----------------------------------------------------------------------------
 
-# Parse config file
-cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
-output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
 
 # Define work requirements
 num_work::Int = 0
@@ -85,6 +80,7 @@ if length(ARGS) == 2
     num_work = parse(Int, ARGS[2])
 else
     println(stderr, "Got invalid command line arguments: $ARGS")
+    println(stderr, "Expected: ID_WORK NUM_WORK")
     exit(1)
 end
 
@@ -94,15 +90,27 @@ if (id_work < 1) || (id_work > num_work)
     exit(1)
 end
 
-if !isdir(output_dir)
+# Parse config file
+println("Using base config: $cfg_base")
+cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
+output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
+
+# Clean output folder
+if id_work==1
     println("Creating output folder: $output_dir")
+    rm(output_dir, force=true, recursive=true)
     mkdir(output_dir)
+
+    save_netcdfs && mkdir(joinpath(output_dir,"nc"))
+    save_plots && mkdir(joinpath(output_dir,"pl"))
+end
+if !isdir(output_dir)
+    println(stderr, "Could not find output directory '$output_dir'")
+    exit(1)
 end
 
-# Results path
+# Results path and base config
 cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base.toml"), force=true)
-save_netcdfs && mkdir(joinpath(output_dir,"nc"))
-save_plots && mkdir(joinpath(output_dir,"pl"))
 
 # Output dir for this particular worker
 OUT_DIR = joinpath(output_dir,"wk_$id_work")
@@ -130,13 +138,15 @@ if cfg["files"]["input_sf"] != "greygas"
 end
 @info "Spectral bands for RT: $bands"
 
-# Get shared structure variables
+# Shared structure variables, assigned temporary values
 radius    = cfg["planet"]["radius"]
 mass      = cfg["planet"]["mass"] # interior mass
 gravity   = phys.grav_accel(mass, radius)
 mass_tot  = mass * 1.1
 frac_core = 0.325
 frac_atm  = 0.01
+stellar_Teff = cfg["planet"]["star_Teff"]
+input_star   = cfg["files"]["input_star"]
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
@@ -211,9 +221,9 @@ for i in 2:gridsize
 end
 
 # Write combinations to file
-if id_work == 1
+gpfile = joinpath(output_dir,"gridpoints.csv")
+if (id_work == 1) || !isfile(gpfile)
     @info "Writing flattened grid to file"
-    gpfile = joinpath(output_dir,"gridpoints.csv")
     @info "    $gpfile"
     open(gpfile, "w") do hdl
         # Header
@@ -243,16 +253,6 @@ result_table::Array{Dict,    1}  = [Dict{String,Float64}(k => Float64(DEFAULT_FI
 result_profs::Array{Dict,    1}  = [Dict{String,Array}()  for _ in 1:gridsize] # array of dicts (p, t, r)
 result_emits::Array{Float64, 2}  = fill(DEFAULT_FILL, (gridsize,bands)) # array of fluxes
 wlarr::Array{Float64,1}          = fill(DEFAULT_FILL, bands)
-
-# Initial values, to be updated by grid
-radius    = cfg["planet"]["radius"]
-mass      = cfg["planet"]["mass"] # interior mass
-gravity   = phys.grav_accel(mass, radius)
-mass_tot  = mass * 1.1
-frac_core = 0.325
-frac_atm  = 0.01
-stellar_Teff = cfg["planet"]["star_Teff"]
-input_star   = cfg["files"]["input_star"]
 
 @info "Generated grid of $(length(input_keys)) dimensions, with $gridsize points"
 sleep(3)
@@ -545,15 +545,13 @@ for (i,p) in enumerate(grid_flat)
         # inform user
         if k == "worker"
             continue
-        else
-            @info "    set $k = $val"
         end
 
         # updating the stellar spectrum requires creating a whole new atmos object...
         if "Teff" in keys(p)
-            if (i > 1) && (grid_flat[i-1]["Teff"] != val)
+            if (i > 1) && (grid_flat[i-1]["Teff"] != grid_flat[i]["Teff"])
                 @info "Updating Teff parameter..."
-                stellar_Teff = Float64(val)
+                stellar_Teff = Float64(grid_flat[i]["Teff"])
 
                 # make new atmosphere
                 atmosphere.deallocate!(atmos)
@@ -563,6 +561,7 @@ for (i,p) in enumerate(grid_flat)
         end
 
         # set other parameter...
+        @info "    set $k = $val"
         if k == "p_surf"
             atmos.p_oboa = val * 1e5 # convert bar to Pa
             atmos.p_boa = atmos.p_oboa

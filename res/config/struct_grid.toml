@@ -19,7 +19,7 @@ title = "Base config for structure calcs"
 [files]
     input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf" # "greygas" #
     input_star      = "blackbody"
-    output_dir      = "out/"
+    output_dir      = "nogit_scratch/out/"
 
 [composition]
     p_surf          = 100.0
