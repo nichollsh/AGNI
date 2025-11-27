@@ -9,10 +9,10 @@
 #SBATCH --output=slurm-grid-%j.log
 
 echo "Allocated workers: $SLURM_CPUS_PER_TASK"
-echo "Allocated node:    $SLURM_NODEID"
+echo "Allocated node:    $SLURM_JOB_NODELIST"
 
-echo "Start time:        $(date -d @$SLURM_JOB_START_TIME)"
-echo "Start time:        $(date -d @$SLURM_JOB_END_TIME)"
+echo "Started at:        $(date -d @$SLURM_JOB_START_TIME)"
+echo "Expected end:      $(date -d @$SLURM_JOB_END_TIME)"
 
 echo " "
 julia -t$SLURM_CPUS_PER_TASK misc/grid/manager.jl
