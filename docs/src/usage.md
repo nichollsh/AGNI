@@ -73,30 +73,31 @@ Potential solver flags are:
 * `P` - step was forcibly extrapolated because the solver is not making good progress
 * `U` - the atmosphere has become gravitationally unbound
 
-## Grids of models
+## Grids of models parallelised across multiple cores
 
 The code is not explicitly parallelised. However, there is functionality to run a grid
 of models using by the script located at `misc/grid/worker.jl`. This script runs a
 single worker process, of potentially many. All grid configuration should be done by editing
 the `worker.jl` file directly.
 
-For example, to run worker ID=1, with only 1 worker allocated:
+For example, to run worker ID=1 and allocate this 1 worker to the whole grid:
 ```console
 julia --project=. misc/grid/worker.jl 1 1
 ```
 
 However, by allocating multiple workers and running them simultaneously using the manager
 script located at `misc/grid/manager.jl`, we can parallelise the calculations. The number
-of workers is defined by the number of allocated threads, with the `-t` flag.
+of workers is defined by the number of threads with which the script is run.
 
-For example, run this manager script with 4 workers (and 4 threads) on your local machine:
+For example, run this manager script with 4 threads (and thus 4 workers):
 ```console
 julia -t4 misc/grid/manager.jl
 ```
 
-The manager script could also be executed on a compute cluster by using Slurm.
+The manager script could also be executed on a compute cluster by using Slurm. You should
+then define the number of workers (and the allotted time) inside the `slurm.sh` script.
 
-For example, to run the manager via slurm:
+For example:
 ```console
 sbatch misc/grid/slurm.sh"
 ```
