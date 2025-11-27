@@ -76,13 +76,29 @@ Potential solver flags are:
 ## Grids of models
 
 The code is not explicitly parallelised. However, there is functionality to run a grid
-of models using by the script located at `misc/utilities/grid_worker.jl`.
+of models using by the script located at `misc/grid/worker.jl`. This script runs a
+single worker process, of potentially many. All grid configuration should be done by editing
+the `worker.jl` file directly.
 
-This script can be run on your local machine. However, it could also be dispatched to a node
-within a compute cluster by using Slurm. For example, with a 24 hr and 3 GB memory limit:
-
+For example, to run worker ID=1, with only 1 worker allocated:
 ```console
-sbatch --mem-per-cpu=3G --time=1440 --wrap "julia --project=. misc/utilities/grid_worker.jl"
+julia --project=. misc/grid/worker.jl 1 1
+```
+
+However, by allocating multiple workers and running them simultaneously using the manager
+script located at `misc/grid/manager.jl`, we can parallelise the calculations. The number
+of workers is defined by the number of allocated threads, with the `-t` flag.
+
+For example, run this manager script with 4 workers (and 4 threads) on your local machine:
+```console
+julia -t4 misc/grid/manager.jl
+```
+
+The manager script could also be executed on a compute cluster by using Slurm.
+
+For example, to run the manager via slurm:
+```console
+sbatch misc/grid/slurm.sh"
 ```
 
 
