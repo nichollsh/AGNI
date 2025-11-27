@@ -94,6 +94,7 @@ end
 println("Using base config: $cfg_base")
 cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
+output_dir = realpath(output_dir)
 
 # Clean output folder
 if id_work==1
@@ -151,28 +152,6 @@ input_star   = cfg["files"]["input_star"]
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
 
-# Warn about size of grid
-gz_est = prod([length(_v) for _v in values(grid)])
-if gz_est > 1e6
-    @info "Grid has $(gz_est/1e6)M points"
-elseif gz_est > 1e4
-    @info "Grid has $(gz_est/1e3)k points"
-else
-    @info "Grid has $gz_est points"
-end
-rt_est = gz_est * 5.0 # seconds
-if rt_est > 60*60
-    rt_est /= 60*60 # hrs
-    if rt_est > 24
-        rt_est /= 24 # days
-        @info "Single-core runtime will be approximately $(rt_est) days"
-    else
-        @info "Single-core runtime will be approximately $(rt_est) hours"
-    end
-else
-    @info "Single-core runtime will be approximately $(rt_est) seconds"
-end
-
 # Tidy grid
 @info "Grid axes:"
 #    round total mass to 2dp
@@ -207,10 +186,20 @@ grid_flat = [
 ]
 gridsize = length(grid_flat)
 
+# Warn about total grid size
+gz_est = prod([length(_v) for _v in values(grid)])
+if gz_est > 1e6
+    @info "Grid size is $(gz_est/1e6)M points"
+elseif gz_est > 1e4
+    @info "Grid size is $(gz_est/1e3)k points"
+else
+    @info "Grid size is $gz_est points"
+end
+
 # Assign workers to grid points
 #    Last worker will take the "remainder" points if chunks do not fit wholly
 chunksize = round(Int,gridsize/(num_work),RoundDown)
-@info "Chunk size is $chunksize"
+@info "Chunk size is $chunksize points"
 grid_flat[1]["worker"] = 1
 for i in 2:gridsize
     if (mod(i-1,chunksize) == 0) && (i>1)
@@ -219,6 +208,21 @@ for i in 2:gridsize
         grid_flat[i]["worker"] = grid_flat[i-1]["worker"]
     end
 end
+
+# Estimate worker runtime
+rt_est = chunksize * 15.0 # seconds
+if rt_est > 60*60
+    rt_est /= 60*60 # hrs
+    if rt_est > 24
+        rt_est /= 24 # days
+        @info "Worker runtime will be approx $(rt_est) days"
+    else
+        @info "Worker runtime will be approx $(rt_est) hours"
+    end
+else
+    @info "Worker runtime will be approx $(rt_est) seconds"
+end
+
 
 # Write combinations to file
 gpfile = joinpath(output_dir,"gridpoints.csv")
@@ -540,6 +544,7 @@ for (i,p) in enumerate(grid_flat)
     succ_last = succ
 
     # Update parameters
+    param_updated = false
     for (k,val) in p
 
         # inform user
@@ -561,7 +566,11 @@ for (i,p) in enumerate(grid_flat)
         end
 
         # set other parameter...
-        @info "    set $k = $val"
+        if (i==1) || Bool(grid_flat[i-1][k] != grid_flat[i][k])
+            @info "    updated $k = $val"
+        else
+            @info "    use     $k = $val"
+        end
         if k == "p_surf"
             atmos.p_oboa = val * 1e5 # convert bar to Pa
             atmos.p_boa = atmos.p_oboa
@@ -636,7 +645,7 @@ for (i,p) in enumerate(grid_flat)
         atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
     end
 
-    @info @sprintf("    using p_surf = %.2e bar",atmos.pl[end]/1e5)
+    # @info @sprintf("    using p_surf = %.2e bar",atmos.pl[end]/1e5)
 
     # Set temperature array based on interpolation from last solution
     max_steps = Int(cfg["execution"]["max_steps"])
