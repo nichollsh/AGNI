@@ -60,7 +60,7 @@ output_keys =  ["succ", "flux_loss",
                 "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
-const save_netcdfs           = false        # NetCDF file for each case
+const save_netcdfs           = true        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 2            # frequency to write CSV file
 const modplot::Int           = 0            # Plot during runtime (debug)
@@ -68,7 +68,7 @@ const frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 1.0
 const transspec_p::Float64   = 2e3          # Pa
 const fc_floor::Float64      = 300.0        # K
-const num_work::Int          = 2  # %NUM_WORKERS [do not change this comment]
+const num_work::Int          = 1  # %NUM_WORKERS [do not change this comment]
 
 
 # =============================================================================
@@ -531,6 +531,7 @@ for (i,p) in enumerate(grid_flat)
     global save_netcdfs
     global save_plots
     global wlarr
+    global stellar_Teff
 
     # Check that this worker is assigned to this grid point, by index
     if grid_flat[i]["worker"] != id_work
