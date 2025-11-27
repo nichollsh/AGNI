@@ -3,8 +3,8 @@
 # To be run from within the AGNI root directory
 # First command line argument must be the worker ID
 
-# e.g. to dispatch worker 1, of potentially many workers
-#   julia --project=. misc/utilities/grid_worker.jl 1
+# e.g. to run worker 1 of 3
+#   julia --project=. misc/grid/worker.jl 1 3
 
 using .Iterators
 using LoggingExtras
@@ -19,14 +19,14 @@ const R_earth::Float64 = 6.371e6    # m
 const M_earth::Float64 = 5.972e24   # kg
 const DEFAULT_FILL::Float64 = 0.0   # fill value for arrays
 
-println("Hello from grid_worker.jl")
+println("Hello from grid/worker.jl")
 
 # =============================================================================
 #                        ALL CONFIGURATION DONE HERE
 # -----------------------------------------------------------------------------
 
 # Base parameters
-cfg_base = "res/config/structure_grid.toml"
+cfg_base = "res/config/struct_grid.toml"
 println("Using base config: $cfg_base")
 
 # Mass array with custom spacing
@@ -60,7 +60,7 @@ output_keys =  ["succ", "flux_loss",
                 "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
-const save_netcdfs           = true        # NetCDF file for each case
+const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 2            # frequency to write CSV file
 const modplot::Int           = 0            # Plot during runtime (debug)
@@ -68,8 +68,6 @@ const frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 1.0
 const transspec_p::Float64   = 2e3          # Pa
 const fc_floor::Float64      = 300.0        # K
-const num_work::Int          = 1  # %NUM_WORKERS [do not change this comment]
-
 
 # =============================================================================
 #                      GRID EXECUTION DONE BELOW
@@ -80,20 +78,23 @@ cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
 
 # Define work requirements
+num_work::Int = 0
 id_work::Int = 0
-println("Number of workers in grid: $num_work")
-if length(ARGS) == 1
+if length(ARGS) == 2
     id_work = parse(Int, ARGS[1])
-    println("User requested operation of worker with ID=$id_work")
+    num_work = parse(Int, ARGS[2])
 else
-    raise("Got invalid command line arguments: $ARGS")
+    println(stderr, "Got invalid command line arguments: $ARGS")
+    exit(1)
 end
 
 # Root output folder
 if (id_work < 1) || (id_work > num_work)
-    raise("Invalid worker ID=$id_work")
+    println(stderr, "Invalid worker ID=$id_work")
+    exit(1)
+end
 
-elseif id_work == 1
+if id_work == 1
     println("Creating output folder: $output_dir")
     rm(output_dir,force=true,recursive=true)
     mkdir(output_dir)
@@ -112,9 +113,12 @@ AGNI.setup_logging(
     cfg["execution"]["verbosity"]
 )
 
+@info "This process is operating worker ID=$id_work (of $num_work total)"
+
 # Output dir for this particular worker
 if !isdir(output_dir)
-    raise("Grid output folder not found: $output_dir")
+    println(stderr, "Grid output folder not found: $output_dir")
+    exit(1)
 end
 OUT_DIR = joinpath(output_dir,"wk_$id_work")
 rm(OUT_DIR, recursive=true, force=true)

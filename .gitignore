@@ -40,6 +40,9 @@ runtime.sf
 runtime.sf_k
 socstar.dat
 slurm*.out
+slurm*.log
+sbatch*.out
+sbatch*.log
 
 # Misc files
 .DS_Store
