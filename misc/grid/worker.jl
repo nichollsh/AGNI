@@ -94,35 +94,29 @@ if (id_work < 1) || (id_work > num_work)
     exit(1)
 end
 
-if id_work == 1
+if !isdir(output_dir)
     println("Creating output folder: $output_dir")
-    rm(output_dir,force=true,recursive=true)
     mkdir(output_dir)
-
-    # Backup config to output dir
-    cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base_config.toml"))
-
-    # Results path
-    save_netcdfs && mkdir(joinpath(output_dir,"nc"))
-    save_plots && mkdir(joinpath(output_dir,"pl"))
 end
+
+# Results path
+cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base.toml"), force=true)
+save_netcdfs && mkdir(joinpath(output_dir,"nc"))
+save_plots && mkdir(joinpath(output_dir,"pl"))
+
+# Output dir for this particular worker
+OUT_DIR = joinpath(output_dir,"wk_$id_work")
+rm(OUT_DIR, recursive=true, force=true)
+mkdir(OUT_DIR)
 
 # Setup logging ASAP
 AGNI.setup_logging(
-    joinpath(output_dir, "wk_$(id_work).log"),
+    joinpath(OUT_DIR, "wk_$(id_work).log"),
     cfg["execution"]["verbosity"]
 )
 
 @info "This process is operating worker ID=$id_work (of $num_work total)"
-
-# Output dir for this particular worker
-if !isdir(output_dir)
-    println(stderr, "Grid output folder not found: $output_dir")
-    exit(1)
-end
-OUT_DIR = joinpath(output_dir,"wk_$id_work")
-rm(OUT_DIR, recursive=true, force=true)
-mkdir(OUT_DIR)
+@info "    OUT_DIR=$OUT_DIR"
 
 # Output files
 result_table_path::String = joinpath(OUT_DIR,"result_table.csv")
@@ -134,7 +128,7 @@ bands::Int = 1
 if cfg["files"]["input_sf"] != "greygas"
     bands = parse(Int,split(cfg["files"]["input_sf"],"/")[end-1])
 end
-@info "Spectral bands: $bands"
+@info "Spectral bands for RT: $bands"
 
 # Get shared structure variables
 radius    = cfg["planet"]["radius"]

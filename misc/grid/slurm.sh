@@ -6,7 +6,12 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem-per-cpu=3G
-#SBATCH --output=slurm-grid-stdout-%j.log
-#SBATCH --output=slurm-grid-stderr-%j.log
+#SBATCH --output=slurm-grid-%j.log
 
-julia misc/grid/manager.jl
+echo "Workers: $SLURM_CPUS_PER_TASK"
+echo "Time: $SBATCH_TIMELIMIT"
+echo "Node: $SLURM_NODEID"
+
+julia -t$SLURM_CPUS_PER_TASK misc/grid/manager.jl
+
+echo "Done"
