@@ -18,6 +18,7 @@ const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
 const R_earth::Float64 = 6.371e6    # m
 const M_earth::Float64 = 5.972e24   # kg
 const DEFAULT_FILL::Float64 = 0.0   # fill value for arrays
+const SGL_RUNTIME::Float64 = 10.0   # estimated runtime for a single gridpoint [seconds]
 
 # =============================================================================
 #                        ALL CONFIGURATION HERE
@@ -43,7 +44,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
     # metallicities here are by MASS fraction relative to hydrogen (converted to mole below)
     # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
-    # "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
+    "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
     "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
 
     "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
@@ -210,7 +211,7 @@ for i in 2:gridsize
 end
 
 # Estimate worker runtime
-rt_est = chunksize * 15.0 # seconds
+rt_est = chunksize * SGL_RUNTIME # seconds
 if rt_est > 60*60
     rt_est /= 60*60 # hrs
     if rt_est > 24
@@ -514,12 +515,14 @@ time_start::Float64 = time()
 # Run the grid of models
 succ = false
 succ_last = false
+i_counter = 0
 for (i,p) in enumerate(grid_flat)
 
     # i = gridpoint index
     # p = parameters at this gridpoint
 
     # globals, defined outside the loop
+    global i_counter
     global succ
     global succ_last
     global atmos
@@ -542,7 +545,8 @@ for (i,p) in enumerate(grid_flat)
     if grid_flat[i]["worker"] != id_work
         continue
     end
-    @info @sprintf("Grid point %d / %-d (%2.1f%%)",i,gridsize,100*i/gridsize)
+    i_counter += 1
+    @info @sprintf("Grid point %d of %d total (number %d of chunk)",i,gridsize,i_counter)
 
     succ_last = succ
 
