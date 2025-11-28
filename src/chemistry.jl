@@ -89,7 +89,7 @@ module chemistry
         # Mixing ratios to original values
         # Oceans to original values
         for g in atmos.gas_names
-            @. atmos.gas_vmr[g] = atmos.gas_ovmr[g]
+            @. atmos.gas_vmr[g]  = atmos.gas_ovmr[g]
             @. atmos.gas_cvmr[g] = atmos.gas_ovmr[g]
 
             atmos.ocean_tot[g] = atmos.ocean_ini[g]
@@ -502,31 +502,31 @@ module chemistry
 
                 # Calculate elemental abundances from surface mixing ratios [molecules/m^3]
                 #   assuming ideal gas: N/V = P*x/(Kb*T) , where x is the VMR
-                N_t = zeros(Float64, length(phys.elems_standard)) # total atoms in all gases
-                N_g = zeros(Float64, length(phys.elems_standard)) # atoms in current gas
+                N_inp_t = zeros(Float64, length(phys.elems_standard)) # total atoms in all gases
+                N_inp_g = zeros(Float64, length(phys.elems_standard)) # atoms in current gas
                 #    loop over gases
                 for gas in atmos.gas_names
-                    fill!(N_g, 0.0)
+                    fill!(N_inp_g, 0.0)
 
                     # count atoms in this gas
                     d = phys.count_atoms(gas)
                     for (i,e) in enumerate(phys.elems_standard)
                         if haskey(d, e)
-                            N_g[i] += d[e] # N_g stores num of atoms in this gas
+                            N_inp_g[i] += d[e] # N_inp_g stores num of atoms in this gas
                         end
                     end
 
                     # Get gas abundance from original VMR value
-                    #    scale number of atoms by the abundance of the gas
-                    N_g *= atmos.gas_vmr[gas][end] * atmos.p[end] / (phys.k_B * atmos.tmp[end])
+                    #    scale number of atoms by the abundance of the gas (p = Ng kB T)
+                    N_inp_g *= atmos.gas_vmr[gas][end] * atmos.p[end] / (phys.k_B * atmos.tmp[end])
 
                     # Add atoms from this gas to total atoms in the mixture
-                    N_t += N_g
+                    N_inp_t += N_inp_g
                 end
 
                 # Convert elemental abundances to metallicity number ratios, rel to hydrogen
                 for (i,e) in enumerate(phys.elems_standard)
-                    atmos.metal_calc[e] = N_t[i]/N_t[1]
+                    atmos.metal_calc[e] = N_inp_t[i]/N_inp_t[1]
                 end
             end
 
@@ -562,19 +562,23 @@ module chemistry
             return _x*d + atmos.fastchem_floor*(1-d)
         end
 
+        # Work out which indices are visited by fc
+        fc_levels::Array{Int,1} = Float64[atmos.nlev_c]
+        if !atmos.fastchem_wellmixed
+            fc_levels = collect(Float64,1:atmos.nlev_c)
+        end
+
         # Write PT profile every time
         open(atmos.fastchem_prof,"w") do f
             write(f,"# AGNI temperature structure \n")
             write(f,"# bar, kelvin \n")
-            for i in 1:atmos.nlev_c
-                write(  f,
-                        @sprintf("%.6e    %.6e \n",
-                            atmos.p[i]*1e-5,
-                            _transform_floor(atmos.tmp[i])
-                            )
-                     )
-            end
-        end
+
+            for i in fc_levels
+                write(f, @sprintf("%.6e    %.6e \n",
+                            atmos.p[i]*1e-5, _transform_floor(atmos.tmp[i]))
+                        )
+            end # /levels
+        end # /file
 
         # Run fastchem
         run(pipeline(`$(atmos.fastchem_exec) $(atmos.fastchem_conf)`, stdout=devnull))
@@ -583,12 +587,21 @@ module chemistry
         data = readdlm(atmos.fastchem_moni, '\t', String)
         fail_elem::String = ""
         fail_conv::String = ""
-        for i in 1:atmos.nlev_c
-            if data[i+1,6][1] == 'f'
-                fail_elem *= @sprintf("%d ",i)
-            end
-            if data[i+1,5][1] == 'f'
-                fail_conv *= @sprintf("%d ",i)
+        for i in fc_levels
+            if atmos.fastchem_wellmixed
+                if startswith(data[2,6], 'f')
+                    fail_elem *= @sprintf("%d ",i)
+                end
+                if startswith(data[2,5], 'f')
+                    fail_conv *= @sprintf("%d ",i)
+                end
+            else
+                if startswith(data[i+1,6],'f')
+                    fail_elem *= @sprintf("%d ",i)
+                end
+                if startswith(data[i+1,5],'f')
+                    fail_conv *= @sprintf("%d ",i)
+                end
             end
         end
         if !isempty(fail_elem)
@@ -612,19 +625,23 @@ module chemistry
         (data,head) = readdlm(atmos.fastchem_chem, '\t', Float64, header=true)
         data = transpose(data)  # convert to: gas, level
 
-        # Clear VMRs
+        # Clear VMRs now that surf metallicity has been recorded
         for g in atmos.gas_names
-            fill!(atmos.gas_vmr[g],  0.0)
+            fill!(atmos.gas_vmr[g],   0.0)
+            fill!(atmos.gas_cvmr[g],  0.0)
         end
 
         # Parse gas chemistry
-        g_fc::String = atmosphere.UNSET_STR
-        d_fc::Dict = Dict{String, Int}()
-        g_in::String = atmosphere.UNSET_STR
+        g_fc::String = atmosphere.UNSET_STR  # gas name in fastchem
+        d_fc::Dict = Dict{String, Int}()     # ^ broken in to atoms
+        g_in::String = atmosphere.UNSET_STR  # gas name in AGNI, matched by atom count
         match::Bool = false
-        N_t = data[4,:] # at each level: sum of gas number densities
 
-        for (i,h) in enumerate(head)  # for each column (gas)
+
+        # for each column (gas)
+        #   i = gas index in fc file
+        #   h = gas name in header of fc file
+        for (i,h) in enumerate(head)
 
             # skip columns (p, T, ntot, ngas, mu, and elemental abundances)
             if i <= 5+count_elem_nonzero
@@ -664,10 +681,16 @@ module chemistry
 
             # matched?
             if match
-                N_g = data[i,:]  # number densities for this gas
-                @. atmos.gas_vmr[g_in] += N_g / N_t    # VMR for this gas
-            end
-        end
+                # convert number densities to VMR, and store
+                if atmos.fastchem_wellmixed
+                    # just 1 value
+                    fill!(atmos.gas_vmr[g_in], data[i,1]/data[4,1])
+                else
+                    # whole profile (+= because of cis/trans being combined)
+                    @. atmos.gas_vmr[g_in] += data[i,:] / data[4,:]
+                end
+            end # /match
+        end # /gas
 
         # Do not renormalise mixing ratios, since this is done by fastchem
         # If we are missing gases then that's okay.
@@ -675,7 +698,7 @@ module chemistry
         # Find where T(p) drops below fastchem_floor temperature.
         # Make sure that regions above that use the reasonable VMR values
         i_trunc::Int = 0
-        for i in range(start=atmos.nlev_c, stop=1, step=-1)
+        for i in reverse(sort(fc_levels))
             if atmos.tmp[i] < atmos.fastchem_floor
                i_trunc = i
                break
@@ -683,9 +706,8 @@ module chemistry
         end
         if i_trunc > 0
             # @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
-            i_trunc = min(i_trunc, atmos.nlev_c-1)
             for g in atmos.gas_names
-                atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc+1]
+                atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc]
             end
         end
 

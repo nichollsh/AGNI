@@ -68,13 +68,13 @@ module consts
     # Standard species
     const gases_standard::Array{String, 1} = [
         # volatile elems
-        "H", "N", "O", "C", "S", "He",
+        "H", "O", "C", "N", "S", "P", "He",
         # basic
         "CH4", "CO2", "CO", "H2", "H2O", "O2", "OH", "O3",
         # hydrocarbon
-        "H2O2", "C2H6", "C2H4","C2H2",  "CH3", "H2CO", "HO2",
+        "H2O2", "C2H6", "C2H4","C2H2",  "CH3", "H2CO", "HO2", "C2", "C3", "C4", "C5",
         # sulfur bearing
-        "SO", "S2", "S8", "SO2",  "H2SO4", "H2S", "S", "CS2", "OCS",
+        "SO", "S2", "S8", "SO2", "H2SO4", "H2S", "S", "CS2", "OCS",
         # nitrogen
         "N2", "HCN", "NH3",  "HNO3", "N2O5", "HONO", "HO2NO2",
         "NO3", "N2O", "NO", "NO2",
