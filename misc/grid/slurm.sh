@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --time=00-04:00:00
-#SBATCH --cpus-per-task=12
+#SBATCH --time=00-12:00:00
+#SBATCH --cpus-per-task=25
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem-per-cpu=3G
+#SBATCH --mem-per-cpu=1500M
 #SBATCH --output=slurm-grid-%j.log
 
 echo "Allocated workers: $SLURM_CPUS_PER_TASK"
