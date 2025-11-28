@@ -307,6 +307,7 @@ module atmosphere
         fastchem_chem::String           # Path to output gas composition
         fastchem_cond::String           # Path to output condensate phases
         fastchem_moni::String           # Path to output monitor file
+        fastchem_wellmixed::Bool        # True: perform chemistry at Tsurf. False: do 1D profile.
 
         # RFM radiative transfer
         flag_rfm::Bool                  # RFM enabled?
@@ -481,6 +482,7 @@ module atmosphere
                     fastchem_maxiter_solv::Int  =  40000,
                     fastchem_xtol_chem::Float64 =  1.0e-3,
                     fastchem_xtol_elem::Float64 =  1.0e-3,
+                    fastchem_wellmixed::Bool    =  false,
 
                     rfm_parfile::String =       UNSET_STR,
 
@@ -1068,6 +1070,7 @@ module atmosphere
             @debug "FastChem env variable not set, so FC won't be available for use"
         end
         # other parameters for FC
+        atmos.fastchem_wellmixed    = fastchem_wellmixed
         atmos.fastchem_floor        = fastchem_floor
         atmos.fastchem_maxiter_chem = fastchem_maxiter_chem
         atmos.fastchem_maxiter_solv = fastchem_maxiter_solv

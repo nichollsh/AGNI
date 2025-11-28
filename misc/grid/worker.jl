@@ -42,10 +42,10 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
     "mass_tot"      =>       mass_arr,  # M_earth
 
-    # metallicities here are by MASS fraction relative to hydrogen (converted to mole below)
+    # metallicities here are by MOLE fraction relative to hydrogen
     # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
-    "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
-    "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
+    "metal_O"       => 10 .^ range(start=-2.0,  stop=2.0,   step=2.0),
+    "metal_C"       => 10 .^ range(start=-2.0,  stop=2.0,   step=2.0),
 
     "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
     "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
@@ -59,13 +59,14 @@ const output_keys =  ["succ", "flux_loss",
 
 # Grid management options
 const save_netcdfs           = false        # NetCDF file for each case
-const save_plots             = false        # plots for each case
-const modwrite::Int          = 20            # frequency to write CSV file
-const modplot::Int           = 0            # Plot during runtime (debug)
+const save_plots             = true        # plots for each case
+const modwrite::Int          = 20           # Write CSV file every `modwrite` gridpoints
+const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
 const frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 1.0
 const transspec_p::Float64   = 2e3          # Pa
-const fc_floor::Float64      = 300.0        # K
+const fc_floor::Float64      = 1000.0       # K
+const fc_wellmixed::Bool     = true         # calculate abundances as well-mixed ?
 
 
 # =============================================================================
@@ -101,15 +102,16 @@ if id_work==1
     println("Creating output folder: $output_dir")
     rm(output_dir, force=true, recursive=true)
     mkdir(output_dir)
-
-    save_netcdfs && mkdir(joinpath(output_dir,"nc"))
-    save_plots && mkdir(joinpath(output_dir,"pl"))
 end
 if !isdir(output_dir)
     println(stderr, "Could not find output directory '$output_dir'")
     exit(1)
 end
 output_dir = realpath(output_dir)
+
+# Auxiliary folders
+save_netcdfs && mkpath(joinpath(output_dir,"nc"))
+save_plots && mkpath(joinpath(output_dir,"pl"))
 
 # Results path and base config
 cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base.toml"), force=true)
@@ -480,6 +482,7 @@ function init_atmos(OUT_DIR::String)
                                     surf_roughness=cfg["planet"]["roughness"],
                                     surf_windspeed=cfg["planet"]["wind_speed"],
                                     fastchem_floor = fc_floor,
+                                    fastchem_wellmixed = fc_wellmixed,
                                     Kzz_floor = 0.0,
                                     flux_int=cfg["planet"]["flux_int"],
                                     surface_material=cfg["planet"]["surface_material"],
@@ -614,11 +617,14 @@ for (i,p) in enumerate(grid_flat)
             atmos.gas_vmr[gas][:]  .= val
 
         elseif startswith(k, "metal_")
+            gas = String(split(k,"_")[2])
 
             # metallicity key is by mass frac, but atmosphere stores value by mol frac
             # convert these via scaling with factor mu_H/mu_gas
-            gas = String(split(k,"_")[2])
-            atmos.metal_orig[gas] = val * phys._get_mmw("H") / phys._get_mmw(gas)
+            # atmos.metal_orig[gas] = val * phys._get_mmw("H") / phys._get_mmw(gas)
+
+            # number fraction only?
+            atmos.metal_orig[gas] = val
 
             # remove FC input file to force update
             rm(atmos.fastchem_elem, force=true)
@@ -668,6 +674,11 @@ for (i,p) in enumerate(grid_flat)
         setpt.request!(atmos, cfg["execution"]["initial_state"])
         easy_start = Bool(cfg["execution"]["easy_start"])
     end
+
+    # Allow more steps for first solution
+    if i_counter == 1
+        max_steps *= 2
+    end 
 
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],

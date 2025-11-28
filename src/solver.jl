@@ -900,23 +900,30 @@ module solver
             rm(path_jac, force=true)
         elseif code == CODE_ITE
             @error "    failure (maximum iterations)"
+            plot_step()
         elseif code == CODE_SIN
             @error "    failure (singular jacobian)"
             plotting.jacobian(b, path_jac)
+            plot_step()
         elseif code == CODE_TIM
             @error "    failure (maximum time)"
         elseif code == CODE_NAN
             @error "    failure (NaN values)"
+            plot_step()
         elseif code == CODE_CFG
             @error "    failure (configuration)"
         elseif code == CODE_OBJ
             @error "    failure (objective function)"
+            plot_step()
         elseif code == CODE_STP
-            @error "    failure (last step not ok)"
+            @error "    failure (other; last step not ok)"
+            plot_step()
         elseif code == CODE_HYD
             @error "    failure (hydrostatic integration)"
+            plot_step()
         else
             @error "    failure (other)"
+            plot_step()
         end
 
         # timeout
