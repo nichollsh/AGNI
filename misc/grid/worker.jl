@@ -46,7 +46,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     # "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
     # "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
 
-    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
+    # "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
     "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
 ))
 

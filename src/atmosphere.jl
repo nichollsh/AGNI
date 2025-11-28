@@ -1576,12 +1576,14 @@ module atmosphere
     if the parameter `stellar_spectrum` has value of `"blackbody"`.
 
     Arguments:
-    - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
-    - `stellar_spectrum::String`       path to stellar spectrum csv file
-    - `stellar_Teff::Float64`          star effective temperature if blackbody
+    - `atmos::Atmos_t`             the atmosphere struct instance to be used.
+    - `stellar_spectrum::String`   path to stellar spectrum csv file
+    - `stellar_Teff::Float64`      star effective temperature if blackbody
+    - `check_safe_gas::Bool`       require that there be at least one 'safe' gas in the mix
     """
     function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String;
-                        stellar_Teff::Float64=-1.0)::Bool
+                        stellar_Teff::Float64=-1.0,
+                        check_safe_gas::Bool=true)::Bool
 
         @debug "Allocate atmosphere"
         if !atmos.is_param
@@ -1956,7 +1958,7 @@ module atmosphere
         end
 
         # There must be at least one 'safe' gas
-        if !any(values(atmos.gas_safe))
+        if !any(values(atmos.gas_safe)) && check_safe_gas
             @error "None of the supplied gases are considered 'safe'"
             @error "There must be at least one gas which satisfies criteria:"
             @error "    a) is dry, i.e. non-condensable"

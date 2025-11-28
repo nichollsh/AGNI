@@ -395,9 +395,9 @@ module setpt
 
 
     """
-    Set T = max(T,T_dew) for a specified gas.
+    **Set T = max(T,T_dew) for a specified gas.**
 
-    Does not modify VMRs or surface temperature.
+    Does not modify VMRs. Does update water-cloud locations.
     """
     function saturation!(atmos::atmosphere.Atmos_t, gas::String)
 
@@ -410,27 +410,44 @@ module setpt
             return nothing
         end
 
-        x::Float64 = 0.0
-        Tdew::Float64 = 0.0
+        xgas::Float64 = 0.0
 
-        # Check if each level is condensing. If it is, place on phase curve
-        for i in 1:atmos.nlev_c
-
-            x = atmos.gas_vmr[gas][i]
-            if x < 1.0e-10
-                continue
+        # Return the new temperature (Float) and whether saturated (Bool)
+        function _tdew(tmp::Float64,pgas::Float64)::Tuple
+            # Tiny partial pressure
+            if pgas < 1e-99
+                return (tmp, false)
             end
 
-            # Set to saturation curve
-            Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i] * x)
-            if atmos.tmp[i] <= Tdew+1e-2
-                atmos.tmp[i]  = Tdew
-                atmos.gas_sat[gas][i] = true
+            # Supercritical
+            if tmp >= atmos.gas_dat[gas].T_crit
+                return (tmp, false)
+            end
+
+            # Otherwise...
+            Tdew = phys.get_Tdew(atmos.gas_dat[gas], pgas)
+            if tmp <= Tdew + 1e-2
+                return (Tdew, true)
+            else
+                return (tmp, false)
             end
         end
 
-        # Set cell-edge temperatures
-        atmosphere.set_tmpl_from_tmp!(atmos)
+        # Check if each level is saturated: tmp < Tdew. If it is, set to Tdew.
+        for i in range(start=atmos.nlev_l, stop=1, step=-1)
+
+            # Composition
+            xgas = atmos.gas_vmr[gas][min(i,atmos.nlev_c)]
+
+            # Cell-centres
+            if i <= atmos.nlev_c
+                (atmos.tmp[i], atmos.gas_sat[gas][i]) = _tdew(atmos.tmp[i], atmos.p[i]*xgas)
+            end
+
+            # Cell-edges
+            atmos.tmpl[i] = _tdew(atmos.tmpl[i], atmos.pl[i]*xgas)[1]
+        end
+        atmos.tmp_surf = atmos.tmpl[end]
 
         # Set cloud
         if (gas == "H2O") && atmos.control.l_cloud
