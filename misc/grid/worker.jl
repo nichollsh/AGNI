@@ -516,6 +516,9 @@ succ = false
 succ_last = false
 for (i,p) in enumerate(grid_flat)
 
+    # i = gridpoint index
+    # p = parameters at this gridpoint
+
     # globals, defined outside the loop
     global succ
     global succ_last
@@ -544,8 +547,11 @@ for (i,p) in enumerate(grid_flat)
     succ_last = succ
 
     # Update parameters
-    param_updated = false
-    for (k,val) in p
+    for (idx,(k,val)) in enumerate(p)
+
+        # idx = index of parameter
+        # k   = name of parameter
+        # val = value of parameter
 
         # inform user
         if k == "worker"
@@ -553,7 +559,7 @@ for (i,p) in enumerate(grid_flat)
         end
 
         # updating the stellar spectrum requires creating a whole new atmos object...
-        if "Teff" in keys(p)
+        if ("Teff" in keys(p)) && (idx == 1)
             if (i > 1) && (grid_flat[i-1]["Teff"] != grid_flat[i]["Teff"])
                 @info "Updating Teff parameter..."
                 stellar_Teff = Float64(grid_flat[i]["Teff"])
