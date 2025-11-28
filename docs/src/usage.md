@@ -102,6 +102,13 @@ For example:
 sbatch misc/grid/slurm.sh"
 ```
 
+To combine the results of these workers, run the `consolidate.jl` script.
+
+For example, assuming that the grid is stored in the `out/` directory:
+```console
+julia misc/grid/consolidate.jl out/
+```
+
 
 ## Configuration
 AGNI configuration files are formatted using [TOML](https://toml.io/en/). There
