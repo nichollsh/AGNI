@@ -317,7 +317,7 @@ function write_emits()
         # Header of wavelength values
         head = "0.0"
         for b in 1:bands
-            head *= @sprintf(",%.6e",wlarr[b])
+            head *= @sprintf(",%.6e",wlarr[b]*1e9) # convert to nm
         end
         head *= "\n"
         write(hdl,head)
