@@ -44,9 +44,9 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     # metallicities here are by MASS fraction relative to hydrogen (converted to mole below)
     # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
     # "metal_O"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
-    # "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
+    "metal_C"       => 10 .^ range(start=-1.0,  stop=3.0,   step=2.0),
 
-    # "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
+    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
     "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
 ))
 
@@ -59,7 +59,7 @@ const output_keys =  ["succ", "flux_loss",
 # Grid management options
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
-const modwrite::Int          = 10            # frequency to write CSV file
+const modwrite::Int          = 20            # frequency to write CSV file
 const modplot::Int           = 0            # Plot during runtime (debug)
 const frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 1.0
@@ -94,7 +94,6 @@ end
 println("Using base config: $cfg_base")
 cfg::Dict = AGNI.open_config(joinpath(ROOT_DIR,cfg_base))
 output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
-output_dir = realpath(output_dir)
 
 # Clean output folder
 if id_work==1
@@ -109,6 +108,7 @@ if !isdir(output_dir)
     println(stderr, "Could not find output directory '$output_dir'")
     exit(1)
 end
+output_dir = realpath(output_dir)
 
 # Results path and base config
 cp(joinpath(ROOT_DIR,cfg_base), joinpath(output_dir,"base.toml"), force=true)
