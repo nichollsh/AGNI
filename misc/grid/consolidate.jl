@@ -4,7 +4,9 @@
 # First argument must provide path to grid output folder
 
 using Glob
-using DelimitedFiles
+using CSV
+using DataFrames
+using NCDatasets
 
 # Get output dir from ARGS
 output_dir::String = ""
@@ -14,9 +16,10 @@ else
     println(stderr,"Invalid arguments: $ARGS")
     exit(1)
 end
-
-if !isdir(output_dir)
-    println(stderr,"Not a directory: $indir")
+if isdir(output_dir)
+    println("Found target directory: $output_dir")
+else
+    println(stderr,"Not a directory: $output_dir")
     exit(1)
 end
 
@@ -25,35 +28,92 @@ if isempty(work_dirs)
     println(stderr,"No worker folders found in $indir")
     exit(1)
 end
-println("Found worker directories: $work_dirs")
+println("Found $(length(work_dirs)) worker sub-directories")
 
-# Dictionary of dictionaries - one per worker
-dfs = Dict{String,Dict}()
+# Combined results dataframe
+println("Combining result tables...")
+dfs_table = DataFrame[] # not sorted
 for dir in work_dirs
-    fpath = joinpath(dir,"result_table.csv")
-    (data, head) = readdlm(fpath, ',', Float64; header=true)
+    println("    reading $(basename(dir))")
+    f  = joinpath(dir, "result_table.csv")
+    df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
+    push!(dfs_table, df)
+end
+combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_table)
 
-    # Read into dictionary
-    df = Dict{String,Array}()
-    for (i,h) in enumerate(head)
-       df[h] = data[:,i]
+outpath = joinpath(output_dir, "consolidated_table.csv")
+rm(outpath, force=true)
+CSV.write(outpath, combined)
+println("    wrote $(nrow(combined))x$(ncol(combined)) table to '$outpath'")
+println(" ")
+
+# Combined fluxes dataframe
+println("Combining emission fluxes...")
+dfs_emits = DataFrame[] # not sorted
+for dir in work_dirs
+    println("    reading $(basename(dir))")
+    f  = joinpath(dir, "result_emits.csv")
+    df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
+    push!(dfs_emits, df)
+end
+combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_emits)
+
+outpath = joinpath(output_dir, "consolidated_emits.csv")
+rm(outpath, force=true)
+CSV.write(outpath, combined)
+println("    wrote $(nrow(combined))x$(ncol(combined)) emits to '$outpath'")
+println(" ")
+
+# Combined NetCDF file
+println("Combining NetCDF profiles...")
+dfs_profs = Dict{String,Array}[] # not sorted
+for dir in work_dirs
+    println("    reading $(basename(dir))")
+    f  = joinpath(dir, "result_profs.nc")
+
+    ds = Dataset(f) # open
+    df = Dict([(k,ds[k][:,:]) for k in ("t","p","r")]) # read T,P,R arrays
+    close(ds) # close
+    push!(dfs_profs, df)
+end
+
+outpath = joinpath(output_dir, "consolidated_profs.nc")
+rm(outpath, force=true)
+ds = Dataset(outpath,"c")
+
+ds.attrib["description"]  = "AGNI grid consolidated profiles (t-p-r)"
+ds.attrib["hostname"]     = gethostname()
+ds.attrib["username"]     = ENV["USER"]
+
+(nlev, gridsize) = size(dfs_profs[1]["t"])
+defDim(ds, "nlev_c",   nlev)
+defDim(ds, "gridsize", gridsize)
+println("    found nlev_c = $nlev")
+
+var_p = defVar(ds, "p", Float64, ("nlev_c","gridsize",) ) # saved in python dimension order
+var_t = defVar(ds, "t", Float64, ("nlev_c","gridsize",) )
+var_r = defVar(ds, "r", Float64, ("nlev_c","gridsize",) )
+
+for (idx,dir) in enumerate(work_dirs)  # for each worker directory
+    # get mask of indicies that this worker performed
+    mask_work = dfs_table[idx][!,"index"][:]
+
+    println("    parsing $(basename(dir))")
+
+    # loop over these indices
+    for i in mask_work
+        for j in 1:nlev
+            # println("Get profile value for index=$i at level=$j")
+            var_p[j,i] = dfs_profs[idx]["p"][j,i]
+            var_t[j,i] = dfs_profs[idx]["t"][j,i]
+            var_r[j,i] = dfs_profs[idx]["r"][j,i]
+        end
     end
-
-    # Store by worker index integer
-    dfs[parse(Int,split(dir,"_")[end])] = df
 end
+close(ds)
 
-# Consolidate results into a single dictionary (each with 2D array)
-results_table = Dict{String,Array}()
-for wk in sort(keys(dfs))
-    println("Adding worker $wk")
-end
+println("    wrote $(gridsize)x$(nlev) t-p-r profs to '$outpath'")
+println(" ")
 
 
-# combined = reduce((a,b)->vcat(a,b; cols=:union), dfs)
-# if outpath === nothing
-#     outpath = joinpath(indir, "combined.csv")
-# end
-# mkpath(dirname(outpath))
-# CSV.write(outpath, combined)
-# @info "Wrote $(nrow(combined)) rows, $(ncol(combined)) cols" outpath
+println("Done!")
