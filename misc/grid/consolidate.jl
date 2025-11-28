@@ -40,7 +40,6 @@ for dir in work_dirs
     push!(dfs_table, df)
 end
 combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_table)
-
 outpath = joinpath(output_dir, "consolidated_table.csv")
 rm(outpath, force=true)
 CSV.write(outpath, combined)
@@ -58,9 +57,14 @@ for dir in work_dirs
 end
 combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_emits)
 
+# manually read column names as wavelengths
+head_first = split(readchomp(joinpath(work_dirs[1], "result_emits.csv")),"\n")[1]
+head_emits = String["index"]
+append!(head_emits, split(head_first,",")[2:end])
+
 outpath = joinpath(output_dir, "consolidated_emits.csv")
 rm(outpath, force=true)
-CSV.write(outpath, combined)
+CSV.write(outpath, combined, header=head_emits)
 println("    wrote $(nrow(combined))x$(ncol(combined)) emits to '$outpath'")
 println(" ")
 
