@@ -42,19 +42,25 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
     "mass_tot"      =>       mass_arr,  # M_earth
 
+    # OLD METHOD...
     # metallicities here are by MOLE fraction relative to hydrogen
     # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
-    "metal_O"       => 10 .^ range(start=-2.0,  stop=2.0,   step=2.0),
-    "metal_C"       => 10 .^ range(start=-2.0,  stop=2.0,   step=2.0),
+    # "metal_O"       => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),
+    # "metal_C"       => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),
 
-    "instellation"  => 10 .^ range(start=log10(1.0),  stop=log10(2500.0),  length=5), # S_earth
-    "Teff"          =>       range(start=2500,  stop=6000,  step=700.0),
+    # NEW METHOD...
+    "metal_Z"       => 10 .^ range(start=-2.0,  stop=2.0,   step=2.0),  # total metallicity
+    "metal_CO"      => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),  # C/O mass ratio
+
+    "instellation"  =>  Float64[1.0, 10.0, 100.0, 1000.0, 2500.0], # S_earth
+    "Teff"          =>       range(start=2500,  stop=5500,  step=600.0),
 ))
 
 # Variables to record
 const output_keys =  ["succ", "flux_loss",
                         "p_surf", "t_surf", "r_surf", "μ_surf",
                         "t_phot", "r_phot", "μ_phot", "g_phot",
+                        "vmr_H2", "vmr_H2O", "vmr_CO2", "vmr_CO",
                         "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
@@ -62,11 +68,11 @@ const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = true        # plots for each case
 const modwrite::Int          = 20           # Write CSV file every `modwrite` gridpoints
 const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
-const frac_min::Float64      = 0.001        # 0.001 -> 1170 bar for Earth
-const frac_max::Float64      = 1.0
+const frac_min::Float64      = 0.0005        # 0.001 -> 1170 bar for Earth
+const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
-const fc_floor::Float64      = 1000.0       # K
-const fc_wellmixed::Bool     = true         # calculate abundances as well-mixed ?
+const fc_floor::Float64      = 800.0       # K
+const fc_wellmixed::Bool     = false      # calculate abundances as well-mixed ?
 
 
 # =============================================================================
@@ -151,6 +157,8 @@ frac_core = 0.325
 frac_atm  = 0.01
 stellar_Teff = cfg["planet"]["star_Teff"]
 input_star   = cfg["files"]["input_star"]
+metal_Z    = 100.0
+metal_CO   = 1.0
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
@@ -432,6 +440,30 @@ function update_structure!(atmos, mtot, fatm, fcor)
     atmosphere.generate_pgrid!(atmos)
 end
 
+
+"""
+Update metallicity (by */H mol) from Z and C/O mass ratios
+"""
+function update_metallicity!(atmos, Z, CO)
+
+    # Need to work out what the X/H mass ratios are...
+
+    # C/H by mass
+    C_to_H = (CO * Z) / (1+CO)
+
+    # O/H by mass
+    O_to_H = Z - C_to_H
+
+    # metallicity is by mass frac, but atmosphere stores value by mol frac
+    atmos.metal_orig["C"] = C_to_H * phys._get_mmw("H") / phys._get_mmw("C")
+    atmos.metal_orig["O"] = O_to_H * phys._get_mmw("H") / phys._get_mmw("O")
+    atmos.metal_orig["H"] = 1.0
+    atmos.metal_orig["S"] = 0.0
+
+    # remove FC input file to force update
+    rm(atmos.fastchem_elem, force=true)
+end
+
 """
 Initialise atmosphere object
 
@@ -543,6 +575,8 @@ for (i,p) in enumerate(grid_flat)
     global save_plots
     global wlarr
     global stellar_Teff
+    global metal_Z
+    global metal_CO
 
     # Check that this worker is assigned to this grid point, by index
     if grid_flat[i]["worker"] != id_work
@@ -616,18 +650,13 @@ for (i,p) in enumerate(grid_flat)
             gas = split(k,"_")[2]
             atmos.gas_vmr[gas][:]  .= val
 
-        elseif startswith(k, "metal_")
-            gas = String(split(k,"_")[2])
+        elseif k == "metal_Z"
+            metal_Z = val
+            update_metallicity!(atmos, metal_Z, metal_CO)
 
-            # metallicity key is by mass frac, but atmosphere stores value by mol frac
-            # convert these via scaling with factor mu_H/mu_gas
-            # atmos.metal_orig[gas] = val * phys._get_mmw("H") / phys._get_mmw(gas)
-
-            # number fraction only?
-            atmos.metal_orig[gas] = val
-
-            # remove FC input file to force update
-            rm(atmos.fastchem_elem, force=true)
+        elseif k == "metal_CO"
+            metal_CO = val
+            update_metallicity!(atmos, metal_Z, metal_CO)
 
         elseif k == "Teff"
             # already handled
@@ -678,7 +707,7 @@ for (i,p) in enumerate(grid_flat)
     # Allow more steps for first solution
     if i_counter == 1
         max_steps *= 2
-    end 
+    end
 
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
@@ -753,6 +782,10 @@ for (i,p) in enumerate(grid_flat)
             result_table[i][k] = atmos.transspec_μ
         elseif k == "g_phot"
             result_table[i][k] = atmos.transspec_grav
+
+        elseif startswith(k, "vmr_")
+            gas = split(k,"_")[2]
+            result_table[i][k] = atmos.gas_vmr[gas][end]
 
         elseif k == "Kzz_max"
             result_table[i][k] = maximum(atmos.Kzz)
