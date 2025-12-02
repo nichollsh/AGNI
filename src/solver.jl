@@ -266,7 +266,6 @@ module solver
         lml::Float64             = 1.0                 # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
-        dx_max_step::Float64     = Float64(dx_max)      # dx_max allowed in current step
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost
@@ -713,15 +712,8 @@ module solver
             end
 
             # Max step size
-            #    limit by user requirement
-            dx_max_step = Float64(dx_max)
-            #    limit by distance to tmp_ceil
-            dx_max_step = min(dx_max_step, abs(atmos.tmp_ceiling-tmp_pad - maximum(x_cur)) )
-            #    limit by distance to tmp_floor
-            dx_max_step = min(dx_max_step, abs(minimum(x_cur) - atmos.tmp_floor+tmp_pad))
-
-            # Limit step size by dx_max_step, without changing direction of dx vector
-            x_dif *= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
+            #    limit by user requirement, without changing direction of dx vector
+            x_dif *= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
             # Extrapolate step if on plateau.
             #    This acts to give the solver a 'nudge' in (hopefully) the right direction.
@@ -799,12 +791,15 @@ module solver
 
             end # end linesearch
 
-            # Limit step size by dx_min
-            x_dif[x_dif.<0.0] .= clamp.(x_dif[x_dif.<0.0], -dx_max_step, -dx_min)
-            x_dif[x_dif.>0.0] .= clamp.(x_dif[x_dif.>0.0], dx_min, dx_max_step)
+            # Enforce minimum step size (dx_min)
+            x_dif[x_dif.<0.0] .= clamp.(x_dif[x_dif.<0.0], -dx_max, -dx_min)
+            x_dif[x_dif.>0.0] .= clamp.(x_dif[x_dif.>0.0], dx_min, dx_max)
 
             # Take the step
             @. x_cur = x_old + x_dif
+
+            # Hard limit by tmp_ceil and tmp_floor
+            clamp!(x_cur, atmos.tmp_floor+tmp_pad, atmos.tmp_ceiling-tmp_pad)
 
             # Recalculate layer properties
             if ! atmosphere.calc_layer_props!(atmos)
