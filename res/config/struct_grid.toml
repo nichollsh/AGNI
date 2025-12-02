@@ -2,7 +2,7 @@
 title = "Base config for structure calcs"
 
 [planet]
-    tmp_surf        = 2500.0
+    tmp_surf        = 1200.0
     instellation    = 1e6 #3.402500e6
     albedo_b        = 0.18
     s0_fact         = 0.25
@@ -17,13 +17,13 @@ title = "Base config for structure calcs"
     star_Teff       = 3415.0
 
 [files]
-    input_sf        = "greygas"# "res/spectral_files/Dayspring/48/Dayspring.sf"
+    input_sf        =  "res/spectral_files/Dayspring/48/Dayspring.sf"
     input_star      = "blackbody"
     output_dir      = "nogit_scratch/out/"
 
 [composition]
     p_surf          = 100.0
-    p_top           = 1e-5
+    p_top           = 1e-4
     metallicities   = {"C"=0.1, "O"=10.0}  # mass fraction
     condensates     = []
 
@@ -32,13 +32,13 @@ title = "Base config for structure calcs"
     verbosity       = 1
     max_steps       = 50
     max_runtime     = 200
-    num_levels      = 35
+    num_levels      = 30
     solution_type   = 3
     solver          = "newton"
     dx_max          = 300.0
     dx_min          = 1e-5
-    initial_state   = ["iso","2000"]
-    linesearch      = 1
+    initial_state   = ["iso","1200"]
+    linesearch      = 2
     easy_start      = false
     grey_start      = false
     converge_atol   = 1.0
@@ -48,7 +48,7 @@ title = "Base config for structure calcs"
 [physics]
     chemistry       = true
     continua        = true
-    rayleigh        = false
+    rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
     grey_lw         = 5e-3

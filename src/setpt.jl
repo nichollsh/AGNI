@@ -66,6 +66,10 @@ module setpt
                 idx_req += 1
                 setpt.add!(atmos,parse(Float64, request[idx_req]))
 
+            elseif str_req == "teq"
+                # add isothermal at Teq
+                setpt.Teq!(atmos)
+
             elseif str_req == "surfsat"
                 # ensure surface is not super-saturated
                 chemistry.restore_composition!(atmos)
@@ -284,6 +288,12 @@ module setpt
         fill!(atmos.tmpl, set_tmp)
         fill!(atmos.tmp , set_tmp)
 
+        return
+    end
+
+    # Set atmosphere to be isothermal at the radiative equilibrium temperature
+    function Teq!(atmos::atmosphere.Atmos_t)
+        stratosphere!(atmos, phys.calc_Teq(atmos.instellation,atmos.albedo_b))
         return
     end
 

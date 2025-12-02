@@ -49,10 +49,10 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     # "metal_C"       => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),
 
     # NEW METHOD...
-    "metal_Z"       => 10 .^ range(start=-1.0,  stop=2.0,   step=1.0),  # total metallicity
+    "metal_Z"       => 10 .^ range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
     "metal_CO"      => 10 .^ range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
-    "instellation"  =>  Float64[1.0, 25.0, 250.0, 1000.0, 2500.0], # S_earth
+    "instellation"  =>  Float64[1.0, 10.0, 100.0, 300.0, 1000.0], # S_earth
     "Teff"          =>       range(start=2500,  stop=5500,  step=600.0),
 ))
 
@@ -67,11 +67,11 @@ const output_keys =  ["succ", "flux_loss", "r_bound",
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 25           # Write CSV file every `modwrite` gridpoints
-const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
+const modplot::Int           = 2            # Plot every `modplot` solver steps (debug)
 const frac_min::Float64      = 0.0005        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
-const fc_floor::Float64      = 800.0       # K
+const fc_floor::Float64      = 500.0       # K
 const fc_wellmixed::Bool     = false      # calculate abundances as well-mixed ?
 
 
@@ -651,6 +651,9 @@ for (i,p) in enumerate(grid_flat)
         elseif k == "instellation"
             atmos.instellation = val * 1361.0 # W/m^2
 
+            # set T(p) = loglinear up to Teq
+            setpt.request!(atmos, ["loglin","$(phys.calc_Teq(atmos.instellation,atmos.albedo_b))"])
+
         elseif startswith(k, "vmr_")
             gas = split(k,"_")[2]
             atmos.gas_vmr[gas][:]  .= val
@@ -705,7 +708,7 @@ for (i,p) in enumerate(grid_flat)
         easy_start = false
     else
         # last iter failed -> restore initial guess for T(p)
-        setpt.request!(atmos, cfg["execution"]["initial_state"])
+        # setpt.request!(atmos, cfg["execution"]["initial_state"])
         easy_start = Bool(cfg["execution"]["easy_start"])
     end
 
@@ -713,6 +716,8 @@ for (i,p) in enumerate(grid_flat)
     if i_counter == 1
         max_steps *= 2
     end
+
+    solver.ls_increase = 1.08
 
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
@@ -771,7 +776,7 @@ for (i,p) in enumerate(grid_flat)
         elseif k == "r_bound"
             if all(atmos.layer_isbound)
                 # fully bound by gravity
-                result_table[i][k] = 1e99
+                result_table[i][k] = -1
             else
                 # unbound at some layer
                 result_table[i][k] = minimum(atmos.r[.!atmos.layer_isbound])
