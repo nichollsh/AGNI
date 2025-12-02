@@ -36,6 +36,7 @@ title = "Base config for structure calcs"
     solution_type   = 3
     solver          = "newton"
     dx_max          = 300.0
+    dx_min          = 1e-5
     initial_state   = ["iso","2000"]
     linesearch      = 1
     easy_start      = false
