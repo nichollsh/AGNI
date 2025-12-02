@@ -49,7 +49,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     # "metal_C"       => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),
 
     # NEW METHOD...
-    "metal_Z"       => 10 .^ range(start=-1.0,  stop=2.0,   step=1.5),  # total metallicity
+    "metal_Z"       => 10 .^ range(start=-1.0,  stop=2.0,   step=1.0),  # total metallicity
     "metal_CO"      => 10 .^ range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
     "instellation"  =>  Float64[1.0, 25.0, 250.0, 1000.0, 2500.0], # S_earth
@@ -66,7 +66,7 @@ const output_keys =  ["succ", "flux_loss", "r_bound",
 # Grid management options
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
-const modwrite::Int          = 20           # Write CSV file every `modwrite` gridpoints
+const modwrite::Int          = 25           # Write CSV file every `modwrite` gridpoints
 const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
 const frac_min::Float64      = 0.0005        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
@@ -547,6 +547,11 @@ wlarr[:] .= atmos.bands_cen[:]
 time_start::Float64 = time()
 @info "Start time: $(now())"
 
+# Write initial files
+write_table()
+write_emits()
+write_profs(atmos.nlev_c)
+
 # Run the grid of models
 succ = false
 succ_last = false
@@ -724,6 +729,7 @@ for (i,p) in enumerate(grid_flat)
                                             rainout=Bool(cfg["physics"]["rainout"]),
                                             oceans=Bool(cfg["physics"]["oceans"]),
                                             dx_max=Float64(cfg["execution"]["dx_max"]),
+                                            dx_min=Float64(cfg["execution"]["dx_min"]),
                                             ls_method=Int(cfg["execution"]["linesearch"]),
                                             easy_start=easy_start,
                                             modplot=modplot,
@@ -765,7 +771,7 @@ for (i,p) in enumerate(grid_flat)
         elseif k == "r_bound"
             if all(atmos.layer_isbound)
                 # fully bound by gravity
-                result_table[i][k] = -1.0
+                result_table[i][k] = 1e99
             else
                 # unbound at some layer
                 result_table[i][k] = minimum(atmos.r[.!atmos.layer_isbound])
