@@ -200,6 +200,7 @@ module atmosphere
         layer_grav::Array{Float64,1}        # gravity [m s-2]
         layer_thick::Array{Float64,1}       # geometrical thickness [m]
         layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
+        layer_isbound::Array{Bool,1}        # is this layer gravitationally bound?
 
         # Calculated bolometric radiative fluxes (W m-2)
         flux_int::Float64                   # Effective flux  [W m-2] for sol_type=3
@@ -730,6 +731,7 @@ module atmosphere
         atmos.layer_thick   = zeros(Float64, atmos.nlev_c) # geometric thickness [m]
         atmos.layer_mass    = zeros(Float64, atmos.nlev_c) # mass per unit area [kg m-2]
         atmos.layer_grav    = ones(Float64, atmos.nlev_c) * atmos.grav_surf
+        atmos.layer_isbound = trues(atmos.nlev_c)
 
         # Initialise thermodynamic properties
         atmos.layer_μ       = zeros(Float64, atmos.nlev_c)
@@ -1297,11 +1299,12 @@ module atmosphere
     function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
 
         # Reset arrays
-        fill!(atmos.r         ,   atmos.rp)
-        fill!(atmos.rl        ,   atmos.rp)
-        fill!(atmos.layer_grav,   atmos.grav_surf)
-        fill!(atmos.layer_thick,  1.0)
-        fill!(atmos.layer_mass ,  1.0)
+        fill!(atmos.r         ,    atmos.rp)
+        fill!(atmos.rl        ,    atmos.rp)
+        fill!(atmos.layer_grav,    atmos.grav_surf)
+        fill!(atmos.layer_thick,   1.0)
+        fill!(atmos.layer_mass ,   1.0)
+        fill!(atmos.layer_isbound, true)
 
         # Temporary values
         ok::Bool            = true
@@ -1324,6 +1327,7 @@ module atmosphere
             atmos.r[i] = integrate_hydrograv(atmos.rl[i+1], grav, atmos.pl[i+1], atmos.p[i], atmos.layer_ρ[i])
             if atmos.r[i] > atmos.rl[i+1] + HYDROGRAV_maxdr
                 atmos.r[i] = atmos.rl[i+1] + HYDROGRAV_maxdr
+                atmos.layer_isbound[i] = false
                 ok = false
             end
 
@@ -1340,6 +1344,7 @@ module atmosphere
             atmos.rl[i] = integrate_hydrograv(atmos.r[i], grav, atmos.p[i], atmos.pl[i], atmos.layer_ρ[i])
             if atmos.rl[i] > atmos.r[i] + HYDROGRAV_maxdr
                 atmos.rl[i] = atmos.r[i] + HYDROGRAV_maxdr
+                atmos.layer_isbound[i] = false
                 ok = false
             end
 
