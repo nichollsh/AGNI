@@ -57,15 +57,15 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 ))
 
 # Variables to record
-const output_keys =  ["succ", "flux_loss",
+const output_keys =  ["succ", "flux_loss", "r_bound",
                         "p_surf", "t_surf", "r_surf", "μ_surf",
                         "t_phot", "r_phot", "μ_phot", "g_phot",
-                        "vmr_H2", "vmr_H2O", "vmr_CO2", "vmr_CO",
+                        "vmr_H2", "vmr_H2O", "vmr_CO2", "vmr_CO", "vmr_O2",
                         "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
 const save_netcdfs           = false        # NetCDF file for each case
-const save_plots             = true        # plots for each case
+const save_plots             = false        # plots for each case
 const modwrite::Int          = 20           # Write CSV file every `modwrite` gridpoints
 const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
 const frac_min::Float64      = 0.0005        # 0.001 -> 1170 bar for Earth
@@ -762,6 +762,14 @@ for (i,p) in enumerate(grid_flat)
             end
         elseif k == "flux_loss"
             result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+        elseif k == "r_bound"
+            if all(atmos.layer_isbound)
+                # fully bound by gravity
+                result_table[i][k] = -1.0
+            else
+                # unbound at some layer
+                result_table[i][k] = minimum(atmos.r[.!atmos.layer_isbound])
+            end
 
         elseif k == "p_surf"
             result_table[i][k] = atmos.p_boa
