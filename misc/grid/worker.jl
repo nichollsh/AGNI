@@ -28,8 +28,8 @@ const SGL_RUNTIME::Float64 = 10.0   # estimated runtime for a single gridpoint [
 const cfg_base = "res/config/struct_grid.toml"
 
 # Mass array with custom spacing
-const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(4.5),   length=7),
-                                            range(start=log10(5.0),  stop=log10(10.0),  length=9)
+const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(4.5),   length=8),
+                                            range(start=log10(5.0),  stop=log10(10.0),  length=8)
                                           )
 
 
@@ -49,10 +49,10 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     # "metal_C"       => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),
 
     # NEW METHOD...
-    "metal_Z"       => 10 .^ range(start=-2.0,  stop=2.0,   step=2.0),  # total metallicity
-    "metal_CO"      => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),  # C/O mass ratio
+    "metal_Z"       => 10 .^ range(start=-1.0,  stop=2.0,   step=1.5),  # total metallicity
+    "metal_CO"      => 10 .^ range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
-    "instellation"  =>  Float64[1.0, 10.0, 100.0, 1000.0, 2500.0], # S_earth
+    "instellation"  =>  Float64[1.0, 25.0, 250.0, 1000.0, 2500.0], # S_earth
     "Teff"          =>       range(start=2500,  stop=5500,  step=600.0),
 ))
 

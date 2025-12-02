@@ -37,8 +37,8 @@ module atmosphere
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic and gravity calc (constants and limits)
-    const HYDROGRAV_STEPS::Int64   = 35        # num of sub-layers in hydrostatic integration
-    const HYDROGRAV_maxdr::Float64 = 1e7       # maximum dz across each layer [m]
+    const HYDROGRAV_STEPS::Int64   = 40        # num of sub-layers in hydrostatic integration
+    const HYDROGRAV_maxdr::Float64 = 1e6       # maximum dz across each layer [m]
     const HYDROGRAV_ming::Float64  = 1e-3      # minimum allowed gravity [m/s^2]
     const HYDROGRAV_constg::Bool   = false     # constant gravity with height?
 
