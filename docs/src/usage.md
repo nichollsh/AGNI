@@ -254,15 +254,15 @@ Configure plotting routines all of these should be `true` or `false`.
 
 * `execution.initial_state` describes the initial temperature profile applied to the atmosphere. This is a list of strings which are applied in the given order, which allows the user to describe a specific state as required. The descriptors are listed below, some of which take a single argument that needs to immediately follow the descriptor in the list order.
      - `dry`              : integrate the dry adiabatic lapse rate from the surface upwards
-     - `str`,       `arg` : apply an isothermal stratosphere at `arg` kelvin
-     - `iso`,       `arg` : set the whole atmosphere to be isothermal at `arg` kelvin
-     - `csv`,       `arg` : set the temperature profile using the CSV file at the file path `arg`
-     - `sat`,       `arg` : apply Clausius-Clapeyron saturation curve for the gas `arg`
-     - `ncdf`,      `arg` : load profile from the NetCDF file located at `arg`
-     - `loglin`,    `arg` : log-linear profile between `tmp_surf` at the bottom and `arg` at the top
+     - `str`,       `tmp` : apply an isothermal stratosphere at temperature `tmp`
+     - `iso`,       `tmp` : set the whole atmosphere to be isothermal at temperature `tmp`
+     - `csv`,       `pth` : set the temperature profile using the CSV file at the file path `pth`
+     - `sat`,       `gas` : apply Clausius-Clapeyron saturation curve for the gas `gas`
+     - `ncdf`,      `pth` : load profile from the NetCDF file located at `pth`
+     - `loglin`,    `tmp` : log-linear profile between `tmp_surf` at the bottom and `tmp` at the top
      - `ana`              : use the Guillot ([2010](https://arxiv.org/abs/1006.4702)) analytical temperature solution
 
-    For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model.
+    For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model. Provide `tmp="Teq"` to have AGNI automatically substitute-in the planet's radiative equilibrium temperature here.
 
 * `physics.chemistry` enables a calculation of equilibrium thermochemistry in the atmosphere. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. More information on the chemistry is available on the [Equilibrium chemistry](@ref) page.
 

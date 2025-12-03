@@ -7,6 +7,7 @@ using Glob
 using CSV
 using DataFrames
 using NCDatasets
+using Printf
 
 # Get output dir from ARGS
 output_dir::String = ""
@@ -44,6 +45,12 @@ outpath = joinpath(output_dir, "consolidated_table.csv")
 rm(outpath, force=true)
 CSV.write(outpath, combined)
 println("    wrote $(nrow(combined))x$(ncol(combined)) table to '$outpath'")
+println(" ")
+
+println("Statistics...")
+@printf("    total:   %7d \n",nrow( filter(row -> row["succ"] != 0.0, combined) ) )
+@printf("    success: %7d \n",nrow( filter(row -> row["succ"]  > 0.0, combined) ) )
+@printf("    failure: %7d \n",nrow( filter(row -> row["succ"]  < 0.0, combined) ) )
 println(" ")
 
 # Combined fluxes dataframe
