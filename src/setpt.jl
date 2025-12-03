@@ -54,17 +54,17 @@ module setpt
             elseif str_req == "str"
                 # isothermal stratosphere
                 idx_req += 1
-                setpt.stratosphere!(atmos, parse(Float64, request[idx_req]))
+                setpt.stratosphere!(atmos, request[idx_req])
 
             elseif str_req == "loglin"
                 # log-linear profile between T_surf and T_top
                 idx_req += 1
-                setpt.loglinear!(atmos, parse(Float64, request[idx_req]))
+                setpt.loglinear!(atmos, request[idx_req])
 
             elseif str_req == "iso"
                 # isothermal profile
                 idx_req += 1
-                setpt.isothermal!(atmos, parse(Float64, request[idx_req]))
+                setpt.isothermal!(atmos, request[idx_req])
 
             elseif str_req == "csv"
                 # set from csv file
@@ -79,7 +79,7 @@ module setpt
             elseif str_req == "add"
                 # add X kelvin from the currently stored T(p)
                 idx_req += 1
-                setpt.add!(atmos,parse(Float64, request[idx_req]))
+                setpt.add!(atmos,request[idx_req])
 
             elseif str_req == "surfsat"
                 # ensure surface is not super-saturated
@@ -134,13 +134,13 @@ module setpt
 
         # Extrapolate loaded grid to lower pressures (prevent domain error)
         if (atmos.pl[1] < pl[1])
-            pushfirst!(pl,   atmos.pl[1]/1.1)
+            pushfirst!(pl,   atmos.pl[1]/1.01)
             pushfirst!(tmpl, tmpl[1])
         end
 
         # Extrapolate loaded grid to higher pressures
         if (atmos.pl[end] > pl[end])
-            push!(pl,   atmos.pl[end]*1.1)
+            push!(pl,   atmos.pl[end]*1.01)
             push!(tmpl, tmpl[end])
         end
 
@@ -307,11 +307,14 @@ module setpt
     end
 
     # Set atmosphere to be isothermal at the given temperature
-    function add!(atmos::atmosphere.Atmos_t, delta::Float64)
+    function add!(atmos::atmosphere.Atmos_t, delta)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
             return
         end
+
+        delta = _parse_tmp_str(atmos, delta)
+
         @. atmos.tmpl += delta
         @. atmos.tmp  += delta
 

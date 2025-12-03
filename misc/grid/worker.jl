@@ -67,7 +67,7 @@ const output_keys =  ["succ", "flux_loss", "r_bound",
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
-const modplot::Int           = 1            # Plot every `modplot` solver steps (debug)
+const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
 const frac_min::Float64      = 0.0005        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
@@ -226,12 +226,12 @@ if rt_est > 60*60
     rt_est /= 60*60 # hrs
     if rt_est > 24
         rt_est /= 24 # days
-        @info "Worker runtime will be approx $(rt_est) days"
+        @info @sprintf("Worker runtime will be approx %.2f days",rt_est)
     else
-        @info "Worker runtime will be approx $(rt_est) hours"
+        @info @sprintf("Worker runtime will be approx %.2f hours",rt_est)
     end
 else
-    @info "Worker runtime will be approx $(rt_est) seconds"
+    @info @sprintf("Worker runtime will be approx %.2f seconds",rt_est)
 end
 
 

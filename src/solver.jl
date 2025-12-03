@@ -119,9 +119,9 @@ module solver
     plateau_s::Float64 =    10.0     # Scale factor applied to x_dif when plateau_i > plateau_n
     plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
     #    linesearch
-    ls_tau::Float64    =    0.6     # backtracking downscale size
-    ls_increase::Float64 =  0.9    # factor by which the cost can increase from last step before triggering linesearch
-    ls_max_steps::Int    =  16      # maximum steps undertaken by linesearch routine
+    ls_tau::Float64    =    0.5     # backtracking downscale size
+    ls_increase::Float64 =  0.8    # factor by which the cost can increase from last step before triggering linesearch
+    ls_max_steps::Int    =  12      # maximum steps undertaken by linesearch routine
     ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
     ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
     #    easy start
@@ -227,9 +227,7 @@ module solver
         end
 
         # Warn user about frequency of composition calculations...
-        compose_jac &= (rainout || chemistry || oceans)
-        compose_ls  &= (rainout || chemistry || oceans)
-        if compose_jac
+        if compose_jac && (rainout || chemistry || oceans)
             @warn "Expect slow forward-model evaluations"
             @warn "    compose_jac=$compose_jac"
         end
@@ -280,7 +278,8 @@ module solver
         c_old::Float64           = Inf                  # old cost (i-1)
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
-        ls_cost::Float64         = 1.0e99               # linesearch cost
+        ls_cost::Float64         = 1.0e99               # linesearch cost at ls_alpha
+        ls_cful::Float64         = 1.0e99               # linesearch cost at full step
         easy_start               = Bool(easy_start)     # make copy of variable - don't modify parameter
         easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor
         plateau_apply::Bool      = false                # Plateau declared in this iteration?
@@ -335,7 +334,8 @@ module solver
             _set_tmps!(x)
 
             # Do chemistry?
-            if compose
+            compose_here = compose && (oceans || chem || rainout)
+            if compose_here
                 chemistry.calc_composition!(atmos, oceans, chem, false)
             end
 
@@ -347,7 +347,7 @@ module solver
                 end
                 chemistry._sat_aloft!(atmos)
 
-            elseif !compose
+            elseif !compose_here
                 atmosphere.calc_layer_props!(atmos)
             end
 
