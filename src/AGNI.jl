@@ -81,7 +81,9 @@ module AGNI
         to_file::Bool = !isempty(outpath)
         if to_file
             # remove old file
-            rm(outpath, force=true)
+            if isfile(outpath)
+                rm(outpath)
+            end
 
             # configure
             logger_file = FormatLogger(outpath; append=false) do io, args
@@ -116,7 +118,7 @@ module AGNI
                     level = "ERROR"
                 end
                 # Set color, set bold, print level, unset bold, unset color, message
-                @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s \n",
+                @printf(term_io, "[\033[%dm\033[1m %-5s \033[21m\033[0m] %s\n",
                                     color, level, args.message)
             end;
         end
