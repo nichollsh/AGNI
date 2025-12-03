@@ -2,7 +2,7 @@
 title = "Base config for structure calcs"
 
 [planet]
-    tmp_surf        = 1200.0
+    tmp_surf        = 1800.0
     instellation    = 1e6 #3.402500e6
     albedo_b        = 0.18
     s0_fact         = 0.25
@@ -32,11 +32,11 @@ title = "Base config for structure calcs"
     verbosity       = 1
     max_steps       = 50
     max_runtime     = 200
-    num_levels      = 30
+    num_levels      = 32
     solution_type   = 3
     solver          = "newton"
     dx_max          = 300.0
-    dx_min          = 1e-5
+    dx_min          = 1e-9
     initial_state   = ["iso","1200"]
     linesearch      = 2
     easy_start      = false

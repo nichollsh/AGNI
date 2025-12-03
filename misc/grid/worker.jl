@@ -28,7 +28,7 @@ const SGL_RUNTIME::Float64 = 10.0   # estimated runtime for a single gridpoint [
 const cfg_base = "res/config/struct_grid.toml"
 
 # Mass array with custom spacing
-const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.5),  stop=log10(4.5),   length=8),
+const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=log10(4.5),   length=8),
                                             range(start=log10(5.0),  stop=log10(10.0),  length=8)
                                           )
 
@@ -49,8 +49,8 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     # "metal_C"       => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),
 
     # NEW METHOD...
-    "metal_Z"       => 10 .^ range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
-    "metal_CO"      => 10 .^ range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
+    "logZ"          =>   range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
+    "logCO"         =>   range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
     "instellation"  =>  Float64[1.0, 10.0, 100.0, 300.0, 1000.0], # S_earth
     "Teff"          =>       range(start=2500,  stop=5500,  step=600.0),
@@ -66,12 +66,12 @@ const output_keys =  ["succ", "flux_loss", "r_bound",
 # Grid management options
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
-const modwrite::Int          = 25           # Write CSV file every `modwrite` gridpoints
-const modplot::Int           = 2            # Plot every `modplot` solver steps (debug)
+const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
+const modplot::Int           = 1            # Plot every `modplot` solver steps (debug)
 const frac_min::Float64      = 0.0005        # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
-const fc_floor::Float64      = 500.0       # K
+const fc_floor::Float64      = 600.0       # K
 const fc_wellmixed::Bool     = false      # calculate abundances as well-mixed ?
 
 
@@ -157,8 +157,8 @@ frac_core = 0.325
 frac_atm  = 0.01
 stellar_Teff = cfg["planet"]["star_Teff"]
 input_star   = cfg["files"]["input_star"]
-metal_Z    = 100.0
-metal_CO   = 1.0
+logZ       = 2.0
+logCO      = 0.0
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
@@ -255,7 +255,7 @@ if (id_work == 1) || !isfile(gpfile)
             row *= @sprintf("%08d,",p["worker"])
 
             # Other keys
-            row *= join([@sprintf("%.6e",p[k]) for k in input_keys], ",") * "\n"
+            row *= join([@sprintf("%.5e",p[k]) for k in input_keys], ",") * "\n"
 
             # Write out
             write(hdl,row)
@@ -302,7 +302,7 @@ function write_table()
 
             row = @sprintf("%08d",i)
             for k in output_keys
-                row *= @sprintf(",%.6e",result_table[i][k])
+                row *= @sprintf(",%.5e",result_table[i][k])
             end
             write(hdl,row*"\n")
         end
@@ -328,7 +328,7 @@ function write_emits()
         # Header of wavelength values
         head = "0.0"
         for b in 1:bands
-            head *= @sprintf(",%.6e",wlarr[b]*1e9) # convert to nm
+            head *= @sprintf(",%.5e",wlarr[b]*1e9) # convert to nm
         end
         head *= "\n"
         write(hdl,head)
@@ -343,7 +343,7 @@ function write_emits()
 
             row = @sprintf("%08d",i)
             for b in 1:bands
-                row *= @sprintf(",%.6e",result_emits[i,b])
+                row *= @sprintf(",%.5e",result_emits[i,b])
             end
             write(hdl,row*"\n")
         end
@@ -444,7 +444,11 @@ end
 """
 Update metallicity (by */H mol) from Z and C/O mass ratios
 """
-function update_metallicity!(atmos, Z, CO)
+function update_metallicity!(atmos, _logZ, _logCO)
+
+    # Convert from log-scale to linear
+    Z  = 10^_logZ
+    CO = 10^_logCO
 
     # Need to work out what the X/H mass ratios are...
 
@@ -532,6 +536,7 @@ function init_atmos(OUT_DIR::String)
     end
 
     # Set PT
+    atm.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
     setpt.request!(atm, cfg["execution"]["initial_state"])
 
     return atm
@@ -580,8 +585,8 @@ for (i,p) in enumerate(grid_flat)
     global save_plots
     global wlarr
     global stellar_Teff
-    global metal_Z
-    global metal_CO
+    global logZ
+    global logCO
 
     # Check that this worker is assigned to this grid point, by index
     if grid_flat[i]["worker"] != id_work
@@ -591,6 +596,7 @@ for (i,p) in enumerate(grid_flat)
     @info @sprintf("Grid point %d of %d total (number %d of chunk)",i,gridsize,i_counter)
 
     succ_last = succ
+    updated_k = false
 
     # Update parameters
     for (idx,(k,val)) in enumerate(p)
@@ -618,7 +624,8 @@ for (i,p) in enumerate(grid_flat)
         end
 
         # set other parameter...
-        if (i==1) || Bool(grid_flat[i-1][k] != grid_flat[i][k])
+        updated_k = (i==1) || Bool(grid_flat[i-1][k] != grid_flat[i][k])
+        if updated_k
             @info "    updated $k = $val"
         else
             @info "    use     $k = $val"
@@ -652,19 +659,22 @@ for (i,p) in enumerate(grid_flat)
             atmos.instellation = val * 1361.0 # W/m^2
 
             # set T(p) = loglinear up to Teq
-            setpt.request!(atmos, ["loglin","$(phys.calc_Teq(atmos.instellation,atmos.albedo_b))"])
+            if updated_k
+                atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
+                setpt.request!(atmos, ["loglin","Teq"])
+            end
 
         elseif startswith(k, "vmr_")
             gas = split(k,"_")[2]
             atmos.gas_vmr[gas][:]  .= val
 
-        elseif k == "metal_Z"
-            metal_Z = val
-            update_metallicity!(atmos, metal_Z, metal_CO)
+        elseif k == "logZ"
+            logZ = val
+            update_metallicity!(atmos, logZ, logCO)
 
-        elseif k == "metal_CO"
-            metal_CO = val
-            update_metallicity!(atmos, metal_Z, metal_CO)
+        elseif k == "logCO"
+            logCO = val
+            update_metallicity!(atmos, logZ, logCO)
 
         elseif k == "Teff"
             # already handled
@@ -707,8 +717,8 @@ for (i,p) in enumerate(grid_flat)
         setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
         easy_start = false
     else
-        # last iter failed -> restore initial guess for T(p)
-        # setpt.request!(atmos, cfg["execution"]["initial_state"])
+        # last iter failed
+        setpt.request!(atmos, cfg["execution"]["initial_state"])
         easy_start = Bool(cfg["execution"]["easy_start"])
     end
 
@@ -717,7 +727,7 @@ for (i,p) in enumerate(grid_flat)
         max_steps *= 2
     end
 
-    solver.ls_increase = 1.08
+    # solver.ls_increase = 0.7
 
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],

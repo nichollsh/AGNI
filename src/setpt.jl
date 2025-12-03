@@ -20,6 +20,21 @@ module setpt
     using LoggingExtras
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
+    function _parse_tmp_str(atmos::atmosphere.Atmos_t, tmp)::Float64
+
+        if tmp isa String
+            if lowercase(tmp) == "teq"
+                return phys.calc_Teq(atmos.instellation, atmos.albedo_b)
+            else
+                return parse(Float64, tmp)
+            end
+        elseif tmp isa Number
+            return Float64(tmp)
+        else
+            error("Invalid temperature choice '$(tmp)'")
+        end
+    end
+
     # Process a series of requests describing T(p)
     function request!(atmos::atmosphere.Atmos_t, request::Array{String,1})::Bool
         num_req::Int = length(request)          # Number of requests
@@ -65,10 +80,6 @@ module setpt
                 # add X kelvin from the currently stored T(p)
                 idx_req += 1
                 setpt.add!(atmos,parse(Float64, request[idx_req]))
-
-            elseif str_req == "teq"
-                # add isothermal at Teq
-                setpt.Teq!(atmos)
 
             elseif str_req == "surfsat"
                 # ensure surface is not super-saturated
@@ -280,20 +291,18 @@ module setpt
     end # end load_ncdf
 
     # Set atmosphere to be isothermal at the given temperature
-    function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
+    function isothermal!(atmos::atmosphere.Atmos_t, set_tmp)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
             return
         end
+
+
+        set_tmp = _parse_tmp_str(atmos, set_tmp)
+
         fill!(atmos.tmpl, set_tmp)
         fill!(atmos.tmp , set_tmp)
 
-        return
-    end
-
-    # Set atmosphere to be isothermal at the radiative equilibrium temperature
-    function Teq!(atmos::atmosphere.Atmos_t)
-        stratosphere!(atmos, phys.calc_Teq(atmos.instellation,atmos.albedo_b))
         return
     end
 
@@ -354,7 +363,9 @@ module setpt
     end
 
     # Set atmosphere to have an isothermal stratosphere
-    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp::Float64)
+    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp)
+
+        strat_tmp = _parse_tmp_str(atmos, strat_tmp)
 
         # Keep stratosphere below tmp_surf value
         strat_tmp = min(strat_tmp, atmos.tmp_surf)
@@ -381,7 +392,9 @@ module setpt
     end
 
     # Set atmosphere to have a log-linear T(p) profile
-    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp::Float64)
+    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp)
+
+        top_tmp = _parse_tmp_str(atmos, top_tmp)
 
         # Keep top_tmp below tmp_surf value
         top_tmp = min(top_tmp, atmos.tmp_surf)
@@ -400,7 +413,6 @@ module setpt
 
         return nothing
     end
-
 
 
 
