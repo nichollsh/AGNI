@@ -433,7 +433,7 @@ module chemistry
 
         # Check minimum temperature
         if maximum(atmos.tmpl) < atmos.fastchem_floor
-            @warn "The entire temperature profile is too cold for FastChem"
+            @debug "Whole atmosphere too cold for FC (fc_floor=$(atmos.fastchem_floor))"
         end
 
         count_elem_nonzero::Int = 0
