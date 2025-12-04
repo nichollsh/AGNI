@@ -49,7 +49,7 @@ module solver
 
         midp::Float64 = 0.5*(a+b)
 
-        for i = 1:max_steps
+        for i in 1:max_steps
             if fx1 < fx2
                 b = x2
                 x2 = x1
@@ -105,6 +105,9 @@ module solver
     end
 
     # Solver constants and parameters
+    #    chemistry
+    compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
+    compose_ls::Bool      = true    # Do chem/comp for every linesearch step
     #    jacobian
     perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
     perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
@@ -116,9 +119,9 @@ module solver
     plateau_s::Float64 =    10.0     # Scale factor applied to x_dif when plateau_i > plateau_n
     plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
     #    linesearch
-    ls_tau::Float64    =    0.7     # backtracking downscale size
-    ls_increase::Float64 =  0.9    # factor by which the cost can increase from last step before triggering linesearch
-    ls_max_steps::Int    =  10      # maximum steps undertaken by linesearch routine
+    ls_tau::Float64    =    0.5     # backtracking downscale size
+    ls_increase::Float64 =  0.8    # factor by which the cost can increase from last step before triggering linesearch
+    ls_max_steps::Int    =  12      # maximum steps undertaken by linesearch routine
     ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
     ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
     #    easy start
@@ -197,6 +200,7 @@ module solver
         # --------------------
         @debug "Reticulating splines..."
 
+
         # Validate sol_type
         if (sol_type < 1) || (sol_type > 4)
             @error "Invalid solution type ($sol_type)."
@@ -220,6 +224,12 @@ module solver
         if latent && !rainout
             @error "Must enable rainout if also including latent heating"
             return false
+        end
+
+        # Warn user about frequency of composition calculations...
+        if compose_jac && (rainout || chemistry || oceans)
+            @warn "Expect slow forward-model evaluations"
+            @warn "    compose_jac=$compose_jac"
         end
 
         # Start timer
@@ -266,10 +276,10 @@ module solver
         lml::Float64             = 1.0                 # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
-        dx_max_step::Float64     = Float64(dx_max)      # dx_max allowed in current step
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
-        ls_cost::Float64         = 1.0e99               # linesearch cost
+        ls_cost::Float64         = 1.0e99               # linesearch cost at ls_alpha
+        ls_cful::Float64         = 1.0e99               # linesearch cost at full step
         easy_start               = Bool(easy_start)     # make copy of variable - don't modify parameter
         easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor
         plateau_apply::Bool      = false                # Plateau declared in this iteration?
@@ -314,7 +324,7 @@ module solver
         end # end set_tmps
 
         # Objective function
-        function _fev!(x::Array{Float64,1},resid::Array{Float64,1})::Bool
+        function _fev!(x::Array{Float64,1},resid::Array{Float64,1}; compose::Bool=false)::Bool
 
             # Reset masks
             fill!(atmos.mask_c, false)
@@ -323,6 +333,12 @@ module solver
             # Set new temperatures
             _set_tmps!(x)
 
+            # Do chemistry?
+            compose_here = compose && (oceans || chem || rainout)
+            if compose_here
+                chemistry.calc_composition!(atmos, oceans, chem, false)
+            end
+
             # Do saturation aloft here, only. Keep chemistry fixed.
             if rainout
                 # reset back to post-chemistry mixing ratios
@@ -330,7 +346,8 @@ module solver
                     @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
                 end
                 chemistry._sat_aloft!(atmos)
-            else
+
+            elseif !compose_here
                 atmosphere.calc_layer_props!(atmos)
             end
 
@@ -384,7 +401,7 @@ module solver
             ok::Bool = true
 
             # Evalulate residuals at x
-            ok = ok && _fev!(x, resid)
+            ok = ok && _fev!(x, resid, compose=compose_jac)
 
             # For each level...
             for i in 1:arr_len
@@ -713,15 +730,8 @@ module solver
             end
 
             # Max step size
-            #    limit by user requirement
-            dx_max_step = Float64(dx_max)
-            #    limit by distance to tmp_ceil
-            dx_max_step = min(dx_max_step, abs(atmos.tmp_ceiling-tmp_pad - maximum(x_cur)) )
-            #    limit by distance to tmp_floor
-            dx_max_step = min(dx_max_step, abs(minimum(x_cur) - atmos.tmp_floor+tmp_pad))
-
-            # Limit step size by dx_max_step, without changing direction of dx vector
-            x_dif *= min(1.0, dx_max_step / maximum(abs.(x_dif[:])))
+            #    limit by user requirement, without changing direction of dx vector
+            x_dif *= min(1.0, dx_max / maximum(abs.(x_dif[:])))
 
             # Extrapolate step if on plateau.
             #    This acts to give the solver a 'nudge' in (hopefully) the right direction.
@@ -741,26 +751,27 @@ module solver
                 # Reset
                 ls_alpha = ls_max_scale   # Greater than 1 => extension of step
                 ls_cost  = 1.0e99   # a big number
+                ls_cful  = 1.0e99   # cost of full step
 
                 # Internal function minimised by linesearch method
                 function _ls_func(scale::Float64)::Float64
                     @. x_cur = x_old + scale * x_dif
-                    _fev!(x_cur,r_tst)
+                    _fev!(x_cur,r_tst, compose=compose_ls)
                     return _cost(r_tst)
                 end
 
                 # Calculate the cost using the full step size
-                ls_cost = _ls_func(ls_alpha)
+                ls_cful = _ls_func(ls_alpha)
 
                 # Do we need to do linesearch? Triggers due to any of:
                 #    - Cost increase from full step is too large
                 #    - It is the first step
-                if (ls_cost > c_cur*ls_increase ) || (step == 1)
+                if (ls_cful > c_cur*ls_increase ) || (step == 1)
 
                     # Yes, we do need to do linesearch...
                     stepflags *= "Ls-"
 
-                    if (ls_method == 1) || (ls_cost*0.1 < conv_atol + conv_rtol * c_max)
+                    if (ls_method == 1) || (ls_cful*0.1 < conv_atol + conv_rtol * c_max)
                         # Use golden-section search method
                         ls_alpha = gs_search(_ls_func, ls_min_scale, ls_max_scale,
                                                 1.0e-9, ls_min_scale, ls_max_steps)
@@ -768,23 +779,30 @@ module solver
                     elseif ls_method == 2
                         # Use backtracking method
 
-                        for il in 1:ls_max_steps
+                        il = 1
+                        while il <= ls_max_steps
+
+                            if il >= ls_max_steps
+                                @debug "            ls reached max steps"
+                            end
+
                             # try shrinking it further
                             ls_alpha *= ls_tau
-
                             if ls_alpha < ls_min_scale
                                 # scale too small!
                                 ls_alpha = ls_min_scale
+                                @debug "            ls reached min scale"
                                 break
                             end
 
                             ls_cost = _ls_func(ls_alpha)
-                            if ls_cost <= c_cur#*ls_increase
-                                # this scale is good enough
+                            if ls_cost <= ls_cful*ls_increase
+                                # this scale is good enough, because
+                                # the cost is less than that of a full-step
+                                @debug "            ls converged ok"
                                 break
                             end
                         end
-
                     else
                         @error "Invalid linesearch algorithm $ls_method"
                         code = CODE_CFG
@@ -799,12 +817,18 @@ module solver
 
             end # end linesearch
 
-            # Limit step size by dx_min
-            x_dif[x_dif.<0.0] .= clamp.(x_dif[x_dif.<0.0], -dx_max_step, -dx_min)
-            x_dif[x_dif.>0.0] .= clamp.(x_dif[x_dif.>0.0], dx_min, dx_max_step)
+            # Enforce minimum step size (dx_min)
+            x_dif[x_dif.<0.0] .= clamp.(x_dif[x_dif.<0.0], -dx_max, -dx_min)
+            x_dif[x_dif.>0.0] .= clamp.(x_dif[x_dif.>0.0], dx_min, dx_max)
 
             # Take the step
             @. x_cur = x_old + x_dif
+
+            # Hard limit by tmp_ceil and tmp_floor
+            clamp!(x_cur, atmos.tmp_floor+tmp_pad, atmos.tmp_ceiling-tmp_pad)
+
+            # Evaluate fluxes
+            _fev!(x_cur, r_cur, compose=true)
 
             # Recalculate layer properties
             if ! atmosphere.calc_layer_props!(atmos)
@@ -812,9 +836,6 @@ module solver
                 step_ok = false
                 stepflags *= "Ub-"
             end
-
-            # Evaluate fluxes
-            _fev!(x_cur, r_cur)
 
             # New cost value from this step
             c_old = c_cur
@@ -900,23 +921,30 @@ module solver
             rm(path_jac, force=true)
         elseif code == CODE_ITE
             @error "    failure (maximum iterations)"
+            plot_step()
         elseif code == CODE_SIN
             @error "    failure (singular jacobian)"
             plotting.jacobian(b, path_jac)
+            plot_step()
         elseif code == CODE_TIM
             @error "    failure (maximum time)"
         elseif code == CODE_NAN
             @error "    failure (NaN values)"
+            plot_step()
         elseif code == CODE_CFG
             @error "    failure (configuration)"
         elseif code == CODE_OBJ
             @error "    failure (objective function)"
+            plot_step()
         elseif code == CODE_STP
-            @error "    failure (last step not ok)"
+            @error "    failure (other; last step not ok)"
+            plot_step()
         elseif code == CODE_HYD
             @error "    failure (hydrostatic integration)"
+            plot_step()
         else
             @error "    failure (other)"
+            plot_step()
         end
 
         # timeout
@@ -926,8 +954,7 @@ module solver
         end
 
         # perform one last evaluation to set `atmos` given the final `x_cur`
-        chemistry.calc_composition!(atmos, oceans, chem, rainout)
-        _fev!(x_cur, zeros(Float64, arr_len))
+        _set_tmps!(x_cur)
 
         # calc kzz profile
         if radiative_Kzz

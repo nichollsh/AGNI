@@ -20,6 +20,21 @@ module setpt
     using LoggingExtras
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
+    function _parse_tmp_str(atmos::atmosphere.Atmos_t, tmp)::Float64
+
+        if tmp isa String
+            if lowercase(tmp) == "teq"
+                return phys.calc_Teq(atmos.instellation, atmos.albedo_b)
+            else
+                return parse(Float64, tmp)
+            end
+        elseif tmp isa Number
+            return Float64(tmp)
+        else
+            error("Invalid temperature choice '$(tmp)'")
+        end
+    end
+
     # Process a series of requests describing T(p)
     function request!(atmos::atmosphere.Atmos_t, request::Array{String,1})::Bool
         num_req::Int = length(request)          # Number of requests
@@ -39,17 +54,17 @@ module setpt
             elseif str_req == "str"
                 # isothermal stratosphere
                 idx_req += 1
-                setpt.stratosphere!(atmos, parse(Float64, request[idx_req]))
+                setpt.stratosphere!(atmos, request[idx_req])
 
             elseif str_req == "loglin"
                 # log-linear profile between T_surf and T_top
                 idx_req += 1
-                setpt.loglinear!(atmos, parse(Float64, request[idx_req]))
+                setpt.loglinear!(atmos, request[idx_req])
 
             elseif str_req == "iso"
                 # isothermal profile
                 idx_req += 1
-                setpt.isothermal!(atmos, parse(Float64, request[idx_req]))
+                setpt.isothermal!(atmos, request[idx_req])
 
             elseif str_req == "csv"
                 # set from csv file
@@ -64,7 +79,7 @@ module setpt
             elseif str_req == "add"
                 # add X kelvin from the currently stored T(p)
                 idx_req += 1
-                setpt.add!(atmos,parse(Float64, request[idx_req]))
+                setpt.add!(atmos,request[idx_req])
 
             elseif str_req == "surfsat"
                 # ensure surface is not super-saturated
@@ -119,13 +134,13 @@ module setpt
 
         # Extrapolate loaded grid to lower pressures (prevent domain error)
         if (atmos.pl[1] < pl[1])
-            pushfirst!(pl,   atmos.pl[1]/1.1)
+            pushfirst!(pl,   atmos.pl[1]/1.01)
             pushfirst!(tmpl, tmpl[1])
         end
 
         # Extrapolate loaded grid to higher pressures
         if (atmos.pl[end] > pl[end])
-            push!(pl,   atmos.pl[end]*1.1)
+            push!(pl,   atmos.pl[end]*1.01)
             push!(tmpl, tmpl[end])
         end
 
@@ -276,11 +291,15 @@ module setpt
     end # end load_ncdf
 
     # Set atmosphere to be isothermal at the given temperature
-    function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
+    function isothermal!(atmos::atmosphere.Atmos_t, set_tmp)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
             return
         end
+
+
+        set_tmp = _parse_tmp_str(atmos, set_tmp)
+
         fill!(atmos.tmpl, set_tmp)
         fill!(atmos.tmp , set_tmp)
 
@@ -288,11 +307,14 @@ module setpt
     end
 
     # Set atmosphere to be isothermal at the given temperature
-    function add!(atmos::atmosphere.Atmos_t, delta::Float64)
+    function add!(atmos::atmosphere.Atmos_t, delta)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
             return
         end
+
+        delta = _parse_tmp_str(atmos, delta)
+
         @. atmos.tmpl += delta
         @. atmos.tmp  += delta
 
@@ -344,7 +366,9 @@ module setpt
     end
 
     # Set atmosphere to have an isothermal stratosphere
-    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp::Float64)
+    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp)
+
+        strat_tmp = _parse_tmp_str(atmos, strat_tmp)
 
         # Keep stratosphere below tmp_surf value
         strat_tmp = min(strat_tmp, atmos.tmp_surf)
@@ -371,7 +395,9 @@ module setpt
     end
 
     # Set atmosphere to have a log-linear T(p) profile
-    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp::Float64)
+    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp)
+
+        top_tmp = _parse_tmp_str(atmos, top_tmp)
 
         # Keep top_tmp below tmp_surf value
         top_tmp = min(top_tmp, atmos.tmp_surf)
@@ -393,11 +419,10 @@ module setpt
 
 
 
-
     """
-    Set T = max(T,T_dew) for a specified gas.
+    **Set T = max(T,T_dew) for a specified gas.**
 
-    Does not modify VMRs or surface temperature.
+    Does not modify VMRs. Does update water-cloud locations.
     """
     function saturation!(atmos::atmosphere.Atmos_t, gas::String)
 
@@ -410,27 +435,44 @@ module setpt
             return nothing
         end
 
-        x::Float64 = 0.0
-        Tdew::Float64 = 0.0
+        xgas::Float64 = 0.0
 
-        # Check if each level is condensing. If it is, place on phase curve
-        for i in 1:atmos.nlev_c
-
-            x = atmos.gas_vmr[gas][i]
-            if x < 1.0e-10
-                continue
+        # Return the new temperature (Float) and whether saturated (Bool)
+        function _tdew(tmp::Float64,pgas::Float64)::Tuple
+            # Tiny partial pressure
+            if pgas < 1e-99
+                return (tmp, false)
             end
 
-            # Set to saturation curve
-            Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i] * x)
-            if atmos.tmp[i] <= Tdew+1e-2
-                atmos.tmp[i]  = Tdew
-                atmos.gas_sat[gas][i] = true
+            # Supercritical
+            if tmp >= atmos.gas_dat[gas].T_crit
+                return (tmp, false)
+            end
+
+            # Otherwise...
+            Tdew = phys.get_Tdew(atmos.gas_dat[gas], pgas)
+            if tmp <= Tdew + 1e-2
+                return (Tdew, true)
+            else
+                return (tmp, false)
             end
         end
 
-        # Set cell-edge temperatures
-        atmosphere.set_tmpl_from_tmp!(atmos)
+        # Check if each level is saturated: tmp < Tdew. If it is, set to Tdew.
+        for i in range(start=atmos.nlev_l, stop=1, step=-1)
+
+            # Composition
+            xgas = atmos.gas_vmr[gas][min(i,atmos.nlev_c)]
+
+            # Cell-centres
+            if i <= atmos.nlev_c
+                (atmos.tmp[i], atmos.gas_sat[gas][i]) = _tdew(atmos.tmp[i], atmos.p[i]*xgas)
+            end
+
+            # Cell-edges
+            atmos.tmpl[i] = _tdew(atmos.tmpl[i], atmos.pl[i]*xgas)[1]
+        end
+        atmos.tmp_surf = atmos.tmpl[end]
 
         # Set cloud
         if (gas == "H2O") && atmos.control.l_cloud
