@@ -29,7 +29,7 @@ const cfg_base = "res/config/struct_grid.toml"
 
 # Mass array with custom spacing
 const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=log10(4.5),   length=8),
-                                            range(start=log10(5.0),  stop=log10(10.0),  length=8)
+                                            range(start=log10(5.0),  stop=log10(10.0),  length=7)
                                           )
 
 
@@ -38,15 +38,15 @@ const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=
 #    enter the least-important parameters first
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    # "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
+    "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.12),
     "frac_atm"      =>       range(start=0.00,  stop=0.10,  step=0.01),
     "mass_tot"      =>       mass_arr,  # M_earth
 
     "logZ"          =>   range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
-    # "logCO"         =>   range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
+    "logCO"         =>   range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
     "instellation"  =>  Float64[1.0, 10.0, 100.0, 300.0, 1000.0], # S_earth
-    # "Teff"          =>       range(start=2500,  stop=5500,  step=600.0),
+    "Teff"          =>       range(start=2500,  stop=5500,  step=600.0),
 ))
 
 # Variables to record

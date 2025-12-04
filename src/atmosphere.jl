@@ -39,6 +39,7 @@ module atmosphere
     # Hydrostatic and gravity calc (constants and limits)
     const HYDROGRAV_steps::Int64   = 2000      # total number of layers in hydrostatic integration
     const HYDROGRAV_maxdr::Float64 = 1e7       # maximum dz across each layer [m]
+    const HYDROGRAV_mindr::Float64 = 1e-2      # minimum dz across each layer [m]
     const HYDROGRAV_ming::Float64  = 1e-4      # minimum allowed gravity [m/s^2]
     const HYDROGRAV_constg::Bool   = false     # constant gravity with height?
     const HYDROGRAV_selfg::Bool    = true      # include self-gravity of the atmosphere?
@@ -1329,6 +1330,7 @@ module atmosphere
 
             # Integrate from lower edge to centre
             atmos.r[i] = integrate_hydrograv(atmos.rl[i+1], atmos.gl[i+1], atmos.pl[i+1], atmos.p[i], atmos.layer_ρ[i], nsub)
+            atmos.r[i] = max(atmos.r[i], atmos.rl[i+1] + HYDROGRAV_mindr)
             if atmos.r[i] > atmos.rl[i+1] + HYDROGRAV_maxdr
                 atmos.r[i] = atmos.rl[i+1] + HYDROGRAV_maxdr
                 atmos.layer_isbound[i] = false
@@ -1347,6 +1349,7 @@ module atmosphere
 
             # Integrate from centre to upper edge
             atmos.rl[i] = integrate_hydrograv(atmos.r[i], atmos.g[i], atmos.p[i], atmos.pl[i], atmos.layer_ρ[i], nsub)
+            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + HYDROGRAV_mindr)
             if atmos.rl[i] > atmos.r[i] + HYDROGRAV_maxdr
                 atmos.rl[i] = atmos.r[i] + HYDROGRAV_maxdr
                 atmos.layer_isbound[i] = false
