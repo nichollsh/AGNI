@@ -19,7 +19,7 @@ jobs:
     name: install_and_test
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Setup system
       - name: NetCDF
@@ -38,7 +38,7 @@ jobs:
 
       # Setup SOCRATES
       - name: Get SOCRATES
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: 'nichollsh/SOCRATES'
           path: 'SOCRATES'
