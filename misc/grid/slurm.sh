@@ -1,13 +1,20 @@
 #!/bin/bash
 
-#SBATCH --time=00-6:00:00
-#SBATCH --cpus-per-task=30
+# CHANGE
+#SBATCH --time=00-2:00:00
+#SBATCH --cpus-per-task=10
+#SBATCH --mem-per-cpu=3000M
 
+# LEAVE
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem-per-cpu=1200M
 #SBATCH --output=slurm-grid-%j.log
 
+
+source $HOME/.bashrc
+
+echo "Julia:             $(which julia)"
+echo "TMPDIR:            $TMPDIR"
 echo "Allocated workers: $SLURM_CPUS_PER_TASK"
 echo "Allocated node:    $SLURM_JOB_NODELIST"
 
