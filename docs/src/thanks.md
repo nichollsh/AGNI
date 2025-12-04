@@ -9,7 +9,7 @@ I would like to thank the following people for their input and assistance during
 * [Arjun Savel](https://www.arjunsavel.com/) -- JOSS paper reviewer
 * [Ryan Macdonald](https://distantworlds.space/) -- JOSS paper reviewer
 * [Boding Ouyang](https://github.com/OYBDOOO)
-* [Soumil Kelkar](s.m.kelkar@rug.nl)
+* [Soumil Kelkar](https://research.rug.nl/en/persons/soumil-kelkar/)
 * [Stuart Daines](https://scholar.google.com/citations?user=EZqVB7wAAAAJ)
 
 Please contact [Harrison Nicholls](https://www.h-nicholls.space/) for any queries relating to AGNI.
