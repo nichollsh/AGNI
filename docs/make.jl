@@ -21,7 +21,7 @@ makedocs(
         "troubleshooting.md",
         "Software manual" => "manual.md",
         "Related codes" => "ecosystem.md",
-        "Contributors" => "contributors.md",
+        "Acknowledgements" => "thanks.md",
         "Contributing" => "contributing.md",
     ]
 )
