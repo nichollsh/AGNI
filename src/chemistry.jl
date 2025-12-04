@@ -274,7 +274,7 @@ module chemistry
                     #    current value and saturation
                     atmos.cond_yield[c][i] = atmos.gas_dat[c].mmw*atmos.p[i]*
                                             (atmos.gas_vmr[c][i] - x_sat)/
-                                            (atmos.layer_grav[i] * atmos.layer_μ[i])
+                                            (atmos.g[i] * atmos.layer_μ[i])
 
                     # set new vmr to saturated value
                     #   this will always be <= to the current value
@@ -342,7 +342,7 @@ module chemistry
 
                 # production of gas mass (kg/m2) that would saturate
                 dm_sat = atmos.gas_dat[c].mmw * dp_sat/
-                                        (atmos.layer_grav[j] * atmos.layer_μ[j])
+                                        (atmos.g[j] * atmos.layer_μ[j])
 
                 # Evaporation efficiency factor
                 #   This is how close the layer can be brought to saturation by evap.
@@ -356,8 +356,7 @@ module chemistry
                 atmos.cond_yield[c][j] -= dm_sat
 
                 # convert evaporated mass back to partial pressure
-                dp_sat = dm_sat * atmos.layer_grav[j] *
-                                            atmos.layer_μ[j] / atmos.gas_dat[c].mmw
+                dp_sat = dm_sat * atmos.g[j] * atmos.layer_μ[j] / atmos.gas_dat[c].mmw
 
                 # convert change in partial pressure to change in vmr
                 atmos.gas_vmr[c][j] += dp_sat / atmos.p[j]
