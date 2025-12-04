@@ -329,18 +329,18 @@ module energy
         atmos.flux_d_lw[1] = 0.0
         for i in 1:atmos.nlev_c
             # Downward LW flux at bottom of layer
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.layer_grav[i] )
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.g[i] )
             atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
 
             # Downward SW flux at bottom of layer
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_sw / atmos.layer_grav[i] )
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_sw / atmos.g[i] )
             atmos.flux_d_sw[i+1] = atmos.flux_d_sw[i] * trans
         end
 
         # Up-directed LW beam, looping from surface upwards
         atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4 * (1-atmos.albedo_s)
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.layer_grav[i] )
+            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.g[i] )
             atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
         end
 
@@ -561,7 +561,6 @@ module energy
             m2 = m2/mt
 
             # Properties interpolated to layer edge
-            grav = atmos.layer_grav[i] * m2 + atmos.layer_grav[i-1] * m1
             mu   = atmos.layer_μ[i]    * m2 + atmos.layer_μ[i-1]    * m1
             c_p  = atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1
             rho  = atmos.layer_ρ[i]    * m2 + atmos.layer_ρ[i-1]    * m1
@@ -570,11 +569,11 @@ module energy
             if atmos.real_gas
                 # general solution
                 ∇_ad = atmos.pl[i] / (atmos.tmpl[i] * rho * c_p)
-                Hp = atmos.pl[i] / (rho * grav)
+                Hp = atmos.pl[i] / (rho * atmos.gl[i])
             else
                 # ideal gas solution
                 ∇_ad = (phys.R_gas / mu) / c_p
-                Hp = phys.R_gas * atmos.tmpl[i] / (mu * grav)
+                Hp = phys.R_gas * atmos.tmpl[i] / (mu * atmos.gl[i])
             end
 
             # Calculate lapse rate deviation from stability
@@ -604,7 +603,7 @@ module energy
                 end
 
                 # Characteristic velocity (from Brunt-Vasalla frequency of parcel)
-                atmos.w_conv[i] = atmos.λ_conv[i] * sqrt(grav/Hp * staby)
+                atmos.w_conv[i] = atmos.λ_conv[i] * sqrt(atmos.gl[i]/Hp * staby)
 
                 # Dry convective flux
                 atmos.flux_cdry[i] = 0.5*rho*c_p*atmos.w_conv[i] * atmos.tmpl[i] * (atmos.λ_conv[i]/Hp) * staby
@@ -924,7 +923,7 @@ module energy
         for i in 1:atmos.nlev_c
             dF = atmos.flux_tot[i+1] - atmos.flux_tot[i]
             dp = atmos.pl[i+1] - atmos.pl[i]
-            atmos.heating_rate[i] = (atmos.layer_grav[i] / atmos.layer_cp[i]) * dF/dp # K/s
+            atmos.heating_rate[i] = (atmos.g[i] / atmos.layer_cp[i]) * dF/dp # K/s
         end
 
         atmos.heating_rate *= 86400.0 # K/day

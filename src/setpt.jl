@@ -502,7 +502,7 @@ module setpt
         # Evalulate cell-centre temperatures
         for i in 1:atmos.nlev_c
             # get LW optical depth
-            τ = guillot.eval_tau(atmos.p[i], atmos.layer_grav[i])
+            τ = guillot.eval_tau(atmos.p[i], atmos.g[i])
 
             # set temperature
             atmos.tmp[i] = guillot.eval_T4_cos(τ, Tint, Tirr, atmos.zenith_degrees)^0.25

@@ -300,7 +300,7 @@ module save
             var_mmw[:]  =   atmos.layer_μ
             var_cp[:]  =    atmos.layer_cp
             var_rho[:]  =   atmos.layer_ρ
-            var_grav[:]  =  atmos.layer_grav
+            var_grav[:]  =  atmos.g
             var_thick[:]  = atmos.layer_thick
 
             # Composition
