@@ -34,12 +34,17 @@ res/thermodynamics/*.nc.chk
 index.html
 
 # Output files
+scratch
+scratch/
 test/out/
 out/*
 runtime.sf
 runtime.sf_k
 socstar.dat
 slurm*.out
+slurm*.log
+sbatch*.out
+sbatch*.log
 
 # Misc files
 .DS_Store

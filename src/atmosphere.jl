@@ -33,11 +33,11 @@ module atmosphere
     import ..spectrum
 
     # Code versions
-    const AGNI_VERSION::String     = "1.8.1"  # current agni version
+    const AGNI_VERSION::String     = "1.8.2"  # current agni version
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic and gravity calc (constants and limits)
-    const HYDROGRAV_STEPS::Int64   = 30        # num of sub-layers in hydrostatic integration
+    const HYDROGRAV_STEPS::Int64   = 40        # num of sub-layers in hydrostatic integration
     const HYDROGRAV_maxdr::Float64 = 1e6       # maximum dz across each layer [m]
     const HYDROGRAV_ming::Float64  = 1e-3      # minimum allowed gravity [m/s^2]
     const HYDROGRAV_constg::Bool   = false     # constant gravity with height?
@@ -200,6 +200,7 @@ module atmosphere
         layer_grav::Array{Float64,1}        # gravity [m s-2]
         layer_thick::Array{Float64,1}       # geometrical thickness [m]
         layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
+        layer_isbound::Array{Bool,1}        # is this layer gravitationally bound?
 
         # Calculated bolometric radiative fluxes (W m-2)
         flux_int::Float64                   # Effective flux  [W m-2] for sol_type=3
@@ -307,6 +308,7 @@ module atmosphere
         fastchem_chem::String           # Path to output gas composition
         fastchem_cond::String           # Path to output condensate phases
         fastchem_moni::String           # Path to output monitor file
+        fastchem_wellmixed::Bool        # True: perform chemistry at Tsurf. False: do 1D profile.
 
         # RFM radiative transfer
         flag_rfm::Bool                  # RFM enabled?
@@ -481,6 +483,7 @@ module atmosphere
                     fastchem_maxiter_solv::Int  =  40000,
                     fastchem_xtol_chem::Float64 =  1.0e-3,
                     fastchem_xtol_elem::Float64 =  1.0e-3,
+                    fastchem_wellmixed::Bool    =  false,
 
                     rfm_parfile::String =       UNSET_STR,
 
@@ -728,6 +731,7 @@ module atmosphere
         atmos.layer_thick   = zeros(Float64, atmos.nlev_c) # geometric thickness [m]
         atmos.layer_mass    = zeros(Float64, atmos.nlev_c) # mass per unit area [kg m-2]
         atmos.layer_grav    = ones(Float64, atmos.nlev_c) * atmos.grav_surf
+        atmos.layer_isbound = trues(atmos.nlev_c)
 
         # Initialise thermodynamic properties
         atmos.layer_μ       = zeros(Float64, atmos.nlev_c)
@@ -1068,6 +1072,7 @@ module atmosphere
             @debug "FastChem env variable not set, so FC won't be available for use"
         end
         # other parameters for FC
+        atmos.fastchem_wellmixed    = fastchem_wellmixed
         atmos.fastchem_floor        = fastchem_floor
         atmos.fastchem_maxiter_chem = fastchem_maxiter_chem
         atmos.fastchem_maxiter_solv = fastchem_maxiter_solv
@@ -1294,11 +1299,12 @@ module atmosphere
     function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
 
         # Reset arrays
-        fill!(atmos.r         ,   atmos.rp)
-        fill!(atmos.rl        ,   atmos.rp)
-        fill!(atmos.layer_grav,   atmos.grav_surf)
-        fill!(atmos.layer_thick,  1.0)
-        fill!(atmos.layer_mass ,  1.0)
+        fill!(atmos.r         ,    atmos.rp)
+        fill!(atmos.rl        ,    atmos.rp)
+        fill!(atmos.layer_grav,    atmos.grav_surf)
+        fill!(atmos.layer_thick,   1.0)
+        fill!(atmos.layer_mass ,   1.0)
+        fill!(atmos.layer_isbound, true)
 
         # Temporary values
         ok::Bool            = true
@@ -1321,6 +1327,7 @@ module atmosphere
             atmos.r[i] = integrate_hydrograv(atmos.rl[i+1], grav, atmos.pl[i+1], atmos.p[i], atmos.layer_ρ[i])
             if atmos.r[i] > atmos.rl[i+1] + HYDROGRAV_maxdr
                 atmos.r[i] = atmos.rl[i+1] + HYDROGRAV_maxdr
+                atmos.layer_isbound[i] = false
                 ok = false
             end
 
@@ -1337,6 +1344,7 @@ module atmosphere
             atmos.rl[i] = integrate_hydrograv(atmos.r[i], grav, atmos.p[i], atmos.pl[i], atmos.layer_ρ[i])
             if atmos.rl[i] > atmos.r[i] + HYDROGRAV_maxdr
                 atmos.rl[i] = atmos.r[i] + HYDROGRAV_maxdr
+                atmos.layer_isbound[i] = false
                 ok = false
             end
 
@@ -1576,12 +1584,14 @@ module atmosphere
     if the parameter `stellar_spectrum` has value of `"blackbody"`.
 
     Arguments:
-    - `atmos::Atmos_t`                 the atmosphere struct instance to be used.
-    - `stellar_spectrum::String`       path to stellar spectrum csv file
-    - `stellar_Teff::Float64`          star effective temperature if blackbody
+    - `atmos::Atmos_t`             the atmosphere struct instance to be used.
+    - `stellar_spectrum::String`   path to stellar spectrum csv file
+    - `stellar_Teff::Float64`      star effective temperature if blackbody
+    - `check_safe_gas::Bool`       require that there be at least one 'safe' gas in the mix
     """
     function allocate!(atmos::atmosphere.Atmos_t, stellar_spectrum::String;
-                        stellar_Teff::Float64=-1.0)::Bool
+                        stellar_Teff::Float64=-1.0,
+                        check_safe_gas::Bool=true)::Bool
 
         @debug "Allocate atmosphere"
         if !atmos.is_param
@@ -1956,7 +1966,7 @@ module atmosphere
         end
 
         # There must be at least one 'safe' gas
-        if !any(values(atmos.gas_safe))
+        if !any(values(atmos.gas_safe)) && check_safe_gas
             @error "None of the supplied gases are considered 'safe'"
             @error "There must be at least one gas which satisfies criteria:"
             @error "    a) is dry, i.e. non-condensable"

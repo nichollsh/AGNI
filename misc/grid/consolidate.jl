@@ -1,0 +1,142 @@
+#!/usr/bin/env -S julia --color=yes --startup-file=no
+
+# Consolidate worker output data into single data files
+# First argument must provide path to grid output folder
+
+using Glob
+using CSV
+using DataFrames
+using NCDatasets
+using Printf
+
+# Get output dir from ARGS
+output_dir::String = ""
+if length(ARGS) == 1
+    output_dir = ARGS[1]
+else
+    println(stderr,"Invalid arguments: $ARGS")
+    exit(1)
+end
+if isdir(output_dir)
+    println("Found target directory: $output_dir")
+else
+    println(stderr,"Not a directory: $output_dir")
+    exit(1)
+end
+
+work_dirs = glob("wk_*", output_dir)
+if isempty(work_dirs)
+    println(stderr,"No worker folders found in $indir")
+    exit(1)
+end
+println("Found $(length(work_dirs)) worker sub-directories")
+
+# Combined results dataframe
+println("Combining result tables...")
+dfs_table = DataFrame[] # not sorted
+for dir in work_dirs
+    println("    reading $(basename(dir))")
+    f  = joinpath(dir, "result_table.csv")
+    if isfile(f)
+        df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
+        push!(dfs_table, df)
+    else
+        println("        skipping worker; could not find $f")
+    end
+end
+combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_table)
+outpath = joinpath(output_dir, "consolidated_table.csv")
+rm(outpath, force=true)
+CSV.write(outpath, combined)
+println("    wrote $(nrow(combined))x$(ncol(combined)) table to '$outpath'")
+println(" ")
+
+println("Statistics...")
+@printf("    total:   %7d \n",nrow( filter(row -> row["succ"] != 0.0, combined) ) )
+@printf("    success: %7d \n",nrow( filter(row -> row["succ"]  > 0.0, combined) ) )
+@printf("    failure: %7d \n",nrow( filter(row -> row["succ"]  < 0.0, combined) ) )
+println(" ")
+
+# Combined fluxes dataframe
+println("Combining emission fluxes...")
+dfs_emits = DataFrame[] # not sorted
+for dir in work_dirs
+    println("    reading $(basename(dir))")
+    f  = joinpath(dir, "result_emits.csv")
+    if isfile(f)
+        df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
+        push!(dfs_emits, df)
+    else
+        println("        skipping worker; could not find $f")
+    end
+end
+combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_emits)
+
+# manually read column names as wavelengths
+head_first = split(readchomp(joinpath(work_dirs[1], "result_emits.csv")),"\n")[1]
+head_emits = String["index"]
+append!(head_emits, split(head_first,",")[2:end])
+
+outpath = joinpath(output_dir, "consolidated_emits.csv")
+rm(outpath, force=true)
+CSV.write(outpath, combined, header=head_emits)
+println("    wrote $(nrow(combined))x$(ncol(combined)) emits to '$outpath'")
+println(" ")
+
+# Combined NetCDF file
+println("Combining NetCDF profiles...")
+dfs_profs = Dict{String,Array}[] # not sorted
+for dir in work_dirs
+    println("    reading $(basename(dir))")
+    f  = joinpath(dir, "result_profs.nc")
+
+    if isfile(f)
+        ds = Dataset(f) # open
+        df = Dict([(k,ds[k][:,:]) for k in ("t","p","r")]) # read T,P,R arrays
+        close(ds) # close
+        push!(dfs_profs, df)
+    else
+        println("        skipping worker; could not find $f")
+    end
+end
+
+outpath = joinpath(output_dir, "consolidated_profs.nc")
+rm(outpath, force=true)
+ds = Dataset(outpath,"c")
+
+ds.attrib["description"]  = "AGNI grid consolidated profiles (t-p-r)"
+ds.attrib["hostname"]     = gethostname()
+ds.attrib["username"]     = ENV["USER"]
+
+(nlev, gridsize) = size(dfs_profs[1]["t"])
+defDim(ds, "nlev_c",   nlev)
+defDim(ds, "gridsize", gridsize)
+println("    found nlev_c = $nlev")
+
+var_p = defVar(ds, "p", Float64, ("nlev_c","gridsize",) ) # saved in python dimension order
+var_t = defVar(ds, "t", Float64, ("nlev_c","gridsize",) )
+var_r = defVar(ds, "r", Float64, ("nlev_c","gridsize",) )
+
+for (idx,dir) in enumerate(work_dirs)  # for each worker directory
+    # get mask of indicies that this worker performed
+    mask_work = dfs_table[idx][!,"index"][:]
+
+    println("    parsing $(basename(dir))")
+
+    # loop over these indices
+    for i in mask_work
+        for j in 1:nlev
+            # println("Get profile value for index=$i at level=$j")
+            var_p[j,i] = dfs_profs[idx]["p"][j,i]
+            var_t[j,i] = dfs_profs[idx]["t"][j,i]
+            var_r[j,i] = dfs_profs[idx]["r"][j,i]
+        end
+    end
+end
+close(ds)
+
+println("    wrote $(gridsize)x$(nlev) t-p-r profs to '$outpath'")
+println(" ")
+
+
+println("Done!")

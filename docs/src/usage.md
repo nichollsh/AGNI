@@ -73,16 +73,42 @@ Potential solver flags are:
 * `P` - step was forcibly extrapolated because the solver is not making good progress
 * `U` - the atmosphere has become gravitationally unbound
 
-## Grids of models
+## Grids of models parallelised with multiple processes
 
 The code is not explicitly parallelised. However, there is functionality to run a grid
-of models using by the script located at `misc/utilities/grid_agni.jl`.
+of models using by the script located at `misc/grid/worker.jl`. This script operates a
+single worker (of potentially many). All parameter configuration should be done by editing
+the `worker.jl` file directly.
 
-This script can be run on your local machine. However, it could also be dispatched to a node
-within a compute cluster by using Slurm. For example, with a 24 hr and 3 GB memory limit:
-
+For example, to run worker ID=1 and allocate two workers to the whole grid:
 ```console
-sbatch --mem-per-cpu=3G --time=1440 --wrap "julia --project=. misc/utilities/grid_agni.jl"
+julia --project=. misc/grid/worker.jl 1 2
+```
+
+By allocating multiple workers and running them simultaneously using the manager script,
+which is located at `misc/grid/manager.jl`, we can parallelise the simulations. The number
+of workers is defined by the number of threads with which the manager script is run.
+
+For example, run this manager script with four threads (and thus have four workers):
+```console
+julia -t4 misc/grid/manager.jl
+```
+
+The manager script can also be executed on a HPC cluster by using the Slurm workload
+manager - assuming it is available on your server. You should then define the number
+of workers (and the allotted time) inside `slurm.sh` by setting `cpus-per-task=XX`.
+
+For example:
+```console
+sbatch misc/grid/slurm.sh"
+```
+
+Once finished, combine the results of these workers by using the `consolidate.jl` script.
+This will generate `consolidated_*` files (2 CSV, 1 NetCDF) in the root folder of the grid.
+
+For example, assuming that the grid root is located at the path `out/`:
+```console
+julia misc/grid/consolidate.jl out/
 ```
 
 
@@ -228,15 +254,15 @@ Configure plotting routines all of these should be `true` or `false`.
 
 * `execution.initial_state` describes the initial temperature profile applied to the atmosphere. This is a list of strings which are applied in the given order, which allows the user to describe a specific state as required. The descriptors are listed below, some of which take a single argument that needs to immediately follow the descriptor in the list order.
      - `dry`              : integrate the dry adiabatic lapse rate from the surface upwards
-     - `str`,       `arg` : apply an isothermal stratosphere at `arg` kelvin
-     - `iso`,       `arg` : set the whole atmosphere to be isothermal at `arg` kelvin
-     - `csv`,       `arg` : set the temperature profile using the CSV file at the file path `arg`
-     - `sat`,       `arg` : apply Clausius-Clapeyron saturation curve for the gas `arg`
-     - `ncdf`,      `arg` : load profile from the NetCDF file located at `arg`
-     - `loglin`,    `arg` : log-linear profile between `tmp_surf` at the bottom and `arg` at the top
+     - `str`,       `tmp` : apply an isothermal stratosphere at temperature `tmp`
+     - `iso`,       `tmp` : set the whole atmosphere to be isothermal at temperature `tmp`
+     - `csv`,       `pth` : set the temperature profile using the CSV file at the file path `pth`
+     - `sat`,       `gas` : apply Clausius-Clapeyron saturation curve for the gas `gas`
+     - `ncdf`,      `pth` : load profile from the NetCDF file located at `pth`
+     - `loglin`,    `tmp` : log-linear profile between `tmp_surf` at the bottom and `tmp` at the top
      - `ana`              : use the Guillot ([2010](https://arxiv.org/abs/1006.4702)) analytical temperature solution
 
-    For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model.
+    For example, setting `initial_state = ["dry", "sat", "H2O", "str", "180"]` will set T(p) to follow the dry adiabat from the surface, the water condensation curve above that, and then to be isothermal at 180 K until the top of the model. Provide `tmp="Teq"` to have AGNI automatically substitute-in the planet's radiative equilibrium temperature here.
 
 * `physics.chemistry` enables a calculation of equilibrium thermochemistry in the atmosphere. This is handled externally by FastChem, so you must set the environment variable `FC_DIR` to point to the FastChem directory. More information on the chemistry is available on the [Equilibrium chemistry](@ref) page.
 
