@@ -37,8 +37,12 @@ dfs_table = DataFrame[] # not sorted
 for dir in work_dirs
     println("    reading $(basename(dir))")
     f  = joinpath(dir, "result_table.csv")
-    df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
-    push!(dfs_table, df)
+    if isfile(f)
+        df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
+        push!(dfs_table, df)
+    else
+        println("        skipping worker; could not find $f")
+    end
 end
 combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_table)
 outpath = joinpath(output_dir, "consolidated_table.csv")
@@ -59,8 +63,12 @@ dfs_emits = DataFrame[] # not sorted
 for dir in work_dirs
     println("    reading $(basename(dir))")
     f  = joinpath(dir, "result_emits.csv")
-    df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
-    push!(dfs_emits, df)
+    if isfile(f)
+        df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
+        push!(dfs_emits, df)
+    else
+        println("        skipping worker; could not find $f")
+    end
 end
 combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_emits)
 
@@ -82,10 +90,14 @@ for dir in work_dirs
     println("    reading $(basename(dir))")
     f  = joinpath(dir, "result_profs.nc")
 
-    ds = Dataset(f) # open
-    df = Dict([(k,ds[k][:,:]) for k in ("t","p","r")]) # read T,P,R arrays
-    close(ds) # close
-    push!(dfs_profs, df)
+    if isfile(f)
+        ds = Dataset(f) # open
+        df = Dict([(k,ds[k][:,:]) for k in ("t","p","r")]) # read T,P,R arrays
+        close(ds) # close
+        push!(dfs_profs, df)
+    else
+        println("        skipping worker; could not find $f")
+    end
 end
 
 outpath = joinpath(output_dir, "consolidated_profs.nc")
