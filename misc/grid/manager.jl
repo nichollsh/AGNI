@@ -32,7 +32,7 @@ println("Requested $(nthreads()) threads, so will allocate $num_work workers")
 @threads for id in 1:num_work
     # sleep if worker>1
     if id > 1
-        sleep(5.0 * id)
+        sleep(10.0 + 2.0 * id)
     end
 
     # Start worker...

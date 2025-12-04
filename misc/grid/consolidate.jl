@@ -29,19 +29,22 @@ if isempty(work_dirs)
     println(stderr,"No worker folders found in $indir")
     exit(1)
 end
-println("Found $(length(work_dirs)) worker sub-directories")
+num_work = length(work_dirs)
+println("Found $num_work worker sub-directories")
 
 # Combined results dataframe
 println("Combining result tables...")
 dfs_table = DataFrame[] # not sorted
-for dir in work_dirs
-    println("    reading $(basename(dir))")
+for iwk in 1:num_work
+    dir = joinpath(output_dir, "wk_$iwk")
+    print("    $iwk/$num_work ")
     f  = joinpath(dir, "result_table.csv")
     if isfile(f)
+        println("    reading $f")
         df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
         push!(dfs_table, df)
     else
-        println("        skipping worker; could not find $f")
+        println("    skipped; could not find $f")
     end
 end
 combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_table)
@@ -52,7 +55,8 @@ println("    wrote $(nrow(combined))x$(ncol(combined)) table to '$outpath'")
 println(" ")
 
 println("Statistics...")
-@printf("    total:   %7d \n",nrow( filter(row -> row["succ"] != 0.0, combined) ) )
+@printf("    total:   %7d \n",nrow(combined) )
+@printf("    visited: %7d \n",nrow( filter(row -> row["succ"] != 0.0, combined) ) )
 @printf("    success: %7d \n",nrow( filter(row -> row["succ"]  > 0.0, combined) ) )
 @printf("    failure: %7d \n",nrow( filter(row -> row["succ"]  < 0.0, combined) ) )
 println(" ")
@@ -60,14 +64,16 @@ println(" ")
 # Combined fluxes dataframe
 println("Combining emission fluxes...")
 dfs_emits = DataFrame[] # not sorted
-for dir in work_dirs
-    println("    reading $(basename(dir))")
+for iwk in 1:num_work
+    dir = joinpath(output_dir, "wk_$iwk")
+    print("    $iwk/$num_work ")
     f  = joinpath(dir, "result_emits.csv")
     if isfile(f)
+        println("    reading $f")
         df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
         push!(dfs_emits, df)
     else
-        println("        skipping worker; could not find $f")
+        println("    skipped; could not find $f")
     end
 end
 combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_emits)
@@ -86,17 +92,19 @@ println(" ")
 # Combined NetCDF file
 println("Combining NetCDF profiles...")
 dfs_profs = Dict{String,Array}[] # not sorted
-for dir in work_dirs
-    println("    reading $(basename(dir))")
+for iwk in 1:num_work
+    dir = joinpath(output_dir, "wk_$iwk")
+    print("    $iwk/$num_work ")
     f  = joinpath(dir, "result_profs.nc")
 
     if isfile(f)
+        println("    reading $f")
         ds = Dataset(f) # open
         df = Dict([(k,ds[k][:,:]) for k in ("t","p","r")]) # read T,P,R arrays
         close(ds) # close
         push!(dfs_profs, df)
     else
-        println("        skipping worker; could not find $f")
+        println("    skipped; could not find $f")
     end
 end
 
@@ -117,19 +125,20 @@ var_p = defVar(ds, "p", Float64, ("nlev_c","gridsize",) ) # saved in python dime
 var_t = defVar(ds, "t", Float64, ("nlev_c","gridsize",) )
 var_r = defVar(ds, "r", Float64, ("nlev_c","gridsize",) )
 
-for (idx,dir) in enumerate(work_dirs)  # for each worker directory
+for iwk in 1:num_work  # for each worker directory
     # get mask of indicies that this worker performed
-    mask_work = dfs_table[idx][!,"index"][:]
+    mask_work = dfs_table[iwk][!,"index"][:]
 
-    println("    parsing $(basename(dir))")
+    print("    $iwk/$num_work ")
+    println("    writing profile")
 
     # loop over these indices
     for i in mask_work
         for j in 1:nlev
             # println("Get profile value for index=$i at level=$j")
-            var_p[j,i] = dfs_profs[idx]["p"][j,i]
-            var_t[j,i] = dfs_profs[idx]["t"][j,i]
-            var_r[j,i] = dfs_profs[idx]["r"][j,i]
+            var_p[j,i] = dfs_profs[iwk]["p"][j,i]
+            var_t[j,i] = dfs_profs[iwk]["t"][j,i]
+            var_r[j,i] = dfs_profs[iwk]["r"][j,i]
         end
     end
 end
