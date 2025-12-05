@@ -536,7 +536,7 @@ module energy
         # Work variables
         Hp::Float64 = 0.0; hgt::Float64 = 0.0
         m1::Float64 = 0.0; m2::Float64 = 0.0; mt::Float64 = 0.0
-        grav::Float64 = 0.0; mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
+        mu::Float64 = 0.0; c_p::Float64 = 0.0; rho::Float64 = 0.0
         ∇_ad::Float64 = 0.0; ∇_pr::Float64 = 0.0; ∇_μ::Float64 = 0.0; staby::Float64 = 0.0
 
 

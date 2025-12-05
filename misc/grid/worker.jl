@@ -39,7 +39,7 @@ const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
     "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.12),
-    "frac_atm"      =>  10.0 .^ range(start=-4,  stop=-1,  length=10),
+    "frac_atm"      =>  10.0 .^ range(start=-3.5,  stop=-0.5,  length=10),
     "mass_tot"      =>  mass_arr,  # M_earth
 
     "logZ"          =>  range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
@@ -68,7 +68,7 @@ const transspec_p::Float64   = 2e3          # Pa
 const fc_floor::Float64      = 600.0       # K
 const fc_wellmixed::Bool     = false      # calculate abundances as well-mixed ?
 
-atmosphere.HYDROGRAV_selfg = true
+atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
 
 
@@ -166,10 +166,18 @@ input_keys = collect(keys(grid))
 #    limit atmosphere mass fraction
 if "frac_atm" in keys(grid)
     grid["frac_atm"] = clamp.(grid["frac_atm"], frac_min, frac_max)
+    grid["frac_atm"] = round.(grid["frac_atm"]; sigdigits=3)
 end
 #    limit core mass fraction
 if "frac_core" in keys(grid)
     grid["frac_core"] = clamp.(grid["frac_core"], frac_min, frac_max)
+    grid["frac_core"] = round.(grid["frac_core"]; sigdigits=3)
+end
+# round other quantities to 3dp...
+for k in String["mass_tot", "Teff", "instellation"]
+    if k in keys(grid)
+        grid[k] = round.(grid[k]; digits=3)
+    end
 end
 
 # Print gridpoints for user
