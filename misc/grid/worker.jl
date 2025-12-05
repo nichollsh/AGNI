@@ -39,7 +39,7 @@ const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
     "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.12),
-    "frac_atm"      =>  range(start=0.00,  stop=0.10,  step=0.01),
+    "frac_atm"      =>  10.0 .^ range(start=-4,  stop=-1,  length=10),
     "mass_tot"      =>  mass_arr,  # M_earth
 
     "logZ"          =>  range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
@@ -62,7 +62,7 @@ const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
 const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
-const frac_min::Float64      = 0.0001        # 0.001 -> 1170 bar for Earth
+const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
 const fc_floor::Float64      = 600.0       # K

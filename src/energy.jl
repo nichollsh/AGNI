@@ -182,7 +182,7 @@ module energy
         atmos.atm.r_level[1, 0:end] .= atmos.rl[:]
         atmos.atm.t_level[1, 0:end] .= atmos.tmpl[:]
 
-        atmos.atm.mass[1, :]        .= atmos.layer_mass[:]
+        atmos.atm.mass[1, :]        .= atmos.layer_σ[:]
         atmos.atm.density[1,:]      .= atmos.layer_ρ[:]
 
         if lw
@@ -552,8 +552,8 @@ module energy
             ∇_pr = log(atmos.tmp[i-1]/atmos.tmp[i]) / log(atmos.p[i-1]/atmos.p[i])
 
             # Mass weights
-            m1 = atmos.layer_mass[i-1]
-            m2 = atmos.layer_mass[i]
+            m1 = atmos.layer_σ[i-1]
+            m2 = atmos.layer_σ[i]
             mt = m1+m2
 
             # Normalise weights

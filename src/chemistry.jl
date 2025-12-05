@@ -386,7 +386,7 @@ module chemistry
                 if atmos.cond_yield["H2O"][i] > 0.0
                     # liquid water content (take ratio of mass surface densities [kg/m^2])
                     atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i]*atmos.cloud_alpha) /
-                                                atmos.layer_mass[i]
+                                                atmos.layer_σ[i]
 
                     # droplet radius and area fraction (fixed values)
                     atmos.cloud_arr_r[i] = atmos.cloud_val_r

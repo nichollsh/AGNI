@@ -100,7 +100,7 @@ of workers (and the allotted time) inside `slurm.sh` by setting `cpus-per-task=X
 
 For example:
 ```console
-sbatch misc/grid/slurm.sh"
+sbatch --export=ALL misc/grid/slurm.sh
 ```
 
 Once finished, combine the results of these workers by using the `consolidate.jl` script.

@@ -36,13 +36,13 @@ module atmosphere
     const AGNI_VERSION::String     = "1.8.2"  # current agni version
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
-    # Hydrostatic and gravity calc (constants and limits)
-    const HYDROGRAV_steps::Int64   = 2000      # total number of layers in hydrostatic integration
-    const HYDROGRAV_maxdr::Float64 = 1e7       # maximum dz across each layer [m]
-    const HYDROGRAV_mindr::Float64 = 1e-2      # minimum dz across each layer [m]
-    const HYDROGRAV_ming::Float64  = 1e-4      # minimum allowed gravity [m/s^2]
-    const HYDROGRAV_constg::Bool   = false     # constant gravity with height?
-    const HYDROGRAV_selfg::Bool    = true      # include self-gravity of the atmosphere?
+    # Hydrostatic+gravity+mass calculation (constants and limits)
+    HYDROGRAV_steps::Int64   = 8000      # total number of steps in height integration
+    HYDROGRAV_maxdr::Float64 = 1e9       # maximum dz across each layer [m]
+    HYDROGRAV_mindr::Float64 = 1e-5      # minimum dz across each layer [m]
+    HYDROGRAV_ming::Float64  = 1e-10     # minimum allowed gravity [m/s^2]
+    HYDROGRAV_constg::Bool   = false     # constant gravity with height?
+    HYDROGRAV_selfg::Bool    = true      # include self-gravity of the atmosphere?
 
     # Other constants
     const UNSET_STR::String             = "__AGNI_UNSET_STR"
@@ -58,7 +58,6 @@ module atmosphere
     # Pressure grid
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
-    const PRESSURE_FACT_TOP::Float64    = 0.8       # Pressure factor at top layer
 
     # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
@@ -140,6 +139,8 @@ module atmosphere
         rl::Array{Float64,1}    # ce radius [m]
         g::Array{Float64,1}     # cc gravity [m s-2]
         gl::Array{Float64,1}    # ce gravity [m s-2]
+        m::Array{Float64,1}     # cc mass encl [kg]
+        ml::Array{Float64,1}    # ce mass encl [kg]
 
         tmp_floor::Float64      # Temperature floor to prevent numerics [K]
         tmp_ceiling::Float64    # Temperature ceiling to prevent numerics [K]
@@ -198,12 +199,12 @@ module atmosphere
         real_gas::Bool                      # use real-gas equations of state where possible
         thermo_funct::Bool                  # use temperature-dependent evaluation of thermodynamic properties
         layer_ρ::Array{Float64,1}           # mass density [kg m-3]
+        layer_σ::Array{Float64,1}           # mass of each layer, per unit area  [kg m-2]
         layer_μ::Array{Float64,1}           # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
         layer_kc::Array{Float64,1}          # thermal conductivity at const-p [W m-1 K-1]
         layer_thick::Array{Float64,1}       # geometrical thickness [m]
-        layer_mass::Array{Float64,1}        # mass per unit area [kg m-2]
-        layer_isbound::Array{Bool,1}        # is this layer gravitationally bound?
+        layer_isbound::Array{Bool,1}        # is this layer strongly bound by gravity?
 
         # Calculated bolometric radiative fluxes (W m-2)
         flux_int::Float64                   # Effective flux  [W m-2] for sol_type=3
@@ -728,13 +729,19 @@ module atmosphere
         # Initialise pressure grid with current p_toa and p_boa
         generate_pgrid!(atmos)
 
-        # Initialise mesh geometry
+        # Initialise grid and other arrays
+        #    radii
         atmos.r             = zeros(Float64, atmos.nlev_c) # radii at cell centres [m]
         atmos.rl            = zeros(Float64, atmos.nlev_l) # radii at cell edges [m]
-        atmos.layer_thick   = zeros(Float64, atmos.nlev_c) # geometric thickness [m]
+        atmos.layer_thick   = zeros(Float64, atmos.nlev_c)
+        #    gravity
         atmos.g             = ones(Float64, atmos.nlev_c) * atmos.grav_surf
         atmos.gl            = ones(Float64, atmos.nlev_l) * atmos.grav_surf
-        atmos.layer_mass    = zeros(Float64, atmos.nlev_c) # mass per unit area [kg m-2]
+        #    enclosed mass [kg]
+        atmos.m             = ones(Float64, atmos.nlev_c) * atmos.interior_mass
+        atmos.ml            = ones(Float64, atmos.nlev_l) * atmos.interior_mass
+        #    surface density (mass of each layer per unit area [kg m-2])
+        atmos.layer_σ       = zeros(Float64, atmos.nlev_c)
         atmos.layer_isbound = trues(atmos.nlev_c)
 
         # Initialise thermodynamic properties
@@ -1287,18 +1294,18 @@ module atmosphere
     end
 
     """
-    **Calculate radius and gravity for all layers.**
+    **Calculate radii, gravities, and masses for all layers.**
 
     Performs hydrostatic integration from the ground upwards.
     Requires density, temperature, pressure to have already been set.
 
-    Does not account for ocean thickness.
+    Does not account for surface ocean height.
 
     Arguments:
-        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
 
     Returns:
-        - `ok::Bool`                function result is ok
+    - `bound::Bool`             atmosphere is strongly bound by gravity
     """
     function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
 
@@ -1307,79 +1314,77 @@ module atmosphere
         fill!(atmos.rl        ,    atmos.rp)
         fill!(atmos.g         ,    atmos.grav_surf)
         fill!(atmos.gl        ,    atmos.grav_surf)
+        fill!(atmos.m         ,    atmos.interior_mass)
+        fill!(atmos.ml        ,    atmos.interior_mass)
         fill!(atmos.layer_thick,   1.0)
-        fill!(atmos.layer_mass ,   1.0)
+        fill!(atmos.layer_σ ,      1.0)
         fill!(atmos.layer_isbound, true)
 
+        # Check config...
+        if HYDROGRAV_constg && HYDROGRAV_selfg
+            @warn "Incompatible gravity parameters have been set:"
+            @warn "    constant with height (HYDROGRAV_constg=$HYDROGRAV_constg)"
+            @warn "    atmos self-attraction (HYDROGRAV_selfg=$HYDROGRAV_selfg)"
+        end
+
         # Temporary values
-        nsub::Int           = round(Int, HYDROGRAV_steps/atmos.nlev_c, RoundUp)
-        ok::Bool            = true
-        mass_encl::Float64  = atmos.interior_mass # mass enclosed within current level
+        nsub::Int = round(Int, HYDROGRAV_steps/atmos.nlev_c, RoundUp)
 
         # Integrate from surface upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
-            # Calculate gravity at lower edge
-            if !HYDROGRAV_constg
-                atmos.gl[i+1] = phys.G_grav * mass_encl / atmos.rl[i+1]^2
-            end
-            if atmos.gl[i+1] < HYDROGRAV_ming
-                atmos.gl[i+1] = HYDROGRAV_ming
-                ok = false
-            end
-
+            # ------------
             # Integrate from lower edge to centre
-            atmos.r[i] = integrate_hydrograv(atmos.rl[i+1], atmos.gl[i+1], atmos.pl[i+1], atmos.p[i], atmos.layer_ρ[i], nsub)
+            atmos.r[i], atmos.g[i], atmos.m[i] =
+                integ_hydrograv(atmos.rl[i+1], atmos.gl[i+1], atmos.ml[i+1], atmos.pl[i+1],
+                                    atmos.p[i], atmos.layer_ρ[i], nsub)
+
+            #   apply radius limiter
             atmos.r[i] = max(atmos.r[i], atmos.rl[i+1] + HYDROGRAV_mindr)
-            if atmos.r[i] > atmos.rl[i+1] + HYDROGRAV_maxdr
-                atmos.r[i] = atmos.rl[i+1] + HYDROGRAV_maxdr
+            if atmos.r[i] > atmos.rl[i+1] + HYDROGRAV_maxdr/2
+                atmos.r[i] = atmos.rl[i+1] + HYDROGRAV_maxdr/2
                 atmos.layer_isbound[i] = false
-                ok = false
             end
 
-            # Calculate gravity at cell centre
-            #     Does not account for attraction within the layer itself
-            if !HYDROGRAV_constg
-                atmos.g[i] = phys.G_grav * mass_encl / atmos.r[i]^2
+            #   apply gravity limiter
+            if HYDROGRAV_constg
+                atmos.g[i] = atmos.grav_surf
             end
             if atmos.g[i] < HYDROGRAV_ming
                 atmos.g[i] = HYDROGRAV_ming
-                ok = false
-            end
-
-            # Integrate from centre to upper edge
-            atmos.rl[i] = integrate_hydrograv(atmos.r[i], atmos.g[i], atmos.p[i], atmos.pl[i], atmos.layer_ρ[i], nsub)
-            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + HYDROGRAV_mindr)
-            if atmos.rl[i] > atmos.r[i] + HYDROGRAV_maxdr
-                atmos.rl[i] = atmos.r[i] + HYDROGRAV_maxdr
                 atmos.layer_isbound[i] = false
-                ok = false
             end
 
-            # Calculate gravity at top-edge of layer
-            #     Does not account for attraction within the layer itself
-            if !HYDROGRAV_constg
-                atmos.gl[i] = phys.G_grav * mass_encl / atmos.rl[i]^2
+            # ------------
+            # Integrate from centre to upper edge
+            atmos.rl[i], atmos.gl[i], atmos.ml[i] =
+                integ_hydrograv(atmos.r[i], atmos.g[i], atmos.m[i], atmos.p[i],
+                                    atmos.pl[i], atmos.layer_ρ[i], nsub)
+
+            #   apply radius limiter
+            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + HYDROGRAV_mindr)
+            if atmos.rl[i] > atmos.r[i] + HYDROGRAV_maxdr/2
+                atmos.rl[i] = atmos.r[i] + HYDROGRAV_maxdr/2
+                atmos.layer_isbound[i] = false
+            end
+
+            #   apply gravity limiter
+            if HYDROGRAV_constg
+                atmos.gl[i] = atmos.grav_surf
             end
             if atmos.gl[i] < HYDROGRAV_ming
                 atmos.gl[i] = HYDROGRAV_ming
-                ok = false
+                atmos.layer_isbound[i] = false
             end
 
             # Store: Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
-            # Mass per unit area at layer-centre [kg m-2] - "surface density"
-            #     4π terms cancelled-out
-            atmos.layer_mass[i] = (atmos.pl[i+1]*atmos.rl[i+1]^2/atmos.gl[i+1] - atmos.pl[i]*atmos.rl[i]^2/atmos.gl[i])/atmos.r[i]^2
-
-            # Add cumulative mass [kg] to account for self-attraction
-            if HYDROGRAV_selfg
-                mass_encl += atmos.layer_mass[i] * 4 * pi * atmos.r[i]^2
-            end
+            # Mass of layer, per unit area at layer-centre [kg m-2]
+            atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
         end
 
-        return ok
+        return all(atmos.layer_isbound)
     end
 
     """
@@ -1388,22 +1393,42 @@ module atmosphere
     Uses the classic fourth-order Runge-Kutta method.
 
     Arguments:
-        - `r0::Float64`     radius   at start of interval [m]
-        - `g0::Float64`     gravity  at start of interval [m s-2]
-        - `p0::Float64`     pressure at start of interval [Pa]
-        - `p1::Float64`     pressure at end   of interval [Pa]
-        - `rho::Float64`    density throughout interval, constant [kg m-3]
-        - `n::Int`          number of steps for integration (n >= 2)
+    - `r0::Float64`     radius   at start of interval [m]
+    - `g0::Float64`     gravity  at start of interval [m s-2]
+    - `m0::Float64`     mass enc at start of interval [kg]
+    - `p0::Float64`     pressure at start of interval [Pa]
+    - `p1::Float64`     pressure at end   of interval [Pa]
+    - `rho::Float64`    density throughout interval, constant [kg m-3]
+    - `n::Int`          number of steps for integration (n >= 2)
 
     Returns:
-        - `r1::Float64`     radius at end of interval [m]
+    - `rj::Float64`     radius   at end of interval [m]
+    - `gj::Float64`     gravity  at end of interval [kg]
+    - `mj::Float64`     mass enc at end of interval [kg]
     """
-    function integrate_hydrograv(r0::Float64, g0::Float64,
-                                    p0::Float64, p1::Float64, rho::Float64, n::Int)::Float64
+    function integ_hydrograv(r0::Float64, g0::Float64, m0::Float64, p0::Float64,
+                                    p1::Float64, rho::Float64, n::Int)::Tuple{Float64,Float64,Float64}
 
-        # Gravity at given radius (neglecting mass within the interval)
+        # Work variables
+        pj::Float64 = p0    # rolling pressure (decreasing)
+        rj::Float64 = r0    # rolling radius   (increasing)
+        gj::Float64 = g0    # rolling gravity  (incr, decr, or constant)
+        mj::Float64 = m0    # rolling mass     (increasing)
+
+        # Get gravity at r
         function _grav(r)
-            return g0 * (r0/r)^2
+            if HYDROGRAV_constg
+                # gravity is constant
+                return g0
+            else
+                if HYDROGRAV_selfg
+                    # gravity changes with mass and radius
+                    return phys.grav_accel(mj, rj)
+                else
+                    # gravity changes with radius only
+                    return g0 * (r0/rj)^2
+                end
+            end
         end
 
         # Derivative to integrate
@@ -1418,25 +1443,27 @@ module atmosphere
         k1::Float64  = 0.0; k2::Float64 = 0.0
         k3::Float64  = 0.0; k4::Float64 = 0.0
 
-        # Integrate over pressure space
-        pj::Float64 = p0    # rolling pressure (decreasing)
-        rj::Float64 = r0    # rolling radius   (increasing)
+        # Loop over sub-levels between p0 and p1
         for _ in range(p0, stop=p1, step=dp)
 
-            # gradient terms
+            # Integrate radius ...
             k1 = _drdp(pj,       rj)
             k2 = _drdp(pj + dp2, rj + k1*dp2)
             k3 = _drdp(pj + dp2, rj + k2*dp2)
             k4 = _drdp(pj + dp,  rj + k3*dp)
-
-            # step height (increase)
             rj += dp/6 * (k1 + 2*k2 + 2*k3 + k4)
 
-            # step pressure (decrease)
+            # Integrate mass enclosed ...
+            mj += 4 * pi * rj^2 * (-1 * dp) / gj
+
+            # Integrate pressure (negative change )
             pj += dp
+
+            # Update gravity
+            gj = _grav(rj)
         end
 
-        return rj
+        return (rj, gj, mj)
     end
 
     """
@@ -1579,7 +1606,7 @@ module atmosphere
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
         # Shrink top-most layer to avoid doing too much extrapolation
-        atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
+        # atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
 
         # Finally, convert arrays to actual pressure units [Pa]
         @. atmos.p  = 10.0 ^ atmos.p
