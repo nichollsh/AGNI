@@ -38,15 +38,15 @@ const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=
 #    enter the least-important parameters first
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.12),
-    "frac_atm"      =>       range(start=0.00,  stop=0.10,  step=0.01),
-    "mass_tot"      =>       mass_arr,  # M_earth
+    "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.12),
+    "frac_atm"      =>  range(start=0.00,  stop=0.10,  step=0.01),
+    "mass_tot"      =>  mass_arr,  # M_earth
 
-    "logZ"          =>   range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
-    "logCO"         =>   range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
+    "logZ"          =>  range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
+    "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
-    "instellation"  =>  Float64[1.0, 10.0, 100.0, 300.0, 1000.0], # S_earth
-    "Teff"          =>       range(start=2500,  stop=5500,  step=600.0),
+    "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
+    "Teff"          =>  range(start=2500,  stop=5500,  step=600.0),
 ))
 
 # Variables to record
@@ -131,6 +131,7 @@ AGNI.setup_logging(
 )
 
 @info "This process is operating worker ID=$id_work (of $num_work total)"
+@info "    HOSTNAME=$(gethostname())"
 @info "    OUT_DIR=$OUT_DIR"
 
 # Output files
@@ -162,10 +163,6 @@ input_keys = collect(keys(grid))
 
 # Tidy grid
 @info "Grid axes:"
-#    round total mass to 2dp
-if "mass_tot" in keys(grid)
-    grid["mass_tot"] = round.(grid["mass_tot"]; digits=2)
-end
 #    limit atmosphere mass fraction
 if "frac_atm" in keys(grid)
     grid["frac_atm"] = clamp.(grid["frac_atm"], frac_min, frac_max)
@@ -173,11 +170,6 @@ end
 #    limit core mass fraction
 if "frac_core" in keys(grid)
     grid["frac_core"] = clamp.(grid["frac_core"], frac_min, frac_max)
-end
-#    round instellation to 1dp
-#    sort in descending order
-if "instellation" in keys(grid)
-    grid["instellation"] = reverse(sort(round.(grid["instellation"]; digits=1)))
 end
 
 # Print gridpoints for user
