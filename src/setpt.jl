@@ -36,7 +36,7 @@ module setpt
     end
 
     # Process a series of requests describing T(p)
-    function request!(atmos::atmosphere.Atmos_t, request::Array{String,1})::Bool
+    function request!(atmos::atmosphere.Atmos_t, request::Array)::Bool
         num_req::Int = length(request)          # Number of requests
         idx_req::Int = 1                        # Index of current request
         str_req::String = atmosphere.UNSET_STR  # String of current request
