@@ -2,7 +2,7 @@
 title = "Base config for structure calcs"
 
 [planet]
-    tmp_surf        = 1200.0
+    tmp_surf        = 1700.0
     instellation    = 1e6 #3.402500e6
     albedo_b        = 0.18
     s0_fact         = 0.25
@@ -32,12 +32,12 @@ title = "Base config for structure calcs"
     verbosity       = 1
     max_steps       = 50
     max_runtime     = 200
-    num_levels      = 32
+    num_levels      = 35
     solution_type   = 3
     solver          = "newton"
     dx_max          = 400.0
     dx_min          = 1e-10
-    initial_state   = ["loglin","Teq"]
+    initial_state   = ["iso","1500"]
     linesearch      = 2
     easy_start      = false
     grey_start      = false
@@ -53,14 +53,14 @@ title = "Base config for structure calcs"
     overlap_method  = "ee"
     grey_lw         = 5e-3
     grey_sw         = 2e-4
-    real_gas        = false
+    real_gas        = true
     thermo_funct    = true
     sensible_heat   = true
     conduction      = false
     advection       = false
     latent_heat     = false
     convection      = true
-    convection_crit = "l"
+    convection_crit = "s"
     rainout         = false
     oceans          = false
 

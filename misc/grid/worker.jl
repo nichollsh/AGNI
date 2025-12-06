@@ -35,11 +35,10 @@ const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=
 
 # Define grid
 #    parameters will be varied in the same order as these keys
-#    enter the least-important parameters first
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.12),
-    "frac_atm"      =>  10.0 .^ range(start=-3.5,  stop=-0.5,  length=10),
+    "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=-1.0,  length=8),
+    # "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.1),
     "mass_tot"      =>  mass_arr,  # M_earth
 
     "logZ"          =>  range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
@@ -61,7 +60,7 @@ const output_keys =  ["succ", "flux_loss", "r_bound",
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
-const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
+const modplot::Int           = 1            # Plot every `modplot` solver steps (debug)
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
@@ -725,6 +724,7 @@ for (i,p) in enumerate(grid_flat)
     end
 
     # Solve for RCE
+    solver.ls_increase = 0.5
     succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
                                             conduct=cfg["physics"]["conduction"],
                                             convect=cfg["physics"]["convection"],
