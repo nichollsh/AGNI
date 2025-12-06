@@ -37,7 +37,7 @@ module atmosphere
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
-    HYDROGRAV_steps::Int64   = 8000      # total number of steps in height integration
+    HYDROGRAV_steps::Int64   = 9000      # total number of steps in height integration
     HYDROGRAV_maxdr::Float64 = 1e9       # maximum dz across each layer [m]
     HYDROGRAV_mindr::Float64 = 1e-5      # minimum dz across each layer [m]
     HYDROGRAV_ming::Float64  = 1e-10     # minimum allowed gravity [m/s^2]
@@ -666,9 +666,10 @@ module atmosphere
         atmos.C_d =  0.001  # placeholder, will be overwritten
 
         if atmos.real_gas && (atmos.mlt_criterion == 'l')
-            @warn "Ledoux criterion not supported for real gases"
-            @warn "    Switching criterion to Schwarzschild, neglecting MMW gradients"
-            atmos.mlt_criterion = 's'
+            @warn "Ledoux criterion not self-consistently supported for real gases"
+            @warn "    (Will use Ledoux criterion anyway)"
+            # @warn "    Switching criterion to Schwarzschild, neglecting MMW gradients"
+            # atmos.mlt_criterion = 's'
         end
         if !(atmos.mlt_criterion in ['s','l'])
             @error "Invalid choice for mlt_criterion: $(atmos.mlt_criterion)"

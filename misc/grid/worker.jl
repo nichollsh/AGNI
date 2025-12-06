@@ -60,12 +60,13 @@ const output_keys =  ["succ", "flux_loss", "r_bound",
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
-const modplot::Int           = 1            # Plot every `modplot` solver steps (debug)
+const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
-const fc_floor::Float64      = 600.0       # K
+const fc_floor::Float64      = 1000.0       # K
 const fc_wellmixed::Bool     = false      # calculate abundances as well-mixed ?
+const mlt_asymptotic::Bool   = true
 
 atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
@@ -106,7 +107,7 @@ if id_work==1
     mkdir(output_dir)
 end
 if !isdir(output_dir)
-    println(stderr, "Could not find output directory '$output_dir'")
+    println(stderr, "Could not find output folder '$output_dir'")
     exit(1)
 end
 output_dir = realpath(output_dir)
@@ -177,6 +178,10 @@ for k in String["mass_tot", "Teff", "instellation"]
     if k in keys(grid)
         grid[k] = round.(grid[k]; digits=3)
     end
+end
+# sort mass_tot in decreasing order...
+if "mass_tot" in keys(grid)
+    grid["mass_tot"] = reverse(sort(grid["mass_tot"]))
 end
 
 # Print gridpoints for user
@@ -513,6 +518,7 @@ function init_atmos(OUT_DIR::String)
                                     use_all_gases     = true,
                                     surf_roughness=cfg["planet"]["roughness"],
                                     surf_windspeed=cfg["planet"]["wind_speed"],
+                                    mlt_asymptotic=mlt_asymptotic,
                                     fastchem_floor = fc_floor,
                                     fastchem_wellmixed = fc_wellmixed,
                                     Kzz_floor = 0.0,
@@ -656,8 +662,8 @@ for (i,p) in enumerate(grid_flat)
 
             # set T(p) = loglinear up to Teq
             if updated_k
-                atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
-                setpt.request!(atmos, ["loglin","Teq"])
+                atmos.tmp_surf = 200.0 + phys.calc_Teq(atmos.instellation, atmos.albedo_b)
+                setpt.request!(atmos, cfg["execution"]["initial_state"])
             end
 
         elseif startswith(k, "vmr_")
@@ -708,7 +714,7 @@ for (i,p) in enumerate(grid_flat)
 
     # Set temperature array based on interpolation from last solution
     max_steps = Int(cfg["execution"]["max_steps"])
-    if succ_last && (i>1) && haskey(result_profs[i-1],"p")
+    if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
         setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
         easy_start = false
@@ -724,7 +730,7 @@ for (i,p) in enumerate(grid_flat)
     end
 
     # Solve for RCE
-    solver.ls_increase = 0.5
+    # solver.ls_increase = 1.0
     succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
                                             conduct=cfg["physics"]["conduction"],
                                             convect=cfg["physics"]["convection"],
