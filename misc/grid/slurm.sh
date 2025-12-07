@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # CHANGE
-#SBATCH --time=00-8:00:00
-#SBATCH --cpus-per-task=25
-#SBATCH --mem-per-cpu=2500M
+#SBATCH --time=00-24:00:00
+#SBATCH --cpus-per-task=30
+#SBATCH --mem-per-cpu=2700M
 
 # LEAVE
 #SBATCH --export=ALL
@@ -22,7 +22,7 @@ echo "TMPDIR:            $TMPDIR"
 echo "Allocated workers: $SLURM_CPUS_PER_TASK"
 echo "Allocated node:    $SLURM_JOB_NODELIST"
 
-echo "Started at:        $(date -d @$SLURM_JOB_START_TIME)"
+echo "Started at:        $(date)"
 echo "Expected end:      $(date -d @$SLURM_JOB_END_TIME)"
 
 echo " "

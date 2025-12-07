@@ -28,16 +28,16 @@ const SGL_RUNTIME::Float64 = 10.0   # estimated runtime for a single gridpoint [
 const cfg_base = "res/config/struct_grid.toml"
 
 # Mass array with custom spacing
-const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=log10(4.5),   length=8),
+mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=log10(4.5),   length=8),
                                             range(start=log10(5.0),  stop=log10(10.0),  length=7)
                                           )
-
+mass_arr = reverse(sort(mass_arr))
 
 # Define grid
 #    parameters will be varied in the same order as these keys
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=-1.0,  length=8),
+    "frac_atm"      =>  10.0 .^ range(start=-1.0,  stop=-3.0,  length=8),
     # "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.1),
     "mass_tot"      =>  mass_arr,  # M_earth
 
@@ -61,6 +61,7 @@ const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
 const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
+const use_tmpdir             = true
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
@@ -70,6 +71,7 @@ const mlt_asymptotic::Bool   = true
 
 atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
+
 
 
 # =============================================================================
@@ -124,6 +126,17 @@ OUT_DIR = joinpath(output_dir,"wk_$id_work")
 rm(OUT_DIR, recursive=true, force=true)
 mkdir(OUT_DIR)
 
+# IO dir for this worker
+if haskey(ENV, "TMPDIR") && use_tmpdir
+    tmpdir = realpath(ENV["TMPDIR"])
+    IO_DIR = joinpath(tmpdir,"AGNIgrid","wk_$id_work")
+    rm(IO_DIR, recursive=true, force=true)
+    mkpath(IO_DIR)
+else
+    IO_DIR = OUT_DIR
+end
+
+
 # Setup logging ASAP
 AGNI.setup_logging(
     joinpath(OUT_DIR, "wk_$(id_work).log"),
@@ -133,6 +146,7 @@ AGNI.setup_logging(
 @info "This process is operating worker ID=$id_work (of $num_work total)"
 @info "    HOSTNAME=$(gethostname())"
 @info "    OUT_DIR=$OUT_DIR"
+@info "    IO_DIR=$IO_DIR"
 
 # Output files
 result_table_path::String = joinpath(OUT_DIR,"result_table.csv")
@@ -178,10 +192,6 @@ for k in String["mass_tot", "Teff", "instellation"]
     if k in keys(grid)
         grid[k] = round.(grid[k]; digits=3)
     end
-end
-# sort mass_tot in decreasing order...
-if "mass_tot" in keys(grid)
-    grid["mass_tot"] = reverse(sort(grid["mass_tot"]))
 end
 
 # Print gridpoints for user
@@ -474,8 +484,9 @@ Initialise atmosphere object
 
 Arguments:
  - `OUT_DIR::String`    worker output folder
+ - `IO_DIR::String`    worker temp folder
 """
-function init_atmos(OUT_DIR::String)
+function init_atmos(OUT_DIR::String, IO_DIR::String)
 
     global radius
     global mass_tot
@@ -504,7 +515,7 @@ function init_atmos(OUT_DIR::String)
                                     cfg["composition"]["p_top"],
                                     mf_dict, "";
 
-                                    IO_DIR=OUT_DIR,
+                                    IO_DIR=IO_DIR,
                                     condensates=cfg["composition"]["condensates"],
                                     κ_grey_lw=cfg["physics"]["grey_lw"],
                                     κ_grey_sw=cfg["physics"]["grey_sw"],
@@ -546,7 +557,7 @@ function init_atmos(OUT_DIR::String)
 end
 
 # Initialise new atmosphere
-atmos = init_atmos(OUT_DIR)
+atmos = init_atmos(OUT_DIR, IO_DIR)
 wlarr[:] .= atmos.bands_cen[:]
 
 # Get start time
@@ -620,7 +631,7 @@ for (i,p) in enumerate(grid_flat)
 
                 # make new atmosphere
                 atmosphere.deallocate!(atmos)
-                atmos = init_atmos(OUT_DIR)
+                atmos = init_atmos(OUT_DIR, IO_DIR)
                 wlarr[:] .= atmos.bands_cen[:]
             end
         end
