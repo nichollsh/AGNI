@@ -28,8 +28,8 @@ const SGL_RUNTIME::Float64 = 10.0   # estimated runtime for a single gridpoint [
 const cfg_base = "res/config/struct_grid.toml"
 
 # Mass array with custom spacing
-mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=log10(4.5),   length=8),
-                                            range(start=log10(5.0),  stop=log10(10.0),  length=7)
+mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(1.0),  stop=log10(4.5),   length=8)[1:end-1],
+                                            range(start=log10(4.5),  stop=log10(10.0),  length=8)
                                           )
 mass_arr = reverse(sort(mass_arr))
 
@@ -37,12 +37,14 @@ mass_arr = reverse(sort(mass_arr))
 #    parameters will be varied in the same order as these keys
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_atm"      =>  10.0 .^ range(start=-1.0,  stop=-3.0,  length=8),
+    "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=-1.0,  length=8),
+    "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
+
     # "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.1),
     "mass_tot"      =>  mass_arr,  # M_earth
 
-    "logZ"          =>  range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
-    "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
+
+    "logZ"          =>  range(start=1.5,  stop=-1.0,   step=-0.5),  # total metallicity
 
     "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
     "Teff"          =>  range(start=2500,  stop=5500,  step=600.0),
@@ -72,6 +74,8 @@ const mlt_asymptotic::Bool   = true
 atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
 
+# solver.ls_increase = 1.0
+solver.easy_incr  = 1/solver.easy_ini
 
 
 # =============================================================================
@@ -171,6 +175,7 @@ stellar_Teff = cfg["planet"]["star_Teff"]
 input_star   = cfg["files"]["input_star"]
 logZ       = 2.0
 logCO      = 0.0
+easy_start = Bool(cfg["execution"]["easy_start"])
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
@@ -600,6 +605,7 @@ for (i,p) in enumerate(grid_flat)
     global stellar_Teff
     global logZ
     global logCO
+    global easy_start
 
     # Check that this worker is assigned to this grid point, by index
     if grid_flat[i]["worker"] != id_work
@@ -673,7 +679,8 @@ for (i,p) in enumerate(grid_flat)
 
             # set T(p) = loglinear up to Teq
             if updated_k
-                atmos.tmp_surf = 200.0 + phys.calc_Teq(atmos.instellation, atmos.albedo_b)
+                # atmos.tmp_surf = 200.0 + phys.calc_Teq(atmos.instellation, atmos.albedo_b)
+                atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
                 setpt.request!(atmos, cfg["execution"]["initial_state"])
             end
 
@@ -728,11 +735,12 @@ for (i,p) in enumerate(grid_flat)
     if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
         setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
-        easy_start = false
+        # easy_start = false
     else
         # last iter failed
+        atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
         setpt.request!(atmos, cfg["execution"]["initial_state"])
-        easy_start = Bool(cfg["execution"]["easy_start"])
+        # easy_start = true
     end
 
     # Allow more steps for first solution
@@ -741,7 +749,6 @@ for (i,p) in enumerate(grid_flat)
     end
 
     # Solve for RCE
-    # solver.ls_increase = 1.0
     succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
                                             conduct=cfg["physics"]["conduction"],
                                             convect=cfg["physics"]["convection"],
