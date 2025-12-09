@@ -25,7 +25,7 @@ const AGNI_DIR::String = abspath(dirname(@__FILE__),"..","..")
 
 # Get number of workers specified in grid_worker
 grid_script = readchomp(EXEC_WORKER)
-num_work::Int = nthreads()
+num_work::Int = nthreads() # set equal in all cases, for now
 println("Requested $(nthreads()) threads, so will allocate $num_work workers")
 
 # Loop over workers to dispatch them
@@ -36,13 +36,14 @@ println("Requested $(nthreads()) threads, so will allocate $num_work workers")
     end
 
     # Start worker...
-    println("Dispatching worker $id in thread $id...")
+    println("Worker $id started in thread $id...")
     run(
         pipeline(`$EXEC_JULIA --project=$AGNI_DIR $EXEC_WORKER $id $num_work`;
                     stdout=devnull
                 ),
         wait=true
     )
+    println("    worker $id exited")
 end
 
 println("All workers completed at $(now())")
