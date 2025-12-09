@@ -2,7 +2,7 @@
 
 # CHANGE
 #SBATCH --time=00-24:00:00
-#SBATCH --cpus-per-task=40
+#SBATCH --cpus-per-task=70
 #SBATCH --mem-per-cpu=2400M
 
 # LEAVE
@@ -11,7 +11,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --output=slurm-grid-%j.log
+#SBATCH --output=slurm-%x-%j-stdout.log
+#SBATCH --error=slurm-%x-%j-stderr.log
 
 
 echo "Home dir:          $HOME"
@@ -23,7 +24,7 @@ echo "Allocated workers: $SLURM_CPUS_PER_TASK"
 echo "Allocated node:    $SLURM_JOB_NODELIST"
 
 echo "Started at:        $(date)"
-echo "Expected end:      $(date -d @$SLURM_JOB_END_TIME)"
+echo "Expected end:      $(date -d @$SLURM_JOB_END_TIME)    [EPOCH=$SLURM_JOB_END_TIME]"
 
 echo " "
 srun julia -t$SLURM_CPUS_PER_TASK misc/grid/manager.jl

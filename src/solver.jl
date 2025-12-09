@@ -124,7 +124,7 @@ module solver
     plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
     #    linesearch
     ls_tau::Float64    =    0.5     # backtracking downscale size
-    ls_increase::Float64 =  0.8    # factor by which the cost can increase from last step before triggering linesearch
+    ls_increase::Float64 =  0.7     # threshold for change in the cost function, between steps, for triggering/converging linesearch (large values => do LS more often)
     ls_max_steps::Int    =  12      # maximum steps undertaken by linesearch routine
     ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
     ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch

@@ -67,7 +67,7 @@ const use_tmpdir             = true
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
-const fc_floor::Float64      = 1000.0       # K
+const fc_floor::Float64      = 800.0       # K
 const fc_wellmixed::Bool     = false      # calculate abundances as well-mixed ?
 const mlt_asymptotic::Bool   = true
 
