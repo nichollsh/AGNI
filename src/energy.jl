@@ -19,7 +19,9 @@ module energy
     import ..chemistry
     import ..spectrum
 
-    const FILL_FINITE_FLUX::Float64 = 1.0
+    # Constants
+    FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
+    CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [Pa]
 
     """
     **Set non-finite values in an array equal to a given fill value**.
@@ -520,11 +522,8 @@ module energy
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
-
-    Optional arguments:
-    - `pmin::Float64`           pressure [bar] below which convection is disabled
     """
-    function convection!(atmos::atmosphere.Atmos_t; pmin::Float64=1.0e-4)
+    function convection!(atmos::atmosphere.Atmos_t)
 
         # Reset arrays
         fill!(atmos.mask_c,     false)
@@ -544,7 +543,7 @@ module energy
         for i in range(start=atmos.nlev_l-1, step=-1, stop=2)
 
             # Optionally skip low pressures
-            if atmos.pl[i] <= pmin * 1.0e5  # convert bar to Pa
+            if atmos.pl[i] <= CONVECT_MIN_PRESSURE * 1.0e5  # convert bar to Pa
                 break
             end
 

@@ -38,15 +38,19 @@ mass_arr = reverse(sort(mass_arr))
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
     "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=-1.0,  length=8),
-    "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
     # "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.1),
-    "mass_tot"      =>  mass_arr,  # M_earth
+    "frac_core"     =>  Float64[0.325, 0.700],
 
+    "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
+
+    "mass_tot"      =>  mass_arr,  # M_earth
 
     "logZ"          =>  range(start=1.5,  stop=-1.0,   step=-0.5),  # total metallicity
 
+    "flux_int"      => Float64[0.0, 2.5],   # internal heat flux
     "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
+
     "Teff"          =>  range(start=2500,  stop=5500,  step=600.0),
 ))
 
@@ -74,8 +78,10 @@ const mlt_asymptotic::Bool   = true
 atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
 
-# solver.ls_increase = 1.0
+# solver.ls_increase = 1.02
 solver.easy_incr  = 1/solver.easy_ini
+
+# energy.CONVECT_MIN_PRESSURE = 1e-3 * 1e5    # 1 mbar -> Pa
 
 
 # =============================================================================
@@ -612,10 +618,12 @@ for (i,p) in enumerate(grid_flat)
         continue
     end
     i_counter += 1
-    @info @sprintf("Grid point %d of %d total (number %d of chunk)",i,gridsize,i_counter)
+    @info @sprintf("Grid point %d of %d total (%d of %d in chunk)",
+                                i,gridsize,   i_counter,chunksize)
 
     succ_last = succ
     updated_k = false
+    easy_start = false
 
     # Update parameters
     for (idx,(k,val)) in enumerate(p)
@@ -629,7 +637,8 @@ for (i,p) in enumerate(grid_flat)
             continue
         end
 
-        # updating the stellar spectrum requires creating a whole new atmos object...
+        # updating the stellar spectrum requires creating a whole new atmos object
+        #   so do this first...
         if ("Teff" in keys(p)) && (idx == 1)
             if (i > 1) && (grid_flat[i-1]["Teff"] != grid_flat[i]["Teff"])
                 @info "Updating Teff parameter..."
@@ -639,11 +648,13 @@ for (i,p) in enumerate(grid_flat)
                 atmosphere.deallocate!(atmos)
                 atmos = init_atmos(OUT_DIR, IO_DIR)
                 wlarr[:] .= atmos.bands_cen[:]
+
+                easy_start = true
             end
         end
 
         # set other parameter...
-        updated_k = (i==1) || Bool(grid_flat[i-1][k] != grid_flat[i][k])
+        updated_k = (i_counter ==1) || (i==1) || Bool(grid_flat[i-1][k] != grid_flat[i][k])
         if updated_k
             @info "    updated $k = $val"
         else
@@ -674,14 +685,24 @@ for (i,p) in enumerate(grid_flat)
             mass_tot = val * M_earth # convert to SI
             update_structure!(atmos, mass_tot, frac_atm, frac_core)
 
+        elseif k == "flux_int"
+            atmos.flux_int = val
+
+            # set T(p)
+            if updated_k
+                atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
+                setpt.request!(atmos, cfg["execution"]["initial_state"])
+                easy_start = true
+            end
+
         elseif k == "instellation"
             atmos.instellation = val * 1361.0 # W/m^2
 
-            # set T(p) = loglinear up to Teq
+            # set T(p)
             if updated_k
-                # atmos.tmp_surf = 200.0 + phys.calc_Teq(atmos.instellation, atmos.albedo_b)
                 atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
                 setpt.request!(atmos, cfg["execution"]["initial_state"])
+                easy_start = true
             end
 
         elseif startswith(k, "vmr_")
@@ -699,34 +720,12 @@ for (i,p) in enumerate(grid_flat)
         elseif k == "Teff"
             # already handled
 
+
         else
             @error "Unhandled input parameter: $k"
             exit(1)
         end
     end
-
-    # Ensure VMRs sum to unity
-    # tot_vmr::Float64 = 0.0
-    # for i in 1:atmos.nlev_c
-    #     # get total
-    #     tot_vmr = 0.0
-    #     for g in atmos.gas_names
-    #         tot_vmr += atmos.gas_vmr[g][i]
-    #     end
-
-    #     # normalise to 1 if greater than 1, otherwise fill with H2
-    #     if tot_vmr > 1
-    #         for g in atmos.gas_names
-    #             atmos.gas_vmr[g][i] /= tot_vmr
-    #         end
-    #     else
-    #         atmos.gas_vmr["H2"][i] += 1-tot_vmr
-    #     end
-    # end
-    # # set original vmr arrays
-    # for g in atmos.gas_names
-    #     atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
-    # end
 
     @info @sprintf("    using p_surf = %.2e bar",atmos.p_boa/1e5)
 
@@ -734,13 +733,13 @@ for (i,p) in enumerate(grid_flat)
     max_steps = Int(cfg["execution"]["max_steps"])
     if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
-        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
+        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=true)
         # easy_start = false
     else
         # last iter failed
         atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
         setpt.request!(atmos, cfg["execution"]["initial_state"])
-        # easy_start = true
+        easy_start = true
     end
 
     # Allow more steps for first solution
@@ -802,6 +801,7 @@ for (i,p) in enumerate(grid_flat)
             end
         elseif k == "flux_loss"
             result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+
         elseif k == "r_bound"
             if all(atmos.layer_isbound)
                 # fully bound by gravity

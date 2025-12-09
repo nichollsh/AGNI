@@ -110,7 +110,8 @@ module setpt
     end
 
     # Set by interpolating from T,P arrays
-    function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array)
+    function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array;
+                            extrap::Bool=false)
 
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
@@ -147,9 +148,15 @@ module setpt
         # Interpolate from the loaded grid to the required one
         #   This uses log-pressures in order to make the interpolation behave
         #   reasonably across the entire grid.
-        itp::Extrapolation = extrapolate(interpolate((log10.(pl),),tmpl, Gridded(Linear())), Flat())
+        itp::Extrapolation = extrapolate(
+                                        interpolate((log10.(pl),),tmpl, Gridded(Linear())),
+                                        extrap ? Linear() : Flat()
+                                        )
         @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
         @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
+
+        clamp!(atmos.tmpl, atmos.tmp_floor+0.1, atmos.tmp_ceiling-0.1)
+        clamp!(atmos.tmp,  atmos.tmp_floor+0.1, atmos.tmp_ceiling-0.1)
 
         return
     end

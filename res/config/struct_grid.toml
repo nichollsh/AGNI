@@ -3,7 +3,7 @@ title = "Base config for structure calcs"
 
 [planet]
     tmp_surf        = 2200.0
-    instellation    = 1e6 #3.402500e6
+    instellation    = 4e5 #3.402500e6
     albedo_b        = 0.18
     s0_fact         = 0.25
     zenith_angle    = 54.74
@@ -17,12 +17,12 @@ title = "Base config for structure calcs"
     star_Teff       = 3415.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"
+    input_sf        = "res/spectral_files/Honeyside_with_O2/48/Honeyside.sf"
     input_star      = "blackbody"
     output_dir      = "nogit_scratch/out/"
 
 [composition]
-    p_surf          = 100.0
+    p_surf          = 1e4
     p_top           = 1e-4
     metallicities   = {"C"=0.1, "O"=10.0}  # mass fraction
     condensates     = []
@@ -31,7 +31,7 @@ title = "Base config for structure calcs"
     clean_output    = true
     verbosity       = 1
     max_steps       = 50
-    max_runtime     = 300
+    max_runtime     = 320
     num_levels      = 40
     solution_type   = 3
     solver          = "newton"
