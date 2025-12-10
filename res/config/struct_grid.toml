@@ -26,7 +26,7 @@ title = "Base config for structure calcs"
 [composition]
     p_surf          = 1e4
     p_top           = 1e-4
-    metallicities   = {"C"=0.1, "O"=10.0}  # mass fraction
+    metallicities   = {"C"=1.0, "O"=10.0, "N"=0.3, "S"=0.1}  # temp mass fractions
     condensates     = []
 
 [execution]

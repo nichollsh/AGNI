@@ -66,8 +66,8 @@ const output_keys =  ["succ", "flux_loss", "r_bound",
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
-const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
-const use_tmpdir             = true
+const modplot::Int           = 1            # Plot every `modplot` solver steps (debug)
+const use_tmpdir             = false
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 2e3          # Pa
@@ -468,23 +468,40 @@ Update metallicity (by */H mol) from Z and C/O mass ratios
 """
 function update_metallicity!(atmos, _logZ, _logCO)
 
-    # Convert from log-scale to linear
+    #----------------------------
+    # Molar N/H and S/H ratios from solar values
+
+    # Asplund 2009 number density ratios, via FC source files
+    N_to_H_MOLAR = 10^(7.83-12)
+    S_to_H_MOLAR = 10^(7.12-12)
+
+    # Convert to mass ratios
+    N_to_H = N_to_H_MOLAR * phys._get_mmw("N") / phys._get_mmw("H")
+    S_to_H = S_to_H_MOLAR * phys._get_mmw("S") / phys._get_mmw("H")
+
+    # ------------------------
+    # Convert Z and C/O (by mass) from log-scaled to actual values
     Z  = 10^_logZ
     CO = 10^_logCO
 
-    # Need to work out what the X/H mass ratios are...
+    # Work out what the C/H and O/H mass ratios are
+    #     While also accounting for S and N contribution to total metallicity (Z)
 
-    # C/H by mass
-    C_to_H = (CO * Z) / (1+CO)
+    #     C/H by mass
+    C_to_H = ( CO/(1+CO) ) * (Z - N_to_H - S_to_H)
 
-    # O/H by mass
-    O_to_H = Z - C_to_H
+    #     O/H by mass
+    O_to_H = C_to_H / CO
 
+
+    # ----------------------------
+    # pass to dictionary used for FC input
     # metallicity is by mass frac, but atmosphere stores value by mol frac
+    atmos.metal_orig["H"] = 1.0
     atmos.metal_orig["C"] = C_to_H * phys._get_mmw("H") / phys._get_mmw("C")
     atmos.metal_orig["O"] = O_to_H * phys._get_mmw("H") / phys._get_mmw("O")
-    atmos.metal_orig["H"] = 1.0
-    atmos.metal_orig["S"] = 0.0
+    atmos.metal_orig["S"] = S_to_H * phys._get_mmw("H") / phys._get_mmw("S")
+    atmos.metal_orig["N"] = N_to_H * phys._get_mmw("H") / phys._get_mmw("N")
 
     # remove FC input file to force update
     rm(atmos.fastchem_elem, force=true)

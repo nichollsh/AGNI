@@ -2,7 +2,7 @@
 
 # CHANGE
 #SBATCH --time=02-01:00:00
-#SBATCH --cpus-per-task=70
+#SBATCH --cpus-per-task=80
 #SBATCH --mem-per-cpu=2500M
 
 # LEAVE
