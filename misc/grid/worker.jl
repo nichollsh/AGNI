@@ -40,7 +40,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=-1.0,  length=8),
 
     # "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_core"     =>  Float64[0.325, 0.700],
+    "frac_core"     =>  Float64[0.325, 0.5, 0.7],
 
     "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
@@ -48,7 +48,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
     "logZ"          =>  range(start=1.5,  stop=-1.0,   step=-0.5),  # total metallicity
 
-    "flux_int"      => Float64[0.0, 2.5],   # internal heat flux
+    # "flux_int"      => Float64[0.0, 1.0],   # internal heat flux
     "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
 
     "Teff"          =>  range(start=2500,  stop=5500,  step=600.0),
@@ -730,7 +730,8 @@ for (i,p) in enumerate(grid_flat)
     @info @sprintf("    using p_surf = %.2e bar",atmos.p_boa/1e5)
 
     # Set temperature array based on interpolation from last solution
-    max_steps = Int(cfg["execution"]["max_steps"])
+    max_steps   = Int(cfg["execution"]["max_steps"])
+    max_runtime = Float64(cfg["execution"]["max_runtime"])
     if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
         setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=true)
@@ -744,7 +745,8 @@ for (i,p) in enumerate(grid_flat)
 
     # Allow more steps for first solution
     if i_counter == 1
-        max_steps *= 2
+        max_steps   *= 2
+        max_runtime *= 2
     end
 
     # Solve for RCE
@@ -755,7 +757,7 @@ for (i,p) in enumerate(grid_flat)
                                             sens_heat= cfg["physics"]["sensible_heat"],
                                             chem=cfg["physics"]["chemistry"],
                                             max_steps=max_steps,
-                                            max_runtime=Float64(cfg["execution"]["max_runtime"]),
+                                            max_runtime=max_runtime,
                                             conv_atol= cfg["execution"]["converge_atol"],
                                             conv_rtol=cfg["execution"]["converge_rtol"],
                                             method=1,

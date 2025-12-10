@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # CHANGE
-#SBATCH --time=00-24:00:00
-#SBATCH --cpus-per-task=75
-#SBATCH --mem-per-cpu=2600M
+#SBATCH --time=02-01:00:00
+#SBATCH --cpus-per-task=70
+#SBATCH --mem-per-cpu=2500M
 
 # LEAVE
 #SBATCH --export=ALL
