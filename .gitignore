@@ -52,6 +52,8 @@ __pycache__
 debug/
 nogit*
 .osfcli.config
+.venv
+.conda
 
 # RFM
 rfm
