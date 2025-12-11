@@ -40,7 +40,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=-1.0,  length=8),
 
     # "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_core"     =>  Float64[0.325, 0.5, 0.7],
+    "frac_core"     =>  Float64[0.325, 0.7],
 
     "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
@@ -51,7 +51,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     # "flux_int"      => Float64[0.0, 1.0],   # internal heat flux
     "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
 
-    "Teff"          =>  range(start=2500,  stop=5500,  step=600.0),
+    "Teff"          =>  range(start=2500,  stop=5750,  step=650.0),
 ))
 
 # Variables to record
@@ -59,7 +59,8 @@ const output_keys =  ["succ", "flux_loss", "r_bound",
                         "p_surf",
                         "t_surf", "r_surf", "μ_surf", "g_surf",
                         "t_phot", "r_phot", "μ_phot", "g_phot",
-                        "vmr_H2", "vmr_H2O", "vmr_CO2", "vmr_CO", "vmr_O2",
+                        "vmr_H2", "vmr_H2O", "vmr_CO2", "vmr_CO", "vmr_O2", "vmr_OH",
+                        "vmr_NH3", "vmr_NO2", "vmr_N2", "vmr_SO2", "vmr_H2S", "vmr_H2SO4",
                         "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
