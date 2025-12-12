@@ -48,7 +48,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
     "logZ"          =>  range(start=1.0,  stop=-2.0,   step=-0.5),  # total metallicity
 
-    "flux_int"      => Float64[0.0, 1.0],   # internal heat flux
+    "flux_int"      => Float64[0.0, 0.5],   # internal heat flux
     "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
 
     "Teff"          =>  range(start=2500,  stop=5750,  step=650.0),
@@ -71,9 +71,9 @@ const modplot::Int           = 0            # Plot every `modplot` solver steps 
 const use_tmpdir             = true
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
-const transspec_p::Float64   = 2e3          # Pa
-const fc_floor::Float64      = 800.0       # K
-const fc_wellmixed::Bool     = false      # calculate abundances as well-mixed ?
+const transspec_p::Float64   = 20e-3 * 1e5  # 20 mbar -> Pa
+const fc_floor::Float64      = 900.0        # K
+const fc_wellmixed::Bool     = false        # calculate abundances as well-mixed ?
 const mlt_asymptotic::Bool   = true
 
 atmosphere.HYDROGRAV_selfg  = true
@@ -752,7 +752,7 @@ for (i,p) in enumerate(grid_flat)
     max_runtime = Float64(cfg["execution"]["max_runtime"])
     if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
-        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=true)
+        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=false)
         # easy_start = false
     else
         # last iter failed
