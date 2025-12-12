@@ -37,18 +37,18 @@ mass_arr = reverse(sort(mass_arr))
 #    parameters will be varied in the same order as these keys
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=-1.0,  length=8),
+    "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=-1.0,  length=6),
 
     # "frac_core"     =>  range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_core"     =>  Float64[0.325, 0.7],
+    "frac_core"     =>  Float64[0.200, 0.325, 0.7],
 
     "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
 
     "mass_tot"      =>  mass_arr,  # M_earth
 
-    "logZ"          =>  range(start=1.5,  stop=-1.0,   step=-0.5),  # total metallicity
+    "logZ"          =>  range(start=1.0,  stop=-2.0,   step=-0.5),  # total metallicity
 
-    # "flux_int"      => Float64[0.0, 1.0],   # internal heat flux
+    "flux_int"      => Float64[0.0, 1.0],   # internal heat flux
     "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
 
     "Teff"          =>  range(start=2500,  stop=5750,  step=650.0),

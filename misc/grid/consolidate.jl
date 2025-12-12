@@ -55,10 +55,14 @@ println("    wrote $(nrow(combined))x$(ncol(combined)) table to '$outpath'")
 println(" ")
 
 println("Statistics...")
-@printf("    total:   %7d \n",nrow(combined) )
-@printf("    visited: %7d \n",nrow( filter(row -> row["succ"] != 0.0, combined) ) )
-@printf("    success: %7d \n",nrow( filter(row -> row["succ"]  > 0.0, combined) ) )
-@printf("    failure: %7d \n",nrow( filter(row -> row["succ"]  < 0.0, combined) ) )
+num_tot = nrow(combined)
+num_suc = nrow( filter(row -> row["succ"]  >  0.1, combined) )
+num_fai = nrow( filter(row -> row["succ"]  < -0.1, combined) )
+num_vis = num_suc + num_fai
+@printf("    total:   %7d \n",num_tot)
+@printf("    visited: %7d \n",num_vis )
+@printf("    success: %7d (%.1f%% of visited)\n",num_suc,100*num_suc/num_vis )
+@printf("    failure: %7d (%.1f%% of visited)\n",num_fai,100*num_fai/num_vis )
 println(" ")
 
 # Combined fluxes dataframe

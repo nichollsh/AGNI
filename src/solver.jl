@@ -284,9 +284,12 @@ module solver
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost at ls_alpha
         ls_cful::Float64         = 1.0e99               # linesearch cost at full step
+        plateau_apply::Bool      = false                # Plateau declared in this iteration?
+
+        #     stability
         easy_start               = Bool(easy_start)     # make copy of variable - don't modify parameter
         easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor
-        plateau_apply::Bool      = false                # Plateau declared in this iteration?
+        fc_wm_default::Bool      = atmos.fastchem_wellmixed # should we aim for well-mixed composition?
 
         #     tracking
         step::Int =             0       # Step number
@@ -547,6 +550,8 @@ module solver
         easy_start = easy_start && (convect || latent)
         if !easy_start
             easy_sf = 1.0
+        else
+            atmos.fastchem_wellmixed = true
         end
 
         # Initial plot
@@ -625,11 +630,17 @@ module solver
 
                 # Check if sf needs to be increased
                 if (c_cur*easy_trig < conv_atol + conv_rtol * c_max) && !grey_step
-                    stepflags *= "r"
+                    # increase scale factor
                     easy_sf = max(easy_sf, easy_ini)
                     easy_sf = min(1.0, easy_sf*easy_incr)
-                    easy_step = true
+                    stepflags *= "r"
                     @debug "        updated easy_sf = $easy_sf"
+
+                    # mark as increased
+                    easy_step = true
+
+                    # restore original fc parameters
+                    atmos.fastchem_wellmixed = fc_wm_default
                 end
 
                 # done modulating
@@ -912,6 +923,10 @@ module solver
             end
 
         end # end solver loop
+
+        # make sure to restore original settings, if haven't already
+        atmos.rt_scheme = rt_default
+        atmos.fastchem_wellmixed = fc_wm_default
 
         # ----------------------------------------------------------
         # Extract solution
