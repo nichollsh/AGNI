@@ -20,7 +20,7 @@ title = "Roughly 55 Cancri e @ fO2=IW"
     output_dir      = "out/"
 
 [composition]
-    p_top           = 1e-7
+    p_top           = 1e-6
     p_dict          = {H2O = 0.308,CO2 = 15.516,N2  = 16.065,H2  = 0.691,CO  = 231.415    }
     condensates     = []
 
