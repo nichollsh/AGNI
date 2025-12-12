@@ -22,6 +22,7 @@ module energy
     # Constants
     FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
     CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [Pa]
+    CONVECT_REAL_GAS::Bool          = false     # use real gas EOS in convection scheme, if RG EOS enabled
 
     """
     **Set non-finite values in an array equal to a given fill value**.
@@ -565,7 +566,7 @@ module energy
             rho  = atmos.layer_ρ[i]    * m2 + atmos.layer_ρ[i-1]    * m1
 
             # Dry convective lapse rate, and pressure scale height
-            if atmos.real_gas
+            if atmos.real_gas && CONVECT_REAL_GAS
                 # general solution
                 ∇_ad = atmos.pl[i] / (atmos.tmpl[i] * rho * c_p)
                 Hp = atmos.pl[i] / (rho * atmos.gl[i])

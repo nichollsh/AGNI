@@ -109,6 +109,7 @@ module solver
     end
 
     # Solver constants and parameters
+    cost_exponent::Real   = 4
     #    chemistry
     compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
     compose_ls::Bool      = true    # Do chem/comp for every linesearch step
@@ -481,7 +482,7 @@ module solver
 
         # Cost function to minimise
         function _cost(_r::Array)::Float64
-            return norm(_r,3)
+            return norm(_r,cost_exponent)
         end
 
         # Plot current state
