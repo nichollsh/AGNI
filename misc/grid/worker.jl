@@ -45,7 +45,7 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
     "logZ"          =>  range(start=1.0,  stop=-2.0,   step=-0.5),  # total metallicity
 
-    "flux_int"      => Float64[0.0, 0.5],   # internal heat flux
+    #"flux_int"      => Float64[0.0, 0.5],   # internal heat flux
     "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
 
     "Teff"          =>  range(start=2500,  stop=5750,  step=650.0),
