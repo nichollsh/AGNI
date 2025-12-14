@@ -18,7 +18,7 @@ const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
 const R_earth::Float64 = 6.371e6    # m
 const M_earth::Float64 = 5.972e24   # kg
 const DEFAULT_FILL::Float64 = 0.0   # fill value for arrays
-const SGL_RUNTIME::Float64 = 10.0   # estimated runtime for a single gridpoint [seconds]
+const SGL_RUNTIME::Float64 = 45.0   # estimated runtime for a single gridpoint [seconds]
 
 # =============================================================================
 #                        ALL CONFIGURATION HERE
