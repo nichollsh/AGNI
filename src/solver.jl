@@ -1059,11 +1059,6 @@ module solver
             @error "Invalid solution type ($sol_type)"
             return false
         end
-        if sol_type == 1
-            @error "Solution type of 1 (fixed Tsurf) is not supported by solve_prescribed"
-            return false
-        end
-
         # Validate atm_type
         if (atm_type < 1) || (atm_type > 3)
             @error "Invalid atmosphere prescription ($atm_type)"
@@ -1094,7 +1089,13 @@ module solver
         end
 
         # Handle different solution types
-        if sol_type == 2
+        if sol_type == 1
+            # Constant surface temperature, which is trivial
+            _prescribe!(atmos, atm_type, atmos.tmp_surf)
+            energy.calc_fluxes!(atmos, radiative=true)
+            succ = true
+
+        elseif sol_type == 2
             # Conductive boundary layer => find Tsurf based on Tmagma
 
             function _skinfunc!(_tsurf::Float64)::Float64
