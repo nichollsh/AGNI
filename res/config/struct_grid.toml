@@ -4,7 +4,7 @@ title = "Base config for structure calcs"
 [planet]
     tmp_surf        = 2200.0
     instellation    = 4e5 #3.402500e6
-    albedo_b        = 0.18
+    albedo_b        = 0.00
     s0_fact         = 0.25
     zenith_angle    = 54.74
     surface_material= "res/surface_albedos/lunarmarebasalt.dat"
