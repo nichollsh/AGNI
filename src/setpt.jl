@@ -36,7 +36,7 @@ module setpt
     end
 
     # Process a series of requests describing T(p)
-    function request!(atmos::atmosphere.Atmos_t, request::Array{String,1})::Bool
+    function request!(atmos::atmosphere.Atmos_t, request::Array)::Bool
         num_req::Int = length(request)          # Number of requests
         idx_req::Int = 1                        # Index of current request
         str_req::String = atmosphere.UNSET_STR  # String of current request
@@ -110,7 +110,8 @@ module setpt
     end
 
     # Set by interpolating from T,P arrays
-    function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array)
+    function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array;
+                            extrap::Bool=false)
 
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
@@ -147,9 +148,15 @@ module setpt
         # Interpolate from the loaded grid to the required one
         #   This uses log-pressures in order to make the interpolation behave
         #   reasonably across the entire grid.
-        itp::Extrapolation = extrapolate(interpolate((log10.(pl),),tmpl, Gridded(Linear())), Flat())
+        itp::Extrapolation = extrapolate(
+                                        interpolate((log10.(pl),),tmpl, Gridded(Linear())),
+                                        extrap ? Linear() : Flat()
+                                        )
         @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
         @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
+
+        clamp!(atmos.tmpl, atmos.tmp_floor+0.1, atmos.tmp_ceiling-0.1)
+        clamp!(atmos.tmp,  atmos.tmp_floor+0.1, atmos.tmp_ceiling-0.1)
 
         return
     end
@@ -502,7 +509,7 @@ module setpt
         # Evalulate cell-centre temperatures
         for i in 1:atmos.nlev_c
             # get LW optical depth
-            τ = guillot.eval_tau(atmos.p[i], atmos.layer_grav[i])
+            τ = guillot.eval_tau(atmos.p[i], atmos.g[i])
 
             # set temperature
             atmos.tmp[i] = guillot.eval_T4_cos(τ, Tint, Tirr, atmos.zenith_degrees)^0.25

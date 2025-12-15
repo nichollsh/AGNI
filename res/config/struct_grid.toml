@@ -2,9 +2,9 @@
 title = "Base config for structure calcs"
 
 [planet]
-    tmp_surf        = 1900.0
-    instellation    = 1e6 #3.402500e6
-    albedo_b        = 0.18
+    tmp_surf        = 2200.0
+    instellation    = 4e5 #3.402500e6
+    albedo_b        = 0.00
     s0_fact         = 0.25
     zenith_angle    = 54.74
     surface_material= "res/surface_albedos/lunarmarebasalt.dat"
@@ -17,29 +17,31 @@ title = "Base config for structure calcs"
     star_Teff       = 3415.0
 
 [files]
-    input_sf        =  "res/spectral_files/Dayspring/48/Dayspring.sf"
+    input_sf        = "res/spectral_files/Honeyside_with_O2/48/Honeyside.sf"
+    #input_sf        = "greygas"
+    #input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"
     input_star      = "blackbody"
     output_dir      = "nogit_scratch/out/"
 
 [composition]
-    p_surf          = 100.0
-    p_top           = 1e-4
-    metallicities   = {"C"=0.1, "O"=10.0}  # mass fraction
+    p_surf          = 1e4
+    p_top           = 1e-3
+    metallicities   = {"C"=1.0, "O"=10.0, "N"=0.3, "S"=0.1}  # temp mass fractions
     condensates     = []
 
 [execution]
     clean_output    = true
     verbosity       = 1
-    max_steps       = 50
-    max_runtime     = 200
-    num_levels      = 35
+    max_steps       = 52
+    max_runtime     = 320
+    num_levels      = 40
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 400.0
+    dx_max          = 300.0
     dx_min          = 1e-10
-    initial_state   = ["loglin","Teq"]
+    initial_state   = ["loglin","2000"] #["loglin","1400", "str", "Teq"]
     linesearch      = 2
-    easy_start      = false
+    easy_start      = true
     grey_start      = false
     converge_atol   = 1.0
     converge_rtol   = 1.0e-2
@@ -53,14 +55,14 @@ title = "Base config for structure calcs"
     overlap_method  = "ee"
     grey_lw         = 5e-3
     grey_sw         = 2e-4
-    real_gas        = false
+    real_gas        = true
     thermo_funct    = true
-    sensible_heat   = true
+    sensible_heat   = false
     conduction      = false
     advection       = false
     latent_heat     = false
     convection      = true
-    convection_crit = "l"
+    convection_crit = "s"
     rainout         = false
     oceans          = false
 

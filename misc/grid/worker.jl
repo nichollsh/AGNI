@@ -18,7 +18,7 @@ const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
 const R_earth::Float64 = 6.371e6    # m
 const M_earth::Float64 = 5.972e24   # kg
 const DEFAULT_FILL::Float64 = 0.0   # fill value for arrays
-const SGL_RUNTIME::Float64 = 10.0   # estimated runtime for a single gridpoint [seconds]
+const SGL_RUNTIME::Float64 = 45.0   # estimated runtime for a single gridpoint [seconds]
 
 # =============================================================================
 #                        ALL CONFIGURATION HERE
@@ -28,39 +28,36 @@ const SGL_RUNTIME::Float64 = 10.0   # estimated runtime for a single gridpoint [
 const cfg_base = "res/config/struct_grid.toml"
 
 # Mass array with custom spacing
-const mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(0.7),  stop=log10(4.5),   length=8),
-                                            range(start=log10(5.0),  stop=log10(10.0),  length=8)
+mass_arr::Array{Float64, 1} = 10.0 .^ vcat( range(start=log10(1.0),  stop=log10(4.5),   length=8)[1:end-1],
+                                            range(start=log10(4.5),  stop=log10(10.0),  length=8)
                                           )
-
+mass_arr = reverse(sort(mass_arr))
 
 # Define grid
 #    parameters will be varied in the same order as these keys
-#    enter the least-important parameters first
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_core"     =>       range(start=0.2,   stop=0.7,   step=0.1),
-    "frac_atm"      =>       range(start=0.00,  stop=0.15,  step=0.03),
-    "mass_tot"      =>       mass_arr,  # M_earth
+    "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=log10(0.25),  length=7),
+    "frac_core"     =>  Float64[0.200, 0.325, 0.7],
 
-    # OLD METHOD...
-    # metallicities here are by MOLE fraction relative to hydrogen
-    # "metal_S"       => 10 .^ range(start=-1.0,  stop=3.0,     step=2.0),
-    # "metal_O"       => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),
-    # "metal_C"       => 10 .^ range(start=-4.0,  stop=0.0,   step=2.0),
+    "mass_tot"      =>  mass_arr,  # M_earth
 
-    # NEW METHOD...
-    "logZ"          =>   range(start=-1.0,  stop=1.5,   step=0.5),  # total metallicity
-    "logCO"         =>   range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
+    "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
+    "logZ"          =>  range(start=1.0,  stop=-2.0,   step=-0.5),  # total metallicity
 
-    "instellation"  =>  Float64[1.0, 10.0, 100.0, 300.0, 1000.0], # S_earth
-    "Teff"          =>       range(start=2500,  stop=5500,  step=600.0),
+    #"flux_int"      => Float64[0.0, 0.5],   # internal heat flux
+    "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
+
+    "Teff"          =>  range(start=2500,  stop=5750,  step=650.0),
 ))
 
 # Variables to record
 const output_keys =  ["succ", "flux_loss", "r_bound",
-                        "p_surf", "t_surf", "r_surf", "μ_surf",
+                        "p_surf",
+                        "t_surf", "r_surf", "μ_surf", "g_surf",
                         "t_phot", "r_phot", "μ_phot", "g_phot",
-                        "vmr_H2", "vmr_H2O", "vmr_CO2", "vmr_CO", "vmr_O2",
+                        "vmr_H2", "vmr_H2O", "vmr_CO2", "vmr_CO", "vmr_O2", "vmr_OH",
+                        "vmr_NH3", "vmr_NO2", "vmr_N2", "vmr_SO2", "vmr_H2S", "vmr_H2SO4",
                         "Kzz_max", "conv_ptop", "conv_pbot",]
 
 # Grid management options
@@ -68,11 +65,21 @@ const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
 const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
 const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
-const frac_min::Float64      = 0.0005        # 0.001 -> 1170 bar for Earth
+const use_tmpdir             = true
+const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
-const transspec_p::Float64   = 2e3          # Pa
-const fc_floor::Float64      = 600.0       # K
-const fc_wellmixed::Bool     = false      # calculate abundances as well-mixed ?
+const transspec_p::Float64   = 20e-3 * 1e5  # 20 mbar -> Pa
+const fc_floor::Float64      = 900.0        # K
+const fc_wellmixed::Bool     = false        # calculate abundances as well-mixed ?
+const mlt_asymptotic::Bool   = true
+
+atmosphere.HYDROGRAV_selfg  = true
+atmosphere.HYDROGRAV_constg = false
+
+# solver.ls_increase = 1.02
+solver.easy_incr  = 1/solver.easy_ini
+
+# energy.CONVECT_MIN_PRESSURE = 1e-3 * 1e5    # 1 mbar -> Pa
 
 
 # =============================================================================
@@ -110,7 +117,7 @@ if id_work==1
     mkdir(output_dir)
 end
 if !isdir(output_dir)
-    println(stderr, "Could not find output directory '$output_dir'")
+    println(stderr, "Could not find output folder '$output_dir'")
     exit(1)
 end
 output_dir = realpath(output_dir)
@@ -127,6 +134,17 @@ OUT_DIR = joinpath(output_dir,"wk_$id_work")
 rm(OUT_DIR, recursive=true, force=true)
 mkdir(OUT_DIR)
 
+# IO dir for this worker
+if haskey(ENV, "TMPDIR") && use_tmpdir
+    tmpdir = realpath(ENV["TMPDIR"])
+    IO_DIR = joinpath(tmpdir,"AGNIgrid","wk_$id_work")
+    rm(IO_DIR, recursive=true, force=true)
+    mkpath(IO_DIR)
+else
+    IO_DIR = OUT_DIR
+end
+
+
 # Setup logging ASAP
 AGNI.setup_logging(
     joinpath(OUT_DIR, "wk_$(id_work).log"),
@@ -134,7 +152,9 @@ AGNI.setup_logging(
 )
 
 @info "This process is operating worker ID=$id_work (of $num_work total)"
+@info "    HOSTNAME=$(gethostname())"
 @info "    OUT_DIR=$OUT_DIR"
+@info "    IO_DIR=$IO_DIR"
 
 # Output files
 result_table_path::String = joinpath(OUT_DIR,"result_table.csv")
@@ -159,28 +179,28 @@ stellar_Teff = cfg["planet"]["star_Teff"]
 input_star   = cfg["files"]["input_star"]
 logZ       = 2.0
 logCO      = 0.0
+easy_start = Bool(cfg["execution"]["easy_start"])
 
 # Get the keys from the grid dictionary
 input_keys = collect(keys(grid))
 
 # Tidy grid
 @info "Grid axes:"
-#    round total mass to 2dp
-if "mass_tot" in keys(grid)
-    grid["mass_tot"] = round.(grid["mass_tot"]; digits=2)
-end
 #    limit atmosphere mass fraction
 if "frac_atm" in keys(grid)
     grid["frac_atm"] = clamp.(grid["frac_atm"], frac_min, frac_max)
+    grid["frac_atm"] = round.(grid["frac_atm"]; sigdigits=3)
 end
 #    limit core mass fraction
 if "frac_core" in keys(grid)
     grid["frac_core"] = clamp.(grid["frac_core"], frac_min, frac_max)
+    grid["frac_core"] = round.(grid["frac_core"]; sigdigits=3)
 end
-#    round instellation to 1dp
-#    sort in descending order
-if "instellation" in keys(grid)
-    grid["instellation"] = reverse(sort(round.(grid["instellation"]; digits=1)))
+# round other quantities to 3dp...
+for k in String["mass_tot", "Teff", "instellation"]
+    if k in keys(grid)
+        grid[k] = round.(grid[k]; digits=3)
+    end
 end
 
 # Print gridpoints for user
@@ -421,7 +441,7 @@ function update_structure!(atmos, mtot, fatm, fcor)
         @warn "Core fraction ($fcor) and atm fraction ($fatm) sum to >1"
     end
 
-    # atmosphere mass
+    # atmosphere mass [SI units]
     mass_atm = mtot * fatm
 
     # interior mass from remainder
@@ -446,23 +466,40 @@ Update metallicity (by */H mol) from Z and C/O mass ratios
 """
 function update_metallicity!(atmos, _logZ, _logCO)
 
-    # Convert from log-scale to linear
+    #----------------------------
+    # Molar N/H and S/H ratios from solar values
+
+    # Asplund 2009 number density ratios, via FC source files
+    N_to_H_MOLAR = 10^(7.83-12)
+    S_to_H_MOLAR = 10^(7.12-12)
+
+    # Convert to mass ratios
+    N_to_H = N_to_H_MOLAR * phys._get_mmw("N") / phys._get_mmw("H")
+    S_to_H = S_to_H_MOLAR * phys._get_mmw("S") / phys._get_mmw("H")
+
+    # ------------------------
+    # Convert Z and C/O (by mass) from log-scaled to actual values
     Z  = 10^_logZ
     CO = 10^_logCO
 
-    # Need to work out what the X/H mass ratios are...
+    # Work out what the C/H and O/H mass ratios are
+    #     While also accounting for S and N contribution to total metallicity (Z)
 
-    # C/H by mass
-    C_to_H = (CO * Z) / (1+CO)
+    #     C/H by mass
+    C_to_H = ( CO/(1+CO) ) * (Z - N_to_H - S_to_H)
 
-    # O/H by mass
-    O_to_H = Z - C_to_H
+    #     O/H by mass
+    O_to_H = C_to_H / CO
 
+
+    # ----------------------------
+    # pass to dictionary used for FC input
     # metallicity is by mass frac, but atmosphere stores value by mol frac
+    atmos.metal_orig["H"] = 1.0
     atmos.metal_orig["C"] = C_to_H * phys._get_mmw("H") / phys._get_mmw("C")
     atmos.metal_orig["O"] = O_to_H * phys._get_mmw("H") / phys._get_mmw("O")
-    atmos.metal_orig["H"] = 1.0
-    atmos.metal_orig["S"] = 0.0
+    atmos.metal_orig["S"] = S_to_H * phys._get_mmw("H") / phys._get_mmw("S")
+    atmos.metal_orig["N"] = N_to_H * phys._get_mmw("H") / phys._get_mmw("N")
 
     # remove FC input file to force update
     rm(atmos.fastchem_elem, force=true)
@@ -473,8 +510,9 @@ Initialise atmosphere object
 
 Arguments:
  - `OUT_DIR::String`    worker output folder
+ - `IO_DIR::String`    worker temp folder
 """
-function init_atmos(OUT_DIR::String)
+function init_atmos(OUT_DIR::String, IO_DIR::String)
 
     global radius
     global mass_tot
@@ -503,7 +541,7 @@ function init_atmos(OUT_DIR::String)
                                     cfg["composition"]["p_top"],
                                     mf_dict, "";
 
-                                    IO_DIR=OUT_DIR,
+                                    IO_DIR=IO_DIR,
                                     condensates=cfg["composition"]["condensates"],
                                     κ_grey_lw=cfg["physics"]["grey_lw"],
                                     κ_grey_sw=cfg["physics"]["grey_sw"],
@@ -517,6 +555,7 @@ function init_atmos(OUT_DIR::String)
                                     use_all_gases     = true,
                                     surf_roughness=cfg["planet"]["roughness"],
                                     surf_windspeed=cfg["planet"]["wind_speed"],
+                                    mlt_asymptotic=mlt_asymptotic,
                                     fastchem_floor = fc_floor,
                                     fastchem_wellmixed = fc_wellmixed,
                                     Kzz_floor = 0.0,
@@ -544,7 +583,7 @@ function init_atmos(OUT_DIR::String)
 end
 
 # Initialise new atmosphere
-atmos = init_atmos(OUT_DIR)
+atmos = init_atmos(OUT_DIR, IO_DIR)
 wlarr[:] .= atmos.bands_cen[:]
 
 # Get start time
@@ -587,16 +626,19 @@ for (i,p) in enumerate(grid_flat)
     global stellar_Teff
     global logZ
     global logCO
+    global easy_start
 
     # Check that this worker is assigned to this grid point, by index
     if grid_flat[i]["worker"] != id_work
         continue
     end
     i_counter += 1
-    @info @sprintf("Grid point %d of %d total (number %d of chunk)",i,gridsize,i_counter)
+    @info @sprintf("Grid point %d of %d total (%d of %d in chunk)",
+                                i,gridsize,   i_counter,chunksize)
 
     succ_last = succ
     updated_k = false
+    easy_start = false
 
     # Update parameters
     for (idx,(k,val)) in enumerate(p)
@@ -610,7 +652,8 @@ for (i,p) in enumerate(grid_flat)
             continue
         end
 
-        # updating the stellar spectrum requires creating a whole new atmos object...
+        # updating the stellar spectrum requires creating a whole new atmos object
+        #   so do this first...
         if ("Teff" in keys(p)) && (idx == 1)
             if (i > 1) && (grid_flat[i-1]["Teff"] != grid_flat[i]["Teff"])
                 @info "Updating Teff parameter..."
@@ -618,13 +661,15 @@ for (i,p) in enumerate(grid_flat)
 
                 # make new atmosphere
                 atmosphere.deallocate!(atmos)
-                atmos = init_atmos(OUT_DIR)
+                atmos = init_atmos(OUT_DIR, IO_DIR)
                 wlarr[:] .= atmos.bands_cen[:]
+
+                easy_start = true
             end
         end
 
         # set other parameter...
-        updated_k = (i==1) || Bool(grid_flat[i-1][k] != grid_flat[i][k])
+        updated_k = (i_counter ==1) || (i==1) || Bool(grid_flat[i-1][k] != grid_flat[i][k])
         if updated_k
             @info "    updated $k = $val"
         else
@@ -652,16 +697,27 @@ for (i,p) in enumerate(grid_flat)
             update_structure!(atmos, mass_tot, frac_atm, frac_core)
 
         elseif k == "mass_tot"
-            mass_tot = val * M_earth
+            mass_tot = val * M_earth # convert to SI
             update_structure!(atmos, mass_tot, frac_atm, frac_core)
+
+        elseif k == "flux_int"
+            atmos.flux_int = val
+
+            # set T(p)
+            if updated_k
+                atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
+                setpt.request!(atmos, cfg["execution"]["initial_state"])
+                easy_start = true
+            end
 
         elseif k == "instellation"
             atmos.instellation = val * 1361.0 # W/m^2
 
-            # set T(p) = loglinear up to Teq
+            # set T(p)
             if updated_k
                 atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
-                setpt.request!(atmos, ["loglin","Teq"])
+                setpt.request!(atmos, cfg["execution"]["initial_state"])
+                easy_start = true
             end
 
         elseif startswith(k, "vmr_")
@@ -679,55 +735,34 @@ for (i,p) in enumerate(grid_flat)
         elseif k == "Teff"
             # already handled
 
+
         else
             @error "Unhandled input parameter: $k"
             exit(1)
         end
     end
 
-    # Ensure VMRs sum to unity
-    tot_vmr::Float64 = 0.0
-    for i in 1:atmos.nlev_c
-        # get total
-        tot_vmr = 0.0
-        for g in atmos.gas_names
-            tot_vmr += atmos.gas_vmr[g][i]
-        end
-
-        # normalise to 1 if greater than 1, otherwise fill with H2
-        if tot_vmr > 1
-            for g in atmos.gas_names
-                atmos.gas_vmr[g][i] /= tot_vmr
-            end
-        else
-            atmos.gas_vmr["H2"][i] += 1-tot_vmr
-        end
-    end
-    # set original vmr arrays
-    for g in atmos.gas_names
-        atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
-    end
-
-    # @info @sprintf("    using p_surf = %.2e bar",atmos.pl[end]/1e5)
+    @info @sprintf("    using p_surf = %.2e bar",atmos.p_boa/1e5)
 
     # Set temperature array based on interpolation from last solution
-    max_steps = Int(cfg["execution"]["max_steps"])
-    if succ_last && (i>1) && haskey(result_profs[i-1],"p")
+    max_steps   = Int(cfg["execution"]["max_steps"])
+    max_runtime = Float64(cfg["execution"]["max_runtime"])
+    if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
-        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"])
-        easy_start = false
+        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=false)
+        # easy_start = false
     else
         # last iter failed
+        atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
         setpt.request!(atmos, cfg["execution"]["initial_state"])
-        easy_start = Bool(cfg["execution"]["easy_start"])
+        easy_start = true
     end
 
     # Allow more steps for first solution
     if i_counter == 1
-        max_steps *= 2
+        max_steps   *= 2
+        max_runtime *= 2
     end
-
-    # solver.ls_increase = 0.7
 
     # Solve for RCE
     succ = solver.solve_energy!(atmos, sol_type=cfg["execution"]["solution_type"],
@@ -737,7 +772,7 @@ for (i,p) in enumerate(grid_flat)
                                             sens_heat= cfg["physics"]["sensible_heat"],
                                             chem=cfg["physics"]["chemistry"],
                                             max_steps=max_steps,
-                                            max_runtime=Float64(cfg["execution"]["max_runtime"]),
+                                            max_runtime=max_runtime,
                                             conv_atol= cfg["execution"]["converge_atol"],
                                             conv_rtol=cfg["execution"]["converge_rtol"],
                                             method=1,
@@ -783,6 +818,7 @@ for (i,p) in enumerate(grid_flat)
             end
         elseif k == "flux_loss"
             result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+
         elseif k == "r_bound"
             if all(atmos.layer_isbound)
                 # fully bound by gravity
