@@ -35,10 +35,14 @@ module solver
     - `atol`        Convergence: absolute tolerance on minimum
     - `max_steps`   Maximum number of iterations
     - `warnings`    Print warning if search does not converge before `max_steps`` are taken.
+
+    Returns:
+    - `sol`         Best solution found by search.
+    - `succ`        Did search converge?
     """
     function gs_search(f::Function,a::Float64,b::Float64,
                             dxtol::Float64,atol::Float64,max_steps::Int;
-                            warnings::Bool=false)::Float64
+                            warnings::Bool=false)::Tuple{Float64,Bool}
         c::Float64 = (-1+sqrt(5))/2
 
         x1::Float64 = c*a + (1-c)*b
@@ -67,26 +71,26 @@ module solver
 
             if fx1 < atol
                 # @debug "GS search found minimum. $(i+2) function evaluations, best = $x1"
-                return x1
+                return (x1, true)
             end
 
             if fx2 < atol
                 # @debug "GS search found minimum. $(i+2) function evaluations, best = $x2"
-                return x2
+                return (x2, true)
             end
 
             midp = 0.5*(a+b)
 
             if abs(b-a) < dxtol
                 # @debug "GS search reached minimum bracket size. $(i+2) function evaluations, best = $best"
-                return midp
+                return (midp, false)
             end
         end
 
         if warnings
             @warn "GS search did not converge"
         end
-        return midp
+        return (midp, false)
     end
 
     # Status codes for solver
@@ -105,6 +109,7 @@ module solver
     end
 
     # Solver constants and parameters
+    cost_exponent::Real   = 4
     #    chemistry
     compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
     compose_ls::Bool      = true    # Do chem/comp for every linesearch step
@@ -120,7 +125,7 @@ module solver
     plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
     #    linesearch
     ls_tau::Float64    =    0.5     # backtracking downscale size
-    ls_increase::Float64 =  0.8    # factor by which the cost can increase from last step before triggering linesearch
+    ls_increase::Float64 =  0.7     # threshold for change in the cost function, between steps, for triggering/converging linesearch (large values => do LS more often)
     ls_max_steps::Int    =  12      # maximum steps undertaken by linesearch routine
     ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
     ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
@@ -280,9 +285,12 @@ module solver
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost at ls_alpha
         ls_cful::Float64         = 1.0e99               # linesearch cost at full step
+        plateau_apply::Bool      = false                # Plateau declared in this iteration?
+
+        #     stability
         easy_start               = Bool(easy_start)     # make copy of variable - don't modify parameter
         easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor
-        plateau_apply::Bool      = false                # Plateau declared in this iteration?
+        fc_wm_default::Bool      = atmos.fastchem_wellmixed # should we aim for well-mixed composition?
 
         #     tracking
         step::Int =             0       # Step number
@@ -474,7 +482,7 @@ module solver
 
         # Cost function to minimise
         function _cost(_r::Array)::Float64
-            return norm(_r,3)
+            return norm(_r,cost_exponent)
         end
 
         # Plot current state
@@ -543,6 +551,8 @@ module solver
         easy_start = easy_start && (convect || latent)
         if !easy_start
             easy_sf = 1.0
+        else
+            atmos.fastchem_wellmixed = true
         end
 
         # Initial plot
@@ -621,11 +631,17 @@ module solver
 
                 # Check if sf needs to be increased
                 if (c_cur*easy_trig < conv_atol + conv_rtol * c_max) && !grey_step
-                    stepflags *= "r"
+                    # increase scale factor
                     easy_sf = max(easy_sf, easy_ini)
                     easy_sf = min(1.0, easy_sf*easy_incr)
-                    easy_step = true
+                    stepflags *= "r"
                     @debug "        updated easy_sf = $easy_sf"
+
+                    # mark as increased
+                    easy_step = true
+
+                    # restore original fc parameters
+                    atmos.fastchem_wellmixed = fc_wm_default
                 end
 
                 # done modulating
@@ -774,7 +790,7 @@ module solver
                     if (ls_method == 1) || (ls_cful*0.1 < conv_atol + conv_rtol * c_max)
                         # Use golden-section search method
                         ls_alpha = gs_search(_ls_func, ls_min_scale, ls_max_scale,
-                                                1.0e-9, ls_min_scale, ls_max_steps)
+                                                1.0e-9, ls_min_scale, ls_max_steps)[1]
 
                     elseif ls_method == 2
                         # Use backtracking method
@@ -909,6 +925,10 @@ module solver
 
         end # end solver loop
 
+        # make sure to restore original settings, if haven't already
+        atmos.rt_scheme = rt_default
+        atmos.fastchem_wellmixed = fc_wm_default
+
         # ----------------------------------------------------------
         # Extract solution
         # ----------------------------------------------------------
@@ -1039,17 +1059,13 @@ module solver
             @error "Invalid solution type ($sol_type)"
             return false
         end
-        if sol_type == 1
-            @error "Solution type of 1 (fixed Tsurf) is not supported by solve_prescribed"
-            return false
-        end
-
         # Validate atm_type
         if (atm_type < 1) || (atm_type > 3)
             @error "Invalid atmosphere prescription ($atm_type)"
             return false
         end
 
+        succ::Bool = false
 
         # Function to set atmosphere according to the desired prescription
         function _prescribe!(atmos::atmosphere.Atmos_t, atm_type::Int, _tsurf::Float64)
@@ -1067,10 +1083,19 @@ module solver
                 setpt.dry_adiabat!(atmos)
                 setpt.stratosphere!(atmos, phys.calc_Tskin(atmos.instellation, atmos.albedo_b))
             end
+
+            # layer properties
+            atmosphere.calc_layer_props!(atmos)
         end
 
         # Handle different solution types
-        if sol_type == 2
+        if sol_type == 1
+            # Constant surface temperature, which is trivial
+            _prescribe!(atmos, atm_type, atmos.tmp_surf)
+            energy.calc_fluxes!(atmos, radiative=true)
+            succ = true
+
+        elseif sol_type == 2
             # Conductive boundary layer => find Tsurf based on Tmagma
 
             function _skinfunc!(_tsurf::Float64)::Float64
@@ -1087,8 +1112,8 @@ module solver
 
             # Find solution for T_surf
             tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            T_surf = gs_search(_skinfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
-                                    0.0, tol, max_steps; warnings=true)
+            (T_surf,succ) = gs_search(_skinfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
+                                        0.0, tol, max_steps; warnings=true)
 
             # Store final result
             _skinfunc!(T_surf)
@@ -1111,8 +1136,8 @@ module solver
 
             # Find solution for T_surf
             tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            T_surf = gs_search(_intfunc!, atmos.tmp_floor, tmp_upper,
-                                    0.0, tol, max_steps; warnings=true)
+            (T_surf,succ) = gs_search(_intfunc!, atmos.tmp_floor, tmp_upper,
+                                        0.0, tol, max_steps; warnings=true)
 
             # Store final result
             _intfunc!(T_surf)
@@ -1133,15 +1158,15 @@ module solver
 
             # Find solution for T_surf
             tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_u_lw))
-            T_surf = gs_search(_olrfunc!, atmos.tmp_floor, tmp_upper,
-                                    0.0, tol, max_steps; warnings=true)
+            (T_surf,succ) = gs_search(_olrfunc!, atmos.tmp_floor, tmp_upper,
+                                        0.0, tol, max_steps; warnings=true)
 
             # Store final result
             _olrfunc!(T_surf)
         end
 
         # Flag as solved
-        atmos.is_converged = true
+        atmos.is_converged = succ
         atmos.is_solved = true
 
         # Print info
@@ -1194,6 +1219,8 @@ module solver
             return false
         end
 
+        succ::Bool = false
+
         # Handle different solution types
         if sol_type == 1
             # Fixed temperature case => just calculate radiative fluxes
@@ -1216,8 +1243,8 @@ module solver
 
             # Find solution for T_surf
             tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            T_surf = gs_search(_skinfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
-                                    0.0, tol, max_steps; warnings=true)
+            (T_surf,succ) = gs_search(_skinfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
+                                        0.0, tol, max_steps; warnings=true)
 
             # Store final result
             _skinfunc!(T_surf)
@@ -1238,8 +1265,8 @@ module solver
 
             # Find solution for T_surf
             tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            T_surf = gs_search(_intfunc!, atmos.tmp_floor, tmp_upper,
-                                    0.0, tol, max_steps; warnings=true)
+            (T_surf,succ) = gs_search(_intfunc!, atmos.tmp_floor, tmp_upper,
+                                        0.0, tol, max_steps; warnings=true)
 
             # Store final result
             _intfunc!(T_surf)
@@ -1260,15 +1287,15 @@ module solver
 
             # Find solution for T_surf
             tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_u_lw))
-            T_surf = gs_search(_olrfunc!, atmos.tmp_floor, tmp_upper,
-                                    0.0, tol, max_steps; warnings=true)
+            (T_surf,succ) = gs_search(_olrfunc!, atmos.tmp_floor, tmp_upper,
+                                        0.0, tol, max_steps; warnings=true)
 
             # Store final result
             _olrfunc!(T_surf)
         end
 
         # Flag as solved
-        atmos.is_converged = true
+        atmos.is_converged = succ
         atmos.is_solved = true
 
         # Print info

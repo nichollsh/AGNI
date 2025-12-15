@@ -274,7 +274,7 @@ module chemistry
                     #    current value and saturation
                     atmos.cond_yield[c][i] = atmos.gas_dat[c].mmw*atmos.p[i]*
                                             (atmos.gas_vmr[c][i] - x_sat)/
-                                            (atmos.layer_grav[i] * atmos.layer_μ[i])
+                                            (atmos.g[i] * atmos.layer_μ[i])
 
                     # set new vmr to saturated value
                     #   this will always be <= to the current value
@@ -342,7 +342,7 @@ module chemistry
 
                 # production of gas mass (kg/m2) that would saturate
                 dm_sat = atmos.gas_dat[c].mmw * dp_sat/
-                                        (atmos.layer_grav[j] * atmos.layer_μ[j])
+                                        (atmos.g[j] * atmos.layer_μ[j])
 
                 # Evaporation efficiency factor
                 #   This is how close the layer can be brought to saturation by evap.
@@ -356,8 +356,7 @@ module chemistry
                 atmos.cond_yield[c][j] -= dm_sat
 
                 # convert evaporated mass back to partial pressure
-                dp_sat = dm_sat * atmos.layer_grav[j] *
-                                            atmos.layer_μ[j] / atmos.gas_dat[c].mmw
+                dp_sat = dm_sat * atmos.g[j] * atmos.layer_μ[j] / atmos.gas_dat[c].mmw
 
                 # convert change in partial pressure to change in vmr
                 atmos.gas_vmr[c][j] += dp_sat / atmos.p[j]
@@ -387,7 +386,7 @@ module chemistry
                 if atmos.cond_yield["H2O"][i] > 0.0
                     # liquid water content (take ratio of mass surface densities [kg/m^2])
                     atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i]*atmos.cloud_alpha) /
-                                                atmos.layer_mass[i]
+                                                atmos.layer_σ[i]
 
                     # droplet radius and area fraction (fixed values)
                     atmos.cloud_arr_r[i] = atmos.cloud_val_r
@@ -433,7 +432,7 @@ module chemistry
 
         # Check minimum temperature
         if maximum(atmos.tmpl) < atmos.fastchem_floor
-            @warn "The entire temperature profile is too cold for FastChem"
+            @debug "Whole atmosphere too cold for FC (fc_floor=$(atmos.fastchem_floor))"
         end
 
         count_elem_nonzero::Int = 0
@@ -697,19 +696,19 @@ module chemistry
 
         # Find where T(p) drops below fastchem_floor temperature.
         # Make sure that regions above that use the reasonable VMR values
-        i_trunc::Int = 0
-        for i in reverse(sort(fc_levels))
-            if atmos.tmp[i] < atmos.fastchem_floor
-               i_trunc = i
-               break
-            end
-        end
-        if i_trunc > 0
-            # @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
-            for g in atmos.gas_names
-                atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc]
-            end
-        end
+        # i_trunc::Int = 0
+        # for i in reverse(sort(fc_levels))
+        #     if atmos.tmp[i] < atmos.fastchem_floor
+        #        i_trunc = i
+        #        break
+        #     end
+        # end
+        # if i_trunc > 0
+        #     # @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
+        #     for g in atmos.gas_names
+        #         atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc]
+        #     end
+        # end
 
         # Also record this result in gas_cvmr dictionary
         for g in atmos.gas_names
