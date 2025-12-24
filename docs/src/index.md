@@ -22,4 +22,4 @@ If you use AGNI, please cite the following papers:
 * Nicholls et al. (2025b)  - [10.21105/joss.07726](https://doi.org/10.21105/joss.07726)
 * Nicholls et al. (in rev) - [2507.02656](https://arxiv.org/abs/2507.02656)
 
-This software is available under the GPLv3. Copyright © 2025 Harrison Nicholls.
+This software is available under the GPLv3. Copyright © 2023-2026 Harrison Nicholls.

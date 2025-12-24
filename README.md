@@ -37,7 +37,7 @@ See the [Getting Started](https://www.h-nicholls.space/AGNI/dev/setup/) page in 
 If you use AGNI, please cite the following papers:
 * Nicholls et al. (2025a)  - [10.1093/mnras/stae2772](https://doi.org/10.1093/mnras/stae2772)
 * Nicholls et al. (2025b)  - [10.21105/joss.07726](https://doi.org/10.21105/joss.07726)
-* Nicholls et al. (in rev) - [2507.02656](https://arxiv.org/abs/2507.02656)
+* Nicholls et al. (2026) - [2507.02656](https://arxiv.org/abs/2507.02656)
 
 ## Example
 Below is an animated example of AGNI solving for a temperature-pressure profile, starting from an isothermal state.
@@ -56,4 +56,4 @@ Below is an animated example of AGNI solving for a temperature-pressure profile,
 * `test/`           - Tests for the code
 * `tutorials/`      - Notebooks and tutorials
 
-This software is available under GPLv3. Copyright (C) 2025 Harrison Nicholls.
+This software is available under GPLv3. Copyright (C) 2023-2026 Harrison Nicholls.
