@@ -2428,7 +2428,7 @@ module atmosphere
         # Equation 10.1 from Seager textbook
         @inbounds for i in 1:atmos.nlev_c
             atmos.timescale_rad[i] = atmos.layer_cp[i] * (atmos.pl[i+1] - atmos.pl[i]) /
-                                     (atmos.g[i] * 4 * phys.σSB * atmos.tmp[i])
+                                     (atmos.g[i] * 4 * phys.σSB * atmos.tmp[i]^3)
         end
 
         return nothing
