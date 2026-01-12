@@ -8,11 +8,11 @@ Other components of the wider PROTEUS ecosystem may be found in the table below:
 |:---------|:------------|:--------|
 | PROTEUS  | Model coupling        | [proteus-framework.org](https://proteus-framework.org/) |
 | JANUS    | Convective atmosphere | [fwl-janus.readthedocs.io](https://fwl-janus.readthedocs.io) |
-| MORS     | Stellar evolution     | [fwl-mors.readthedocs.io](https://fwl-mors.readthedocs.io/) |
+| MORS     | Stellar evolution     | [proteus-framework.org/obliqua](https://proteus-framework.org/MORS/) |
 | ZEPHYRUS | Hydrodynamic escape   | [fwl-zephyrus.readthedocs.io](https://fwl-zephyrus.readthedocs.io/) |
 | CALLIOPE | Volatile outgassing   | [proteus-framework.org/callope](https://proteus-framework.org/CALLIOPE/) |
 | LovePy   | Mantle tidal heating  | [github.com/nichollsh/lovepy](https://github.com/nichollsh/lovepy) |
-| Obliqua  | Mantle tidal heating  | [proteus-framework.org/obliqua](https://proteus-framework.org/OBLIQUA/) |
+| Obliqua  | Mantle tidal heating  | [proteus-framework.org/obliqua](https://proteus-framework.org/Obliqua/) |
 | VULCAN   | Chemical kinetics     | [github.com/FormingWorlds/VULCAN](https://github.com/FormingWorlds/VULCAN) |
 | Zalmoxis | Interior structure    | [zalmoxis.readthedocs.io](https://zalmoxis.readthedocs.io/) |
 | Aragog   | Interior dynamics     | [github.com/FormingWorlds/aragog](https://github.com/FormingWorlds/aragog) |
