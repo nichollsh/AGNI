@@ -62,7 +62,7 @@ module consts
 
     # List of elements included in the model
     const elems_standard::Array{String,1} = ["H","C","N","O","S","P","He",
-                                                "Fe","Mg","Si","Ca","Al"]
+                                                "Fe","Mg","Si","Ca","Al","Na"]
     export elems_standard
 
     # Standard species
