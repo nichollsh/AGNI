@@ -82,7 +82,7 @@ module consts
         "PH3",
 
         # refractory elems
-        "Na", "Si", "Ti", "Mg", "K",
+        "Na", "Si", "Ti", "Mg", "K", "Fe",
         # rock vapours
         "SiO2", "SiO", "SiH", "SiH2", "SiH4",
         "FeO", "FeH",
@@ -259,10 +259,13 @@ module consts
         ("He" , "#30FF71" ),
 
         # refractory elements
-        ("Fe" , "#888888"),
+        ("Fe" , "#aa8888"),
         ("Si" , "#aa2277"),
         ("Mg" , "#996633"),
-        ("Na" , "#1144ff")
+        ("Na" , "#1144ff"),
+        ("Ti" , "#779922"),
+        ("K"  , "#bbbbee"),
+        ("Al" , "#ff7711"),
     ])
 
     # Table of liquid-phase density for ocean calculation [kg/m^3]
