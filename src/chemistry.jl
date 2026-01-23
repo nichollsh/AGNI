@@ -507,6 +507,11 @@ module chemistry
                 for gas in atmos.gas_names
                     fill!(N_inp_g, 0.0)
 
+                    # non-zero abundance?
+                    if atmos.gas_vmr[gas][end] < 1e-30
+                        continue
+                    end
+
                     # count atoms in this gas
                     d = phys.count_atoms(gas)
                     for (i,e) in enumerate(phys.elems_standard)
@@ -521,6 +526,12 @@ module chemistry
 
                     # Add atoms from this gas to total atoms in the mixture
                     N_inp_t += N_inp_g
+                end
+
+                # Check that we have some hydrogen...
+                if N_inp_t[1] < 1e-30
+                    @error "Cannot calculate metallicity of hydrogen-free mixture!"
+                    state = 1
                 end
 
                 # Convert elemental abundances to metallicity number ratios, rel to hydrogen
@@ -542,7 +553,13 @@ module chemistry
                     end
 
                     # normalise abundance relative to hydrogen
-                    write(f, @sprintf("%s    %.3f \n",e,log10(atmos.metal_calc[e]) + 12.0))
+                    if isfinite(atmos.metal_calc[e])
+                        write(f, @sprintf("%s    %.3f \n",e,log10(atmos.metal_calc[e]) + 12.0))
+                    else
+                        @error "Got non-finite metallicity for $e - adopting solar value"
+                        write(f, @sprintf("%s    %.3f \n",e,phys.consts._solar_metallicity[e]))
+                    end
+
                     count_elem_nonzero += 1
                 end
             end
