@@ -62,7 +62,7 @@ module consts
 
     # List of elements included in the model
     const elems_standard::Array{String,1} = ["H","C","N","O","S","P","He",
-                                                "Fe","Mg","Si","Ca","Al","Na"]
+                                                "Fe","Mg","Si","Ca","Al","Na","Ti","K"]
     export elems_standard
 
     # Standard species
@@ -82,7 +82,7 @@ module consts
         "PH3",
 
         # refractory elems
-        "Na", "Si", "Ti", "Mg",
+        "Na", "Si", "Ti", "Mg", "K",
         # rock vapours
         "SiO2", "SiO", "SiH", "SiH2", "SiH4",
         "FeO", "FeH",
