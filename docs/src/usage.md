@@ -200,6 +200,7 @@ Parameters that tell the model what to do.
 
 ### `[physics]`
 Parameters that describe how the model should treat the physics.
+
 | Parameter         | Description   |
 | ----------------: | :------------ |
 | `chemistry     `  | Include 1D equilibrium chemistry in the atmosphere (true/false) |

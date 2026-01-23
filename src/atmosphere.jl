@@ -33,7 +33,7 @@ module atmosphere
     import ..spectrum
 
     # Code versions
-    const AGNI_VERSION::String     = "1.8.2"  # current agni version
+    const AGNI_VERSION::String     = "1.8.4"  # current agni version
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
@@ -801,6 +801,10 @@ module atmosphere
         for k in keys(metallicities)
             # mass -> mole, by scaling factor 1/mu
             atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
+
+            if atmos.metal_orig["H"] < 1e-30
+                @error "Cannot define metallicity of hydrogen relative to itself!"
+            end
         end
 
         # Phase change compositional variables
@@ -2428,7 +2432,7 @@ module atmosphere
         # Equation 10.1 from Seager textbook
         @inbounds for i in 1:atmos.nlev_c
             atmos.timescale_rad[i] = atmos.layer_cp[i] * (atmos.pl[i+1] - atmos.pl[i]) /
-                                     (atmos.g[i] * 4 * phys.σSB * atmos.tmp[i])
+                                     (atmos.g[i] * 4 * phys.σSB * atmos.tmp[i]^3)
         end
 
         return nothing
