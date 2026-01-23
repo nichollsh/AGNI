@@ -71,19 +71,24 @@ module consts
         "H", "O", "C", "N", "S", "P", "He",
         # basic
         "CH4", "CO2", "CO", "H2", "H2O", "O2", "OH", "O3",
-        # hydrocarbon
+        # carbon
         "H2O2", "C2H6", "C2H4","C2H2",  "CH3", "H2CO", "HO2", "C2", "C3", "C4", "C5",
-        # sulfur bearing
+        # sulfur
         "SO", "S2", "S8", "SO2", "H2SO4", "H2S", "S", "CS2", "OCS",
         # nitrogen
         "N2", "HCN", "NH3",  "HNO3", "N2O5", "HONO", "HO2NO2",
         "NO3", "N2O", "NO", "NO2",
         # phosphorous
         "PH3",
-        # refractory
-        # "SiO2", "Si", "SiO",
-        # "Fe", "FeO", "FeH",
-        # "Mg2", "Mg", "MgO",
+
+        # refractory elems
+        "Na", "Si", "Ti", "Mg",
+        # rock vapours
+        "SiO2", "SiO", "SiH", "SiH2", "SiH4",
+        "FeO", "FeH",
+        "Mg2", "MgO",
+        "TiO", "TiO2",
+        "HAlO2"
     ]
     export gases_standard
 

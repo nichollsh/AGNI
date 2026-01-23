@@ -10,7 +10,7 @@ title: "AGNI: An open-source model for extreme atmospheres on rocky exoplanets"
 doi: 10.21105/joss.07726
 date-released: 2025-11-20
 
-version: 1.8.3
+version: 1.8.4
 url: "https://github.com/nichollsh/AGNI"
 type: software
 license: "GPL-3.0"

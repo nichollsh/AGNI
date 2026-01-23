@@ -8,6 +8,7 @@ I would like to thank the following people for their input and assistance during
 * [Claire Marie Guimond](https://clairesworld.github.io/)
 * [Arjun Savel](https://www.arjunsavel.com/) -- JOSS paper reviewer
 * [Ryan Macdonald](https://distantworlds.space/) -- JOSS paper reviewer
+* [Leoni Janssen](https://www.universiteitleiden.nl/en/staffmembers/leoni-janssen)
 * [Boding Ouyang](https://github.com/OYBDOOO)
 * [Soumil Kelkar](https://research.rug.nl/en/persons/soumil-kelkar/)
 * [Stuart Daines](https://scholar.google.com/citations?user=EZqVB7wAAAAJ)
