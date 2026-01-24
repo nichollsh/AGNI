@@ -2,8 +2,8 @@
 title = "Base config for structure calcs"
 
 [planet]
-    tmp_surf        = 2200.0
-    instellation    = 4e5 #3.402500e6
+    tmp_surf        = 2000.0
+    instellation    = 13610.0 # #3.402500e6
     albedo_b        = 0.00
     s0_fact         = 0.25
     zenith_angle    = 54.74
@@ -14,7 +14,7 @@ title = "Base config for structure calcs"
     flux_int        = 0.0
     roughness       = 1.0e-2
     wind_speed      = 10.0
-    star_Teff       = 3415.0
+    star_Teff       = 3150.0 #3415.0
 
 [files]
     input_sf        = "res/spectral_files/Honeyside_with_O2/48/Honeyside.sf"

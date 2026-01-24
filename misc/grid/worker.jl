@@ -38,17 +38,18 @@ mass_arr = reverse(sort(mass_arr))
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
     "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=log10(0.25),  length=7),
-    "frac_core"     =>  Float64[0.200, 0.325, 0.7],
+    # "frac_core"     =>  Float64[0.200, 0.325, 0.7],
+
+    "flux_int"      => Float64[803.0, 115.0, 10.0, 1.36, 0.095, 0.0],   # internal heat flux
 
     "mass_tot"      =>  mass_arr,  # M_earth
 
     "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
     "logZ"          =>  range(start=1.0,  stop=-2.0,   step=-0.5),  # total metallicity
 
-    #"flux_int"      => Float64[0.0, 0.5],   # internal heat flux
-    "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
+    # "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
 
-    "Teff"          =>  range(start=2500,  stop=5750,  step=650.0),
+    # "Teff"          =>  range(start=2500,  stop=5750,  step=650.0),
 ))
 
 # Variables to record
@@ -76,7 +77,7 @@ const mlt_asymptotic::Bool   = true
 atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
 
-# solver.ls_increase = 1.02
+solver.ls_increase = 1.02
 solver.easy_incr  = 1/solver.easy_ini
 
 # energy.CONVECT_MIN_PRESSURE = 1e-3 * 1e5    # 1 mbar -> Pa
@@ -552,7 +553,7 @@ function init_atmos(OUT_DIR::String, IO_DIR::String)
                                     overlap_method    = cfg["physics"]["overlap_method"],
                                     real_gas          = cfg["physics"]["real_gas"],
                                     thermo_functions  = cfg["physics"]["thermo_funct"],
-                                    use_all_gases     = true,
+                                    use_all_vols      = true,
                                     surf_roughness=cfg["planet"]["roughness"],
                                     surf_windspeed=cfg["planet"]["wind_speed"],
                                     mlt_asymptotic=mlt_asymptotic,

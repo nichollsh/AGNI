@@ -109,7 +109,7 @@ module solver
     end
 
     # Solver constants and parameters
-    cost_exponent::Real   = 4
+    cost_exponent::Real   = 3
     #    chemistry
     compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
     compose_ls::Bool      = true    # Do chem/comp for every linesearch step
