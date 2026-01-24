@@ -422,6 +422,7 @@ module atmosphere
     - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
+    - `use_all_vols::Bool`              store information on all supported VOLATILE gases, neglecting rock vapours
     - `check_integrity::Bool`           confirm integrity of thermo files using their checksum
     - `κ_grey_lw::Float64`              gas opacity when using grey-gas RT scheme, longwave
     - `κ_grey_sw::Float64`              gas opacity when using grey-gas RT scheme, shortwave
@@ -476,6 +477,7 @@ module atmosphere
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
                     use_all_gases::Bool =       false,
+                    use_all_vols::Bool =        false,
                     check_integrity::Bool =     true,
 
                     κ_grey_lw::Float64  =       8e-4,
@@ -801,10 +803,10 @@ module atmosphere
         for k in keys(metallicities)
             # mass -> mole, by scaling factor 1/mu
             atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
+        end
 
-            if atmos.metal_orig["H"] < 1e-30
-                @error "Cannot define metallicity of hydrogen relative to itself!"
-            end
+        if haskey(atmos.metal_orig, "H") && (atmos.metal_orig["H"] != 1.0)
+            @error "Cannot define metallicity of hydrogen relative to itself!"
         end
 
         # Phase change compositional variables
@@ -924,9 +926,16 @@ module atmosphere
         end
 
         # add extra gases if required
-        if use_all_gases
+        if use_all_gases || use_all_vols
             for gas in phys.gases_standard
+                # add this gas if not already included
                 if !(gas in atmos.gas_names)
+
+                    # skip vapours if user only requested all_vols
+                    if !use_all_gases && (gas in phys.vaps_standard)
+                        continue
+                    end
+
                     atmos.gas_vmr[gas] = zeros(Float64, atmos.nlev_c)
                     push!(atmos.gas_names, gas)
                     atmos.gas_num += 1
