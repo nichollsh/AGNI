@@ -20,9 +20,9 @@ if ! [ -x "$(command -v unzip)" ]; then
 fi
 
 # Check internet connectivity
-header=$(wget --spider -S "https://zenodo.org" 2>&1 | grep "HTTP/")
+header=$(wget --spider -S "https://zenodo.org" 2>&1 | grep "HTTP")
 # echo $header
-if ! [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* ]]; then
+if ! [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* || $header == *"response 2"* || $header == *"response 3"* ]]; then
     # Return error if we don't get a positive HTTP response from Zenodo
     echo "ERROR: Failed to establish a connection to Zenodo"
     echo "Response: $header"

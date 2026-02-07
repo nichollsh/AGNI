@@ -21,7 +21,8 @@ if [ -n "$RAD_DIR" ]; then
     echo "Found SOCRATES path: yes"
 else
     echo "Found SOCRATES path: no"
-    echo "You need to install SOCRATES AND set the RAD_DIR environment variable"
+    echo "You need to install SOCRATES and set the RAD_DIR environment variable"
+    echo "This requires modifying your shell rc file to export RAD_DIR"
     echo "Check the docs: https://www.h-nicholls.space/AGNI/"
     exit 1
 fi
