@@ -85,7 +85,7 @@ Where [TARGET] can be any of the following:
         $help_thermo\
 "
 
-# Generic Zenodo downloader function
+# Generic single file from Zenodo record
 function zenodo {
     # $1 = Zenodo identifier for Record
     # $2 = target folder (on disk)
@@ -128,17 +128,78 @@ function zenodo {
     return 0
 }
 
-# Get zip file and extract it
+# Wrapper around unzip command
+function unzip_wrap {
+    # $1 = zip file path
+    # $2 = target folder to unzip into
+
+    # If the file to check for is in the zip, exclude it from unzip command
+    exclude_file="_readme.txt"
+    if unzip -l $1 | grep -q $exclude_file; then
+        exclude_flag="-x $exclude_file"
+    else
+        exclude_flag=""
+    fi
+
+    unzip -oq $1 -d $2 ${exclude_flag}
+    rm $1
+
+    return 0
+}
+
+# Get whole Zenodo record as Zip, and extract the files
+function zenodo_all {
+    # $1 = Zenodo identifier for Record
+    # $2 = target folder (on disk) to extract files into
+
+    # target file path
+    tgt="$2/$1.zip"
+
+    # target url
+    url="https://zenodo.org/api/records/$1/files-archive"
+
+    # get data
+    echo "    zenodo/$1 > $tgt"
+    mkdir -p $2
+    wget -qO $tgt $url
+
+    # check if command failed or if file does not exist
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command"
+    elif [[ ! -f "$tgt" ]]; then
+        echo "ERROR: Failed to download $1. File not found on disk."
+    else
+        unzip_wrap $tgt $2
+        return 0
+    fi
+
+    # try again at downloading the file?
+    echo "Trying again to download the file"
+    sleep 1
+    wget -qO $tgt $url
+
+    # check if command failed or if file does not exist
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command"
+        exit 1
+    elif [[ ! -f "$tgt" ]]; then
+        echo "ERROR: Failed to download $1. File not found on disk."
+        exit 1
+    fi
+
+    unzip_wrap $tgt $2
+
+    return 0
+}
+
+# Get a zip file from within a Zenodo record, and extract it
 function get_zip {
     # $1 = Zenodo record
     # $2 = target folder on disk
     # $3 = name of zip file in the Zenodo record
 
-    zippath="$2/$3"
-
     zenodo $1 $2 $3
-    unzip -oq $zippath -d $2
-    rm $zippath
+    unzip_wrap "$2/$3" $2
 }
 
 # Get a spectral file by name
@@ -231,12 +292,9 @@ function handle_request {
             echo $help_basic
 
             anyspec Oak 318
-            # anyspec Dayspring 16
             anyspec Dayspring 48
-            # anyspec Honeyside 256
 
-            zenodo 15721440 $stellar sun.txt
-
+            zenodo 17981836 $stellar sun.txt
             get_zip 15805460 $thermo gases.zip
             ;;
 
@@ -260,37 +318,17 @@ function handle_request {
 
         "stellar")
             echo $help_stellar
-            rec="15721440"
-            zenodo $rec $stellar trappist-1.txt
-            zenodo $rec $stellar eps-eri.txt
-            zenodo $rec $stellar hd97658.txt
-            zenodo $rec $stellar gj1214.txt
-            zenodo $rec $stellar sun.txt
-            zenodo $rec $stellar l-98-59.txt
+
+            # muscles spectra
+            zenodo_all 15721440 $stellar
+
+            # modern sun spectrum
+            zenodo 17981836 $stellar sun.txt
             ;;
 
         "surfaces")
             echo $help_surf_standard
-            rec="15880455"
-            zenodo $rec $surface andesite.dat
-            zenodo $rec $surface basaltglass.dat
-            zenodo $rec $surface basalttuff.dat
-            zenodo $rec $surface diorite.dat
-            zenodo $rec $surface gabbro.dat
-            zenodo $rec $surface granite.dat
-            zenodo $rec $surface harzburgite.dat
-            zenodo $rec $surface hematite.dat
-            zenodo $rec $surface lherzolite.dat
-            zenodo $rec $surface lunaranorthosite.dat
-            zenodo $rec $surface lunarmarebasalt.dat
-            zenodo $rec $surface marsbasalticshergottite.dat
-            zenodo $rec $surface marsbreccia.dat
-            zenodo $rec $surface norite.dat
-            zenodo $rec $surface phonolite.dat
-            zenodo $rec $surface pyrite.dat
-            zenodo $rec $surface rhyolite.dat
-            zenodo $rec $surface tephrite.dat
-            zenodo $rec $surface tholeiiticbasalt.dat
+            zenodo_all 15880455 $surface    # Hammond+24 RELAB data
             ;;
 
         "surfaces_extended")
