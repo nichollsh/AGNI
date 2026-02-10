@@ -32,9 +32,12 @@ failed = 0
 # which test suite to run?
 suite::String = "all"
 if length(ARGS)>0
-    suite = ARGS[1]
+    suite = strip(ARGS[1])
+    if suite == "0"
+        suite = "fast"
+    end
 end
-@info "Using suite $suite"
+@info "Using test suite '$suite'"
 
 rm(OUT_DIR,force=true,recursive=true)
 if !isdir(OUT_DIR) && !isfile(OUT_DIR)

@@ -108,9 +108,9 @@ module save
             ds.attrib["description"]        = "AGNI atmosphere data"
             ds.attrib["date"]               = Dates.format(now(), "yyyy-u-dd HH:MM:SS")
             ds.attrib["hostname"]           = gethostname()
-            ds.attrib["username"]           = ENV["USER"]
-            ds.attrib["AGNI_version"]      = atmos.AGNI_VERSION
-            ds.attrib["SOCRATES_version"]  = atmos.SOCRATES_VERSION
+            ds.attrib["username"]           = get(ENV,"USER","UNKNOWN")
+            ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
+            ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
 
             plat::String = "Generic"
             if Sys.isapple()

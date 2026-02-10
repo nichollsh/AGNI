@@ -386,7 +386,7 @@ function write_profs(nlev::Int)
 
     ds.attrib["description"]        = "AGNI grid worker profiles (t-p-r)"
     ds.attrib["hostname"]           = gethostname()
-    ds.attrib["username"]           = ENV["USER"]
+    ds.attrib["username"]           = get(ENV,"USER","UNKNOWN")
     ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
     ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
     ds.attrib["id_work"]            = id_work
