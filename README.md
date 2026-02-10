@@ -13,13 +13,13 @@
   <a href="https://doi.org/10.1093/mnras/stae2772"><img src="https://img.shields.io/badge/DOI-10.1093%2Fmnras%2Fstae2772-blue"></a>
   <a href="https://joss.theoj.org/papers/380d8e608e9f863b639af76ceebc7131"><img src="https://joss.theoj.org/papers/380d8e608e9f863b639af76ceebc7131/status.svg"></a>
   <a href="https://ascl.net/2508.020"><img src="https://img.shields.io/badge/ascl-2508.020-navy.svg" alt="ascl:2508.020" /></a>
+  <a href="https://doi.org/10.5281/zenodo.15386789"><img src="https://img.shields.io/badge/Zenodo-17431569-blue.svg"></a>
 </p>
 
 <p align="center" style="margin: -5px">
-  <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml/badge.svg"></a>
+  <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/covbadge.svg"></a>
   <a href="https://www.h-nicholls.space/AGNI/"><img src="https://github.com/nichollsh/AGNI/actions/workflows/documentation.yml/badge.svg"></a>
   <a href="LICENSE.txt"><img src="https://img.shields.io/github/license/nichollsh/AGNI?label=License"></a>
-  <a href="https://doi.org/10.5281/zenodo.15386789"><img src="https://img.shields.io/badge/Zenodo-17431569-blue.svg"></a>
 </p>
 
 
