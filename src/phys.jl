@@ -14,10 +14,9 @@ module phys
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
     # Import internal modules
-    include("consts.jl")
     include("blake.jl")
-    using .consts
     import .blake
+    using ..consts
 
     # A large floating point number
     const BIGFLOAT::Float64     = 1e99
