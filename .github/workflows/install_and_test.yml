@@ -81,6 +81,8 @@ jobs:
       - name: Get coverage
         run: |
           julia --project=. test/get_coverage.jl
+          export total=$(cat coverage.total)
+          echo "total=$total" >> $GITHUB_ENV
 
       # Upload output dir for inspection by user
       - name: Upload result as artifact
@@ -89,4 +91,18 @@ jobs:
           name: test-artifact
           path: |
             out/*
+            coverage.*
+
+      # Make badge
+      - name: Create coverage badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: e20f4fa3c7811c75d34005311fef3696
+          filename: covbadge.svg
+          label: Coverage
+          message: ${{ env.total }}%
+          minColorRange: 50
+          maxColorRange: 90
+          valColorRange: ${{ env.total }}
 
