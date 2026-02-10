@@ -14,8 +14,7 @@ deps/*.log
 test/out/
 Manifest.toml
 *.cov
-coverage.info
-coverage.total
+coverage.*
 
 # Docs
 docs/build
