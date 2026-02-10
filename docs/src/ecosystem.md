@@ -8,7 +8,7 @@ Other components of the wider PROTEUS ecosystem may be found in the table below:
 |:---------|:------------|:--------|
 | PROTEUS  | Coupled modelling framework  | [proteus-framework.org/proteus](https://proteus-framework.org/proteus) |
 | SOCRATES | Convective atmosphere | [github.com/FormingWorlds/SOCRATES](https://github.com/FormingWorlds/SOCRATES) |
-| JANUS    | Convective atmosphere | [proteus-framework.org/janus](proteus-framework.org/janus) |
+| JANUS    | Convective atmosphere | [proteus-framework.org/janus](https://proteus-framework.org/janus) |
 | MORS     | Stellar evolution     | [proteus-framework.org/mors](https://proteus-framework.org/mors) |
 | ZEPHYRUS | Hydrodynamic escape   | [proteus-framework.org/zephyrus](https://proteus-framework.org/zephyrus) |
 | CALLIOPE | Volatile outgassing   | [proteus-framework.org/calliope](https://proteus-framework.org/calliope) |
