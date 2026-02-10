@@ -295,7 +295,7 @@ function handle_request {
             anyspec Dayspring 48
 
             zenodo 17981836 $stellar sun.txt
-            get_zip 15805460 $thermo gases.zip
+            handle_request "thermodynamics"
             ;;
 
         "highres")
