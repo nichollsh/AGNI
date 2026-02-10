@@ -31,14 +31,14 @@ covered_lines, total_lines = get_summary(coverage)
 coverage_pct = round(covered_lines / total_lines * 100, digits=1)
 @info "Total coverage: $covered_lines of $total_lines ($coverage_pct% coverage)"
 
-# Write coverage to single file
+# Write total coverage to single file
 open("coverage.total", "w") do io
     write(io, "$coverage_pct")
 end
 
-# Write to file that CI can read
+# Write to files that CI can read
 LCOV.writefile("coverage.info", coverage)
-
+export_codecov_json(coverage, "coverage.json")
 
 # Or process a single file
 # @show get_summary(process_file(joinpath("src", "AGNI.jl")))
