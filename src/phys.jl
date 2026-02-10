@@ -23,7 +23,7 @@ module phys
     const BIGLOGFLOAT::Float64  = 99.0
 
     # Minimum data file version [YYYYMMDD, as integer]
-    const MIN_DATA_VERSION::Int64 = 20250220
+    const MIN_DATA_VERSION::Int64 = 20260201
 
     # Enable/disable flags
     ENABLE_CHECKSUM::Bool = true  # can still be disabled when function is called
@@ -204,7 +204,7 @@ module phys
 
                 # we always have these
                 gas.mmw = ds["mmw"][1]
-                gas.JANAF_name = String(ds["JANAF"][:])
+                gas.JANAF_name = String(ds["JANAF"][1])
 
                 # triple point and critical point
                 if haskey(ds, "T_trip")
