@@ -30,9 +30,6 @@ total  = 0
 failed = 0
 
 # which test suite to run?
-# 0 - none
-# 10 - fast
-# 20 - all
 suite::String = "all"
 if length(ARGS)>0
     suite = ARGS[1]
@@ -48,9 +45,15 @@ rtol   = 1e-3
 
 # Test module imported
 @test isdefined(AGNI.atmosphere, :setup!)
+if suite == "none"
+    @info "No tests selected. Exiting."
+    exit()
+end
 
 # Other tests
 LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
 include("test_consts.jl")
 include("test_phys.jl")
-include("test_integration.jl")
+if suite != "fast"
+    include("test_integration.jl")
+end

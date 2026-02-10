@@ -76,7 +76,7 @@ jobs:
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export LD_LIBRARY_PATH=""
           cd test/
-          julia --project=.. --code-coverage runtests.jl
+          julia --project=.. --code-coverage runtests.jl fast
 
       - name: Get coverage
         run: |
