@@ -28,11 +28,17 @@ coverage = merge_coverage_counts(coverage, filter!(
 
 # Get total coverage for all Julia files
 covered_lines, total_lines = get_summary(coverage)
-coverage_pct = round(covered_lines / total_lines * 100, digits=2)
+coverage_pct = round(covered_lines / total_lines * 100, digits=1)
 @info "Total coverage: $covered_lines of $total_lines ($coverage_pct% coverage)"
 
+# Write coverage to single file
+open("coverage.total", "w") do io
+    write(io, "$coverage_pct")
+end
+
 # Write to file that CI can read
-LCOV.writefile("coverage.info", coverage_pct)
+LCOV.writefile("coverage.info", coverage)
+
 
 # Or process a single file
 # @show get_summary(process_file(joinpath("src", "AGNI.jl")))
