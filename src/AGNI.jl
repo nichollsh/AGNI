@@ -14,6 +14,7 @@ module AGNI
     import TOML:parsefile
 
     # Include local jl files (order matters)
+    include("consts.jl")
     include("phys.jl")
     include("spectrum.jl")
     include("atmosphere.jl")
@@ -29,6 +30,7 @@ module AGNI
 
 
     # Import submodules
+    import .consts
     import .phys
     import .spectrum
     import .atmosphere
@@ -43,6 +45,7 @@ module AGNI
     import .load
 
     # Export submodules (mostly for autodoc purposes)
+    export consts
     export phys
     export spectrum
     export atmosphere
