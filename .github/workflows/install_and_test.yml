@@ -75,7 +75,12 @@ jobs:
         run: |
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export LD_LIBRARY_PATH=""
-          julia --project=. -e 'using Pkg; Pkg.test()'
+          cd test/
+          julia --project=.. --code-coverage runtests.jl
+
+      - name: Get coverage
+        run: |
+          julia --project=. test/get_coverage.jl
 
       # Upload output dir for inspection by user
       - name: Upload result as artifact
