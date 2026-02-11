@@ -14,17 +14,16 @@ module phys
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
     # Import internal modules
-    include("consts.jl")
     include("blake.jl")
-    using .consts
     import .blake
+    using ..consts
 
     # A large floating point number
     const BIGFLOAT::Float64     = 1e99
     const BIGLOGFLOAT::Float64  = 99.0
 
     # Minimum data file version [YYYYMMDD, as integer]
-    const MIN_DATA_VERSION::Int64 = 20250220
+    const MIN_DATA_VERSION::Int64 = 20260201
 
     # Enable/disable flags
     ENABLE_CHECKSUM::Bool = true  # can still be disabled when function is called
@@ -205,7 +204,7 @@ module phys
 
                 # we always have these
                 gas.mmw = ds["mmw"][1]
-                gas.JANAF_name = String(ds["JANAF"][:])
+                gas.JANAF_name = String(ds["JANAF"][1])
 
                 # triple point and critical point
                 if haskey(ds, "T_trip")
