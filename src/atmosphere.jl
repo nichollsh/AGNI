@@ -38,7 +38,7 @@ module atmosphere
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
     HYDROGRAV_steps::Int64   = 2000      # total number of steps in height integration
-    HYDROGRAV_maxdr::Float64 = 1e7       # maximum dz across each layer [m]
+    HYDROGRAV_maxdr::Float64 = 1e8       # maximum dz across each layer [m]
     HYDROGRAV_mindr::Float64 = 1e-5      # minimum dz across each layer [m]
     HYDROGRAV_ming::Float64  = 1e-4     # minimum allowed gravity [m/s^2]
     HYDROGRAV_constg::Bool   = false     # constant gravity with height?

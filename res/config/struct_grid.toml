@@ -2,7 +2,7 @@
 title = "Base config for structure calcs"
 
 [planet]
-    tmp_surf        = 3000.0
+    tmp_surf        = 1900.0
     instellation    = 13610.0 # #3.402500e6
     albedo_b        = 0.00
     s0_fact         = 0.25
@@ -17,7 +17,7 @@ title = "Base config for structure calcs"
     star_Teff       = 3150.0 #3415.0
 
 [files]
-    input_sf        = "res/spectral_files/Honeyside_with_O2/48/Honeyside.sf"
+    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"
     #input_sf        = "greygas"
     #input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"
     input_star      = "blackbody"
@@ -37,9 +37,9 @@ title = "Base config for structure calcs"
     num_levels      = 40
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 200.0
+    dx_max          = 400.0
     dx_min          = 1e-10
-    initial_state   = ["loglin","2000"] #["loglin","1400", "str", "Teq"]
+    initial_state   = ["loglin","Teq"] #["loglin","1400", "str", "Teq"]
     linesearch      = 2
     easy_start      = true
     grey_start      = false
