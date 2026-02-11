@@ -109,7 +109,7 @@ module solver
     end
 
     # Solver constants and parameters
-    cost_exponent::Real   = 3
+    cost_exponent::Real   = 4
     #    chemistry
     compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
     compose_ls::Bool      = true    # Do chem/comp for every linesearch step
@@ -127,7 +127,7 @@ module solver
     ls_tau::Float64    =    0.5     # backtracking downscale size
     ls_increase::Float64 =  0.7     # threshold for change in the cost function, between steps, for triggering/converging linesearch (large values => do LS more often)
     ls_max_steps::Int    =  12      # maximum steps undertaken by linesearch routine
-    ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
+    ls_min_scale::Float64 = 1.0e-4  # minimum step scale allowed by linesearch
     ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
     #    easy start
     easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
@@ -232,7 +232,7 @@ module solver
         end
 
         # Warn user about frequency of composition calculations...
-        if compose_jac && (rainout || chemistry || oceans)
+        if compose_jac && (rainout || chem || oceans)
             @warn "Expect slow forward-model evaluations"
             @warn "    compose_jac=$compose_jac"
         end

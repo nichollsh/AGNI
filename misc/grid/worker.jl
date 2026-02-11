@@ -40,7 +40,8 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
     "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=log10(0.25),  length=7),
     # "frac_core"     =>  Float64[0.200, 0.325, 0.7],
 
-    "flux_int"      => Float64[803.0, 115.0, 10.0, 1.36, 0.095, 0.0],   # internal heat flux
+    "flux_int"      => Float64[100.0, 10.0, 1.0, 0.1, 0.0],   # internal heat flux
+
 
     "mass_tot"      =>  mass_arr,  # M_earth
 
@@ -665,7 +666,7 @@ for (i,p) in enumerate(grid_flat)
                 atmos = init_atmos(OUT_DIR, IO_DIR)
                 wlarr[:] .= atmos.bands_cen[:]
 
-                easy_start = true
+                easy_start = Bool(cfg["execution"]["easy_start"])
             end
         end
 
@@ -708,7 +709,7 @@ for (i,p) in enumerate(grid_flat)
             if updated_k
                 atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
                 setpt.request!(atmos, cfg["execution"]["initial_state"])
-                easy_start = true
+                easy_start = Bool(cfg["execution"]["easy_start"])
             end
 
         elseif k == "instellation"
@@ -718,7 +719,7 @@ for (i,p) in enumerate(grid_flat)
             if updated_k
                 atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
                 setpt.request!(atmos, cfg["execution"]["initial_state"])
-                easy_start = true
+                easy_start = Bool(cfg["execution"]["easy_start"])
             end
 
         elseif startswith(k, "vmr_")
@@ -750,13 +751,13 @@ for (i,p) in enumerate(grid_flat)
     max_runtime = Float64(cfg["execution"]["max_runtime"])
     if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
-        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=false)
+        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=true)
         # easy_start = false
     else
         # last iter failed
         atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
         setpt.request!(atmos, cfg["execution"]["initial_state"])
-        easy_start = true
+        easy_start = Bool(cfg["execution"]["easy_start"])
     end
 
     # Allow more steps for first solution
