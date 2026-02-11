@@ -38,7 +38,7 @@ mass_arr = reverse(sort(mass_arr))
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
     "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=log10(0.25),  length=7),
-    "frac_core"     =>  Float64[0.200, 0.325, 0.5, 0.7],
+    "frac_core"     =>  Float64[0.200, 0.325, 0.450, 0.575, 0.700],
 
     # "flux_int"      => Float64[100.0, 10.0, 1.0, 0.1, 0.0],   # internal heat flux
 
@@ -70,7 +70,7 @@ const use_tmpdir             = true
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 20e-3 * 1e5  # 20 mbar -> Pa
-const fc_floor::Float64      = 900.0        # K
+const fc_floor::Float64      = 700.0        # K
 const fc_wellmixed::Bool     = false        # calculate abundances as well-mixed ?
 const mlt_asymptotic::Bool   = true
 
