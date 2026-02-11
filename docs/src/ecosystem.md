@@ -6,16 +6,16 @@ Other components of the wider PROTEUS ecosystem may be found in the table below:
 
 |  Code    | Description | Website |
 |:---------|:------------|:--------|
-| PROTEUS  | Model coupling        | [proteus-framework.org](https://proteus-framework.org/) |
-| JANUS    | Convective atmosphere | [fwl-janus.readthedocs.io](https://fwl-janus.readthedocs.io) |
-| MORS     | Stellar evolution     | [proteus-framework.org/obliqua](https://proteus-framework.org/MORS/) |
-| ZEPHYRUS | Hydrodynamic escape   | [fwl-zephyrus.readthedocs.io](https://fwl-zephyrus.readthedocs.io/) |
-| CALLIOPE | Volatile outgassing   | [proteus-framework.org/callope](https://proteus-framework.org/CALLIOPE/) |
+| PROTEUS  | Coupled modelling framework  | [proteus-framework.org/proteus](https://proteus-framework.org/proteus) |
+| SOCRATES | Convective atmosphere | [github.com/FormingWorlds/SOCRATES](https://github.com/FormingWorlds/SOCRATES) |
+| JANUS    | Convective atmosphere | [proteus-framework.org/janus](https://proteus-framework.org/janus) |
+| MORS     | Stellar evolution     | [proteus-framework.org/mors](https://proteus-framework.org/mors) |
+| ZEPHYRUS | Hydrodynamic escape   | [proteus-framework.org/zephyrus](https://proteus-framework.org/zephyrus) |
+| CALLIOPE | Volatile outgassing   | [proteus-framework.org/calliope](https://proteus-framework.org/calliope) |
 | LovePy   | Mantle tidal heating  | [github.com/nichollsh/lovepy](https://github.com/nichollsh/lovepy) |
-| Obliqua  | Mantle tidal heating  | [proteus-framework.org/obliqua](https://proteus-framework.org/Obliqua/) |
-| VULCAN   | Chemical kinetics     | [github.com/FormingWorlds/VULCAN](https://github.com/FormingWorlds/VULCAN) |
-| Zalmoxis | Interior structure    | [zalmoxis.readthedocs.io](https://zalmoxis.readthedocs.io/) |
-| Aragog   | Interior dynamics     | [github.com/FormingWorlds/aragog](https://github.com/FormingWorlds/aragog) |
-| SPIDER   | Interior dynamics     | [github.com/djbower/spider](https://github.com/djbower/spider) |
-
+| Obliqua  | Mantle tidal heating  | [proteus-framework.org/obliqua](https://proteus-framework.org/obliqua) |
+| VULCAN   | Chemical kinetics     | [proteus-framework.org/vulcan](https://proteus-framework.org/vulcan) |
+| Zalmoxis | Interior structure    | [proteus-framework.org/zalmoxis](https://proteus-framework.org/zalmoxis) |
+| Aragog   | Interior dynamics     | [proteus-framework.org/aragog](https://proteus-framework.org/spider) |
+| SPIDER   | Interior dynamics     | [proteus-framework.org/spider](https://proteus-framework.org/spider) |
 

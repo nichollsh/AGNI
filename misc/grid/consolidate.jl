@@ -118,7 +118,7 @@ ds = Dataset(outpath,"c")
 
 ds.attrib["description"]  = "AGNI grid consolidated profiles (t-p-r)"
 ds.attrib["hostname"]     = gethostname()
-ds.attrib["username"]     = ENV["USER"]
+ds.attrib["username"]     = get(ENV,"USER","UNKNOWN")
 
 (nlev, gridsize) = size(dfs_profs[1]["t"])
 defDim(ds, "nlev_c",   nlev)
