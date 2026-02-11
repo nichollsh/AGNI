@@ -37,10 +37,10 @@ module atmosphere
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
-    HYDROGRAV_steps::Int64   = 9000      # total number of steps in height integration
-    HYDROGRAV_maxdr::Float64 = 1e9       # maximum dz across each layer [m]
+    HYDROGRAV_steps::Int64   = 10000      # total number of steps in height integration
+    HYDROGRAV_maxdr::Float64 = 1e8       # maximum dz across each layer [m]
     HYDROGRAV_mindr::Float64 = 1e-5      # minimum dz across each layer [m]
-    HYDROGRAV_ming::Float64  = 1e-10     # minimum allowed gravity [m/s^2]
+    HYDROGRAV_ming::Float64  = 1e-4     # minimum allowed gravity [m/s^2]
     HYDROGRAV_constg::Bool   = false     # constant gravity with height?
     HYDROGRAV_selfg::Bool    = true      # include self-gravity of the atmosphere?
 
@@ -58,6 +58,7 @@ module atmosphere
     # Pressure grid
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
+    const PRESSURE_FACT_TOP::Float64    = 0.8      # Pressure factor at top layer
 
     # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
@@ -1395,7 +1396,8 @@ module atmosphere
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
             # Mass of layer, per unit area at layer-centre [kg m-2]
-            atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
+            # atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
+            atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.g[i]
         end
 
         return all(atmos.layer_isbound)
@@ -1620,7 +1622,7 @@ module atmosphere
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
         # Shrink top-most layer to avoid doing too much extrapolation
-        # atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
+        atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
 
         # Finally, convert arrays to actual pressure units [Pa]
         @. atmos.p  = 10.0 ^ atmos.p
