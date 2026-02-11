@@ -1396,8 +1396,8 @@ module atmosphere
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
             # Mass of layer, per unit area at layer-centre [kg m-2]
-            # atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
-            atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.g[i]
+            atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
+            # atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.g[i]
         end
 
         return all(atmos.layer_isbound)
@@ -1622,7 +1622,7 @@ module atmosphere
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
         # Shrink top-most layer to avoid doing too much extrapolation
-        atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
+        # atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
 
         # Finally, convert arrays to actual pressure units [Pa]
         @. atmos.p  = 10.0 ^ atmos.p
