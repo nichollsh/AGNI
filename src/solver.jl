@@ -232,7 +232,7 @@ module solver
         end
 
         # Warn user about frequency of composition calculations...
-        if compose_jac && (rainout || chemistry || oceans)
+        if compose_jac && (rainout || chem || oceans)
             @warn "Expect slow forward-model evaluations"
             @warn "    compose_jac=$compose_jac"
         end
