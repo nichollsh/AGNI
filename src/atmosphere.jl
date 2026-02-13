@@ -709,6 +709,8 @@ module atmosphere
         atmos.transspec_p    =  2e3     # 20 mbar = 2000 Pa
         if atmos.p_toa > atmos.transspec_p
             @error "p_top must be less than transspec_p"
+            @error "    Got p_top:       $(atmos.p_toa) Pa"
+            @error "    and transspec_p: $(atmos.transspec_p) Pa"
             return false
         end
 
