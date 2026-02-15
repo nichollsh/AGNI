@@ -266,6 +266,7 @@ module plotting
                             size_x::Int=550, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
+                            incl_deep::Bool=true,
                             title::String=""
                         )
 
@@ -339,6 +340,12 @@ module plotting
         # Condensation
         if incl_latent
             plot!(plt, _symlog.(atmos.flux_l), arr_P, label="Latent", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
+        end
+
+        # Deep heating
+        if incl_deep && atmos.deep_heating.active
+            col_d::String = "#8B008B"  # Dark magenta for deep heating
+            plot!(plt, _symlog.(atmos.flux_deep), arr_P, label="Deep", lw=w*1.2, lc=col_d, ls=:solid, linealpha=alpha)
         end
 
         # Sensible heat
