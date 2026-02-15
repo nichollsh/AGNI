@@ -396,6 +396,83 @@ module AGNI
         # Output folder
         output_dir = abspath(cfg["files"]["output_dir"])
 
+        # Deep heating configuration
+        deep_active::Bool         = false
+        deep_P_dep::Float64       = 1.0e5
+        deep_sigma_P::Float64     = 1.0
+        deep_efficiency::Float64  = 0.0
+        deep_mechanism::Symbol    = :generic
+        deep_norm::Symbol         = :pressure
+        deep_below::Symbol        = :clamp
+        deep_power_mode::Symbol   = :efficiency
+        deep_F_total::Float64     = 0.0
+        deep_power::Float64       = 0.0
+        deep_ohm_Tpeak::Float64   = 1550.0
+        deep_ohm_sigmaT::Float64  = 250.0
+        deep_tid_e::Float64       = 0.0
+        deep_tid_a::Float64       = 0.0
+        deep_tid_Mstar::Float64   = 0.0
+        deep_tid_k2::Float64      = 0.0
+        deep_tid_Q::Float64       = 1.0
+        if haskey(cfg, "deep_heating")
+            dh = cfg["deep_heating"]
+            if haskey(dh, "active")
+                deep_active = Bool(dh["active"])
+            end
+            if haskey(dh, "P_dep")
+                deep_P_dep = Float64(dh["P_dep"])
+            end
+            if haskey(dh, "sigma_P")
+                deep_sigma_P = Float64(dh["sigma_P"])
+            end
+            if haskey(dh, "efficiency")
+                deep_efficiency = Float64(dh["efficiency"])
+            end
+
+            # Optional extended parameters
+            if haskey(dh, "mechanism")
+                deep_mechanism = Symbol(lowercase(String(dh["mechanism"])))
+            end
+            if haskey(dh, "normalization")
+                deep_norm = Symbol(lowercase(String(dh["normalization"])))
+            end
+            if haskey(dh, "below_domain")
+                deep_below = Symbol(lowercase(String(dh["below_domain"])))
+            end
+            if haskey(dh, "power_mode")
+                deep_power_mode = Symbol(lowercase(String(dh["power_mode"])))
+            end
+            if haskey(dh, "F_total")
+                deep_F_total = Float64(dh["F_total"])
+            end
+            if haskey(dh, "power")
+                deep_power = Float64(dh["power"])
+            end
+            if haskey(dh, "ohmic_Tpeak")
+                deep_ohm_Tpeak = Float64(dh["ohmic_Tpeak"])
+            end
+            if haskey(dh, "ohmic_sigmaT")
+                deep_ohm_sigmaT = Float64(dh["ohmic_sigmaT"])
+            end
+
+            # Tidal mechanism parameters
+            if haskey(dh, "tidal_e")
+                deep_tid_e = Float64(dh["tidal_e"])
+            end
+            if haskey(dh, "tidal_a")
+                deep_tid_a = Float64(dh["tidal_a"])
+            end
+            if haskey(dh, "tidal_Mstar")
+                deep_tid_Mstar = Float64(dh["tidal_Mstar"])
+            end
+            if haskey(dh, "tidal_k2")
+                deep_tid_k2 = Float64(dh["tidal_k2"])
+            end
+            if haskey(dh, "tidal_Q")
+                deep_tid_Q = Float64(dh["tidal_Q"])
+            end
+        end
+
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
         atmos = atmosphere.Atmos_t()
@@ -436,6 +513,28 @@ module AGNI
         # Allocate atmosphere
         @debug "Reticulating splines..."
         atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
+
+        # Configure deep atmospheric heating
+        if deep_active
+            atmosphere.set_deep_heating!(atmos,
+                                         active=deep_active,
+                                         P_dep=deep_P_dep,
+                                         sigma_P=deep_sigma_P,
+                                         efficiency=deep_efficiency,
+                                         mechanism=deep_mechanism,
+                                         normalization=deep_norm,
+                                         below_domain=deep_below,
+                                         power_mode=deep_power_mode,
+                                         F_total=deep_F_total,
+                                         power=deep_power,
+                                         ohmic_Tpeak=deep_ohm_Tpeak,
+                                         ohmic_sigmaT=deep_ohm_sigmaT,
+                                         tidal_e=deep_tid_e,
+                                         tidal_a=deep_tid_a,
+                                         tidal_Mstar=deep_tid_Mstar,
+                                         tidal_k2=deep_tid_k2,
+                                         tidal_Q=deep_tid_Q)
+        end
 
         # Set temperatures as appropriate
         if transparent

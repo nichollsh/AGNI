@@ -399,6 +399,167 @@ module energy
 
 
     """
+    **Calculate deep atmospheric heating flux (e.g., Ohmic dissipation, tidal heating).**
+
+    The heating is deposited as a Gaussian distribution in log-pressure space,
+    centered at `P_dep` with width `sigma_P`. The total deposited flux is
+    `efficiency * instellation`.
+
+    The flux gradient is defined as:
+        dF_deep/dP = F_total / (sqrt(2π) * σ_P * P) * exp(-(ln(P) - ln(P_dep))^2 / (2 * σ_P^2))
+
+    This flux is integrated from the TOA downwards to obtain the cumulative
+    flux at each cell edge, representing energy being deposited into the atmosphere.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    """
+    function deep_heating!(atmos::atmosphere.Atmos_t)
+
+        # Reset flux array
+        fill!(atmos.flux_deep, 0.0)
+
+        # Check if deep heating is active
+        if !atmos.deep_heating.active
+            return nothing
+        end
+
+        # Extract parameters
+        P_dep::Float64          = atmos.deep_heating.P_dep
+        sigma_P::Float64        = atmos.deep_heating.sigma_P
+        efficiency::Float64     = atmos.deep_heating.efficiency
+        mechanism::Symbol       = atmos.deep_heating.mechanism
+        normalization::Symbol   = atmos.deep_heating.normalization
+        below_domain::Symbol    = atmos.deep_heating.below_domain
+        power_mode::Symbol      = atmos.deep_heating.power_mode
+        F_total_in::Float64     = atmos.deep_heating.F_total
+        power_in::Float64       = atmos.deep_heating.power
+        ohmic_Tpeak::Float64    = atmos.deep_heating.ohmic_Tpeak
+        ohmic_sigmaT::Float64   = atmos.deep_heating.ohmic_sigmaT
+        tidal_e::Float64        = atmos.deep_heating.tidal_e
+        tidal_a::Float64        = atmos.deep_heating.tidal_a
+        tidal_Mstar::Float64    = atmos.deep_heating.tidal_Mstar
+        tidal_k2::Float64       = atmos.deep_heating.tidal_k2
+        tidal_Q::Float64        = atmos.deep_heating.tidal_Q
+
+        # Determine effective efficiency (mechanism parameterisation)
+        eff::Float64 = clamp(efficiency, 0.0, 1.0)
+        if mechanism == :ohmic
+            # Simple population-level proxy: efficiency peaks around a characteristic Teq.
+            # Teq is estimated from absorbed, globally-averaged flux.
+            F_abs::Float64 = atmos.instellation * (1.0 - atmos.albedo_b) * atmos.s0_fact / 4.0
+            Teq::Float64 = (F_abs / phys.σSB)^(0.25)
+            if ohmic_sigmaT <= 0.0
+                eff = 0.0
+            else
+                eff = eff * exp(-((Teq - ohmic_Tpeak)^2) / (2.0 * ohmic_sigmaT^2))
+            end
+            eff = clamp(eff, 0.0, 1.0)
+        elseif mechanism == :tidal
+            # For tidal heating, `efficiency` is not used directly unless power_mode=:efficiency.
+            # The recommended use is `power_mode=:power` with parameters below.
+        end
+
+        # Determine total deposited flux [W m-2]
+        F_total::Float64 = 0.0
+        if mechanism == :tidal && power_mode == :power && power_in <= 0.0
+            # Compute a default tidal heating power if not explicitly provided.
+            # Equilibrium-tide scaling (synchronous, small-e):
+            #   E_dot = (21/2) * (k2/Q) * (G M_*^2 R_p^5 / a^6) * n * e^2
+            # where n = sqrt(G (M_* + M_p)/a^3) ~ sqrt(G M_*/a^3).
+            if (tidal_a > 0.0) && (tidal_Mstar > 0.0) && (tidal_Q > 0.0) && (tidal_k2 > 0.0) && (tidal_e > 0.0)
+                n::Float64 = sqrt(phys.G_grav * tidal_Mstar / tidal_a^3)
+                power_in = (21.0/2.0) * (tidal_k2 / tidal_Q) * (phys.G_grav * tidal_Mstar^2 * atmos.rp^5 / tidal_a^6) * n * tidal_e^2
+            end
+        end
+
+        if power_mode == :efficiency
+            # Legacy behaviour: define heating as a fraction of instellation (per unit area).
+            F_total = eff * atmos.instellation
+        elseif power_mode == :flux
+            F_total = max(F_total_in, 0.0)
+        elseif power_mode == :power
+            # Convert total power [W] to an equivalent globally-averaged surface flux [W m-2].
+            A::Float64 = 4.0 * π * atmos.rp^2
+            if A <= 0.0
+                F_total = 0.0
+            else
+                F_total = max(power_in, 0.0) / A
+            end
+        else
+            error("Invalid deep heating power_mode: $(power_mode)")
+        end
+
+        # If heating is effectively zero, do nothing
+        if F_total <= 0.0
+            return nothing
+        end
+
+        # If deposition is outside the domain and requested, apply as a bottom boundary flux.
+        if below_domain == :boundary_flux
+            if (P_dep > atmos.p_boa) || (P_dep < atmos.p_toa)
+                atmos.flux_deep .= F_total
+                return nothing
+            end
+        end
+
+        # Prepare log-pressure variables
+        ln_P_dep::Float64 = log(P_dep)
+        ln_P::Float64 = 0.0
+
+        # Integrate from TOA downwards to get cumulative flux at each level edge
+        atmos.flux_deep[1] = 0.0
+
+        if normalization == :pressure
+            # Legacy: pressure-normalised dF/dP profile
+            norm_factor::Float64 = 1.0 / (sqrt(2.0 * π) * sigma_P)
+            dF_dP::Float64 = 0.0
+            gaussian::Float64 = 0.0
+            dp::Float64 = 0.0
+
+            @inbounds for i in 1:atmos.nlev_c
+                ln_P = log(atmos.p[i])
+                gaussian = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                dF_dP = F_total * norm_factor * gaussian / atmos.p[i]
+                dp = atmos.pl[i+1] - atmos.pl[i]
+                atmos.flux_deep[i+1] = atmos.flux_deep[i] + dF_dP * dp
+            end
+
+        elseif normalization == :mass
+            # dm-weighted normalisation: ensures Σ(ε_dep*dm) = F_total
+            # Here, each cell deposits ΔF_i = scale * G_i * layer_mass[i].
+            denom::Float64 = 0.0
+            G::Float64 = 0.0
+
+            @inbounds for i in 1:atmos.nlev_c
+                ln_P = log(atmos.p[i])
+                G = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                denom += G * atmos.layer_mass[i]
+            end
+
+            if denom <= 0.0
+                if below_domain == :boundary_flux
+                    atmos.flux_deep .= F_total
+                end
+                return nothing
+            end
+
+            scale::Float64 = F_total / denom
+            @inbounds for i in 1:atmos.nlev_c
+                ln_P = log(atmos.p[i])
+                G = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                atmos.flux_deep[i+1] = atmos.flux_deep[i] + (scale * G * atmos.layer_mass[i])
+            end
+
+        else
+            error("Invalid deep heating normalization: $(normalization)")
+        end
+
+        return nothing
+    end
+
+
+    """
     **Calculate dry convective fluxes using mixing length theory.**
 
     Convective energy transport fluxes are calculated at every level edge, just
@@ -723,6 +884,9 @@ module energy
         fill!(atmos.band_d_sw, 0.0)
         fill!(atmos.band_n_sw, 0.0)
 
+        # deep heating
+        fill!(atmos.flux_deep, 0.0)
+
         # total fluxes
         fill!(atmos.flux_dif, 0.0)
         fill!(atmos.flux_tot, 0.0)
@@ -814,6 +978,15 @@ module energy
         if conduct
             conduct!(atmos)
             @turbo @. atmos.flux_tot += atmos.flux_cdct
+        end
+
+        # +Deep atmospheric heating (Ohmic/tidal dissipation)
+        # Note: flux_deep is computed but NOT added to flux_tot.
+        # For sol_type>=3, heating is added directly to the solver residual.
+        # This prevents numerical artifacts ("hook" shape) in deep P-T profiles
+        # because the heating doesn't propagate through flux_dif incorrectly.
+        if atmos.deep_heating.active
+            deep_heating!(atmos)
         end
 
         # Flux difference across each level
