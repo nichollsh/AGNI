@@ -37,7 +37,7 @@ mass_arr = reverse(sort(mass_arr))
 #    parameters will be varied in the same order as these keys
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=log10(0.25),  length=7),
+    "frac_atm"      =>  10.0 .^ range(start=-3.25,  stop=log10(0.25),  length=8),
     "frac_core"     =>  Float64[0.200, 0.325, 0.450, 0.575, 0.700],
 
     # "flux_int"      => Float64[100.0, 10.0, 1.0, 0.1, 0.0],   # internal heat flux
