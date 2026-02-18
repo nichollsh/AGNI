@@ -66,7 +66,7 @@ module consts
     export elems_standard
 
     # Standard species
-    const gases_standard::Array{String, 1} = [
+    const vols_standard::Array{String,1} = [
         # volatile elems
         "H", "O", "C", "N", "S", "P", "He",
         # basic
@@ -80,7 +80,8 @@ module consts
         "NO3", "N2O", "NO", "NO2",
         # phosphorous
         "PH3",
-
+    ]
+    const vaps_standard::Array{String,1} = [
         # refractory elems
         "Na", "Si", "Ti", "Mg", "K", "Fe",
         # rock vapours
@@ -90,6 +91,9 @@ module consts
         "TiO", "TiO2",
         "HAlO2"
     ]
+    const gases_standard::Array{String, 1} = vcat(vols_standard, vaps_standard)
+    export vols_standard
+    export vaps_standard
     export gases_standard
 
     # Atom counts in some standard species

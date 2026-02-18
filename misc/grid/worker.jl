@@ -37,18 +37,19 @@ mass_arr = reverse(sort(mass_arr))
 #    parameters will be varied in the same order as these keys
 const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 
-    "frac_atm"      =>  10.0 .^ range(start=-3.0,  stop=log10(0.25),  length=7),
-    "frac_core"     =>  Float64[0.200, 0.325, 0.7],
+    "frac_atm"      =>  10.0 .^ range(start=-3.25,  stop=log10(0.25),  length=8),
+    "frac_core"     =>  Float64[0.200, 0.325, 0.450, 0.575, 0.700],
+
+    # "flux_int"      => Float64[100.0, 10.0, 1.0, 0.1, 0.0],   # internal heat flux
 
     "mass_tot"      =>  mass_arr,  # M_earth
 
     "logCO"         =>  range(start=-3.0,  stop=0.0,   step=1.0),  # C/O mass ratio
     "logZ"          =>  range(start=1.0,  stop=-2.0,   step=-0.5),  # total metallicity
 
-    #"flux_int"      => Float64[0.0, 0.5],   # internal heat flux
     "instellation"  =>  Float64[1000.0, 300.0, 100.0, 10.0, 1.0 ], # S_earth
 
-    "Teff"          =>  range(start=2500,  stop=5750,  step=650.0),
+    "Teff"          =>  range(start=2500,  stop=6500,  step=800.0),
 ))
 
 # Variables to record
@@ -69,14 +70,14 @@ const use_tmpdir             = true
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
 const frac_max::Float64      = 0.999
 const transspec_p::Float64   = 20e-3 * 1e5  # 20 mbar -> Pa
-const fc_floor::Float64      = 900.0        # K
+const fc_floor::Float64      = 700.0        # K
 const fc_wellmixed::Bool     = false        # calculate abundances as well-mixed ?
 const mlt_asymptotic::Bool   = true
 
 atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
 
-# solver.ls_increase = 1.02
+solver.ls_increase = 1.02
 solver.easy_incr  = 1/solver.easy_ini
 
 # energy.CONVECT_MIN_PRESSURE = 1e-3 * 1e5    # 1 mbar -> Pa
@@ -552,7 +553,7 @@ function init_atmos(OUT_DIR::String, IO_DIR::String)
                                     overlap_method    = cfg["physics"]["overlap_method"],
                                     real_gas          = cfg["physics"]["real_gas"],
                                     thermo_functions  = cfg["physics"]["thermo_funct"],
-                                    use_all_gases     = true,
+                                    use_all_vols      = true,
                                     surf_roughness=cfg["planet"]["roughness"],
                                     surf_windspeed=cfg["planet"]["wind_speed"],
                                     mlt_asymptotic=mlt_asymptotic,
@@ -664,7 +665,7 @@ for (i,p) in enumerate(grid_flat)
                 atmos = init_atmos(OUT_DIR, IO_DIR)
                 wlarr[:] .= atmos.bands_cen[:]
 
-                easy_start = true
+                easy_start = Bool(cfg["execution"]["easy_start"])
             end
         end
 
@@ -707,7 +708,7 @@ for (i,p) in enumerate(grid_flat)
             if updated_k
                 atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
                 setpt.request!(atmos, cfg["execution"]["initial_state"])
-                easy_start = true
+                easy_start = Bool(cfg["execution"]["easy_start"])
             end
 
         elseif k == "instellation"
@@ -717,7 +718,7 @@ for (i,p) in enumerate(grid_flat)
             if updated_k
                 atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
                 setpt.request!(atmos, cfg["execution"]["initial_state"])
-                easy_start = true
+                easy_start = Bool(cfg["execution"]["easy_start"])
             end
 
         elseif startswith(k, "vmr_")
@@ -749,13 +750,13 @@ for (i,p) in enumerate(grid_flat)
     max_runtime = Float64(cfg["execution"]["max_runtime"])
     if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
-        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=false)
+        setpt.fromarrays!(atmos, result_profs[i-1]["p"], result_profs[i-1]["t"]; extrap=true)
         # easy_start = false
     else
         # last iter failed
         atmos.tmp_surf = Float64(cfg["planet"]["tmp_surf"])
         setpt.request!(atmos, cfg["execution"]["initial_state"])
-        easy_start = true
+        easy_start = Bool(cfg["execution"]["easy_start"])
     end
 
     # Allow more steps for first solution

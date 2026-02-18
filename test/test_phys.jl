@@ -72,8 +72,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3)
         end
         if !test_pass
-            @info "Expected values = $(v_expt) J mol-1 K-1"
-            @info "Modelled values = $(v_obs) J mol-1 K-1"
+            @warn "Expected values = $(v_expt) J mol-1 K-1\n Modelled values = $(v_obs) J mol-1 K-1"
         end
         @test test_pass
     end
@@ -92,9 +91,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3, atol=1e-12)
         end
 
-        if test_pass
-            @test_logs (:warn, "Expected values = $(v_expt) kg m-3")
-            @test_logs (:warn, "Modelled values = $(v_obs) kg m-3")
+        if !test_pass
+            @warn "Expected values = $(v_expt) kg m-3\n Modelled values = $(v_obs) kg m-3"
         end
         @test test_pass
     end
@@ -116,8 +114,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         end
 
         if !test_pass
-            @test_logs (:warn, "Expected values = $(v_expt) kg m-3")
-            @test_logs (:warn, "Modelled values = $(v_obs) kg m-3")
+            @warn "Expected values = $(v_expt) kg m-3\n Modelled values = $(v_obs) kg m-3"
         end
         @test test_pass
     end
@@ -137,9 +134,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], vdw_CO2)
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3)
         end
-        if test_pass
-            @test_logs (:warn, "Expected values = $(v_expt) kg m-3")
-            @test_logs (:warn, "Modelled values = $(v_obs) kg m-3")
+        if !test_pass
+            @warn "Expected values = $(v_expt) kg m-3\n Modelled values = $(v_obs) kg m-3"
         end
         @test test_pass
     end
@@ -186,8 +182,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         end
 
         if !test_pass
-            @test_logs (:warn, "Expected values = $(dct_e)")
-            @test_logs (:warn, "Modelled values = $(dct_o)")
+            @warn "Expected values = $(dct_e)\n Modelled values = $(dct_o)"
         end
         atmosphere.deallocate!(atmos)
         @test test_pass
