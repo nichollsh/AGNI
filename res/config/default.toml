@@ -23,31 +23,14 @@ title = "Default"                       # Name for this configuration file
     stellar_Teff    = 4000.0            # Stellar effective temperature, if using `input_star="blackbody"`
 
 [deep_heating]
-    active          = false             # Enable deep atmospheric heating (e.g., Ohmic/tidal dissipation).
+    active          = false             # Enable deep atmospheric heating.
     P_dep           = 1.0e5             # Deposition pressure [Pa] - center of Gaussian heating profile.
     sigma_P         = 1.0               # Width of Gaussian in log-pressure space [dimensionless].
     efficiency      = 0.0               # Heating efficiency as fraction of instellation.
-
-    # Optional advanced controls (leave unset to use legacy behaviour)
-    mechanism       = "generic"         # "generic" | "ohmic" | "tidal"
-    normalization   = "pressure"        # "pressure" (legacy dF/dP) | "mass" (dm-weighted)
-    below_domain    = "clamp"           # "clamp" | "boundary_flux" (if P_dep below/above domain)
-
-    # Choose how the heating magnitude is specified
-    power_mode      = "efficiency"      # "efficiency" | "flux" | "power"
-    F_total         = 0.0               # [W m-2] used when power_mode="flux"
-    power           = 0.0               # [W] used when power_mode="power" (converted to global-mean W m-2)
-
-    # Ohmic proxy curve (only used when mechanism="ohmic")
-    ohmic_Tpeak     = 1550.0            # [K] peak temperature of efficiency curve
-    ohmic_sigmaT    = 250.0             # [K] width of efficiency curve
-
-    # Tidal parameters (only used when mechanism="tidal" and power_mode="power" with power=0)
-    tidal_e         = 0.0               # Eccentricity
-    tidal_a         = 0.0               # Semi-major axis [m]
-    tidal_Mstar     = 0.0               # Stellar mass [kg]
-    tidal_k2        = 0.0               # Love number k2
-    tidal_Q         = 1.0               # Tidal quality factor Q
+    normalization   = "pressure"        # "pressure" (legacy dF/dP) | "mass" (dm-weighted).
+    below_domain    = "clamp"           # "clamp" | "boundary_flux" (if P_dep outside domain).
+    power_mode      = "efficiency"      # "efficiency" | "flux".
+    F_total         = 0.0               # [W m-2] used when power_mode="flux".
 
 [files]
     input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
