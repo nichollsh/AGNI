@@ -854,7 +854,7 @@ module energy
         ok::Bool = true
 
         # Warn if no flux terms are enabled
-        if !(radiative || latent || convective || sens_heat || conductive || advective)
+        if !(radiative || latent_heat || convective || sens_heat || conductive || advective)
             @warn "No flux terms enabled in call to `calc_fluxes!`"
             ok = false
         end
