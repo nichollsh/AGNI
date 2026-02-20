@@ -571,14 +571,16 @@ module energy
 
         elseif normalization == :mass
             # dm-weighted normalisation: ensures Σ(ε_dep*dm) = F_total
-            # Here, each cell deposits ΔF_i = scale * G_i * layer_mass[i].
+            # Column mass per unit area for layer i: dm_i = dp_i / g_i  [kg m⁻²]
             denom::Float64 = 0.0
             G::Float64 = 0.0
+            dm_i::Float64 = 0.0
 
             @inbounds for i in 1:atmos.nlev_c
                 ln_P = log(atmos.p[i])
                 G = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
-                denom += G * atmos.layer_mass[i]
+                dm_i = (atmos.pl[i+1] - atmos.pl[i]) / atmos.g[i]
+                denom += G * dm_i
             end
 
             if denom <= 0.0
@@ -592,7 +594,8 @@ module energy
             @inbounds for i in 1:atmos.nlev_c
                 ln_P = log(atmos.p[i])
                 G = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
-                atmos.flux_deep[i+1] = atmos.flux_deep[i] + (scale * G * atmos.layer_mass[i])
+                dm_i = (atmos.pl[i+1] - atmos.pl[i]) / atmos.g[i]
+                atmos.flux_deep[i+1] = atmos.flux_deep[i] + (scale * G * dm_i)
             end
 
         else

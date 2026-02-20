@@ -2385,7 +2385,6 @@ module atmosphere
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
-        atmos.ediv_add =          zeros(Float64, atmos.nlev_c)
         atmos.flux_deep =         zeros(Float64, atmos.nlev_l)  # Deep atmospheric heating flux
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
         atmos.timescale_conv =    zeros(Float64, atmos.nlev_c)
