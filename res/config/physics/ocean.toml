@@ -12,7 +12,7 @@ title = "Ocean formation test"
     radius          = 6.37e6
     gravity         = 9.81
     flux_int        = 0.0
-    turb_coeff      = 1.0e-4
+    roughness       = 1.0e-4
     wind_speed      = 10.0
     skin_k          = 2.0
     skin_d          = 0.01
@@ -28,15 +28,27 @@ title = "Ocean formation test"
     p_surf          = 7000.0
     p_top           = 1e-5
     vmr_dict        = { H2O=0.1, CO2=0.75, N2=0.05}
-    chemistry       = 0
     condensates     = ["H2O"]
 
 [execution]
     clean_output    = true
-    verbosity       = 1
+    verbosity       = 2
     max_steps       = 300
     max_runtime     = 400
     num_levels      = 44
+    solution_type   = 3
+    solver          = "newton"
+    dx_max          = 150.0
+    initial_state   = ["iso", "700"]
+    linesearch      = 2
+    easy_start      = true
+    grey_start      = false
+    converge_atol   = 1.0
+    converge_rtol   = 1.0e-2
+    perturb_all     = true
+
+[physics]
+    chemistry       = false
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -44,21 +56,13 @@ title = "Ocean formation test"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
+    advection       = false
     conduction      = true
     latent_heat     = true
     convection      = true
     convection_crit = "l"
     rainout         = true
-    solution_type   = 3
-    solver          = "newton"
-    dx_max          = 150.0
-    initial_state   = ["iso", "700"]
-    linesearch      = 2
-    easy_start      = true
-    converge_atol   = 1.0
-    converge_rtol   = 1.0e-2
-    perturb_all     = true
-
+    oceans          = true
 
 [plots]
     at_runtime      = true

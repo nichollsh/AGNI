@@ -100,7 +100,7 @@ module save
         # into PROTEUS without compatibility issues.
 
         # Absorb output from these calls, because they spam the Debug logger
-        with_logger(MinLevelLogger(current_logger(), Logging.Info-200)) do
+        with_logger(MinLevelLogger(current_logger(), Logging.Error)) do
 
             ds = Dataset(fname,"c")
 
@@ -108,9 +108,9 @@ module save
             ds.attrib["description"]        = "AGNI atmosphere data"
             ds.attrib["date"]               = Dates.format(now(), "yyyy-u-dd HH:MM:SS")
             ds.attrib["hostname"]           = gethostname()
-            ds.attrib["username"]           = ENV["USER"]
-            ds.attrib["AGNI_version"]      = atmos.AGNI_VERSION
-            ds.attrib["SOCRATES_version"]  = atmos.SOCRATES_VERSION
+            ds.attrib["username"]           = get(ENV,"USER","UNKNOWN")
+            ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
+            ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
 
             plat::String = "Generic"
             if Sys.isapple()
@@ -301,7 +301,7 @@ module save
             var_mmw[:]  =   atmos.layer_μ
             var_cp[:]  =    atmos.layer_cp
             var_rho[:]  =   atmos.layer_ρ
-            var_grav[:]  =  atmos.layer_grav
+            var_grav[:]  =  atmos.g
             var_thick[:]  = atmos.layer_thick
 
             # Composition
@@ -383,6 +383,5 @@ module save
 
         return nothing
     end # end write_ncdf
-
 
 end

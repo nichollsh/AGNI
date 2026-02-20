@@ -79,6 +79,10 @@ module load
             atmos.pl =          ds["pl"][:]
             atmos.tmp =         ds["tmp"][:]
             atmos.tmpl =        ds["tmpl"][:]
+            atmos.flux_n =      ds["fl_N"][:]
+            atmos.flux_u =      ds["fl_U"][:]
+            atmos.flux_d =      ds["fl_D"][:]
+            atmos.flux_cdry =   ds["fl_cnvct"][:]
             atmos.cloud_arr_l = ds["cloud_mmr"][:]
             atmos.p_toa =       atmos.pl[1]
             atmos.p_boa =       atmos.pl[end]
@@ -97,7 +101,6 @@ module load
                 g = input_gases[i]
                 atmos.gas_vmr[g]      = zeros(Float64, nlev_c)
                 atmos.gas_vmr[g][:]  .= raw_vmrs[i, :]
-                atmos.gas_ovmr[g][:] .= atmos.gas_vmr[g][:]
             end
 
             # recalculate remaining layer properties
@@ -107,6 +110,11 @@ module load
 
         end # suppress output
         @debug "ALL DEBUG RESTORED"
+
+        for g in atmos.gas_names
+            @. atmos.gas_ovmr[g] .= atmos.gas_vmr[g]
+            @. atmos.gas_cvmr[g] .= atmos.gas_vmr[g]
+        end
 
         return true
     end # end read_ncdf

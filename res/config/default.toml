@@ -18,8 +18,9 @@ title = "Default"                       # Name for this configuration file
     skin_k          = 2.0               # Conductive skin conductivity [W m-1 K-1]. Used when sol_type=2.
     tmp_magma       = 3000.0            # Magma temperature [K]. Used when sol_type=2.
     flux_int        = 0.0               # Planet's internal flux [W m-2]. Used when sol_type=3.
-    turb_coeff      = 0.001             # Turbulent exchange coefficient for sensible heat.
+    roughness       = 0.001             # Surface roughness length scale [m]
     wind_speed      = 2.0               # Effective wind speed for sensible heat [m s-1].
+    stellar_Teff    = 4000.0            # Stellar effective temperature, if using `input_star="blackbody"`
 
 [deep_heating]
     active          = false             # Enable deep atmospheric heating (e.g., Ohmic/tidal dissipation).
@@ -49,15 +50,15 @@ title = "Default"                       # Name for this configuration file
     tidal_Q         = 1.0               # Tidal quality factor Q
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"   # Path to SOCRATES spectral file.
-    input_star      = "res/stellar_spectra/sun.txt"              # Path to stellar spectrum.
+    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
+    input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum. Set to "blackbody" to use `planet.stellar_Teff`.
     output_dir      = "out/"                                            # Path to output directory.
+    io_dir          = "out/"                                            # Path for fast file operations (optional).
 
 [composition]
     p_surf          = 270.0                     # Total surface pressure [bar].
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
     vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
-    chemistry       = 0                         # Chemistry type (see wiki).
     condensates     = []                        # List of volatiles which are allowed to condense.
 
 [execution]
@@ -66,27 +67,35 @@ title = "Default"                       # Name for this configuration file
     max_steps       = 20000                     # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
     num_levels      = 200                       # Number of model levels.
-    continua        = true                      # Include absorption from continua?
-    rayleigh        = true                      # Include rayleigh scattering?
-    cloud           = false                     # Include water cloud radiative properties?
-    overlap_method  = "ee"                      # Method for treating line overlap.
-    real_gas        = true                      # Use real gas equation of state where possible?
-    thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?
-    sensible_heat   = false                     # Include sensible heat transport at the surface?
-    conduction      = true                      # Include thermal conductive heat transport?
-    latent_heat     = false                     # Include heat release from phase change
-    convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
-    convection      = true                      # Include heat transport by convection
-    rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
+    converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
+    converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
     solution_type   = 0                         # Solution type (see wiki).
     solver          = ""                        # Solver to use (see wiki).
     dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
     initial_state   = ["dry", "sat", "H2O"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
     linesearch      = 0                         # Linesearch method to be used (0: None, 1: Golden, 2: Backtracking)
     easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.
-    converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
-    converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
+    grey_start      = false                     # Initially solve for RCE using double-grey rad trans.
     perturb_all     = false                     # Perturb all rows of jacobin matrix?
+
+[physics]
+    chemistry       = false                     # Solve for thermochemistry in atmosphere?
+    continua        = true                      # Include absorption from continua?
+    rayleigh        = true                      # Include rayleigh scattering?
+    cloud           = false                     # Include water cloud radiative properties?
+    overlap_method  = "ee"                      # Method for treating line overlap.
+    grey_lw         = 1e-4                      # Grey longwave opacity, used when `input_sf="greygas"`
+    grey_sw         = 1e-5                      # Grey shortwave opacity, used when `input_sf="greygas"`
+    real_gas        = true                      # Use real gas equation of state where possible?
+    thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?
+    sensible_heat   = false                     # Include sensible heat transport at the surface?
+    conduction      = true                      # Include thermal conductive heat transport?
+    oceans          = false                     # Model ocean formation - check saturation at surface
+    rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
+    latent_heat     = false                     # Include heat release from phase change
+    advection       = false                     # Include advective heat flux from dynamics
+    convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
+    convection      = true                      # Include heat transport by convection
 
 [plots]
     at_runtime      = true                      # Make some plots at runtime?

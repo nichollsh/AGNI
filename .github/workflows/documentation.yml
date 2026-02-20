@@ -36,7 +36,7 @@ jobs:
 
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: '1.11'
       - uses: julia-actions/cache@v1
 
       - name: Install Documenter
@@ -78,4 +78,6 @@ jobs:
       - name: Build docs and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
-        run: julia --project="./" docs/make.jl
+        run: |
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          julia --project="./" docs/make.jl
