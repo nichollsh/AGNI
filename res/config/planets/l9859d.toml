@@ -12,7 +12,7 @@ title = "L 98-59 d"
     radius          = 8064561.9164
     mass            = 9.79e24
     flux_int        = 0.58586427102
-    turb_coeff      = 1.0e-2
+    roughness       = 1.0e-2
     wind_speed      = 10.0
     star_Teff       = 3415.0
 
@@ -25,9 +25,7 @@ title = "L 98-59 d"
     p_surf          = 32.89e3
     p_top           = 1e-4
     vmr_dict        = { H2=0.8, H2S=0.15, H2O=0.05 }
-    chemistry       = 0
     condensates     = []
-
 
 [execution]
     clean_output    = true
@@ -35,6 +33,19 @@ title = "L 98-59 d"
     max_steps       = 200
     max_runtime     = 400
     num_levels      = 38
+    solution_type   = 3
+    solver          = "newton"
+    dx_max          = 500.0
+    initial_state   = ["loglin","1000"]
+    linesearch      = 2
+    easy_start      = false
+    grey_start      = false
+    converge_atol   = 1e-1
+    converge_rtol   = 1e-2
+    perturb_all     = false
+
+[physics]
+    chemistry       = false
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -42,20 +53,13 @@ title = "L 98-59 d"
     real_gas        = true
     thermo_funct    = true
     sensible_heat   = true
+    advection       = false
     conduction      = true
-    latent_heat     = true
+    latent_heat     = false
     convection      = true
     convection_crit = "s"
     rainout         = false
-    solution_type   = 3
-    solver          = "newton"
-    dx_max          = 500.0
-    initial_state   = ["loglin","1000"]
-    linesearch      = 2
-    easy_start      = false
-    converge_atol   = 1e-1
-    converge_rtol   = 1e-2
-    perturb_all     = false
+    oceans          = false
 
 [plots]
     at_runtime      = true

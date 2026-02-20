@@ -14,6 +14,7 @@ deps/*.log
 test/out/
 Manifest.toml
 *.cov
+coverage.*
 
 # Docs
 docs/build
@@ -34,11 +35,17 @@ res/thermodynamics/*.nc.chk
 index.html
 
 # Output files
+scratch
+scratch/
 test/out/
 out/*
 runtime.sf
 runtime.sf_k
 socstar.dat
+slurm*.out
+slurm*.log
+sbatch*.out
+sbatch*.log
 
 # Misc files
 .DS_Store
@@ -46,6 +53,8 @@ __pycache__
 debug/
 nogit*
 .osfcli.config
+.venv
+.conda
 
 # RFM
 rfm

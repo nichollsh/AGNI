@@ -10,6 +10,7 @@ module setpt
 
     import ..phys
     import ..atmosphere
+    import ..chemistry
 
     include("guillot.jl")
     import .guillot
@@ -19,11 +20,26 @@ module setpt
     using LoggingExtras
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
+    function _parse_tmp_str(atmos::atmosphere.Atmos_t, tmp)::Float64
+
+        if tmp isa String
+            if lowercase(tmp) == "teq"
+                return phys.calc_Teq(atmos.instellation, atmos.albedo_b)
+            else
+                return parse(Float64, tmp)
+            end
+        elseif tmp isa Number
+            return Float64(tmp)
+        else
+            error("Invalid temperature choice '$(tmp)'")
+        end
+    end
+
     # Process a series of requests describing T(p)
-    function request!(atmos::atmosphere.Atmos_t, request::Array{String,1})::Bool
+    function request!(atmos::atmosphere.Atmos_t, request::Array)::Bool
         num_req::Int = length(request)          # Number of requests
         idx_req::Int = 1                        # Index of current request
-        str_req::String = "_unset"              # String of current request
+        str_req::String = atmosphere.UNSET_STR  # String of current request
         prt_req::String = "Setting T(p): "
         while idx_req <= num_req
             # get command
@@ -38,17 +54,17 @@ module setpt
             elseif str_req == "str"
                 # isothermal stratosphere
                 idx_req += 1
-                setpt.stratosphere!(atmos, parse(Float64, request[idx_req]))
+                setpt.stratosphere!(atmos, request[idx_req])
 
             elseif str_req == "loglin"
                 # log-linear profile between T_surf and T_top
                 idx_req += 1
-                setpt.loglinear!(atmos, parse(Float64, request[idx_req]))
+                setpt.loglinear!(atmos, request[idx_req])
 
             elseif str_req == "iso"
                 # isothermal profile
                 idx_req += 1
-                setpt.isothermal!(atmos, parse(Float64, request[idx_req]))
+                setpt.isothermal!(atmos, request[idx_req])
 
             elseif str_req == "csv"
                 # set from csv file
@@ -63,7 +79,12 @@ module setpt
             elseif str_req == "add"
                 # add X kelvin from the currently stored T(p)
                 idx_req += 1
-                setpt.add!(atmos,parse(Float64, request[idx_req]))
+                setpt.add!(atmos,request[idx_req])
+
+            elseif str_req == "surfsat"
+                # ensure surface is not super-saturated
+                chemistry.restore_composition!(atmos)
+                chemistry._sat_surf!(atmos)
 
             elseif str_req == "sat"
                 # condensing a volatile
@@ -79,7 +100,7 @@ module setpt
                 return false
             end
 
-            atmosphere.calc_layer_props!(atmos, ignore_errors=true)
+            atmosphere.calc_layer_props!(atmos)
 
             # iterate
             idx_req += 1
@@ -88,12 +109,64 @@ module setpt
         return true
     end
 
+    # Set by interpolating from T,P arrays
+    function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array;
+                            extrap::Bool=false)
+
+        if !atmos.is_param
+            @error "setpt: Atmosphere parameters not set"
+            return
+        end
+
+        # Check if arrays are flipped
+        #      Pressure must be increasing with index
+        if pl[1] > pl[2]
+            pl = reverse(pl)
+            tmpl = reverse(tmpl)
+        end
+
+        # Check that pressure is monotonic
+        for i in 1:length(pl)-1
+            if pl[i] > pl[i+1]
+                @error "setpt: input array of pressures is not monotonically increasing"
+                return
+            end
+        end
+
+        # Extrapolate loaded grid to lower pressures (prevent domain error)
+        if (atmos.pl[1] < pl[1])
+            pushfirst!(pl,   atmos.pl[1]/1.01)
+            pushfirst!(tmpl, tmpl[1])
+        end
+
+        # Extrapolate loaded grid to higher pressures
+        if (atmos.pl[end] > pl[end])
+            push!(pl,   atmos.pl[end]*1.01)
+            push!(tmpl, tmpl[end])
+        end
+
+        # Interpolate from the loaded grid to the required one
+        #   This uses log-pressures in order to make the interpolation behave
+        #   reasonably across the entire grid.
+        itp::Extrapolation = extrapolate(
+                                        interpolate((log10.(pl),),tmpl, Gridded(Linear())),
+                                        extrap ? Linear() : Flat()
+                                        )
+        @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
+        @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
+
+        clamp!(atmos.tmpl, atmos.tmp_floor+0.1, atmos.tmp_ceiling-0.1)
+        clamp!(atmos.tmp,  atmos.tmp_floor+0.1, atmos.tmp_ceiling-0.1)
+
+        return
+    end
+
     # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
 
         # Check file exists
         if !isfile(fpath)
-            @error "setpt: The file '$fpath' does not exist"
+            @error "setpt: file '$fpath' does not exist"
             return
         end
 
@@ -111,10 +184,9 @@ module setpt
 
         # Validate
         if nlev_l < 3
-            @error "setpt: CSV file contains too few levels (contains $nlev_l edge values)"
+            @error "setpt: file contains too few levels (contains $nlev_l edge values)"
             return
         end
-        nlev_c = nlev_l - 1
 
         # Allocate temporary T and P arrays
         tmpl = zeros(Float64,nlev_l)
@@ -151,42 +223,8 @@ module setpt
             idx += 1
         end
 
-        # Check if arrays are flipped
-        if pl[1] > pl[2]
-            pl = reverse(pl)
-            tmpl = reverse(tmpl)
-        end
-
-        # Check that pressure is monotonic
-        for i in 1:nlev_c
-            if pl[i] > pl[i+1]
-                @error "setpt: Pressure is not monotonic in csv file"
-                return
-            end
-        end
-
-        # Extrapolate loaded grid to lower pressures (prevent domain error)
-        if (atmos.pl[1] < pl[1])
-            p_ext = atmos.pl[1]/1.1
-            t_ext = (tmpl[1] - tmpl[3])/(pl[1] - pl[3]) * (p_ext - pl[1])
-            pushfirst!(pl,   p_ext)
-            pushfirst!(tmpl, t_ext)
-        end
-
-        # Extrapolate loaded grid to higher pressures
-        if (atmos.pl[end] > pl[end])
-            p_ext = atmos.pl[end]*1.1
-            t_ext = (tmpl[end] - tmpl[end-2])/(pl[end] - pl[end-2]) * (p_ext - pl[end])
-            push!(pl,   p_ext)
-            push!(tmpl, t_ext)
-        end
-
-        # Interpolate from the loaded grid to the required one
-        #   This uses log-pressures in order to make the interpolation behave
-        #   reasonably across the entire grid.
-        itp::Extrapolation = extrapolate(interpolate((log10.(pl),),tmpl, Gridded(Linear())), Flat())
-        @. atmos.tmpl = itp(log10(atmos.pl))  # Cell edges
-        @. atmos.tmp  = itp(log10(atmos.p ))   # Cell centres
+        # Use fromarrays function to do the rest
+        fromarrays!(atmos, pl, tmpl)
 
         return
     end
@@ -260,11 +298,15 @@ module setpt
     end # end load_ncdf
 
     # Set atmosphere to be isothermal at the given temperature
-    function isothermal!(atmos::atmosphere.Atmos_t, set_tmp::Float64)
+    function isothermal!(atmos::atmosphere.Atmos_t, set_tmp)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
             return
         end
+
+
+        set_tmp = _parse_tmp_str(atmos, set_tmp)
+
         fill!(atmos.tmpl, set_tmp)
         fill!(atmos.tmp , set_tmp)
 
@@ -272,11 +314,14 @@ module setpt
     end
 
     # Set atmosphere to be isothermal at the given temperature
-    function add!(atmos::atmosphere.Atmos_t, delta::Float64)
+    function add!(atmos::atmosphere.Atmos_t, delta)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
             return
         end
+
+        delta = _parse_tmp_str(atmos, delta)
+
         @. atmos.tmpl += delta
         @. atmos.tmp  += delta
 
@@ -328,7 +373,9 @@ module setpt
     end
 
     # Set atmosphere to have an isothermal stratosphere
-    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp::Float64)
+    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp)
+
+        strat_tmp = _parse_tmp_str(atmos, strat_tmp)
 
         # Keep stratosphere below tmp_surf value
         strat_tmp = min(strat_tmp, atmos.tmp_surf)
@@ -355,7 +402,9 @@ module setpt
     end
 
     # Set atmosphere to have a log-linear T(p) profile
-    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp::Float64)
+    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp)
+
+        top_tmp = _parse_tmp_str(atmos, top_tmp)
 
         # Keep top_tmp below tmp_surf value
         top_tmp = min(top_tmp, atmos.tmp_surf)
@@ -376,68 +425,11 @@ module setpt
     end
 
 
-    # Ensure that the surface isn't supersaturated
-    function prevent_surfsupersat!(atmos::atmosphere.Atmos_t)::Bool
-        if !(atmos.is_alloc && atmos.is_param)
-            @error "setpt: Atmosphere is not setup or allocated"
-            return
-        end
-
-        x::Float64      = 0.0
-        psat::Float64   = 0.0
-        rained::Bool    = false
-
-        # For each condensable volatile
-        for gas in atmos.gas_names
-            # Get VMR at surface
-            x = atmos.gas_vmr[gas][atmos.nlev_c]
-            if x < 1.0e-10
-                continue
-            end
-
-            # Check criticality
-            if (atmos.tmp_surf > atmos.gas_dat[gas].T_crit)
-                continue
-            end
-
-            # Check surface pressure (should not be supersaturated)
-            psat = phys.get_Psat(atmos.gas_dat[gas], atmos.tmp_surf)
-            if x*atmos.pl[end] > psat
-
-                # Set flag
-                rained = true
-
-                # Reduce amount of volatile until reaches phase curve
-                atmos.p_boa = atmos.pl[end]*(1.0-x) + psat
-                atmos.gas_vmr[gas][atmos.nlev_c] = psat / atmos.p_boa
-
-                # Check that p_boa is still reasonable
-                if atmos.p_boa <= 10.0 * atmos.p_toa
-                    @error "setpt: Supersaturation check ($gas) resulted in an unreasonably small surface pressure"
-                end
-            end
-        end
-
-        # Renormalise VMRs
-        tot_vmr = 0.0
-        for g in atmos.gas_names
-            tot_vmr += atmos.gas_vmr[g][atmos.nlev_c]
-        end
-        for g in atmos.gas_names
-            atmos.gas_vmr[g][atmos.nlev_c] /= tot_vmr
-        end
-
-        # Generate new pressure grid
-        atmosphere.generate_pgrid!(atmos)
-
-        return rained
-    end
-
 
     """
-    Set T = max(T,T_dew) for a specified gas.
+    **Set T = max(T,T_dew) for a specified gas.**
 
-    Does not modify VMRs or surface temperature.
+    Does not modify VMRs. Does update water-cloud locations.
     """
     function saturation!(atmos::atmosphere.Atmos_t, gas::String)
 
@@ -450,27 +442,44 @@ module setpt
             return nothing
         end
 
-        x::Float64 = 0.0
-        Tdew::Float64 = 0.0
+        xgas::Float64 = 0.0
 
-        # Check if each level is condensing. If it is, place on phase curve
-        for i in 1:atmos.nlev_c
-
-            x = atmos.gas_vmr[gas][i]
-            if x < 1.0e-10
-                continue
+        # Return the new temperature (Float) and whether saturated (Bool)
+        function _tdew(tmp::Float64,pgas::Float64)::Tuple
+            # Tiny partial pressure
+            if pgas < 1e-99
+                return (tmp, false)
             end
 
-            # Set to saturation curve
-            Tdew = phys.get_Tdew(atmos.gas_dat[gas], atmos.p[i] * x)
-            if atmos.tmp[i] <= Tdew+1e-2
-                atmos.tmp[i]  = Tdew
-                atmos.gas_sat[gas][i] = true
+            # Supercritical
+            if tmp >= atmos.gas_dat[gas].T_crit
+                return (tmp, false)
+            end
+
+            # Otherwise...
+            Tdew = phys.get_Tdew(atmos.gas_dat[gas], pgas)
+            if tmp <= Tdew + 1e-2
+                return (Tdew, true)
+            else
+                return (tmp, false)
             end
         end
 
-        # Set cell-edge temperatures
-        atmosphere.set_tmpl_from_tmp!(atmos)
+        # Check if each level is saturated: tmp < Tdew. If it is, set to Tdew.
+        for i in range(start=atmos.nlev_l, stop=1, step=-1)
+
+            # Composition
+            xgas = atmos.gas_vmr[gas][min(i,atmos.nlev_c)]
+
+            # Cell-centres
+            if i <= atmos.nlev_c
+                (atmos.tmp[i], atmos.gas_sat[gas][i]) = _tdew(atmos.tmp[i], atmos.p[i]*xgas)
+            end
+
+            # Cell-edges
+            atmos.tmpl[i] = _tdew(atmos.tmpl[i], atmos.pl[i]*xgas)[1]
+        end
+        atmos.tmp_surf = atmos.tmpl[end]
 
         # Set cloud
         if (gas == "H2O") && atmos.control.l_cloud
@@ -500,7 +509,7 @@ module setpt
         # Evalulate cell-centre temperatures
         for i in 1:atmos.nlev_c
             # get LW optical depth
-            τ = guillot.eval_tau(atmos.p[i], atmos.layer_grav[i])
+            τ = guillot.eval_tau(atmos.p[i], atmos.g[i])
 
             # set temperature
             atmos.tmp[i] = guillot.eval_T4_cos(τ, Tint, Tirr, atmos.zenith_degrees)^0.25

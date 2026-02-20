@@ -14,17 +14,16 @@ module phys
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
     # Import internal modules
-    include("consts.jl")
     include("blake.jl")
-    using .consts
     import .blake
+    using ..consts
 
     # A large floating point number
     const BIGFLOAT::Float64     = 1e99
     const BIGLOGFLOAT::Float64  = 99.0
 
     # Minimum data file version [YYYYMMDD, as integer]
-    const MIN_DATA_VERSION::Int64 = 20250220
+    const MIN_DATA_VERSION::Int64 = 20260201
 
     # Enable/disable flags
     ENABLE_CHECKSUM::Bool = true  # can still be disabled when function is called
@@ -205,7 +204,7 @@ module phys
 
                 # we always have these
                 gas.mmw = ds["mmw"][1]
-                gas.JANAF_name = String(ds["JANAF"][:])
+                gas.JANAF_name = String(ds["JANAF"][1])
 
                 # triple point and critical point
                 if haskey(ds, "T_trip")
@@ -838,6 +837,38 @@ module phys
     """
     function calc_therm_diffus(k::Float64, ρ::Float64, cp::Float64)::Float64
         return k / (ρ * cp)
+    end
+
+    """
+    **Calculate planetary equilibrium temperature.**
+
+    https://en.wikipedia.org/wiki/Planetary_equilibrium_temperature?useskin=vector
+
+    Arguments:
+    - `S::Float64`       Bolometric instellation [W m-2]
+    - `α::Float64`       Bond albedo
+
+    Returns:
+    - `Teq::Float64`     Planetary equilibrium temperature [K]
+    """
+    function calc_Teq(S::Float64, α::Float64)::Float64
+        return (S*(1-α)/(4*consts.σSB))^0.25
+    end
+
+    """
+    **Calculate planetary *skin* temperature.**
+
+    https://en.wikipedia.org/wiki/Skin_temperature_(atmosphere)?useskin=vector
+
+    Arguments:
+    - `S::Float64`       Bolometric instellation [W m-2]
+    - `α::Float64`       Bond albedo
+
+    Returns:
+    - `Tskin::Float64`   Planetary skin temperature [K]
+    """
+    function calc_Tskin(S::Float64, α::Float64)::Float64
+        return calc_Teq(S, α) * (0.5^0.25)
     end
 
 end # end module

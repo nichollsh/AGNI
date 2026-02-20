@@ -1,23 +1,23 @@
 {
-  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.json",
   "@type": "Code",
   "author": [
     {
       "@id": "https://orcid.org/0000-0002-8368-4641",
       "@type": "Person",
-      "email": "harrison.nicholls@physics.ox.ac.uk",
+      "email": "harrison.nicholls@ast.cam.ac.uk",
       "name": "Harrison Nicholls",
-      "affiliation": "Department of Physics, University of Oxford, Parks Road, Oxford OX1 3PU, UK"
+      "affiliation": "University of Cambridge"
     }
   ],
   "identifier": "",
   "codeRepository": "https://github.com/nichollsh/AGNI",
   "datePublished": "2024-12-29",
-  "dateModified": "2025-10-21",
   "dateCreated": "2024-09-13",
+  "dateModified": "2026-02-10",
   "description": "An open-source model for extreme atmospheres on rocky exoplanets.",
-  "keywords": "physics, radiative transfer, exoplanets, astronomy, convection, radiation, planets, atmospheres",
-  "license": "GPL v3.0",
+  "keywords": "exoplanets, radiation, astronomy, atmosphere, optimization, julia, fortran, convection, chemistry, magma, planetary, physics",
+  "license": "GPL-3.0",
   "title": "AGNI",
-  "version": "1.7.9"
+  "version": "1.8.6"
 }

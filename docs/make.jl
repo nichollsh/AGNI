@@ -19,7 +19,10 @@ makedocs(
         "usage.md",
         "examples/index.md",
         "troubleshooting.md",
-        "Development" => "manual/index.md"
+        "Software manual" => "manual.md",
+        "Related codes" => "ecosystem.md",
+        "Acknowledgements" => "thanks.md",
+        "Contributing" => "contributing.md",
     ]
 )
 

@@ -3,6 +3,10 @@
 
 name: Tests
 
+permissions:
+  contents: read
+  pull-requests: write
+
 on:
   pull_request:
     branches: [main]
@@ -14,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     name: install_and_test
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
       # Setup system
       - name: NetCDF
@@ -33,12 +38,13 @@ jobs:
 
       # Setup SOCRATES
       - name: Get SOCRATES
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: 'nichollsh/SOCRATES'
           path: 'SOCRATES'
 
-      - uses: actions/cache@v4
+      - name: Restore SOCRATES from cache
+        uses: actions/cache@v4
         id: cache-socrates
         with:
           path: |
@@ -47,7 +53,7 @@ jobs:
             SOCRATES/set_rad_env
           key: socrates-${{ hashFiles('SOCRATES/version') }}
 
-      - name: Build SOCRATES
+      - name: Build SOCRATES if required
         if: steps.cache-socrates.outputs.cache-hit != 'true'
         run: |
           export LD_LIBRARY_PATH=""
@@ -64,10 +70,39 @@ jobs:
           export LD_LIBRARY_PATH=""
           julia --project=. -e 'using Pkg; Pkg.build()'
 
-      - name: Test AGNI
+      # Run the tests
+      - name: Run AGNI test suite
         run: |
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export LD_LIBRARY_PATH=""
-          julia --project=. -e 'using Pkg; Pkg.test()'
+          cd test/
+          julia --project=.. --code-coverage runtests.jl
 
+      - name: Get coverage
+        run: |
+          julia --project=. test/get_coverage.jl
+          export total=$(cat coverage.total)
+          echo "total=$total" >> $GITHUB_ENV
+
+      # Upload output dir for inspection by user
+      - name: Upload result as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifact
+          path: |
+            out/*
+            coverage.*
+
+      # Make badge
+      - name: Create coverage badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: e20f4fa3c7811c75d34005311fef3696
+          filename: covbadge.svg
+          label: Coverage
+          message: ${{ env.total }}%
+          minColorRange: 50
+          maxColorRange: 90
+          valColorRange: ${{ env.total }}
 
