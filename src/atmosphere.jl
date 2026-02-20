@@ -62,6 +62,51 @@ module atmosphere
     # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
+    """
+    **Parameters for deep atmospheric heating.**
+
+    AGNI treats deep heating as an *additional upward energy flux* that is deposited
+    within the column following a Gaussian profile in log-pressure space.
+
+    Two power modes are supported:
+    - `:efficiency` — heating flux = `efficiency × instellation` (stellar efficiency)
+    - `:flux`       — heating flux = `F_total` (fixed radiative flux in W m⁻²)
+
+    Additional design choices:
+    - Pressure-normalised deposition (dF/dP profile; legacy behaviour)
+    - Mass-normalised deposition (dm-weighted; aligns with ∂L/∂m forms)
+    - Handling deposition below the model bottom as a *bottom boundary flux*
+
+    Notes:
+    - Pressures are in Pa throughout AGNI.
+    - `efficiency` is always clamped to [0,1].
+
+    Fields:
+    - `active::Bool`              Enable/disable deep heating.
+    - `P_dep::Float64`            Deposition pressure centre [Pa].
+    - `sigma_P::Float64`          Width of Gaussian in log-pressure space [dimensionless].
+    - `efficiency::Float64`       Heating efficiency (fraction of instellation), used when `power_mode=:efficiency`.
+    - `normalization::Symbol`     `:pressure` (legacy) or `:mass` (dm-weighted).
+    - `below_domain::Symbol`      `:clamp` or `:boundary_flux`.
+    - `power_mode::Symbol`        `:efficiency` | `:flux`.
+    - `F_total::Float64`          Total deposited flux [W m-2], used when `power_mode=:flux`.
+    """
+    struct DeepHeatingParams
+        active::Bool
+        P_dep::Float64
+        sigma_P::Float64
+        efficiency::Float64
+        normalization::Symbol
+        below_domain::Symbol
+        power_mode::Symbol
+        F_total::Float64
+    end
+
+    # Default constructor with heating disabled
+    DeepHeatingParams() = DeepHeatingParams(false, 1.0e5, 1.0, 0.0,
+                                            :pressure, :clamp,
+                                            :efficiency, 0.0)
+
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
 
@@ -284,6 +329,10 @@ module atmosphere
 
         # Cell-internal heating
         flux_advect::Array{Float64, 1}     # Energy flux advected into each cell [W m-2], treated as entering into its bottom edge
+
+        # Deep atmospheric heating
+        deep_heating::DeepHeatingParams     # Parameters for deep heating
+        flux_deep::Array{Float64,1}         # Deep heating flux at cell edges [W m-2] # should add at lw flux level
 
         # Total energy flux
         flux_dif::Array{Float64,1}      # Flux lost at each level [W m-2] (positive is heating up)
@@ -1124,6 +1173,9 @@ module atmosphere
             mkdir(atmos.rfm_work)
         end
 
+        # Deep atmospheric heating (default: disabled)
+        atmos.deep_heating = DeepHeatingParams()
+
         # Record that the parameters are set
         atmos.is_param = true
         atmos.is_solved = false
@@ -1132,6 +1184,74 @@ module atmosphere
         @debug "Setup complete"
         return true
     end # end function setup
+
+
+    """
+    **Set deep atmospheric heating parameters.**
+
+    Configures the deep heating source
+    which deposits energy as a Gaussian distribution in log-pressure space.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `active::Bool`            enable/disable deep heating.
+    - `P_dep::Float64`          deposition pressure [Pa].
+    - `sigma_P::Float64`        width of Gaussian in log-pressure space [dimensionless].
+    - `efficiency::Float64`     heating efficiency as fraction of instellation.
+
+    Returns:
+        Nothing
+    """
+    function set_deep_heating!(atmos::atmosphere.Atmos_t;
+                                active::Bool=false,
+                                P_dep::Float64=1.0e5,
+                                sigma_P::Float64=1.0,
+                                efficiency::Float64=0.0,
+                                normalization::Symbol=:pressure,
+                                below_domain::Symbol=:clamp,
+                                power_mode::Symbol=:efficiency,
+                                F_total::Float64=0.0)
+
+        # Validate/normalise parameters
+        sigma_P = max(sigma_P, 0.01)  # Prevent division issues
+        efficiency = clamp(efficiency, 0.0, 1.0)
+
+        # Normalise symbols
+        if !(normalization in (:pressure, :mass))
+            error("Invalid deep heating normalization: $(normalization)")
+        end
+        if !(below_domain in (:clamp, :boundary_flux))
+            error("Invalid deep heating below_domain: $(below_domain)")
+        end
+        if !(power_mode in (:efficiency, :flux))
+            error("Invalid deep heating power_mode: $(power_mode)")
+        end
+
+        # Deposition pressure handling
+        if below_domain == :clamp
+            P_dep = clamp(P_dep, atmos.p_toa, atmos.p_boa)
+        else
+            # Allow P_dep outside domain (used as a signal for boundary-flux mode)
+            P_dep = max(P_dep, atmos.p_toa)
+        end
+
+        # Create and store the parameters
+        atmos.deep_heating = DeepHeatingParams(active, P_dep, sigma_P, efficiency,
+                               normalization, below_domain,
+                               power_mode, F_total)
+
+        if active
+            @info @sprintf("Deep heating enabled: norm=%s below=%s mode=%s",
+                           String(normalization), String(below_domain), String(power_mode))
+            if power_mode == :efficiency
+                @info @sprintf("    P_dep=%.2e Pa, σ_P=%.2f, ε=%.4f", P_dep, sigma_P, efficiency)
+            else
+                @info @sprintf("    P_dep=%.2e Pa, σ_P=%.2f, F_total=%.4e W/m²", P_dep, sigma_P, F_total)
+            end
+        end
+
+        return nothing
+    end
 
 
     """
@@ -2265,6 +2385,7 @@ module atmosphere
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)
+        atmos.flux_deep =         zeros(Float64, atmos.nlev_l)  # Deep atmospheric heating flux
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
         atmos.timescale_conv =    zeros(Float64, atmos.nlev_c)
         atmos.timescale_rad =     zeros(Float64, atmos.nlev_c)

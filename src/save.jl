@@ -62,15 +62,15 @@ module save
         @debug "Writing fluxes CSV to $fname"
 
         open(fname, "w") do f
-            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , convect     , latent      , tot      \n")
-            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
+            write(f, "# pressure  , U_LW        , D_LW        , N_LW        , U_SW        , D_SW        , N_SW        , U           , D           , N           , convect     , latent      , deep        , tot      \n")
+            write(f, "# [Pa]      , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]     , [W m-2]  \n")
             for i in 1:atmos.nlev_l
-                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n",
+                @printf(f, "%1.5e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e , %+1.4e \n",
                           atmos.pl[i],
                           atmos.flux_u_lw[i], atmos.flux_d_lw[i], atmos.flux_n_lw[i],
                           atmos.flux_u_sw[i], atmos.flux_d_sw[i], atmos.flux_n_sw[i],
                           atmos.flux_u[i],    atmos.flux_d[i],    atmos.flux_n[i],
-                          atmos.flux_cdry[i], atmos.flux_l[i],    atmos.flux_tot[i]
+                          atmos.flux_cdry[i], atmos.flux_l[i],    atmos.flux_deep[i], atmos.flux_tot[i]
                           )
             end
         end
@@ -274,6 +274,7 @@ module save
             var_fcc =       defVar(ds, "fl_cndct",  Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_fla =       defVar(ds, "fl_latent", Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_ft =        defVar(ds, "fl_tot",    Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
+            var_fdp =       defVar(ds, "fl_deep",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_fdiff =     defVar(ds, "fl_dif",    Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_hr =        defVar(ds, "hrate",     Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "K day-1"))
             var_kzz =       defVar(ds, "Kzz",       Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "m2 s-1"))
@@ -342,6 +343,7 @@ module save
             var_fcc[:] =    atmos.flux_cdct
             var_fla[:] =    atmos.flux_l
 
+            var_fdp[:] =    atmos.flux_deep
             var_ft[:] =     atmos.flux_tot
             var_hr[:] =     atmos.heating_rate
             var_fdiff[:] =  atmos.flux_dif

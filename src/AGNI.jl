@@ -486,6 +486,43 @@ module AGNI
             io_dir = cfg["files"]["io_dir"]
         end
 
+        # Deep heating configuration
+        deep_active::Bool         = false
+        deep_P_dep::Float64       = 1.0e5
+        deep_sigma_P::Float64     = 1.0
+        deep_efficiency::Float64  = 0.0
+        deep_norm::Symbol         = :pressure
+        deep_below::Symbol        = :clamp
+        deep_power_mode::Symbol   = :efficiency
+        deep_F_total::Float64     = 0.0
+        if haskey(cfg, "deep_heating")
+            dh = cfg["deep_heating"]
+            if haskey(dh, "active")
+                deep_active = Bool(dh["active"])
+            end
+            if haskey(dh, "P_dep")
+                deep_P_dep = Float64(dh["P_dep"])
+            end
+            if haskey(dh, "sigma_P")
+                deep_sigma_P = Float64(dh["sigma_P"])
+            end
+            if haskey(dh, "efficiency")
+                deep_efficiency = Float64(dh["efficiency"])
+            end
+            if haskey(dh, "normalization")
+                deep_norm = Symbol(lowercase(String(dh["normalization"])))
+            end
+            if haskey(dh, "below_domain")
+                deep_below = Symbol(lowercase(String(dh["below_domain"])))
+            end
+            if haskey(dh, "power_mode")
+                deep_power_mode = Symbol(lowercase(String(dh["power_mode"])))
+            end
+            if haskey(dh, "F_total")
+                deep_F_total = Float64(dh["F_total"])
+            end
+        end
+
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
         atmos = atmosphere.Atmos_t()
@@ -528,6 +565,19 @@ module AGNI
 
         # Allocate atmosphere
         atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
+
+        # Configure deep atmospheric heating
+        if deep_active
+            atmosphere.set_deep_heating!(atmos,
+                                         active=deep_active,
+                                         P_dep=deep_P_dep,
+                                         sigma_P=deep_sigma_P,
+                                         efficiency=deep_efficiency,
+                                         normalization=deep_norm,
+                                         below_domain=deep_below,
+                                         power_mode=deep_power_mode,
+                                         F_total=deep_F_total)
+        end
 
         # Set temperatures as appropriate
         if transparent
