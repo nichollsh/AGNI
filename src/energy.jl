@@ -528,7 +528,7 @@ module energy
             # No deep heating
             return nothing
         else
-            error("Invalid deep heating power_mode: $(power_mode)")
+            error("Invalid deep heating power_mode: $(atmos.deepheat_power_mode)")
         end
 
         # If heating is effectively zero, do nothing
@@ -979,7 +979,7 @@ module energy
         ok::Bool = true
 
         # Warn if no flux terms are enabled
-        if !(radiative || latent_heat || convective || sens_heat || conductive || advective || deepheating)
+        if !(radiative || latent_heat || convective || sens_heat || conductive || advective || deep)
             @warn "No flux terms enabled in call to `calc_fluxes!`"
             ok = false
         end
