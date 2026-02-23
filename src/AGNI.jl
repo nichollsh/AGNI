@@ -486,42 +486,6 @@ module AGNI
             io_dir = cfg["files"]["io_dir"]
         end
 
-        # Deep heating configuration
-        deep_active::Bool         = false
-        deep_P_dep::Float64       = 1.0e5
-        deep_sigma_P::Float64     = 1.0
-        deep_efficiency::Float64  = 0.0
-        deep_norm::Symbol         = :pressure
-        deep_below::Symbol        = :clamp
-        deep_power_mode::Symbol   = :efficiency
-        deep_F_total::Float64     = 0.0
-        if haskey(cfg, "deep_heating")
-            dh = cfg["deep_heating"]
-            if haskey(dh, "active")
-                deep_active = Bool(dh["active"])
-            end
-            if haskey(dh, "P_dep")
-                deep_P_dep = Float64(dh["P_dep"])
-            end
-            if haskey(dh, "sigma_P")
-                deep_sigma_P = Float64(dh["sigma_P"])
-            end
-            if haskey(dh, "efficiency")
-                deep_efficiency = Float64(dh["efficiency"])
-            end
-            if haskey(dh, "normalization")
-                deep_norm = Symbol(lowercase(String(dh["normalization"])))
-            end
-            if haskey(dh, "below_domain")
-                deep_below = Symbol(lowercase(String(dh["below_domain"])))
-            end
-            if haskey(dh, "power_mode")
-                deep_power_mode = Symbol(lowercase(String(dh["power_mode"])))
-            end
-            if haskey(dh, "F_total")
-                deep_F_total = Float64(dh["F_total"])
-            end
-        end
 
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
@@ -567,17 +531,24 @@ module AGNI
         atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
 
         # Configure deep atmospheric heating
-        if deep_active
+        if haskey(cfg["physics"],"deep_heating")
+            dh = cfg["physics"]["deep_heating"]
+            if ! all(k in keys(dh) for k in ["Pmid","Pwid","flux_rel","flux_abs","norm_method","domain","power_mode"])
+                @error "Config: deep heating enabled but parameters are not set"
+                @error "        you must provide `Pmid`, `Pwid`, `flux_rel`, `flux_abs`, `norm_method`, `domain`, and `power_mode`"
+                return false
+            end
+
+            # Pass values, converting Bar->Pa where needed
             atmosphere.set_deep_heating!(atmos,
-                                         active=deep_active,
-                                         P_dep=deep_P_dep,
-                                         sigma_P=deep_sigma_P,
-                                         efficiency=deep_efficiency,
-                                         normalization=deep_norm,
-                                         below_domain=deep_below,
-                                         power_mode=deep_power_mode,
-                                         F_total=deep_F_total)
+                                            Float64(dh["Pmid"])*1e5, Float64(dh["Pwid"]),
+                                            Float64(dh["flux_rel"]), Float64(dh["flux_abs"]),
+                                            Symbol(dh["norm_method"]),
+                                            Symbol(dh["domain"]),
+                                            Symbol(dh["power_mode"])) || return false
         end
+        incl_deep::Bool = atmos.deepheat_power_mode != :off
+
 
         # Set temperatures as appropriate
         if transparent
@@ -619,6 +590,7 @@ module AGNI
             energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
                                 convective=incl_convect, sens_heat=incl_sens,
                                 conductive=incl_conduct, advective=incl_advect,
+                                deep=incl_deep,
                                 calc_cf=Bool(cfg["plots"]["contribution"]))
 
         # Transparent atmosphere solver
@@ -711,7 +683,7 @@ module AGNI
             plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"),
                                     incl_mlt=incl_convect, incl_eff=(sol_type==3),
                                     incl_cdct=incl_conduct, incl_latent=incl_latent,
-                                    incl_advect=incl_advect)
+                                    incl_advect=incl_advect, incl_deep=incl_deep)
         cfg["plots"]["emission"] && \
             plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
         cfg["plots"]["albedo"] && \

@@ -22,16 +22,6 @@ title = "Default"                       # Name for this configuration file
     wind_speed      = 2.0               # Effective wind speed for sensible heat [m s-1].
     stellar_Teff    = 4000.0            # Stellar effective temperature, if using `input_star="blackbody"`
 
-[deep_heating]
-    active          = false             # Enable deep atmospheric heating.
-    P_dep           = 1.0e5             # Deposition pressure [Pa] - center of Gaussian heating profile.
-    sigma_P         = 1.0               # Width of Gaussian in log-pressure space [dimensionless].
-    efficiency      = 0.0               # Heating efficiency as fraction of instellation.
-    normalization   = "pressure"        # "pressure" (legacy dF/dP) | "mass" (dm-weighted).
-    below_domain    = "clamp"           # "clamp" | "boundary_flux" (if P_dep outside domain).
-    power_mode      = "efficiency"      # "efficiency" | "flux".
-    F_total         = 0.0               # [W m-2] used when power_mode="flux".
-
 [files]
     input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum. Set to "blackbody" to use `planet.stellar_Teff`.
@@ -79,6 +69,15 @@ title = "Default"                       # Name for this configuration file
     advection       = false                     # Include advective heat flux from dynamics
     convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
     convection      = true                      # Include heat transport by convection
+
+    [physics.deep_heating]
+        Pmid            = 1e-3              # Center of Gaussian heating profile [bar]
+        Pwid            = 1.0               # Width of Gaussian in log-Pascal units.
+        power_mode      = "off"             # Power mode for heating (off, rel, abs)
+        norm_method     = "pressure"        # Normalisation coordinate: "pressure" (legacy dF/dP), or "mass" (dm-weighted).
+        domain          = "clamp"           # How to handle Pmid outside domain (clamp, boundary_flux)
+        flux_rel        = 0.0               # Set flux by fraction of instellation, used for power_mode="rel".
+        flux_abs        = 10.0              # Set flux by [W m-2], used for power_mode="abs".
 
 [plots]
     at_runtime      = true                      # Make some plots at runtime?
