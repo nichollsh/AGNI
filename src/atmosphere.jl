@@ -1166,7 +1166,7 @@ module atmosphere
     - `flux_rel::Float64`      heating flux relative to instellation.
     - `flux_abs::Float64`      heating flux absolute [W m-2].
     - `norm_method::Symbol`    method for normalising the Gaussian (:pressure, :mass).
-    - `domain::Symbol`         how to handle deposition pressures outside the domain (:clamp, :below_domain).
+    - `domain::Symbol`         how to handle deposition pressures outside the domain (:clamp, :boundary_flux).
     - `power_mode::Symbol`     off, or relative/absolute flux (:off, :rel, :abs).
 
     Returns:
@@ -1214,8 +1214,8 @@ module atmosphere
             @error "Invalid deep heating domain treatment: $(domain)"
             return false
         end
-
         atmos.deepheat_domain = domain
+
         # Set power mode
         atmos.deepheat_power_mode = power_mode
         atmos.deepheat_flux_rel = flux_rel
