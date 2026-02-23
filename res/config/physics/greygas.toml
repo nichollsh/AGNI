@@ -57,7 +57,6 @@ title = "Grey gas"
     thermo_funct    = true
     sensible_heat   = false
     conduction      = false
-    advection       = false
     latent_heat     = false
     convection      = true
     convection_crit = "s"

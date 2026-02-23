@@ -958,7 +958,6 @@ module energy
     - `convective::Bool`                include MLT convection flux
     - `sens_heat::Bool`                 include TKE sensible heat flux
     - `conductive::Bool`                include conductive heat flux
-    - `advective::Bool`                 include advective heat flux
     - `deep::Bool`                      include deep heating flux (layer-internal production)
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
@@ -969,8 +968,7 @@ module energy
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t;
                           radiative::Bool=false, latent_heat::Bool=false, convective::Bool=false,
-                          sens_heat::Bool=false, conductive::Bool=false, advective::Bool=false,
-                          deep::Bool=false,
+                          sens_heat::Bool=false, conductive::Bool=false, deep::Bool=false,
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
                           calc_cf::Bool=false)::Bool
 
@@ -979,7 +977,7 @@ module energy
         ok::Bool = true
 
         # Warn if no flux terms are enabled
-        if !(radiative || latent_heat || convective || sens_heat || conductive || advective || deep)
+        if !(radiative || latent_heat || convective || sens_heat || conductive || deep)
             @warn "No flux terms enabled in call to `calc_fluxes!`"
             ok = false
         end
@@ -1015,11 +1013,6 @@ module energy
         if conductive
             conduct!(atmos)
             @. atmos.flux_tot += atmos.flux_cdct
-        end
-
-        # +Advection
-        if advective
-            @. atmos.flux_tot += atmos.flux_advect
         end
 
         # +Deep atmospheric heating
