@@ -287,7 +287,7 @@ module atmosphere
 
         # Deep atmospheric heating
         deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
-        deepheat_Pmid::Float64          # Deposition pressur centre [Pa]
+        deepheat_Pmid::Float64          # Deposition pressure centre [Pa]
         deepheat_Pwid::Float64          # Width of Gaussian in log-pressure space [logPa]
         deepheat_domain::Symbol         # Method for treating deep heating below the model domain (:clamp or :boundary_flux)
         deepheat_power_mode::Symbol     # Method for setting total flux (:off, :rel, or :abs)
@@ -1207,14 +1207,15 @@ module atmosphere
         # Deposition pressure handling
         if domain == :clamp
             atmos.deepheat_Pmid = clamp(atmos.deepheat_Pmid, atmos.p_toa, atmos.p_boa)
-        elseif domain == :below_domain
-            # Allow Poutside domain
+        elseif domain == :boundary_flux
+            # Allow P outside domain
             atmos.deepheat_Pmid = max(atmos.deepheat_Pmid, atmos.p_toa)
         else
             @error "Invalid deep heating domain treatment: $(domain)"
             return false
         end
 
+        atmos.deepheat_domain = domain
         # Set power mode
         atmos.deepheat_power_mode = power_mode
         atmos.deepheat_flux_rel = flux_rel
