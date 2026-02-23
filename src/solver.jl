@@ -151,7 +151,7 @@ module solver
     - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
-    - `advect::Bool`                    include advective heat exchange (dynamics)
+    - `deep::Bool`                      include deep heat production (e.g. from dynamics)
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
     - `oceans::Bool`                    check surface saturation (ocean formation)
 
@@ -184,7 +184,7 @@ module solver
                             sol_type::Int=1,
                             chem::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
-                            conduct::Bool=true, latent::Bool=true, advect::Bool=true,
+                            conduct::Bool=true, latent::Bool=true, deep::Bool=true,
                             rainout::Bool=true, oceans::Bool=true,
                             dx_min::Float64=1e-7, dx_max::Float64=400.0,
                             tmp_pad::Float64 = 5.0,
@@ -362,7 +362,7 @@ module solver
             # Calculate fluxes
             step_ok &= energy.calc_fluxes!(atmos, radiative=true,
                                 latent_heat=latent, convective=convect, sens_heat=sens_heat,
-                                conductive=conduct, advective=advect,
+                                conductive=conduct, deep=deep,
                                 convect_sf=easy_sf, latent_sf=easy_sf)
 
             # Calculate residuals subject to the solution type

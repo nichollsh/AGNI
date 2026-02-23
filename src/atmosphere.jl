@@ -282,9 +282,6 @@ module atmosphere
         cloud_val_l::Float64                #  |-> Default scalar values to above arrays
         cloud_val_f::Float64                # /
 
-        # Cell-internal heating
-        flux_advect::Array{Float64, 1}     # Energy flux advected into each cell [W m-2], treated as entering into its bottom edge
-
         # Deep atmospheric heating
         deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
         deepheat_Pmid::Float64          # Deposition pressure centre [Pa]
@@ -2361,8 +2358,6 @@ module atmosphere
         atmos.Kzz =               zeros(Float64, atmos.nlev_l)  # eddy diffusion coeff [m2 s-1]
         atmos.w_conv =            zeros(Float64, atmos.nlev_l)  # convective velocity [m s-1]
         atmos.λ_conv =            zeros(Float64, atmos.nlev_l)  # mixing length [m]
-
-        atmos.flux_advect =       zeros(Float64, atmos.nlev_l)  # advective heat flux
 
         atmos.flux_tot =          zeros(Float64, atmos.nlev_l)
         atmos.flux_dif =          zeros(Float64, atmos.nlev_c)

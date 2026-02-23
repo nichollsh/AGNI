@@ -413,7 +413,6 @@ module AGNI
         #    solver stuff
         incl_convect::Bool     = cfg["physics"]["convection"]
         incl_conduct::Bool     = cfg["physics"]["conduction"]
-        incl_advect::Bool      = cfg["physics"]["advection"]
         incl_sens::Bool        = cfg["physics"]["sensible_heat"]
         incl_latent::Bool      = cfg["physics"]["latent_heat"]
         sol_type::Int          = cfg["execution"]["solution_type"]
@@ -589,7 +588,7 @@ module AGNI
         if sol == "none"
             energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
                                 convective=incl_convect, sens_heat=incl_sens,
-                                conductive=incl_conduct, advective=incl_advect,
+                                conductive=incl_conduct,
                                 deep=incl_deep,
                                 calc_cf=Bool(cfg["plots"]["contribution"]))
 
@@ -610,7 +609,7 @@ module AGNI
             solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
                                 conduct=incl_conduct, chem=chem,
                                 convect=incl_convect, latent=incl_latent,
-                                sens_heat=incl_sens, advect=incl_advect,
+                                sens_heat=incl_sens, deep=incl_deep,
                                 max_steps=Int(cfg["execution"]["max_steps"]),
                                 max_runtime=Float64(cfg["execution"]["max_runtime"]),
                                 conv_atol=conv_atol,
@@ -683,7 +682,7 @@ module AGNI
             plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"),
                                     incl_mlt=incl_convect, incl_eff=(sol_type==3),
                                     incl_cdct=incl_conduct, incl_latent=incl_latent,
-                                    incl_advect=incl_advect, incl_deep=incl_deep)
+                                    incl_deep=incl_deep)
         cfg["plots"]["emission"] && \
             plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
         cfg["plots"]["albedo"] && \
