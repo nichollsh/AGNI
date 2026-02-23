@@ -507,29 +507,26 @@ module energy
         # Reset flux array
         fill!(atmos.flux_deep, 0.0)
 
-        # Check if deep heating is active
-        if !atmos.deep_heating.active
-            return nothing
-        end
-
         # Extract parameters
-        P_dep::Float64          = atmos.deep_heating.P_dep
-        sigma_P::Float64        = atmos.deep_heating.sigma_P
-        efficiency::Float64     = atmos.deep_heating.efficiency
-        normalization::Symbol   = atmos.deep_heating.normalization
-        below_domain::Symbol    = atmos.deep_heating.below_domain
-        power_mode::Symbol      = atmos.deep_heating.power_mode
-        F_total_in::Float64     = atmos.deep_heating.F_total
+        P_dep::Float64          = atmos.deepheat_Pmid
+        sigma_P::Float64        = atmos.deepheat_Pwid
+        efficiency::Float64     = atmos.deepheat_flux_rel
+        F_total_in::Float64     = atmos.deepheat_flux_abs
+        normalisation::Symbol   = atmos.deepheat_norm_method
+        below_domain::Symbol    = atmos.deepheat_domain
 
         # Determine total deposited flux [W m-2]
         F_total::Float64 = 0.0
-        if power_mode == :efficiency
+        if atmos.deepheat_power_mode == :rel
             # Stellar efficiency: define heating as a fraction of instellation (per unit area).
             eff::Float64 = clamp(efficiency, 0.0, 1.0)
             F_total = eff * atmos.instellation
-        elseif power_mode == :flux
+        elseif atmos.deepheat_power_mode == :abs
             # Fixed radiative flux [W m-2]
             F_total = max(F_total_in, 0.0)
+        elseif atmos.deepheat_power_mode == :off
+            # No deep heating
+            return nothing
         else
             error("Invalid deep heating power_mode: $(power_mode)")
         end
@@ -554,7 +551,7 @@ module energy
         # Integrate from TOA downwards to get cumulative flux at each level edge
         atmos.flux_deep[1] = 0.0
 
-        if normalization == :pressure
+        if normalisation == :pressure
             # Legacy: pressure-normalised dF/dP profile
             norm_factor::Float64 = 1.0 / (sqrt(2.0 * π) * sigma_P)
             dF_dP::Float64 = 0.0
@@ -569,7 +566,7 @@ module energy
                 atmos.flux_deep[i+1] = atmos.flux_deep[i] + dF_dP * dp
             end
 
-        elseif normalization == :mass
+        elseif normalisation == :mass
             # dm-weighted normalisation: ensures Σ(ε_dep*dm) = F_total
             # Column mass per unit area for layer i: dm_i = dp_i / g_i  [kg m⁻²]
             denom::Float64 = 0.0
@@ -599,7 +596,7 @@ module energy
             end
 
         else
-            error("Invalid deep heating normalization: $(normalization)")
+            error("Invalid deep heating normalisation: $(normalisation)")
         end
 
         return nothing
@@ -962,6 +959,7 @@ module energy
     - `sens_heat::Bool`                 include TKE sensible heat flux
     - `conductive::Bool`                include conductive heat flux
     - `advective::Bool`                 include advective heat flux
+    - `deep::Bool`                      include deep heating flux (layer-internal production)
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
@@ -972,6 +970,7 @@ module energy
     function calc_fluxes!(atmos::atmosphere.Atmos_t;
                           radiative::Bool=false, latent_heat::Bool=false, convective::Bool=false,
                           sens_heat::Bool=false, conductive::Bool=false, advective::Bool=false,
+                          deep::Bool=false,
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
                           calc_cf::Bool=false)::Bool
 
@@ -980,7 +979,7 @@ module energy
         ok::Bool = true
 
         # Warn if no flux terms are enabled
-        if !(radiative || latent_heat || convective || sens_heat || conductive || advective)
+        if !(radiative || latent_heat || convective || sens_heat || conductive || advective || deepheating)
             @warn "No flux terms enabled in call to `calc_fluxes!`"
             ok = false
         end
@@ -1028,7 +1027,7 @@ module energy
         # For sol_type>=3, heating is added directly to the solver residual.
         # This prevents numerical artifacts ("hook" shape) in deep P-T profiles
         # because the heating doesn't propagate through flux_dif incorrectly.
-        if atmos.deep_heating.active
+        if deep
             deep_heating!(atmos)
         end
 
