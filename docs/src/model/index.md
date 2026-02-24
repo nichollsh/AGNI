@@ -53,6 +53,9 @@ Latent heats are temperature-dependent, using values derived from Coker (2007) a
 
 AGNI assumes that no work is done during phase changes aloft, $p dV \approx 0$, so enthalpy and latent heat become equivalent.
 
+## Deep heating
+In addition to the energy transport terms, some heat production/loss may occur within a given layer of the atmosphere; e.g. from advective heat transport or ohmic dissipation. AGNI includes a parameterisation of this 'deep' heating through a Gaussian energy deposition profile in log-pressure space, centred at a user-specified centre and width. This is a representation of energy sources/sinks from otherwise unmodelled physics. The 'deep heating' functionality was first introduced to AGNI by [Cheng An Hsieh](https://didymos65803.github.io/).
+
 ## Stellar flux
 A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, an artificial additional albedo factor, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
 

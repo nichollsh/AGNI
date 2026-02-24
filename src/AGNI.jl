@@ -413,7 +413,6 @@ module AGNI
         #    solver stuff
         incl_convect::Bool     = cfg["physics"]["convection"]
         incl_conduct::Bool     = cfg["physics"]["conduction"]
-        incl_advect::Bool      = cfg["physics"]["advection"]
         incl_sens::Bool        = cfg["physics"]["sensible_heat"]
         incl_latent::Bool      = cfg["physics"]["latent_heat"]
         sol_type::Int          = cfg["execution"]["solution_type"]
@@ -486,6 +485,7 @@ module AGNI
             io_dir = cfg["files"]["io_dir"]
         end
 
+
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
         atmos = atmosphere.Atmos_t()
@@ -529,6 +529,26 @@ module AGNI
         # Allocate atmosphere
         atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
 
+        # Configure deep atmospheric heating
+        if haskey(cfg["physics"],"deep_heating")
+            dh = cfg["physics"]["deep_heating"]
+            if ! all(k in keys(dh) for k in ["Pmid","Pwid","flux_rel","flux_abs","norm_method","domain","power_mode"])
+                @error "Config: deep heating enabled but parameters are not set"
+                @error "        you must provide `Pmid`, `Pwid`, `flux_rel`, `flux_abs`, `norm_method`, `domain`, and `power_mode`"
+                return false
+            end
+
+            # Pass values, converting Bar->Pa where needed
+            atmosphere.set_deep_heating!(atmos,
+                                            Float64(dh["Pmid"])*1e5, Float64(dh["Pwid"]),
+                                            Float64(dh["flux_rel"]), Float64(dh["flux_abs"]),
+                                            Symbol(dh["norm_method"]),
+                                            Symbol(dh["domain"]),
+                                            Symbol(dh["power_mode"])) || return false
+        end
+        incl_deep::Bool = atmos.deepheat_power_mode != :off
+
+
         # Set temperatures as appropriate
         if transparent
             # Make the atmosphere transparent. Also sets pressures to be small and turns
@@ -568,7 +588,8 @@ module AGNI
         if sol == "none"
             energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
                                 convective=incl_convect, sens_heat=incl_sens,
-                                conductive=incl_conduct, advective=incl_advect,
+                                conductive=incl_conduct,
+                                deep=incl_deep,
                                 calc_cf=Bool(cfg["plots"]["contribution"]))
 
         # Transparent atmosphere solver
@@ -588,7 +609,7 @@ module AGNI
             solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
                                 conduct=incl_conduct, chem=chem,
                                 convect=incl_convect, latent=incl_latent,
-                                sens_heat=incl_sens, advect=incl_advect,
+                                sens_heat=incl_sens, deep=incl_deep,
                                 max_steps=Int(cfg["execution"]["max_steps"]),
                                 max_runtime=Float64(cfg["execution"]["max_runtime"]),
                                 conv_atol=conv_atol,
@@ -661,7 +682,7 @@ module AGNI
             plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"),
                                     incl_mlt=incl_convect, incl_eff=(sol_type==3),
                                     incl_cdct=incl_conduct, incl_latent=incl_latent,
-                                    incl_advect=incl_advect)
+                                    incl_deep=incl_deep)
         cfg["plots"]["emission"] && \
             plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
         cfg["plots"]["albedo"] && \

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 # Run this function from inside the `test/` folder
-# e.g. as `julia --project=.. runtests.jl `
+# e.g. as `julia --project=.. runtests.jl`
 
 # Get AGNI root directory
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
@@ -57,6 +57,7 @@ end
 LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
 include("test_consts.jl")
 include("test_phys.jl")
+include("test_deep_heating.jl")
 if suite != "fast"
     include("test_integration.jl")
 end
