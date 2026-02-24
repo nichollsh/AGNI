@@ -167,6 +167,7 @@ module solver
     - `easy_start::Bool`                improve convergence reliability; introduce convection and latent heat gradually
     - `grey_start::Bool`                improve convergence reliability; obtain double-grey solution first
     - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
+    - `conv_type::Int`                  convergence type (1: cost function, 2: median residual, 3: mean residual)
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `modplot::Int`                    iteration frequency at which to make plots
@@ -192,7 +193,7 @@ module solver
                             fdc::Bool=true, fdo::Int=2,
                             method::Int=1,
                             easy_start::Bool=false, grey_start::Bool=false,
-                            ls_method::Int=1,
+                            ls_method::Int=1, conv_type::Int=1,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
                             modplot::Int=1, save_frames::Bool=true,
                             modprint::Int=1, plot_jacobian::Bool=true,
@@ -281,6 +282,7 @@ module solver
         lml::Float64             = 1.0                 # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
+        conv_val::Float64        = Inf                  # quantity used to evaluate convergence
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
         ls_cost::Float64         = 1.0e99               # linesearch cost at ls_alpha
@@ -523,7 +525,7 @@ module solver
         # ----------------------------------------------------------
         # Setup initial guess
         # ----------------------------------------------------------
-            @info @sprintf("    sol_type  = %d", sol_type)
+            @info @sprintf("    sol_type  = %d,    conv_type = %d", sol_type, conv_type)
         if (sol_type == 1)
             @info @sprintf("    tmp_surf  = %.2f K", atmos.tmp_surf)
         elseif (sol_type == 2)
@@ -570,7 +572,7 @@ module solver
         end
 
         if modprint > 0
-            @info @sprintf("    step  resid_med    cost     flux_OLR    max(x)    max(|dx|)   flags")
+            @info @sprintf("    step  |res_med|    cost     flux_OLR   max(x)     max(|dx|)  flags")
         else
             @info "    please wait..."
         end
@@ -639,7 +641,7 @@ module solver
                 stepflags *= "M"
 
                 # Check if sf needs to be increased
-                if (c_cur*easy_trig < conv_atol + conv_rtol * c_max) && !grey_step
+                if (conv_val*easy_trig < conv_atol + conv_rtol * c_max) && !grey_step
                     # increase scale factor
                     easy_sf = max(easy_sf, easy_ini)
                     easy_sf = min(1.0, easy_sf*easy_incr)
@@ -668,7 +670,7 @@ module solver
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
             if (step <= 2) || perturb_all || easy_step ||
-                    (c_cur*perturb_trig < conv_atol + conv_rtol * c_max) ||
+                    (conv_val*perturb_trig < conv_atol + conv_rtol * c_max) ||
                     mod(step,perturb_mod)==0
                 # Update whole matrix when any of these are true:
                 #    - first step
@@ -875,7 +877,7 @@ module solver
             end
 
             # Model statistics
-            r_med   =   median(r_cur)
+            r_med   =   median(abs.(r_cur))
             iworst  =   argmax(abs.(r_cur))
             r_max   =   r_cur[iworst]
             x_med   =   median(x_cur)
@@ -883,7 +885,21 @@ module solver
             dx_stat =   maximum(abs.(x_dif))
             r_old_2nm = r_cur_2nm
             r_cur_2nm = norm(r_cur)
-            c_max =     maximum(abs.(atmos.flux_tot))
+            c_max =     maximum(abs.(atmos.flux_tot[end-3:end])) # bottom few layers
+
+            # Metric used for convergence
+            if conv_type == 1
+                conv_val = c_cur
+            elseif conv_type == 2
+                conv_val = r_med
+            elseif conv_type == 3
+                conv_val = mean(abs.(r_cur))
+            else
+                @error "Invalid choice for convergence type"
+                @error "    Got $conv_type. Must be 1, 2, or 3"
+                code = CODE_CFG
+                break
+            end
 
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
@@ -894,7 +910,7 @@ module solver
             end
 
             # Inform user
-            info_str *= @sprintf("%+.2e  %.3e  %.3e  %.3e  %.3e  %-s",
+            info_str *= @sprintf("%.3e  %.3e  %.3e  %.3e  %.3e  %-s",
                                  r_med, c_cur, atmos.flux_u_lw[1],
                                  x_max, dx_stat, stepflags[1:end-1])
             if (modprint>0) && (mod(step, modprint)==0)
@@ -909,7 +925,7 @@ module solver
 
             # Converged?
             @debug "        check convergence"
-            if (c_cur < conv_atol + conv_rtol * c_max)
+            if (conv_val < conv_atol + conv_rtol * c_max)
                 # still using grey RT?
                 if grey_step
                     # switch to preferred RT scheme
@@ -1017,7 +1033,7 @@ module solver
         # ----------------------------------------------------------
         # Print info
         # ----------------------------------------------------------
-        loss = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+        loss = maximum(atmos.flux_tot) - minimum(atmos.flux_tot)
         loss_pct = 100.0*loss/maximum(abs.(atmos.flux_tot))
         if sol_type == 4
             @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
@@ -1028,7 +1044,7 @@ module solver
         @info @sprintf("    total flux at TOA  = %+.2e W m-2     ", atmos.flux_tot[1])
         @info @sprintf("    total flux at BOA  = %+.2e W m-2     ", atmos.flux_tot[end])
         @info @sprintf("    global flux loss   = %+.2e W m-2  (%+.2e %%) ", loss, loss_pct)
-        # @info @sprintf("    final cost value   = %+.2e W m-2     ", c_cur)
+        @info @sprintf("    final conv.value   = %+.2e W m-2     ", conv_val)
         @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
         if rainout || oceans
             @info @sprintf("    surf pressure      = %-9.3e bar      ", atmos.p_boa/1e5)

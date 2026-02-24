@@ -185,8 +185,9 @@ Parameters that tell the model what to do.
 | `max_steps     `  | Maximum number of steps the solver should take before giving up (typically <200). |
 | `max_runtime   `  | Maximum wall-clock runtime [s] before giving up. |
 | `num_levels    `  | Number of model levels. Typically ~50, and ideally less than 100.  |
-| `converge_atol `  | Convergence criterion, absolute amount of energy flux lost [W m-2]. |
-| `converge_rtol `  | Convergence criterion, relative amount of energy flux lost [dimensionless]. |
+| `converge_atol `  | Convergence criterion absolute tolerance [W m-2]. |
+| `converge_rtol `  | Convergence criterion relative tolerance [dimensionless]. |
+| `converge_type `  | Definition of convergence criterion (1: cost function, 2: median resid, 3: mean resid) |
 | `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see below). |
 | `solution_type `  | Solution type (see below). |
 | `solver        `  | Solver to use (see below). |
