@@ -490,8 +490,8 @@ module energy
     centered at `P_dep` with width `sigma_P`.
 
     Two power modes are supported:
-    - `:efficiency` — total flux = `efficiency × instellation` (stellar efficiency)
-    - `:flux`       — total flux = `F_total` (fixed radiative flux in W m⁻²)
+    - `:rel`        — total flux = `efficiency × instellation` (stellar efficiency)
+    - `:abs`        — total flux = `F_total` (fixed radiative flux in W m⁻²)
 
     The flux gradient is defined as:
         dF_deep/dP = F_total / (sqrt(2π) * σ_P * P) * exp(-(ln(P) - ln(P_dep))² / (2 * σ_P²))
