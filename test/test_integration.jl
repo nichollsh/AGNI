@@ -286,7 +286,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         # -------------
         # Test flux calculation
         # -------------
-        energy.calc_fluxes!(atmos, radiative=true, convective=true, conductive=true, sens_heat=true, latent_heat=true, advective=true)
+        energy.calc_fluxes!(atmos, radiative=true, convective=true, conductive=true, sens_heat=true, latent_heat=true, deep=true)
         val_e = 8518.663363443498  # from previous tests
         val_o = atmos.flux_tot[atmos.nlev_c-10]
         test_pass = isapprox(val_e, val_o; rtol=1e-3)

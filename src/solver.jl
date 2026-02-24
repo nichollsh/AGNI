@@ -151,7 +151,7 @@ module solver
     - `sens_heat::Bool`                 include sensible heating at the surface
     - `conduct::Bool`                   include conductive heat transport within the atmosphere
     - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
-    - `advect::Bool`                    include advective heat exchange (dynamics)
+    - `deep::Bool`                      include deep heat production (e.g. from dynamics)
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios, not just energy fluxes)
     - `oceans::Bool`                    check surface saturation (ocean formation)
 
@@ -184,7 +184,7 @@ module solver
                             sol_type::Int=1,
                             chem::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
-                            conduct::Bool=true, latent::Bool=true, advect::Bool=true,
+                            conduct::Bool=true, latent::Bool=true, deep::Bool=true,
                             rainout::Bool=true, oceans::Bool=true,
                             dx_min::Float64=1e-7, dx_max::Float64=400.0,
                             tmp_pad::Float64 = 5.0,
@@ -362,7 +362,7 @@ module solver
             # Calculate fluxes
             step_ok &= energy.calc_fluxes!(atmos, radiative=true,
                                 latent_heat=latent, convective=convect, sens_heat=sens_heat,
-                                conductive=conduct, advective=advect,
+                                conductive=conduct, deep=deep,
                                 convect_sf=easy_sf, latent_sf=easy_sf)
 
             # Calculate residuals subject to the solution type
@@ -377,13 +377,22 @@ module solver
                 resid[end] = atmos.flux_tot[end] - energy.skin_flux(atmos)
 
             elseif (sol_type == 3)
-                # Zero loss
-                resid[1:end-1] .= atmos.flux_dif[1:end]
-                resid[end] = atmos.flux_tot[end] - atmos.flux_int
 
+                # Energy balance for each layer:
+                # At equilibrium, heating deposited in a layer equals net flux divergence.
+                # flux_dif = flux_tot[i+1] - flux_tot[i] (positive = cooling)
+                # heating_div = flux_deep[i+1] - flux_deep[i] (positive = heating deposited)
+                # Residual = cooling - heating = flux_dif - heating_div
+                heating_term = atmos.flux_deep[2:end] .- atmos.flux_deep[1:end-1]
+                resid[1:end-1] .= atmos.flux_dif[1:end] .+ heating_term
+
+                # TOA boundary: total upward flux = internal + deep heating from below
+                # flux_deep[end] is the total heating flux entering from below the domain
+                resid[end] = atmos.flux_tot[end] - atmos.flux_int
             elseif (sol_type == 4)
-                # Zero loss
-                resid[1:end-1] .= atmos.flux_dif[1:end]
+                # Same energy balance as sol_type=3
+                heating_term = atmos.flux_deep[2:end] .- atmos.flux_deep[1:end-1]
+                resid[1:end-1] .= atmos.flux_dif[1:end] .+ heating_term
                 # OLR is equal to target_olr
                 resid[end] = atmos.target_olr - atmos.flux_u_lw[1]
 

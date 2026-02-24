@@ -213,7 +213,6 @@ Parameters that describe how the model should treat the physics.
 | `real_gas      `  | Use real-gas equation(s) of state where possible (true/false) |
 | `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false) |
 | `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false) |
-| `advection `      | Include advective heat transport into each cell (true/false) |
 | `convection    `  | Include vertical heat transport associated with convection (true/false) |
 | `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false) |
