@@ -53,9 +53,9 @@ const grid::OrderedDict = OrderedDict{String,Array{Float64,1}}((
 ))
 
 # Variables to record
-const output_keys =  ["succ", "flux_loss", "r_bound",
-                        "p_surf",
-                        "t_surf", "r_surf", "μ_surf", "g_surf",
+const output_keys =  ["succ","flux_loss_max", "flux_loss_med", "flux_toa", "flux_boa",
+                        "r_bound",
+                        "p_surf", "t_surf", "r_surf", "μ_surf", "g_surf",
                         "t_phot", "r_phot", "μ_phot", "g_phot",
                         "vmr_H2", "vmr_H2O", "vmr_CO2", "vmr_CO", "vmr_O2", "vmr_OH",
                         "vmr_NH3", "vmr_NO2", "vmr_N2", "vmr_SO2", "vmr_H2S", "vmr_H2SO4",
@@ -817,8 +817,18 @@ for (i,p) in enumerate(grid_flat)
             else
                 result_table[i][k] = -1.0 # failure
             end
-        elseif k == "flux_loss"
-            result_table[i][k] = maximum(abs.(atmos.flux_tot)) - minimum(abs.(atmos.flux_tot))
+
+        elseif k == "flux_loss_max"
+            result_table[i][k] = abs(maximum(atmos.flux_tot) - minimum(atmos.flux_tot))
+
+        elseif k == "flux_loss_med"
+            result_table[i][k] = median(atmos.flux_tot)
+
+        elseif k == "flux_toa"
+            result_table[i][k] = atmos.flux_tot[1]
+
+        elseif k == "flux_boa"
+            result_table[i][k] = atmos.flux_tot[end]
 
         elseif k == "r_bound"
             if all(atmos.layer_isbound)
