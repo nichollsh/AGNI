@@ -307,7 +307,7 @@ module plotting
                             size_x::Int=550, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
-                            incl_deep::Bool=true, 
+                            incl_deep::Bool=true,
                             title::String=""
                         )
 
