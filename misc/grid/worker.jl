@@ -65,7 +65,7 @@ const output_keys =  ["succ","flux_loss_max", "flux_loss_med", "flux_toa", "flux
 # Grid management options
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
-const modwrite::Int          = 2           # Write CSV file every `modwrite` gridpoints
+const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
 const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
 const use_tmpdir             = true
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
