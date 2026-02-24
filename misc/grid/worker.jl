@@ -12,6 +12,7 @@ using Printf
 using DataStructures
 using NCDatasets
 using Dates
+using Statistics
 using AGNI
 
 const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../../")
@@ -64,7 +65,7 @@ const output_keys =  ["succ","flux_loss_max", "flux_loss_med", "flux_toa", "flux
 # Grid management options
 const save_netcdfs           = false        # NetCDF file for each case
 const save_plots             = false        # plots for each case
-const modwrite::Int          = 40           # Write CSV file every `modwrite` gridpoints
+const modwrite::Int          = 2           # Write CSV file every `modwrite` gridpoints
 const modplot::Int           = 0            # Plot every `modplot` solver steps (debug)
 const use_tmpdir             = true
 const frac_min::Float64      = 1e-7         # 0.001 -> 1170 bar for Earth
@@ -782,6 +783,7 @@ for (i,p) in enumerate(grid_flat)
                                             dx_max=Float64(cfg["execution"]["dx_max"]),
                                             dx_min=Float64(cfg["execution"]["dx_min"]),
                                             ls_method=Int(cfg["execution"]["linesearch"]),
+                                            conv_type=Int(cfg["execution"]["converge_type"]),
                                             easy_start=easy_start,
                                             modplot=modplot,
                                             save_frames=false,
@@ -822,7 +824,7 @@ for (i,p) in enumerate(grid_flat)
             result_table[i][k] = abs(maximum(atmos.flux_tot) - minimum(atmos.flux_tot))
 
         elseif k == "flux_loss_med"
-            result_table[i][k] = median(atmos.flux_tot)
+            result_table[i][k] = median(diff(atmos.flux_tot))
 
         elseif k == "flux_toa"
             result_table[i][k] = atmos.flux_tot[1]
