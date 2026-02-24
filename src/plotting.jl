@@ -307,7 +307,7 @@ module plotting
                             size_x::Int=550, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
-                            incl_advect::Bool=true,
+                            incl_deep::Bool=true,
                             title::String=""
                         )
 
@@ -331,7 +331,7 @@ module plotting
         col_t::String = "#ff4400"
         col_o::String = "#66CD00"
         col_p::String = "#ecb000"
-        col_a::String = "#7700bd"
+        col_d::String = "#8B008B"
 
         alpha = 0.7
         w = 2.0
@@ -345,7 +345,7 @@ module plotting
         # Zero line
         plot!(plt, [0.0, 0.0], [arr_P[1], arr_P[end]], lw=0.4, lc="black", label="")
 
-        # Intrinsic/interior flux
+        # Indicate the target intrinsic (or interior) heat flux
         if incl_eff
             plot!(plt, [_symlog(atmos.flux_int)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="INT")
         end
@@ -384,9 +384,9 @@ module plotting
             plot!(plt, _symlog.(atmos.flux_l), arr_P, label="Latent", lw=w*1.2, lc=col_p, ls=:solid, linealpha=alpha)
         end
 
-        # Advection
-        if incl_advect
-            plot!(plt, _symlog.(atmos.flux_advect), arr_P, label="Advect", lw=w*1.2, lc=col_a, ls=:solid, linealpha=alpha)
+        # Deep heating
+        if incl_deep
+            plot!(plt, _symlog.(atmos.flux_deep), arr_P, label="Deep", lw=w*1.2, lc=col_d, ls=:solid, linealpha=alpha)
         end
 
         # Sensible heat
