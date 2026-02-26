@@ -36,7 +36,7 @@ title = "Base config for structure calcs"
     max_runtime     = 320
     num_levels      = 40
     solution_type   = 3
-    converge_type   = 2
+    converge_type   = 1
     solver          = "newton"
     dx_max          = 400.0
     dx_min          = 1e-10
@@ -44,8 +44,8 @@ title = "Base config for structure calcs"
     linesearch      = 2
     easy_start      = true
     grey_start      = false
-    converge_atol   = 1e-3
-    converge_rtol   = 1.0e-5
+    converge_atol   = 1.0
+    converge_rtol   = 1e-1
     perturb_all     = true
 
 [physics]
