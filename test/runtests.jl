@@ -1,6 +1,9 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
+
 # Run this function from inside the `test/` folder
 # e.g. as `julia --project=.. runtests.jl`
+
+# To run with coverage reporting, add `--code-coverage` flag
 
 # Get AGNI root directory
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
