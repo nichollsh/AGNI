@@ -1,6 +1,6 @@
 # AGNI — Copilot Instructions
 
-AGNI is a Julia package that simulates radiative-convective equilibrium (RCE) in extreme rocky-exoplanet atmospheres. It wraps the Fortran SOCRATES radiative transfer code via a Julia FFI layer.
+AGNI is a Julia package that simulates radiative-convective equilibrium (RCE) in extreme rocky-exoplanet atmospheres. It wraps the Fortran SOCRATES radiative transfer code via a Julia layer.
 
 ## Build, Test, and Run
 
@@ -67,7 +67,7 @@ The package entry point is `src/AGNI.jl`, which `include()`s submodule files **i
 |---|---|
 | `atmosphere` | `Atmos_t` struct, setup/allocate/deallocate, hydrostatic integrator |
 | `energy` | Flux calculations: SOCRATES RT, MLT convection, conduction, latent/sensible heat |
-| `solver` | Nonlinear solvers (Newton, Gauss-Newton, Levenberg-Marquardt, Jacobi-Newton) |
+| `solver` | Core solver module for radiative-convective equilibrium. Using Newton, Gauss-Newton, or Levenberg-Marquardt; with damping and linesearch |
 | `setpt` | Setting initial T(p) profiles (dry adiabat, saturation, Guillot, custom) |
 | `spectrum` | Spectral file loading and management |
 | `chemistry` | Thermochemical equilibrium via FastChem; rainout logic |
@@ -76,9 +76,10 @@ The package entry point is `src/AGNI.jl`, which `include()`s submodule files **i
 | `phys` | Physical utility functions (EOS, thermodynamics) |
 | `consts` | Physical constants |
 | `save` | NetCDF and CSV output |
-| `plotting` | Makie/GR-based diagnostic plots |
-| `load` | Reading profiles and external data |
-| `guillot` / `blake` | Analytic T(p) profile implementations |
+| `plotting` | Julia GR-based plots and animations |
+| `load` | Reading atmosphere profiles |
+| `guillot` | Analytic T(p) profile implementations |
+| `blake` | Blake2b checksum utilities for file integrity verification |
 
 ### External dependencies
 - **SOCRATES** (Fortran RT code, loaded at runtime via `include(ENV["RAD_DIR"]/julia/src/SOCRATES.jl)`). The `atmosphere` module hard-includes this path on load.
@@ -91,6 +92,7 @@ The package entry point is `src/AGNI.jl`, which `include()`s submodule files **i
 Every `src/*.jl` file begins with:
 ```julia
 if (abspath(PROGRAM_FILE) == @__FILE__)
+    thisfile = @__FILE__
     error("The file '$thisfile' is not for direct execution")
 end
 ```
@@ -99,7 +101,7 @@ end
 New source files must be added at the correct position in `AGNI.jl`'s `include` list (dependencies before dependents) and then explicitly `import`ed and `export`ed.
 
 ### Bang (`!`) functions mutate `Atmos_t`
-Functions like `setup!`, `allocate!`, `deallocate!`, `set_deep_heating!` follow the Julia convention of mutating their primary argument in place and returning `Bool` (true = success).
+Functions like `setup!`, `allocate!`, `deallocate!`, `set_deep_heating!` follow the Julia convention of mutating their primary argument in place.
 
 ### Configuration is TOML-driven
 All physics options, file paths, solver settings, and output flags come from a single TOML config file. The config dict is validated in `AGNI.open_config` and `AGNI.run_from_config` before any model objects are created. Add new config keys there first.
