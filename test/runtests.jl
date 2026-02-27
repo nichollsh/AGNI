@@ -57,6 +57,8 @@ end
 LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
 include("test_consts.jl")
 include("test_phys.jl")
+include("test_guillot.jl")
+include("test_ocean.jl")
 include("test_deep_heating.jl")
 if suite != "fast"
     include("test_integration.jl")

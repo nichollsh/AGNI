@@ -187,4 +187,77 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         atmosphere.deallocate!(atmos)
         @test test_pass
     end
+
+
+    # -------------
+    # Test saturation pressure lookup
+    # At the boiling point of water (373.15 K) Psat should be ~1 atm = 101325 Pa
+    # -------------
+    @testset "Psat" begin
+        gas_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+        T_boil  = 373.15  # [K]
+        Psat_e  = 101325.0  # expected ~1 atm [Pa]
+        Psat_o  = phys.get_Psat(gas_H2O, T_boil)
+        @test isfinite(Psat_o)
+        @test Psat_o > 0.0
+        @test isapprox(Psat_o, Psat_e; rtol=0.05)
+    end
+
+
+    # -------------
+    # Test latent heat lookup
+    # At the boiling point of water (373.15 K) Lv ≈ 2.256e6 J/kg
+    # -------------
+    @testset "Lv" begin
+        gas_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+        T_boil  = 373.15   # [K]
+        Lv_e    = 2.256e6  # expected latent heat [J/kg]
+        Lv_o    = phys.get_Lv(gas_H2O, T_boil)
+        @test isfinite(Lv_o)
+        @test Lv_o > 0.0
+        @test isapprox(Lv_o, Lv_e; rtol=0.05)
+    end
+
+
+    # -------------
+    # Test thermal conductivity (kinetic theory estimate)
+    # Must be positive and in a physically reasonable range for water vapour
+    # -------------
+    @testset "Kc" begin
+        gas_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+        t_test  = [200.0, 500.0, 1000.0]  # [K]
+        for t in t_test
+            Kc = phys.get_Kc(gas_H2O, t)
+            @test isfinite(Kc) && Kc > 0.0
+        end
+        # conductivity must increase with temperature (∝ sqrt(T))
+        @test phys.get_Kc(gas_H2O, 500.0) > phys.get_Kc(gas_H2O, 200.0)
+    end
+
+
+    # -------------
+    # Test is_vapour
+    # Ideal gas is always in the vapour phase (no real-gas condensation)
+    # -------------
+    @testset "is_vapour" begin
+        gas_N2::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "N2", true, false)
+        # ideal / no-sat stub is always vapour
+        @test phys.is_vapour(gas_N2, 300.0, 1e5)
+        @test phys.is_vapour(gas_N2, 100.0, 1e8)
+    end
+
+
+    # -------------
+    # Test _pretty_color
+    # Known gases return their lookup colour; unknown gases return a valid hex string
+    # -------------
+    @testset "pretty_color" begin
+        # known lookup entry
+        @test phys._pretty_color("CO2") == AGNI.consts._lookup_color["CO2"]
+        # unknown molecule: must return a 7-character hex code starting with '#'
+        col_sio = phys._pretty_color("SiO")
+        @test length(col_sio) == 7
+        @test col_sio[1] == '#'
+    end
+
 end
