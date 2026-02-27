@@ -37,10 +37,10 @@ module atmosphere
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
-    HYDROGRAV_steps::Int64   = 9000      # total number of steps in height integration
-    HYDROGRAV_maxdr::Float64 = 1e9       # maximum dz across each layer [m]
+    HYDROGRAV_steps::Int64   = 2000      # total number of steps in height integration
+    HYDROGRAV_maxdr::Float64 = 1e8       # maximum dz across each layer [m]
     HYDROGRAV_mindr::Float64 = 1e-5      # minimum dz across each layer [m]
-    HYDROGRAV_ming::Float64  = 1e-10     # minimum allowed gravity [m/s^2]
+    HYDROGRAV_ming::Float64  = 1e-4     # minimum allowed gravity [m/s^2]
     HYDROGRAV_constg::Bool   = false     # constant gravity with height?
     HYDROGRAV_selfg::Bool    = true      # include self-gravity of the atmosphere?
 
@@ -58,6 +58,7 @@ module atmosphere
     # Pressure grid
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
+    const PRESSURE_FACT_TOP::Float64    = 0.8      # Pressure factor at top layer
 
     # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
@@ -429,6 +430,7 @@ module atmosphere
     - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
+    - `use_all_vols::Bool`              store information on all supported VOLATILE gases, neglecting rock vapours
     - `check_integrity::Bool`           confirm integrity of thermo files using their checksum
     - `κ_grey_lw::Float64`              gas opacity when using grey-gas RT scheme, longwave
     - `κ_grey_sw::Float64`              gas opacity when using grey-gas RT scheme, shortwave
@@ -483,6 +485,7 @@ module atmosphere
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
                     use_all_gases::Bool =       false,
+                    use_all_vols::Bool =        false,
                     check_integrity::Bool =     true,
 
                     κ_grey_lw::Float64  =       8e-4,
@@ -810,10 +813,10 @@ module atmosphere
         for k in keys(metallicities)
             # mass -> mole, by scaling factor 1/mu
             atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
+        end
 
-            if atmos.metal_orig["H"] < 1e-30
-                @error "Cannot define metallicity of hydrogen relative to itself!"
-            end
+        if haskey(atmos.metal_orig, "H") && (atmos.metal_orig["H"] != 1.0)
+            @error "Cannot define metallicity of hydrogen relative to itself!"
         end
 
         # Phase change compositional variables
@@ -933,9 +936,16 @@ module atmosphere
         end
 
         # add extra gases if required
-        if use_all_gases
+        if use_all_gases || use_all_vols
             for gas in phys.gases_standard
+                # add this gas if not already included
                 if !(gas in atmos.gas_names)
+
+                    # skip vapours if user only requested all_vols
+                    if !use_all_gases && (gas in phys.vaps_standard)
+                        continue
+                    end
+
                     atmos.gas_vmr[gas] = zeros(Float64, atmos.nlev_c)
                     push!(atmos.gas_names, gas)
                     atmos.gas_num += 1
@@ -1487,6 +1497,7 @@ module atmosphere
 
             # Mass of layer, per unit area at layer-centre [kg m-2]
             atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
+            # atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.g[i]
         end
 
         return all(atmos.layer_isbound)
@@ -1711,7 +1722,7 @@ module atmosphere
         atmos.p[1:end] .= 0.5 .* (atmos.pl[1:end-1] .+ atmos.pl[2:end])
 
         # Shrink top-most layer to avoid doing too much extrapolation
-        # atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
+        atmos.p[1] = atmos.pl[1]*PRESSURE_FACT_TOP + atmos.p[1]*(1-PRESSURE_FACT_TOP)
 
         # Finally, convert arrays to actual pressure units [Pa]
         @. atmos.p  = 10.0 ^ atmos.p

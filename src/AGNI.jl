@@ -416,9 +416,13 @@ module AGNI
         incl_sens::Bool        = cfg["physics"]["sensible_heat"]
         incl_latent::Bool      = cfg["physics"]["latent_heat"]
         sol_type::Int          = cfg["execution"]["solution_type"]
+        perturb_all::Bool      = cfg["execution"]["perturb_all"]
         conv_atol::Float64     = cfg["execution"]["converge_atol"]
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
-        perturb_all::Bool      = cfg["execution"]["perturb_all"]
+        conv_type::Int         = 1
+        if haskey(cfg["execution"],"converge_type")
+            conv_type = Int(cfg["execution"]["converge_type"])
+        end
 
         #    plotting stuff
         plt_tmp::Bool          = cfg["plots"]["temperature"]
@@ -619,6 +623,7 @@ module AGNI
                                 oceans=oceans,
                                 dx_max=Float64(cfg["execution"]["dx_max"]),
                                 ls_method=Int(cfg["execution"]["linesearch"]),
+                                conv_type=conv_type,
                                 easy_start=Bool(cfg["execution"]["easy_start"]),
                                 grey_start=Bool(cfg["execution"]["grey_start"]),
                                 modplot=modplot,

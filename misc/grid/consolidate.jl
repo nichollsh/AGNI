@@ -38,14 +38,63 @@ dfs_table = DataFrame[] # not sorted
 for iwk in 1:num_work
     dir = joinpath(output_dir, "wk_$iwk")
     print("    $iwk/$num_work ")
+    old_style = false
+
+    # read results table
     f  = joinpath(dir, "result_table.csv")
     if isfile(f)
         println("    reading $f")
         df = CSV.read(f, DataFrame; normalizenames=true, missingstring=["", "NA", "NaN"])
-        push!(dfs_table, df)
     else
         println("    skipped; could not find $f")
+        continue
     end
+
+    # handle old-format tables...
+
+    # rename flux_loss key to flux_loss_max if it exists
+    if "flux_loss" in names(df)
+        rename!(df, "flux_loss" => "flux_loss_max")
+        old_style = true
+    end
+
+    # add extra columns to dataframe
+    if old_style
+        df[!, "flux_loss_med"]  = zeros(Float64, nrow(df))
+        df[!, "flux_toa"]       = zeros(Float64, nrow(df))
+        df[!, "flux_boa"]       = zeros(Float64, nrow(df))
+
+        # read log file
+        f = joinpath(dir, "wk_$iwk.log")
+        lines =  readlines(f)
+        ipt = 0
+        for (il,line) in enumerate(lines)
+            if startswith(line,"[ INFO  ] Grid point")
+                ipt += 1
+            end
+            if startswith(line,"[ INFO  ]     total flux at TOA  =")
+                if contains(lines[il-2],"Solver timed-out before")
+                    df[ipt,:flux_loss_med] = parse(Float64, split(lines[il-4][19:end],r"\s+")[2])
+                    df[ipt,:succ] = convert(Float64,-2)
+
+                elseif contains(lines[il-1],"(singular jacobian) ")
+                    df[ipt,:flux_loss_med] = 1e9 # not recorded
+                    df[ipt,:succ] = convert(Float64,-3)
+
+                elseif contains(lines[il-1],"(maximum iterations) ")
+                    df[ipt,:flux_loss_med] = parse(Float64, split(lines[il-2][19:end],r"\s+")[2])
+                    df[ipt,:succ] = convert(Float64,-4)
+
+                else
+                    df[ipt,:flux_loss_med] = parse(Float64, split(lines[il-2][19:end],r"\s+")[2])
+                end
+                df[ipt,:flux_toa]      = parse(Float64, split(lines[il][34:end],r"\s+")[2])
+                df[ipt,:flux_boa]      = parse(Float64, split(lines[il+1][34:end],r"\s+")[2])
+            end
+        end
+    end
+
+    push!(dfs_table, df)
 end
 combined = reduce((a,b)->vcat(a,b; cols=:union), dfs_table)
 outpath = joinpath(output_dir, "consolidated_table.csv")

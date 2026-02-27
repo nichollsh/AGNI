@@ -25,6 +25,8 @@ module setpt
         if tmp isa String
             if lowercase(tmp) == "teq"
                 return phys.calc_Teq(atmos.instellation, atmos.albedo_b)
+            elseif lowercase(tmp) == "tsurf"
+                return atmos.tmp_surf
             else
                 return parse(Float64, tmp)
             end
