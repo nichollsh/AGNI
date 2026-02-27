@@ -313,7 +313,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         val_e = atmos.flux_int
         val_o = atmos.flux_tot[1]
         test_pass = isapprox(val_e, val_o; rtol=1e-2, atol=0.5)
-        if test_pass
+        if !test_pass
             @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
         @test test_pass
