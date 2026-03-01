@@ -54,7 +54,7 @@ ratios (`vmr_dict` or `vmr_file`), or by metallicities (`metallicities`).
 | `vmr_dict      `  | Gas volume mixing ratios (=mole fractions) at the surface. Must also set `p_surf`. |
 | `vmr_file      `  | Path to a file containing mixing ratio profiles. Must also set `p_surf`. |
 | `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
-| `condensates   `  | List of volatiles which are allowed to condense. Incompatible with `chemistry > 0`. |
+| `condensates   `  | List of volatiles which are allowed to condense. Can be used together with thermochemical equilibrium (`physics.chemistry = true`). |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
 
 

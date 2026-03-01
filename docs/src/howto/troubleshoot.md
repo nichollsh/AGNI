@@ -31,7 +31,7 @@ brew install wget
 ```
 
 ## Unzip is not installed
-You need to install [unzip](https://www.gnu.org/software/wget/). This command is used
+You need to install [unzip](https://infozip.sourceforge.net/). This command is used
 by AGNI to extract some data files once downloaded. Most computers come with this
 command; otherwise see [this page](https://ioflood.com/blog/install-unzip-command-linux/).
 
@@ -52,7 +52,7 @@ sudo apt install libnetcdf-dev netcdf-bin ncview libnetcdff-dev
 
 To install NetCDF on MacOS:
 ```bash
-sudo brew install netcdf netcdf-fortran
+brew install netcdf netcdf-fortran
 ```
 
 ## Julia errors on start, potentially referencing the CURL library
