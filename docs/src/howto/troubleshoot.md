@@ -50,6 +50,12 @@ To install NetCDF on Ubuntu:
 sudo apt install libnetcdf-dev netcdf-bin ncview libnetcdff-dev
 ```
 
+To install NetCDF on Fedora/RHEL:
+```bash
+sudo dnf install netcdf netcdf-devel netcdf-fortran netcdf-fortran-devel
+```
+
+
 To install NetCDF on MacOS:
 ```bash
 brew install netcdf netcdf-fortran
