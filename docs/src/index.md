@@ -11,7 +11,8 @@ AGNI's primary purpose is to simulate the atmospheric temperature-, height-, and
 Pronounced as _ag-nee_. Named after the fire deity of Hinduism.
 
 Follow [Getting started](@ref) for information on installing the code and
-obtaining results.
+obtaining results. See [How-to guides](@ref) for specific tasks, and
+[Model description](@ref) for an explanation of the physics.
 
 Contact: see information on [my website homepage](https://www.h-nicholls.space/).
 

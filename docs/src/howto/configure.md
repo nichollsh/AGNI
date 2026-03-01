@@ -1,0 +1,101 @@
+# Configuring AGNI
+
+AGNI configuration files are formatted using [TOML](https://toml.io/en/). There
+are examples in `res/config/`. The default configuration file contains comments
+explaining the purpose of each parameter. Take care to format the variables in the
+TOML file correctly. There are no 'default values': not all parameters are required in
+all cases, but the model will return an error naming any parameters which are both
+necessary and absent.
+
+Run AGNI with a specific configuration file by passing its path as an argument:
+```bash
+./agni.jl res/config/hotdry.toml
+```
+
+## Configuration sections
+
+The configuration files are broken into four sections (or "tables"). A full description
+of every parameter is given in the [Configuration reference](@ref).
+
+### `[planet]`
+General properties of the planet: surface temperature, instellation, gravity, stellar
+spectrum properties, and surface material.
+
+### `[files]`
+Input/output files and other paths: spectral file, stellar spectrum, output directory,
+and optional RFM parameter file.
+
+### `[composition]`
+Atmospheric composition and chemistry. There are three main ways to set the composition:
+partial pressures (`p_dict`), mixing ratios (`vmr_dict` or `vmr_file`), or by
+metallicities (`metallicities`).
+
+### `[execution]`
+Parameters that control what the model does: number of levels, solver choice, solution
+type, convergence tolerances, initial temperature profile, and runtime limits.
+
+### `[physics]`
+Physics toggles: convection, condensation, chemistry, real-gas EOS, continua, Rayleigh
+scattering, clouds, sensible heat.
+
+### `[plots]`
+Toggle which diagnostic plots are generated at runtime.
+
+## Choosing a solution type
+
+The `execution.solution_type` integer tells AGNI what atmospheric state to solve for:
+* **1** – Conserve energy fluxes with fixed surface temperature (`planet.tmp_surf`).
+* **2** – Conserve energy fluxes with the surface temperature set by heat conduction
+  through a solid conductive boundary layer; requires `planet.skin_d`, `planet.skin_k`,
+  and `planet.tmp_magma`.
+* **3** – Solve for a state where the net flux at each level equals `planet.flux_int`
+  (radiative equilibrium).
+
+See [Obtaining a solution](@ref) in the model description for a detailed explanation.
+
+## Choosing a solver
+
+The `execution.solver` string selects the numerical solver:
+* `""` (empty) – no solving; fluxes are calculated from the initial state only.
+* `"newton"` – Newton-Raphson algorithm.
+* `"gauss"` – Gauss-Newton algorithm.
+* `"levenberg"` – Levenberg–Marquardt algorithm.
+* `"transparent"` – use when `composition.transparent=true`.
+
+## Setting the initial temperature profile
+
+`execution.initial_state` is an ordered list of descriptors applied in sequence to build
+the starting T(p) profile. Available descriptors:
+
+| Descriptor | Argument | Effect |
+|:-----------|:---------|:-------|
+| `dry`      | –        | Dry adiabatic lapse rate from the surface upwards |
+| `str`      | `tmp`    | Isothermal stratosphere at temperature `tmp` |
+| `iso`      | `tmp`    | Set the whole atmosphere isothermal at `tmp` |
+| `csv`      | `pth`    | Load profile from a CSV file at path `pth` |
+| `sat`      | `gas`    | Clausius-Clapeyron saturation curve for gas `gas` |
+| `ncdf`     | `pth`    | Load profile from a NetCDF file at path `pth` |
+| `loglin`   | `tmp`    | Log-linear profile between `tmp_surf` and `tmp` at the top |
+| `ana`      | –        | Guillot ([2010](https://arxiv.org/abs/1006.4702)) analytical solution |
+
+**Example:** `initial_state = ["dry", "sat", "H2O", "str", "180"]` applies the dry
+adiabat from the surface, the water condensation curve above that, then an isothermal
+stratosphere at 180 K. Use `tmp="Teq"` to substitute the planet's radiative equilibrium
+temperature automatically.
+
+## Gas opacity overlap method
+
+`physics.overlap_method` tells SOCRATES how to combine gas opacities in mixtures:
+* `"ee"`   – equivalent extinction (fastest)
+* `"rorr"` – random overlap with resorting and re-binning
+* `"ro"`   – random overlap (most accurate, slowest)
+
+See Amundsen+[2017](https://www.aanda.org/articles/aa/full_html/2017/02/aa29322-16/aa29322-16.html)
+for a comparison.
+
+## Transparent atmosphere
+
+Setting `composition.transparent = true` configures a transparent (opacity-free)
+atmosphere. This is useful for computing bare-rock emission spectra or surface
+temperatures without an overlying atmosphere. When enabled, use `solver = "transparent"`
+and omit all other `[composition]` parameters.
