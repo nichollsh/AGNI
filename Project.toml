@@ -1,6 +1,6 @@
 name = "AGNI"
 uuid = "ede838c1-9ec3-4ebe-8ae8-da4091b3f21c"
-authors = ["Harrison Nicholls <harrison.nicholls@physics.ox.ac.uk>"]
+authors = ["Harrison Nicholls <contact@h-nicholls.space>"]
 version = "1.8.9"
 
 [deps]
