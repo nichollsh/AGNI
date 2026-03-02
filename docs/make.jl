@@ -5,8 +5,8 @@ using AGNI
 format = Documenter.HTML(edit_link = "main",
                          prettyurls = get(ENV, "CI", nothing) == "true",
                          assets = [
-                             joinpath("assets", "style.css"),
-                             joinpath("assets", "logo.ico"),
+                             "assets/style.css",
+                             "assets/logo.ico",
                         ]
 )
 
