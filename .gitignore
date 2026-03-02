@@ -55,6 +55,7 @@ nogit*
 .osfcli.config
 .venv
 .conda
+.ipynb_checkpoints
 
 # RFM
 rfm

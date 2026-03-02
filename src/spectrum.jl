@@ -215,9 +215,12 @@ module spectrum
     - `star_file::String`        Path to file containing stellar spectrum in SOC format.
     - `outp_file::String`        Path to output spectral file.
     - `insert_rscatter::Bool`    Calculate Rayleigh scattering coefficients?
+
+    Returns:
+    - `success::Bool`            function executed successfully
     """
     function insert_stellar_and_rscatter(orig_file::String, star_file::String,
-                                            outp_file::String, insert_rscatter::Bool)
+                                            outp_file::String, insert_rscatter::Bool)::Bool
 
         # Inputs to prep_spec
         prep_spec = abspath(ENV["RAD_DIR"],"bin","prep_spec")
@@ -265,12 +268,24 @@ module spectrum
 
         # Run executable
         @debug "Running prep_spec now"
-        run(pipeline(`bash $execpath`, stdout=devnull))
+        try
+            ps = run(pipeline(`bash $execpath`, stdout=devnull))
 
-        # Delete executable
+            if !success(ps)
+                @error "prep_spec failed with exit code $(ps.exitcode)"
+                @error "Command: bash $execpath"
+                return false
+            end
+
+        catch e
+            @error "Failed to run prep_spec: $e"
+            @error "Command: bash $execpath"
+            return false
+        end
+
+        # Tidy up
         rm(execpath)
-
-        return nothing
+        return true
     end
 
 end # end module spectrum
