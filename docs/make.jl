@@ -6,7 +6,7 @@ format = Documenter.HTML(edit_link = "main",
                          prettyurls = get(ENV, "CI", nothing) == "true",
                          assets = [
                              joinpath("assets", "style.css"),
-                             joinpath("assets", "logo.ico")
+                             joinpath("assets", "logo.ico"),
                         ]
 )
 
@@ -15,13 +15,13 @@ makedocs(
     format=format,
     pages = [
         "Home" => "index.md",
-        
+
         PageNode("Tutorials" => "tutorials/index.md", [
             "Getting started"  => "tutorials/getting_started.md",
             "Example outputs"  => "tutorials/examples.md",
             ]
         ),
-        
+
         PageNode("How-to guides" => "howto/index.md", [
             "Obtaining input data"        => "howto/data.md",
             "Configuring AGNI"            => "howto/configure.md",
@@ -33,14 +33,14 @@ makedocs(
             "Contributing to AGNI"        => "howto/contribute.md",
             ],
         ),
-        
+
         PageNode("Explanation" => "explanation/index.md", [
             "Model description"  => "explanation/model.md",
             "Related codes"      => "explanation/ecosystem.md",
             "Bibliography"       => "explanation/references.md",
             ],
         ),
-        
+
         PageNode("Reference" => "reference/index.md", [
             "Configuration reference"   => "reference/configuration.md",
             "Solver and output flags"   => "reference/solver_flags.md",

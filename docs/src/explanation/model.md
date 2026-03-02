@@ -12,9 +12,8 @@ Radiative transfer (RT) refers to the transport of radiation energy through a me
 AGNI nominally simulates RT using SOCRATES, a numerical code written by the UK Met Office which solves the RT equation using a two-stream solution. SOCRATES is accessed using a Julia interface originally written by Stuart Daines. Opacity is handled using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases.
 
 The model uses k-terms fitted to spectral absorption cross-section data from [DACE](https://dace.unige.ch/opacityDatabase/?#). The MT_CKD model is used to estimate water continuum absorption cross-sections. Other continua are derived from the HITRAN tables. Rayleigh scattering and water cloud radiative properties are also included. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/nichollsh/SOCRATES) on GitHub. The flowchart below outlines how these absorption data are converted into a 'spectral file'.
-```@raw html
-  <img src="assets/spectral_flowchart.svg" width=100% class="center"/>
-```
+
+![](fig_spectral_flowchart.svg)
 
 Surface reflectivity can be modelled as a greybody with an albedo from 0 to 1. Alternatively, the surface can be modelled using empirical reflectance data that varies (spectrally) with wavelength. In the latter case a filepath must be provided via the config. The file can tabulate any one of: spherical reflectance ('r'), hemispherical emissivity ('e'), or single scattering albedo ('w'). These data are compiled on Zenodo [here](https://zenodo.org/communities/proteus_framework/records?q&f=subject%3Asurface_albedos&l=list&p=1&s=10&sort=newest).
 
@@ -140,9 +139,10 @@ which represents a state where the fluxes are sufficiently conserved. The quanti
 
 ### Iterative steps
 The model solves for $\bm{x}$ iteratively, starting from some initial guess. The initial guess should be any reasonable temperature profile which is not significantly cooler than the expected solution. The flowchart below broadly outlines the solution process.
-```@raw html
-  <img src="assets/model_flowchart.svg" width=50% class="center"/>
-```
+
+![](fig_model_flowchart.svg)
+
+
 The Jacobian matrix $\bm{J}$ represents the directional gradient of the residuals with respect to the solution vector. It is a square matrix with elements set according to
 ```math
 J_{uv} = \frac{\partial r_u}{\partial x_v}

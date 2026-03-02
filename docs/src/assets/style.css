@@ -1,3 +1,7 @@
+img {
+width: 75%;
+}
+
 .left {
     float: left;
     padding: 2px;
@@ -13,12 +17,14 @@
     display: block;
     margin-left: auto;
     margin-right: auto;
+    width: 32%;
 }
 
 .display-dark-only {
     display: none;
     margin-left: auto;
     margin-right: auto;
+    width: 32%;
 }
 
 .theme--documenter-dark .display-light-only {
