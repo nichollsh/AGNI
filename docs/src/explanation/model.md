@@ -2,7 +2,7 @@
 AGNI models a planetary atmosphere by treating it as a single column (1D) and splitting it up into levels of finite thickness. These levels are defined in pressure-space, and are arranged logarithmically between the surface and the top of the atmosphere. The atmosphere is assumed to be plane-parallel. Quantities such as pressure and temperature are calculated at level-centres and level-edges, while energy fluxes are calculated only at the edges, and thermodynamic properties (e.g. heat capacity) are calculated only at their centres.
 
 ## Height structure
-The atmosphere is assumed to be hydrostatically supported. The density of the gas mixture is calculated using using Amagat's additive volume law to combine the densities of the components. The densities of each gas component are nominally calculated using the Van der Walls equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
+The atmosphere is assumed to be hydrostatically supported. The density of the gas mixture is calculated using Amagat's additive volume law to combine the densities of the components. The densities of each gas component are nominally calculated using the Van der Waals equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
 
 The height at each pressure level is obtained by integrating from the surface upwards using a fourth order Runge-Kutta method. This includes self-gravitational attraction, and makes AGNI applicable as an atmospheric structure model.
 
@@ -11,7 +11,7 @@ Radiative transfer (RT) refers to the transport of radiation energy through a me
 
 AGNI nominally simulates RT using SOCRATES, a numerical code written by the UK Met Office which solves the RT equation using a two-stream solution. SOCRATES is accessed using a Julia interface originally written by Stuart Daines. Opacity is handled using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases.
 
-The model uses k-terms fitted to spectral absorption cross-section data from [DACE](https://dace.unige.ch/opacityDatabase/?#). The MT_CKD model is used to estimate water continuum absorption cross-sections. Other continuua are derived from the HITRAN tables. Rayleigh scattering and water cloud radiative properties are also included. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/nichollsh/SOCRATES) on GitHub. The flowchart below outlines how these absorption data are converted into a 'spectral file'.
+The model uses k-terms fitted to spectral absorption cross-section data from [DACE](https://dace.unige.ch/opacityDatabase/?#). The MT_CKD model is used to estimate water continuum absorption cross-sections. Other continua are derived from the HITRAN tables. Rayleigh scattering and water cloud radiative properties are also included. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/nichollsh/SOCRATES) on GitHub. The flowchart below outlines how these absorption data are converted into a 'spectral file'.
 ```@raw html
   <img src="assets/spectral_flowchart.svg" width=100% class="center"/>
 ```
@@ -35,19 +35,19 @@ AGNI incorporates a simple ocean model, which is tied to the atmosphere rainout 
 
 The condensation and chemistry calculations then operate together. At each solver step, the following actions occur:
 1. The *surface* temperature and partial pressures are checked against saturation, for each condensable
-    - Super-saturated condensables have their partial pressures decreased, and the mass is added to the ocean resevoir
-    - Sub-saturated condensables have their partial pressures increased based on the availablity of surface condensate
-2. Chemistry is then performed to calculated the gas phase speciation; see [Equilibrium chemistry](@ref) below
+    - Super-saturated condensables have their partial pressures decreased, and the mass is added to the ocean reservoir
+    - Sub-saturated condensables have their partial pressures increased based on the availability of surface condensate
+2. Chemistry is then performed to calculate the gas phase speciation; see [Equilibrium chemistry](@ref) below
 3. Rainout is calculated aloft, based on sub/super-saturation at *every* atmosphere level.
 
-In the first step, the model is effectively non-hydrostatic because the surface pressure (and whole pressure grid) is adjusted according to *surface* sub/super-saturation. The sum of condensation at the surface and aloft  go towards modulating the surface ocean content. The ocean layer structure is calculated according to liquid density. Two parameters (ocean basin area, contentinental shelf height) determine the filling fraction of the basins; i.e. whether the planet is a 'desert planet', a 'contentinental planet', or an 'aqua planet'.
+In the first step, the model is effectively non-hydrostatic because the surface pressure (and whole pressure grid) is adjusted according to *surface* sub/super-saturation. The sum of condensation at the surface and aloft go towards modulating the surface ocean content. The ocean layer structure is calculated according to liquid density. Two parameters (ocean basin area, continental shelf height) determine the filling fraction of the basins; i.e. whether the planet is a 'desert planet', a 'continental planet', or an 'aqua planet'.
 
-During the third step, where phase change happens aloft, the mixing ratios of dry species are increased in order to satisfy the total pressure at condensing levels. This is treated as a hydrostatic processes. The total accumulated amount of condensation (for each volatile) is then re-evaporated in the deeper atmosphere where possible. Rain reaching the surface contributes to the ocean.
+During the third step, where phase change happens aloft, the mixing ratios of dry species are increased in order to satisfy the total pressure at condensing levels. This is treated as a hydrostatic process. The total accumulated amount of condensation (for each volatile) is then re-evaporated in the deeper atmosphere where possible. Rain reaching the surface contributes to the ocean.
 
 ## Phase change in the atmosphere
 Gases release energy "latent heat" into their surroundings when condensing into a liquid or solid. This is included in the model through a diffusive condensation scheme, which assumes a fixed condensation timescale. Any rain which is not re-evaporated before reaching the surface is considered to contribute towards forming an ocean (secondary reservoir).
 
-The latent heating associated with the change in partial pressure of condensable gases in the atmosphere is used to calculate a latent heating rate at each level of the model (positive where condensing, negative where evaporating). The heating rates in each layer are then integrated (from the TOA downwards) to provide a latent heat transport *flux* at cell-edges, which the assumption being that condensation occurs by updrafts. The integrated condensable heat flux is balanced by evaporation at deeper layers which closes the energy balance.
+The latent heating associated with the change in partial pressure of condensable gases in the atmosphere is used to calculate a latent heating rate at each level of the model (positive where condensing, negative where evaporating). The heating rates in each layer are then integrated (from the TOA downwards) to provide a latent heat transport *flux* at cell-edges, with the assumption being that condensation occurs by updrafts. The integrated condensable heat flux is balanced by evaporation at deeper layers which closes the energy balance.
 
 Latent heats are temperature-dependent, using values derived from Coker (2007) and Wagner & Pruß ([2001](https://doi.org/10.1063/1.1461829)). Heat capacities are also temperature-dependent, using values derived from the JANAF database. See the [ThermoTools repo](https://github.com/nichollsh/ThermoTools) for scripts. This method is conceptually similar to Derras-Chouk+[2025](https://arxiv.org/abs/2508.16750).
 
@@ -62,9 +62,9 @@ A key input to the radiation model is the shortwave downward-directed flux from 
 ## Equilibrium chemistry
 By default, AGNI assumes that the atmosphere composition is "well-mixed". This means that the mixing ratios of the species are constant with height. Condensation of a super-saturated volatile will reduce its mixing ratio such that it becomes exactly saturated.
 
-With condensation turned off, AGNI can couple to [FastChem](https://newstrangeworlds.github.io/FastChem/) - a fast numerical model of equilibrium gas-phase chemistry. FastChem takes metallicities (elemental ratios), pressures, and temperatures as input variables. It outputs the partial pressures of a wide range of volatile species, with their mixing ratios set by the equilibrium of their collective thermochemical reactions.
+AGNI can couple to [FastChem](https://newstrangeworlds.github.io/FastChem/) — a fast numerical code for gas-phase thermochemical equilibrium. FastChem takes elemental abundances (metallicities), pressures, and temperatures as input variables and returns the mixing ratios of hundreds of gas-phase species at thermochemical equilibrium. When the configuration variable `physics.chemistry = true` FastChem will be enabled.
 
-AGNI uses the inputted gas partial pressures (or mixing ratios) to calculate the atmosphere's metallicity. When the configuration variable `composition.chemistry=true` FastChem will be enabled. At each step of the solver loop, the metallicity and T-P profile will be provided to FastChem in order to calculate the atmospheric composition at each layer. This new composition is applied when calculating energy fluxes, emission spectra, etc.
+At each step of the solver loop, AGNI derives the atmosphere's bulk elemental metallicity from the gas composition (or from user-provided metallicities), then calls FastChem to compute gas-phase equilibrium mixing ratios across the column. AGNI's own rainout and condensation scheme (`_sat_aloft!`) subsequently operates on the post-FastChem composition, handling super-saturation and cold-trapping. The two schemes are therefore **complementary**: FastChem handles gas-phase speciation while AGNI handles condensation independently.
 
 ## Transparent atmospheres
 It is useful to run AGNI with a transparent atmosphere in various scenarios. For example, in the calculation of reflectance or emission spectra of 'bare rock' planets. Or alternatively to determine a planet's surface temperature in the absence of an overlying atmosphere. AGNI incorporates this functionality through the configuration variable `composition.transparent=true`. This will set the atmosphere surface pressure to be small and disable the gas opacity, continuum opacity, and other absorption processes in SOCRATES.
@@ -84,7 +84,7 @@ It is necessary to tell AGNI what kind of atmospheric solution to solve for. The
 
 Solution type (1) enforces a fixed surface temperature and instellation, allowing all other temperatures and $F_\text{int}$ to be solved-for as dependent variables. This could be used to model a young planet far from 'radiative equilibrium' (or 'global energy balance') where its surface temperature is very large and the outgoing energy flux is non-zero.
 
-Solution type (2) is appropriate for coupling with magma ocean model, where a conductive skin of solidified rock forms at the atmosphere-mantle interface. This skin is a kind of boundary layer that must be parameterised as having a particular thickness and thermal conductivity. It's thought that these layers are important for regulating the energy budget of young rocky planets. This is similar to type (1) except that $T_s$ is allowed to change and $T_m$ is fixed.
+Solution type (2) is appropriate for coupling with a magma ocean model, where a conductive skin of solidified rock forms at the atmosphere-mantle interface. This skin is a kind of boundary layer that must be parameterised as having a particular thickness and thermal conductivity. It's thought that these layers are important for regulating the energy budget of young rocky planets. This is similar to type (1) except that $T_s$ is allowed to change and $T_m$ is fixed.
 
 Solution type (3) is comparable to the implementation inside other atmosphere climate models: the surface temperature is free to change along with the rest of the atmosphere, and AGNI solves for a state of radiative equilibrium.
 
@@ -147,7 +147,7 @@ The Jacobian matrix $\bm{J}$ represents the directional gradient of the residual
 ```math
 J_{uv} = \frac{\partial r_u}{\partial x_v}
 ```
-AGNI estimates $\bm{J}$ using finite-differences, requiring $N+1$ evalulations of $\bm{r}$ in order to fill the matrix. This corresponds to $2(N+1)+1$ objective function calculations under a 2nd order central-difference scheme. Each level $v$ with temperature $x_v$ is perturbed by an amount $\pm \varepsilon x_v$ in order to fill a single column of $\bm{J}$. As such, it can be expensive to construct a full Jacobian, especially when it is discarded at the end of each iteration. To reduce the total number of calculations, AGNI retains some of the columns in $\bm{J}$ between model iterations. This assumes that the second derivative of the residuals is small. A column $v$ is retained only when
+AGNI estimates $\bm{J}$ using finite-differences, requiring $N+1$ evaluations of $\bm{r}$ in order to fill the matrix. This corresponds to $2(N+1)+1$ objective function calculations under a 2nd order central-difference scheme. Each level $v$ with temperature $x_v$ is perturbed by an amount $\pm \varepsilon x_v$ in order to fill a single column of $\bm{J}$. As such, it can be expensive to construct a full Jacobian, especially when it is discarded at the end of each iteration. To reduce the total number of calculations, AGNI retains some of the columns in $\bm{J}$ between model iterations. This assumes that the second derivative of the residuals is small. A column $v$ is retained only when
 ```math
 \max |r_i| \lt 0.7 \text{ for } i \in \{v-1, v, v+1\}
 ```

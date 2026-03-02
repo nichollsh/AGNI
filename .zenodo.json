@@ -3,7 +3,7 @@
         {
             "name": "Harrison Nicholls",
             "orcid": "0000-0002-8368-4641",
-            "affiliation": "University of Oxford",
+            "affiliation": "University of Cambridge",
             "type": "ProjectLeader"
         }
     ],
@@ -17,12 +17,12 @@
         {
             "name": "Raymond Pierrehumbert",
             "orcid": "0000-0002-5887-1197",
-            "affiliation": "University of Oxford",
+            "affiliation": "MIT",
             "type": "ProjectMember"
         }
     ],
     "title": "AGNI: An open-source model for extreme atmospheres on rocky exoplanets",
-    "version": "1.8.7",
+    "version": "1.8.9",
     "access_right": "open",
     "related_identifiers": [
         {

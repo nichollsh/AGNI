@@ -49,16 +49,44 @@ automatically pull changes from GitHub and download any required data files.
 ./src/get_agni.sh
 ```
 
-## Using the code
-See [Using the model](@ref) for information on using the code.
-See [Troubleshooting](@ref) for troubleshooting advice.
+## Your first model run
 
+The environment variable `RAD_DIR` must point to the SOCRATES installation
+directory. The best way to do this is to add `RAD_DIR=path/to/socrates/folder/` to your
+shell rc file (e.g. `~/.bashrc`).
 
-## Coupling with FastChem
-Coupling with FastChem can be enabled using the configuration parameter `composition.chemistry`.
-Of course, it is first necessary to set up FastChem, which can be done by running:
+Then run AGNI with the default configuration file:
 ```bash
-./src/get_fastchem.sh
+./agni.jl
 ```
-You **must** then set the `FC_DIR` environment variable to the location of the FastChem
-installation folder. Ideally you should also add this variable to your bashrc file.
+
+You should see the following output:
+```log
+[ INFO  ] Using configuration 'Default'
+[ INFO  ] Setting-up a new atmosphere struct
+[ INFO  ] Loading thermodyamic data
+[ INFO  ] Inserting stellar spectrum and Rayleigh coefficients
+[ INFO  ] Allocating atmosphere with composition:
+[ INFO  ]       1 H2O     1.00e+00 (EOS_AQUA)
+[ INFO  ] Setting T(p): dry, sat
+[ INFO  ] Solving with 'none'
+[ INFO  ]     done
+[ INFO  ] Total RT evalulations: 2
+[ INFO  ] Writing results
+[ INFO  ] Plotting results
+[ INFO  ] Deallocating memory
+[ INFO  ] Model runtime: 16.60 seconds
+```
+
+The line following "Allocating atmosphere with composition" is a table of gases, their
+volume mixing ratios, and flags. In this case there is only one gas.
+
+Potential flags for each species are:
+* `EOS_[XX]` - using the `[XX]` equation of state (e.g. ideal gas, AQUA)
+* `NO_OPACITY` - no opacity data available, but can contribute to the thermodynamics
+* `NO_THERMO` - no thermodynamic data available, so will be treated as a diatomic ideal gas
+* `COND` - this gas is allowed to condense
+
+Output files are written to the directory specified in the configuration file (default: `out/`).
+See [Example outputs](@ref) for illustrative results, and [How-to guides](@ref) for
+next steps such as configuring the model for your own science case.

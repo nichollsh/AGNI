@@ -73,7 +73,7 @@ title = "Default"                       # Name for this configuration file
     [physics.deep_heating]
         Pmid            = 1.0              # Center of Gaussian heating profile [bar]
         Pwid            = 1.0               # Width of Gaussian in log-Pascal units.
-        power_mode      = "abs"             # Power mode for heating (off, rel, abs)
+        power_mode      = "off"             # Power mode for heating (off, rel, abs)
         norm_method     = "pressure"        # Normalisation coordinate: "pressure" (legacy dF/dP), or "mass" (dm-weighted).
         domain          = "clamp"           # How to handle Pmid outside domain (clamp, boundary_flux)
         flux_rel        = 0.0               # Set flux by fraction of instellation, used for power_mode="rel".
