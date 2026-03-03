@@ -20,6 +20,9 @@ module setpt
     using LoggingExtras
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
+    """
+    Parse a temperature value from a string keyword (`"teq"`, `"tsurf"`, or a numeric string) or a numeric input.
+    """
     function _parse_tmp_str(atmos::atmosphere.Atmos_t, tmp)::Float64
 
         if tmp isa String
@@ -37,7 +40,13 @@ module setpt
         end
     end
 
-    # Process a series of requests describing T(p)
+    """
+    Process a sequence of T(p) setup requests and apply them in order to the atmosphere.
+
+    Each element of `request` is a command string (`"dry"`, `"iso"`, `"str"`, `"loglin"`,
+    `"csv"`, `"ncdf"`, `"add"`, `"sat"`, `"surfsat"`, `"ana"`) optionally followed by
+    a parameter value.
+    """
     function request!(atmos::atmosphere.Atmos_t, request::Array)::Bool
         num_req::Int = length(request)          # Number of requests
         idx_req::Int = 1                        # Index of current request
@@ -111,7 +120,9 @@ module setpt
         return true
     end
 
-    # Set by interpolating from T,P arrays
+    """
+    Set the T(p) profile by log-pressure interpolation from given pressure [Pa] and temperature [K] arrays.
+    """
     function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array;
                             extrap::Bool=false)
 
@@ -163,7 +174,9 @@ module setpt
         return
     end
 
-    # Read atmosphere T(p) from a CSV file (does not overwrite p_boa and p_toa)
+    """
+    Set the T(p) profile by reading pressure [Pa] and temperature [K] columns from a CSV file.
+    """
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
 
         # Check file exists
@@ -299,7 +312,9 @@ module setpt
         return
     end # end load_ncdf
 
-    # Set atmosphere to be isothermal at the given temperature
+    """
+    Set the atmosphere to an isothermal profile at the given temperature.
+    """
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
@@ -315,7 +330,9 @@ module setpt
         return
     end
 
-    # Set atmosphere to be isothermal at the given temperature
+    """
+    Add a constant temperature offset to every level of the T(p) profile.
+    """
     function add!(atmos::atmosphere.Atmos_t, delta)
         if !atmos.is_param
             @error "setpt: Atmosphere parameters not set"
@@ -330,7 +347,9 @@ module setpt
         return nothing
     end
 
-    # Set atmosphere to dry adiabat
+    """
+    Set the T(p) profile to the dry adiabat, integrated upward from the surface temperature.
+    """
     function dry_adiabat!(atmos::atmosphere.Atmos_t)
         # Validate input
         if !(atmos.is_alloc && atmos.is_param)
@@ -374,7 +393,9 @@ module setpt
         return nothing
     end
 
-    # Set atmosphere to have an isothermal stratosphere
+    """
+    Cap temperatures above the tropopause to give an isothermal stratosphere at `strat_tmp` [K].
+    """
     function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp)
 
         strat_tmp = _parse_tmp_str(atmos, strat_tmp)
@@ -403,7 +424,9 @@ module setpt
         return nothing
     end
 
-    # Set atmosphere to have a log-linear T(p) profile
+    """
+    Set the T(p) profile to vary log-linearly with pressure from the surface temperature down to `top_tmp` [K] at the top.
+    """
     function loglinear!(atmos::atmosphere.Atmos_t, top_tmp)
 
         top_tmp = _parse_tmp_str(atmos, top_tmp)

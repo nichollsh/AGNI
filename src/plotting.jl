@@ -27,7 +27,9 @@ module plotting
                              :titlefontsize => 9,
                              :dpi => 220)
 
-    # Symmetric log
+    """
+    Apply a symmetric log10 transform, returning zero for |v| < 1.
+    """
     function _symlog(v::Float64)::Float64
         if abs(v) < 1.0
             return 0.0
@@ -35,17 +37,23 @@ module plotting
         return sign(v)*max(log10(abs(v)), 0.0)
     end
 
-    # Int to string
+    """
+    Format an integer as a plain decimal string.
+    """
     function _intstr(v::Int)::String
         return @sprintf("%d",v)
     end
 
-    # Get y-axis limits
+    """
+    Return `(p_top, p_bot)` pressure axis limits [bar] for a standard profile plot.
+    """
     function _get_ylims(atmos::atmosphere.Atmos_t)::Tuple
         return (1e-5*atmos.pl[1]/1.5, 1e-5*max(atmos.p_oboa, atmos.p_boa)*1.5 )
     end
 
-    # Get y-axis ticks for log10 axis scale
+    """
+    Return pressure tick mark values [bar] on a log10 scale for a standard profile plot.
+    """
     function _get_yticks(atmos::atmosphere.Atmos_t)::Array
         ylims = _get_ylims(atmos)
         return 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))

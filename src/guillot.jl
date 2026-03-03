@@ -18,22 +18,30 @@ module guillot
     const κ_th::Float64 = 7e-2 * 10  # LW opacity [m2/kg]
     const γ::Float64    = κ_vs/κ_th  # opacity ratio
 
-    # Evaluate exponential integral of order 1
+    """
+    Evaluate exponential integral of order 1.
+    """
     function _E1(z::Float64)::Float64
         return -1*expinti(-z)
     end
 
-    # Evaluate exponential integral of order 2
+    """
+    Evaluate exponential integral of order 2.
+    """
     function _E2(z::Float64)::Float64
         return exp(-z) - z*_E1(z)
     end
 
-    # Evaluate irradiation temperature
+    """
+    Evaluate irradiation temperature given stellar effective temperature, radius, and orbital separation.
+    """
     function eval_Tirr(Tstar::Float64, Rstar::Float64, sep::Float64)::Float64
         return Tstar * sqrt(Rstar/sep)
     end
 
-    # Evaluate planetary equilibrium temperature
+    """
+    Evaluate planetary equilibrium temperature given stellar effective temperature, radius, and orbital separation.
+    """
     function eval_Teqm(Tstar::Float64, Rstar::Float64, sep::Float64)::Float64
         return Tstar * sqrt(Rstar/(2*sep))
     end

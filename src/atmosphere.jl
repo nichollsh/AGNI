@@ -342,7 +342,9 @@ module atmosphere
         Atmos_t() = new()
     end
 
-    # Deallocate SOCRATES arrays
+    """
+    Deallocate SOCRATES arrays and mark the atmosphere as unallocated.
+    """
     function deallocate!(atmos::atmosphere.Atmos_t)
         SOCRATES.deallocate_atm(     atmos.atm)
 
@@ -359,7 +361,9 @@ module atmosphere
         return nothing
     end
 
-    # Check parameter is within valid range
+    """
+    Check that a named parameter value lies within a valid range, logging an error if not.
+    """
     function _check_range(name, val; min=nothing, max=nothing)::Bool
         if !isnothing(min) && !isnothing(max) && ((val<min) || (val>max))
             @error "$name is out of range"
