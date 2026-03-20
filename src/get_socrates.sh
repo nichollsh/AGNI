@@ -43,9 +43,9 @@ root=$(realpath "$root/..")
 socpath="$root/socrates"
 rm -rf "$socpath"
 if [ "$use_ssh" = true ]; then
-    git clone git@github.com:nichollsh/SOCRATES.git "$socpath"
+    git clone git@github.com:FormingWorlds/SOCRATES.git "$socpath"
 else
-    git clone https://github.com/nichollsh/SOCRATES.git "$socpath"
+    git clone https://github.com/FormingWorlds/SOCRATES.git "$socpath"
 fi
 
 # Compile SOCRATES

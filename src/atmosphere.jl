@@ -33,7 +33,7 @@ module atmosphere
     import ..spectrum
 
     # Code versions
-    const AGNI_VERSION::String     = "1.8.7"  # current agni version
+    const AGNI_VERSION::String     = "1.9.0"  # current agni version
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
@@ -2074,7 +2074,7 @@ module atmosphere
             atmos.gas_soc_names     = Array{String}(undef, atmos.gas_soc_num)   # list of names
             for i_gas in 1:atmos.gas_soc_num   # for each supported gas
                 atmos.gas_soc_names[i_gas] =
-                    SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
+                    SOCRATES.gas_list_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
             end
 
             # Warn user if all absorbers are condensable, which risks opacity going to zero
