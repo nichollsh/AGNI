@@ -2073,8 +2073,11 @@ module atmosphere
             atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases
             atmos.gas_soc_names     = Array{String}(undef, atmos.gas_soc_num)   # list of names
             for i_gas in 1:atmos.gas_soc_num   # for each supported gas
-                atmos.gas_soc_names[i_gas] =
-                    SOCRATES.gas_list_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
+                if startswith(atmos.SOCRATES_VERSION, "24")
+                    atmos.gas_soc_names[i_gas] = SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
+                else
+                    atmos.gas_soc_names[i_gas] = SOCRATES.gas_list_pcf.header_gas[  atmos.spectrum.Gas.type_absorb[i_gas]]
+                end
             end
 
             # Warn user if all absorbers are condensable, which risks opacity going to zero
