@@ -1856,7 +1856,7 @@ module atmosphere
 
             SOCRATES.set_spectrum(spectrum=atmos.spectrum,
                                     spectral_file=atmos.control.spectral_file,
-                                    l_all_gasses=true)
+                                    l_all_gases=true)
 
             # Remove temporary star file if it exists
             rm(socstar, force=true)
@@ -2068,6 +2068,9 @@ module atmosphere
             for j in atmos.control.first_band:atmos.control.last_band
                 atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
             end
+
+            # Optimise calculation when only one sub-band is used
+            atmos.control.l_grey_single = true
 
             # Check supported gases
             atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases
