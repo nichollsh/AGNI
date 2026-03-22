@@ -8,7 +8,9 @@ GNU/Linux and MacOS (including ARM) are supported.
 * netcdf-fortran
 * make
 * wget
+* curl
 * unzip
+* cmake
 
 !!! warning
     Do not install Julia using your system package manager. Install only from julialang.org as below.
