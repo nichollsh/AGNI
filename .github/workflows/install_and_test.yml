@@ -68,6 +68,7 @@ jobs:
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export RAD_BIN="$RAD_DIR/bin/"
           export LD_LIBRARY_PATH=""
+          export FC=$(command -v gfortran)
           julia --project=. -e 'using Pkg; Pkg.build()'
 
       # Run the tests
