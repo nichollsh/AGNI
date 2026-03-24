@@ -14,7 +14,7 @@
 
 * Ensure the PR description clearly describes the problem and solution. Include the relevant issue number if applicable.
 
-* Before submitting, please ensure your changes are consistent with the existing codebase. These can also be viewed in the [development manual](https://www.h-nicholls.space/AGNI/dev/manual/).
+* Before submitting, please ensure your changes are consistent with the existing codebase. These can also be viewed in the [API reference guide](https://www.h-nicholls.space/AGNI/dev/reference/api/).
 
 
 ## New features
@@ -39,5 +39,5 @@
 
 AGNI is free, libre, and open source software. I encourage your contributions and suggestions.
 
-Thanks,  
+Thanks,
 -Harrison

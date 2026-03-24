@@ -13,7 +13,7 @@ Outline your test configuration; e.g. MacOS with Python 3.13.
 
 ## Checklist
 
-- [ ] I have followed the [contributing guidelines](https://www.h-nicholls.space/AGNI/dev/contributing/)
+- [ ] I have followed the [contributing guidelines](https://www.h-nicholls.space/AGNI/dev/howto/contribute/)
 - [ ] My code follows the style guidelines of this project
 - [ ] I have performed a self-review of my code
 - [ ] My changes generate no new warnings or errors
