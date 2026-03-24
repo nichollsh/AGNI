@@ -40,7 +40,7 @@ jobs:
       - name: Get SOCRATES
         uses: actions/checkout@v6
         with:
-          repository: 'nichollsh/SOCRATES'
+          repository: 'FormingWorlds/SOCRATES'
           path: 'SOCRATES'
 
       - name: Restore SOCRATES from cache

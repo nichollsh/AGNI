@@ -7,7 +7,7 @@ RAD_DIR = abspath(ENV["RAD_DIR"])
 println("RAD_DIR = $RAD_DIR")
 
 # Get socrates version
-SOC_VER = abspath(RAD_DIR,"version")
+SOC_VER = readchomp(joinpath(RAD_DIR, "version"))
 println("SOC_VER = $SOC_VER")
 
 # Generate wrappers

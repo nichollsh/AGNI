@@ -2,8 +2,8 @@
 *.mod
 *.o
 radiation_code.lock
-socrates
-SOCRATES
+socrates*
+SOCRATES*
 
 # FastChem folder
 fastchem

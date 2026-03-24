@@ -33,7 +33,7 @@ module atmosphere
     import ..spectrum
 
     # Code versions
-    const AGNI_VERSION::String     = "1.8.7"  # current agni version
+    const AGNI_VERSION::String     = "1.9.0"  # current agni version
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
@@ -1856,7 +1856,7 @@ module atmosphere
 
             SOCRATES.set_spectrum(spectrum=atmos.spectrum,
                                     spectral_file=atmos.control.spectral_file,
-                                    l_all_gasses=true)
+                                    l_all_gases=true)
 
             # Remove temporary star file if it exists
             rm(socstar, force=true)
@@ -2069,12 +2069,18 @@ module atmosphere
                 atmos.control.i_gas_overlap_band[j] = atmos.control.i_gas_overlap
             end
 
+            # Optimise calculation when only one sub-band is used
+            atmos.control.l_grey_single = true
+
             # Check supported gases
             atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases
             atmos.gas_soc_names     = Array{String}(undef, atmos.gas_soc_num)   # list of names
             for i_gas in 1:atmos.gas_soc_num   # for each supported gas
-                atmos.gas_soc_names[i_gas] =
-                    SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
+                if startswith(atmos.SOCRATES_VERSION, "24")
+                    atmos.gas_soc_names[i_gas] = SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
+                else
+                    atmos.gas_soc_names[i_gas] = SOCRATES.gas_list_pcf.header_gas[  atmos.spectrum.Gas.type_absorb[i_gas]]
+                end
             end
 
             # Warn user if all absorbers are condensable, which risks opacity going to zero
