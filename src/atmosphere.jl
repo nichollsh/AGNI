@@ -2204,12 +2204,33 @@ module atmosphere
 
             SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
 
+            # Defaults for prescribed cloud optical metadata
+            atmos.cld.n_opt_level_drop_prsc = 1
+            atmos.cld.n_phase_term_drop_prsc = 1
+            atmos.cld.n_opt_level_ice_prsc = 1
+            atmos.cld.n_phase_term_ice_prsc = 1
+            fill!(atmos.cld.drop_pressure_prsc, 0.0)
+            fill!(atmos.cld.drop_absorption_prsc, 0.0)
+            fill!(atmos.cld.drop_scattering_prsc, 0.0)
+            fill!(atmos.cld.drop_phase_fnc_prsc, 0.0)
+            fill!(atmos.cld.ice_pressure_prsc, 0.0)
+            fill!(atmos.cld.ice_absorption_prsc, 0.0)
+            fill!(atmos.cld.ice_scattering_prsc, 0.0)
+            fill!(atmos.cld.ice_phase_fnc_prsc, 0.0)
+            atmos.cld.dp_corr_strat = 0.0
+            atmos.cld.dp_corr_conv = 0.0
+
             if atmos.control.l_cloud
                 atmos.cld.n_condensed       = 1
                 atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
                 atmos.cld.n_cloud_type      = 1
-                atmos.cld.i_cloud_type[1]   = SOCRATES.rad_pcf.ip_cloud_type_water
+                if atmos.control.i_cloud_representation == SOCRATES.rad_pcf.ip_cloud_homogen
+                    atmos.cld.i_cloud_type[1] = SOCRATES.rad_pcf.ip_cloud_type_homogen
+                else
+                    atmos.cld.i_cloud_type[1] = SOCRATES.rad_pcf.ip_cloud_type_water
+                end
                 atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
+                atmos.cld.condensed_n_phf[1] = atmos.spectrum.Drop.n_phf[atmos.control.i_st_water]
 
                 # reset parameters
                 fill!(atmos.cld.condensed_param_list, 0.0)
@@ -2230,6 +2251,11 @@ module atmosphere
             else
                 atmos.cld.n_condensed  = 0
                 atmos.cld.n_cloud_type = 0
+                fill!(atmos.cld.condensed_n_phf, 0)
+                fill!(atmos.cld.i_condensed_param, 0)
+                fill!(atmos.cld.type_condensed, 0)
+                fill!(atmos.cld.i_cloud_type, 0)
+                fill!(atmos.cld.frac_cloud, 0.0)
             end
         end # end socrates only
 
