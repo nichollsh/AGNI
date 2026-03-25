@@ -56,6 +56,7 @@ title = "Default"                       # Name for this configuration file
     chemistry       = false                     # Solve for thermochemistry in atmosphere?
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
+    aerosol         = false                     # Include parametrised aerosols from SOCRATES spectral metadata?
     cloud           = false                     # Include water cloud radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
     grey_lw         = 1e-4                      # Grey longwave opacity, used when `input_sf="greygas"`
@@ -78,6 +79,11 @@ title = "Default"                       # Name for this configuration file
         domain          = "clamp"           # How to handle Pmid outside domain (clamp, boundary_flux)
         flux_rel        = 0.0               # Set flux by fraction of instellation, used for power_mode="rel".
         flux_abs        = 10.0              # Set flux by [W m-2], used for power_mode="abs".
+
+[aerosols]
+    rel_humidity    = 0.5                      # Mean RH used for moist aerosol lookups [0,1].
+    species_mmr     = {}                       # Optional per-species overrides keyed by SOCRATES aerosol type ID string.
+    avg_phase_moments = 1                      # Cscatter_average -P: retained phase-function moments in generated .avg files.
 
 [plots]
     at_runtime      = true                      # Make some plots at runtime?

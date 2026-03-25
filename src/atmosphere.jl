@@ -284,6 +284,12 @@ module atmosphere
         cloud_val_l::Float64                #  |-> Default scalar values to above arrays
         cloud_val_f::Float64                # /
 
+        # Parametrised aerosols (SOCRATES's classic aerosol functionality)
+        aerosol_species_mmr::Dict{String, Float64}  # Optional species overrides by SOCRATES aerosol type ID string
+        aerosol_species_id::Dict{String, Int}      # Mapping from SOCRATES aerosol type ID string to index in aerosol arrays
+        aerosol_rel_humidity::Float64       # Mean relative humidity used by moist aerosol schemes [0,1]
+        aerosol_avg_phase_moments::Int      # Number of phase-function moments retained by Cscatter_average (-P)
+
         # Deep atmospheric heating
         deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
         deepheat_Pmid::Float64          # Deposition pressure centre [Pa]
@@ -428,7 +434,10 @@ module atmosphere
     - `flag_rayleigh::Bool`             include rayleigh scattering?
     - `flag_gcontinuum::Bool`           include generalised continuum absorption?
     - `flag_continuum::Bool`            include continuum absorption?
-    - `flag_aerosol::Bool`              include aersols?
+    - `flag_aerosol::Bool`              include aerosols?
+    - `aerosol_rel_humidity::Float64`   mean relative humidity for aerosol optics lookup (used by moist aerosol schemes)
+    - `aerosol_species_mmr::Dict`       optional per-species MMR overrides, keyed by SOCRATES aerosol type ID string
+    - `aerosol_avg_phase_moments::Int` number of phase-function moments retained by Cscatter_average (-P)
     - `flag_cloud::Bool`                include clouds?
     - `phs_timescale::Float64`          phase change timescale [s]
     - `evap_efficiency::Float64`        re-evaporatione efficiency compared to saturating amount
@@ -484,6 +493,9 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
+                    aerosol_rel_humidity::Float64 = 0.5,
+                    aerosol_species_mmr::Dict = Dict{String, Float64}(),
+                    aerosol_avg_phase_moments::Int = 1,
 
                     phs_timescale::Float64 =    1e6,
                     evap_efficiency::Float64 =  0.05,
@@ -585,9 +597,9 @@ module atmosphere
             @info "Using grey-gas radiative transfer scheme"
 
             # check options
-            if flag_rayleigh || flag_cloud
+            if flag_rayleigh || flag_cloud || flag_aerosol
                 @error "Scattering not supported by grey-gas RT scheme!"
-                @error "    In this case, disable rayleigh scattering and clouds"
+                @error "    In this case, disable rayleigh scattering, aerosols, and clouds"
                 return false
             end
 
@@ -742,6 +754,30 @@ module atmosphere
         atmos.control.l_drop::Bool =        flag_cloud
         atmos.control.l_ice::Bool  =        false
         atmos.transparent =                 false
+
+        # Aerosol parameters
+        atmos.aerosol_rel_humidity = aerosol_rel_humidity
+        _check_range("Aerosol relative humidity", atmos.aerosol_rel_humidity; min=0.0, max=1.0) || return false
+        atmos.aerosol_species_mmr = Dict{String, Float64}()
+        atmos.aerosol_species_id = Dict{String, Int}()
+        for (k, v) in aerosol_species_mmr
+            vv = Float64(v)
+            _check_range("Aerosol mass mixing ratio override for type $k", vv; min=0.0) || return false
+            atmos.aerosol_species_mmr[string(k)] = vv
+
+            # check that aerosol species is valid
+            if haskey(SOCRATES.input_head_pcf.aerosol_species, k)
+                atmos.aerosol_species_id[string(k)] = SOCRATES.input_head_pcf.aerosol_species[k]
+            else
+                @error "Aerosol species '$k' has no mapping in SOCRATES"
+                return false
+            end
+        end
+        atmos.aerosol_avg_phase_moments = aerosol_avg_phase_moments
+        if atmos.aerosol_avg_phase_moments < 1
+            @error "Aerosol averaging phase_moments must be >= 1"
+            return false
+        end
 
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
@@ -1798,10 +1834,11 @@ module atmosphere
             spectral_file_run::String  = joinpath([atmos.IO_DIR, "runtime.sf"])
             spectral_file_runk::String = joinpath([atmos.IO_DIR, "runtime.sf_k"])
 
+
             # Setup spectral file
             socstar::String = joinpath([atmos.IO_DIR, "socstar.dat"])
             if !isempty(stellar_spectrum)
-                @debug "Inserting stellar spectrum into spectral file"
+                @debug "Inserting blocks into spectral file"
 
                 # Remove if already exists
                 rm(spectral_file_run , force=true)
@@ -1841,10 +1878,26 @@ module atmosphere
                 # Write stellar spectrum to disk in format required by SOCRATES
                 spectrum.write_to_socrates_format(wl, fl, socstar) || return false
 
-                # Insert stellar spectrum and rayleigh scattering, if required
-                spectrum.insert_stellar_and_rscatter(atmos.spectral_file,
-                                                        socstar, spectral_file_run,
-                                                        atmos.control.l_rayleigh)
+                # Generate aerosol .avg data files
+                aerosol_avg_files_rt::Dict = Dict{String,String}()
+                if atmos.control.l_aerosol
+                    @debug "Generating aerosol .avg files with Cscatter_average"
+                    aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
+                        atmos.spectral_file,
+                        keys(atmos.aerosol_species_mmr),
+                        atmos.IO_DIR,
+                        atmos.aerosol_avg_phase_moments,
+                        socstar
+                    )
+                end
+
+                # Insert blocks into spectral file
+                @debug "Inserting required blocks into runtime spectral file"
+                spectrum.insert_blocks(atmos.spectral_file,
+                                        socstar, spectral_file_run,
+                                        atmos.control.l_rayleigh,
+                                        atmos.control.l_aerosol;
+                                        aerosol_avg_files=aerosol_avg_files_rt) || return false
 
             else
                 # Stellar spectrum was not provided, which is taken to mean that
@@ -2166,18 +2219,45 @@ module atmosphere
         if atmos.rt_scheme == RT_SOCRATES
 
             SOCRATES.allocate_aer_prsc(atmos.aer, atmos.dimen, atmos.spectrum)
+
+            # Use minimal prescribed-optics dimensions unless explicit prescribed optics are provided.
+            atmos.dimen.nd_profile_aerosol_prsc   = 1
+            atmos.dimen.nd_opt_level_aerosol_prsc = 1
+            atmos.dimen.nd_phf_term_aerosol_prsc  = 1
+            fill!(atmos.aer.n_opt_level_prsc, 1)
+            fill!(atmos.aer.n_phase_term_prsc, 1)
+            fill!(atmos.aer.pressure_prsc, 0.0)
+            fill!(atmos.aer.absorption_prsc, 0.0)
+            fill!(atmos.aer.scattering_prsc, 0.0)
+            fill!(atmos.aer.phase_fnc_prsc, 0.0)
+
+            # Initialize aerosol fields used by SOCRATES classic aerosol parametrizations.
+            fill!(atmos.aer.mix_ratio, 0.0)
+            fill!(atmos.aer.mean_rel_humidity, atmos.aerosol_rel_humidity)
+            fill!(atmos.aer.mode_mix_ratio, 0.0)
+            fill!(atmos.aer.mode_absorption, 0.0)
+            fill!(atmos.aer.mode_scattering, 0.0)
+            fill!(atmos.aer.mode_asymmetry, 0.0)
+            atmos.aer.n_mode = 0
+
+            for i = 1:atmos.spectrum.Dim.nd_aerosol_mr
+                atmos.aer.mr_type_index[i] = i
+            end
+
+            # Enable aerosol radiative effect using spectrum-defined parametrizations and AGNI MMR inputs.
+            fill!(atmos.aer.mr_source, SOCRATES.rad_pcf.ip_aersrc_classic_roff) # default to no aerosol effect
             if atmos.control.l_aerosol
-                @error "Aerosols not implemented"
-                return false
-            else
-                atmos.dimen.nd_profile_aerosol_prsc   = 1
-                atmos.dimen.nd_opt_level_aerosol_prsc = 1
-                atmos.dimen.nd_phf_term_aerosol_prsc  = 1
+                # loop over aerosols in spectral file
+                for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
+                    # get name of aerosol
+                    type_id = string(atmos.spectrum.Aerosol.type_aerosol[i])
+                    aerosol_name = SOCRATES.aerosol_suffix[type_id]
 
-                atmos.aer.mr_source .= SOCRATES.rad_pcf.ip_aersrc_classic_roff
-
-                for i = 1:atmos.spectrum.Dim.nd_aerosol_species
-                    atmos.aer.mr_type_index[i] = i
+                    # get mmr from name
+                    if haskey(atmos.aerosol_species_mmr, aerosol_name)
+                        atmos.aer.mix_ratio[1, :, i] .= atmos.aerosol_species_mmr[aerosol_name]
+                        atmos.aer.mr_source[i] = SOCRATES.rad_pcf.ip_aersrc_classic_ron
+                    end
                 end
             end
 

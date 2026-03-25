@@ -489,6 +489,18 @@ module AGNI
             io_dir = cfg["files"]["io_dir"]
         end
 
+        # Optional aerosol parametrization controls
+        aerosol_rel_humidity::Float64 = 0.5
+        aerosol_species_mmr::Dict{String, Float64} = Dict{String, Float64}()
+        aerosol_avg_phase_moments::Int = 1
+        if haskey(cfg, "aerosols")
+            aerosol_rel_humidity = Float64(cfg["aerosols"]["rel_humidity"])
+            aerosol_avg_phase_moments = Int(cfg["aerosols"]["avg_phase_moments"])
+            for (k, v) in cfg["aerosols"]["species_mmr"]
+                aerosol_species_mmr[string(k)] = Float64(v)
+            end
+        end
+
 
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
@@ -514,7 +526,11 @@ module AGNI
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["physics"]["continua"],
                                 flag_rayleigh     = cfg["physics"]["rayleigh"],
+                                flag_aerosol      = get(cfg["physics"], "aerosol", false),
                                 flag_cloud        = cfg["physics"]["cloud"],
+                                aerosol_rel_humidity = aerosol_rel_humidity,
+                                aerosol_species_mmr  = aerosol_species_mmr,
+                                aerosol_avg_phase_moments = aerosol_avg_phase_moments,
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
@@ -780,4 +796,3 @@ module AGNI
     end
 
 end
-
