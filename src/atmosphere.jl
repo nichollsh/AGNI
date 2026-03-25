@@ -2182,61 +2182,69 @@ module atmosphere
             # see src/aux/input_cloud_cdf.f
             #######################################
 
-            atmos.dimen.nd_profile_cloud_prsc   = 1
-            atmos.dimen.nd_opt_level_cloud_prsc = 1
-            atmos.dimen.nd_phf_term_cloud_prsc  = 1
+            # Prescribed-optics dimensions (input_cloud_cdf: set to 1 when no .opt files are used).
+            atmos.dimen.nd_profile_cloud_prsc   = 1   # number of cloud profiles with prescribed optics
+            atmos.dimen.nd_opt_level_cloud_prsc = 1   # number of pressure levels for prescribed optics
+            atmos.dimen.nd_phf_term_cloud_prsc  = 1   # number of prescribed phase-function terms
 
             if atmos.control.l_cloud
-                # Ice and water mixed homogeneously (-K 1) = ip_cloud_homogen
-                # Cloud mixing liquid and ice (-K 2) = ip_cloud_ice_water
-
+                # Cloud representation (input_cloud_cdf/set_cld): 1=homogeneous mixed phase.
                 atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_homogen
-                atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_mix_max      # Goes with ip_max_rand
-                atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand           # Maximum/random overlap in a mixed column (-C 2)
-                atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous        # Homogeneous cloud
-                atmos.control.i_st_water  = 5                                      # Liquid Water Droplet type 5 (-d 5)
-                atmos.control.i_cnv_water = 5                                      # Convective Liquid Water Droplet type 5
-                atmos.control.i_st_ice    = 11                                     # Water Ice type 11 (-i 11)
-                atmos.control.i_cnv_ice   = 11                                     # Convective Water Ice type 11
+                # Vertical cloud solver option (input_cloud_cdf): max-random mixed-column treatment.
+                atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_mix_max
+                # Cloud overlap assumption for the mixed-column solver.
+                atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand
+                # Sub-grid condensate inhomogeneity switch (0/1 style selector in SOCRATES).
+                atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous
+                # Microphysical optical parametrization IDs from spectrum metadata (water and ice).
+                atmos.control.i_st_water  = 5
+                atmos.control.i_cnv_water = 5
+                atmos.control.i_st_ice    = 11
+                atmos.control.i_cnv_ice   = 11
             else
-                atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off # 5 (clear sky)
+                # Disable cloud solver path entirely in SOCRATES.
+                atmos.control.i_cloud = SOCRATES.rad_pcf.ip_cloud_off
             end
 
             SOCRATES.allocate_cld_prsc(atmos.cld, atmos.dimen, atmos.spectrum)
 
             # Defaults for prescribed cloud optical metadata
-            atmos.cld.n_opt_level_drop_prsc = 1
-            atmos.cld.n_phase_term_drop_prsc = 1
-            atmos.cld.n_opt_level_ice_prsc = 1
-            atmos.cld.n_phase_term_ice_prsc = 1
-            fill!(atmos.cld.drop_pressure_prsc, 0.0)
-            fill!(atmos.cld.drop_absorption_prsc, 0.0)
-            fill!(atmos.cld.drop_scattering_prsc, 0.0)
-            fill!(atmos.cld.drop_phase_fnc_prsc, 0.0)
-            fill!(atmos.cld.ice_pressure_prsc, 0.0)
-            fill!(atmos.cld.ice_absorption_prsc, 0.0)
-            fill!(atmos.cld.ice_scattering_prsc, 0.0)
-            fill!(atmos.cld.ice_phase_fnc_prsc, 0.0)
-            atmos.cld.dp_corr_strat = 0.0
-            atmos.cld.dp_corr_conv = 0.0
+            atmos.cld.n_opt_level_drop_prsc       = 1       # vertical levels for droplet prescribed optics
+            atmos.cld.n_phase_term_drop_prsc      = 1       # phase-function moments for droplets
+            atmos.cld.n_opt_level_ice_prsc        = 1       # vertical levels for ice prescribed optics
+            atmos.cld.n_phase_term_ice_prsc       = 1       # phase-function moments for ice
+            fill!(atmos.cld.drop_pressure_prsc,     0.0)    # droplet optics pressure grid [Pa]
+            fill!(atmos.cld.drop_absorption_prsc,   0.0)    # droplet absorption coefficient
+            fill!(atmos.cld.drop_scattering_prsc,   0.0)    # droplet scattering coefficient
+            fill!(atmos.cld.drop_phase_fnc_prsc,    0.0)    # droplet prescribed phase function
+            fill!(atmos.cld.ice_pressure_prsc,      0.0)    # ice optics pressure grid [Pa]
+            fill!(atmos.cld.ice_absorption_prsc,    0.0)    # ice absorption coefficient
+            fill!(atmos.cld.ice_scattering_prsc,    0.0)    # ice scattering coefficient
+            fill!(atmos.cld.ice_phase_fnc_prsc,     0.0)    # ice prescribed phase function
+            atmos.cld.dp_corr_strat             =   0.0     # decorrelation scale for stratiform cloud overlap
+            atmos.cld.dp_corr_conv              =   0.0     # decorrelation scale for convective cloud overlap
 
             if atmos.control.l_cloud
-                atmos.cld.n_condensed       = 1
-                atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water
-                atmos.cld.n_cloud_type      = 1
+                atmos.cld.n_condensed       = 1  # one condensate component in AGNI cloud mode
+                atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water # stratiform liquid water
+                atmos.cld.n_cloud_type      = 1  # one cloud-fraction field read by RT core
                 if atmos.control.i_cloud_representation == SOCRATES.rad_pcf.ip_cloud_homogen
+                    # set_cld/input_cloud_cdf: homogeneous representation expects ip_cloud_type_homogen.
                     atmos.cld.i_cloud_type[1] = SOCRATES.rad_pcf.ip_cloud_type_homogen
                 else
+                    # for split water/ice representations this would be water-cloud type.
                     atmos.cld.i_cloud_type[1] = SOCRATES.rad_pcf.ip_cloud_type_water
                 end
-                atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2
-                atmos.cld.condensed_n_phf[1] = atmos.spectrum.Drop.n_phf[atmos.control.i_st_water]
+                atmos.cld.i_condensed_param[1] = SOCRATES.rad_pcf.ip_drop_pade_2 # optical parameterization ID
+                atmos.cld.condensed_n_phf[1] = atmos.spectrum.Drop.n_phf[atmos.control.i_st_water] # available phase-function order
 
-                # reset parameters
+                # Coefficient table for selected droplet parametrization (input_cloud_cdf lines ~550-565).
                 fill!(atmos.cld.condensed_param_list, 0.0)
 
-                # input_cloud_cdf.f90, line 565
-                n_cloud_parameter = 16 # for  ip_drop_pade_2
+                # Pade cloud parametrisation (see set_n_cloud_parameter.F90)
+                n_cloud_parameter = 16 #  ip_drop_pade_2 (Pade approximation of the second order)
+
+                # Set cloud parameters (see socrates_set_cld.F90, Line 275 ish)
                 for j in 1:atmos.nbands
                     for k in 1:n_cloud_parameter
                         atmos.cld.condensed_param_list[k, 1, j] = atmos.spectrum.Drop.parm_list[k, j,
@@ -2244,11 +2252,15 @@ module atmosphere
                     end
                 end
 
-                # In-cloud fractions of different types of cloud
+                # Frac_cloud is the partitioning across different cloud types (sum to 1 where cloudy).
+                #      this is NOT the area of the grid covered by clouds.
+                # Set to zero by default
                 fill!(atmos.cld.frac_cloud, 0.0)
+                # Set to 1 for a single cloud type
                 atmos.cld.frac_cloud[1,:,1] .= 1.0
 
             else
+                # Explicitly clear cloud metadata when clouds are disabled.
                 atmos.cld.n_condensed  = 0
                 atmos.cld.n_cloud_type = 0
                 fill!(atmos.cld.condensed_n_phf, 0)

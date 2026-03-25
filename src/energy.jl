@@ -155,9 +155,25 @@ module energy
         ###################################################
 
         if atmos.control.l_cloud
-            atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]    # Total cloud area fraction in layers
-            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]    # Mass mixing ratios of condensate
-            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]    # Characteristic dimensions of condensed species
+            # SOCRATES expects:
+            #   w_cloud              -> Total cloud area fraction in layers, in [0, 1] (dimensionless)
+            #   condensed_mix_ratio  -> Mass mixing ratios of condensate [kg kg-1], (LWC)
+            #   condensed_dim_char   -> Characteristic dimensions of condensed species [m], (radius)
+            # The LWC is the mass of condensate per mass of dry air
+            #   Refer to opt_propt_water_cloud.f90 (L234), compare to Slingo & Schrecker (1982) Equations 15,16,17
+            if any((atmos.cloud_arr_f .< 0.0) .| (atmos.cloud_arr_f .> 1.0))
+                @warn "Cloud area fraction outside [0,1]; clamping before SOCRATES call"
+            end
+            if any(atmos.cloud_arr_l .< 0.0)
+                @warn "Negative cloud mass mixing ratio found; clamping to zero before SOCRATES call"
+            end
+            if any(atmos.cloud_arr_r .< 0.0)
+                @warn "Negative cloud particle size found; clamping to zero before SOCRATES call"
+            end
+
+            atmos.cld.w_cloud[1,:]               .= clamp.(atmos.cloud_arr_f[:], 0.0, 1.0)
+            atmos.cld.condensed_mix_ratio[1,:,1] .= max.(atmos.cloud_arr_l[:], 0.0)
+            atmos.cld.condensed_dim_char[1,:,1]  .= max.(atmos.cloud_arr_r[:], 0.0)
         else
             atmos.cld.w_cloud[1,:]               .= 0.0
             atmos.cld.condensed_mix_ratio[1,:,1] .= 0.0
@@ -1059,4 +1075,3 @@ module energy
     end
 
 end # end module
-
