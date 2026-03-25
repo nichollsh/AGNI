@@ -754,7 +754,7 @@ module atmosphere
 
         # Aerosol parameters
         atmos.aerosol_mmr_ini   = 0.0  # default MMR of aerosols
-        atmos.aerosol_phase_num = 4    # number of phase-function moments
+        atmos.aerosol_phase_num = 1    # number of phase-function moments
         atmos.aerosol_relhumid  = 0.0  # relative humidity used by moist aerosol schemes
         atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
         atmos.aerosol_names = Array{String}[] # list of species names, in same order as spectral file

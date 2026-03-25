@@ -33,7 +33,7 @@ title = "Default"                       # Name for this configuration file
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
     vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
     condensates     = []                        # List of volatiles which are allowed to condense.
-    aerosols        = { "soot"=0.0 }            # List of aerosols and default MMRs
+    aerosols        = { "soot"=1e-4 }            # List of aerosols and default MMRs
 
 [execution]
     clean_output    = true                      # Clean the output folder at model startup.
