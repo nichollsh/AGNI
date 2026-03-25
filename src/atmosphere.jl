@@ -288,7 +288,7 @@ module atmosphere
         aerosol_mmr::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles
         aerosol_names::Array{String,1}               # Map SOCRATES index (int) to name (string)
         aerosol_relhumid::Float64                    # Mean relative humidity used by moist aerosol schemes [0,1]
-        aerosol_phase_num::Int                       # Number of phase-function moments retained by Cscatter_average (-P)
+        aerosol_phase_num::Int                       # Number of phase-function moments retained when averaging
 
         # Deep atmospheric heating
         deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
@@ -437,7 +437,7 @@ module atmosphere
     - `flag_aerosol::Bool`              include aerosols?
     - `aerosol_relhumid::Float64`       mean relative humidity for aerosol optics lookup (used by moist aerosol schemes)
     - `aerosol_mmr_ini::Dict`           aerosols MMR values to initialise profile with
-    - `aerosol_phase_num::Int`          number of phase-function moments retained by Cscatter_average (-P)
+    - `aerosol_phase_num::Int`          number of phase-function moments retained when averaging
     - `flag_cloud::Bool`                include clouds?
     - `phs_timescale::Float64`          phase change timescale [s]
     - `evap_efficiency::Float64`        re-evaporatione efficiency compared to saturating amount
@@ -762,7 +762,7 @@ module atmosphere
         atmos.aerosol_names = Array{String}[] # list of species names, in same order as spectral file
         for (k, v) in aerosol_mmr_ini
             _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
-            atmos.aerosol_mmr[string(k)] = ones(Float64, atmos.nlev_c) * v
+            atmos.aerosol_mmr[lowercase(k)] = ones(Float64, atmos.nlev_c) * v
         end
         atmos.aerosol_phase_num = aerosol_phase_num
         _check_range("Aerosol phase moments", atmos.aerosol_phase_num; min=1) || return false
@@ -1869,10 +1869,10 @@ module atmosphere
                 # Generate aerosol .avg data files
                 aerosol_avg_files_rt::Dict = Dict{String,String}()
                 if atmos.control.l_aerosol
-                    @debug "Generating aerosol .avg files with Cscatter_average"
+                    @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
                         atmos.spectral_file,
-                        atmos.aerosol_names,
+                        [s for s in keys(atmos.aerosol_mmr)],
                         atmos.IO_DIR,
                         atmos.aerosol_phase_num,
                         socstar

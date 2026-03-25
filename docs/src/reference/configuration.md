@@ -110,7 +110,7 @@ Parameters controlling SOCRATES 'classic' aerosol parametrizations.
 | Parameter           | Description   |
 | ------------------: | :------------ |
 | `rel_humidity    `  | Mean relative humidity used for moist aerosol optical lookups [0,1]. |
-| `avg_phase_moments` | Number of phase-function moments retained by `Cscatter_average` (`-P`) when creating runtime `.avg` files. |
+| `avg_phase_moments` | Number of scattering phase-function moments to include. |
 | `species_mmr     `  | Dictionary of aerosol mass-mixing-ratio overrides [kg/kg], keyed by SOCRATES aerosol suffix (e.g. `soot`, `dustdiv1`, `biogenic`). |
 
 

@@ -248,8 +248,23 @@ module spectrum
             return false
         end
 
+        # Copy original file to 'work' file
+        work_file = outp_file*"(work)"
+        cp(orig_file,      work_file;      force=true)
+        cp(orig_file*"_k", work_file*"_k"; force=true)
+
+        # Add all aerosols to spectral file
+        if insert_aerosol
+            # Insert number of aerosols on line 3
+            run(`sed -i '4i Total number of aerosols =    25' $work_file`)
+
+            # Insert aerosol names before first *END block
+            run(`sed -i '/\*BLOCK: TYPE =    1/ i List of indexing numbers of aerosols.\nIndex       Aerosol(type number and name)\n    1           1       Water soluble \n    2           2       Dust-like \n    3           3       Oceanic \n    4           4       Soot \n    5           6       Sulphuric Acid \n    6          31       Two-bin Dust Div 1 \n    7          32       Two-bin Dust Div 2 \n    8          17       Dust Division 1 \n    9          18       Dust Division 2 \n   10          19       Dust Division 3 \n   11          20       Dust Division 4 \n   12          21       Dust Division 5 \n   13          22       Dust Division 6 \n   14          10       Accum. Sulphate \n   15          11       Aitken Sulphate \n   16          12       Fresh Soot \n   17          13       Aged Soot \n   18          23       Biomass Division 1 \n   19          24       Biomass Division 2 \n   20          15       NaCl film mode \n   21          16       NaCl jet mode \n   22          25       Biogenic \n   23          26       Fresh fossil-fuel OC \n   24          27       Aged fossil-fuel OC \n   25          30       Ammonium nitrate\n' $work_file`)
+        end # insert_aerosol
+
         # Write executable
         execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_insert_stellar.sh"
+        @debug "Wrapping script: $execpath"
         rm(execpath, force=true)
         open(execpath, "w") do f
 
@@ -257,7 +272,7 @@ module spectrum
             write(f, prep_spec*" <<-EOF\n")
 
             # paths
-            write(f, orig_file*" \n")
+            write(f, work_file*" \n")
             write(f, "n \n")
             write(f, outp_file*" \n")
 
@@ -317,6 +332,8 @@ module spectrum
 
         # Tidy up
         rm(execpath)
+        # rm(work_file, force=true)
+        # rm(work_file*"_k", force=true)
         return true
     end
 
@@ -324,7 +341,7 @@ module spectrum
     """
     **Generate SOCRATES aerosol `.avg` files from monochromatic aerosol scattering files.**
 
-    Uses `Cscatter_average` as documented in the SOCRATES user guide with
+    Uses `scatter_average_90` as documented in the SOCRATES user guide with
     solar-weighted averaging (`-S <solar> -w`). Does not modify the spectral file.
 
     Arguments:
@@ -341,7 +358,7 @@ module spectrum
                                         species::Array{String,1},
                                         output_dir::String,
                                         phase_moments::Int,
-                                        star_file::String)::Array{String,1}
+                                        star_file::String)::Dict{String,String}
 
         if !isfile(orig_file)
             error("Spectral file not found: '$spectral_file'")
@@ -350,42 +367,87 @@ module spectrum
             error("phase_moments must be >= 1, got $phase_moments")
         end
         if isempty(star_file)
-            error("star_file must be provided for Cscatter_average (-S)")
+            error("star_file must be provided for scatter_average")
         end
 
         if !isfile(star_file)
             error("Solar spectrum file not found: '$star_file'")
         end
 
-        mkpath(output_dir)
-        cscatter_average = abspath(ENV["RAD_DIR"], "bin", "Cscatter_average")
-        if !isfile(cscatter_average)
-            error("Cannot find Cscatter_average at '$cscatter_average'")
-        end
-
         avg_files::Dict = Dict{String, String}()
-        for s in species
+        scat_av_90 = abspath(ENV["RAD_DIR"], "bin", "scatter_average_90")
 
-            # input mon file
-            mon = abspath(joinpath(ENV["RAD_DIR"], "data", "aerosols", s*".mon"))
-            if !isfile(mon)
-                error("Monochromatic aerosol scattering file not found: '$mon'")
-            end
+        # Write executable
+        execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_aerosol_scatter.sh"
+        @debug "Wrapping script: $execpath"
+        rm(execpath, force=true)
+        open(execpath, "w") do f
 
-            # output avg file
-            avg = abspath(joinpath(output_dir, s*".avg"))
-            rm(avg, force=true)
+            # loop over aerosol species
+            for s in species
+                @debug "    adding species $s"
 
-            cmd = `$cscatter_average -s $orig_file -P $phase_moments -w -S $star_file -a $avg $mon`
+                # exec scatter_average_90
+                write(f, scat_av_90*" <<-EOF\n")
 
-            @debug "Running Cscatter_average: $cmd"
-            run(pipeline(cmd, stdout=devnull))
+                # input spectral file
+                write(f, orig_file*" \n")
 
-            if !isfile(avg_files[s])
-                error("Cscatter_average did not produce expected file '$avg_files[s]'")
+                # input mon file
+                mon = abspath(joinpath(ENV["RAD_DIR"], "data", "aerosol", s*".mon"))
+                if !isfile(mon)
+                    @error "Monochromatic aerosol data not found ($mon), skipping $s"
+                    continue
+                end
+                write(f, mon*" \n")
+
+                # averaging parameters
+                write(f, "3 \n") # spectrum weighting
+                write(f, star_file*" \n") # solar spectrum for weighting
+                write(f, "1 \n") # thin averaging (-w)
+                write(f, "n \n") # no instrumental response required
+                write(f, "y \n") # per block?
+
+                # output avg file
+                avg_files[s] = abspath(joinpath(output_dir, s*".avg"))
+                rm(avg_files[s], force=true)
+                write(f, avg_files[s]*" \n") # path to output file
+
+                # number of phase moments
+                write(f, "$phase_moments \n")
+                write(f, "n \n") # not dependent on radius
+
+                # exit scatter_average_90
+                write(f, "EOF\n")
+                write(f, " ")
             end
         end
 
+        # Check that any species were processed
+        if isempty(avg_files)
+            @debug "No aerosol species processed."
+            return avg_files
+        end
+
+        # Run executable
+        @debug "Running scatter_average_90 now"
+        try
+            ps = run(pipeline(`bash $execpath`, stdout=devnull))
+
+            if !success(ps)
+                @error "scatter_average_90 failed with exit code $(ps.exitcode)"
+                @error "Command: bash $execpath"
+                return avg_files
+            end
+
+        catch e
+            @error "Failed to run scatter_average_90: $e"
+            @error "Command: bash $execpath"
+            return avg_files
+        end
+
+        # Tidy up
+        # rm(execpath)
         return avg_files
     end
 
