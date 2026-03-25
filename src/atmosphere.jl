@@ -179,6 +179,7 @@ module atmosphere
         cond_accum::Dict{String, Float64}           # condensate accumulation left after evaporation aloft (implicit surface liquid) [kg/m^2]
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
+        coldtrap::Bool                              # keep cold-trapping effect of condensation on gas mixing ratios?
 
         # Ocean tracking variables
         ocean_ini::Dict{String, Float64}    # INPUT: ocean reservoir from user [kg/m^2] - does not change
@@ -431,6 +432,7 @@ module atmosphere
     - `flag_cloud::Bool`                include clouds?
     - `phs_timescale::Float64`          phase change timescale [s]
     - `evap_efficiency::Float64`        re-evaporatione efficiency compared to saturating amount
+    - `coldtrap::Bool`                  keep the cold-trapping effect of condensation on gas mixing ratios
     - `real_gas::Bool`                  use real gas EOS where possible
     - `thermo_functions::Bool`          use temperature-dependent thermodynamic properties
     - `use_all_gases::Bool`             store information on all supported gases, incl those not provided in cfg
@@ -486,6 +488,7 @@ module atmosphere
                     phs_timescale::Float64 =    1e6,
                     evap_efficiency::Float64 =  0.05,
 
+                    coldtrap::Bool =            true,
                     real_gas::Bool =            true,
                     thermo_functions::Bool =    true,
                     use_all_gases::Bool =       false,
@@ -627,6 +630,7 @@ module atmosphere
 
         atmos.real_gas      =   real_gas
         atmos.thermo_funct  =   thermo_functions
+        atmos.coldtrap      =   coldtrap
 
         atmos.tmp_floor =       max(1,tmp_floor)
         atmos.tmp_ceiling =     tmp_ceiling
