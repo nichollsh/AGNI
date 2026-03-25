@@ -55,7 +55,7 @@ title = "Default"                       # Name for this configuration file
 [physics]
     chemistry       = false                     # Solve for thermochemistry in atmosphere?
     continua        = true                      # Include absorption from continua?
-    rayleigh        = true                      # Include rayleigh scattering?
+    rayleigh        = false                      # Include rayleigh scattering?
     aerosol         = true                     # Include parametrised aerosols from SOCRATES spectral metadata?
     cloud           = false                     # Include water cloud radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.

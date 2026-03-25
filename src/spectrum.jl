@@ -18,6 +18,64 @@ module spectrum
 
     import ..phys
 
+    include(joinpath(ENV["RAD_DIR"], "julia", "gen", "input_head_pcf.jl"))
+
+    """
+    **Insert aerosol header information into a SOCRATES spectral file.**
+
+    Arguments:
+    - `work_file::String`           Path to spectral file to modify (will be modified in place)
+    - `species::Array{String,1}`   List of aerosol species names
+
+    """
+    function insert_aerosol_header(work_file::String, species::Array{String,1})::Bool
+
+        # Read file into memory
+        lines = readlines(work_file)
+
+        # Loop through aerosols
+        block0_lines = [
+            "List of indexing numbers of aerosols.",
+            "Index       Aerosol(type number and name)",
+        ]
+        num_aer = 0
+        for (i,s) in enumerate(input_head_pcf.aerosol_suffix)
+            if s in species
+                num_aer += 1
+                push!(block0_lines,
+                        @sprintf("   %2d          %2d       %s ",
+                        num_aer, i, strip(input_head_pcf.aerosol_title[i]))
+                    )
+            end
+        end
+
+        # List number of aerosols near the top of file
+        insert!(lines, 4, "Total number of aerosols =    $num_aer")
+
+        # Match previous insertion before first `*BLOCK: TYPE =    1`.
+        block_idx = -1
+        for l in lines
+            if startswith(l, "*END")
+                block_idx = findfirst(==(l), lines)
+                break
+            end
+        end
+        if block_idx < 1
+            @error "Could not find first '*END' when injecting aerosol header"
+            return false
+        end
+
+        # Insert aerosol header lines into file
+        foreach(l -> insert!(lines, block_idx, l), reverse(block0_lines))
+
+        # Overwrite with modified file
+        open(work_file, "w") do f
+            write(f, join(lines, "\n"))
+            write(f, "\n")
+        end
+        return true
+    end
+
     """
     **Validate spectral file.**
 
@@ -248,19 +306,14 @@ module spectrum
             return false
         end
 
-        # Copy original file to 'work' file
-        work_file = outp_file*"(work)"
-        cp(orig_file,      work_file;      force=true)
-        cp(orig_file*"_k", work_file*"_k"; force=true)
+        # Copy original file to output file
+        cp(orig_file,      outp_file;      force=true)
+        cp(orig_file*"_k", outp_file*"_k"; force=true)
 
-        # Add all aerosols to spectral file
+        # Add all aerosol header information into spectral file
         if insert_aerosol
-            # Insert number of aerosols on line 3
-            run(`sed -i '4i Total number of aerosols =    25' $work_file`)
-
-            # Insert aerosol names before first *END block
-            run(`sed -i '/\*BLOCK: TYPE =    1/ i List of indexing numbers of aerosols.\nIndex       Aerosol(type number and name)\n    1           1       Water soluble \n    2           2       Dust-like \n    3           3       Oceanic \n    4           4       Soot \n    5           6       Sulphuric Acid \n    6          31       Two-bin Dust Div 1 \n    7          32       Two-bin Dust Div 2 \n    8          17       Dust Division 1 \n    9          18       Dust Division 2 \n   10          19       Dust Division 3 \n   11          20       Dust Division 4 \n   12          21       Dust Division 5 \n   13          22       Dust Division 6 \n   14          10       Accum. Sulphate \n   15          11       Aitken Sulphate \n   16          12       Fresh Soot \n   17          13       Aged Soot \n   18          23       Biomass Division 1 \n   19          24       Biomass Division 2 \n   20          15       NaCl film mode \n   21          16       NaCl jet mode \n   22          25       Biogenic \n   23          26       Fresh fossil-fuel OC \n   24          27       Aged fossil-fuel OC \n   25          30       Ammonium nitrate\n' $work_file`)
-        end # insert_aerosol
+            insert_aerosol_header(outp_file, [s for s in keys(aerosol_avg_files)]) || return false
+        end
 
         # Write executable
         execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_insert_stellar.sh"
@@ -272,9 +325,11 @@ module spectrum
             write(f, prep_spec*" <<-EOF\n")
 
             # paths
-            write(f, work_file*" \n")
-            write(f, "n \n")
             write(f, outp_file*" \n")
+            write(f, "a \n") # modify output file in-place
+
+            # write(f, "n \n") # write to new file
+            # write(f, outp_file*" \n")
 
             # write thermal source function + stellar spectrum
             for inp in star_inputs
@@ -301,7 +356,7 @@ module spectrum
                     end
                     write(f, "11 \n")
                     write(f, avgfile*" \n")
-                    write(f, "y \n")
+                    # write(f, "y \n")
                 end
             end
 
@@ -332,8 +387,6 @@ module spectrum
 
         # Tidy up
         rm(execpath)
-        # rm(work_file, force=true)
-        # rm(work_file*"_k", force=true)
         return true
     end
 

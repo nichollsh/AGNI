@@ -763,6 +763,7 @@ module atmosphere
         for (k, v) in aerosol_mmr_ini
             _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
             atmos.aerosol_mmr[lowercase(k)] = ones(Float64, atmos.nlev_c) * v
+            push!(atmos.aerosol_names, "")
         end
         atmos.aerosol_phase_num = aerosol_phase_num
         _check_range("Aerosol phase moments", atmos.aerosol_phase_num; min=1) || return false
@@ -2240,11 +2241,11 @@ module atmosphere
             if atmos.control.l_aerosol
                 for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
                     # get name of this aerosol
-                    type_id = string(atmos.spectrum.Aerosol.type_aerosol[i])
+                    type_id = Int(atmos.spectrum.Aerosol.type_aerosol[i])
                     name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
 
                     # store name from index (for updating aerosol profiles in the future)
-                    atmos.aerosol_names[i] = aerosol_names
+                    atmos.aerosol_names[i] = name
 
                     # Set default mass mixing ratio
                     if haskey(atmos.aerosol_mmr, name)
