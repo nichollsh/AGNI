@@ -67,28 +67,39 @@ module consts
 
     # Standard species
     const vols_standard::Array{String,1} = [
-        # volatile elems
-        "H", "O", "C", "N", "S", "P", "He",
+        # volatile atoms
+        "H", "O", "C", "N", "S", "P", "He", "Ar",
         # basic
         "CH4", "CO2", "CO", "H2", "H2O", "O2", "OH", "O3",
         # carbon
         "H2O2", "C2H6", "C2H4","C2H2",  "CH3", "H2CO", "HO2", "C2", "C3", "C4", "C5",
+        "CH3CHO", "CH3OOH", "CH3COCH3", "CH3COCHO", "CHOCHO",
+        "C2H5CHO", "HOCH2CHO", "C2H5COCH3", "CH3ONO2", "C2H3", "C3H4", "C4H3",
+        "C2N2", "HCO",
         # sulfur
         "SO", "S2", "S8", "SO2", "H2SO4", "H2S", "S", "CS2", "OCS",
+        "CH3SH", "CH3S", "C2H6S", "C2H6S2",
         # nitrogen
         "N2", "HCN", "NH3",  "HNO3", "N2O5", "HONO", "HO2NO2",
-        "NO3", "N2O", "NO", "NO2",
+        "NO3", "N2O", "NO", "NO2", "N2O4", "N2H4", "N2O3", "CN",
+        # halogens and biosignatures
+        "HCl", "HF", "CH3Cl", "CH3F", "CH3Br", "SF6",
         # phosphorous
-        "PH3",
+        "PH3", "PS", "PO", "PN",
+        # isotopologues
+        "HDO",
     ]
     const vaps_standard::Array{String,1} = [
-        # refractory elems
-        "Na", "Si", "Ti", "Mg", "K", "Fe",
+        # (semi)refractory atoms
+        "Na", "Si", "Ti", "V", "Mg", "K", "Fe", "Li", "Rb", "Cs", "Ca", "Al", "Cr",
+        # ions
+        "H-",
         # rock vapours
         "SiO2", "SiO", "SiH", "SiH2", "SiH4",
         "FeO", "FeH",
         "Mg2", "MgO",
-        "TiO", "TiO2",
+        "TiO", "TiO2", "VO", "CrH",
+        "CaO", "AlO", "Na2", "NaO", "NaOH", "KOH",
         "HAlO2"
     ]
     const gases_standard::Array{String, 1} = vcat(vols_standard, vaps_standard)
@@ -110,6 +121,7 @@ module consts
         "SO2" => Dict("S"=>1, "O"=>2),
         "H2S" => Dict("S"=>1, "H"=>2),
         "S2"  => Dict("S"=>2),
+        "S8"  => Dict("S"=>8),
     ]
     )
     export _lookup_count_atoms
@@ -118,6 +130,7 @@ module consts
     const _lookup_mmw::Dict{String, Float64} = Dict([
         # molecules
         ("H2O",     1.801530E-02 ),
+        ("HDO",     2.002760E-02 ),
         ("CO2",     4.401000E-02 ),
         ("O3",      4.799820E-02 ),
         ("N2O",     4.401280E-02 ),
@@ -149,7 +162,6 @@ module consts
         ("CH3",     1.503450E-02 ),
         ("H2CO",    3.002600E-02 ),
         ("HO2",     3.300670E-02 ),
-        ("HDO",     1.902140E-02 ),
         ("HCl",     3.646100E-02 ),
         ("HF",      2.000689E-02 ),
 
@@ -242,7 +254,7 @@ module consts
 
     # Table of pre-defined colors for plotting
     const _lookup_color::Dict{String, String} = Dict([
-        # common volatiles
+        # basic gases
         ("H2O", "#027FB1" ),
         ("CO2", "#D24901" ),
         ("H2" , "#008C01" ),
@@ -261,15 +273,22 @@ module consts
         ("S" ,  "#ff22ff"),
         ("P" ,  "#33ccff"),
         ("He" , "#30FF71" ),
+        ("Ar",  "#FF007F"),
 
-        # refractory elements
-        ("Fe" , "#aa8888"),
-        ("Si" , "#aa2277"),
-        ("Mg" , "#996633"),
-        ("Na" , "#1144ff"),
-        ("Ti" , "#779922"),
-        ("K"  , "#bbbbee"),
-        ("Al" , "#ff7711"),
+        # (semi)refractory elements
+        ("Na",   "#1144ff"),
+        ("Si",   "#aa2277"),
+        ("Ti",   "#779922"),
+        ("V",    "#555555"),
+        ("Mg",   "#996633"),
+        ("K",    "#bbbbee"),
+        ("Fe",   "#aa8888"),
+        ("Li",   "#ffaaaa"),
+        ("Rb",   "#ddaacc"),
+        ("Cs",   "#ccaaee"),
+        ("Ca",   "#ccffdd"),
+        ("Al",   "#ff7711"),
+        ("Cr",   "#77aa77"),
     ])
 
     # Table of liquid-phase density for ocean calculation [kg/m^3]
