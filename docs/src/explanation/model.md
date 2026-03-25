@@ -13,6 +13,8 @@ AGNI nominally simulates RT using SOCRATES, a numerical code written by the UK M
 
 The model uses k-terms fitted to spectral absorption cross-section data from [DACE](https://dace.unige.ch/opacityDatabase/?#). The MT_CKD model is used to estimate water continuum absorption cross-sections. Other continua are derived from the HITRAN tables. Rayleigh scattering, water cloud radiative properties, and aerosol parametrisations are also included. For aerosols, generates band-averaged optical properties files at runtime using `scatter_average_90`, then inserts these into the runtime spectral file using `prep_spec`, alongside the stellar spectrum and Rayleigh scattering terms. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/FormingWorlds/SOCRATES) on GitHub. The flowchart below outlines how these absorption data are converted into a 'spectral file'.
 
+The monochromatic scattering properties are stored in `SOCRATES/data/aerosol/*.mon` files. New `.mon` files can be generated using the `SOCRATES/sbin/Cscatter` script, which can allow the creation of new aerosol data.
+
 ![](fig_spectral_flowchart.svg)
 
 Surface reflectivity can be modelled as a greybody with an albedo from 0 to 1. Alternatively, the surface can be modelled using empirical reflectance data that varies (spectrally) with wavelength. In the latter case a filepath must be provided via the config. The file can tabulate any one of: spherical reflectance ('r'), hemispherical emissivity ('e'), or single scattering albedo ('w'). These data are compiled on Zenodo [here](https://zenodo.org/communities/proteus_framework/records?q&f=subject%3Asurface_albedos&l=list&p=1&s=10&sort=newest).

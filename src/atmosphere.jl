@@ -289,6 +289,7 @@ module atmosphere
         aerosol_names::Array{String,1}               # Map SOCRATES index (int) to name (string)
         aerosol_relhumid::Float64                    # Mean relative humidity used by moist aerosol schemes [0,1]
         aerosol_phase_num::Int                       # Number of phase-function moments retained when averaging
+        aerosol_mmr_ini::Float64                     # Default mass mixing ratio of aerosols
 
         # Deep atmospheric heating
         deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
@@ -435,9 +436,7 @@ module atmosphere
     - `flag_gcontinuum::Bool`           include generalised continuum absorption?
     - `flag_continuum::Bool`            include continuum absorption?
     - `flag_aerosol::Bool`              include aerosols?
-    - `aerosol_relhumid::Float64`       mean relative humidity for aerosol optics lookup (used by moist aerosol schemes)
-    - `aerosol_mmr_ini::Dict`           aerosols MMR values to initialise profile with
-    - `aerosol_phase_num::Int`          number of phase-function moments retained when averaging
+    - `aerosol_species::Dict`           aerosols MMR values to initialise profile with
     - `flag_cloud::Bool`                include clouds?
     - `phs_timescale::Float64`          phase change timescale [s]
     - `evap_efficiency::Float64`        re-evaporatione efficiency compared to saturating amount
@@ -493,9 +492,7 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
-                    aerosol_relhumid::Float64 = 0.5,
-                    aerosol_mmr_ini::Dict =   Dict{String, Float64}(),
-                    aerosol_phase_num::Int =    1,
+                    aerosol_species::Dict =     Dict{String, Float64}(),
 
                     phs_timescale::Float64 =    1e6,
                     evap_efficiency::Float64 =  0.05,
@@ -756,17 +753,16 @@ module atmosphere
         atmos.transparent =                 false
 
         # Aerosol parameters
-        atmos.aerosol_relhumid = aerosol_relhumid
-        _check_range("Aerosol relative humidity", atmos.aerosol_relhumid; min=0.0, max=1.0) || return false
+        atmos.aerosol_mmr_ini   = 0.0  # default MMR of aerosols
+        atmos.aerosol_phase_num = 4    # number of phase-function moments
+        atmos.aerosol_relhumid  = 0.0  # relative humidity used by moist aerosol schemes
         atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
         atmos.aerosol_names = Array{String}[] # list of species names, in same order as spectral file
-        for (k, v) in aerosol_mmr_ini
+        for (k, v) in aerosol_species
             _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
             atmos.aerosol_mmr[lowercase(k)] = ones(Float64, atmos.nlev_c) * v
             push!(atmos.aerosol_names, "")
         end
-        atmos.aerosol_phase_num = aerosol_phase_num
-        _check_range("Aerosol phase moments", atmos.aerosol_phase_num; min=1) || return false
 
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)

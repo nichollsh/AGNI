@@ -56,6 +56,8 @@ ratios (`vmr_dict` or `vmr_file`), or by metallicities (`metallicities`).
 | `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
 | `condensates   `  | List of volatiles which are allowed to condense. Can be used together with thermochemical equilibrium (`physics.chemistry = true`). |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
+| `aerosols      `  | Dictionary of aerosols and their mass mixing ratios [kg/kg]. |
+
 
 
 ## `[execution]`
@@ -103,16 +105,6 @@ Parameters that describe how the model should treat the physics.
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false). |
 | `rainout       `  | Enable condensation and evaporation of condensables aloft. Required for `latent_heat=true`. |
 | `oceans        `  | Enable condensation and evaporation of condensables at the surface. |
-
-## `[aerosols]`
-Parameters controlling SOCRATES 'classic' aerosol parametrizations.
-
-| Parameter           | Description   |
-| ------------------: | :------------ |
-| `rel_humidity    `  | Mean relative humidity used for moist aerosol optical lookups [0,1]. |
-| `avg_phase_moments` | Number of scattering phase-function moments to include. |
-| `species_mmr     `  | Dictionary of aerosol mass-mixing-ratio overrides [kg/kg], keyed by SOCRATES aerosol suffix (e.g. `soot`, `dustdiv1`, `biogenic`). |
-
 
 ## `[plots]`
 Configure plotting routines; all of these should be `true` or `false`.

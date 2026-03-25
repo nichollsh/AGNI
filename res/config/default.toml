@@ -33,10 +33,11 @@ title = "Default"                       # Name for this configuration file
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
     vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
     condensates     = []                        # List of volatiles which are allowed to condense.
+    aerosols        = { "soot"=0.0 }            # List of aerosols and default MMRs
 
 [execution]
     clean_output    = true                      # Clean the output folder at model startup.
-    verbosity       = 2                         # Log level (0: none, 1: normal, 2: debug)
+    verbosity       = 1                         # Log level (0: none, 1: normal, 2: debug)
     max_steps       = 20000                     # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
     num_levels      = 200                       # Number of model levels.
@@ -55,8 +56,8 @@ title = "Default"                       # Name for this configuration file
 [physics]
     chemistry       = false                     # Solve for thermochemistry in atmosphere?
     continua        = true                      # Include absorption from continua?
-    rayleigh        = false                      # Include rayleigh scattering?
-    aerosol         = true                     # Include parametrised aerosols from SOCRATES spectral metadata?
+    rayleigh        = true                      # Include rayleigh scattering?
+    aerosol         = true                      # Include parametrised aerosols from SOCRATES spectral metadata?
     cloud           = false                     # Include water cloud radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
     grey_lw         = 1e-4                      # Grey longwave opacity, used when `input_sf="greygas"`
@@ -79,11 +80,6 @@ title = "Default"                       # Name for this configuration file
         domain          = "clamp"           # How to handle Pmid outside domain (clamp, boundary_flux)
         flux_rel        = 0.0               # Set flux by fraction of instellation, used for power_mode="rel".
         flux_abs        = 10.0              # Set flux by [W m-2], used for power_mode="abs".
-
-[aerosols]
-    rel_humidity    = 0.5                      # Mean RH used for moist aerosol lookups [0,1].
-    species_mmr     = {soot=1e-3}                       # Optional per-species overrides keyed by SOCRATES aerosol type ID string.
-    avg_phase_moments = 1                      # Number of scattering phase-function moments to include.
 
 [plots]
     at_runtime      = true                      # Make some plots at runtime?

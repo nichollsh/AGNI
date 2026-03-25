@@ -500,7 +500,7 @@ module spectrum
         end
 
         # Tidy up
-        # rm(execpath)
+        rm(execpath)
         return avg_files
     end
 
