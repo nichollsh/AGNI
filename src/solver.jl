@@ -352,9 +352,7 @@ module solver
             # Do saturation aloft here, only. Keep chemistry fixed.
             if rainout
                 # reset back to post-chemistry mixing ratios
-                for g in atmos.gas_names
-                    @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
-                end
+                chemistry.reset_to_chem!(atmos)
                 chemistry._sat_aloft!(atmos)
 
             elseif !compose_here

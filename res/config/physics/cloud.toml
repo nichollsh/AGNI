@@ -14,14 +14,14 @@ title = "Cloud radiative properties test"
     flux_int        = 0.0
 
 [files]
-    input_sf        = "res/spectral_files/Frostflow/256/Frostflow.sf"
+    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"
     input_star      = "res/stellar_spectra/sun.txt"
     output_dir      = "out/"
 
 [composition]
     p_surf          = 2000.0
     p_top           = 1e-6
-    vmr_dict        = { H2O=0.8, CO2=0.19, N2=0.01}
+    vmr_dict        = { H2O=0.1, CO2=0.8, N2=0.1}
     condensates     = ["H2O"]
 
 [execution]

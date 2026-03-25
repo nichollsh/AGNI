@@ -261,6 +261,8 @@ module save
             var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases");  nc_comp..., ) # Transposed cf JANUS because of how Julia stores arrays
             var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "mol mol-1")) # ^^
             var_cldl  =     defVar(ds, "cloud_mmr", Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg kg-1"))
+            var_cldf  =     defVar(ds, "cloud_area",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "1"))
+            var_cldr  =     defVar(ds, "cloud_size",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
@@ -322,6 +324,8 @@ module save
 
             # Clouds
             var_cldl[:] =   atmos.cloud_arr_l
+            var_cldf[:] =   atmos.cloud_arr_f
+            var_cldr[:] =   atmos.cloud_arr_r
 
             # Kzz mixing
             var_kzz[:] =    atmos.Kzz
