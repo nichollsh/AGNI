@@ -285,10 +285,10 @@ module atmosphere
         cloud_val_f::Float64                # /
 
         # Parametrised aerosols (SOCRATES's classic aerosol functionality)
-        aerosol_species_mmr::Dict{String, Float64}  # Optional species overrides by SOCRATES aerosol type ID string
-        aerosol_species_id::Dict{String, Int}      # Mapping from SOCRATES aerosol type ID string to index in aerosol arrays
-        aerosol_rel_humidity::Float64       # Mean relative humidity used by moist aerosol schemes [0,1]
-        aerosol_avg_phase_moments::Int      # Number of phase-function moments retained by Cscatter_average (-P)
+        aerosol_mmr::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles
+        aerosol_names::Array{String,1}               # Map SOCRATES index (int) to name (string)
+        aerosol_relhumid::Float64                    # Mean relative humidity used by moist aerosol schemes [0,1]
+        aerosol_phase_num::Int                       # Number of phase-function moments retained by Cscatter_average (-P)
 
         # Deep atmospheric heating
         deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
@@ -435,9 +435,9 @@ module atmosphere
     - `flag_gcontinuum::Bool`           include generalised continuum absorption?
     - `flag_continuum::Bool`            include continuum absorption?
     - `flag_aerosol::Bool`              include aerosols?
-    - `aerosol_rel_humidity::Float64`   mean relative humidity for aerosol optics lookup (used by moist aerosol schemes)
-    - `aerosol_species_mmr::Dict`       optional per-species MMR overrides, keyed by SOCRATES aerosol type ID string
-    - `aerosol_avg_phase_moments::Int` number of phase-function moments retained by Cscatter_average (-P)
+    - `aerosol_relhumid::Float64`       mean relative humidity for aerosol optics lookup (used by moist aerosol schemes)
+    - `aerosol_mmr_ini::Dict`           aerosols MMR values to initialise profile with
+    - `aerosol_phase_num::Int`          number of phase-function moments retained by Cscatter_average (-P)
     - `flag_cloud::Bool`                include clouds?
     - `phs_timescale::Float64`          phase change timescale [s]
     - `evap_efficiency::Float64`        re-evaporatione efficiency compared to saturating amount
@@ -493,9 +493,9 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
-                    aerosol_rel_humidity::Float64 = 0.5,
-                    aerosol_species_mmr::Dict = Dict{String, Float64}(),
-                    aerosol_avg_phase_moments::Int = 1,
+                    aerosol_relhumid::Float64 = 0.5,
+                    aerosol_mmr_ini::Dict =   Dict{String, Float64}(),
+                    aerosol_phase_num::Int =    1,
 
                     phs_timescale::Float64 =    1e6,
                     evap_efficiency::Float64 =  0.05,
@@ -756,28 +756,16 @@ module atmosphere
         atmos.transparent =                 false
 
         # Aerosol parameters
-        atmos.aerosol_rel_humidity = aerosol_rel_humidity
-        _check_range("Aerosol relative humidity", atmos.aerosol_rel_humidity; min=0.0, max=1.0) || return false
-        atmos.aerosol_species_mmr = Dict{String, Float64}()
-        atmos.aerosol_species_id = Dict{String, Int}()
-        for (k, v) in aerosol_species_mmr
-            vv = Float64(v)
-            _check_range("Aerosol mass mixing ratio override for type $k", vv; min=0.0) || return false
-            atmos.aerosol_species_mmr[string(k)] = vv
-
-            # check that aerosol species is valid
-            if haskey(SOCRATES.input_head_pcf.aerosol_species, k)
-                atmos.aerosol_species_id[string(k)] = SOCRATES.input_head_pcf.aerosol_species[k]
-            else
-                @error "Aerosol species '$k' has no mapping in SOCRATES"
-                return false
-            end
+        atmos.aerosol_relhumid = aerosol_relhumid
+        _check_range("Aerosol relative humidity", atmos.aerosol_relhumid; min=0.0, max=1.0) || return false
+        atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
+        atmos.aerosol_names = Array{String}[] # list of species names, in same order as spectral file
+        for (k, v) in aerosol_mmr_ini
+            _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
+            atmos.aerosol_mmr[string(k)] = ones(Float64, atmos.nlev_c) * v
         end
-        atmos.aerosol_avg_phase_moments = aerosol_avg_phase_moments
-        if atmos.aerosol_avg_phase_moments < 1
-            @error "Aerosol averaging phase_moments must be >= 1"
-            return false
-        end
+        atmos.aerosol_phase_num = aerosol_phase_num
+        _check_range("Aerosol phase moments", atmos.aerosol_phase_num; min=1) || return false
 
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
@@ -1884,9 +1872,9 @@ module atmosphere
                     @debug "Generating aerosol .avg files with Cscatter_average"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
                         atmos.spectral_file,
-                        keys(atmos.aerosol_species_mmr),
+                        atmos.aerosol_names,
                         atmos.IO_DIR,
-                        atmos.aerosol_avg_phase_moments,
+                        atmos.aerosol_phase_num,
                         socstar
                     )
                 end
@@ -2233,7 +2221,8 @@ module atmosphere
 
             # Initialize aerosol fields used by SOCRATES classic aerosol parametrizations.
             fill!(atmos.aer.mix_ratio, 0.0)
-            fill!(atmos.aer.mean_rel_humidity, atmos.aerosol_rel_humidity)
+            fill!(atmos.aer.mean_rel_humidity, atmos.aerosol_relhumid)
+            # MODE optical properties
             fill!(atmos.aer.mode_mix_ratio, 0.0)
             fill!(atmos.aer.mode_absorption, 0.0)
             fill!(atmos.aer.mode_scattering, 0.0)
@@ -2244,18 +2233,22 @@ module atmosphere
                 atmos.aer.mr_type_index[i] = i
             end
 
-            # Enable aerosol radiative effect using spectrum-defined parametrizations and AGNI MMR inputs.
-            fill!(atmos.aer.mr_source, SOCRATES.rad_pcf.ip_aersrc_classic_roff) # default to no aerosol effect
+            # Configure aerosols
+            #      default to no aerosol effect
+            fill!(atmos.aer.mr_source, SOCRATES.rad_pcf.ip_aersrc_classic_roff)
+            #      set properties
             if atmos.control.l_aerosol
-                # loop over aerosols in spectral file
                 for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
-                    # get name of aerosol
+                    # get name of this aerosol
                     type_id = string(atmos.spectrum.Aerosol.type_aerosol[i])
-                    aerosol_name = SOCRATES.aerosol_suffix[type_id]
+                    name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
 
-                    # get mmr from name
-                    if haskey(atmos.aerosol_species_mmr, aerosol_name)
-                        atmos.aer.mix_ratio[1, :, i] .= atmos.aerosol_species_mmr[aerosol_name]
+                    # store name from index (for updating aerosol profiles in the future)
+                    atmos.aerosol_names[i] = aerosol_names
+
+                    # Set default mass mixing ratio
+                    if haskey(atmos.aerosol_mmr, name)
+                        atmos.aer.mix_ratio[1, :, i] .= atmos.aerosol_mmr[name][:]
                         atmos.aer.mr_source[i] = SOCRATES.rad_pcf.ip_aersrc_classic_ron
                     end
                 end

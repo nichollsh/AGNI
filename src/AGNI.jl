@@ -491,13 +491,13 @@ module AGNI
 
         # Optional aerosol parametrization controls
         aerosol_rel_humidity::Float64 = 0.5
-        aerosol_species_mmr::Dict{String, Float64} = Dict{String, Float64}()
-        aerosol_avg_phase_moments::Int = 1
+        aerosol_species::Dict{String, Float64} = Dict{String, Float64}()
+        aerosol_phase_num::Int = 1
         if haskey(cfg, "aerosols")
             aerosol_rel_humidity = Float64(cfg["aerosols"]["rel_humidity"])
-            aerosol_avg_phase_moments = Int(cfg["aerosols"]["avg_phase_moments"])
+            aerosol_phase_num = Int(cfg["aerosols"]["avg_phase_moments"])
             for (k, v) in cfg["aerosols"]["species_mmr"]
-                aerosol_species_mmr[string(k)] = Float64(v)
+                aerosol_species[string(k)] = Float64(v)
             end
         end
 
@@ -528,9 +528,9 @@ module AGNI
                                 flag_rayleigh     = cfg["physics"]["rayleigh"],
                                 flag_aerosol      = get(cfg["physics"], "aerosol", false),
                                 flag_cloud        = cfg["physics"]["cloud"],
-                                aerosol_rel_humidity = aerosol_rel_humidity,
-                                aerosol_species_mmr  = aerosol_species_mmr,
-                                aerosol_avg_phase_moments = aerosol_avg_phase_moments,
+                                aerosol_relhumid  = aerosol_rel_humidity,
+                                aerosol_mmr_ini   = aerosol_species,
+                                aerosol_phase_num = aerosol_phase_num,
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],

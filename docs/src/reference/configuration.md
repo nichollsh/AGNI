@@ -90,7 +90,8 @@ Parameters that describe how the model should treat the physics.
 | `chemistry     `  | Include 1D equilibrium chemistry in the atmosphere (true/false). |
 | `continua      `  | Include collisional/continuum absorption in radiative transfer (true/false). |
 | `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false). |
-| `cloud         `  | Include cloud scattering and opacity in radiative transfer (true/false). |
+| `aerosol       `  | Include aerosols in radiative transfer  (true/false). |
+| `cloud         `  | Include water clouds in radiative transfer (true/false). |
 | `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see [Configuring AGNI](@ref)). |
 | `grey_lw`         | Grey opacity [m2/kg] of longwave (thermal) radiation. Used when `input_sf="greygas"`. |
 | `grey_sw`         | Grey opacity [m2/kg] of shortwave (stellar) radiation. Used when `input_sf="greygas"`. |
@@ -102,6 +103,16 @@ Parameters that describe how the model should treat the physics.
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false). |
 | `rainout       `  | Enable condensation and evaporation of condensables aloft. Required for `latent_heat=true`. |
 | `oceans        `  | Enable condensation and evaporation of condensables at the surface. |
+
+## `[aerosols]`
+Parameters controlling SOCRATES 'classic' aerosol parametrizations.
+
+| Parameter           | Description   |
+| ------------------: | :------------ |
+| `rel_humidity    `  | Mean relative humidity used for moist aerosol optical lookups [0,1]. |
+| `avg_phase_moments` | Number of phase-function moments retained by `Cscatter_average` (`-P`) when creating runtime `.avg` files. |
+| `species_mmr     `  | Dictionary of aerosol mass-mixing-ratio overrides [kg/kg], keyed by SOCRATES aerosol suffix (e.g. `soot`, `dustdiv1`, `biogenic`). |
+
 
 ## `[plots]`
 Configure plotting routines; all of these should be `true` or `false`.

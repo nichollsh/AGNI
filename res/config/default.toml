@@ -36,7 +36,7 @@ title = "Default"                       # Name for this configuration file
 
 [execution]
     clean_output    = true                      # Clean the output folder at model startup.
-    verbosity       = 1                         # Log level (0: none, 1: normal, 2: debug)
+    verbosity       = 2                         # Log level (0: none, 1: normal, 2: debug)
     max_steps       = 20000                     # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
     num_levels      = 200                       # Number of model levels.
@@ -56,7 +56,7 @@ title = "Default"                       # Name for this configuration file
     chemistry       = false                     # Solve for thermochemistry in atmosphere?
     continua        = true                      # Include absorption from continua?
     rayleigh        = true                      # Include rayleigh scattering?
-    aerosol         = false                     # Include parametrised aerosols from SOCRATES spectral metadata?
+    aerosol         = true                     # Include parametrised aerosols from SOCRATES spectral metadata?
     cloud           = false                     # Include water cloud radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
     grey_lw         = 1e-4                      # Grey longwave opacity, used when `input_sf="greygas"`
@@ -82,7 +82,7 @@ title = "Default"                       # Name for this configuration file
 
 [aerosols]
     rel_humidity    = 0.5                      # Mean RH used for moist aerosol lookups [0,1].
-    species_mmr     = {}                       # Optional per-species overrides keyed by SOCRATES aerosol type ID string.
+    species_mmr     = {soot=1e-3}                       # Optional per-species overrides keyed by SOCRATES aerosol type ID string.
     avg_phase_moments = 1                      # Cscatter_average -P: retained phase-function moments in generated .avg files.
 
 [plots]
