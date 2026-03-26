@@ -30,7 +30,7 @@ title = "Aerosols radiative properties test"
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
     vmr_dict        = { H2O=0.05, CH4=0.1, CO=0.05, N2=0.8 }               # Volatile volume mixing ratios (=mole fractions).
     condensates     = []                        # List of volatiles which are allowed to condense.
-    aerosols        = { "soot"=1e-4, "nitrate"=1e-2 }            # List of aerosols and default MMRs
+    aerosols        = { "soot"=1e-4, "nitrate"=1e-2, "sulph"=1e-7 }            # List of aerosols and default MMRs
 
 [execution]
     clean_output    = true                      # Clean the output folder at model startup.
