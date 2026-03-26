@@ -18,34 +18,71 @@ module spectrum
 
     import ..phys
 
-    """
-    **Validate spectral file.**
+    include(joinpath(ENV["RAD_DIR"], "julia", "gen", "input_head_pcf.jl"))
 
-    This function should probably calculate the file checksums, but for now it
-        simply checks the files for NaN values.
+    """
+    **Insert aerosol header information into a SOCRATES spectral file.**
 
     Arguments:
-    - `path::String`        Path to .sf file
+    - `work_file::String`          Path to spectral file to modify in-place
+    - `species::Array{String,1}`   List of aerosol species names
 
     Returns:
-    - `ok::Bool`            File is valid? (true/false)
+    - `success::Bool`              function executed successfully
     """
-    function check_spfile_integrity(path::String)::Bool
+    function insert_aerosol_header(work_file::String, species::Array{String,1})::Bool
 
-        @debug "Checking integrity of spectral file"
+        # Read file into memory
+        lines = readlines(work_file)
 
-        spectral_file_run::String  = abspath(path)
-        spectral_file_runk::String = spectral_file_run*"_k"
-
-        if occursin("NaN", readchomp(spectral_file_runk))
-            @error "Spectral_k file contains NaN values"
-            return false
-        end
-        if occursin("NaN", readchomp(spectral_file_run))
-            @error "Spectral file contains NaN values"
-            return false
+        # Check that file does not already contain aerosol header information
+        for l in lines
+            if contains(l, "aerosols")
+                @error "Spectral file already contains aerosol header information"
+                return false
+            end
         end
 
+        # Loop through aerosols
+        block0_lines = [
+            "List of indexing numbers of aerosols.",
+            "Index       Aerosol(type number and name)",
+        ]
+        num_aer = 0
+        for (i,s) in enumerate(input_head_pcf.aerosol_suffix)
+            if s in species
+                num_aer += 1
+                push!(block0_lines,
+                        @sprintf("   %2d          %2d       %s ",
+                        num_aer, i, strip(input_head_pcf.aerosol_title[i]))
+                    )
+            end
+        end
+
+        # List number of aerosols near the top of file
+        insert!(lines, 4, "Total number of aerosols =    $num_aer")
+
+        # Match previous insertion before first `*BLOCK: TYPE =    1`.
+        block_idx = -1
+        for l in lines
+            if startswith(l, "*END")
+                block_idx = findfirst(==(l), lines)
+                break
+            end
+        end
+        if block_idx < 1
+            @error "Could not find first '*END' when injecting aerosol header"
+            return false
+        end
+
+        # Insert aerosol header lines into file
+        foreach(l -> insert!(lines, block_idx, l), reverse(block0_lines))
+
+        # Overwrite with modified file
+        open(work_file, "w") do f
+            write(f, join(lines, "\n"))
+            write(f, "\n")
+        end
         return true
     end
 
@@ -206,21 +243,27 @@ module spectrum
 
 
     """
-    **Insert a stellar spectrum and Rayleigh coeffs into a SOCRATES spectral file.**
+    **Insert a stellar spectrum, Rayleigh coeffs, and aerosol properties into a SOCRATES spectral file.**
 
     Will not overwrite the original file.
+
+    Inserts stellar spectrum first, then Rayleigh coefficients, then aerosol properties.
+    The aerosol .avg files must already exist. The stellar spectrum must already exist.
 
     Arguments:
     - `orig_file::String`        Path to original spectral file.
     - `star_file::String`        Path to file containing stellar spectrum in SOC format.
     - `outp_file::String`        Path to output spectral file.
     - `insert_rscatter::Bool`    Calculate Rayleigh scattering coefficients?
+    - `insert_aerosol::Bool`     Insert aerosol parametrizations?
+    - `aerosol_avg_files::Dict`  Paths to aerosol .avg files (if `insert_aerosol=true`)
 
     Returns:
     - `success::Bool`            function executed successfully
     """
-    function insert_stellar_and_rscatter(orig_file::String, star_file::String,
-                                            outp_file::String, insert_rscatter::Bool)::Bool
+    function insert_blocks(orig_file::String, star_file::String, outp_file::String,
+                            insert_rscatter::Bool, insert_aerosol::Bool;
+                            aerosol_avg_files::Dict{String,String}=Dict())::Bool
 
         # Inputs to prep_spec
         prep_spec = abspath(ENV["RAD_DIR"],"bin","prep_spec")
@@ -232,8 +275,36 @@ module spectrum
             "y"                     # exit prep_spec
             ]
 
+        # Check files exist
+        if !isfile(orig_file)
+            @error "Original spectral file not found: '$orig_file'"
+            return false
+        end
+        if !isfile(star_file)
+            @error "Stellar spectrum file not found: '$star_file'"
+            return false
+        end
+
+        # Copy original file to output file
+        cp(orig_file,      outp_file;      force=true)
+        cp(orig_file*"_k", outp_file*"_k"; force=true)
+
+        # Add all aerosol header information into spectral file
+        if insert_aerosol
+            insert_aerosol_header(outp_file, [s for s in keys(aerosol_avg_files)]) || return false
+        end
+
+        # Check that aerosol .avg files exist
+        for avgfile in values(aerosol_avg_files)
+            if !isfile(avgfile)
+                @error "Aerosol .avg file not found: '$avgfile'"
+                return false
+            end
+        end
+
         # Write executable
         execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_insert_stellar.sh"
+        @debug "Wrapping script: $execpath"
         rm(execpath, force=true)
         open(execpath, "w") do f
 
@@ -241,9 +312,11 @@ module spectrum
             write(f, prep_spec*" <<-EOF\n")
 
             # paths
-            write(f, orig_file*" \n")
-            write(f, "n \n")
             write(f, outp_file*" \n")
+            write(f, "a \n") # modify output file in-place
+
+            # write(f, "n \n") # write to new file
+            # write(f, outp_file*" \n")
 
             # write thermal source function + stellar spectrum
             for inp in star_inputs
@@ -251,14 +324,26 @@ module spectrum
             end
 
             # write rayleigh coefficients
+            todo_str = "Inserting stellar spectrum"
             if insert_rscatter
-                @info "Inserting stellar spectrum and Rayleigh coefficients"
+                todo_str *= ", Rayleigh coefficients"
                 write(f, "3 \n")       #  block 3, please
                 write(f, "c \n")       #  custom composition
                 write(f, "a \n")       #  all gases
-            else
-                @info "Inserting stellar spectrum"
             end
+
+            # write aerosol properties
+            if insert_aerosol
+                todo_str *= ", aerosol properties"
+
+                for avgfile in values(aerosol_avg_files)
+                    write(f, "11 \n")
+                    write(f, avgfile*" \n")
+                    # write(f, "y \n")
+                end
+            end
+
+            @info todo_str
 
             # exit prep_spec
             write(f, "-1 \n")
@@ -286,6 +371,128 @@ module spectrum
         # Tidy up
         rm(execpath)
         return true
+    end
+
+
+    """
+    **Generate SOCRATES aerosol `.avg` files from monochromatic aerosol scattering files.**
+
+    Uses `scatter_average_90` as documented in the SOCRATES user guide with
+    solar-weighted averaging (`-S <solar> -w`). Does not modify the spectral file.
+
+    Arguments:
+    - `orig_file::String`             Original spectral file
+    - `species::Array{String,1}`      List of aerosol species
+    - `output_dir::String`            Directory where output `.avg` files are written
+    - `phase_moments::Int`            Number of phase-function moments to retain
+    - `star_file::String`             Solar spectrum file for SW-weighted averaging
+    - `scattering_dir::String`        Directory containing scattering files (.mon)
+
+    Returns:
+    - `avg_files::Dict{String,String}` Mapping from aerosol species to generated `.avg` file paths.
+    """
+    function generate_aerosol_avg_files(orig_file::String,
+                                        species::Array{String,1},
+                                        output_dir::String,
+                                        phase_moments::Int,
+                                        star_file::String,
+                                        scattering_dir::String)::Dict{String,String}
+
+        if !isfile(orig_file)
+            error("Spectral file not found: '$orig_file'")
+        end
+        if phase_moments < 1
+            error("phase_moments must be >= 1, got $phase_moments")
+        end
+        if isempty(star_file)
+            error("star_file must be provided for scatter_average")
+        end
+
+        if !isfile(star_file)
+            error("Solar spectrum file not found: '$star_file'")
+        end
+
+
+        avg_files::Dict = Dict{String, String}()
+        scat_av_90 = abspath(ENV["RAD_DIR"], "bin", "scatter_average_90")
+
+        # check mon files exist
+        for s in species
+            mon = abspath(joinpath(scattering_dir, s*".mon"))
+            if !isfile(mon)
+                @error "Monochromatic aerosol data not found for '$s'"
+                @error "    Expected at: '$mon'"
+                return avg_files
+            end
+        end
+
+        # Write executable
+        execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_aerosol_scatter.sh"
+        @debug "Wrapping script: $execpath"
+        rm(execpath, force=true)
+        open(execpath, "w") do f
+
+            # loop over aerosol species
+            for s in species
+                @debug "    adding species $s"
+
+                # exec scatter_average_90
+                write(f, scat_av_90*" <<-EOF\n")
+
+                # input spectral file
+                write(f, orig_file*" \n")
+
+                # input mon file
+                write(f, abspath(joinpath(scattering_dir, s*".mon"))*" \n")
+
+                # averaging parameters
+                write(f, "3 \n") # spectrum weighting
+                write(f, star_file*" \n") # solar spectrum for weighting
+                write(f, "1 \n") # thin averaging (-w)
+                write(f, "n \n") # no instrumental response required
+                write(f, "y \n") # per block?
+
+                # output avg file
+                avg_files[s] = abspath(joinpath(output_dir, s*".avg"))
+                rm(avg_files[s], force=true)
+                write(f, avg_files[s]*" \n") # path to output file
+
+                # number of phase moments
+                write(f, "$phase_moments \n")
+                write(f, "n \n") # not dependent on radius
+
+                # exit scatter_average_90
+                write(f, "EOF\n")
+                write(f, " ")
+            end
+        end
+
+        # Check that any species were processed
+        if isempty(avg_files)
+            @debug "No aerosol species processed."
+            return avg_files
+        end
+
+        # Run executable
+        @debug "Running scatter_average_90 now"
+        try
+            ps = run(pipeline(`bash $execpath`, stdout=devnull))
+
+            if !success(ps)
+                @error "scatter_average_90 failed with exit code $(ps.exitcode)"
+                @error "Command: bash $execpath"
+                return avg_files
+            end
+
+        catch e
+            @error "Failed to run scatter_average_90: $e"
+            @error "Command: bash $execpath"
+            return avg_files
+        end
+
+        # Tidy up
+        rm(execpath)
+        return avg_files
     end
 
 end # end module spectrum

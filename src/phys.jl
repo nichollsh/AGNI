@@ -358,6 +358,12 @@ module phys
         while i <= nchar
             last = (i == nchar)
 
+            # Skip unsupported characters
+            if m[i] in ['(',')','[',']','{','}','-','+',' ']
+                i += 1
+                continue
+            end
+
             # new element
             if isuppercase(m[i])
                 count = 0

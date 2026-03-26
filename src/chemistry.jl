@@ -11,8 +11,8 @@ This module handles chemistry, condensation, and evaporation.
 
 Note the important distinctions between the variables which store atmospheric composition.
  * `gas_ovmr` stores VMRs inputted by the user, which are usually constant in height.
+ * `gas_cvmr` stores the VMRs calculated by fastchem, which are used as the starting point for condensation calculations.
  * `gas_vmr` stores the runtime gas volume mixing ratios, after all calculations are performed.
-
 """
 module chemistry
 
@@ -242,11 +242,6 @@ module chemistry
             maxvmr[c] = atmos.gas_vmr[c][end]
         end
 
-        # Reset water cloud
-        fill!(atmos.cloud_arr_r, 0.0)
-        fill!(atmos.cloud_arr_l, 0.0)
-        fill!(atmos.cloud_arr_f, 0.0)
-
         # Handle condensation (loop from bottom up)
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
@@ -382,21 +377,11 @@ module chemistry
 
         # Set water clouds at levels where condensation occurs
         if "H2O" in atmos.condensates
-            for i in 1:atmos.nlev_c-1
-                if atmos.cond_yield["H2O"][i] > 0.0
-                    # liquid water content (take ratio of mass surface densities [kg/m^2])
-                    atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i]*atmos.cloud_alpha) /
-                                                atmos.layer_σ[i]
-
-                    # droplet radius and area fraction (fixed values)
-                    atmos.cloud_arr_r[i] = atmos.cloud_val_r
-                    atmos.cloud_arr_f[i] = atmos.cloud_val_f
-                end
-            end
+            atmosphere.set_cloud!(atmos; from_yield=true)
         end
 
-        # # Layer properties
-        # atmosphere.calc_layer_props!(atmos)
+        # Layer properties
+        atmosphere.calc_layer_props!(atmos)
 
         return nothing
     end
@@ -740,6 +725,19 @@ module chemistry
     end
 
     """
+    **Reset gas VMRs to post-chemistry values, overwriting condensate effect on VMR**
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    """
+    function reset_to_chem!(atmos::atmosphere.Atmos_t)
+        for g in atmos.gas_names
+            @. atmos.gas_vmr[g] = atmos.gas_cvmr[g]
+        end
+        return nothing
+    end
+
+    """
     **Run condensation and chemistry schemes as required.**
 
     This function is designed as a wrapper for appropriately handling these three
@@ -784,6 +782,11 @@ module chemistry
             for c in atmos.condensates
                 atmos.ocean_tot[c] += atmos.cond_accum[c]
             end
+        end
+
+        # keep cold trapping effect on abundances?
+        if !atmos.coldtrap
+            reset_to_chem!(atmos)
         end
 
         return state

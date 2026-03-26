@@ -489,6 +489,13 @@ module AGNI
             io_dir = cfg["files"]["io_dir"]
         end
 
+        # Optional aerosol parametrization controls
+        aerosol_species::Dict{String, Float64} = Dict{String, Float64}()
+        if haskey(cfg["composition"], "aerosols")
+            for (k, v) in cfg["composition"]["aerosols"]
+                aerosol_species[string(k)] = Float64(v)
+            end
+        end
 
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
@@ -514,7 +521,9 @@ module AGNI
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["physics"]["continua"],
                                 flag_rayleigh     = cfg["physics"]["rayleigh"],
+                                flag_aerosol      = get(cfg["physics"], "aerosol", false),
                                 flag_cloud        = cfg["physics"]["cloud"],
+                                aerosol_species   = aerosol_species,
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
@@ -661,8 +670,10 @@ module AGNI
         atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
         atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
         atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
-        @info @sprintf("Oceans cover %d%% area, max depth %g km",
+        if oceans
+            @info @sprintf("Oceans cover %d%% area, max depth %g km",
                             atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
+        end
 
         # Write arrays
         @info "Writing results"
@@ -780,4 +791,3 @@ module AGNI
     end
 
 end
-

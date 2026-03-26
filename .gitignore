@@ -31,6 +31,7 @@ res/stellar_spectra/*
 res/surface_albedos/*
 res/thermodynamics/*.nc
 res/thermodynamics/*.nc.chk
+res/scattering/*
 !res/*/_readme.txt
 index.html
 

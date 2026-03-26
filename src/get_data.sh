@@ -38,6 +38,7 @@ stellar=$res/stellar_spectra
 surface=$res/surface_albedos
 thermo=$res/thermodynamics
 parfiles=$res/parfiles
+scattering=$res/scattering
 
 # Make basic data folders
 mkdir -p $res
@@ -46,6 +47,7 @@ mkdir -p $stellar
 mkdir -p $surface
 mkdir -p $thermo
 mkdir -p $parfiles
+mkdir -p $scattering
 
 # Help strings
 help_dryrun="Test the get_data script"
@@ -58,6 +60,7 @@ help_surf_standard="Get a basic collection of surface reflectance data"
 help_surf_extended="Get an extended collection of surface reflectance data"
 help_parfiles="Get a collection of gas linelist par files"
 help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
+help_scattering="Get lookup data and parameter files for aerosol and cloud scattering"
 help="\
 Download and unpack data used to run the model.
 
@@ -81,6 +84,8 @@ Where [TARGET] can be any of the following:
         $help_surf_extended
     parfiles
         $help_parfiles
+    scattering
+        $help_scattering
     thermodynamics
         $help_thermo\
 "
@@ -296,6 +301,7 @@ function handle_request {
 
             zenodo 17981836 $stellar sun.txt
             handle_request "thermodynamics"
+            handle_request "scattering"
             ;;
 
         "highres")
@@ -347,6 +353,11 @@ function handle_request {
             rec="15806626"
             zenodo $rec $parfiles h2o-co2_4000-5000.par
             zenodo $rec $parfiles mixture_100-50000.par
+            ;;
+
+        "scattering")
+            echo $help_scattering
+            zenodo_all 19232950 $scattering
             ;;
 
         *)

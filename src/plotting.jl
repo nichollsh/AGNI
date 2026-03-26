@@ -174,14 +174,16 @@ module plotting
     end
 
     """
-    Plot the cloud mass mixing ratio and area fraction.
+    **Plot the cloud and aerosol mass mixing ratios.**
     """
     function plot_cloud(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int=500, size_y::Int=400,
                             title::String="")
 
-        xlims = (-1, 101)
-        xticks = collect(range(start=0.0, stop=100.0, step=10.0))
+        xlims = (-8.0, 0.0)
+        xticks = collect(range(start=xlims[1], stop=xlims[2], step=1))
+
+        lw = 2.0
 
         # Create plot
         plt = plot( xlims=xlims, xticks=xticks,
@@ -190,18 +192,32 @@ module plotting
 
         # Temperature profile for reference
         tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
-        plot!(plt, tmp_nrm*100.0, atmos.p*1e-5, lc="black",
-                        linealpha=0.3, label=L"\hat{T}(p)")
+        @. tmp_nrm = xlims[1] + (xlims[2]-xlims[1])*tmp_nrm
+        plot!(plt, tmp_nrm, atmos.p*1e-5, lc="black",
+                        linealpha=0.3, lw=lw, label=L"\hat{T}(p)")
 
         # Plot cloud profiles
-        plot!(plt, atmos.cloud_arr_l*100.0, atmos.p*1e-5, lw=2, lc="black", label="MMR")
-        plot!(plt, atmos.cloud_arr_f*100.0, atmos.p*1e-5, lw=2, lc="red",   label="Area frac.", ls=:dot)
+        ls = atmos.control.l_cloud ? :solid : :dot
+        plot!(plt, log10.(clamp.(atmos.cloud_arr_l,10^xlims[1],10^xlims[2])), atmos.p*1e-5,
+                    lw=lw, ls=ls, label="Cloud", linealpha=0.7)
+
+        # Plot aerosol profiles
+        ls = atmos.control.l_aerosol ? :solid : :dot
+        for k_aer in keys(atmos.aerosol_mmr)
+            plot!(plt, log10.(clamp.(atmos.aerosol_mmr[k_aer], 10^xlims[1], 10^xlims[2])), atmos.p*1e-5,
+                    lw=lw, ls=ls, label=k_aer, linealpha=0.7)
+        end
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Decorate
-        xlabel!(plt, "Quantity [%]")
+        xlabel!(plt, "log10(mass mixing ratio)")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
+        xaxis!(plt, xlims=xlims)
         if !isempty(title)
             title!(plt, title)
         end

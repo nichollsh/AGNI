@@ -21,7 +21,7 @@ module energy
 
     # Constants
     FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
-    CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [Pa]
+    CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [bar]
     CONVECT_REAL_GAS::Bool          = false     # use real gas EOS in convection scheme, if RG EOS enabled
 
     """
@@ -155,13 +155,27 @@ module energy
         ###################################################
 
         if atmos.control.l_cloud
-            atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]    # Total cloud area fraction in layers
-            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]    # Mass mixing ratios of condensate
-            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]    # Characteristic dimensions of condensed species
-        else
-            atmos.cld.w_cloud[1,:]               .= 0.0
-            atmos.cld.condensed_mix_ratio[1,:,1] .= 0.0
-            atmos.cld.condensed_dim_char[1,:,1]  .= 0.0
+            # SOCRATES expects:
+            #   w_cloud              -> Total cloud area fraction in layers, in [0, 1] (dimensionless)
+            #   condensed_mix_ratio  -> Mass mixing ratios of condensate [kg kg-1], (LWC)
+            #   condensed_dim_char   -> Characteristic dimensions of condensed species [m], (radius)
+            # The LWC is the mass of condensate per mass of dry air
+            #   Refer to opt_propt_water_cloud.f90 (L234); c.f. Slingo & Schrecker (1982) Eq 15,16,17
+            atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]
+            atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]
+            atmos.cld.condensed_dim_char[1,:,1]  .= atmos.cloud_arr_r[:]
+        end
+
+        ###################################################
+        # Aerosol information
+        ###################################################
+
+        # Set mixing ratio profiles for aerosols
+        fill!(atmos.aer.mix_ratio, 0.0)
+        if atmos.control.l_aerosol
+            for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
+                atmos.aer.mix_ratio[1, :, i] .= atmos.aerosol_mmr[atmos.aerosol_names[i]][:]
+            end
         end
 
         ###################################################
@@ -1059,4 +1073,3 @@ module energy
     end
 
 end # end module
-

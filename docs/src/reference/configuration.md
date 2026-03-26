@@ -56,6 +56,8 @@ ratios (`vmr_dict` or `vmr_file`), or by metallicities (`metallicities`).
 | `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
 | `condensates   `  | List of volatiles which are allowed to condense. Can be used together with thermochemical equilibrium (`physics.chemistry = true`). |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
+| `aerosols      `  | Dictionary of aerosols and their mass mixing ratios [kg/kg]. |
+
 
 
 ## `[execution]`
@@ -90,7 +92,8 @@ Parameters that describe how the model should treat the physics.
 | `chemistry     `  | Include 1D equilibrium chemistry in the atmosphere (true/false). |
 | `continua      `  | Include collisional/continuum absorption in radiative transfer (true/false). |
 | `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false). |
-| `cloud         `  | Include cloud scattering and opacity in radiative transfer (true/false). |
+| `aerosol       `  | Include aerosols in radiative transfer  (true/false). |
+| `cloud         `  | Include water clouds in radiative transfer (true/false). |
 | `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see [Configuring AGNI](@ref)). |
 | `grey_lw`         | Grey opacity [m2/kg] of longwave (thermal) radiation. Used when `input_sf="greygas"`. |
 | `grey_sw`         | Grey opacity [m2/kg] of shortwave (stellar) radiation. Used when `input_sf="greygas"`. |

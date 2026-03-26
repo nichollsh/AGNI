@@ -127,11 +127,13 @@ module save
             nlev_c = Int(atmos.nlev_c)
             nlev_l = nlev_c + 1
             ngases = atmos.gas_num
+            naeros = max(1,length(atmos.aerosol_mmr))
             nchars = 16
 
             defDim(ds, "nlev_c",    nlev_c)        # Cell centres
             defDim(ds, "nlev_l",    nlev_l)        # Cell edges
             defDim(ds, "ngases",    ngases)        # Gases
+            defDim(ds, "naeros",    naeros)  # Aerosols
             defDim(ds, "nchars",    nchars)        # Length of string containing gas names
             defDim(ds, "nbands",    atmos.nbands)  # Number of spectral bands
             defDim(ds, "nchannels", atmos.dimen.nd_channel)  # Number of spectral channels
@@ -156,6 +158,7 @@ module save
             var_fray =      defVar(ds, "flag_rayleigh", Char,    ())                                            # Includes rayleigh scattering?
             var_fcon =      defVar(ds, "flag_continuum",Char,    ())                                            # Includes continuum absorption?
             var_fcld =      defVar(ds, "flag_cloud"    ,Char,    ())                                            # Includes clouds?
+            var_faer =      defVar(ds, "flag_aerosol"  ,Char,    ())                                            # Includes aerosols?
             var_tfun =      defVar(ds, "thermo_funct"  ,Char,    ())                                            # Using temperature-dependent thermodynamic functions
             var_rgas =      defVar(ds, "real_gas"      ,Char,    ())                                            # Using real gas EOS
             var_ssol =      defVar(ds, "solved"        ,Char,    ())                                            # Has a solver been used?
@@ -210,6 +213,12 @@ module save
                 var_fcld[1] = 'n'
             end
 
+            if atmos.control.l_aerosol
+                var_faer[1] = 'y'
+            else
+                var_faer[1] = 'n'
+            end
+
             if atmos.thermo_funct
                 var_tfun[1] = 'y'
             else
@@ -261,6 +270,10 @@ module save
             var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases");  nc_comp..., ) # Transposed cf JANUS because of how Julia stores arrays
             var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "mol mol-1")) # ^^
             var_cldl  =     defVar(ds, "cloud_mmr", Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg kg-1"))
+            var_cldf  =     defVar(ds, "cloud_area",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "1"))
+            var_cldr  =     defVar(ds, "cloud_size",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
+            var_aerosols =  defVar(ds, "aerosols",  Char,    ("nchars", "naeros");  nc_comp..., ) # Transposed cf JANUS because of how Julia stores arrays
+            var_aer_l =     defVar(ds, "aer_mmr",   Float64, ("naeros", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "kg kg-1")) # ^^
             var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
@@ -322,6 +335,28 @@ module save
 
             # Clouds
             var_cldl[:] =   atmos.cloud_arr_l
+            var_cldf[:] =   atmos.cloud_arr_f
+            var_cldr[:] =   atmos.cloud_arr_r
+
+            # Aerosols
+            if length(atmos.aerosol_mmr) == 0
+                var_aer_l[1, :] = collect(0.0 for i in 1:nlev_c)
+            else
+                for (i_aer, k_aer) in enumerate(sort(collect(keys(atmos.aerosol_mmr))))
+                    # Fill aerosol names
+                    for i_char in 1:nchars
+                        var_aerosols[i_char, i_aer] = ' '
+                    end
+                    for i_char in 1:length(k_aer)
+                        var_aerosols[i_char,i_aer] = k_aer[i_char]
+                    end
+
+                    # Fill MMR
+                    for i_lvl in 1:nlev_c
+                        var_aer_l[i_aer, i_lvl] = atmos.aerosol_mmr[k_aer][i_lvl]
+                    end
+                end
+            end
 
             # Kzz mixing
             var_kzz[:] =    atmos.Kzz
