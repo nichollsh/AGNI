@@ -53,7 +53,7 @@ given wavelength -- this is then plotted versus wavelength and pressure.
 
 
 ## Aerosol radiative properties
-AGNI incorporates the radiative effects of aerosols and clouds in the atmosphere. The model supports arbitrary aerosol types, basedon Mie theory. Pre-computed aerosol types include soot, ash, sulfate, and nitrate particles.
+AGNI incorporates the radiative effects of aerosols and clouds in the atmosphere. The model supports arbitrary aerosol types, based on Mie theory. Pre-computed aerosol types include soot, ash, sulfate, and nitrate particles.
 
 In the example below, an atmosphere is configured with three aerosol species at different concentrations. The configuration file is located at `res/config/physics/aerosols.toml`
 
