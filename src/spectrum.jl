@@ -412,8 +412,19 @@ module spectrum
             error("Solar spectrum file not found: '$star_file'")
         end
 
+
         avg_files::Dict = Dict{String, String}()
         scat_av_90 = abspath(ENV["RAD_DIR"], "bin", "scatter_average_90")
+
+        # check mon files exist
+        for s in species
+            mon = abspath(joinpath(scattering_dir, s*".mon"))
+            if !isfile(mon)
+                @error "Monochromatic aerosol data not found for '$s'"
+                @error "    Expected at: '$mon'"
+                return avg_files
+            end
+        end
 
         # Write executable
         execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_aerosol_scatter.sh"
@@ -432,13 +443,7 @@ module spectrum
                 write(f, orig_file*" \n")
 
                 # input mon file
-                mon = abspath(joinpath(scattering_dir, s*".mon"))
-                if !isfile(mon)
-                    @error "Monochromatic aerosol data not found for '$s'"
-                    @error "    Expected at: '$mon'"
-                    return avg_files
-                end
-                write(f, mon*" \n")
+                write(f, abspath(joinpath(scattering_dir, s*".mon"))*" \n")
 
                 # averaging parameters
                 write(f, "3 \n") # spectrum weighting

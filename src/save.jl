@@ -339,18 +339,22 @@ module save
             var_cldr[:] =   atmos.cloud_arr_r
 
             # Aerosols
-            for (i_aer, k_aer) in enumerate(keys(atmos.aerosol_mmr))
-                # Fill aerosol names
-                for i_char in 1:nchars
-                    var_aerosols[i_char, i_aer] = ' '
-                end
-                for i_char in 1:length(k_aer)
-                    var_aerosols[i_char,i_aer] = k_aer[i_char]
-                end
+            if length(atmos.aerosol_mmr) == 0
+                var_aer_l[1, :] = collect(0.0 for i in 1:nlev_c)
+            else
+                for (i_aer, k_aer) in enumerate(sort(collect(keys(atmos.aerosol_mmr))))
+                    # Fill aerosol names
+                    for i_char in 1:nchars
+                        var_aerosols[i_char, i_aer] = ' '
+                    end
+                    for i_char in 1:length(k_aer)
+                        var_aerosols[i_char,i_aer] = k_aer[i_char]
+                    end
 
-                # Fill MMR
-                for i_lvl in 1:nlev_c
-                    var_aer_l[i_aer, i_lvl] = atmos.aerosol_mmr[k_aer][i_lvl]
+                    # Fill MMR
+                    for i_lvl in 1:nlev_c
+                        var_aer_l[i_aer, i_lvl] = atmos.aerosol_mmr[k_aer][i_lvl]
+                    end
                 end
             end
 
