@@ -294,6 +294,14 @@ module spectrum
             insert_aerosol_header(outp_file, [s for s in keys(aerosol_avg_files)]) || return false
         end
 
+        # Check that aerosol .avg files exist
+        for avgfile in values(aerosol_avg_files)
+            if !isfile(avgfile)
+                @error "Aerosol .avg file not found: '$avgfile'"
+                return false
+            end
+        end
+
         # Write executable
         execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_insert_stellar.sh"
         @debug "Wrapping script: $execpath"
@@ -329,10 +337,6 @@ module spectrum
                 todo_str *= ", aerosol properties"
 
                 for avgfile in values(aerosol_avg_files)
-                    if !isfile(avgfile)
-                        @error "Aerosol .avg file not found: '$avgfile'"
-                        return false
-                    end
                     write(f, "11 \n")
                     write(f, avgfile*" \n")
                     # write(f, "y \n")
@@ -395,7 +399,7 @@ module spectrum
                                         scattering_dir::String)::Dict{String,String}
 
         if !isfile(orig_file)
-            error("Spectral file not found: '$spectral_file'")
+            error("Spectral file not found: '$orig_file'")
         end
         if phase_moments < 1
             error("phase_moments must be >= 1, got $phase_moments")

@@ -127,7 +127,7 @@ module save
             nlev_c = Int(atmos.nlev_c)
             nlev_l = nlev_c + 1
             ngases = atmos.gas_num
-            naeros = length(atmos.aerosol_mmr)
+            naeros = max(1,length(atmos.aerosol_mmr))
             nchars = 16
 
             defDim(ds, "nlev_c",    nlev_c)        # Cell centres

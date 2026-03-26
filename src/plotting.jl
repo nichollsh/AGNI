@@ -198,7 +198,7 @@ module plotting
 
         # Plot cloud profiles
         ls = atmos.control.l_cloud ? :solid : :dot
-        plot!(plt, log10.(clamp.(atmos.cloud_arr_r,10^xlims[1],10^xlims[2])), atmos.p*1e-5,
+        plot!(plt, log10.(clamp.(atmos.cloud_arr_l,10^xlims[1],10^xlims[2])), atmos.p*1e-5,
                     lw=lw, ls=ls, label="Cloud", linealpha=0.7)
 
         # Plot aerosol profiles

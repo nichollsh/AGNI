@@ -807,7 +807,7 @@ module atmosphere
         atmos.aerosol_phase_num = 1    # number of phase-function moments
         atmos.aerosol_relhumid  = 0.0  # relative humidity used by moist aerosol schemes
         atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
-        atmos.aerosol_names = Array{String}[] # list of species names, in same order as spectral file
+        atmos.aerosol_names = String[] # list of species names, in same order as spectral file
         for (k, v) in aerosol_species
             _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
             atmos.aerosol_mmr[lowercase(k)] = zeros(Float64, atmos.nlev_c)
@@ -2330,6 +2330,10 @@ module atmosphere
             atmos.cld.dp_corr_strat             =   0.0     # decorrelation scale for stratiform cloud overlap
             atmos.cld.dp_corr_conv              =   0.0     # decorrelation scale for convective cloud overlap
 
+            # Set area, mixing ratio, and size to zero
+            fill!(atmos.cld.w_cloud            , 0.0)
+            fill!(atmos.cld.condensed_mix_ratio, 0.0)
+            fill!(atmos.cld.condensed_dim_char , 0.0)
             if atmos.control.l_cloud
                 atmos.cld.n_condensed       = 1  # one condensate component in AGNI cloud mode
                 atmos.cld.type_condensed[1] = SOCRATES.rad_pcf.ip_clcmp_st_water # stratiform liquid water
@@ -2357,11 +2361,6 @@ module atmosphere
                                                                         atmos.cld.i_condensed_param[1]]
                     end
                 end
-
-                # Set area, mixing ratio, and size to zero
-                atmos.cld.w_cloud[1,:]               .= 0.0
-                atmos.cld.condensed_mix_ratio[1,:,1] .= 0.0
-                atmos.cld.condensed_dim_char[1,:,1]  .= 0.0
 
                 # Frac_cloud is the partitioning across different cloud types (sum to 1 where cloudy).
                 #      this is NOT the area of the grid covered by clouds.
@@ -2747,7 +2746,7 @@ module atmosphere
                 @info @sprintf("    %10s - %s", name, strip(title))
                 push!(aerosol_names, name)
             end
-            if !isempty(atmos.aerosol_mmr)
+            if isempty(atmos.aerosol_mmr)
                 @info "    [none]"
             end
 
