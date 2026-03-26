@@ -81,6 +81,7 @@ module atmosphere
         ROOT_DIR::String        # path to AGNI root folder (containing agni.jl)
         OUT_DIR::String         # path to output folder
         THERMO_DIR::String      # path to thermo data
+        SCATTERING_DIR::String  # path to scattering data
         FC_DIR::String          # path to fastchem install folder
         RFM_DIR::String         # path to RFM install folder
         FRAMES_DIR::String      # path to frames of animation
@@ -538,8 +539,9 @@ module atmosphere
             return false
         end
 
-        # Locate thermodynamics dir
+        # Locate data directories
         atmos.THERMO_DIR = joinpath(atmos.ROOT_DIR, "res", "thermodynamics")
+        atmos.SCATTERING_DIR = joinpath(atmos.ROOT_DIR, "res", "scattering")
 
         # Make output directory if does not exist
         if isempty(OUT_DIR)
@@ -1876,7 +1878,8 @@ module atmosphere
                         [s for s in keys(atmos.aerosol_mmr)],
                         atmos.IO_DIR,
                         atmos.aerosol_phase_num,
-                        socstar
+                        socstar,
+                        atmos.SCATTERING_DIR
                     )
 
                     # check that all files were generated successfully

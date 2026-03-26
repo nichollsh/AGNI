@@ -382,6 +382,7 @@ module spectrum
     - `output_dir::String`            Directory where output `.avg` files are written
     - `phase_moments::Int`            Number of phase-function moments to retain
     - `star_file::String`             Solar spectrum file for SW-weighted averaging
+    - `scattering_dir::String`        Directory containing scattering files (.mon)
 
     Returns:
     - `avg_files::Dict{String,String}` Mapping from aerosol species to generated `.avg` file paths.
@@ -390,7 +391,8 @@ module spectrum
                                         species::Array{String,1},
                                         output_dir::String,
                                         phase_moments::Int,
-                                        star_file::String)::Dict{String,String}
+                                        star_file::String,
+                                        scattering_dir::String)::Dict{String,String}
 
         if !isfile(orig_file)
             error("Spectral file not found: '$spectral_file'")
@@ -426,7 +428,7 @@ module spectrum
                 write(f, orig_file*" \n")
 
                 # input mon file
-                mon = abspath(joinpath(ENV["RAD_DIR"], "data", "aerosol", s*".mon"))
+                mon = abspath(joinpath(scattering_dir, s*".mon"))
                 if !isfile(mon)
                     @error "Monochromatic aerosol data not found for '$s'"
                     @error "    Expected at: '$mon'"
