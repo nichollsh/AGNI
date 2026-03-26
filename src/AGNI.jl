@@ -670,8 +670,10 @@ module AGNI
         atmos.ocean_topliq = ocean.get_topliq(atmos.ocean_layers)
         atmos.ocean_maxdepth = ocean.get_maxdepth(atmos.ocean_layers)
         atmos.ocean_areacov = ocean.get_areacov(atmos.ocean_layers, atmos.ocean_ob_frac)
-        @info @sprintf("Oceans cover %d%% area, max depth %g km",
+        if oceans
+            @info @sprintf("Oceans cover %d%% area, max depth %g km",
                             atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
+        end
 
         # Write arrays
         @info "Writing results"

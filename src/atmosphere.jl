@@ -752,17 +752,6 @@ module atmosphere
         atmos.control.l_ice::Bool  =        false
         atmos.transparent =                 false
 
-        # Aerosol parameters
-        atmos.aerosol_mmr_ini   = 0.0  # default MMR of aerosols
-        atmos.aerosol_phase_num = 1    # number of phase-function moments
-        atmos.aerosol_relhumid  = 0.0  # relative humidity used by moist aerosol schemes
-        atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
-        atmos.aerosol_names = Array{String}[] # list of species names, in same order as spectral file
-        for (k, v) in aerosol_species
-            _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
-            atmos.aerosol_mmr[lowercase(k)] = ones(Float64, atmos.nlev_c) * v
-            push!(atmos.aerosol_names, "")
-        end
 
         # Initialise temperature grid
         atmos.tmpl = zeros(Float64, atmos.nlev_l)
@@ -810,6 +799,21 @@ module atmosphere
         atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
         atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
+
+        # Aerosol parameters
+        atmos.aerosol_mmr_ini   = 0.0  # default MMR of aerosols
+        atmos.aerosol_phase_num = 1    # number of phase-function moments
+        atmos.aerosol_relhumid  = 0.0  # relative humidity used by moist aerosol schemes
+        atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
+        atmos.aerosol_names = Array{String}[] # list of species names, in same order as spectral file
+        for (k, v) in aerosol_species
+            _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
+            atmos.aerosol_mmr[lowercase(k)] = zeros(Float64, atmos.nlev_c)
+            set_aerosol!(atmos, lowercase(k), v)
+
+            # Store empty strings for now (set in allocate! function)
+            push!(atmos.aerosol_names, UNSET_STR)
+        end
 
         # Read VMRs
         if !isempty(mf_path) && !isempty(mf_dict)
@@ -1874,6 +1878,13 @@ module atmosphere
                         atmos.aerosol_phase_num,
                         socstar
                     )
+
+                    # check that all files were generated successfully
+                    if length(aerosol_avg_files_rt) != length(atmos.aerosol_mmr)
+                        @error "Failed to generate required aerosol .avg files"
+                        list_available_aerosols(atmos)
+                        return false
+                    end
                 end
 
                 # Insert blocks into spectral file
@@ -1893,12 +1904,18 @@ module atmosphere
                 spectral_file_runk = atmos.spectral_file*"_k"
             end
 
-            # Read-in spectral file to be used at runtime
+            # Read-in spectral file path to be used at runtime
             atmos.control.spectral_file = spectral_file_run
 
-            SOCRATES.set_spectrum(spectrum=atmos.spectrum,
-                                    spectral_file=atmos.control.spectral_file,
-                                    l_all_gases=true)
+            # Set spectrum in SOCRATES
+            set_spectrum_kwargs = Dict(:spectrum=>atmos.spectrum,
+                                        :spectral_file=>atmos.control.spectral_file)
+            if startswith(atmos.SOCRATES_VERSION, "24")
+                set_spectrum_kwargs[:l_all_gasses] = true
+            else
+                set_spectrum_kwargs[:l_all_gases] = true
+            end
+            SOCRATES.set_spectrum(; set_spectrum_kwargs...)
 
             # Remove temporary star file if it exists
             rm(socstar, force=true)
@@ -2233,8 +2250,10 @@ module atmosphere
             # Configure aerosols
             #      default to no aerosol effect
             fill!(atmos.aer.mr_source, SOCRATES.rad_pcf.ip_aersrc_classic_roff)
+            fill!(atmos.aer.mix_ratio, 0.0)
             #      set properties
             if atmos.control.l_aerosol
+                # loop over aerosols in spectral file
                 for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
                     # get name of this aerosol
                     type_id = Int(atmos.spectrum.Aerosol.type_aerosol[i])
@@ -2243,10 +2262,20 @@ module atmosphere
                     # store name from index (for updating aerosol profiles in the future)
                     atmos.aerosol_names[i] = name
 
-                    # Set default mass mixing ratio
-                    if haskey(atmos.aerosol_mmr, name)
-                        atmos.aer.mix_ratio[1, :, i] .= atmos.aerosol_mmr[name][:]
-                        atmos.aer.mr_source[i] = SOCRATES.rad_pcf.ip_aersrc_classic_ron
+                    # Enable aerosol
+                    atmos.aer.mr_source[i] = SOCRATES.rad_pcf.ip_aersrc_classic_ron
+
+                    # Add array to aerosol_mmr if not requested by user already
+                    if !haskey(atmos.aerosol_mmr, name)
+                        atmos.aerosol_mmr[name] = zeros(Float64, atmos.nlev_c)
+                    end
+                end
+
+                # warn if user has requested unsupported aerosol
+                for name in keys(atmos.aerosol_mmr)
+                    if !(name in atmos.aerosol_names)
+                        @warn "Requested aerosol '$name' not found in spectral file"
+                        list_available_aerosols(atmos)
                     end
                 end
             end
@@ -2326,17 +2355,23 @@ module atmosphere
                     end
                 end
 
+                # Set area, mixing ratio, and size to zero
+                atmos.cld.w_cloud[1,:]               .= 0.0
+                atmos.cld.condensed_mix_ratio[1,:,1] .= 0.0
+                atmos.cld.condensed_dim_char[1,:,1]  .= 0.0
+
                 # Frac_cloud is the partitioning across different cloud types (sum to 1 where cloudy).
                 #      this is NOT the area of the grid covered by clouds.
                 # Set to zero by default
                 fill!(atmos.cld.frac_cloud, 0.0)
-                # Set to 1 for a single cloud type
+                # Set to 1 for a single cloud type, across whole profile
                 atmos.cld.frac_cloud[1,:,1] .= 1.0
 
             else
                 # Explicitly clear cloud metadata when clouds are disabled.
                 atmos.cld.n_condensed  = 0
                 atmos.cld.n_cloud_type = 0
+
                 fill!(atmos.cld.condensed_n_phf, 0)
                 fill!(atmos.cld.i_condensed_param, 0)
                 fill!(atmos.cld.type_condensed, 0)
@@ -2685,6 +2720,126 @@ module atmosphere
         end
 
         return nothing
+    end
+
+    """
+    **List available aerosol species.**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`       the atmosphere struct instance to check
+
+    Returns:
+    - `aerosol_names::Array{String, 1}`  list of available aerosol species
+    """
+    function list_available_aerosols(atmos::atmosphere.Atmos_t)::Array{String, 1}
+
+        aerosol_names = String[]
+
+        if atmos.control.l_aerosol
+            @info "Available aerosol species:"
+            for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
+                type_id = Int(atmos.spectrum.Aerosol.type_aerosol[i])
+                name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
+                title = SOCRATES.input_head_pcf.aerosol_title[type_id]
+                @info @sprintf("    %10s - %s", name, strip(title))
+                push!(aerosol_names, name)
+            end
+            if !isempty(atmos.aerosol_mmr)
+                @info "    [none]"
+            end
+
+            @info "Supported but unavailable species:"
+            for (i,name) in enumerate(SOCRATES.input_head_pcf.aerosol_suffix)
+                if !(name in aerosol_names)
+                    title = SOCRATES.input_head_pcf.aerosol_title[i]
+                    @info @sprintf("    %10s - %s", name, strip(title))
+                end
+            end
+        else
+            @info "Aerosol treatment is disabled; no aerosol species available"
+        end
+
+        return aerosol_names
+    end
+
+    """
+    **Set water cloud profile based on saturation.**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used.
+    - `from_yield::Bool`              set cloud properties based on condensation yield
+
+    Returns:
+    - `any_cloud::Bool`  whether any clouds are present
+    """
+    function set_cloud!(atmos::atmosphere.Atmos_t; from_yield::Bool=true)::Bool
+
+        # Reset profiles
+        fill!(atmos.cloud_arr_r, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        fill!(atmos.cloud_arr_f, 0.0)
+
+        # Loop through layers and set cloud properties based on condensation yield
+        for i in 1:atmos.nlev_c-1
+            # liquid water content (take ratio of mass surface densities [kg/m^2])
+            if from_yield
+                # set by condensation yield
+                atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i]*atmos.cloud_alpha) /
+                                        atmos.layer_σ[i]
+            else
+                # set by mask
+                atmos.cloud_arr_l[i] = atmos.gas_sat["H2O"][i] ? atmos.cloud_val_l : 0.0
+            end
+        end
+        clamp!(atmos.cloud_arr_l, 0.0, 1.0)
+
+        # Set droplet radius and area fraction (fixed values)
+        atmos.cloud_arr_r[atmos.cloud_arr_l .> 0] .= atmos.cloud_val_r
+        atmos.cloud_arr_f[atmos.cloud_arr_l .> 0] .= atmos.cloud_val_f
+
+        # Clamp
+        clamp!(atmos.cloud_arr_f, 0.0, 1.0)
+        if any(atmos.cloud_arr_r .< 0.0)
+            @warn "Negative cloud particle size"
+        end
+
+        return any(atmos.cloud_arr_l .> 0.0) # Return whether any clouds are present
+    end
+
+    """
+    **Set aerosol profile for a given species.**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used
+    - `species::String`             the name of the aerosol species to set
+    - `mmr`                         the mixing ratio (profile or scalar) to set
+
+    Optional arguments
+    - `pmin::Float64`  the minimum pressure [Pa]
+    - `pmax::Float64`  the maximum pressure [Pa]
+
+    """
+    function set_aerosol!(atmos::atmosphere.Atmos_t, species::String,
+                            mmr::Union{Array{Float64, 1}, Float64} = 0.0;
+                            pmin::Float64 = 0.0, pmax::Float64 = 1e9)::Bool
+
+        # Mask for pressure range
+        idx_mask = (atmos.p .>= pmin) .& (atmos.p .<= pmax)
+
+        # Set mixing ratio profile for aerosol
+        if isa(mmr, Float64)
+            # constant profile
+            atmos.aerosol_mmr[species][idx_mask] .= mmr
+        else
+            # 1D profile
+            if length(mmr) != length(atmos.p)
+                @error "Length of input mmr array does not match number of layers"
+                return false
+            end
+            atmos.aerosol_mmr[species][idx_mask] .= mmr[idx_mask]
+        end
+
+        return true
     end
 
 end

@@ -507,14 +507,8 @@ module setpt
         atmos.tmp_surf = atmos.tmpl[end]
 
         # Set cloud
-        if (gas == "H2O") && atmos.control.l_cloud
-            fill!(atmos.cloud_arr_r, 0.0)
-            fill!(atmos.cloud_arr_l, 0.0)
-            fill!(atmos.cloud_arr_f, 0.0)
-
-            atmos.cloud_arr_r[atmos.gas_sat["H2O"][:]] .= atmos.cloud_val_r
-            atmos.cloud_arr_l[atmos.gas_sat["H2O"][:]] .= atmos.cloud_val_l
-            atmos.cloud_arr_f[atmos.gas_sat["H2O"][:]] .= atmos.cloud_val_f
+        if gas == "H2O"
+            atmosphere.set_cloud!(atmos; from_yield=false)
         end
 
         return nothing

@@ -183,6 +183,8 @@ module plotting
         xlims = (-8.0, 0.0)
         xticks = collect(range(start=xlims[1], stop=xlims[2], step=1))
 
+        lw = 2.0
+
         # Create plot
         plt = plot( xlims=xlims, xticks=xticks,
                     ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
@@ -192,15 +194,23 @@ module plotting
         tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
         @. tmp_nrm = xlims[1] + (xlims[2]-xlims[1])*tmp_nrm
         plot!(plt, tmp_nrm, atmos.p*1e-5, lc="black",
-                        linealpha=0.3, label=L"\hat{T}(p)")
+                        linealpha=0.3, lw=lw, label=L"\hat{T}(p)")
 
         # Plot cloud profiles
-        plot!(plt, log10.(clamp.(atmos.cloud_arr_r,10^xlims[1],10^xlims[2])), atmos.p*1e-5, lw=2,  label="Cloud")
+        ls = atmos.control.l_cloud ? :solid : :dot
+        plot!(plt, log10.(clamp.(atmos.cloud_arr_r,10^xlims[1],10^xlims[2])), atmos.p*1e-5,
+                    lw=lw, ls=ls, label="Cloud", linealpha=0.7)
 
         # Plot aerosol profiles
+        ls = atmos.control.l_aerosol ? :solid : :dot
         for k_aer in keys(atmos.aerosol_mmr)
-            plot!(plt, log10.(clamp.(atmos.aerosol_mmr[k_aer], 10^xlims[1], 10^xlims[2])), atmos.p*1e-5, lw=2, label=k_aer)
+            plot!(plt, log10.(clamp.(atmos.aerosol_mmr[k_aer], 10^xlims[1], 10^xlims[2])), atmos.p*1e-5,
+                    lw=lw, ls=ls, label=k_aer, linealpha=0.7)
         end
+
+        # Plot current surface pressure and original
+        @_plt_pboa
+        @_plt_poboa
 
         # Decorate
         xlabel!(plt, "log10(mass mixing ratio)")

@@ -1,8 +1,5 @@
-# This is the default configuration file - it does not solve for RCE
-# The variables are explained below. If you want to model your own conditions,
-# try making a copy of this file and then modifying it.
-
-title = "Default"                       # Name for this configuration file
+# AGNI configuration file
+title = "Aerosols radiative properties test"
 
 [planet]
     tmp_surf        = 2000.0            # Surface temperature [kelvin].
@@ -23,7 +20,7 @@ title = "Default"                       # Name for this configuration file
     stellar_Teff    = 4000.0            # Stellar effective temperature, if using `input_star="blackbody"`
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
+    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"   # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum. Set to "blackbody" to use `planet.stellar_Teff`.
     output_dir      = "out/"                                            # Path to output directory.
     io_dir          = "out/"                                            # Path for fast file operations (optional).
@@ -31,9 +28,9 @@ title = "Default"                       # Name for this configuration file
 [composition]
     p_surf          = 270.0                     # Total surface pressure [bar].
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
-    vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
+    vmr_dict        = { H2O=0.05, CH4=0.1, CO=0.05, N2=0.8 }               # Volatile volume mixing ratios (=mole fractions).
     condensates     = []                        # List of volatiles which are allowed to condense.
-    aerosols        = { }                       # List of aerosols and default MMRs
+    aerosols        = { "soot"=1e-4, "nitrate"=1e-2 }            # List of aerosols and default MMRs
 
 [execution]
     clean_output    = true                      # Clean the output folder at model startup.
@@ -56,8 +53,8 @@ title = "Default"                       # Name for this configuration file
 [physics]
     chemistry       = false                     # Solve for thermochemistry in atmosphere?
     continua        = true                      # Include absorption from continua?
-    rayleigh        = true                      # Include rayleigh scattering?
-    aerosol         = false                     # Include parametrised aerosols from SOCRATES spectral metadata?
+    rayleigh        = false                     # Include rayleigh scattering?
+    aerosol         = true                      # Include parametrised aerosols from SOCRATES spectral metadata?
     cloud           = false                     # Include water cloud radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
     grey_lw         = 1e-4                      # Grey longwave opacity, used when `input_sf="greygas"`
@@ -71,15 +68,6 @@ title = "Default"                       # Name for this configuration file
     latent_heat     = false                     # Include heat release from phase change
     convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
     convection      = true                      # Include heat transport by convection
-
-    [physics.deep_heating]
-        Pmid            = 1.0              # Center of Gaussian heating profile [bar]
-        Pwid            = 1.0               # Width of Gaussian in log-Pascal units.
-        power_mode      = "off"             # Power mode for heating (off, rel, abs)
-        norm_method     = "pressure"        # Normalisation coordinate: "pressure" (legacy dF/dP), or "mass" (dm-weighted).
-        domain          = "clamp"           # How to handle Pmid outside domain (clamp, boundary_flux)
-        flux_rel        = 0.0               # Set flux by fraction of instellation, used for power_mode="rel".
-        flux_abs        = 10.0              # Set flux by [W m-2], used for power_mode="abs".
 
 [plots]
     at_runtime      = true                      # Make some plots at runtime?

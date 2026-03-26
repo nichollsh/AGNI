@@ -24,14 +24,24 @@ module spectrum
     **Insert aerosol header information into a SOCRATES spectral file.**
 
     Arguments:
-    - `work_file::String`           Path to spectral file to modify (will be modified in place)
+    - `work_file::String`          Path to spectral file to modify in-place
     - `species::Array{String,1}`   List of aerosol species names
 
+    Returns:
+    - `success::Bool`              function executed successfully
     """
     function insert_aerosol_header(work_file::String, species::Array{String,1})::Bool
 
         # Read file into memory
         lines = readlines(work_file)
+
+        # Check that file does not already contain aerosol header information
+        for l in lines
+            if contains(l, "aerosols")
+                @error "Spectral file already contains aerosol header information"
+                return false
+            end
+        end
 
         # Loop through aerosols
         block0_lines = [
@@ -73,37 +83,6 @@ module spectrum
             write(f, join(lines, "\n"))
             write(f, "\n")
         end
-        return true
-    end
-
-    """
-    **Validate spectral file.**
-
-    This function should probably calculate the file checksums, but for now it
-        simply checks the files for NaN values.
-
-    Arguments:
-    - `path::String`        Path to .sf file
-
-    Returns:
-    - `ok::Bool`            File is valid? (true/false)
-    """
-    function check_spfile_integrity(path::String)::Bool
-
-        @debug "Checking integrity of spectral file"
-
-        spectral_file_run::String  = abspath(path)
-        spectral_file_runk::String = spectral_file_run*"_k"
-
-        if occursin("NaN", readchomp(spectral_file_runk))
-            @error "Spectral_k file contains NaN values"
-            return false
-        end
-        if occursin("NaN", readchomp(spectral_file_run))
-            @error "Spectral file contains NaN values"
-            return false
-        end
-
         return true
     end
 
@@ -449,8 +428,9 @@ module spectrum
                 # input mon file
                 mon = abspath(joinpath(ENV["RAD_DIR"], "data", "aerosol", s*".mon"))
                 if !isfile(mon)
-                    @error "Monochromatic aerosol data not found ($mon), skipping $s"
-                    continue
+                    @error "Monochromatic aerosol data not found for '$s'"
+                    @error "    Expected at: '$mon'"
+                    return avg_files
                 end
                 write(f, mon*" \n")
 
