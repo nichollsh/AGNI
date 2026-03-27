@@ -20,6 +20,54 @@ module spectrum
 
     include(joinpath(ENV["RAD_DIR"], "julia", "gen", "input_head_pcf.jl"))
 
+    # Constants
+    const FLOAT_SML = 1.0e-45
+    const FLOAT_BIG = 1.0e45
+
+
+    """
+    **Count the number of gaseous absorbers in a SOCRATES spectral file.**
+
+    Arguments:
+    - `spec_file::String`   Path to spectral file
+
+    Returns:
+    - `num_gases::Int`      Number of gaseous absorbers, or -1 if not found
+    """
+    function count_gases(spec_file::String)::Int
+
+        if !isfile(spec_file)
+            @error "Spectral file not found: '$spec_file'"
+            return -1
+        end
+
+        # Read file and search for the gas count line
+        @debug "Counting gaseous absorbers in spectral file: '$spec_file'"
+        lines = readlines(spec_file)
+        for line in lines
+            if contains(line, "Total number of gaseous absorbers")
+                # Extract the number from the line
+                # Format: "Total number of gaseous absorbers =     6"
+                parts = split(line, "=")
+                if length(parts) == 2
+                    num_str = strip(parts[2])
+                    try
+                        return parse(Int, num_str)
+                    catch
+                        @error "Could not parse gas count from line: '$line'"
+                        return -1
+                    end
+                else
+                    @error "Unexpected format for gas count line: '$line'"
+                    return -1
+                end
+            end
+        end
+
+        @error "Could not find 'Total number of gaseous absorbers' in spectral file"
+        return -1
+    end
+
     """
     **Insert aerosol header information into a SOCRATES spectral file.**
 
@@ -117,7 +165,7 @@ module spectrum
         fl *= S0 / ( phys.σSB * Teff^4)
 
         # Limit range on fl to prevent numerical problems
-        clamp!(fl, 1e-30, 1e30)
+        clamp!(fl, FLOAT_SML, FLOAT_BIG)
 
         return wl, fl
     end
@@ -179,7 +227,7 @@ module spectrum
         if len_wl < 500
             @warn "Loaded stellar spectrum is very short!"
         end
-        if minimum(wl) < 1.0e-45
+        if minimum(wl) < FLOAT_SML
             @error "Minimum wavelength is too small"
             return false
         end
@@ -187,7 +235,7 @@ module spectrum
             @error "Stellar wavelength array must be strictly ascending"
             return false
         end
-        clamp!(fl, 1.0e-45, 1.0e+45)  # Clamp values
+        clamp!(fl, FLOAT_SML, FLOAT_BIG)  # Clamp values
 
         # Ensure that wl array has no duplicates
         # https://discourse.julialang.org/t/unique-indices-method-similar-to-matlab/34446/3
@@ -289,6 +337,13 @@ module spectrum
         cp(orig_file,      outp_file;      force=true)
         cp(orig_file*"_k", outp_file*"_k"; force=true)
 
+        # Count number of gaseous absorbers in file, for later use
+        num_gases = count_gases(outp_file)
+        if num_gases < 0
+            @error "Failed to parse gaseous absorbers in spectral file"
+            return false
+        end
+
         # Add all aerosol header information into spectral file
         if insert_aerosol
             insert_aerosol_header(outp_file, [s for s in keys(aerosol_avg_files)]) || return false
@@ -330,6 +385,11 @@ module spectrum
                 write(f, "3 \n")       #  block 3, please
                 write(f, "c \n")       #  custom composition
                 write(f, "a \n")       #  all gases
+
+                # If there's only one gas, add an extra 'y' confirmation
+                if num_gases == 1
+                    write(f, "y \n")
+                end
             end
 
             # write aerosol properties
