@@ -5,18 +5,33 @@ Literature cited in the AGNI source code and documentation. Grouped thematically
 ## Primary AGNI publications
 
 - **Nicholls et al. (2025a)**
-  Magma ocean outgassing and atmosphere structure on sub-Neptunes.
-  *Monthly Notices of the Royal Astronomical Society*, 536(3), 2957–2984.
-  [doi:10.1093/mnras/stae2772](https://doi.org/10.1093/mnras/stae2772)
+  Convective shutdown in the atmospheres of lava worlds
+  MNRAS, [doi:10.1093/mnras/stae2772](https://doi.org/10.1093/mnras/stae2772)
 
 - **Nicholls et al. (2025b)**
   AGNI: An open-source model for extreme atmospheres on rocky exoplanets.
-  *Journal of Open Source Software*, 10(107), 7726.
-  [doi:10.21105/joss.07726](https://doi.org/10.21105/joss.07726)
+  JOSS, [doi:10.21105/joss.07726](https://doi.org/10.21105/joss.07726)
 
 - **Nicholls et al. (2026)**
-  *arXiv preprint* arXiv:2507.02656.
-  [arxiv:2507.02656](https://arxiv.org/abs/2507.02656)
+  Volatile-rich evolution of molten super-Earth L 98-59 d
+  Nature Astronomy, [doi:10.1038/s41550-026-02815-8](https://doi.org/10.1038/s41550-026-02815-8)
+
+```bibtex
+@article{nicholls_convective_2025,
+	author = {Nicholls, Harrison and Pierrehumbert, Raymond T. and Lichtenberg, Tim and Soucasse, Laurent and Smeets, Stef},
+	title = {{Convective shutdown in the atmospheres of lava worlds}},
+	journal = {Mon. Not. R. Astron. Soc.},
+	volume = {536},
+	number = {3},
+	pages = {2957--2971},
+	year = {2025},
+	month = jan,
+	issn = {0035-8711},
+	publisher = {Oxford Academic},
+	doi = {10.1093/mnras/stae2772}
+}
+```
+
 
 ## Radiative transfer
 
@@ -92,7 +107,7 @@ Literature cited in the AGNI source code and documentation. Grouped thematically
 
 ## Individual gas opacity data
 
-- **Polyansky et al. (2018)**  — H₂O
+- **Polyansky et al. (2018)**  — H2O
   ExoMol molecular line lists XXX: a complete high-accuracy line list for water.
   *Monthly Notices of the Royal Astronomical Society*, 480(2), 2597–2608.
   [doi:10.1093/mnras/sty1877](https://doi.org/10.1093/mnras/sty1877)
@@ -107,8 +122,8 @@ Literature cited in the AGNI source code and documentation. Grouped thematically
   *Astronomy & Astrophysics*, 605, A95.
   [doi:10.1051/0004-6361/201731026](https://doi.org/10.1051/0004-6361/201731026)
 
-- **Yurchenko et al. (2020)**  — CO₂
-  ExoMol line lists XXXIX: Ro-vibrational molecular line list for CO₂.
+- **Yurchenko et al. (2020)**  — CO2
+  ExoMol line lists XXXIX: Ro-vibrational molecular line list for CO2.
   *Monthly Notices of the Royal Astronomical Society*, 496(4), 5282–5291.
   [doi:10.1093/mnras/staa1874](https://doi.org/10.1093/mnras/staa1874)
 
@@ -127,13 +142,13 @@ Literature cited in the AGNI source code and documentation. Grouped thematically
   *Monthly Notices of the Royal Astronomical Society*, 437(2), 1828–1835.
   [doi:10.1093/mnras/stt2011](https://doi.org/10.1093/mnras/stt2011)
 
-- **Roueff et al. (2019)**  — H₂
+- **Roueff et al. (2019)**  — H2
   The full infrared spectrum of molecular hydrogen.
   *Astronomy & Astrophysics*, 630, A58.
   [doi:10.1051/0004-6361/201936249](https://doi.org/10.1051/0004-6361/201936249)
 
-- **Western et al. (2018)**  — N₂
-  The spectrum of N₂ from 4,500 to 15,700 cm⁻¹ revisited with PGOPHER.
+- **Western et al. (2018)**  — N2
+  The spectrum of N2 from 4,500 to 15,700 cm⁻¹ revisited with PGOPHER.
   *Journal of Quantitative Spectroscopy and Radiative Transfer*, 219, 127–141.
   [doi:10.1016/j.jqsrt.2018.07.017](https://doi.org/10.1016/j.jqsrt.2018.07.017)
 
@@ -147,8 +162,8 @@ Literature cited in the AGNI source code and documentation. Grouped thematically
   *Astronomy & Astrophysics*, 588, A96.
   [doi:10.1051/0004-6361/201526961](https://doi.org/10.1051/0004-6361/201526961)
 
-- **Shemansky (1969)**  — N₂ Vegard–Kaplan system
-  N₂ Vegard–Kaplan system in absorption.
+- **Shemansky (1969)**  — N2 Vegard–Kaplan system
+  N2 Vegard–Kaplan system in absorption.
   *The Journal of Chemical Physics*, 51(2), 689–700.
   [doi:10.1063/1.1672058](https://doi.org/10.1063/1.1672058)
 
@@ -156,18 +171,18 @@ Literature cited in the AGNI source code and documentation. Grouped thematically
 
 ## Equations of state
 
-- **Wagner & Pruß (2002)**  — H₂O (IAPWS-95)
+- **Wagner & Pruß (2002)**  — H2O (IAPWS-95)
   The IAPWS Formulation 1995 for the Thermodynamic Properties of Ordinary Water Substance for General and Scientific Use.
   *Journal of Physical and Chemical Reference Data*, 31(2), 387–535.
   [doi:10.1063/1.1461829](https://doi.org/10.1063/1.1461829)
 
-- **Feistel & Wagner (2006)**  — H₂O ice
-  A new equation of state for H₂O Ice Ih.
+- **Feistel & Wagner (2006)**  — H2O ice
+  A new equation of state for H2O Ice Ih.
   *Journal of Physical and Chemical Reference Data*, 35(2), 1021–1047.
   [doi:10.1063/1.2183324](https://doi.org/10.1063/1.2183324)
 
-- **Haldemann et al. (2020)**  — AQUA H₂O EOS
-  AQUA: A collection of H₂O equations of state for planetary models.
+- **Haldemann et al. (2020)**  — AQUA H2O EOS
+  AQUA: A collection of H2O equations of state for planetary models.
   *Astronomy & Astrophysics*, 643, A105.
   [doi:10.1051/0004-6361/202038367](https://doi.org/10.1051/0004-6361/202038367)
 
