@@ -24,6 +24,15 @@ module spectrum
     const FLOAT_SML = 1.0e-45
     const FLOAT_BIG = 1.0e45
 
+    """
+    **Get the version of SOCRATES being used.**
+
+    Returns:
+    - `version::String`  Version string from SOCRATES `version` file
+    """
+    function get_socrates_version()::String
+        return readchomp(joinpath(ENV["RAD_DIR"],"version"))
+    end
 
     """
     **Count the number of gaseous absorbers in a SOCRATES spectral file.**
@@ -387,7 +396,7 @@ module spectrum
                 write(f, "a \n")       #  all gases
 
                 # If there's only one gas, add an extra 'y' confirmation
-                if num_gases == 1
+                if (num_gases == 1) && !startswith(get_socrates_version(), "24")
                     write(f, "y \n")
                 end
             end

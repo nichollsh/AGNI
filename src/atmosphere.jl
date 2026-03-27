@@ -609,7 +609,7 @@ module atmosphere
             @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
 
             # Get SOCRATES version
-            atmos.SOCRATES_VERSION = readchomp(joinpath(ENV["RAD_DIR"],"version"))
+            atmos.SOCRATES_VERSION = spectrum.get_socrates_version()
             @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
             # Check SOCRATES version is valid
