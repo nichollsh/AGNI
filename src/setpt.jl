@@ -455,8 +455,13 @@ module setpt
     **Set T = max(T,T_dew) for a specified gas.**
 
     Does not modify VMRs. Does update water-cloud locations.
+
+    Arguments:
+    - `atmos`: Atmosphere object to modify.
+    - `gas`: Name of gas to check for saturation.
+    - `dTdew`: Tolerance for saturation check.
     """
-    function saturation!(atmos::atmosphere.Atmos_t, gas::String)
+    function saturation!(atmos::atmosphere.Atmos_t, gas::String; dTdew::Float64=0.05)
 
         if !(atmos.is_alloc && atmos.is_param)
             @error "setpt: Atmosphere is not setup or allocated"
@@ -483,8 +488,8 @@ module setpt
 
             # Otherwise...
             Tdew = phys.get_Tdew(atmos.gas_dat[gas], pgas)
-            if tmp <= Tdew + 1e-2
-                return (Tdew, true)
+            if tmp <= Tdew + dTdew
+                return (Tdew - dTdew, true)
             else
                 return (tmp, false)
             end
