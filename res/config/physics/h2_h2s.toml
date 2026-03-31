@@ -18,12 +18,12 @@ title = "H2 + H2S test"
 [files]
     input_sf        = "res/spectral_files/Honeyside/256/Honeyside.sf"
     input_star      = "res/stellar_spectra/sun.txt"
-    output_dir      = "out/"
+    output_dir      = "nogit_h2s/h2o_30.0"
 
 [composition]
     p_surf          = 1e3
     p_top           = 1e-5
-    vmr_dict        = { H2=0.999, H2S=0.001 }
+    vmr_dict        = { H2=0.7, H2O=0.3 }
     condensates     = []
 
 [execution]
@@ -34,8 +34,8 @@ title = "H2 + H2S test"
     num_levels      = 40
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 500.0
-    initial_state   = ["ncdf","nogit_h2s/out_01.0/atm.nc"]
+    dx_max          = 400.0
+    initial_state   = ["loglin","500"]
     linesearch      = 2
     easy_start      = false
     grey_start      = false
