@@ -70,15 +70,20 @@ module plotting
 
 
     """
-    Plot the temperature-pressure profile.
+    Plot the temperature-pressure and Kzz profile.
     """
     function plot_pt(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int=500, size_y::Int=400,
                             incl_magma::Bool=false,
                             title::String="")
 
+
+
+        y = atmos.pl ./ 1e5 # pressure -> bar
+
         # Create plot
-        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos), legend=:outertopright,
+        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
+                        # legend=:outertopright,
                         size=(size_x,size_y); plt_default...)
 
         # Plot phase boundary
@@ -114,16 +119,17 @@ module plotting
         scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, atmos.pl/1e5, lc="black", lw=2, label=L"T(p)")
+        plot!(plt, atmos.tmpl, y, lc="black", lw=2, label=L"T(p)")
 
         # Dummy Kzz plot for legend
-        plot!(plt, [0.0,0.0], [1.0, 1.0], lc="darkgreen", lw=1.5, ls=:dash, label=L"K_{zz}")
+        plot!(plt, [-1,-2], [1.0, 1.0], lc="darkgreen", lw=2, ls=:solid, label=L"K_{zz}")
 
         # Plot current surface pressure and original
         @_plt_pboa
         @_plt_poboa
 
         # Decorate
+        xlims!(plt, (0.0, maximum(atmos.tmpl)+5.0))
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
@@ -134,16 +140,20 @@ module plotting
 
         # Add secondary x-axis for Kzz profile
         plt2 = twiny(plt)
-        x2lims = (max(minimum(atmos.Kzz), 1e-20), maximum(atmos.Kzz)*1.5)
-        plot!(plt2, atmos.Kzz, atmos.pl/1e5,
-              lc="darkgreen", lw=1.5, ls=:dash, label="", alpha=0.7)
-        xlabel!(plt2, L"K_{zz}" * " [m² s⁻¹]")
+
+        x = atmos.Kzz .* 1e4 # convert from m²/s to cm²/s for plotting
+        xmin = min(2.0, log10(minimum(x[x.>0])))
+        x = log10.(clamp.(x, 10.0 ^ xmin, Inf64))
+        mask = (atmos.flux_cdry .> 0.0)
+
+        plot!(plt2, x, y,             lc="darkgreen", label="", ls=:dot)
+        plot!(plt2, x[mask], y[mask], lc="darkgreen", label="", ls=:solid)
+        xlabel!(plt2, "log₁₀ " * L"K_{zz}" * " [cm²/s]")
         ylims!(plt2, _get_ylims(atmos))
         yticks!(plt2, _get_yticks(atmos))
         yflip!(plt2)
         yaxis!(plt2, yscale=:log10)
-        xlims!(plt2, x2lims)
-        xaxis!(plt2, xscale=:log10)
+        xlims!(plt2, (xmin, maximum(x)+1))
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -229,7 +239,7 @@ module plotting
         @_plt_poboa
 
         # Decorate
-        xlabel!(plt, "log10(mass mixing ratio)")
+        xlabel!(plt, "₁₀(mass mixing ratio)")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)

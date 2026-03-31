@@ -206,6 +206,7 @@ module atmosphere
         layer_μ::Array{Float64,1}           # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
         layer_kc::Array{Float64,1}          # thermal conductivity at const-p [W m-1 K-1]
+        layer_Hp::Array{Float64,1}          # pressure scale height [m]
         layer_thick::Array{Float64,1}       # geometrical thickness [m]
         layer_isbound::Array{Bool,1}        # is this layer strongly bound by gravity?
 
@@ -255,10 +256,10 @@ module atmosphere
         # Convection
         mlt_asymptotic::Bool                # INPUT: Mixing length scales asymptotically, but ~0 near ground
         mlt_criterion::Char                 # INPUT: Stability criterion. Options: (s)chwarzschild, (l)edoux
-        Kzz_floor::Float64                  # INPUT: Kzz floor [m2 s-1]
-        Kzz_ceiling::Float64                # INPUT: Kzz ceiling [m2 s-1]
-        Kzz_pbreak::Float64                 # INPUT: Kzz break point pressure [Pa]
+        Kzz_pbreak::Float64                # INPUT: Kzz break point pressure [Pa]
         Kzz_kbreak::Float64                 # INPUT: Kzz break point diffusion [m2 s-1]
+        Kzz_power::Float64                  # INPUT: Power law index for Kzz scaling above reference point
+        Kzz_type::Int                       # INPUT: Parametrisation of Kzz
         mask_c::Array{Bool,1}               # OUT: Layers transporting convective flux
         flux_cdry::Array{Float64,1}         # OUT: Dry convective fluxes from MLT
         Kzz::Array{Float64,1}               # OUT: Eddy diffusion coefficient from MLT
@@ -423,7 +424,8 @@ module atmosphere
     - `tmp_floor::Float64`              temperature floor [K].
     - `surf_roughness::Float64`         surface roughness length scale [m]
     - `surf_windspeed::Float64`         surface wind speed [m s-1].
-    - `Kzz_floor::Float64`              min eddy diffusion coefficient, cgs units [cm2 s-1]
+    - `Kzz_kbreak::Float64`             reference eddy diffusion coefficient, cgs units [cm2 s-1]
+    - `Kzz_type::Int`                   parametrisation of Kzz. Options: 1 (constant), 2 (MLT wl), 3 (MLT Fc)
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
@@ -478,7 +480,8 @@ module atmosphere
                     tmp_ceiling::Float64 =      2e4,
                     surf_roughness::Float64 =   0.001,
                     surf_windspeed::Float64 =   2.0,
-                    Kzz_floor::Float64 =        1e5,
+                    Kzz_kbreak::Float64 =       1e5,
+                    Kzz_type::Int =             2,
                     mlt_asymptotic::Bool =      true,
                     mlt_criterion::Char =       's',
                     tmp_magma::Float64 =        3000.0,
@@ -681,10 +684,10 @@ module atmosphere
         atmos.κ_grey_sw = κ_grey_sw
         _check_range("Grey SW opacity", atmos.κ_grey_sw; min=0) || return false
 
-        atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
-        atmos.Kzz_ceiling =     1.0e20 / 1e4
         atmos.Kzz_pbreak =      1e5 # 1 bar as default location for break point
-        atmos.Kzz_kbreak =      max(0.0, atmos.Kzz_floor)
+        atmos.Kzz_kbreak =      max(0.0, Kzz_kbreak)
+        atmos.Kzz_power =       -0.4
+        atmos.Kzz_type =        Kzz_type
         atmos.mlt_asymptotic =  mlt_asymptotic
         atmos.mlt_criterion =   mlt_criterion
 
@@ -782,6 +785,7 @@ module atmosphere
         atmos.layer_ρ       = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         atmos.layer_kc      = zeros(Float64, atmos.nlev_c)
+        atmos.layer_Hp      = zeros(Float64, atmos.nlev_c)
 
         # Initialise cloud arrays
         atmos.cloud_arr_r   = zeros(Float64, atmos.nlev_c)
@@ -1440,6 +1444,9 @@ module atmosphere
         # Perform hydrostatic integration
         ok = ok && calc_profile_radius!(atmos)
 
+        # Calculate scale height at each layer
+        calc_profile_Hp!(atmos)
+
         return ok
     end
 
@@ -1710,6 +1717,40 @@ module atmosphere
                                                     atmos.tmp[idx], atmos.p[idx],
                                                     atmos.layer_μ[idx]
                                                     )
+
+        return nothing
+    end
+
+        """
+    **Calculate the scale height for all layers.**
+
+    Requires temperature, pressure, mmw to be already have been set.
+
+    Arguments:
+        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function calc_profile_Hp!(atmos::atmosphere.Atmos_t)
+        @inbounds for i in 1:atmos.nlev_c
+            calc_single_Hp!(atmos, i)
+        end
+        return nothing
+    end
+
+    """
+    **Calculate the scale height of a single layer.**
+
+    Requires temperature, pressure, mmw to be already have been set.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    - `idx::Int`            index of the layer
+    """
+    function calc_single_Hp!(atmos::atmosphere.Atmos_t, idx::Int)
+        if atmos.real_gas
+            atmos.layer_Hp[idx] = atmos.p[idx] / (atmos.layer_ρ[idx] * atmos.g[idx])
+        else
+            atmos.layer_Hp[idx] = phys.R_gas * atmos.tmp[idx] / (atmos.layer_μ[idx] * atmos.g[idx])
+        end
         return nothing
     end
 

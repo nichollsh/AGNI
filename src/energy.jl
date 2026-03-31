@@ -698,23 +698,21 @@ module energy
             mu   = atmos.layer_μ[i]    * m2 + atmos.layer_μ[i-1]    * m1
             c_p  = atmos.layer_cp[i]   * m2 + atmos.layer_cp[i-1]   * m1
             rho  = atmos.layer_ρ[i]    * m2 + atmos.layer_ρ[i-1]    * m1
+            Hp   = atmos.layer_Hp[i]   * m2 + atmos.layer_Hp[i-1]   * m1
 
-            # Dry convective lapse rate, and pressure scale height
+            # Dry convective lapse rate
             if atmos.real_gas && CONVECT_REAL_GAS
                 # general solution
                 ∇_ad = atmos.pl[i] / (atmos.tmpl[i] * rho * c_p)
-                Hp = atmos.pl[i] / (rho * atmos.gl[i])
             else
                 # ideal gas solution
                 ∇_ad = (phys.R_gas / mu) / c_p
-                Hp = phys.R_gas * atmos.tmpl[i] / (mu * atmos.gl[i])
             end
 
             # Calculate lapse rate deviation from stability
             if atmos.mlt_criterion == 's'
                 # Schwarzschild
                 staby = ∇_pr - ∇_ad
-
             else
                 # Ledoux is the only other option, for now
                 ∇_μ = log(atmos.layer_μ[i-1]/atmos.layer_μ[i]) / log(atmos.p[i-1]/atmos.p[i])
@@ -742,83 +740,77 @@ module energy
                 # Dry convective flux
                 atmos.flux_cdry[i] = 0.5*rho*c_p*atmos.w_conv[i] * atmos.tmpl[i] * (atmos.λ_conv[i]/Hp) * staby
 
-                # Convection eddy diffusion coefficient [m2 s-1]
-                atmos.Kzz[i] =  atmos.w_conv[i] * atmos.λ_conv[i]
-
+                # Kzz calculation
+                if atmos.Kzz_type == 1
+                    # Constant value
+                    atmos.Kzz[i] = atmos.Kzz_kbreak
+                elseif atmos.Kzz_type == 2
+                    # Simple scaling
+                    atmos.Kzz[i] = atmos.λ_conv[i] * atmos.w_conv[i]
+                elseif atmos.Kzz_type == 3
+                    # Eq16 from Charnay+15
+                    atmos.Kzz[i] = (Hp/3.0) * (atmos.λ_conv[i]/Hp)^(4.0/3.0) * (phys.R_gas*atmos.flux_c[i]/(mu*rho*c_p))^(1.0/3.0)
+                else
+                    @error "Invalid Kzz_type parameter: $Kzz_type"
+                end
             end
         end
 
         # Set surface quantities
-        atmos.Kzz[end]    = atmos.Kzz[end-1]
-        atmos.w_conv[end] = atmos.w_conv[end-1]
-        atmos.λ_conv[end] = atmos.λ_conv[end-1]
-
-        # Check for spurious shallow convection occuring ABOVE condensing regions
-        # @inbounds for i in 1:atmos.nlev_l-1
-        #     if (!atmos.mask_l[i] && any(atmos.mask_l[i+1:end])) #|| (atmos.mask_l[i] && !atmos.mask_c[i-1] && !atmos.mask_c[i+1])
-        #         atmos.mask_c[i] = false
-        #         atmos.flux_cdry[i] = 0.0
-        #     end
-        # end
+        atmos.w_conv[end]    = 0.0
+        atmos.λ_conv[end]    = 0.0
+        atmos.flux_cdry[end] = 0.0
 
         return nothing
     end # end of mlt
 
     """
-    **Fill Kzz values for the entire profile.**
+    **Fill Kzz values for remaining regions of profile.**
 
-    This function is called after the convection scheme has been run.
+    This function is called after the convective fluxes have been calculated.
+    The Kzz value in the convective regions are already calculated in the MLT scheme.
 
-    The Kzz value in the convective region (and below) are set equal to the maximum value
-    in the convective region, as calculated by MLT. The value increases with power-law
-    scaling with pressure in the stratosphere.
+    This function calculates Kzz in the non-convective regions, by extending
+    the Kzz values from the convective region through various parameters.
 
     Arguments:
-    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+
+    Returns:
+    - `ok::Bool`            function executed successfully
+
     """
-    function fill_Kzz!(atmos::atmosphere.Atmos_t)
+    function fill_Kzz!(atmos::atmosphere.Atmos_t)::Bool
 
-        Fthresh::Float64 = 1.0e-8
+        # Temporary value
+        Kzz_pref::Float64 = atmos.Kzz_pbreak
 
-        # Kzz limits
-        clamp!(atmos.Kzz, atmos.Kzz_floor, atmos.Kzz_ceiling)
-
-        # Find bottom of convective region (looping downwards)
-        i_cnvct_bot::Int = atmos.nlev_l
-        @inbounds for i in 1:atmos.nlev_l
-            if atmos.flux_cdry[i] > Fthresh
-                i_cnvct_bot = i
-            end
+        # Find reference index for extension of Kzz, starting from convective regions
+        i_Kzz_top::Int = atmos.nlev_l # default
+        i_Kzz_bot::Int = atmos.nlev_l # default
+        if any(atmos.Kzz .> 0.0)
+            # set to maximum of Kzz
+            i_Kzz_top = findmax(atmos.Kzz)[2]
+            # set to bottom of convective region
+            i_Kzz_bot = findlast(x -> x > 0.0, atmos.Kzz)
+        else
+            # otherwise, set to reference pressure
+            i_Kzz_top = findmin(abs.(atmos.pl .- atmos.Kzz_kbreak))[2]
+            i_Kzz_bot = i_Kzz_top
+            atmos.Kzz[i_Kzz_top] = atmos.Kzz_kbreak
         end
+        Kzz_pref = atmos.pl[i_Kzz_top]
 
-        # Find top of convective region (looping upwards from bottom)
-        i_cnvct_top::Int = i_cnvct_bot
-        atmos.Kzz_pbreak = min(1e5, atmos.pl[end])
-        atmos.Kzz_kbreak = atmos.Kzz_floor
-        for i in range(start=i_cnvct_bot, step=-1, stop=1)
-            if atmos.flux_cdry[i] > Fthresh
-                i_cnvct_top = i
-            end
-        end
-
-        # Store breakpoint values
-        atmos.Kzz_pbreak = atmos.pl[i_cnvct_top]
-        atmos.Kzz_kbreak = atmos.Kzz[i_cnvct_top]
-
-        # Set Kzz within and below convective region to constant value. This value best
-        #    represents the diffusive mixing in this region.
-        atmos.Kzz[i_cnvct_bot:end] .= atmos.Kzz[i_cnvct_bot]
-
-        # Extend Kzz in stratosphere based on power-law scaling.
+        # In regions above reference point, extend with power-law scaling.
         #   See equation 28 in Tsai+2020
-        #   https://iopscience.iop.org/article/10.3847/1538-4357/ac29bc/pdf
-        atmos.Kzz[1:i_cnvct_top-1] .= atmos.Kzz[i_cnvct_top] .*
-                                        ( atmos.Kzz_pbreak ./ atmos.pl[1:i_cnvct_top-1]).^0.4
+        #       https://iopscience.iop.org/article/10.3847/1538-4357/ac29bc/pdf
+        #   See also Charnay+15, Moses+16
+        atmos.Kzz[1:i_Kzz_top] .= atmos.Kzz[i_Kzz_top] .* (  atmos.pl[1:i_Kzz_top] ./ Kzz_pref) .^ atmos.Kzz_power
 
-        # Kzz limits
-        clamp!(atmos.Kzz, atmos.Kzz_floor, atmos.Kzz_ceiling)
+        # Extend Kzz downwards with constant value
+        atmos.Kzz[i_Kzz_bot:end] .= atmos.Kzz[i_Kzz_bot]
 
-        return nothing
+        return true
     end
 
     """
@@ -1016,6 +1008,9 @@ module energy
             atmos.flux_cdry *= convect_sf               # Modulate for stability?
             @. atmos.flux_tot += atmos.flux_cdry # Add to total flux
         end
+
+        # Calculate Kzz in non-convective regions
+        fill_Kzz!(atmos)
 
         # +Surface turbulence
         if sens_heat

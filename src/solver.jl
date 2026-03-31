@@ -999,11 +999,6 @@ module solver
         # perform one last evaluation to set `atmos` given the final `x_cur`
         _set_tmps!(x_cur)
 
-        # calc kzz profile
-        if radiative_Kzz
-            energy.fill_Kzz!(atmos)
-        end
-
         # calc heating rate profile
         energy.calc_hrates!(atmos)
 
