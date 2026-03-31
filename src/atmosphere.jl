@@ -700,12 +700,12 @@ module atmosphere
         if atmos.real_gas && (atmos.mlt_criterion == 'l')
             @warn "Ledoux criterion not self-consistently supported for real gases"
             @warn "    (Will use Ledoux criterion anyway)"
-            # @warn "    Switching criterion to Schwarzschild, neglecting MMW gradients"
-            # atmos.mlt_criterion = 's'
         end
         if !(atmos.mlt_criterion in ['s','l'])
-            @error "Invalid choice for mlt_criterion: $(atmos.mlt_criterion)"
-            @error "    Must be: 's' or 'l' only"
+            @error "Invalid choice for mlt_criterion: '$(atmos.mlt_criterion)'"
+            @error "    Valid options:"
+            @error "        's' = Schwarzschild criterion (neglects composition gradients)"
+            @error "        'l' = Ledoux criterion (accounts for mean molecular weight gradients)"
             return false
         end
 
@@ -720,8 +720,8 @@ module atmosphere
         atmos.p_boa = p_surf * 1.0e5
         if atmos.p_toa > atmos.p_boa
             @error "Top pressure must be less than surface pressure"
-            @error "    p_top  = $p_top bar"
-            @error "    p_surf = $p_surf bar"
+            @error "    p_toa = $(atmos.p_toa/1e5) bar"
+            @error "    p_boa = $(atmos.p_boa/1e5) bar"
             return false
         end
         atmos.p_oboa = atmos.p_boa
@@ -739,12 +739,6 @@ module atmosphere
         atmos.transspec_grav =  0.0
         atmos.transspec_r    =  0.0
         atmos.transspec_p    =  2e3     # 20 mbar = 2000 Pa
-        if atmos.p_toa > atmos.transspec_p
-            @error "p_top must be less than transspec_p"
-            @error "    Got p_top:       $(atmos.p_toa) Pa"
-            @error "    and transspec_p: $(atmos.transspec_p) Pa"
-            return false
-        end
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -850,7 +844,7 @@ module atmosphere
         atmos.metal_orig =  Dict{String, Float64}()          # input metallicities rel to H
         atmos.metal_calc =  Dict{String, Float64}()          # calculated metallicities (empty for now)
         for k in keys(metallicities)
-            # mass -> mole, by scaling factor 1/mu
+            # mass -> mole, by scaling factor mu
             atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
         end
 
@@ -1158,6 +1152,12 @@ module atmosphere
         atmos.fastchem_cond         = joinpath(atmos.fastchem_work,"condensates.dat")
         atmos.fastchem_prof         = joinpath(atmos.fastchem_work,"pt.dat")
         atmos.fastchem_moni         = joinpath(atmos.fastchem_work,"monitor.dat")
+
+        _check_range("FastChem temperature floor",    atmos.fastchem_floor; min=100.0, max=10000.0) || return false
+        _check_range("FastChem chemistry tolerance",  atmos.fastchem_xtol_chem; min=1e-10, max=1.0) || return false
+        _check_range("FastChem element tolerance",    atmos.fastchem_xtol_elem; min=1e-10, max=1.0) || return false
+        _check_range("FastChem chemistry iterations", atmos.fastchem_maxiter_chem; min=100, max=1e7) || return false
+        _check_range("FastChem solver iterations",    atmos.fastchem_maxiter_solv; min=100, max=1e7) || return false
 
         # RFM
         atmos.flag_rfm = !(rfm_parfile == UNSET_STR)

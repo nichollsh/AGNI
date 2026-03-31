@@ -77,13 +77,11 @@ module plotting
                             incl_magma::Bool=false,
                             title::String="")
 
-
-
         y = atmos.pl ./ 1e5 # pressure -> bar
 
         # Create plot
         plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
-                        # legend=:outertopright,
+                        legend=:top,
                         size=(size_x,size_y); plt_default...)
 
         # Plot phase boundary
@@ -129,7 +127,7 @@ module plotting
         @_plt_poboa
 
         # Decorate
-        xlims!(plt, (0.0, maximum(atmos.tmpl)+5.0))
+        xlims!(plt, (minimum(atmos.tmpl)-10.0, maximum(atmos.tmpl)+10.0))
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
@@ -142,7 +140,10 @@ module plotting
         plt2 = twiny(plt)
 
         x = atmos.Kzz .* 1e4 # convert from m²/s to cm²/s for plotting
-        xmin = min(2.0, log10(minimum(x[x.>0])))
+        xmin = 2.0
+        if any(x .> 0.0)
+            xmin = min(xmin, log10(minimum(x[x.>0])))
+        end
         x = log10.(clamp.(x, 10.0 ^ xmin, Inf64))
         mask = (atmos.flux_cdry .> 0.0)
 

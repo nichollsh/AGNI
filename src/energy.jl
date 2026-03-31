@@ -434,7 +434,7 @@ module energy
     **Calculate turbulent kinetic energy (TKE) exchange coefficient**.
 
     Based on Monin–Obukhov similarity theory, from roughness length scale.
-    See eq 9 in Nicholson & Benn (2009). Added small epsilon-factor to avoid function
+    See eq 9 in Nicholson & Benn (2006). Added small epsilon-factor to avoid function
     blowing-up around regime where height ≈ roughness.
 
     Arguments:
@@ -795,7 +795,7 @@ module energy
             i_Kzz_bot = findlast(x -> x > 0.0, atmos.Kzz)
         else
             # otherwise, set to reference pressure
-            i_Kzz_top = findmin(abs.(atmos.pl .- atmos.Kzz_kbreak))[2]
+            i_Kzz_top = findmin(abs.(atmos.pl .- atmos.Kzz_pbreak))[2]
             i_Kzz_bot = i_Kzz_top
             atmos.Kzz[i_Kzz_top] = atmos.Kzz_kbreak
         end
@@ -891,6 +891,15 @@ module energy
 
     """
     **Calculate flux carried by conductive skin.**
+
+    This is a simple implementation of fourier's conduction law, with fixed conductivity
+    and thickness of the boundary layer. Parameters are set in the atmos struct.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+    - `flux::Float64`           conductive flux through the skin layer [W m-2].
     """
     function skin_flux(atmos::atmosphere.Atmos_t)::Float64
         return (atmos.tmp_magma - atmos.tmp_surf) * atmos.skin_k / atmos.skin_d
