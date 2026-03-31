@@ -749,7 +749,7 @@ module energy
                     atmos.Kzz[i] = atmos.λ_conv[i] * atmos.w_conv[i]
                 elseif atmos.Kzz_type == 3
                     # Eq16 from Charnay+15
-                    atmos.Kzz[i] = (Hp/3.0) * (atmos.λ_conv[i]/Hp)^(4.0/3.0) * (phys.R_gas*atmos.flux_c[i]/(mu*rho*c_p))^(1.0/3.0)
+                    atmos.Kzz[i] = (Hp/3.0) * (atmos.λ_conv[i]/Hp)^(4.0/3.0) * (phys.R_gas*atmos.flux_cdry[i]/(mu*rho*c_p))^(1.0/3.0)
                 else
                     @error "Invalid Kzz_type parameter: $Kzz_type"
                 end
@@ -783,29 +783,37 @@ module energy
     function fill_Kzz!(atmos::atmosphere.Atmos_t)::Bool
 
         # Temporary value
-        Kzz_pref::Float64 = atmos.Kzz_pbreak
+        Kzz_min::Float64  = 0.0
+
+        # Near-zero value
+        Kzz_eps::Float16 = 1.0e-10
 
         # Find reference index for extension of Kzz, starting from convective regions
         i_Kzz_top::Int = atmos.nlev_l # default
         i_Kzz_bot::Int = atmos.nlev_l # default
-        if any(atmos.Kzz .> 0.0)
-            # set to maximum of Kzz
-            i_Kzz_top = findmax(atmos.Kzz)[2]
+        if any(atmos.Kzz .> Kzz_eps)
+            # set to top of convective region
+            i_Kzz_top = findfirst(x -> x > Kzz_eps, atmos.Kzz)
             # set to bottom of convective region
-            i_Kzz_bot = findlast(x -> x > 0.0, atmos.Kzz)
+            i_Kzz_bot = findlast(x -> x > Kzz_eps, atmos.Kzz)
+            # get minimum value, for filling intermediate zones
+            Kzz_min = minimum(atmos.Kzz[atmos.Kzz .> Kzz_eps])
         else
             # otherwise, set to reference pressure
             i_Kzz_top = findmin(abs.(atmos.pl .- atmos.Kzz_pbreak))[2]
             i_Kzz_bot = i_Kzz_top
             atmos.Kzz[i_Kzz_top] = atmos.Kzz_kbreak
         end
-        Kzz_pref = atmos.pl[i_Kzz_top]
+
+        # Set zero-regions to minimum finite value
+        # This covers the scenarios where multiple detatched convective regions exist
+        atmos.Kzz[atmos.Kzz .<= Kzz_eps] .= Kzz_min
 
         # In regions above reference point, extend with power-law scaling.
         #   See equation 28 in Tsai+2020
         #       https://iopscience.iop.org/article/10.3847/1538-4357/ac29bc/pdf
         #   See also Charnay+15, Moses+16
-        atmos.Kzz[1:i_Kzz_top] .= atmos.Kzz[i_Kzz_top] .* (  atmos.pl[1:i_Kzz_top] ./ Kzz_pref) .^ atmos.Kzz_power
+        atmos.Kzz[1:i_Kzz_top] .= atmos.Kzz[i_Kzz_top] .* (  atmos.pl[1:i_Kzz_top] ./ atmos.pl[i_Kzz_top]) .^ atmos.Kzz_power
 
         # Extend Kzz downwards with constant value
         atmos.Kzz[i_Kzz_bot:end] .= atmos.Kzz[i_Kzz_bot]

@@ -256,7 +256,7 @@ module atmosphere
         # Convection
         mlt_asymptotic::Bool                # INPUT: Mixing length scales asymptotically, but ~0 near ground
         mlt_criterion::Char                 # INPUT: Stability criterion. Options: (s)chwarzschild, (l)edoux
-        Kzz_pbreak::Float64                # INPUT: Kzz break point pressure [Pa]
+        Kzz_pbreak::Float64                 # INPUT: Kzz break point pressure [Pa]
         Kzz_kbreak::Float64                 # INPUT: Kzz break point diffusion [m2 s-1]
         Kzz_power::Float64                  # INPUT: Power law index for Kzz scaling above reference point
         Kzz_type::Int                       # INPUT: Parametrisation of Kzz
