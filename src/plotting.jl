@@ -116,6 +116,9 @@ module plotting
         # Plot profile
         plot!(plt, atmos.tmpl, atmos.pl/1e5, lc="black", lw=2, label=L"T(p)")
 
+        # Dummy Kzz plot for legend
+        plot!(plt, [0.0,0.0], [1.0, 1.0], lc="darkgreen", lw=1.5, ls=:dash, label=L"K_{zz}")
+
         # Plot current surface pressure and original
         @_plt_pboa
         @_plt_poboa
@@ -128,6 +131,19 @@ module plotting
         if !isempty(title)
             title!(plt, title)
         end
+
+        # Add secondary x-axis for Kzz profile
+        plt2 = twiny(plt)
+        x2lims = (max(minimum(atmos.Kzz), 1e-20), maximum(atmos.Kzz)*1.5)
+        plot!(plt2, atmos.Kzz, atmos.pl/1e5,
+              lc="darkgreen", lw=1.5, ls=:dash, label="", alpha=0.7)
+        xlabel!(plt2, L"K_{zz}" * " [m² s⁻¹]")
+        ylims!(plt2, _get_ylims(atmos))
+        yticks!(plt2, _get_yticks(atmos))
+        yflip!(plt2)
+        yaxis!(plt2, yscale=:log10)
+        xlims!(plt2, x2lims)
+        xaxis!(plt2, xscale=:log10)
 
         if !isempty(fname)
             savefig(plt, fname)
