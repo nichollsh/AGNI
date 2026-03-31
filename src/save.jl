@@ -342,6 +342,7 @@ module save
             if length(atmos.aerosol_mmr) == 0
                 var_aerosols[:, 1] = fill(' ', nchars)
                 var_aer_l[1, :] = collect(0.0 for i in 1:nlev_c)
+                var_aer_r[1, :] = collect(0.0 for i in 1:nlev_c)
             else
                 for (i_aer, k_aer) in enumerate(sort(collect(keys(atmos.aerosol_mmr))))
                     # Fill aerosol names
@@ -352,9 +353,10 @@ module save
                         var_aerosols[i_char,i_aer] = k_aer[i_char]
                     end
 
-                    # Fill MMR
+                    # Fill MMR and sizes
                     for i_lvl in 1:nlev_c
                         var_aer_l[i_aer, i_lvl] = atmos.aerosol_mmr[k_aer][i_lvl]
+                        var_aer_r[i_aer, i_lvl] = atmos.aerosol_size[k_aer][i_lvl]
                     end
                 end
             end

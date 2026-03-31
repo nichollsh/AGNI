@@ -63,6 +63,7 @@ include("test_phys.jl")
 include("test_guillot.jl")
 include("test_ocean.jl")
 include("test_deep_heating.jl")
+include("test_kzz.jl")
 if suite != "fast"
     include("test_integration.jl")
 end

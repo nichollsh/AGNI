@@ -287,11 +287,11 @@ module atmosphere
         cloud_val_f::Float64                # /
 
         # Parametrised aerosols (SOCRATES's classic aerosol functionality)
-        aerosol_mmr::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles
+        aerosol_mmr::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles [kg/kg]
+        aerosol_size::Dict{String, Array{Float64,1}} # Aerosol particle size profiles [m]
         aerosol_names::Array{String,1}               # Map SOCRATES index (int) to name (string)
         aerosol_relhumid::Float64                    # Mean relative humidity used by moist aerosol schemes [0,1]
         aerosol_phase_num::Int                       # Number of phase-function moments retained when averaging
-        aerosol_mmr_ini::Float64                     # Default mass mixing ratio of aerosols
 
         # Deep atmospheric heating
         deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
@@ -801,14 +801,15 @@ module atmosphere
         atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
 
         # Aerosol parameters
-        atmos.aerosol_mmr_ini   = 0.0  # default MMR of aerosols
         atmos.aerosol_phase_num = 1    # number of phase-function moments
         atmos.aerosol_relhumid  = 0.0  # relative humidity used by moist aerosol schemes
         atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
+        atmos.aerosol_size = Dict{String, Array{Float64,1}}() # list of MMR profiles
         atmos.aerosol_names = String[] # list of species names, in same order as spectral file
         for (k, v) in aerosol_species
             _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
-            atmos.aerosol_mmr[lowercase(k)] = zeros(Float64, atmos.nlev_c)
+            atmos.aerosol_mmr[lowercase(k)]  = zeros(Float64, atmos.nlev_c)
+            atmos.aerosol_size[lowercase(k)] = zeros(Float64, atmos.nlev_c)
             set_aerosol!(atmos, lowercase(k), v)
 
             # Store empty strings for now (set in allocate! function)
