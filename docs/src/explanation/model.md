@@ -54,7 +54,7 @@ where $\lambda_{\text{conv}}$ is the mixing length and $w_{\text{conv}}$ is the 
 
 **Type 3: MLT convective flux scaling**
 
-Following Charnay et al. ([2015](https://doi.org/10.3847/0004-637X/813/1/15)), Equation 16:
+Following Charnay et al. ([2015](https://iopscience.iop.org/article/10.1088/0004-637X/813/1/15)), Equation 16:
 ```math
 K_{zz} = \frac{H_p}{3} \left(\frac{\lambda_{\text{conv}}}{H_p}\right)^{4/3} \left(\frac{R_{\text{gas}} F_c}{\mu \rho c_p}\right)^{1/3}
 ```
