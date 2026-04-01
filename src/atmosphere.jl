@@ -2318,7 +2318,7 @@ module atmosphere
                         atmos.aerosol_arr_l[name] = zeros(Float64, atmos.nlev_c)
                         if haskey(atmos.aerosol_arr_r, name)
                             @warn "Aerosol '$name' mismatched in arrays!"
-                        else
+                        end
                         atmos.aerosol_arr_r[name] = zeros(Float64, atmos.nlev_c)
                     end
                 end

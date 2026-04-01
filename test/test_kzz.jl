@@ -20,7 +20,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     radius          = 1.0e7
     Kzz_kbreak      = 1e6  # 1e6 cm2/s
     mf_dict         = Dict([("H2O", 1.0)])
-    spfile_name     = "$RES_DIR/spectral_files/Frostflow/48/Frostflow.sf"
+    spfile_name     = "$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
 
     atmos = atmosphere.Atmos_t()
     atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
