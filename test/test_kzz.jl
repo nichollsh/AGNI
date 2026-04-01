@@ -18,7 +18,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     gravity         = 10.0
     nlev_centre     = 100
     radius          = 1.0e7
-    Kzz_kbreak      = 1e6  # 1e6 cm2/s
+    Kzz_kbreak      = 1e6  # m2/s
     mf_dict         = Dict([("H2O", 1.0)])
     spfile_name     = "$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
 

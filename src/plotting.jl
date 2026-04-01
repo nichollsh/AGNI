@@ -242,7 +242,7 @@ module plotting
         @_plt_poboa
 
         # Decorate
-        xlabel!(plt, "₁₀(mass mixing ratio)")
+        xlabel!(plt, "log₁₀ Mass mixing ratio)")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)

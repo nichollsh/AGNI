@@ -425,7 +425,7 @@ module atmosphere
     - `tmp_floor::Float64`              temperature floor [K].
     - `surf_roughness::Float64`         surface roughness length scale [m]
     - `surf_windspeed::Float64`         surface wind speed [m s-1].
-    - `Kzz_kbreak::Float64`             reference eddy diffusion coefficient, cgs units [cm2 s-1]
+    - `Kzz_kbreak::Float64`             reference eddy diffusion coefficient, SI units [m2 s-1]
     - `Kzz_type::Int`                   parametrisation of Kzz. Options: 1 (constant), 2 (MLT wl), 3 (MLT Fc)
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.

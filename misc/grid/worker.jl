@@ -787,7 +787,6 @@ for (i,p) in enumerate(grid_flat)
                                             easy_start=easy_start,
                                             modplot=modplot,
                                             save_frames=false,
-                                            radiative_Kzz=false,
                                             perturb_all=cfg["execution"]["perturb_all"],
                                             )
     # Report radius

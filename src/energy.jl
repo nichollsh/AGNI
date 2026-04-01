@@ -751,7 +751,7 @@ module energy
                     # Eq16 from Charnay+15
                     atmos.Kzz[i] = (Hp/3.0) * (atmos.λ_conv[i]/Hp)^(4.0/3.0) * (phys.R_gas*atmos.flux_cdry[i]/(mu*rho*c_p))^(1.0/3.0)
                 else
-                    @error "Invalid Kzz_type parameter: $Kzz_type"
+                    @error "Invalid Kzz_type parameter: $(atmos.Kzz_type)"
                 end
             end
         end
@@ -786,7 +786,7 @@ module energy
         Kzz_min::Float64  = 0.0
 
         # Near-zero value
-        Kzz_eps::Float16 = 1.0e-10
+        Kzz_eps::Float64 = 1.0e-10
 
         # Find reference index for extension of Kzz, starting from convective regions
         i_Kzz_top::Int = atmos.nlev_l # default
