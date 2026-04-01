@@ -274,6 +274,7 @@ module save
             var_cldr  =     defVar(ds, "cloud_size",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_aerosols =  defVar(ds, "aerosols",  Char,    ("nchars", "naeros");  nc_comp..., ) # Transposed cf JANUS because of how Julia stores arrays
             var_aer_l =     defVar(ds, "aer_mmr",   Float64, ("naeros", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "kg kg-1", "long_name" => "Aerosol mass mixing ratio relative to dry air")) # ^^
+            var_aer_r =     defVar(ds, "aer_size",  Float64, ("naeros", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "m", "long_name" => "Aerosol particle size")) # ^^
             var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
