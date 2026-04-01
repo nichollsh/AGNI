@@ -287,8 +287,9 @@ module atmosphere
         cloud_val_f::Float64                # /
 
         # Parametrised aerosols (SOCRATES's classic aerosol functionality)
-        aerosol_mmr::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles [kg/kg]
-        aerosol_size::Dict{String, Array{Float64,1}} # Aerosol particle size profiles [m]
+        aerosol_arr_l::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles [kg/kg]
+        aerosol_arr_r::Dict{String, Array{Float64,1}}  # Aerosol particle size profiles [m]
+        aerosol_val_r::Float64                         # Default particle size for aerosol species, if not specified in array
         aerosol_names::Array{String,1}               # Map SOCRATES index (int) to name (string)
         aerosol_relhumid::Float64                    # Mean relative humidity used by moist aerosol schemes [0,1]
         aerosol_phase_num::Int                       # Number of phase-function moments retained when averaging
@@ -795,22 +796,24 @@ module atmosphere
         _check_range("Evaporation efficiency", atmos.evap_efficiency; min=0, max=1) || return false
 
         # Hardcoded cloud properties
-        atmos.cloud_alpha   = 0.01    # 1% of condensed water forms substantial clouds
-        atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
-        atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
-        atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
+        atmos.cloud_alpha   = 0.01    # [INPUT] 1% of condensed water forms substantial clouds
+        atmos.cloud_val_r   = 1.0e-5  # [INPUT] 10 micron droplets
+        atmos.cloud_val_l   = 0.8     # [INPUT] Mass mixing ratio of water in each layer
+        atmos.cloud_val_f   = 0.8     # [INPUT] 100% of the cell "area" is cloud
 
         # Aerosol parameters
-        atmos.aerosol_phase_num = 1    # number of phase-function moments
-        atmos.aerosol_relhumid  = 0.0  # relative humidity used by moist aerosol schemes
-        atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
-        atmos.aerosol_size = Dict{String, Array{Float64,1}}() # list of MMR profiles
+        atmos.aerosol_phase_num = 1    # [INPUT] number of phase-function moments
+        atmos.aerosol_relhumid  = 0.0  # [INPUT] relative humidity used by moist aerosol schemes
+        atmos.aerosol_val_r = 1.0e-5   # [INPUT] default particle size for aerosol species
+        atmos.aerosol_arr_l = Dict{String, Array{Float64,1}}() # list of MMR profiles
+        atmos.aerosol_arr_r = Dict{String, Array{Float64,1}}() # list of particle size profiles
         atmos.aerosol_names = String[] # list of species names, in same order as spectral file
         for (k, v) in aerosol_species
+            k = lowercase(k)
             _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
-            atmos.aerosol_mmr[lowercase(k)]  = zeros(Float64, atmos.nlev_c)
-            atmos.aerosol_size[lowercase(k)] = zeros(Float64, atmos.nlev_c)
-            set_aerosol!(atmos, lowercase(k), v)
+            atmos.aerosol_arr_l[k] = zeros(Float64, atmos.nlev_c)
+            atmos.aerosol_arr_r[k] = zeros(Float64, atmos.nlev_c)
+            set_aerosol!(atmos,k , v)
 
             # Store empty strings for now (set in allocate! function)
             push!(atmos.aerosol_names, UNSET_STR)
@@ -1917,7 +1920,7 @@ module atmosphere
                     @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
                         atmos.spectral_file,
-                        [s for s in keys(atmos.aerosol_mmr)],
+                        [s for s in keys(atmos.aerosol_arr_l)],
                         atmos.IO_DIR,
                         atmos.aerosol_phase_num,
                         socstar,
@@ -1925,7 +1928,7 @@ module atmosphere
                     )
 
                     # check that all files were generated successfully
-                    if length(aerosol_avg_files_rt) != length(atmos.aerosol_mmr)
+                    if length(aerosol_avg_files_rt) != length(atmos.aerosol_arr_l)
                         @error "Failed to generate required aerosol .avg files"
                         list_available_aerosols(atmos)
                         return false
@@ -2310,14 +2313,18 @@ module atmosphere
                     # Enable aerosol
                     atmos.aer.mr_source[i] = SOCRATES.rad_pcf.ip_aersrc_classic_ron
 
-                    # Add array to aerosol_mmr if not requested by user already
-                    if !haskey(atmos.aerosol_mmr, name)
-                        atmos.aerosol_mmr[name] = zeros(Float64, atmos.nlev_c)
+                    # Add array if not requested by user already
+                    if !haskey(atmos.aerosol_arr_l, name)
+                        atmos.aerosol_arr_l[name] = zeros(Float64, atmos.nlev_c)
+                        if haskey(atmos.aerosol_arr_r, name)
+                            @warn "Aerosol '$name' mismatched in arrays!"
+                        else
+                        atmos.aerosol_arr_r[name] = zeros(Float64, atmos.nlev_c)
                     end
                 end
 
                 # warn if user has requested unsupported aerosol
-                for name in keys(atmos.aerosol_mmr)
+                for name in keys(atmos.aerosol_arr_l)
                     if !(name in atmos.aerosol_names)
                         @warn "Requested aerosol '$name' not found in spectral file"
                         list_available_aerosols(atmos)
@@ -2788,7 +2795,7 @@ module atmosphere
                 @info @sprintf("    %10s - %s", name, strip(title))
                 push!(aerosol_names, name)
             end
-            if isempty(atmos.aerosol_mmr)
+            if isempty(atmos.aerosol_arr_l)
                 @info "    [none]"
             end
 
@@ -2851,7 +2858,7 @@ module atmosphere
     end
 
     """
-    **Set aerosol profile for a given species.**
+    **Set aerosol profiles for a given species.**
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used
@@ -2873,15 +2880,18 @@ module atmosphere
         # Set mixing ratio profile for aerosol
         if isa(mmr, Float64)
             # constant profile
-            atmos.aerosol_mmr[species][idx_mask] .= mmr
+            atmos.aerosol_arr_l[species][idx_mask] .= mmr
         else
             # 1D profile
             if length(mmr) != length(atmos.p)
                 @error "Length of input mmr array does not match number of layers"
                 return false
             end
-            atmos.aerosol_mmr[species][idx_mask] .= mmr[idx_mask]
+            atmos.aerosol_arr_l[species][idx_mask] .= mmr[idx_mask]
         end
+
+        # Set constant size
+        fill!(atmos.aerosol_arr_r[species], atmos.aerosol_val_r)
 
         return true
     end

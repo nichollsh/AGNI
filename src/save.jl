@@ -127,7 +127,7 @@ module save
             nlev_c = Int(atmos.nlev_c)
             nlev_l = nlev_c + 1
             ngases = atmos.gas_num
-            naeros = max(1,length(atmos.aerosol_mmr))
+            naeros = max(1,length(atmos.aerosol_arr_l))
             nchars = 16
 
             defDim(ds, "nlev_c",    nlev_c)        # Cell centres
@@ -339,12 +339,12 @@ module save
             var_cldr[:] =   atmos.cloud_arr_r
 
             # Aerosols
-            if length(atmos.aerosol_mmr) == 0
+            if length(atmos.aerosol_arr_l) == 0
                 var_aerosols[:, 1] = fill(' ', nchars)
                 var_aer_l[1, :] = collect(0.0 for i in 1:nlev_c)
                 var_aer_r[1, :] = collect(0.0 for i in 1:nlev_c)
             else
-                for (i_aer, k_aer) in enumerate(sort(collect(keys(atmos.aerosol_mmr))))
+                for (i_aer, k_aer) in enumerate(sort(collect(keys(atmos.aerosol_arr_l))))
                     # Fill aerosol names
                     for i_char in 1:nchars
                         var_aerosols[i_char, i_aer] = ' '
@@ -355,8 +355,8 @@ module save
 
                     # Fill MMR and sizes
                     for i_lvl in 1:nlev_c
-                        var_aer_l[i_aer, i_lvl] = atmos.aerosol_mmr[k_aer][i_lvl]
-                        var_aer_r[i_aer, i_lvl] = atmos.aerosol_size[k_aer][i_lvl]
+                        var_aer_l[i_aer, i_lvl] = atmos.aerosol_arr_l[k_aer][i_lvl]
+                        var_aer_r[i_aer, i_lvl] = atmos.aerosol_arr_r[k_aer][i_lvl]
                     end
                 end
             end

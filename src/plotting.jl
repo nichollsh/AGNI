@@ -212,6 +212,8 @@ module plotting
 
         lw = 2.0
 
+        y = atmos.p * 1e-5 # pressure -> bar
+
         # Create plot
         plt = plot( xlims=xlims, xticks=xticks,
                     ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
@@ -220,18 +222,18 @@ module plotting
         # Temperature profile for reference
         tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
         @. tmp_nrm = xlims[1] + (xlims[2]-xlims[1])*tmp_nrm
-        plot!(plt, tmp_nrm, atmos.p*1e-5, lc="black",
+        plot!(plt, tmp_nrm, y, lc="black",
                         linealpha=0.3, lw=lw, label=L"\hat{T}(p)")
 
         # Plot cloud profiles
         ls = atmos.control.l_cloud ? :solid : :dot
-        plot!(plt, log10.(clamp.(atmos.cloud_arr_l,10^xlims[1],10^xlims[2])), atmos.p*1e-5,
+        plot!(plt, log10.(clamp.(atmos.cloud_arr_l,10^xlims[1],10^xlims[2])), y,
                     lw=lw, ls=ls, label="Cloud", linealpha=0.7)
 
         # Plot aerosol profiles
         ls = atmos.control.l_aerosol ? :solid : :dot
-        for k_aer in keys(atmos.aerosol_mmr)
-            plot!(plt, log10.(clamp.(atmos.aerosol_mmr[k_aer], 10^xlims[1], 10^xlims[2])), atmos.p*1e-5,
+        for k_aer in keys(atmos.aerosol_arr_l)
+            plot!(plt, log10.(clamp.(atmos.aerosol_arr_l[k_aer], 10^xlims[1], 10^xlims[2])), y,
                     lw=lw, ls=ls, label=k_aer, linealpha=0.7)
         end
 

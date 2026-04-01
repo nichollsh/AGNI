@@ -174,7 +174,7 @@ module energy
         fill!(atmos.aer.mix_ratio, 0.0)
         if atmos.control.l_aerosol
             for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
-                atmos.aer.mix_ratio[1, :, i] .= atmos.aerosol_mmr[atmos.aerosol_names[i]][:]
+                atmos.aer.mix_ratio[1, :, i] .= atmos.aerosol_arr_l[atmos.aerosol_names[i]][:]
             end
         end
 
