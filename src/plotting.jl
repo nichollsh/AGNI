@@ -70,15 +70,18 @@ module plotting
 
 
     """
-    Plot the temperature-pressure profile.
+    Plot the temperature-pressure and Kzz profile.
     """
     function plot_pt(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int=500, size_y::Int=400,
                             incl_magma::Bool=false,
                             title::String="")
 
+        y = atmos.pl ./ 1e5 # pressure -> bar
+
         # Create plot
-        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos), legend=:outertopright,
+        plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
+                        legend=:top,
                         size=(size_x,size_y); plt_default...)
 
         # Plot phase boundary
@@ -114,13 +117,17 @@ module plotting
         scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, atmos.pl/1e5, lc="black", lw=2, label=L"T(p)")
+        plot!(plt, atmos.tmpl, y, lc="black", lw=2, label=L"T(p)")
+
+        # Dummy Kzz plot for legend
+        plot!(plt, [-1,-2], [1.0, 1.0], lc="darkgreen", lw=2, ls=:solid, label=L"K_{zz}")
 
         # Plot current surface pressure and original
         @_plt_pboa
         @_plt_poboa
 
         # Decorate
+        xlims!(plt, (minimum(atmos.tmpl)-10.0, maximum(atmos.tmpl)+10.0))
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
@@ -128,6 +135,26 @@ module plotting
         if !isempty(title)
             title!(plt, title)
         end
+
+        # Add secondary x-axis for Kzz profile
+        plt2 = twiny(plt)
+
+        x = atmos.Kzz .* 1e4 # convert from m²/s to cm²/s for plotting
+        xmin = 2.0
+        if any(x .> 0.0)
+            xmin = min(xmin, log10(minimum(x[x.>0])))
+        end
+        x = log10.(clamp.(x, 10.0 ^ xmin, Inf64))
+        mask = (atmos.flux_cdry .> 0.0)
+
+        plot!(plt2, x, y,             lc="darkgreen", label="", ls=:dot)
+        plot!(plt2, x[mask], y[mask], lc="darkgreen", label="", ls=:solid)
+        xlabel!(plt2, "log₁₀ " * L"K_{zz}" * " [cm²/s]")
+        ylims!(plt2, _get_ylims(atmos))
+        yticks!(plt2, _get_yticks(atmos))
+        yflip!(plt2)
+        yaxis!(plt2, yscale=:log10)
+        xlims!(plt2, (xmin, maximum(x)+1))
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -185,6 +212,8 @@ module plotting
 
         lw = 2.0
 
+        y = atmos.p * 1e-5 # pressure -> bar
+
         # Create plot
         plt = plot( xlims=xlims, xticks=xticks,
                     ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
@@ -193,18 +222,18 @@ module plotting
         # Temperature profile for reference
         tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
         @. tmp_nrm = xlims[1] + (xlims[2]-xlims[1])*tmp_nrm
-        plot!(plt, tmp_nrm, atmos.p*1e-5, lc="black",
+        plot!(plt, tmp_nrm, y, lc="black",
                         linealpha=0.3, lw=lw, label=L"\hat{T}(p)")
 
         # Plot cloud profiles
         ls = atmos.control.l_cloud ? :solid : :dot
-        plot!(plt, log10.(clamp.(atmos.cloud_arr_l,10^xlims[1],10^xlims[2])), atmos.p*1e-5,
+        plot!(plt, log10.(clamp.(atmos.cloud_arr_l,10^xlims[1],10^xlims[2])), y,
                     lw=lw, ls=ls, label="Cloud", linealpha=0.7)
 
         # Plot aerosol profiles
         ls = atmos.control.l_aerosol ? :solid : :dot
-        for k_aer in keys(atmos.aerosol_mmr)
-            plot!(plt, log10.(clamp.(atmos.aerosol_mmr[k_aer], 10^xlims[1], 10^xlims[2])), atmos.p*1e-5,
+        for k_aer in keys(atmos.aerosol_arr_l)
+            plot!(plt, log10.(clamp.(atmos.aerosol_arr_l[k_aer], 10^xlims[1], 10^xlims[2])), y,
                     lw=lw, ls=ls, label=k_aer, linealpha=0.7)
         end
 
@@ -213,7 +242,7 @@ module plotting
         @_plt_poboa
 
         # Decorate
-        xlabel!(plt, "log10(mass mixing ratio)")
+        xlabel!(plt, "log₁₀ Mass mixing ratio)")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)

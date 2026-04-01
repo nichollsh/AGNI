@@ -4,7 +4,14 @@ AGNI models a planetary atmosphere by treating it as a single column (1D) and sp
 ## Height structure
 The atmosphere is assumed to be hydrostatically supported. The density of the gas mixture is calculated using Amagat's additive volume law to combine the densities of the components. The densities of each gas component are nominally calculated using the Van der Waals equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
 
-The height at each pressure level is obtained by integrating from the surface upwards using a fourth order Runge-Kutta method. This includes self-gravitational attraction, and makes AGNI applicable as an atmospheric structure model.
+The height at each pressure level is obtained by integrating from the surface upwards using a fourth order Runge-Kutta method. This solves the coupled system:
+```math
+\frac{dz}{dP} = -\frac{1}{\rho g}
+```
+```math
+\frac{dg}{dr} = -\frac{G M(r)}{r^2}
+```
+where $z$ is height, $P$ is pressure, $\rho$ is density, $g$ is local gravitational acceleration, $r$ is radial distance from planet centre, $G$ is the gravitational constant, and $M(r)$ is the mass enclosed within radius $r$. This includes self-gravitational attraction, and makes AGNI applicable as an atmospheric structure model.
 
 ## Radiative transfer
 Radiative transfer (RT) refers to the transport of radiation energy through a medium subject to the characteristics of the medium. Radiation passing through an atmosphere is absorbed, emitted, scattered, and reflected. In the context of planetary atmospheres, we also have to handle their surfaces, cloud formation, and radiation from the host star.
@@ -29,6 +36,36 @@ MLT directly calculates the energy flux associated with convective heat transpor
 
 When evaluating convective energy fluxes, AGNI first calculates the temperature gradient across each layer of the atmosphere. Convection occurs within each layer that has a lapse rate $dT/dP$ greater than the critical lapse rate for triggering convection. Equations 2 to 6 of Nicholls+[2025](https://academic.oup.com/mnras/article/536/3/2957/7926963) describe the calculation of the convective energy flux under the Schwarzschild criterion. AGNI can also check against the Ledoux criterion for convective stability, which accounts for vertical gradients in the gas MMW. The atmosphere is not explicitly split into convecting and non-convecting regions, thereby allowing disconnected regions of convection.
 
+### Eddy diffusion coefficient
+
+AGNI calculates the vertical eddy diffusion coefficient $K_{zz}$ (units of m² s⁻¹) to parameterise vertical mixing processes in the atmosphere. Three parametrisations are available, selectable via the `Kzz_type` configuration parameter:
+
+**Type 1: Constant value**
+```math
+K_{zz} = K_{\text{break}}
+```
+where $K_{\text{break}}$ is a user-specified constant diffusion coefficient.
+
+**Type 2: Simple MLT scaling** (default)
+```math
+K_{zz} = \lambda_{\text{conv}} \, w_{\text{conv}}
+```
+where $\lambda_{\text{conv}}$ is the mixing length and $w_{\text{conv}}$ is the convective velocity, both calculated from mixing length theory in convective regions.
+
+**Type 3: MLT convective flux scaling**
+
+Following Charnay et al. ([2015](https://iopscience.iop.org/article/10.1088/0004-637X/813/1/15)), Equation 16:
+```math
+K_{zz} = \frac{H_p}{3} \left(\frac{\lambda_{\text{conv}}}{H_p}\right)^{4/3} \left(\frac{R_{\text{gas}} F_c}{\mu \rho c_p}\right)^{1/3}
+```
+where $H_p$ is the pressure scale height, $R_{\text{gas}}$ is the gas constant, $F_c$ is the convective energy flux, $\mu$ is the mean molecular weight, $\rho$ is the density, and $c_p$ is the specific heat capacity at constant pressure.
+
+In convective regions, $K_{zz}$ is calculated directly using one of the above parametrisations. In non-convective regions (radiative zones), $K_{zz}$ is extended using a power-law scaling with pressure:
+```math
+K_{zz}(p) = K_{\text{ref}} \left(\frac{p}{p_{\text{ref}}}\right)^{\alpha}
+```
+where $K_{\text{ref}}$ and $p_{\text{ref}}$ are the reference diffusion coefficient and pressure at the convective region boundary (or at a user-specified breakpoint pressure), and $\alpha$ is the power-law index (default: $\alpha = -0.4$). This stratospheric scaling follows Tsai et al. ([2020](https://iopscience.iop.org/article/10.3847/1538-4357/ac29bc), Equation 28). Below convective regions, $K_{zz}$ is held constant at its deepest convective value.
+
 ## Condensation, evaporation, and oceans
 AGNI incorporates a simple ocean model, which is tied to the atmosphere rainout and evaporation schemes. This is divided into two reservoirs for each condensable component:
 * An initial reservoir of surface condensate, provided by the user.
@@ -48,14 +85,22 @@ During the third step, where phase change happens aloft, the mixing ratios of dr
 ## Phase change in the atmosphere
 Gases release energy "latent heat" into their surroundings when condensing into a liquid or solid. This is included in the model through a diffusive condensation scheme, which assumes a fixed condensation timescale. Any rain which is not re-evaporated before reaching the surface is considered to contribute towards forming an ocean (secondary reservoir).
 
-The latent heating associated with the change in partial pressure of condensable gases in the atmosphere is used to calculate a latent heating rate at each level of the model (positive where condensing, negative where evaporating). The heating rates in each layer are then integrated (from the TOA downwards) to provide a latent heat transport *flux* at cell-edges, with the assumption being that condensation occurs by updrafts. The integrated condensable heat flux is balanced by evaporation at deeper layers which closes the energy balance.
+The latent heating associated with the change in partial pressure of condensable gases in the atmosphere is used to calculate a latent heating rate at each level of the model (positive where condensing, negative where evaporating). The heating rates in each layer are then integrated (from the TOA downwards) to provide a latent heat transport *flux* at cell-edges, with the assumption being that condensation occurs by updrafts:
+```math
+F_{\text{latent}}(p) = \int_0^p L_v(T) \frac{dq}{dt} dp
+```
+where $L_v(T)$ is the temperature-dependent latent heat of vaporisation, $q$ is the mixing ratio of the condensable species, and the integral is performed from the top of atmosphere downwards. The integrated condensable heat flux is balanced by evaporation at deeper layers which closes the energy balance.
 
 Latent heats are temperature-dependent, using values derived from Coker (2007) and Wagner & Pruß ([2001](https://doi.org/10.1063/1.1461829)). Heat capacities are also temperature-dependent, using values derived from the JANAF database. See the [ThermoTools repo](https://github.com/nichollsh/ThermoTools) for scripts. This method is conceptually similar to Derras-Chouk+[2025](https://arxiv.org/abs/2508.16750).
 
 AGNI assumes that no work is done during phase changes aloft, $p dV \approx 0$, so enthalpy and latent heat become equivalent.
 
 ## Deep heating
-In addition to the energy transport terms, some heat production/loss may occur within a given layer of the atmosphere; e.g. from advective heat transport or ohmic dissipation. AGNI includes a parameterisation of this 'deep' heating through a Gaussian energy deposition profile in log-pressure space, centred at a user-specified centre and width. This is a representation of energy sources/sinks from otherwise unmodelled physics. The 'deep heating' functionality was first introduced to AGNI by [Cheng An Hsieh](https://didymos65803.github.io/).
+In addition to the energy transport terms, some heat production/loss may occur within a given layer of the atmosphere; e.g. from advective heat transport or ohmic dissipation. AGNI includes a parameterisation of this 'deep' heating through a Gaussian energy deposition profile in log-pressure space, centred at a user-specified centre and width:
+```math
+\frac{dF}{dP} = \frac{F_{\text{total}}}{\sqrt{2\pi} \sigma P} \exp\left(-\frac{(\ln P - \ln P_0)^2}{2\sigma^2}\right)
+```
+where $F_{\text{total}}$ is the total integrated heating rate, $P_0$ is the centre pressure of the Gaussian profile, $\sigma$ is the width in log-pressure space, and $P$ is pressure. This is a representation of energy sources/sinks from otherwise unmodelled physics. The 'deep heating' functionality was first introduced to AGNI by [Cheng An Hsieh](https://didymos65803.github.io/).
 
 ## Stellar flux
 A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, an artificial additional albedo factor, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
@@ -82,6 +127,7 @@ It is necessary to tell AGNI what kind of atmospheric solution to solve for. The
 * (1) Aim to conserve energy fluxes throughout the column. The surface temperature is fixed.
 * (2) Aim to conserve energy fluxes throughout the column. The surface temperature is set by energy transport through a solid conductive boundary layer of thickness $d$ such that $T_s = T_m - \frac{Fd}{k}$, where $T_m$ is the mantle temperature and $k$ is the thermal conductivity.
 * (3) Solve for a state such that the flux carried at each level is equal to $F_\text{int} = \sigma T_\text{int}^4$, representing the rate at which a planet is losing energy into space.
+* (4) Solve for a state such that the outgoing longwave radiation (OLR) at the top of atmosphere matches a user-specified target value, while conserving energy throughout the column.
 
 Solution type (1) enforces a fixed surface temperature and instellation, allowing all other temperatures and $F_\text{int}$ to be solved-for as dependent variables. This could be used to model a young planet far from 'radiative equilibrium' (or 'global energy balance') where its surface temperature is very large and the outgoing energy flux is non-zero.
 
@@ -89,9 +135,23 @@ Solution type (2) is appropriate for coupling with a magma ocean model, where a 
 
 Solution type (3) is comparable to the implementation inside other atmosphere climate models: the surface temperature is free to change along with the rest of the atmosphere, and AGNI solves for a state of radiative equilibrium.
 
+Solution type (4) is useful when the target OLR is known from observational constraints or when exploring climate states for a specific energy balance condition.
+
 
 ### Construction
-The atmosphere is constructed of $N$ levels (cell-centres), corresponding to $N+1$ interfaces (cell-edges). The RT model takes cell-centre temperatures $T_i$, pressures $p_i$, geometric heights, and mixing ratios as input variables at each level $i$, as well as the surface temperature and incoming stellar flux. In return, it provides cell-edges spectral fluxes $F_i$ at all $N+1$ interfaces for LW & SW components and upward & downward streams. Convective fluxes can be estimated using the MLT scheme, condensation fluxes from the condensation scheme, and sensible heat from a simple turbulent kinetic energy (TKE) approximation (see Pierrehumbert+[2010](https://geosci.uchicago.edu/~rtp1/PrinciplesPlanetaryClimate/index.html)).
+The atmosphere is constructed of $N$ levels (cell-centres), corresponding to $N+1$ interfaces (cell-edges). The RT model takes cell-centre temperatures $T_i$, pressures $p_i$, geometric heights, and mixing ratios as input variables at each level $i$, as well as the surface temperature and incoming stellar flux. In return, it provides cell-edges spectral fluxes $F_i$ at all $N+1$ interfaces for LW & SW components and upward & downward streams. Convective fluxes can be estimated using the MLT scheme, condensation fluxes from the condensation scheme, and sensible heat from a simple turbulent kinetic energy (TKE) approximation.
+
+### Sensible heat flux
+
+Surface-atmosphere turbulent heat exchange is parameterised using a bulk aerodynamic formula with Monin-Obukhov similarity theory (see Nicholson & Benn [2006](https://doi.org/10.3189/172756506781828584), Equation 9; and Pierrehumbert [2010](https://geosci.uchicago.edu/~rtp1/PrinciplesPlanetaryClimate/index.html)):
+```math
+F_{\text{sens}} = \rho c_p C_d u (T_{\text{surf}} - T_{\text{atm}})
+```
+where $\rho$ is air density, $c_p$ is specific heat capacity, $u$ is wind speed, $T_{\text{surf}}$ is surface temperature, $T_{\text{atm}}$ is the temperature of the lowest atmospheric layer, and $C_d$ is the drag coefficient:
+```math
+C_d = \left(\frac{\kappa}{\ln(h/z_0)}\right)^2
+```
+where $\kappa$ is the von Kármán constant (0.4), $h$ is the height of the lowest atmospheric layer, and $z_0$ is the surface roughness length.
 
 The total upward-directed energy flux $F_{i}$ describes the total upward-directed energy transport (units of $\text{W m}^{-2}$) from cell $i$ into cell $i-1$ above (or into space for $i=1$). For energy to be conserved throughout the column, it must be true that $F_i = F_t \text{ } \forall \text{ } i$ where $F_t$ is the total amount of energy being transported out of the planet. In global radiative equilibrium, $F_t = 0$.
 

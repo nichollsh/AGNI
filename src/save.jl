@@ -127,7 +127,7 @@ module save
             nlev_c = Int(atmos.nlev_c)
             nlev_l = nlev_c + 1
             ngases = atmos.gas_num
-            naeros = max(1,length(atmos.aerosol_mmr))
+            naeros = max(1,length(atmos.aerosol_arr_l))
             nchars = 16
 
             defDim(ds, "nlev_c",    nlev_c)        # Cell centres
@@ -264,16 +264,17 @@ module save
             var_rl =        defVar(ds, "rl",        Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_thick =     defVar(ds, "dz",        Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m s-2"))
-            var_rho =       defVar(ds, "density",   Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg m-3"))
+            var_rho =       defVar(ds, "density",   Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg m-3", "long_name" => "Density of the dry phase at cell centres"))
             var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "J K-1 kg-1"))
             var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg mol-1"))
             var_gases =     defVar(ds, "gases",     Char,    ("nchars", "ngases");  nc_comp..., ) # Transposed cf JANUS because of how Julia stores arrays
             var_x =         defVar(ds, "x_gas",     Float64, ("ngases", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "mol mol-1")) # ^^
-            var_cldl  =     defVar(ds, "cloud_mmr", Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg kg-1"))
-            var_cldf  =     defVar(ds, "cloud_area",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "1"))
+            var_cldl  =     defVar(ds, "cloud_mmr", Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg kg-1", "long_name" => "Cloud mass mixing ratio relative to dry air"))
+            var_cldf  =     defVar(ds, "cloud_area",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Cloud area fraction"))
             var_cldr  =     defVar(ds, "cloud_size",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_aerosols =  defVar(ds, "aerosols",  Char,    ("nchars", "naeros");  nc_comp..., ) # Transposed cf JANUS because of how Julia stores arrays
-            var_aer_l =     defVar(ds, "aer_mmr",   Float64, ("naeros", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "kg kg-1")) # ^^
+            var_aer_l =     defVar(ds, "aer_mmr",   Float64, ("naeros", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "kg kg-1", "long_name" => "Aerosol mass mixing ratio relative to dry air")) # ^^
+            var_aer_r =     defVar(ds, "aer_size",  Float64, ("naeros", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "m", "long_name" => "Aerosol particle size")) # ^^
             var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
@@ -301,8 +302,8 @@ module save
             var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_rfm_wn =    defVar(ds, "rfm_wn",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "cm-1"))
             var_rfm_fl =    defVar(ds, "rfm_fl",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "erg/(s cm2 cm-1)"))
-            var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c") ;  nc_comp..., )
-            var_albr =      defVar(ds, "surface_r", Float64, ("nbands",)         ;  nc_comp..., )
+            var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c") ;  nc_comp..., attrib = OrderedDict("units" => "1"))
+            var_albr =      defVar(ds, "surface_r", Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Spectral spherical reflectance of surface material"))
 
             #     Store data
             var_p[:] =      atmos.p
@@ -339,11 +340,12 @@ module save
             var_cldr[:] =   atmos.cloud_arr_r
 
             # Aerosols
-            if length(atmos.aerosol_mmr) == 0
+            if length(atmos.aerosol_arr_l) == 0
                 var_aerosols[:, 1] = fill(' ', nchars)
                 var_aer_l[1, :] = collect(0.0 for i in 1:nlev_c)
+                var_aer_r[1, :] = collect(0.0 for i in 1:nlev_c)
             else
-                for (i_aer, k_aer) in enumerate(sort(collect(keys(atmos.aerosol_mmr))))
+                for (i_aer, k_aer) in enumerate(sort(collect(keys(atmos.aerosol_arr_l))))
                     # Fill aerosol names
                     for i_char in 1:nchars
                         var_aerosols[i_char, i_aer] = ' '
@@ -352,9 +354,10 @@ module save
                         var_aerosols[i_char,i_aer] = k_aer[i_char]
                     end
 
-                    # Fill MMR
+                    # Fill MMR and sizes
                     for i_lvl in 1:nlev_c
-                        var_aer_l[i_aer, i_lvl] = atmos.aerosol_mmr[k_aer][i_lvl]
+                        var_aer_l[i_aer, i_lvl] = atmos.aerosol_arr_l[k_aer][i_lvl]
+                        var_aer_r[i_aer, i_lvl] = atmos.aerosol_arr_r[k_aer][i_lvl]
                     end
                 end
             end

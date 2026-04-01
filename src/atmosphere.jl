@@ -33,7 +33,7 @@ module atmosphere
     import ..spectrum
 
     # Code versions
-    const AGNI_VERSION::String     = "1.9.2"  # current agni version
+    const AGNI_VERSION::String     = "1.9.3"  # current agni version
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
@@ -206,6 +206,7 @@ module atmosphere
         layer_μ::Array{Float64,1}           # mean molecular weight [kg mol-1]
         layer_cp::Array{Float64,1}          # heat capacity at const-p [J K-1 kg-1]
         layer_kc::Array{Float64,1}          # thermal conductivity at const-p [W m-1 K-1]
+        layer_Hp::Array{Float64,1}          # pressure scale height [m]
         layer_thick::Array{Float64,1}       # geometrical thickness [m]
         layer_isbound::Array{Bool,1}        # is this layer strongly bound by gravity?
 
@@ -255,10 +256,10 @@ module atmosphere
         # Convection
         mlt_asymptotic::Bool                # INPUT: Mixing length scales asymptotically, but ~0 near ground
         mlt_criterion::Char                 # INPUT: Stability criterion. Options: (s)chwarzschild, (l)edoux
-        Kzz_floor::Float64                  # INPUT: Kzz floor [m2 s-1]
-        Kzz_ceiling::Float64                # INPUT: Kzz ceiling [m2 s-1]
         Kzz_pbreak::Float64                 # INPUT: Kzz break point pressure [Pa]
         Kzz_kbreak::Float64                 # INPUT: Kzz break point diffusion [m2 s-1]
+        Kzz_power::Float64                  # INPUT: Power law index for Kzz scaling above reference point
+        Kzz_type::Int                       # INPUT: Parametrisation of Kzz
         mask_c::Array{Bool,1}               # OUT: Layers transporting convective flux
         flux_cdry::Array{Float64,1}         # OUT: Dry convective fluxes from MLT
         Kzz::Array{Float64,1}               # OUT: Eddy diffusion coefficient from MLT
@@ -286,11 +287,12 @@ module atmosphere
         cloud_val_f::Float64                # /
 
         # Parametrised aerosols (SOCRATES's classic aerosol functionality)
-        aerosol_mmr::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles
+        aerosol_arr_l::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles [kg/kg]
+        aerosol_arr_r::Dict{String, Array{Float64,1}}  # Aerosol particle size profiles [m]
+        aerosol_val_r::Float64                         # Default particle size for aerosol species, if not specified in array
         aerosol_names::Array{String,1}               # Map SOCRATES index (int) to name (string)
         aerosol_relhumid::Float64                    # Mean relative humidity used by moist aerosol schemes [0,1]
         aerosol_phase_num::Int                       # Number of phase-function moments retained when averaging
-        aerosol_mmr_ini::Float64                     # Default mass mixing ratio of aerosols
 
         # Deep atmospheric heating
         deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
@@ -423,7 +425,8 @@ module atmosphere
     - `tmp_floor::Float64`              temperature floor [K].
     - `surf_roughness::Float64`         surface roughness length scale [m]
     - `surf_windspeed::Float64`         surface wind speed [m s-1].
-    - `Kzz_floor::Float64`              min eddy diffusion coefficient, cgs units [cm2 s-1]
+    - `Kzz_kbreak::Float64`             reference eddy diffusion coefficient, SI units [m2 s-1]
+    - `Kzz_type::Int`                   parametrisation of Kzz. Options: 1 (constant), 2 (MLT wl), 3 (MLT Fc)
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
@@ -478,7 +481,8 @@ module atmosphere
                     tmp_ceiling::Float64 =      2e4,
                     surf_roughness::Float64 =   0.001,
                     surf_windspeed::Float64 =   2.0,
-                    Kzz_floor::Float64 =        1e5,
+                    Kzz_kbreak::Float64 =       1e5,
+                    Kzz_type::Int =             2,
                     mlt_asymptotic::Bool =      true,
                     mlt_criterion::Char =       's',
                     tmp_magma::Float64 =        3000.0,
@@ -681,10 +685,10 @@ module atmosphere
         atmos.κ_grey_sw = κ_grey_sw
         _check_range("Grey SW opacity", atmos.κ_grey_sw; min=0) || return false
 
-        atmos.Kzz_floor =       max(0.0, Kzz_floor / 1e4)  # convert to SI units
-        atmos.Kzz_ceiling =     1.0e20 / 1e4
         atmos.Kzz_pbreak =      1e5 # 1 bar as default location for break point
-        atmos.Kzz_kbreak =      max(0.0, atmos.Kzz_floor)
+        atmos.Kzz_kbreak =      max(0.0, Kzz_kbreak)
+        atmos.Kzz_power =       -0.4
+        atmos.Kzz_type =        Kzz_type
         atmos.mlt_asymptotic =  mlt_asymptotic
         atmos.mlt_criterion =   mlt_criterion
 
@@ -697,12 +701,12 @@ module atmosphere
         if atmos.real_gas && (atmos.mlt_criterion == 'l')
             @warn "Ledoux criterion not self-consistently supported for real gases"
             @warn "    (Will use Ledoux criterion anyway)"
-            # @warn "    Switching criterion to Schwarzschild, neglecting MMW gradients"
-            # atmos.mlt_criterion = 's'
         end
         if !(atmos.mlt_criterion in ['s','l'])
-            @error "Invalid choice for mlt_criterion: $(atmos.mlt_criterion)"
-            @error "    Must be: 's' or 'l' only"
+            @error "Invalid choice for mlt_criterion: '$(atmos.mlt_criterion)'"
+            @error "    Valid options:"
+            @error "        's' = Schwarzschild criterion (neglects composition gradients)"
+            @error "        'l' = Ledoux criterion (accounts for mean molecular weight gradients)"
             return false
         end
 
@@ -717,8 +721,8 @@ module atmosphere
         atmos.p_boa = p_surf * 1.0e5
         if atmos.p_toa > atmos.p_boa
             @error "Top pressure must be less than surface pressure"
-            @error "    p_top  = $p_top bar"
-            @error "    p_surf = $p_surf bar"
+            @error "    p_toa = $(atmos.p_toa/1e5) bar"
+            @error "    p_boa = $(atmos.p_boa/1e5) bar"
             return false
         end
         atmos.p_oboa = atmos.p_boa
@@ -736,12 +740,6 @@ module atmosphere
         atmos.transspec_grav =  0.0
         atmos.transspec_r    =  0.0
         atmos.transspec_p    =  2e3     # 20 mbar = 2000 Pa
-        if atmos.p_toa > atmos.transspec_p
-            @error "p_top must be less than transspec_p"
-            @error "    Got p_top:       $(atmos.p_toa) Pa"
-            @error "    and transspec_p: $(atmos.transspec_p) Pa"
-            return false
-        end
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -782,6 +780,7 @@ module atmosphere
         atmos.layer_ρ       = zeros(Float64, atmos.nlev_c)
         atmos.layer_cp      = zeros(Float64, atmos.nlev_c)
         atmos.layer_kc      = zeros(Float64, atmos.nlev_c)
+        atmos.layer_Hp      = zeros(Float64, atmos.nlev_c)
 
         # Initialise cloud arrays
         atmos.cloud_arr_r   = zeros(Float64, atmos.nlev_c)
@@ -797,21 +796,24 @@ module atmosphere
         _check_range("Evaporation efficiency", atmos.evap_efficiency; min=0, max=1) || return false
 
         # Hardcoded cloud properties
-        atmos.cloud_alpha   = 0.01    # 1% of condensed water forms substantial clouds
-        atmos.cloud_val_r   = 1.0e-5  # 10 micron droplets
-        atmos.cloud_val_l   = 0.8     # 80% of the saturated vapor turns into cloud
-        atmos.cloud_val_f   = 0.8     # 100% of the cell "area" is cloud
+        atmos.cloud_alpha   = 0.01    # [INPUT] 1% of condensed water forms substantial clouds
+        atmos.cloud_val_r   = 1.0e-5  # [INPUT] 10 micron droplets
+        atmos.cloud_val_l   = 0.8     # [INPUT] Mass mixing ratio of water in each layer
+        atmos.cloud_val_f   = 0.8     # [INPUT] 100% of the cell "area" is cloud
 
         # Aerosol parameters
-        atmos.aerosol_mmr_ini   = 0.0  # default MMR of aerosols
-        atmos.aerosol_phase_num = 1    # number of phase-function moments
-        atmos.aerosol_relhumid  = 0.0  # relative humidity used by moist aerosol schemes
-        atmos.aerosol_mmr  = Dict{String, Array{Float64,1}}() # list of MMR profiles
+        atmos.aerosol_phase_num = 1    # [INPUT] number of phase-function moments
+        atmos.aerosol_relhumid  = 0.0  # [INPUT] relative humidity used by moist aerosol schemes
+        atmos.aerosol_val_r = 1.0e-5   # [INPUT] default particle size for aerosol species
+        atmos.aerosol_arr_l = Dict{String, Array{Float64,1}}() # list of MMR profiles
+        atmos.aerosol_arr_r = Dict{String, Array{Float64,1}}() # list of particle size profiles
         atmos.aerosol_names = String[] # list of species names, in same order as spectral file
         for (k, v) in aerosol_species
+            k = lowercase(k)
             _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
-            atmos.aerosol_mmr[lowercase(k)] = zeros(Float64, atmos.nlev_c)
-            set_aerosol!(atmos, lowercase(k), v)
+            atmos.aerosol_arr_l[k] = zeros(Float64, atmos.nlev_c)
+            atmos.aerosol_arr_r[k] = zeros(Float64, atmos.nlev_c)
+            set_aerosol!(atmos,k , v)
 
             # Store empty strings for now (set in allocate! function)
             push!(atmos.aerosol_names, UNSET_STR)
@@ -846,7 +848,7 @@ module atmosphere
         atmos.metal_orig =  Dict{String, Float64}()          # input metallicities rel to H
         atmos.metal_calc =  Dict{String, Float64}()          # calculated metallicities (empty for now)
         for k in keys(metallicities)
-            # mass -> mole, by scaling factor 1/mu
+            # mass -> mole, by scaling factor mu
             atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
         end
 
@@ -1155,6 +1157,12 @@ module atmosphere
         atmos.fastchem_prof         = joinpath(atmos.fastchem_work,"pt.dat")
         atmos.fastchem_moni         = joinpath(atmos.fastchem_work,"monitor.dat")
 
+        _check_range("FastChem temperature floor",    atmos.fastchem_floor; min=100.0, max=10000.0) || return false
+        _check_range("FastChem chemistry tolerance",  atmos.fastchem_xtol_chem; min=1e-10, max=1.0) || return false
+        _check_range("FastChem element tolerance",    atmos.fastchem_xtol_elem; min=1e-10, max=1.0) || return false
+        _check_range("FastChem chemistry iterations", atmos.fastchem_maxiter_chem; min=100, max=1e7) || return false
+        _check_range("FastChem solver iterations",    atmos.fastchem_maxiter_solv; min=100, max=1e7) || return false
+
         # RFM
         atmos.flag_rfm = !(rfm_parfile == UNSET_STR)
         atmos.rfm_work = joinpath(atmos.IO_DIR, "rfm")
@@ -1440,6 +1448,9 @@ module atmosphere
         # Perform hydrostatic integration
         ok = ok && calc_profile_radius!(atmos)
 
+        # Calculate scale height at each layer
+        calc_profile_Hp!(atmos)
+
         return ok
     end
 
@@ -1710,6 +1721,40 @@ module atmosphere
                                                     atmos.tmp[idx], atmos.p[idx],
                                                     atmos.layer_μ[idx]
                                                     )
+
+        return nothing
+    end
+
+        """
+    **Calculate the scale height for all layers.**
+
+    Requires temperature, pressure, mmw to be already have been set.
+
+    Arguments:
+        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function calc_profile_Hp!(atmos::atmosphere.Atmos_t)
+        @inbounds for i in 1:atmos.nlev_c
+            calc_single_Hp!(atmos, i)
+        end
+        return nothing
+    end
+
+    """
+    **Calculate the scale height of a single layer.**
+
+    Requires temperature, pressure, mmw to be already have been set.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    - `idx::Int`            index of the layer
+    """
+    function calc_single_Hp!(atmos::atmosphere.Atmos_t, idx::Int)
+        if atmos.real_gas
+            atmos.layer_Hp[idx] = atmos.p[idx] / (atmos.layer_ρ[idx] * atmos.g[idx])
+        else
+            atmos.layer_Hp[idx] = phys.R_gas * atmos.tmp[idx] / (atmos.layer_μ[idx] * atmos.g[idx])
+        end
         return nothing
     end
 
@@ -1875,7 +1920,7 @@ module atmosphere
                     @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
                         atmos.spectral_file,
-                        [s for s in keys(atmos.aerosol_mmr)],
+                        [s for s in keys(atmos.aerosol_arr_l)],
                         atmos.IO_DIR,
                         atmos.aerosol_phase_num,
                         socstar,
@@ -1883,7 +1928,7 @@ module atmosphere
                     )
 
                     # check that all files were generated successfully
-                    if length(aerosol_avg_files_rt) != length(atmos.aerosol_mmr)
+                    if length(aerosol_avg_files_rt) != length(atmos.aerosol_arr_l)
                         @error "Failed to generate required aerosol .avg files"
                         list_available_aerosols(atmos)
                         return false
@@ -2268,14 +2313,18 @@ module atmosphere
                     # Enable aerosol
                     atmos.aer.mr_source[i] = SOCRATES.rad_pcf.ip_aersrc_classic_ron
 
-                    # Add array to aerosol_mmr if not requested by user already
-                    if !haskey(atmos.aerosol_mmr, name)
-                        atmos.aerosol_mmr[name] = zeros(Float64, atmos.nlev_c)
+                    # Add array if not requested by user already
+                    if !haskey(atmos.aerosol_arr_l, name)
+                        atmos.aerosol_arr_l[name] = zeros(Float64, atmos.nlev_c)
+                        if haskey(atmos.aerosol_arr_r, name)
+                            @warn "Aerosol '$name' mismatched in arrays!"
+                        end
+                        atmos.aerosol_arr_r[name] = zeros(Float64, atmos.nlev_c)
                     end
                 end
 
                 # warn if user has requested unsupported aerosol
-                for name in keys(atmos.aerosol_mmr)
+                for name in keys(atmos.aerosol_arr_l)
                     if !(name in atmos.aerosol_names)
                         @warn "Requested aerosol '$name' not found in spectral file"
                         list_available_aerosols(atmos)
@@ -2746,7 +2795,7 @@ module atmosphere
                 @info @sprintf("    %10s - %s", name, strip(title))
                 push!(aerosol_names, name)
             end
-            if isempty(atmos.aerosol_mmr)
+            if isempty(atmos.aerosol_arr_l)
                 @info "    [none]"
             end
 
@@ -2809,7 +2858,7 @@ module atmosphere
     end
 
     """
-    **Set aerosol profile for a given species.**
+    **Set aerosol profiles for a given species.**
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used
@@ -2831,15 +2880,18 @@ module atmosphere
         # Set mixing ratio profile for aerosol
         if isa(mmr, Float64)
             # constant profile
-            atmos.aerosol_mmr[species][idx_mask] .= mmr
+            atmos.aerosol_arr_l[species][idx_mask] .= mmr
         else
             # 1D profile
             if length(mmr) != length(atmos.p)
                 @error "Length of input mmr array does not match number of layers"
                 return false
             end
-            atmos.aerosol_mmr[species][idx_mask] .= mmr[idx_mask]
+            atmos.aerosol_arr_l[species][idx_mask] .= mmr[idx_mask]
         end
+
+        # Set constant size
+        fill!(atmos.aerosol_arr_r[species], atmos.aerosol_val_r)
 
         return true
     end
