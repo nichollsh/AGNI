@@ -31,8 +31,6 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
 
     # Test _parse_tmp_str with different inputs
     @testset "parse_tmp_str" begin
-        atmos = create_test_atmosphere()
-
         # Test with numeric string
         result = AGNI.setpt._parse_tmp_str(atmos, "500.0")
         @test isapprox(result, 500.0; atol=1e-10)
