@@ -106,15 +106,29 @@ open(output_file, "w") do io
 
         # Format uncovered line ranges
         uncov_lines = stats["uncovered_lines"]
-        if length(uncov_lines) > 10
-            line_summary = @sprintf("%d-%d, ... (%d more)",
-                uncov_lines[1], uncov_lines[min(5, end)],
-                length(uncov_lines) - 5)
-        elseif length(uncov_lines) > 0
-            line_summary = join(uncov_lines[1:min(10, end)], ", ")
+        if length(uncov_lines) > 1
+            line_summary = ""
+            line_group = Int[]
+            for i in eachindex(uncov_lines)[2:end]
+                # find groups of lines
+                if uncov_lines[i] == uncov_lines[i-1] + 1
+                    # continue group
+                    push!(line_group, uncov_lines[i])
+                else
+                    if length(line_group) > 2
+                        line_summary *= string(line_group[1], "-", line_group[end], ", ")
+                        line_group = Int[]
+                    else
+                        line_summary *= string(uncov_lines[i-1], ", ")
+                    end
+                end
+            end
+        elseif length(uncov_lines) == 1
+            line_summary = string(uncov_lines[1])
         else
             line_summary = "None"
         end
+        line_summary = rstrip(line_summary, (',', ' '))
 
         # Color code: <50% = 🔴, 50-80% = 🟡, >80% = 🟢
         icon = pct >= 80 ? "🟢" : (pct >= 50 ? "🟡" : "🔴")
@@ -142,16 +156,6 @@ open(output_file, "w") do io
             println(io, "")
             println(io, @sprintf("- **Coverage:** %.1f%% (%d / %d lines)",
                 pct, stats["covered"], stats["total"]))
-
-            # Show first 20 uncovered lines
-            uncov_lines = stats["uncovered_lines"]
-            if length(uncov_lines) > 0
-                println(io, "- **Sample uncovered lines:** ",
-                    join(uncov_lines[1:min(20, end)], ", "))
-                if length(uncov_lines) > 20
-                    println(io, "  _(... and $(length(uncov_lines) - 20) more)_")
-                end
-            end
             println(io, "")
         end
     end

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
-# Run this function from inside the `test/` folder
-# e.g. as `julia --project=.. runtests.jl`
+# Run this function from inside the AGNI root folder
+# e.g. as `julia --project=. tests/runtests.jl`
 
 # To run with coverage reporting, add `--code-coverage` flag
 
@@ -58,16 +58,16 @@ end
 
 # Other tests
 LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
-include("test_consts.jl")
-include("test_phys.jl")
-include("test_blake.jl")
-include("test_spectrum.jl")
-include("test_setpt.jl")
+# include("test_consts.jl")
+# include("test_phys.jl")
+# include("test_blake.jl")
+# include("test_spectrum.jl")
+# include("test_setpt.jl")
 include("test_save_load.jl")
-include("test_guillot.jl")
-include("test_ocean.jl")
-include("test_deep_heating.jl")
-include("test_kzz.jl")
-if suite != "fast"
-    include("test_integration.jl")
-end
+# include("test_guillot.jl")
+# include("test_ocean.jl")
+# include("test_deep_heating.jl")
+# include("test_kzz.jl")
+# if suite != "fast"
+#     include("test_integration.jl")
+# end

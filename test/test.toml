@@ -20,10 +20,10 @@ title = "Unit tests configuration"
     star_Teff       = 5000.0
 
 [files]
-    input_sf        = "../res/spectral_files/Dayspring/48/Dayspring.sf"
+    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"
     input_star      = "blackbody"
-    output_dir      = "../out/"
-    io_dir          = "../out/io/"
+    output_dir      = "out/"
+    io_dir          = "out/io/"
 
 [composition]
     p_surf          = 7000.0

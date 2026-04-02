@@ -329,6 +329,9 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         succ = AGNI.run_from_config(cfg)
         @test succ
 
+        # check io directory exists
+        @test isdir(cfg["files"]["io_dir"])
+
         # -------------
         # Compare result from NetCDF
         # -------------
