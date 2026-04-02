@@ -12,11 +12,10 @@ export RAD_DIR=/path/to/SOCRATES
 ```
 
 ### Run All Tests
-From the `test/` directory:
+From the AGNI root directory:
 
 ```bash
-cd test/
-julia --project=.. runtests.jl
+julia --project=. test/runtests.jl
 ```
 
 ### Run Fast Tests Only
@@ -24,15 +23,7 @@ The fast test suite excludes expensive integration tests:
 
 ```bash
 cd test/
-julia --project=.. runtests.jl fast
-```
-
-### Run a Single Test File
-To run an individual test file:
-
-```bash
-cd test/
-julia --project=.. -e 'include("test_phys.jl")'
+julia --project=. test/runtests.jl fast
 ```
 
 ## Test Coverage
@@ -42,7 +33,7 @@ julia --project=.. -e 'include("test_phys.jl")'
 #### Run Tests with Coverage
 ```bash
 cd test/
-julia --project=.. --code-coverage runtests.jl fast
+julia --project=. --code-coverage test/runtests.jl
 ```
 
 #### Process Coverage Data
@@ -56,37 +47,14 @@ This generates:
 - `coverage.info` - LCOV format coverage data
 - `coverage.json` - Codecov JSON format
 - `coverage.total` - Single number with overall coverage percentage
+- `coverage.md` - Markdown formatted file with report on coverage
 
-#### Generate Markdown Report
-To create a human-readable coverage report:
-
-```bash
-julia --project=. test/coverage_to_markdown.jl
-```
-
-This produces `coverage.md` with:
+The `coverage.md` file outlines:
 - Overall coverage percentage
 - Per-file coverage breakdown with color coding (🔴 <50%, 🟡 50-80%, 🟢 >80%)
 - Files needing attention (<50% coverage)
 - Quick wins (small files with 0% coverage)
 - Lists of uncovered line numbers
-
-## Test Suite Structure
-
-The test suite is organized into separate test files, each focusing on a specific module:
-
-| Test File | Module Tested | Description |
-|-----------|---------------|-------------|
-| `test_consts.jl` | `consts` | Physical constants, molecular weights, atom counts, standard species lists |
-| `test_phys.jl` | `phys` | Physical utility functions: EOS, thermodynamics, gas properties, molecular formulas |
-| `test_blake.jl` | `phys.blake` | BLAKE2b file hashing and integrity checking |
-| `test_spectrum.jl` | `spectrum` | Spectral file operations, gas counting, SOCRATES version |
-| `test_setpt.jl` | `setpt` | Temperature profile initialization functions |
-| `test_guillot.jl` | `setpt.guillot` | Analytical Guillot (2010) T(p) profiles |
-| `test_ocean.jl` | `ocean` | Surface liquid distribution and ocean geometry |
-| `test_deep_heating.jl` | (various) | Deep atmospheric heating profiles |
-| `test_kzz.jl` | (various) | Eddy diffusion coefficient (Kzz) profiles |
-| `test_integration.jl` | (full model) | End-to-end integration tests (slow) |
 
 ### Test Design Principles
 
@@ -143,16 +111,7 @@ When adding new tests:
 - **Acceptable**: >50% for core simulation modules (`atmosphere`, `energy`, `solver`)
 - **Document**: Any intentionally untested code (e.g., platform-specific branches)
 
-## Continuous Integration
-
-GitHub Actions automatically:
-1. Runs the fast test suite on every push
-2. Generates coverage reports
-3. Updates the coverage badge in the README
-
-See `.github/workflows/install_and_test.yml` for CI configuration.
-
-## Troubleshooting
+## Troubleshooting the tests
 
 ### Tests fail with "RAD_DIR not set"
 Ensure `RAD_DIR` points to a valid SOCRATES installation:
