@@ -13,6 +13,9 @@ Pkg.activate(ROOT_DIR)
 
 # Include libraries
 using Coverage
+using Printf
+using Dates
+
 
 # process '*.cov' files
 coverage = process_folder() # defaults to src/; alternatively, supply the folder name as argument
@@ -40,5 +43,146 @@ end
 LCOV.writefile("coverage.info", coverage)
 export_codecov_json(coverage, "coverage.json")
 
-# Or process a single file
-# @show get_summary(process_file(joinpath("src", "AGNI.jl")))
+
+# Calculate per-file statistics
+file_stats = Dict{String, Dict{String, Any}}()
+for c in coverage
+    if !haskey(file_stats, c.filename)
+        file_stats[c.filename] = Dict(
+            "covered" => 0,
+            "total" => 0,
+            "uncovered_lines" => Int[],
+            "covered_lines" => Int[]
+        )
+    end
+
+    # c.coverage is a Vector{Union{Nothing, Int64}}
+    for (line_num, cov_count) in enumerate(c.coverage)
+        if cov_count !== nothing
+            file_stats[c.filename]["total"] += 1
+            if cov_count > 0
+                file_stats[c.filename]["covered"] += 1
+                push!(file_stats[c.filename]["covered_lines"], line_num)
+            else
+                push!(file_stats[c.filename]["uncovered_lines"], line_num)
+            end
+        end
+    end
+end
+
+# Calculate overall statistics
+total_covered = sum(stats["covered"] for stats in values(file_stats))
+total_lines = sum(stats["total"] for stats in values(file_stats))
+overall_pct = total_lines > 0 ? total_covered / total_lines * 100 : 0.0
+
+# Sort files by coverage percentage (ascending) and then by name
+sorted_files = sort(collect(file_stats),
+    by = x -> (x[2]["total"] > 0 ? x[2]["covered"]/x[2]["total"] : 0.0, x[1]))
+
+# Generate markdown report
+output_file = joinpath(ROOT_DIR, "coverage.md")
+open(output_file, "w") do io
+    println(io, "# AGNI Code Coverage Report")
+    println(io, "")
+    println(io, "Generated: $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))")
+    println(io, "")
+
+    # Overall summary
+    println(io, "## Overall Coverage")
+    println(io, "")
+    println(io, @sprintf("**Total Coverage: %.1f%%** (%d / %d lines)",
+        overall_pct, total_covered, total_lines))
+    println(io, "")
+
+    # Per-file summary table
+    println(io, "## Coverage by File")
+    println(io, "")
+    println(io, "| File | Coverage | Lines Covered | Total Lines | Uncovered Lines |")
+    println(io, "|------|----------|---------------|-------------|-----------------|")
+
+    for (filename, stats) in sorted_files
+        pct = stats["total"] > 0 ? stats["covered"] / stats["total"] * 100 : 0.0
+        short_name = replace(filename, ROOT_DIR * "/" => "")
+
+        # Format uncovered line ranges
+        uncov_lines = stats["uncovered_lines"]
+        if length(uncov_lines) > 10
+            line_summary = @sprintf("%d-%d, ... (%d more)",
+                uncov_lines[1], uncov_lines[min(5, end)],
+                length(uncov_lines) - 5)
+        elseif length(uncov_lines) > 0
+            line_summary = join(uncov_lines[1:min(10, end)], ", ")
+        else
+            line_summary = "None"
+        end
+
+        # Color code: <50% = 🔴, 50-80% = 🟡, >80% = 🟢
+        icon = pct >= 80 ? "🟢" : (pct >= 50 ? "🟡" : "🔴")
+
+        println(io, @sprintf("| %s | %s %.1f%% | %d | %d | %s |",
+            short_name, icon, pct, stats["covered"], stats["total"], line_summary))
+    end
+
+    println(io, "")
+
+    # Detailed breakdown of low-coverage files (<50%)
+    println(io, "## Files Needing Attention (< 50% coverage)")
+    println(io, "")
+
+    low_coverage_files = [(f, s) for (f, s) in sorted_files
+        if s["total"] > 0 && s["covered"] / s["total"] < 0.5]
+
+    if length(low_coverage_files) == 0
+        println(io, "✅ All files have >= 50% coverage!")
+    else
+        for (filename, stats) in low_coverage_files
+            pct = stats["covered"] / stats["total"] * 100
+            short_name = replace(filename, ROOT_DIR * "/" => "")
+            println(io, "### $(short_name)")
+            println(io, "")
+            println(io, @sprintf("- **Coverage:** %.1f%% (%d / %d lines)",
+                pct, stats["covered"], stats["total"]))
+
+            # Show first 20 uncovered lines
+            uncov_lines = stats["uncovered_lines"]
+            if length(uncov_lines) > 0
+                println(io, "- **Sample uncovered lines:** ",
+                    join(uncov_lines[1:min(20, end)], ", "))
+                if length(uncov_lines) > 20
+                    println(io, "  _(... and $(length(uncov_lines) - 20) more)_")
+                end
+            end
+            println(io, "")
+        end
+    end
+
+    # Quick wins: files with 0% coverage but small size
+    println(io, "## Quick Wins (0% coverage, < 100 lines)")
+    println(io, "")
+
+    quick_wins = [(f, s) for (f, s) in sorted_files
+        if s["total"] > 0 && s["covered"] == 0 && s["total"] < 100]
+
+    if length(quick_wins) == 0
+        println(io, "No small untested files found.")
+    else
+        println(io, "These files are currently untested but are small enough for quick test additions:")
+        println(io, "")
+        println(io, "| File | Total Lines |")
+        println(io, "|------|-------------|")
+
+        for (filename, stats) in sort(quick_wins, by=x->x[2]["total"])
+            short_name = replace(filename, ROOT_DIR * "/" => "")
+            println(io, @sprintf("| %s | %d |", short_name, stats["total"]))
+        end
+    end
+
+    println(io, "")
+    println(io, "---")
+    println(io, "")
+    println(io, "_Generated by `test/coverage_to_markdown.jl`_")
+end
+
+println("Coverage report written to: $output_file")
+println(@sprintf("Overall coverage: %.1f%% (%d / %d lines)",
+    overall_pct, total_covered, total_lines))

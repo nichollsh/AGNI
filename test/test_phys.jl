@@ -260,4 +260,86 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         @test col_sio[1] == '#'
     end
 
+
+    # -------------
+    # Test count_atoms with various formulas
+    # -------------
+    @testset "count_atoms_extended" begin
+        # Simple molecules
+        @test phys.count_atoms("O2") == Dict("O" => 2)
+        @test phys.count_atoms("N2") == Dict("N" => 2)
+        
+        # Molecules with parentheses/brackets (should be skipped by parser)
+        atoms_nh3 = phys.count_atoms("NH3")
+        @test atoms_nh3["N"] == 1
+        @test atoms_nh3["H"] == 3
+        
+        # Two-letter element names
+        atoms_ch4 = phys.count_atoms("CH4")
+        @test atoms_ch4["C"] == 1
+        @test atoms_ch4["H"] == 4
+        
+        # Complex molecule
+        atoms_h2so4 = phys.count_atoms("H2SO4")
+        @test atoms_h2so4["H"] == 2
+        @test atoms_h2so4["S"] == 1
+        @test atoms_h2so4["O"] == 4
+    end
+
+
+    # -------------
+    # Test same_atoms function
+    # -------------
+    @testset "same_atoms" begin
+        @test phys.same_atoms(Dict("H"=>2, "O"=>1), Dict("O"=>1, "H"=>2)) == true
+        @test phys.same_atoms(Dict("C"=>1, "O"=>2), Dict("C"=>1, "O"=>2)) == true
+        @test phys.same_atoms(Dict("H"=>2, "O"=>1), Dict("H"=>2, "O"=>2)) == false
+        @test phys.same_atoms(Dict("H"=>2), Dict("H"=>2, "O"=>1)) == false
+    end
+
+
+    # -------------
+    # Test _get_mmw for various molecules
+    # -------------
+    @testset "get_mmw" begin
+        # Test known molecules
+        @test isapprox(phys._get_mmw("H2O"), AGNI.consts._lookup_mmw["H2O"]; rtol=1e-12)
+        @test isapprox(phys._get_mmw("CO2"), AGNI.consts._lookup_mmw["CO2"]; rtol=1e-12)
+        @test isapprox(phys._get_mmw("N2"), AGNI.consts._lookup_mmw["N2"]; rtol=1e-12)
+        
+        # Test that MMW is positive
+        @test phys._get_mmw("CH4") > 0.0
+        @test phys._get_mmw("O2") > 0.0
+    end
+
+
+    # -------------
+    # Test _pretty_name generates subscripted text
+    # -------------
+    @testset "pretty_name" begin
+        # Function replaces digits with unicode subscripts
+        pn_h2o = phys._pretty_name("H2O")
+        @test pn_h2o != "H2O"  # should be different due to subscript
+        @test !occursin("2", pn_h2o)  # regular '2' should be gone
+        
+        pn_co2 = phys._pretty_name("CO2")
+        @test pn_co2 != "CO2"
+        @test !occursin("2", pn_co2)
+        
+        # Molecule without numbers stays same (except unicode conversion)
+        pn_o = phys._pretty_name("O")
+        @test length(pn_o) >= 1
+    end
+
+
+    # -------------
+    # Test error handling in load_gas for unsupported elements
+    # -------------
+    @testset "load_gas_unsupported_element" begin
+        # Try to load a gas with an unsupported element (should error)
+        # This tests the error path in load_gas
+        # Use a fake element that's not in elems_standard
+        @test_throws ErrorException phys.load_gas("$RES_DIR/thermodynamics/", "Xz2", true, false)
+    end
+
 end

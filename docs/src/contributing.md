@@ -31,6 +31,20 @@
 - Print statements should be made through the logger where possible.
 - The core package code should not contain global variables, except in the phys module.
 
+## Testing
+
+When contributing code changes, please:
+- Run the test suite to ensure your changes don't break existing functionality
+- Add tests for new features or bug fixes
+- Aim for >80% line coverage for new utility functions
+- Keep tests fast (avoid expensive setup/teardown when possible)
+
+See the [Testing Documentation](https://www.h-nicholls.space/AGNI/dev/howto/testing/) for detailed information on:
+- Running tests locally
+- Generating coverage reports
+- Adding new tests
+- Test design principles
+
 ## Queries and questions
 
 * Ask a question about how to use or contribute to AGNI, please use the [discussions page](https://github.com/nichollsh/AGNI/discussions) or contact [Harrison Nicholls](https://www.h-nicholls.space/) directly.

@@ -84,6 +84,7 @@ jobs:
           julia --project=. test/get_coverage.jl
           export total=$(cat coverage.total)
           echo "total=$total" >> $GITHUB_ENV
+          GITHUB_STEP_SUMMARY=$(< coverage.md)
 
       # Upload output dir for inspection by user
       - name: Upload result as artifact
