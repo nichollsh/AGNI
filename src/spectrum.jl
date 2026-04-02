@@ -39,14 +39,15 @@ module spectrum
 
     Arguments:
     - `spec_file::String`   Path to spectral file
+    - `quiet::Bool=false`   Suppresses warnings about missing files or parsing issues.
 
     Returns:
     - `num_gases::Int`      Number of gaseous absorbers, or -1 if not found
     """
-    function count_gases(spec_file::String)::Int
+    function count_gases(spec_file::String; quiet::Bool=false)::Int
 
         if !isfile(spec_file)
-            @error "Spectral file not found: '$spec_file'"
+            quiet || @error "Spectral file not found: '$spec_file'"
             return -1
         end
 
@@ -63,17 +64,17 @@ module spectrum
                     try
                         return parse(Int, num_str)
                     catch
-                        @error "Could not parse gas count from line: '$line'"
+                        quiet || @error "Could not parse gas count from line: '$line'"
                         return -1
                     end
                 else
-                    @error "Unexpected format for gas count line: '$line'"
+                    quiet || @error "Unexpected format for gas count line: '$line'"
                     return -1
                 end
             end
         end
 
-        @error "Could not find 'Total number of gaseous absorbers' in spectral file"
+        quiet || @error "Could not find 'Total number of gaseous absorbers' in spectral file"
         return -1
     end
 
