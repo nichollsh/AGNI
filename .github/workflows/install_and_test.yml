@@ -38,34 +38,34 @@ jobs:
 
       # Setup SOCRATES
       - name: Get SOCRATES
-        uses: actions/checkout@v6
-        with:
-          repository: 'FormingWorlds/SOCRATES'
-          path: 'SOCRATES'
+        run: ./src/get_socrates.sh
 
       - name: Restore SOCRATES from cache
         uses: actions/cache@v4
         id: cache-socrates
         with:
           path: |
-            SOCRATES/bin
-            SOCRATES/sbin
-            SOCRATES/set_rad_env
-          key: socrates-${{ hashFiles('SOCRATES/version') }}
+            socrates/bin
+            socrates/sbin
+            socrates/set_rad_env
+          key: socrates-${{ hashFiles('socrates/version') }}
 
       - name: Build SOCRATES if required
         if: steps.cache-socrates.outputs.cache-hit != 'true'
         run: |
           export LD_LIBRARY_PATH=""
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/socrates"
           cd $RAD_DIR
           ./configure
           ./build_code
           cd ..
 
+      - name: Get FastChem
+        run: ./src/get_fastchem.sh
+
       - name: Build AGNI
         run: |
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/socrates"
           export RAD_BIN="$RAD_DIR/bin/"
           export LD_LIBRARY_PATH=""
           export FC=$(command -v gfortran)
@@ -74,7 +74,7 @@ jobs:
       # Run the tests
       - name: Run AGNI test suite
         run: |
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_DIR="/home/runner/work/AGNI/AGNI/socrates"
           export LD_LIBRARY_PATH=""
           julia --project=. --code-coverage test/runtests.jl
 

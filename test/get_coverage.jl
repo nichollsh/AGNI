@@ -18,13 +18,12 @@ using Dates
 
 
 # process '*.cov' files
-coverage = process_folder() # defaults to src/; alternatively, supply the folder name as argument
-coverage = append!(coverage, process_folder("deps"))  # useful if you want to analyze more than just src/
+coverage = process_folder("src")
+# coverage = append!(coverage, process_folder("deps"))
 
 # process '*.info' files, if you collected them
 coverage = merge_coverage_counts(coverage, filter!(
-    let prefixes = (joinpath(pwd(), "src", ""),
-                    joinpath(pwd(), "deps", ""))
+    let prefixes = (joinpath(pwd(), "src", "")) #, joinpath(pwd(), "deps", ""))
         c -> any(p -> startswith(c.filename, p), prefixes)
     end,
     LCOV.readfolder("test")))
