@@ -34,14 +34,14 @@ jobs:
           version: '1.11'
 
       - name: Cache Julia
-        uses: julia-actions/cache@v2
+        uses: julia-actions/cache@v3
 
       # Setup SOCRATES
       - name: Get SOCRATES
         run: ./src/get_socrates.sh
 
       - name: Restore SOCRATES from cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-socrates
         with:
           path: |
@@ -83,11 +83,11 @@ jobs:
           julia --project=. test/get_coverage.jl
           export total=$(cat coverage.total)
           echo "total=$total" >> $GITHUB_ENV
-          GITHUB_STEP_SUMMARY=$(< coverage.md)
+          GITHUB_STEP_SUMMARY+=$(cat coverage.md)
 
       # Upload output dir for inspection by user
       - name: Upload result as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-artifact
           path: |
@@ -96,7 +96,7 @@ jobs:
 
       # Make badge
       - name: Create coverage badge
-        uses: schneegans/dynamic-badges-action@v1.7.0
+        uses: schneegans/dynamic-badges-action@v1.8.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: e20f4fa3c7811c75d34005311fef3696
