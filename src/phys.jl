@@ -339,11 +339,17 @@ module phys
     """
     Get number of atoms from formula, returning a dictionary
     """
-    function count_atoms(m::String)::Dict{String,Int}
+    function count_atoms(molec::String)::Dict{String,Int}
 
         # Pre-defined molecules
-        if haskey(_lookup_count_atoms, m)
-            return _lookup_count_atoms[m]
+        if haskey(_lookup_count_atoms, molec)
+            return _lookup_count_atoms[molec]
+        end
+
+        # Remove unsafe chars
+        m = String(molec)
+        for c in ['(',')','[',']','{','}','-','+',' ']
+            m = replace(m, c => "")
         end
 
         # Setup
@@ -357,12 +363,6 @@ module phys
         # Loop through string
         while i <= nchar
             last = (i == nchar)
-
-            # Skip unsupported characters
-            if m[i] in ['(',')','[',']','{','}','-','+',' ']
-                i += 1
-                continue
-            end
 
             # new element
             if isuppercase(m[i])
