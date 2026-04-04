@@ -41,7 +41,7 @@ if length(ARGS)>0
         suite = "fast"
     end
 end
-@info "Using test suite '$suite'"
+@info "Requested test suite '$suite'"
 
 rm(OUT_DIR,force=true,recursive=true)
 if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -76,8 +76,12 @@ elseif suite in test_names
     test_names = [suite]
 
 else
-    # run all tests
-    @info "Running all tests"
+    if suite != "all"
+        @error "Test suite '$suite' not found"
+        exit(1)
+    else
+        @info "Running all tests"
+    end
 end
 
 # Collect tests
