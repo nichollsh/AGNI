@@ -288,7 +288,6 @@ module chemistry
 
             end # end condensate
 
-            normalise_vmrs!(atmos, i)
         end # end i levels
 
         # Ensure that all yields are positive at this point
@@ -375,13 +374,17 @@ module chemistry
 
         end # end loop over condensates
 
+        # Layer properties
+        for i in 1:atmos.nlev_c
+            normalise_vmrs!(atmos, i)
+        end
+
+        atmosphere.calc_layer_props!(atmos)
+
         # Set water clouds at levels where condensation occurs
         if "H2O" in atmos.condensates
             atmosphere.set_cloud!(atmos; from_yield=true)
         end
-
-        # Layer properties
-        atmosphere.calc_layer_props!(atmos)
 
         return nothing
     end

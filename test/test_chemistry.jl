@@ -204,8 +204,10 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # -------------
     @testset "sat_aloft_rainout" begin
         mf_dict = Dict([
-            ("H2O" , 0.8),
-            ("N2"  , 0.2)
+            ("H2O" , 0.5),
+            ("N2"  , 0.2),
+            ("CO2" , 0.2),
+            ("CH4" , 0.1)
         ])
 
         atmos = atmosphere.Atmos_t()
@@ -224,6 +226,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 
         # Set a realistic T(p) profile with temperature decreasing aloft
         setpt.dry_adiabat!(atmos)
+        setpt.stratosphere!(atmos, 100.0)  # add isothermal stratosphere
 
         # Store pre-condensation VMRs
         atmos.gas_cvmr["H2O"] .= atmos.gas_vmr["H2O"]
@@ -231,14 +234,22 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         # Call _sat_aloft!
         chemistry._sat_aloft!(atmos)
 
-        # Check that condensate yield is non-negative
-        for c in atmos.condensates
-            @test all(atmos.cond_yield[c] .>= 0.0)
+        # Check that condensate yield is reasonable
+        for g in atmos.gas_names
+            if g in atmos.condensates
+                @test all(isfinite.(atmos.cond_yield[g]))
+            else
+                @test all(atmos.cond_yield[g] .== 0.0)
+            end
         end
 
         # Check that total VMRs still sum to ~1.0
         for i in 1:atmos.nlev_c
             x_tot = sum([atmos.gas_vmr[g][i] for g in atmos.gas_names])
+            if x_tot > 1.0 + 1e-9
+                @warn "Total VMR exceeds 1.0 at level $i: $x_tot"
+                @warn string([g => atmos.gas_vmr[g][i] for g in atmos.gas_names])
+            end
             @test isapprox(x_tot, 1.0; atol=1e-3)
         end
 

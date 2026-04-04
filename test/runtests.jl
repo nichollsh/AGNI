@@ -17,6 +17,7 @@ Pkg.activate(ROOT_DIR)
 using LoggingExtras
 using NCDatasets
 using AGNI
+using Glob
 using Test
 
 @info "Begin AGNI tests"
@@ -51,24 +52,44 @@ rtol   = 1e-3
 
 # Test module imported
 @test isdefined(AGNI.atmosphere, :setup!)
+
+# Configure logging to show only warnings and above
+LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
+
+# Find test names
+test_names = sort([replace(split(basename(f), ".jl")[1], "test_"=>"") for f in glob("test_*.jl", TEST_DIR)])
+
+# Select tests
 if suite == "none"
+    # no tests
     @info "No tests selected. Exiting."
     exit()
+
+elseif suite == "fast"
+    # exclude integration tests
+    @info "Running only fast tests"
+    filter!(t -> !occursin("integration", t), test_names)
+
+elseif suite in test_names
+    # run only the specified test suite
+    @info "Running only test suite '$suite'"
+    test_names = [suite]
+
+else
+    # run all tests
+    @info "Running all tests"
 end
 
-# Other tests
-LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
-# include("test_consts.jl")
-# include("test_phys.jl")
-# include("test_blake.jl")
-# include("test_spectrum.jl")
-# include("test_setpt.jl")
-# include("test_save_load.jl")
-# include("test_guillot.jl")
-# include("test_ocean.jl")
-# include("test_deep_heating.jl")
-# include("test_kzz.jl")
-include("test_chemistry.jl")
-# if suite != "fast"
-#     include("test_integration.jl")
-# end
+# Collect tests
+test_files = String[]
+for test_name in test_names
+    push!(test_files, joinpath(TEST_DIR, "test_$test_name.jl"))
+end
+
+# Run tests
+for test_file in test_files
+    @info "Running '$(test_file)'"
+    include(test_file)
+end
+
+exit(0)
