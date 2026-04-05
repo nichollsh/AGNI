@@ -19,11 +19,10 @@ temp_sf = "/tmp/test_spectral_file_xyz123.sf"
     @testset "count_gases_valid" begin
         # Use one of the test spectral files
         spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
-        if isfile(spfile)
-            num_gases = AGNI.spectrum.count_gases(spfile)
-            @test num_gases > 0
-            @test num_gases isa Int
-        end
+        @test isfile(spfile)
+        num_gases = AGNI.spectrum.count_gases(spfile)
+        @test num_gases > 0
+        @test num_gases isa Int
     end
 
     # Test count_gases with non-existent file

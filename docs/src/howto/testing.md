@@ -31,8 +31,9 @@ julia --project=. test/runtests.jl fast
 ### Generating Coverage Reports
 
 #### Run Tests with Coverage
+From the AGNI root directory:
+
 ```bash
-cd test/
 julia --project=. --code-coverage test/runtests.jl
 ```
 

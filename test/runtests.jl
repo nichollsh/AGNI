@@ -1,7 +1,7 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
 # Run this function from inside the AGNI root folder
-# e.g. as `julia --project=. tests/runtests.jl`
+# e.g. as `julia --project=. test/runtests.jl`
 
 # To run with coverage reporting, add `--code-coverage` flag
 
