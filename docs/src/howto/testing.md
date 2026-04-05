@@ -95,7 +95,7 @@ end
 When adding new tests:
 
 1. Create a new test file in `test/` following the naming convention `test_<module>.jl`
-2. Add it to `test/runtests.jl` in the appropriate location
+2. Any `test_*.jl` file in `test/` will be picked up automatically by `test/runtests.jl`, so no manual edit to `test/runtests.jl` is needed
 3. Follow the existing test patterns (see above)
 4. Avoid expensive operations:
    - Don't call `allocate!`, `setup!`, or `deallocate!` unless absolutely necessary
