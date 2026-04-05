@@ -53,9 +53,6 @@ rtol   = 1e-3
 # Test module imported
 @test isdefined(AGNI.atmosphere, :setup!)
 
-# Configure logging to show only warnings and above
-LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
-
 # Find test names
 test_names = sort([replace(split(basename(f), ".jl")[1], "test_"=>"") for f in glob("test_*.jl", TEST_DIR)])
 
@@ -89,6 +86,10 @@ test_files = String[]
 for test_name in test_names
     push!(test_files, joinpath(TEST_DIR, "test_$test_name.jl"))
 end
+@info "Collected tests: $(join(test_names, ", "))"
+
+# Configure logging to show only warnings and errors
+LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
 
 # Run tests
 for test_file in test_files

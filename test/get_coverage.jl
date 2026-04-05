@@ -16,6 +16,9 @@ using Coverage
 using Printf
 using Dates
 
+target_good = 80.0
+target_bad  = 50.0
+
 
 # process '*.cov' files
 coverage = process_folder("src")
@@ -136,8 +139,7 @@ open(output_file, "w") do io
             line_summary = join(line_parts, ", ")
         end
 
-        # Color code: <50% = 🔴, 50-80% = 🟡, >80% = 🟢
-        icon = pct >= 80 ? "🟢" : (pct >= 50 ? "🟡" : "🔴")
+        icon = pct >= target_good ? "🟢" : (pct >= target_bad ? "🟡" : "🔴")
 
         println(io, @sprintf("| %s | %s %.1f%% | %d | %d | %s |",
             short_name, icon, pct, stats["covered"], stats["total"], line_summary))
@@ -145,15 +147,14 @@ open(output_file, "w") do io
 
     println(io, "")
 
-    # Detailed breakdown of low-coverage files (<50%)
-    println(io, "## Files Needing Attention (< 50% coverage)")
+    # Detailed breakdown of low-coverage files
+    println(io, @sprintf("## Files Needing Attention (< %.1f%% coverage)", target_bad))
     println(io, "")
 
     low_coverage_files = [(f, s) for (f, s) in sorted_files
-        if s["total"] > 0 && s["covered"] / s["total"] < 0.5]
-
+        if s["total"] > 0 && 100 * s["covered"] / s["total"] < target_bad]
     if length(low_coverage_files) == 0
-        println(io, "✅ All files have >= 50% coverage!")
+        println(io, @sprintf("✅ All files have >= %.1f%% coverage!", target_good))
     else
         for (filename, stats) in low_coverage_files
             pct = stats["covered"] / stats["total"] * 100
