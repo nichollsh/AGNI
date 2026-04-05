@@ -37,28 +37,16 @@ jobs:
         uses: julia-actions/cache@v3
 
       # Setup SOCRATES
-      - name: Get SOCRATES
-        run: ./src/get_socrates.sh
-
       - name: Restore SOCRATES from cache
         uses: actions/cache@v5
         id: cache-socrates
         with:
-          path: |
-            socrates/bin
-            socrates/sbin
-            socrates/set_rad_env
+          path: socrates/
           key: socrates-${{ hashFiles('socrates/version') }}
 
       - name: Build SOCRATES if required
         if: steps.cache-socrates.outputs.cache-hit != 'true'
-        run: |
-          export LD_LIBRARY_PATH=""
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/socrates"
-          cd $RAD_DIR
-          ./configure
-          ./build_code
-          cd ..
+        run: ./src/get_socrates.sh
 
       - name: Get FastChem
         run: ./src/get_fastchem.sh

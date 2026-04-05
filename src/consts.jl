@@ -325,7 +325,7 @@ module consts
         ("Cr" , 5.62),
         ("Cu" , 4.18),
         ("F"  , 4.40),
-        ("Br" , -9.0),
+        ("Br" , -9.0),  # no value, placeholder
         ("Fe" , 7.46),
         ("Ge" , 3.62),
         ("H"  , 12.00),
