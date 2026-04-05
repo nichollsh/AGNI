@@ -34,7 +34,7 @@ jobs:
           version: '1.11'
 
       - name: Cache Julia
-        uses: julia-actions/cache@v2
+        uses: julia-actions/cache@v3
 
       # Setup SOCRATES
       - name: Get SOCRATES
@@ -44,13 +44,10 @@ jobs:
           path: 'SOCRATES'
 
       - name: Restore SOCRATES from cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-socrates
         with:
-          path: |
-            SOCRATES/bin
-            SOCRATES/sbin
-            SOCRATES/set_rad_env
+          path: SOCRATES/
           key: socrates-${{ hashFiles('SOCRATES/version') }}
 
       - name: Build SOCRATES if required
@@ -62,6 +59,9 @@ jobs:
           ./configure
           ./build_code
           cd ..
+
+      - name: Get FastChem
+        run: ./src/get_fastchem.sh
 
       - name: Build AGNI
         run: |
@@ -76,18 +76,18 @@ jobs:
         run: |
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export LD_LIBRARY_PATH=""
-          cd test/
-          julia --project=.. --code-coverage runtests.jl
+          julia --project=. --code-coverage test/runtests.jl
 
       - name: Get coverage
         run: |
           julia --project=. test/get_coverage.jl
           export total=$(cat coverage.total)
           echo "total=$total" >> $GITHUB_ENV
+          cat coverage.md >> "$GITHUB_STEP_SUMMARY"
 
       # Upload output dir for inspection by user
       - name: Upload result as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-artifact
           path: |
@@ -96,7 +96,7 @@ jobs:
 
       # Make badge
       - name: Create coverage badge
-        uses: schneegans/dynamic-badges-action@v1.7.0
+        uses: schneegans/dynamic-badges-action@v1.8.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: e20f4fa3c7811c75d34005311fef3696

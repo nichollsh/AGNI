@@ -1911,6 +1911,12 @@ module atmosphere
                     wl, fl = spectrum.load_from_file(atmos.star_file)
                 end
 
+                # Check that spectrum was loaded successfully
+                if (length(wl) <= 1) || (length(fl) != length(wl))
+                    @error "Invalid length of stellar spectrum '$(atmos.star_file)'"
+                    return false
+                end
+
                 # Write stellar spectrum to disk in format required by SOCRATES
                 spectrum.write_to_socrates_format(wl, fl, socstar) || return false
 

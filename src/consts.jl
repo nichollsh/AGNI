@@ -61,14 +61,16 @@ module consts
     export proton_mass
 
     # List of elements included in the model
-    const elems_standard::Array{String,1} = ["H","C","N","O","S","P","He",
-                                                "Fe","Mg","Si","Ca","Al","Na","Ti","K"]
+    const elems_standard::Array{String,1} = ["H","D","C","N","O","S","P",
+                                                "He","Ar","F","Cl","Br",
+                                                "Ti", "V", "Fe", "Si","Al", "Cr",
+                                                "Mg","Ca","Na","Li","K"]
     export elems_standard
 
     # Standard species
     const vols_standard::Array{String,1} = [
         # volatile atoms
-        "H", "O", "C", "N", "S", "P", "He", "Ar",
+        "H", "D", "O", "C", "N", "S", "P", "He",
         # basic
         "CH4", "CO2", "CO", "H2", "H2O", "O2", "OH", "O3",
         # carbon
@@ -77,7 +79,7 @@ module consts
         "C2H5CHO", "HOCH2CHO", "C2H5COCH3", "CH3ONO2", "C2H3", "C3H4", "C4H3",
         "C2N2", "HCO",
         # sulfur
-        "SO", "S2", "S8", "SO2", "H2SO4", "H2S", "S", "CS2", "OCS",
+        "SO", "S2", "S8", "SO2", "H2SO4", "H2S", "CS2", "OCS",
         "CH3SH", "CH3S", "C2H6S", "C2H6S2",
         # nitrogen
         "N2", "HCN", "NH3",  "HNO3", "N2O5", "HONO", "HO2NO2",
@@ -91,7 +93,7 @@ module consts
     ]
     const vaps_standard::Array{String,1} = [
         # (semi)refractory atoms
-        "Na", "Si", "Ti", "V", "Mg", "K", "Fe", "Li", "Rb", "Cs", "Ca", "Al", "Cr",
+        "Na", "Si", "Ti", "V", "Mg", "K", "Fe", "Li", "Ca", "Al", "Cr",
         # ions
         "H-",
         # rock vapours
@@ -167,6 +169,7 @@ module consts
 
         # elements from https://iupac.qmul.ac.uk/AtWt/
         ("H",   1.008000000e-03 ),
+        ("D",   2.014100000e-03 ), # https://chemlin.org/isotope/hydrogen-2
         ("He",  4.002000000e-03 ),
         ("Li",  6.940000000e-03 ),
         ("Be",  9.012000000e-03 ),
@@ -267,6 +270,7 @@ module consts
 
         # volatile elements
         ("H"  , "#0000aa"),
+        ("D"  , "#0000ff"),
         ("C"  , "#ff0000"),
         ("O"  , "#00cc00"),
         ("N"  , "#ffaa00"),
@@ -274,6 +278,9 @@ module consts
         ("P" ,  "#33ccff"),
         ("He" , "#30FF71" ),
         ("Ar",  "#FF007F"),
+        ("F" ,  "#00FFFF"),
+        ("Cl",  "#00FF00"),
+        ("Br",  "#FF00FF"),
 
         # (semi)refractory elements
         ("Na",   "#1144ff"),
@@ -318,6 +325,7 @@ module consts
         ("Cr" , 5.62),
         ("Cu" , 4.18),
         ("F"  , 4.40),
+        ("Br" , -9.0),  # no value, placeholder
         ("Fe" , 7.46),
         ("Ge" , 3.62),
         ("H"  , 12.00),

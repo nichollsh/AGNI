@@ -16,17 +16,18 @@ module blake
     Only works on AMD64 Linux.
 
     Arguments:
-    - `fpath::String`: Path to the file to hash.
+    - `fpath::String`       Path to the file to hash.
+    - `quiet::Bool=false`   Suppresses warnings about missing files.
 
     Returns:
     - `String`: The BLAKE2b hash of the file.
     """
-    function hash_file(fpath::String)::String
+    function hash_file(fpath::String; quiet::Bool=false)::String
         if !Sys.islinux()
             return "ONLY_SUPPORTED_ON_LINUX"
         end
         if !isfile(fpath)
-            @warn "File not found '$fpath'"
+            quiet || @warn "File not found '$fpath'"
             return "FILE_NOT_FOUND:$fpath"
         end
         content = strip(read(`$exec_path $fpath`, String))
@@ -39,15 +40,16 @@ module blake
     Assumes that there's a `.chk` file in the same folder.
 
     Arguments
-    - `fpath::String`: Path to the file to validate.
+    - `fpath::String`       Path to the file to validate
+    - `quiet::Bool=false`   Suppresses warnings
 
     Returns
-    - `Bool`: True if the file is valid, false otherwise.
+    - `Bool`                File is valid.
     """
-    function valid_file(fpath::String)::Bool
+    function valid_file(fpath::String; quiet::Bool=false)::Bool
         # Return true if unsupported
         if !Sys.islinux()
-            @debug "Skipping integrity check for '$fpath'"
+            quiet || @debug "Skipping integrity check for '$fpath'"
             return true
         end
 
@@ -57,16 +59,16 @@ module blake
         # Get the expected hash
         cpath::String = fpath*".chk"
         if !isfile(cpath)
-            @warn "File not found '$cpath'"
+            quiet || @warn "File not found '$cpath'"
             return false
         end
         hash_exp = strip(read(fpath*".chk", String))
 
         # Check if equal
         if Bool(hash_exp != hash_obs)
-            @warn "File '$fpath' failed integrity check"
-            @warn "    obs = '$hash_obs'"
-            @warn "    exp = '$hash_exp'"
+            quiet || @warn "File '$fpath' failed integrity check"
+            quiet || @warn "    obs = '$hash_obs'"
+            quiet || @warn "    exp = '$hash_exp'"
             return false
         end
         return true

@@ -23,27 +23,23 @@ julia agni.jl res/config/hotdry.toml  # use a specific config
 
 ### Run all tests
 ```bash
-cd test/
-julia --project=.. runtests.jl
+julia --project=. test/runtests.jl
 ```
 
 ### Run fast tests only (skips integration tests)
 ```bash
-cd test/
-julia --project=.. runtests.jl fast
+julia --project=. test/runtests.jl fast
 ```
 
 ### Run a single test file
 ```bash
-cd test/
-julia --project=.. -e 'include("test_phys.jl")'
+julia --project=. test/runtests.jl phys
 ```
 
 ### Generate coverage
 ```bash
-cd test/
-julia --project=.. --code-coverage runtests.jl
-julia --project=.. ../test/get_coverage.jl
+julia --project=. --code-coverage test/runtests.jl
+julia --project=. test/get_coverage.jl
 ```
 
 ## Architecture

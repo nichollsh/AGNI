@@ -53,7 +53,7 @@ Below is an animated example of AGNI solving for a temperature-pressure profile,
 * `out/`            - Model output files
 * `res/`            - Resources (configs, thermodynamic data, etc.)
 * `src/`            - Source code
-* `test/`           - Tests for the code
+* `test/`           - Tests for the code (see [Testing Documentation](https://www.h-nicholls.space/AGNI/dev/howto/testing/))
 * `tutorials/`      - Notebooks and tutorials
 
 This software is available under GPLv3. Copyright (C) 2023-2026 Harrison Nicholls.

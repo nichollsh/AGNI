@@ -44,22 +44,22 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         # Test absorbed flux
         val_e = toa_heating * cosd(theta)
         val_o = atmos.flux_d_sw[1]
-        test_pass = isapprox(val_e, val_o; atol=2)
-        if !test_pass
+        test_check = isapprox(val_e, val_o; atol=2)
+        if !test_check
             @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
-        @test test_pass
+        @test test_check
 
         # Test no-scattering
         val_o = atmos.flux_u_sw[2]
         val_e = 0.0
         @info "Expected value = $(val_e) W m-2"
         @info "Modelled value = $(val_o) W m-2"
-        test_pass = isapprox(val_e,val_o; atol=1.0e-10)
-        if !test_pass
+        test_check = isapprox(val_e,val_o; atol=1.0e-10)
+        if !test_check
             @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
-        @test test_pass
+        @test test_check
         atmosphere.deallocate!(atmos)
     end
 
@@ -108,11 +108,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             val_e = 1.0487713813847492e7   # known from previous tests
             val_o = atmos.r[1] # height of topmost layer-centre
 
-            test_pass = isapprox(val_e, val_o; rtol=rtol)
-            if !test_pass
+            test_check = isapprox(val_e, val_o; rtol=rtol)
+            if !test_check
                 @warn ("Expected value = $(val_e) m \n Modelled value = $(val_o) m")
             end
-            @test test_pass
+            @test test_check
         end
 
 
@@ -122,11 +122,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         @testset "greenhouse" begin
             val_e = [270.0, 280.0]
             val_o = atmos.flux_u_lw[1]
-            test_pass = ( val_o > val_e[1]) && (val_o < val_e[2])
-            if !test_pass
+            test_check = ( val_o > val_e[1]) && (val_o < val_e[2])
+            if !test_check
                 @warn ("Expected range = $(val_e) W m-2 \n Modelled value = $(val_o) W m-2")
             end
-            @test test_pass
+            @test test_check
         end
 
 
@@ -136,11 +136,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         @testset "surf_albedo" begin
             val_e = 29.699515011666094  # known from previous tests
             val_o = atmos.flux_u_sw[end] # bottom level
-            test_pass = isapprox(val_e, val_o; rtol=1e-3)
-            if !test_pass
+            test_check = isapprox(val_e, val_o; rtol=1e-3)
+            if !test_check
                 @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
             end
-            @test test_pass
+            @test test_check
         end
 
 
@@ -220,12 +220,12 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 
         val_e = 37.18288051811991
         val_o = atmos.flux_u_sw[20]
-        test_pass = isapprox(val_e, val_o; rtol=1e-3)
-        if !test_pass
+        test_check = isapprox(val_e, val_o; rtol=1e-3)
+        if !test_check
             @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
         atmosphere.deallocate!(atmos)
-        @test test_pass
+        @test test_check
     end
 
 
@@ -269,11 +269,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 
         val_e = 6.144974916820797   # from previous tests
         val_o = atmos.heating_rate[atmos.nlev_c-10]
-        test_pass = isapprox(val_e, val_o; rtol=1e-3)
-        if !test_pass
+        test_check = isapprox(val_e, val_o; rtol=1e-3)
+        if !test_check
             @warn ("Expected value = $(val_e) K/day\n Modelled value = $(val_o) K/day")
         end
-        @test test_pass
+        @test test_check
 
 
         # -------------
@@ -282,11 +282,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         energy.calc_fluxes!(atmos, radiative=true, convective=true, conductive=true, sens_heat=true, latent_heat=true, deep=true)
         val_e = 8235.347576033042  # from previous tests
         val_o = atmos.flux_tot[atmos.nlev_c-10]
-        test_pass = isapprox(val_e, val_o; rtol=1e-3)
-        if !test_pass
+        test_check = isapprox(val_e, val_o; rtol=1e-3)
+        if !test_check
             @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
-        @test test_pass
+        @test test_check
 
         # -------------
         # Transparent atmosphere solver (sol_type = 4)
@@ -298,11 +298,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         solver.solve_transparent!(atmos; sol_type=4)
         val_e = atmos.target_olr
         val_o = atmos.flux_u_lw[1]
-        test_pass = isapprox(val_e, val_o; rtol=1e-3)
-        if !test_pass
+        test_check = isapprox(val_e, val_o; rtol=1e-3)
+        if !test_check
             @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
-        @test test_pass
+        @test test_check
 
         # -------------
         # Transparent atmosphere solver (sol_type = 3)
@@ -312,11 +312,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         solver.solve_transparent!(atmos; sol_type=3)
         val_e = atmos.flux_int
         val_o = atmos.flux_tot[1]
-        test_pass = isapprox(val_e, val_o; rtol=1e-2, atol=0.5)
-        if !test_pass
+        test_check = isapprox(val_e, val_o; rtol=1e-2, atol=0.5)
+        if !test_check
             @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
-        @test test_pass
+        @test test_check
     end
 
     # -------------
@@ -328,6 +328,9 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         # check return code is fine
         succ = AGNI.run_from_config(cfg)
         @test succ
+
+        # check io directory exists
+        @test isdir(cfg["files"]["io_dir"])
 
         # -------------
         # Compare result from NetCDF
@@ -366,45 +369,45 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         # pressure profile
         @debug ("Pressure...")
         arr_e[:] .= [1.0, 1.61372830078497, 2.60411902875434, 4.20234057531355, 6.78143591592047, 10.9433950574805, 17.6596663109266, 28.4979033083612, 45.9878730817361, 74.2119322849048, 119.757895384089, 193.256705023749, 311.863814213277, 503.263462986711, 812.130492972705, 1310.5579604405, 2114.88447058187, 3412.8489230686, 5507.4108934593, 8887.46482282671, 14341.9535068263, 23144.0162625079, 37348.1540366365, 60269.7731509967, 97259.0386156535, 156949.663121218, 253274.113177377, 408715.604290549, 659555.937616089, 1064344.08248185, 1717562.16767397, 2771678.67833306, 4472736.32390834, 7217781.18783982, 11647537.7716905, 18795961.3366388, 30331574.7493941, 48946920.5804721, 78987030.9769821, 127463607.282535, 205691630.391968, 331930405.19812, 535645488.759229, 646902370.004265, 648216250.228125 ]
-        test_pass = all(abs.(arr_e[:] .- arr_o_prs[:]) .< abs.(arr_e[:].*rtol) .+ 0.5)
-        if !test_pass
-            @warn ("Fail \n Observed: $(arr_o_prs)")
+        test_check = all(abs.(arr_e[:] .- arr_o_prs[:]) .< abs.(arr_e[:].*rtol) .+ 0.5)
+        if !test_check
+            @warn ("Fail 'prs' \n Observed: $(arr_o_prs) \n Expected: $(arr_e)")
         end
-        @test test_pass
+        @test test_check
 
         # temperature profile
         @debug ("Temperature...")
-        arr_e[:] .= [160.7088664780815, 172.19032126178496, 178.16561136706684, 179.33373012757735, 180.00977169552914, 179.38249915236452, 179.63139981968027, 181.7784723456627, 183.23201439666911, 182.84793377402212, 183.58309955137906, 186.39754255672958, 190.50608275317828, 195.51792694295384, 201.2539426805421, 207.6206162995812, 214.39033710208366, 221.79737139979238, 231.75042336773424, 246.49731386931796, 263.55300687852633, 287.98847780008725, 320.73277446340387, 355.3021779910596, 392.6169738903187, 429.6576402027081, 460.8349624615243, 487.31898647282645, 514.7451164371932, 543.3888106490932, 570.4324135285711, 593.6178077887256, 610.3907977993852, 619.9928759088517, 624.69827311216, 627.1707368815037, 628.6896155575437, 629.5684702400786, 629.9508386423341, 630.0682907450105, 630.0966361922129, 630.1029022380585, 630.1042558931739, 630.1043594621661, 630.1043597908382]
-        test_pass = all(abs.(arr_e[:] .- arr_o_tmp[:]) .< abs.(arr_e[:].*rtol) .+ 0.5)
-        if !test_pass
-            @warn ("Fail \n Observed: $(arr_o_tmp)")
+        arr_e[:] .= [160.6951945486835, 172.1746786971098, 178.14914386251837, 179.3174970360867, 179.99367397418297, 179.36630061651562, 179.61486432349, 181.76182287005383, 183.21555860820072, 182.8310793945806, 183.5654069142934, 186.37892037403157, 190.48580094893484, 195.49508157697107, 201.22720345759492, 207.58851577389171, 214.35040002077855, 221.74153252547325, 231.6691046616695, 246.41073491399578, 263.4670022579926, 287.093684861275, 319.6845577217464, 355.27365904095996, 392.97312349421725, 429.96569214612794, 461.0531314431462, 487.49045050571283, 514.8861402680147, 543.5031606896113, 570.52469404162, 593.695649254799, 610.4590899795674, 620.0545016788653, 624.7560661682035, 627.2267737068485, 628.7455649318175, 629.6238504081975, 630.0052214218207, 630.1224213875696, 630.1507066331749, 630.1569595627943, 630.158312274035, 630.158413879461, 630.1584141552416]
+        test_check = all(abs.(arr_e[:] .- arr_o_tmp[:]) .< abs.(arr_e[:].*rtol) .+ 0.5)
+        if !test_check
+            @warn ("Fail 'tmp' \n Observed: $(arr_o_tmp) \n Expected: $(arr_e)")
         end
-        @test test_pass
+        @test test_check
 
         # radiative flux
         @debug ("Radiative flux...")
-        arr_e[:] .= [-4.9872131683059706e-5, -0.00021685517390324094, -5.446596077263166e-5, -6.956502420507604e-5, -4.464714481855481e-5, -4.1937900391531e-5, -6.189397629441373e-5, -8.169547623992912e-5, -4.90136637267824e-5, -4.301526104200093e-5, -7.095810627788524e-5, -0.00037362132775342616, -0.0016387527005576885, -0.005163568319403566, -0.015416830214064703, -0.04250362273199926, -0.10932251298316942, -0.30647951633102366, -1.4784710919412305, -9.927186737124345, -38.40847329339533, -39.38202174156268, -40.03873661212435, -24.729291535171853, -8.090326572761398, -0.0002255708594987027, -0.0001643575964322963, -0.00015236288642483942, -0.00017095811467982003, -0.00016738894379386693, -0.0001507433066763042, -0.00012077610864480448, -7.536869504320975e-5, -3.700287694208271e-5, -1.7974538663700912e-5, -1.075028051067406e-5, -6.867279150668537e-6, -3.3999808010110044e-6, -1.1308877208085488e-6, -2.810934676129688e-7, -6.233177590498777e-8, -1.3682293434019401e-8, -4.055073132242046e-8, 2.369779394782707e-8, -2.6217860067846884e-5]
-        test_pass = all(abs.(arr_e[:] .- arr_o_flN[:]) .< abs.(arr_e[:].*rtol) .+ atol)
-        if !test_pass
-            @warn ("Fail \n Observed: $(arr_o_flN)")
+        arr_e[:] .= [1.1870906746480614e-7, -0.0001695253985758427, -4.829445401810517e-6, -1.9480345088140893e-5, 5.5380432968377136e-6, 7.924799490410805e-6, -1.28889058146342e-5, -3.178004538995083e-5, 1.6810952274681767e-6, 6.602606219985319e-6, -2.1631864171922643e-5, -0.00033096340735028207, -0.001622381046161081, -0.0051919088898557675, -0.015542161698306245, -0.042683713302892556, -0.10943129500662963, -0.30541037706086627, -1.4637689353679093, -9.831207438208537, -37.91071184320069, -40.75303719751662, -37.62829881131762, -23.043609644640355, -7.454170712616104, -0.00023558832512549088, -0.00017526234823606046, -0.00016422760828049832, -0.0001785546421331219, -0.0001712531209037138, -0.00015205559718367567, -0.0001204060679818042, -7.441142472330853e-5, -3.639908325325791e-5, -1.776827483812582e-5, -1.068927611447279e-5, -6.814122859744032e-6, -3.3173632762451e-6, -1.0873069782313394e-6, -2.681373675842043e-7, -5.9402425212115286e-8, -1.3076818613219839e-8, -6.566552094707885e-9, -1.264015736614347e-8, -6.251862942009202e-6]
+        test_check = all(abs.(arr_e[:] .- arr_o_flN[:]) .< abs.(arr_e[:].*rtol) .+ atol)
+        if !test_check
+            @warn ("Fail 'flN' \n Observed: $(arr_o_flN) \n Expected: $(arr_e)")
         end
-        @test test_pass
+        @test test_check
 
         # convective flux
-        arr_e[:] .= [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.5717014255377733, 22.0839382511119, 18.39491183960335, 7.661612110746325, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        test_pass = all(abs.(arr_e[:] .- arr_o_flC[:]) .< abs.(arr_e[:].*rtol) .+ atol)
-        if !test_pass
-            @warn ("Fail \n Observed: $(arr_o_flC)")
+        arr_e[:] .= [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.348941001526396, 18.852250092162105, 16.962217985262576, 6.932104632558805, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        test_check = all(abs.(arr_e[:] .- arr_o_flC[:]) .< abs.(arr_e[:].*rtol) .+ atol)
+        if !test_check
+            @warn ("Fail 'flC' \n Observed: $(arr_o_flC) \n Expected: $(arr_e)")
         end
-        @test test_pass
+        @test test_check
 
         # eddy diffusion coefficients
         @debug ("Kzz...")
-        arr_e[:] .= [333668.65612205677, 275540.00776454015, 227537.991614982, 187898.4400422248, 155164.52228356962, 128133.20307543786, 105811.02876317696, 87377.61594338887, 72155.50077524007, 59585.24086419178, 49204.85466386036, 40632.8427539614, 33554.16699321721, 27708.672253775378, 22881.52521331677, 18895.318811832065, 15603.552196467479, 12885.246529707978, 10640.498781356933, 8786.810097503372, 7256.053806881907, 5991.971632950747, 13734.470378102425, 12192.377627146934, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575, 8529.677815084575]
-        test_pass = all(abs.(arr_e[:] .- arr_o_Kzz[:]) .< abs.(arr_e[:].*rtol) .+ 1e4)
-        if !test_pass
-            @warn ("Fail \n Observed: $(arr_o_Kzz)")
+        arr_e[:] .= [427059.004585827, 352660.69825513515, 291223.38308828394, 240489.1139755759, 198593.3043131531, 163996.19868873604, 135426.28376808832, 111833.55761827467, 92350.94002119426, 76262.4055286653, 62976.668084633005, 52005.45007134976, 42945.537123193695, 35463.95918637879, 29285.753198646, 24183.857642759118, 19970.767578287156, 16491.643457278595, 13618.620458920112, 11246.10919976332, 9286.915111152905, 7669.033863158218, 13813.003476924308, 12130.702827887766, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395, 8567.057003230395]
+        test_check = all(abs.(arr_e[:] .- arr_o_Kzz[:]) .< abs.(arr_e[:].*rtol) .+ 1e4)
+        if !test_check
+            @warn ("Fail 'Kzz' \n Observed: $(arr_o_Kzz) \n Expected: $(arr_e)")
         end
-        @test test_pass
+        @test test_check
     end
 end

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S julia --color=yes --startup-file=no
 
-# Run this function from inside the `test/` folder
-# e.g. as `julia --project=.. runtests.jl`
+# Run this function from inside the AGNI root folder
+# e.g. as `julia --project=. test/runtests.jl`
 
 # To run with coverage reporting, add `--code-coverage` flag
 
@@ -17,6 +17,7 @@ Pkg.activate(ROOT_DIR)
 using LoggingExtras
 using NCDatasets
 using AGNI
+using Glob
 using Test
 
 @info "Begin AGNI tests"
@@ -40,7 +41,7 @@ if length(ARGS)>0
         suite = "fast"
     end
 end
-@info "Using test suite '$suite'"
+@info "Requested test suite '$suite'"
 
 rm(OUT_DIR,force=true,recursive=true)
 if !isdir(OUT_DIR) && !isfile(OUT_DIR)
@@ -51,19 +52,49 @@ rtol   = 1e-3
 
 # Test module imported
 @test isdefined(AGNI.atmosphere, :setup!)
+
+# Find test names
+test_names = sort([replace(split(basename(f), ".jl")[1], "test_"=>"") for f in glob("test_*.jl", TEST_DIR)])
+
+# Select tests
 if suite == "none"
+    # no tests
     @info "No tests selected. Exiting."
     exit()
+
+elseif suite == "fast"
+    # exclude integration tests
+    @info "Running only fast tests"
+    filter!(t -> !occursin("integration", t), test_names)
+
+elseif suite in test_names
+    # run only the specified test suite
+    @info "Running only test suite '$suite'"
+    test_names = [suite]
+
+else
+    if suite != "all"
+        @error "Test suite '$suite' not found"
+        exit(1)
+    else
+        @info "Running all tests"
+    end
 end
 
-# Other tests
-LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
-include("test_consts.jl")
-include("test_phys.jl")
-include("test_guillot.jl")
-include("test_ocean.jl")
-include("test_deep_heating.jl")
-include("test_kzz.jl")
-if suite != "fast"
-    include("test_integration.jl")
+# Collect tests
+test_files = String[]
+for test_name in test_names
+    push!(test_files, joinpath(TEST_DIR, "test_$test_name.jl"))
 end
+@info "Collected tests: $(join(test_names, ", "))"
+
+# Configure logging to show only warnings and errors
+LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
+
+# Run tests
+for test_file in test_files
+    @info "Running '$(test_file)'"
+    include(test_file)
+end
+
+exit(0)

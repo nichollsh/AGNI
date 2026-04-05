@@ -288,7 +288,9 @@ module chemistry
 
             end # end condensate
 
+            # Re-normalise VMRs, keeping condensate VMRs fixed
             normalise_vmrs!(atmos, i)
+
         end # end i levels
 
         # Ensure that all yields are positive at this point
@@ -375,13 +377,16 @@ module chemistry
 
         end # end loop over condensates
 
+        # Layer properties
+        for i in 1:atmos.nlev_c
+            normalise_vmrs!(atmos, i)
+        end
+        atmosphere.calc_layer_props!(atmos)
+
         # Set water clouds at levels where condensation occurs
         if "H2O" in atmos.condensates
             atmosphere.set_cloud!(atmos; from_yield=true)
         end
-
-        # Layer properties
-        atmosphere.calc_layer_props!(atmos)
 
         return nothing
     end
@@ -692,25 +697,6 @@ module chemistry
                 end
             end # /match
         end # /gas
-
-        # Do not renormalise mixing ratios, since this is done by fastchem
-        # If we are missing gases then that's okay.
-
-        # Find where T(p) drops below fastchem_floor temperature.
-        # Make sure that regions above that use the reasonable VMR values
-        # i_trunc::Int = 0
-        # for i in reverse(sort(fc_levels))
-        #     if atmos.tmp[i] < atmos.fastchem_floor
-        #        i_trunc = i
-        #        break
-        #     end
-        # end
-        # if i_trunc > 0
-        #     # @warn @sprintf("Temperature below FC floor, at p < %.1e Pa", atmos.p[i_trunc])
-        #     for g in atmos.gas_names
-        #         atmos.gas_vmr[g][1:i_trunc] .= atmos.gas_vmr[g][i_trunc]
-        #     end
-        # end
 
         # Also record this result in gas_cvmr dictionary
         for g in atmos.gas_names
