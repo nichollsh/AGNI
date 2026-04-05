@@ -79,7 +79,7 @@ module consts
         "C2H5CHO", "HOCH2CHO", "C2H5COCH3", "CH3ONO2", "C2H3", "C3H4", "C4H3",
         "C2N2", "HCO",
         # sulfur
-        "SO", "S2", "S8", "SO2", "H2SO4", "H2S", "S", "CS2", "OCS",
+        "SO", "S2", "S8", "SO2", "H2SO4", "H2S", "CS2", "OCS",
         "CH3SH", "CH3S", "C2H6S", "C2H6S2",
         # nitrogen
         "N2", "HCN", "NH3",  "HNO3", "N2O5", "HONO", "HO2NO2",
@@ -325,6 +325,7 @@ module consts
         ("Cr" , 5.62),
         ("Cu" , 4.18),
         ("F"  , 4.40),
+        ("Br" , -9.0),
         ("Fe" , 7.46),
         ("Ge" , 3.62),
         ("H"  , 12.00),

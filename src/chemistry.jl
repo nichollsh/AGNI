@@ -288,6 +288,9 @@ module chemistry
 
             end # end condensate
 
+            # Re-normalise VMRs, keeping condensate VMRs fixed
+            normalise_vmrs!(atmos, i)
+
         end # end i levels
 
         # Ensure that all yields are positive at this point
@@ -378,7 +381,6 @@ module chemistry
         for i in 1:atmos.nlev_c
             normalise_vmrs!(atmos, i)
         end
-
         atmosphere.calc_layer_props!(atmos)
 
         # Set water clouds at levels where condensation occurs

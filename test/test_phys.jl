@@ -11,6 +11,12 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     @test AGNI.phys.count_atoms("H2O") == AGNI.consts._lookup_count_atoms["H2O"]
     @test AGNI.phys.count_atoms("CO2") == AGNI.consts._lookup_count_atoms["CO2"]
 
+    # all molecules
+    for molec in AGNI.consts.vols_standard
+        @test length(AGNI.phys.count_atoms(molec)) > 0
+        @test AGNI.phys._get_mmw(molec) > 0.0
+    end
+
     # same_atoms
     @test AGNI.phys.same_atoms(Dict("H"=>2, "O"=>1), Dict("O"=>1, "H"=>2))
 
@@ -268,17 +274,17 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         # Simple molecules
         @test phys.count_atoms("O2") == Dict("O" => 2)
         @test phys.count_atoms("N2") == Dict("N" => 2)
-        
+
         # Molecules with parentheses/brackets (should be skipped by parser)
         atoms_nh3 = phys.count_atoms("NH3")
         @test atoms_nh3["N"] == 1
         @test atoms_nh3["H"] == 3
-        
+
         # Two-letter element names
         atoms_ch4 = phys.count_atoms("CH4")
         @test atoms_ch4["C"] == 1
         @test atoms_ch4["H"] == 4
-        
+
         # Complex molecule
         atoms_h2so4 = phys.count_atoms("H2SO4")
         @test atoms_h2so4["H"] == 2
@@ -306,7 +312,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         @test isapprox(phys._get_mmw("H2O"), AGNI.consts._lookup_mmw["H2O"]; rtol=1e-12)
         @test isapprox(phys._get_mmw("CO2"), AGNI.consts._lookup_mmw["CO2"]; rtol=1e-12)
         @test isapprox(phys._get_mmw("N2"), AGNI.consts._lookup_mmw["N2"]; rtol=1e-12)
-        
+
         # Test that MMW is positive
         @test phys._get_mmw("CH4") > 0.0
         @test phys._get_mmw("O2") > 0.0
@@ -321,11 +327,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         pn_h2o = phys._pretty_name("H2O")
         @test pn_h2o != "H2O"  # should be different due to subscript
         @test !occursin("2", pn_h2o)  # regular '2' should be gone
-        
+
         pn_co2 = phys._pretty_name("CO2")
         @test pn_co2 != "CO2"
         @test !occursin("2", pn_co2)
-        
+
         # Molecule without numbers stays same (except unicode conversion)
         pn_o = phys._pretty_name("O")
         @test length(pn_o) >= 1
