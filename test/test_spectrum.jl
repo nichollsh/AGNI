@@ -4,7 +4,7 @@ using AGNI
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
 RES_DIR = joinpath(ROOT_DIR,"res/")
 
-temp_sf = "/tmp/test_spectral_file_xyz123.sf"
+temp_sf = tempname() * ".sf"
 
 @testset "spectrum" begin
 
@@ -77,16 +77,16 @@ Some more content
 *BLOCK: TYPE =    1
 """
         write(temp_sf, sf_content)
-        
+
         # Try inserting aerosol header with a valid aerosol name
         success = AGNI.spectrum.insert_aerosol_header(temp_sf, ["dust"])
         @test success
-        
+
         # Check that file was modified
         content = read(temp_sf, String)
         @test contains(content, "Total number of aerosols")
         @test contains(content, "Dust-like Aerosol")
-        
+
         rm(temp_sf, force=true)
     end
 
@@ -110,9 +110,9 @@ Some more content
     @testset "blackbody_star" begin
         Teff = 5800.0  # Sun-like star
         S0 = 1361.0     # Solar constant
-        
+
         wl, fl = AGNI.spectrum.blackbody_star(Teff, S0)
-        
+
         @test length(wl) == length(fl)
         @test length(wl) > 0
         @test all(fl .>= AGNI.spectrum.FLOAT_SML)
@@ -133,7 +133,7 @@ Some more content
 """
         write(temp_sf, test_data)
         wl, fl = AGNI.spectrum.load_from_file(temp_sf)
-        
+
         @test length(wl) == 3
         @test length(fl) == 3
         @test wl[1] == 100.0
@@ -146,18 +146,18 @@ Some more content
         # Create test wavelength and flux arrays
         wl = collect(range(100.0, 1000.0, length=1000))
         fl = ones(Float64, 1000) .* 1e10
-        
-        temp_star = "/tmp/test_star_spectrum.txt"
+
+        temp_star = tempname() * ".txt"
         success = AGNI.spectrum.write_to_socrates_format(wl, fl, temp_star, 500)
         @test success
         @test isfile(temp_star)
-        
+
         # Check file content
         content = read(temp_star, String)
         @test contains(content, "Star spectrum at TOA")
         @test contains(content, "*BEGIN_DATA")
         @test contains(content, "*END")
-        
+
         rm(temp_star, force=true)
     end
 
@@ -165,8 +165,8 @@ Some more content
     @testset "write_to_socrates_format_mismatch" begin
         wl = collect(range(100.0, 1000.0, length=1000))
         fl = ones(Float64, 999)  # Different length
-        
-        temp_star = "/tmp/test_star_mismatch.txt"
+
+        temp_star = tempname() * ".txt"
         success = AGNI.spectrum.write_to_socrates_format(wl, fl, temp_star)
         @test !success
         rm(temp_star, force=true)
@@ -176,8 +176,8 @@ Some more content
     @testset "write_to_socrates_format_short" begin
         wl = collect(range(100.0, 1000.0, length=100))
         fl = ones(Float64, 100) .* 1e10
-        
-        temp_star = "/tmp/test_star_short.txt"
+
+        temp_star = tempname() * ".txt"
         success = AGNI.spectrum.write_to_socrates_format(wl, fl, temp_star)
         @test success
         rm(temp_star, force=true)
@@ -187,8 +187,8 @@ Some more content
     @testset "write_to_socrates_format_wl_too_small" begin
         wl = [1e-50, 100.0, 200.0]
         fl = ones(Float64, 3) .* 1e10
-        
-        temp_star = "/tmp/test_star_wl_small.txt"
+
+        temp_star = tempname() * ".txt"
         success = AGNI.spectrum.write_to_socrates_format(wl, fl, temp_star)
         @test !success
         rm(temp_star, force=true)
@@ -198,8 +198,8 @@ Some more content
     @testset "write_to_socrates_format_descending" begin
         wl = [1000.0, 500.0, 100.0]  # Descending order
         fl = ones(Float64, 3) .* 1e10
-        
-        temp_star = "/tmp/test_star_descend.txt"
+
+        temp_star = tempname() * ".txt"
         success = AGNI.spectrum.write_to_socrates_format(wl, fl, temp_star)
         @test !success
         rm(temp_star, force=true)
@@ -209,8 +209,8 @@ Some more content
     @testset "write_to_socrates_format_duplicates" begin
         wl = [100.0, 200.0, 200.0, 300.0]  # Has duplicate
         fl = ones(Float64, 4) .* 1e10
-        
-        temp_star = "/tmp/test_star_dup.txt"
+
+        temp_star = tempname() * ".txt"
         success = AGNI.spectrum.write_to_socrates_format(wl, fl, temp_star)
         @test success  # Should succeed after removing duplicates
         rm(temp_star, force=true)

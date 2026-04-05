@@ -368,7 +368,7 @@ module spectrum
         end
 
         # Write executable
-        execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_insert_stellar.sh"
+        execpath::String = tempname() * "_agni_insert_stellar.sh"
         @debug "Wrapping script: $execpath"
         rm(execpath, force=true)
         open(execpath, "w") do f
@@ -497,7 +497,7 @@ module spectrum
         end
 
         # Write executable
-        execpath::String = "/tmp/$(abs(rand(Int,1)[1]))_agni_aerosol_scatter.sh"
+        execpath::String = tempname() * "_agni_aerosol_scatter.sh"
         @debug "Wrapping script: $execpath"
         rm(execpath, force=true)
         open(execpath, "w") do f

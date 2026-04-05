@@ -22,7 +22,6 @@ julia --project=. test/runtests.jl
 The fast test suite excludes expensive integration tests:
 
 ```bash
-cd test/
 julia --project=. test/runtests.jl fast
 ```
 
