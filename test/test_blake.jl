@@ -29,6 +29,7 @@ temp_file = tempname() * "_blake.txt"
 
     # Test valid_file with matching hash
     #     Create a temp file and its .chk file with correct hash
+    write(temp_file, "test content")
     correct_hash = AGNI.phys.blake.hash_file(temp_file; quiet=true)
     write(temp_file * ".chk", correct_hash)
     validity2 = AGNI.phys.blake.valid_file(temp_file; quiet=true)
