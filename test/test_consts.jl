@@ -138,7 +138,7 @@ using AGNI
     end
 
     # Most elements in elems_standard should have solar metallicity values
-    # Note: D and Br are currently missing from _solar_metallicity
+    # Note: D is currently missing from _solar_metallicity
     elem_with_metals = filter(e -> haskey(AGNI.consts._solar_metallicity, e), AGNI.consts.elems_standard)
     @test length(elem_with_metals) >= 21  # Most elements should have solar metallicity data
 
