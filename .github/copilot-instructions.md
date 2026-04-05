@@ -38,7 +38,7 @@ julia --project=. test/runtests.jl phys
 
 ### Generate coverage
 ```bash
-julia --project=. --code-coverage runtests.jl
+julia --project=. --code-coverage test/runtests.jl
 julia --project=. test/get_coverage.jl
 ```
 
