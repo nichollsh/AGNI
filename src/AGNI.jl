@@ -267,6 +267,7 @@ module AGNI
         chem::Bool                          = false
         rainout::Bool                       = false
         oceans::Bool                        = false
+        coldtrap::Bool                      = true
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
         pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
@@ -296,6 +297,11 @@ module AGNI
             rainout = Bool(cfg["physics"]["rainout"])
             oceans  = Bool(cfg["physics"]["oceans"])
             condensates = cfg["composition"]["condensates"]
+
+            coldtrap = true
+            if haskey(cfg["physics"], "coldtrap")
+                coldtrap = Bool(cfg["physics"]["coldtrap"])
+            end
 
             comp_set_by::Int = 0
 
@@ -490,10 +496,10 @@ module AGNI
         end
 
         # Optional aerosol parametrization controls
-        aerosol_species::Dict{String, Float64} = Dict{String, Float64}()
+        aerosol_species::Dict = Dict()
         if haskey(cfg["composition"], "aerosols")
             for (k, v) in cfg["composition"]["aerosols"]
-                aerosol_species[string(k)] = Float64(v)
+                aerosol_species[string(k)] = v
             end
         end
 
@@ -518,6 +524,7 @@ module AGNI
 
                                 IO_DIR=io_dir,
                                 condensates=condensates,
+                                coldtrap=coldtrap,
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["physics"]["continua"],
                                 flag_rayleigh     = cfg["physics"]["rayleigh"],
@@ -641,6 +648,7 @@ module AGNI
                                 conv_rtol=conv_rtol,
                                 method=Int(method_idx),
                                 rainout=rainout,
+                                coldtrap=coldtrap,
                                 oceans=oceans,
                                 dx_max=Float64(cfg["execution"]["dx_max"]),
                                 ls_method=Int(cfg["execution"]["linesearch"]),

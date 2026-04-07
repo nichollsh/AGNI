@@ -290,6 +290,7 @@ module atmosphere
         aerosol_arr_l::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles [kg/kg]
         aerosol_arr_r::Dict{String, Array{Float64,1}}  # Aerosol particle size profiles [m]
         aerosol_val_r::Float64                         # Default particle size for aerosol species, if not specified in array
+        aerosol_setby::Dict{String, String}            # Dict of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
         aerosol_names::Array{String,1}               # Map SOCRATES index (int) to name (string)
         aerosol_relhumid::Float64                    # Mean relative humidity used by moist aerosol schemes [0,1]
         aerosol_phase_num::Int                       # Number of phase-function moments retained when averaging
@@ -440,7 +441,7 @@ module atmosphere
     - `flag_gcontinuum::Bool`           include generalised continuum absorption?
     - `flag_continuum::Bool`            include continuum absorption?
     - `flag_aerosol::Bool`              include aerosols?
-    - `aerosol_species::Dict`           aerosols MMR values to initialise profile with
+    - `aerosol_species::Dict`           aerosols MMR values or associated condensates
     - `flag_cloud::Bool`                include clouds?
     - `phs_timescale::Float64`          phase change timescale [s]
     - `evap_efficiency::Float64`        re-evaporatione efficiency compared to saturating amount
@@ -497,7 +498,7 @@ module atmosphere
                     flag_continuum::Bool =      false,
                     flag_aerosol::Bool =        false,
                     flag_cloud::Bool =          false,
-                    aerosol_species::Dict =     Dict{String, Float64}(),
+                    aerosol_species::Dict =     Dict{String, Union{Float64,String}}(),
 
                     phs_timescale::Float64 =    1e6,
                     evap_efficiency::Float64 =  0.05,
@@ -807,16 +808,33 @@ module atmosphere
         atmos.aerosol_val_r = 1.0e-5   # [INPUT] default particle size for aerosol species
         atmos.aerosol_arr_l = Dict{String, Array{Float64,1}}() # list of MMR profiles
         atmos.aerosol_arr_r = Dict{String, Array{Float64,1}}() # list of particle size profiles
+        atmos.aerosol_setby = Dict{String, String}() # dictionary of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
         atmos.aerosol_names = String[] # list of species names, in same order as spectral file
         for (k, v) in aerosol_species
+
+            # set to zero for now (true values will be set elsewhere)
             k = lowercase(k)
-            _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
             atmos.aerosol_arr_l[k] = zeros(Float64, atmos.nlev_c)
             atmos.aerosol_arr_r[k] = zeros(Float64, atmos.nlev_c)
-            set_aerosol!(atmos,k , v)
+            push!(atmos.aerosol_names, UNSET_STR) # set in allocate!
 
-            # Store empty strings for now (set in allocate! function)
-            push!(atmos.aerosol_names, UNSET_STR)
+            # MMR profile tied to condensate or set by value?
+            if isa(v, String)
+                # interpret as condensate name
+                if !(v in condensates)
+                    @error "Aerosol '$k' is tied to '$v', but $v is not in the list of condensates"
+                    return false
+                end
+                @debug "Aerosol '$k' to be associated with species '$v'"
+                set_aerosol!(atmos, k, 0.0)
+                atmos.aerosol_setby[k] = v
+            else
+                # interpret as MMR value
+                v = Float64(v)
+                _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
+                set_aerosol!(atmos, k, v)
+                atmos.aerosol_setby[k] = "value"
+            end
         end
 
         # Read VMRs
@@ -2820,6 +2838,25 @@ module atmosphere
     end
 
     """
+    **Calculate condensate mass mixing ratio at a specific layer.**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   atmosphere struct instance to be used.
+    - `c::String`                   condensate species to calculate for (e.g. "H2O")
+    - `i::Int`                      layer index
+
+    Returns:
+    - `cond_mmr::Float64`           condensate `c` mass mixing ratio at layer `i`
+    """
+    function calc_cond_mmr(atmos::atmosphere.Atmos_t, c::String, i::Int64)::Float64
+        if atmos.cond_yield[c][i] > 0.0
+            return atmos.cond_yield[c][i]*atmos.cloud_alpha / atmos.layer_σ[i]
+        else
+            return 0.0
+        end
+    end
+
+    """
     **Set water cloud profile based on saturation.**
 
     Arguments:
@@ -2841,8 +2878,7 @@ module atmosphere
             # liquid water content (take ratio of mass surface densities [kg/m^2])
             if from_yield
                 # set by condensation yield
-                atmos.cloud_arr_l[i] = (atmos.cond_yield["H2O"][i]*atmos.cloud_alpha) /
-                                        atmos.layer_σ[i]
+                atmos.cloud_arr_l[i] = calc_cond_mmr(atmos, "H2O", i)
             else
                 # set by mask
                 atmos.cloud_arr_l[i] = atmos.gas_sat["H2O"][i] ? atmos.cloud_val_l : 0.0
@@ -2864,12 +2900,12 @@ module atmosphere
     end
 
     """
-    **Set aerosol profiles for a given species.**
+    **Set aerosol MMR profiles for a given species.**
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used
     - `species::String`             the name of the aerosol species to set
-    - `mmr`                         the mixing ratio (profile or scalar) to set
+    - `mmr`                         the mixing ratio to assign (1D array, or Float, or species String)
 
     Optional arguments
     - `pmin::Float64`  the minimum pressure [Pa]
@@ -2877,14 +2913,24 @@ module atmosphere
 
     """
     function set_aerosol!(atmos::atmosphere.Atmos_t, species::String,
-                            mmr::Union{Array{Float64, 1}, Float64} = 0.0;
+                            mmr::Union{Array{Float64, 1}, Float64, String} = 0.0;
                             pmin::Float64 = 0.0, pmax::Float64 = 1e9)::Bool
+
+
+        # Reset
+        fill!(atmos.aerosol_arr_l[species], 0.0)
+        fill!(atmos.aerosol_arr_r[species], 0.0)
 
         # Mask for pressure range
         idx_mask = (atmos.p .>= pmin) .& (atmos.p .<= pmax)
 
         # Set mixing ratio profile for aerosol
-        if isa(mmr, Float64)
+        if isa(mmr, String)
+            # set by species mmr
+            for i in collect(1:atmos.nlev_c)[idx_mask]
+                atmos.aerosol_arr_l[species][i] = atmosphere.calc_cond_mmr(atmos, mmr, i)
+            end
+        elseif isa(mmr, Float64)
             # constant profile
             atmos.aerosol_arr_l[species][idx_mask] .= mmr
         else

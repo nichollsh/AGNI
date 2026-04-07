@@ -68,6 +68,7 @@ title = "Default"                       # Name for this configuration file
     conduction      = true                      # Include thermal conductive heat transport?
     oceans          = false                     # Model ocean formation - check saturation at surface
     rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
+    coldtrap        = true                      # Enable cold-trapping effect on abundances aloft
     latent_heat     = false                     # Include heat release from phase change
     convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
     convection      = true                      # Include heat transport by convection

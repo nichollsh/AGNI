@@ -256,7 +256,7 @@ module chemistry
 
                 # Apply cold trap, implicitly accounting for condensable not making it
                 #   this high up by vertical dynamical-transport processes.
-                if atmos.gas_vmr[c][i] > maxvmr[c]
+                if (atmos.gas_vmr[c][i] > maxvmr[c]) && atmos.coldtrap
                     atmos.gas_vmr[c][i] = maxvmr[c]
                     atmos.gas_sat[c][i] = true
                 end
@@ -386,6 +386,13 @@ module chemistry
         # Set water clouds at levels where condensation occurs
         if "H2O" in atmos.condensates
             atmosphere.set_cloud!(atmos; from_yield=true)
+        end
+
+        # Set aerosol profiles at levels where condensation occurs
+        for aer in atmos.aerosol_names
+            if atmos.aerosol_setby[aer] != "value"
+                atmosphere.set_aerosol!(atmos, aer, atmos.aerosol_setby[aer])
+            end
         end
 
         return nothing
@@ -706,6 +713,11 @@ module chemistry
         # recalculate layer properties
         atmosphere.calc_layer_props!(atmos)
 
+        # Warn on failure
+        if state > 0
+            @warn "FastChem internal failure; elements may not be conserved (state=$state)"
+        end
+
         # See docstring for return codes
         return state
     end
@@ -770,10 +782,10 @@ module chemistry
             end
         end
 
-        # keep cold trapping effect on abundances?
-        if !atmos.coldtrap
-            reset_to_chem!(atmos)
-        end
+        # keep cold trapping rainout effect on abundances?
+        # if !atmos.coldtrap
+        #     reset_to_chem!(atmos)
+        # end
 
         return state
     end

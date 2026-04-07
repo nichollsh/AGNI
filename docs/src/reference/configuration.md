@@ -56,7 +56,7 @@ ratios (`vmr_dict` or `vmr_file`), or by metallicities (`metallicities`).
 | `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
 | `condensates   `  | List of volatiles which are allowed to condense. Can be used together with thermochemical equilibrium (`physics.chemistry = true`). |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
-| `aerosols      `  | Dictionary of aerosols and their mass mixing ratios [kg/kg]. |
+| `aerosols      `  | Dictionary of aerosols, and their mass mixing ratios [kg/kg] or associated condensate species. |
 
 
 
@@ -104,6 +104,7 @@ Parameters that describe how the model should treat the physics.
 | `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux. |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false). |
 | `rainout       `  | Enable condensation and evaporation of condensables aloft. Required for `latent_heat=true`. |
+| `coldtrap      `  | Enable cold-trapping effect on abundances aloft, so that VMR always decreases with height. |
 | `oceans        `  | Enable condensation and evaporation of condensables at the surface. |
 
 ## `[plots]`
