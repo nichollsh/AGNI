@@ -48,6 +48,14 @@ module setpt
     a parameter value.
     """
     function request!(atmos::atmosphere.Atmos_t, request::Array)::Bool
+
+        if !(atmos.is_alloc && atmos.is_param)
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
+        end
+
+        succ::Bool = true
+
         num_req::Int = length(request)          # Number of requests
         idx_req::Int = 1                        # Index of current request
         str_req::String = atmosphere.UNSET_STR  # String of current request
@@ -60,75 +68,74 @@ module setpt
             # handle requests
             if str_req == "dry"
                 # dry adiabat from surface
-                setpt.dry_adiabat!(atmos)
+                succ &= setpt.dry_adiabat!(atmos)
 
             elseif str_req == "str"
                 # isothermal stratosphere
                 idx_req += 1
-                setpt.stratosphere!(atmos, request[idx_req])
+                succ &= setpt.stratosphere!(atmos, request[idx_req])
 
             elseif str_req == "loglin"
                 # log-linear profile between T_surf and T_top
                 idx_req += 1
-                setpt.loglinear!(atmos, request[idx_req])
+                succ &= setpt.loglinear!(atmos, request[idx_req])
 
             elseif str_req == "iso"
                 # isothermal profile
                 idx_req += 1
-                setpt.isothermal!(atmos, request[idx_req])
+                succ &= setpt.isothermal!(atmos, request[idx_req])
 
             elseif str_req == "csv"
                 # set from csv file
                 idx_req += 1
-                setpt.fromcsv!(atmos,request[idx_req])
+                succ &= setpt.fromcsv!(atmos,request[idx_req])
 
             elseif str_req == "ncdf"
                 # set from NetCDF file
                 idx_req += 1
-                setpt.fromncdf!(atmos,request[idx_req])
+                succ &= setpt.fromncdf!(atmos,request[idx_req])
 
             elseif str_req == "add"
                 # add X kelvin from the currently stored T(p)
                 idx_req += 1
-                setpt.add!(atmos,request[idx_req])
+                succ &= setpt.add!(atmos,request[idx_req])
 
             elseif str_req == "surfsat"
                 # ensure surface is not super-saturated
                 chemistry.restore_composition!(atmos)
-                chemistry._sat_surf!(atmos)
+                succ &= chemistry._sat_surf!(atmos)
 
             elseif str_req == "sat"
                 # condensing a volatile
                 idx_req += 1
-                setpt.saturation!(atmos, request[idx_req])
+                succ &= setpt.saturation!(atmos, request[idx_req])
 
             elseif str_req == "ana"
                 # analytic solution
-                setpt.analytic!(atmos)
-
+                succ &= setpt.analytic!(atmos)
             else
-                @error "Invalid initial state '$str_req'"
+                @warn "Invalid initial state '$str_req'"
                 return false
             end
 
-            atmosphere.calc_layer_props!(atmos)
+            succ &= atmosphere.calc_layer_props!(atmos)
 
             # iterate
             idx_req += 1
         end
         @info prt_req[1:end-2]
-        return true
+        return succ
     end
 
     """
     Set the T(p) profile by log-pressure interpolation from given pressure [Pa] and temperature [K] arrays.
     """
     function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array;
-                            extrap::Bool=false)
+                            extrap::Bool=false)::Bool
 
-        if !atmos.is_param
-            @error "setpt: Atmosphere parameters not set"
-            return
+        if !(atmos.is_alloc && atmos.is_param)
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
         end
 
         # Check if arrays are flipped
@@ -141,8 +148,8 @@ module setpt
         # Check that pressure is monotonic
         for i in 1:length(pl)-1
             if pl[i] > pl[i+1]
-                @error "setpt: input array of pressures is not monotonically increasing"
-                return
+                @warn "setpt: input array of pressures is not monotonically increasing"
+                return false
             end
         end
 
@@ -171,18 +178,23 @@ module setpt
         clamp!(atmos.tmpl, atmos.tmp_floor+0.1, atmos.tmp_ceiling-0.1)
         clamp!(atmos.tmp,  atmos.tmp_floor+0.1, atmos.tmp_ceiling-0.1)
 
-        return
+        return true
     end
 
     """
     Set the T(p) profile by reading pressure [Pa] and temperature [K] columns from a CSV file.
     """
-    function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)
+    function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)::Bool
+
+        if !(atmos.is_alloc && atmos.is_param)
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
+        end
 
         # Check file exists
         if !isfile(fpath)
-            @error "setpt: file '$fpath' does not exist"
-            return
+            @warn "setpt: file '$fpath' does not exist"
+            return false
         end
 
         # Read file
@@ -199,8 +211,8 @@ module setpt
 
         # Validate
         if nlev_l < 3
-            @error "setpt: file contains too few levels (contains $nlev_l edge values)"
-            return
+            @warn "setpt: file contains too few levels (contains $nlev_l edge values)"
+            return false
         end
 
         # Allocate temporary T and P arrays
@@ -222,12 +234,12 @@ module setpt
 
             # Validate
             if p_val <= 0.0
-                @error "setpt: Negative pressure(s) in csv file"
-                return
+                @warn "setpt: Negative pressure(s) in csv file"
+                return false
             end
             if t_val <= 0.0
-                @error "setpt: Negative temperature(s) in csv file"
-                return
+                @warn "setpt: Negative temperature(s) in csv file"
+                return false
             end
 
             # Store
@@ -241,18 +253,23 @@ module setpt
         # Use fromarrays function to do the rest
         fromarrays!(atmos, pl, tmpl)
 
-        return
+        return true
     end
 
     """
     Load atmosphere data from NetCDF file (must have same number of levels)
     """
-    function fromncdf!(atmos::atmosphere.Atmos_t, fpath::String)
+    function fromncdf!(atmos::atmosphere.Atmos_t, fpath::String)::Bool
+
+        if !(atmos.is_alloc && atmos.is_param)
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
+        end
 
         # Check file exists
         if !isfile(fpath)
-            @error "setpt: The file '$fpath' does not exist"
-            return
+            @warn "setpt: The file '$fpath' does not exist"
+            return false
         end
 
         # Open file
@@ -309,16 +326,16 @@ module setpt
         end
         @debug "ALL DEBUG RESTORED"
 
-        return
+        return true
     end # end load_ncdf
 
     """
     Set the atmosphere to an isothermal profile at the given temperature.
     """
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp)
-        if !atmos.is_param
-            @error "setpt: Atmosphere parameters not set"
-            return
+        if !(atmos.is_alloc && atmos.is_param)
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
         end
 
 
@@ -327,16 +344,16 @@ module setpt
         fill!(atmos.tmpl, set_tmp)
         fill!(atmos.tmp , set_tmp)
 
-        return
+        return true
     end
 
     """
     Add a constant temperature offset to every level of the T(p) profile.
     """
-    function add!(atmos::atmosphere.Atmos_t, delta)
-        if !atmos.is_param
-            @error "setpt: Atmosphere parameters not set"
-            return
+    function add!(atmos::atmosphere.Atmos_t, delta)::Bool
+        if !(atmos.is_alloc && atmos.is_param)
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
         end
 
         delta = _parse_tmp_str(atmos, delta)
@@ -344,17 +361,17 @@ module setpt
         @. atmos.tmpl += delta
         @. atmos.tmp  += delta
 
-        return nothing
+        return true
     end
 
     """
     Set the T(p) profile to the dry adiabat, integrated upward from the surface temperature.
     """
-    function dry_adiabat!(atmos::atmosphere.Atmos_t)
+    function dry_adiabat!(atmos::atmosphere.Atmos_t)::Bool
         # Validate input
         if !(atmos.is_alloc && atmos.is_param)
-            @error "setpt: Atmosphere is not setup or allocated"
-            return
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
         end
 
         # Set surface
@@ -390,13 +407,13 @@ module setpt
         end
 
 
-        return nothing
+        return true
     end
 
     """
     Cap temperatures above the tropopause to give an isothermal stratosphere at `strat_tmp` [K].
     """
-    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp)
+    function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp)::Bool
 
         strat_tmp = _parse_tmp_str(atmos, strat_tmp)
 
@@ -421,13 +438,18 @@ module setpt
             atmos.tmpl[1] = strat_tmp
         end
 
-        return nothing
+        return true
     end
 
     """
     Set the T(p) profile to vary log-linearly with pressure from the surface temperature down to `top_tmp` [K] at the top.
     """
-    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp)
+    function loglinear!(atmos::atmosphere.Atmos_t, top_tmp)::Bool
+
+        if !(atmos.is_alloc && atmos.is_param)
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
+        end
 
         top_tmp = _parse_tmp_str(atmos, top_tmp)
 
@@ -446,7 +468,7 @@ module setpt
         # Set cell-centres
         atmos.tmp[1:end] .= 0.5 .* (atmos.tmpl[1:end-1] + atmos.tmpl[2:end])
 
-        return nothing
+        return true
     end
 
 
@@ -464,12 +486,13 @@ module setpt
     function saturation!(atmos::atmosphere.Atmos_t, gas::String; dTdew::Float64=0.05)
 
         if !(atmos.is_alloc && atmos.is_param)
-            @error "setpt: Atmosphere is not setup or allocated"
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
         end
 
         # gas is present?
         if !(gas in atmos.gas_names)
-            return nothing
+            return true
         end
 
         xgas::Float64 = 0.0
@@ -516,13 +539,18 @@ module setpt
             atmosphere.set_cloud!(atmos; from_yield=false)
         end
 
-        return nothing
+        return true
     end
 
     """
     **Set temperature profile using Guillot (2010) analytic solution.**
     """
-    function analytic!(atmos::atmosphere.Atmos_t)
+    function analytic!(atmos::atmosphere.Atmos_t)::Bool
+
+        if !(atmos.is_alloc && atmos.is_param)
+            @warn "setpt: Atmosphere is not setup or allocated"
+            return false
+        end
 
         # Evalulate Tirr from the instellation
         Tirr = (atmos.instellation / phys.σSB)^0.25
@@ -541,7 +569,7 @@ module setpt
 
         # Set cell-edge temperatures
         atmosphere.set_tmpl_from_tmp!(atmos)
-        return nothing
+        return true
     end
 
 end # end module

@@ -258,17 +258,17 @@ module energy
         # Check finite
         if !all(isfinite, atmos.radout.flux_down)
             if lw
-                @error "Non-finite value in LW DN flux array"
+                @warn "Non-finite value in LW DN flux array"
             else
-                @error "Non-finite value in SW DN flux array"
+                @warn "Non-finite value in SW DN flux array"
             end
             make_finite!(atmos.radout.flux_down, FILL_FINITE_FLUX)
         end
         if !all(isfinite, atmos.radout.flux_up)
             if lw
-                @error "Non-finite value in LW UP flux array"
+                @warn "Non-finite value in LW UP flux array"
             else
-                @error "Non-finite value in SW UP flux array"
+                @warn "Non-finite value in SW UP flux array"
             end
             make_finite!(atmos.radout.flux_up, FILL_FINITE_FLUX)
         end

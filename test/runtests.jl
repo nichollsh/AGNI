@@ -22,6 +22,9 @@ using Test
 
 @info "Begin AGNI tests"
 
+# Configure
+SLOW_TESTS = ["integration", "chemistry", "deep_heating", "kzz"]
+
 # Prepare
 RES_DIR         = joinpath(ROOT_DIR,"res/")
 OUT_DIR         = joinpath(ROOT_DIR,"out/")
@@ -63,9 +66,11 @@ if suite == "none"
     exit()
 
 elseif suite == "fast"
-    # exclude integration tests
+    # exclude slow tests
     @info "Running only fast tests"
-    filter!(t -> !occursin("integration", t), test_names)
+    for slow in SLOW_TESTS
+        filter!(t -> !occursin(slow, t), test_names)
+    end
 
 elseif suite in test_names
     # run only the specified test suite
@@ -89,7 +94,7 @@ end
 @info "Collected tests: $(join(test_names, ", "))"
 
 # Configure logging to show only warnings and errors
-LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
+LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Error))
 
 # Run tests
 for test_file in test_files

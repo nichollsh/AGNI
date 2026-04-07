@@ -503,7 +503,7 @@ module AGNI
 
         # Setup atmosphere
         @debug "Setup atmosphere "
-        atmosphere.setup!(atmos, ROOT_DIR,output_dir,
+        if !atmosphere.setup!(atmos, ROOT_DIR,output_dir,
                                 String(cfg["files" ]["input_sf"]),
                                 Float64(cfg["planet"]["instellation"]),
                                 Float64(cfg["planet"]["s0_fact"]),
@@ -537,10 +537,16 @@ module AGNI
                                 rfm_parfile=rfm_parfile,
                                 κ_grey_lw=κ_grey_lw,
                                 κ_grey_sw=κ_grey_sw
-                        ) || return false
+                        )
+            @error "Could not setup atmosphere object"
+            return false
+        end
 
         # Allocate atmosphere
-        atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
+        if !atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff)
+            @error "Could not allocate atmosphere object"
+            return false
+        end
 
         # Configure deep atmospheric heating
         if haskey(cfg["physics"],"deep_heating")
@@ -571,14 +577,21 @@ module AGNI
         else
             # Set T(p) by looping over requests in the config.
             #     Each request may be a command, or an argument following a command
-            setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
+            if !setpt.request!(atmos, cfg["execution"]["initial_state"])
+                @error "Could not set initial temperature profile"
+                return false
+            end
         end
 
         # Write initial state
         save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
         # Run chemistry in the first instance
-        chemistry.calc_composition!(atmos, oceans, chem, rainout)
+        chem_state = chemistry.calc_composition!(atmos, oceans, chem, rainout)
+        if chem_state == 1
+            @error "Chemistry failed!"
+            return false
+        end
 
         # Frame dir
         if plt_ani
@@ -588,7 +601,6 @@ module AGNI
         end
 
         # Loop over requested solvers
-        solver_success::Bool = true
         return_success::Bool = true
         allowed_solvers::Array{String,1} = ["newton", "gauss", "levenberg", "jacobinewton"]
         sol = strip(lowercase(cfg["execution"]["solver"]))
@@ -599,7 +611,7 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
-            energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
+            return_success &= energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
                                 convective=incl_convect, sens_heat=incl_sens,
                                 conductive=incl_conduct,
                                 deep=incl_deep,
@@ -607,7 +619,7 @@ module AGNI
 
         # Transparent atmosphere solver
         elseif sol == "transparent"
-            solver_success = solver.solve_transparent!(atmos, sol_type=sol_type,
+            return_success &= solver.solve_transparent!(atmos, sol_type=sol_type,
                                 conv_atol=conv_atol,
                                 conv_rtol=conv_rtol,
                                 max_steps=Int(cfg["execution"]["max_steps"]))
@@ -619,7 +631,7 @@ module AGNI
                 modplot = 1
             end
             method_idx = findfirst(==(sol), allowed_solvers)
-            solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
+            return_success &= solver.solve_energy!(atmos, sol_type=sol_type,
                                 conduct=incl_conduct, chem=chem,
                                 convect=incl_convect, latent=incl_latent,
                                 sens_heat=incl_sens, deep=incl_deep,
@@ -642,18 +654,17 @@ module AGNI
 
         # Invalid selection
         else
-            @error "Invalid solver '$sol'"
+            @warn "Invalid solver '$sol'"
             return_success = false
         end
 
-        return_success &= solver_success
         @info "    done"
         @info "Total radiative transfer evaluations: $(atmos.num_rt_eval)"
 
         # RFM calculation?
         if atmos.flag_rfm
             @info "Running RFM line-by-line radiative transfer..."
-            rfm.run_rfm(atmos, rfm_wn_min, rfm_wn_max)
+            return_success &= rfm.run_rfm(atmos, rfm_wn_min, rfm_wn_max)
             @info "    done"
         end
 

@@ -489,7 +489,7 @@ module plotting
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
-            @error "Cannot plot emission spectrum because radiances have not been calculated"
+            @warn "Cannot plot emission spectrum because radiances have not been calculated"
             return
         end
 
@@ -555,7 +555,7 @@ module plotting
 
         # Check that we have data
         if !atmos.is_out_lw
-            @error "Cannot plot contrib func because radiances have not been calculated"
+            @warn "Cannot plot contrib func because radiances have not been calculated"
             return
         end
 
@@ -638,7 +638,7 @@ module plotting
 
         # Check that we have data
         if !atmos.is_out_lw
-            @error "Cannot plot contribution func because radiances have not been calculated"
+            @warn "Cannot plot contribution func because radiances have not been calculated"
             return
         end
 
@@ -711,7 +711,7 @@ module plotting
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
-            @error "Cannot plot spectral albedo because radiances have not been calculated"
+            @warn "Cannot plot spectral albedo because radiances have not been calculated"
             return
         end
 

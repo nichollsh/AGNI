@@ -119,7 +119,7 @@ module phys
         gas = Gas_t()
         gas.formula = formula
         gas.tmp_dep = tmp_dep
-        fail = false
+        gas.fail = false
 
         # Count atoms
         gas.atoms = count_atoms(formula)
@@ -177,8 +177,9 @@ module phys
 
         elseif ENABLE_CHECKSUM && check_integrity && !blake.valid_file(fpath)
             # file exists - check its integrity
-            @debug("    ncdf file is corrupt")
-            fail = true
+            @warn("    ncdf file is corrupt: '$fpath'")
+            gas.fail = true
+            return gas
 
         else
             # have data => load what we can find inside the file
@@ -191,14 +192,14 @@ module phys
                 # check date created
                 created::Int64 = 0
                 if !haskey(ds,"created")
-                    @error("Data file ($formula) has no creation date")
-                    fail = true
+                    @warn("Data file ($formula) has no creation date")
+                    gas.fail = true
                     return gas
                 end
                 created = ds["created"][1]
                 if created < MIN_DATA_VERSION
-                    @error("Data file ($formula) is outdated ($created < $MIN_DATA_VERSION)")
-                    fail = true
+                    @warn("Data file ($formula) is outdated ($created < $MIN_DATA_VERSION)")
+                    gas.fail = true
                     return gas
                 end
 
@@ -247,6 +248,7 @@ module phys
                             # aqua data found -  this is preferred
                         else
                             @warn("Could not find AQUA table for H2O equation of state")
+                            @warn("    Using ideal gas EOS for H2O")
                         end
                     end
 
@@ -257,6 +259,7 @@ module phys
                             # cms19 data found -  this is preferred
                         else
                             @warn("Could not find CMS19 table for H2 equation of state")
+                            @warn("    Using ideal gas EOS for H2")
                         end
                     end
 
@@ -284,25 +287,25 @@ module phys
 
                     # check shape
                     if !(length(gas.eos_ρ) == length(gas.eos_P) * length(gas.eos_T))
-                        @error("Could not parse $formula EOS data from file")
-                        @error("    temp. length = $(length(gas.eos_T))")
-                        @error("    pres. length = $(length(gas.eos_P))")
-                        @error("    dens. length = $(length(gas.eos_ρ))")
-                        fail = true
+                        @warn("Could not parse $formula EOS data from file")
+                        @warn("    temp. length = $(length(gas.eos_T))")
+                        @warn("    pres. length = $(length(gas.eos_P))")
+                        @warn("    dens. length = $(length(gas.eos_ρ))")
+                        gas.fail = true
                         return gas
                     end
 
                     # check ascending
                     if !issorted(gas.eos_P)
-                        @error("Could not parse $formula EOS data from file")
-                        @error("    Pressure array must be strictly ascending")
-                        fail = true
+                        @warn("Could not parse $formula EOS data from file")
+                        @warn("    Pressure array must be strictly ascending")
+                        gas.fail = true
                         return gas
                     end
                     if !issorted(gas.eos_T)
-                        @error("Could not parse $formula EOS data from file")
-                        @error("    Temperature array must be strictly ascending")
-                        fail = true
+                        @warn("Could not parse $formula EOS data from file")
+                        @warn("    Temperature array must be strictly ascending")
+                        gas.fail = true
                         return gas
                     end
 
@@ -331,7 +334,6 @@ module phys
 
         @debug("    using '$eos_name' equation of state")
         @debug("    done")
-        gas.fail = fail
         return gas
     end # end load_gas
 
@@ -701,12 +703,7 @@ module phys
     function calc_rho_mix(gas::Array{Gas_t,1}, vmr::Array{Float64,1},
                             tmp::Float64, prs::Float64, mmw::Float64)::Float64
 
-        # validate lengths
         ngas::Int = length(gas)
-        if ngas != length(vmr)
-            @error "The number of gases and the number of mixing ratios are different"
-            exit(1)
-        end
 
         # single gas case
         if ngas == 1

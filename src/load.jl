@@ -48,11 +48,11 @@ module load
 
             # Check that these are the same as the allocated atmos struct
             if nlev_c != atmos.nlev_c
-                @error "Cannot load NetCDF file with mismatching number of levels"
+                @warn "Cannot load NetCDF file with mismatching number of levels"
                 return false
             end
             if ngases != atmos.gas_num
-                @error "Cannot load NetCDF file with mismatching nunmber of gases"
+                @warn "Cannot load NetCDF file with mismatching nunmber of gases"
                 return false
             end
 

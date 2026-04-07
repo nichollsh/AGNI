@@ -39,15 +39,14 @@ module spectrum
 
     Arguments:
     - `spec_file::String`   Path to spectral file
-    - `quiet::Bool=false`   Suppresses warnings about missing files or parsing issues.
 
     Returns:
     - `num_gases::Int`      Number of gaseous absorbers, or -1 if not found
     """
-    function count_gases(spec_file::String; quiet::Bool=false)::Int
+    function count_gases(spec_file::String)::Int
 
         if !isfile(spec_file)
-            quiet || @error "Spectral file not found: '$spec_file'"
+            @warn "Spectral file not found: '$spec_file'"
             return -1
         end
 
@@ -64,17 +63,17 @@ module spectrum
                     try
                         return parse(Int, num_str)
                     catch
-                        quiet || @error "Could not parse gas count from line: '$line'"
+                        @warn "Could not parse gas count from line: '$line'"
                         return -1
                     end
                 else
-                    quiet || @error "Unexpected format for gas count line: '$line'"
+                    @warn "Unexpected format for gas count line: '$line'"
                     return -1
                 end
             end
         end
 
-        quiet || @error "Could not find 'Total number of gaseous absorbers' in spectral file"
+        @warn "Could not find 'Total number of gaseous absorbers' in spectral file"
         return -1
     end
 
@@ -96,7 +95,7 @@ module spectrum
         # Check that file does not already contain aerosol header information
         for l in lines
             if contains(l, "aerosols")
-                @error "Spectral file already contains aerosol header information"
+                @warn "Spectral file already contains aerosol header information"
                 return false
             end
         end
@@ -129,7 +128,7 @@ module spectrum
             end
         end
         if block_idx < 1
-            @error "Could not find first '*END' when injecting aerosol header"
+            @warn "Could not find first '*END' when injecting aerosol header"
             return false
         end
 
@@ -199,8 +198,8 @@ module spectrum
         if isfile(path)
             spec_data = readdlm(abspath(path), Float64; header=false, skipstart=2)
         else
-            @error "Cannot find stellar spectrum at '$path'"
-            exit(1)
+            @warn "Cannot find stellar spectrum at '$path'"
+            return zeros(Float64, 1), zeros(Float64, 1)
         end
 
         return spec_data[:,1], spec_data[:,2]
@@ -231,18 +230,18 @@ module spectrum
 
         # Validate
         if len_wl != len_fl
-            @error "Stellar wavelength and flux arrays have different lengths"
+            @warn "Stellar wavelength and flux arrays have different lengths"
             return false
         end
         if len_wl < 500
             @warn "Loaded stellar spectrum is very short!"
         end
         if minimum(wl) < FLOAT_SML
-            @error "Minimum wavelength is too small"
+            @warn "Minimum wavelength is too small"
             return false
         end
         if wl[2] < wl[1]
-            @error "Stellar wavelength array must be strictly ascending"
+            @warn "Stellar wavelength array must be strictly ascending"
             return false
         end
         clamp!(fl, FLOAT_SML, FLOAT_BIG)  # Clamp values
@@ -335,11 +334,11 @@ module spectrum
 
         # Check files exist
         if !isfile(orig_file)
-            @error "Original spectral file not found: '$orig_file'"
+            @warn "Original spectral file not found: '$orig_file'"
             return false
         end
         if !isfile(star_file)
-            @error "Stellar spectrum file not found: '$star_file'"
+            @warn "Stellar spectrum file not found: '$star_file'"
             return false
         end
 
@@ -350,7 +349,7 @@ module spectrum
         # Count number of gaseous absorbers in file, for later use
         num_gases = count_gases(outp_file)
         if num_gases < 0
-            @error "Failed to parse gaseous absorbers in spectral file"
+            @warn "Failed to parse gaseous absorbers in spectral file"
             return false
         end
 
@@ -362,7 +361,7 @@ module spectrum
         # Check that aerosol .avg files exist
         for avgfile in values(aerosol_avg_files)
             if !isfile(avgfile)
-                @error "Aerosol .avg file not found: '$avgfile'"
+                @warn "Aerosol .avg file not found: '$avgfile'"
                 return false
             end
         end
@@ -427,14 +426,14 @@ module spectrum
             ps = run(pipeline(`bash $execpath`, stdout=devnull))
 
             if !success(ps)
-                @error "prep_spec failed with exit code $(ps.exitcode)"
-                @error "Command: bash $execpath"
+                @warn "prep_spec failed with exit code $(ps.exitcode)"
+                @warn "Command: bash $execpath"
                 return false
             end
 
         catch e
-            @error "Failed to run prep_spec: $e"
-            @error "Command: bash $execpath"
+            @warn "Failed to run prep_spec: $e"
+            @warn "Command: bash $execpath"
             return false
         end
 
@@ -468,30 +467,34 @@ module spectrum
                                         star_file::String,
                                         scattering_dir::String)::Dict{String,String}
 
+        avg_files::Dict = Dict{String, String}()
+
         if !isfile(orig_file)
-            error("Spectral file not found: '$orig_file'")
+            @warn("Spectral file not found: '$orig_file'")
+            return avg_files
         end
         if phase_moments < 1
-            error("phase_moments must be >= 1, got $phase_moments")
+            @warn("phase_moments must be >= 1, got $phase_moments")
+            return avg_files
         end
         if isempty(star_file)
-            error("star_file must be provided for scatter_average")
+            @warn("star_file must be provided for scatter_average")
+            return avg_files
         end
 
         if !isfile(star_file)
-            error("Solar spectrum file not found: '$star_file'")
+            @warn("Solar spectrum file not found: '$star_file'")
+            return avg_files
         end
 
-
-        avg_files::Dict = Dict{String, String}()
         scat_av_90 = abspath(ENV["RAD_DIR"], "bin", "scatter_average_90")
 
         # check mon files exist
         for s in species
             mon = abspath(joinpath(scattering_dir, s*".mon"))
             if !isfile(mon)
-                @error "Monochromatic aerosol data not found for '$s'"
-                @error "    Expected at: '$mon'"
+                @warn "Monochromatic aerosol data not found for '$s'"
+                @warn "    Expected at: '$mon'"
                 return avg_files
             end
         end
@@ -549,14 +552,14 @@ module spectrum
             ps = run(pipeline(`bash $execpath`, stdout=devnull))
 
             if !success(ps)
-                @error "scatter_average_90 failed with exit code $(ps.exitcode)"
-                @error "Command: bash $execpath"
+                @warn "scatter_average_90 failed with exit code $(ps.exitcode)"
+                @warn "Command: bash $execpath"
                 return avg_files
             end
 
         catch e
-            @error "Failed to run scatter_average_90: $e"
-            @error "Command: bash $execpath"
+            @warn "Failed to run scatter_average_90: $e"
+            @warn "Command: bash $execpath"
             return avg_files
         end
 

@@ -520,7 +520,7 @@ module chemistry
 
                 # Check that we have some hydrogen...
                 if N_inp_t[1] < 1e-30
-                    @error "Cannot calculate metallicity of hydrogen-free mixture!"
+                    @warn "Cannot calculate metallicity of hydrogen-free mixture!"
                     state = 1
                 end
 
@@ -546,7 +546,7 @@ module chemistry
                     if isfinite(atmos.metal_calc[e])
                         write(f, @sprintf("%s    %.3f \n",e,log10(atmos.metal_calc[e]) + 12.0))
                     else
-                        @error "Got non-finite metallicity for $e - adopting solar value"
+                        @warn "Got non-finite metallicity for $e - adopting solar value"
                         write(f, @sprintf("%s    %.3f \n",e,phys.consts._solar_metallicity[e]))
                     end
 
@@ -625,7 +625,7 @@ module chemistry
 
         # Get gas chemistry output
         if !isfile(atmos.fastchem_chem)
-            @error "Could not find fastchem output"
+            @warn "Could not find FastChem output file '$(atmos.fastchem_chem)'"
             return 1
         end
         (data,head) = readdlm(atmos.fastchem_chem, '\t', Float64, header=true)
