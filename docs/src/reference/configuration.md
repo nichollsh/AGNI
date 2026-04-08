@@ -27,7 +27,7 @@ General properties of the planet.
 | `flux_int        ` | Internal flux [W m-2] to be solved-for when `solution_type=3`. |
 | `roughness       ` | Surface roughness length scale [m]. |
 | `wind_speed      ` | Effective wind speed for sensible heat transport [m s-1]. |
-| `star_Teff       ` | Stellar photospheric temperature [K] used if `files.input_star=="blackbody"`. |
+| `star_Teff       ` | Stellar photospheric temperature [K] used if `input_star=="blackbody"`. |
 
 
 ## `[files]`
@@ -82,8 +82,8 @@ Parameters that tell the model what to do.
 | `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
 | `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
 | `perturb_all`     | Perturb all rows of Jacobian matrix at each solver iteration? True=stable, False=fast. |
-| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] (optional, requires `files.rfm_parfile`). |
-| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] (optional, requires `files.rfm_parfile`). |
+| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] (optional). |
+| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] (optional). |
 
 ## `[physics]`
 Parameters that describe how the model should treat the physics.

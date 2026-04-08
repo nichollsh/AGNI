@@ -940,4 +940,163 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         @info "FC_DIR not set - skipping FastChem tests"
     end
 
+
+    # -------------
+    # Test calc_cond_mmr function
+    # -------------
+    @testset "calc_cond_mmr" begin
+        mf_dict = Dict([
+            ("H2O" , 0.6),
+            ("CO2" , 0.3),
+            ("N2"  , 0.1)
+        ])
+
+        atmos = atmosphere.Atmos_t()
+        atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                        spfile_name,
+                        toa_heating, 1.0, 0.0, theta,
+                        tmp_surf,
+                        gravity, radius,
+                        nlev, p_surf, p_top,
+                        mf_dict, "",
+                        condensates=["H2O"],
+                        real_gas=false,
+                        thermo_functions=true
+                )
+        atmosphere.allocate!(atmos,"")
+
+        # Set some condensation yield
+        test_layer = 10
+        atmos.cond_yield["H2O"][test_layer] = 100.0  # kg/m^2
+        atmos.cloud_alpha = 0.5
+        atmos.layer_σ[test_layer] = 1000.0  # kg/m^2
+
+        # Calculate condensate MMR
+        mmr = atmosphere.calc_cond_mmr(atmos, "H2O", test_layer)
+
+        # Expected: 100.0 * 0.5 / 1000.0 = 0.05
+        @test isapprox(mmr, 0.05; atol=1e-10)
+
+        # Test with zero yield
+        zero_layer = 5
+        atmos.cond_yield["H2O"][zero_layer] = 0.0
+        mmr_zero = atmosphere.calc_cond_mmr(atmos, "H2O", zero_layer)
+        @test mmr_zero == 0.0
+
+        # Test with negative yield (should return 0.0)
+        neg_layer = 15
+        atmos.cond_yield["H2O"][neg_layer] = -10.0
+        mmr_neg = atmosphere.calc_cond_mmr(atmos, "H2O", neg_layer)
+        @test mmr_neg == 0.0
+
+        atmosphere.deallocate!(atmos)
+    end
+
+
+    # -------------
+    # Test set_cloud! function
+    # -------------
+    @testset "set_cloud" begin
+        mf_dict = Dict([
+            ("H2O" , 0.8),
+            ("N2"  , 0.2)
+        ])
+
+        atmos = atmosphere.Atmos_t()
+        atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                        spfile_name,
+                        toa_heating, 1.0, 0.0, theta,
+                        tmp_surf,
+                        gravity, radius,
+                        nlev, p_surf, p_top,
+                        mf_dict, "",
+                        condensates=["H2O"],
+                        real_gas=false,
+                        thermo_functions=true
+                )
+        atmosphere.allocate!(atmos,"")
+
+        # Set condensation yield
+        atmos.cond_yield["H2O"][10] = 50.0
+        atmos.cond_yield["H2O"][11] = 100.0
+        atmos.cloud_alpha = 0.5
+        atmos.layer_σ .= 1000.0
+
+        # Test from_yield=true
+        any_cloud = atmosphere.set_cloud!(atmos, from_yield=true)
+        @test any_cloud == true
+
+        # Check cloud properties are set based on condensation yield
+        mmr_10 = atmosphere.calc_cond_mmr(atmos, "H2O", 10)
+        @test atmos.cloud_arr_l[10] == mmr_10
+        @test atmos.cloud_arr_r[10] == atmos.cloud_val_r
+        @test atmos.cloud_arr_f[10] == atmos.cloud_val_f
+
+        # Check valid bounds
+        @test all(atmos.cloud_arr_l .>= 0.0)
+        @test all(atmos.cloud_arr_l .<= 1.0)
+        @test all(atmos.cloud_arr_f .>= 0.0)
+        @test all(atmos.cloud_arr_f .<= 1.0)
+
+        # Reuse atmos: test no clouds case
+        fill!(atmos.cond_yield["H2O"], 0.0)
+        no_cloud = atmosphere.set_cloud!(atmos, from_yield=true)
+        @test no_cloud == false
+
+        atmosphere.deallocate!(atmos)
+    end
+
+
+    # -------------
+    # Test set_aerosol! with constant and condensate-based profiles
+    # -------------
+    @testset "set_aerosol" begin
+        mf_dict = Dict([
+            ("H2O" , 0.5),
+            ("N2"  , 0.5)
+        ])
+
+        aerosol_dict = Dict("soot" => 1e-4, "ice" => "H2O")
+
+        atmos = atmosphere.Atmos_t()
+        atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                        spfile_name,
+                        toa_heating, 1.0, 0.0, theta,
+                        tmp_surf,
+                        gravity, radius,
+                        nlev, p_surf, p_top,
+                        mf_dict, "",
+                        condensates=["H2O"],
+                        aerosol_species=aerosol_dict,
+                        real_gas=false,
+                        thermo_functions=true
+                )
+        atmosphere.allocate!(atmos,"")
+
+        # Test constant MMR
+        mmr_val = 2e-5
+        success = atmosphere.set_aerosol!(atmos, "soot", mmr_val)
+        @test success == true
+        @test all(atmos.aerosol_arr_l["soot"] .== mmr_val)
+        @test all(atmos.aerosol_arr_r["soot"] .== atmos.aerosol_val_r)
+
+        # Reuse atmos: test condensate-based profile
+        atmos.cond_yield["H2O"][8] = 30.0
+        atmos.cond_yield["H2O"][9] = 60.0
+        atmos.cloud_alpha = 0.4
+        atmos.layer_σ .= 800.0
+
+        success2 = atmosphere.set_aerosol!(atmos, "ice", "H2O")
+        @test success2 == true
+
+        # Check ice aerosol follows condensate
+        for i in 1:nlev
+            expected = atmosphere.calc_cond_mmr(atmos, "H2O", i)
+            @test atmos.aerosol_arr_l["ice"][i] == expected
+        end
+        @test atmos.aerosol_arr_l["ice"][9] > 0.0
+
+        atmosphere.deallocate!(atmos)
+    end
+
 end
