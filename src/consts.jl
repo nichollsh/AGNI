@@ -70,7 +70,7 @@ module consts
     # Standard species
     const vols_standard::Array{String,1} = [
         # volatile atoms
-        "H", "D", "O", "C", "N", "S", "P", "He",
+        "H", "O", "C", "N", "S", "P", "He",
         # basic
         "CH4", "CO2", "CO", "H2", "H2O", "O2", "OH", "O3",
         # carbon
@@ -79,7 +79,7 @@ module consts
         "C2H5CHO", "HOCH2CHO", "C2H5COCH3", "CH3ONO2", "C2H3", "C3H4", "C4H3",
         "C2N2", "HCO",
         # sulfur
-        "SO", "S2", "S8", "SO2", "H2SO4", "H2S", "CS2", "OCS",
+        "SO", "S2", "S3", "S6", "S8", "SO2", "SO3", "H2SO4", "H2S", "CS2", "OCS",
         "CH3SH", "CH3S", "C2H6S", "C2H6S2",
         # nitrogen
         "N2", "HCN", "NH3",  "HNO3", "N2O5", "HONO", "HO2NO2",
@@ -89,13 +89,13 @@ module consts
         # phosphorous
         "PH3", "PS", "PO", "PN",
         # isotopologues
-        "HDO",
+        # "HDO",
     ]
     const vaps_standard::Array{String,1} = [
         # (semi)refractory atoms
         "Na", "Si", "Ti", "V", "Mg", "K", "Fe", "Li", "Ca", "Al", "Cr",
         # ions
-        "H-",
+        # "H-",
         # rock vapours
         "SiO2", "SiO", "SiH", "SiH2", "SiH4",
         "FeO", "FeH",

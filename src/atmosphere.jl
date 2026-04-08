@@ -54,6 +54,7 @@ module atmosphere
     const SKIN_D_MIN::Float64           = 1e-6      # [m]
     const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
     const COND_DISALLOWED::Array        = ["H2","He"]
+    const T_INI_MAX::Float64            = 1500.0    # Maximum initial temperature [K]
 
     # Pressure grid
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
@@ -1101,7 +1102,7 @@ module atmosphere
         #   all of the gases supercritical. This should be a safe condition to
         #   default to, although the user must specify a profile in the cfg.
         for g in atmos.gas_names
-            atmos.tmpl[end] = max(atmos.tmpl[end], atmos.gas_dat[g].T_crit+5.0)
+            atmos.tmpl[end] = clamp(atmos.tmpl[end], atmos.gas_dat[g].T_crit+5.0, T_INI_MAX)
             fill!(atmos.tmpl, atmos.tmpl[end])
             fill!(atmos.tmp, atmos.tmpl[end])
         end
@@ -1109,10 +1110,10 @@ module atmosphere
         # Check T,P range vs EOS limits
         for g in atmos.gas_names
             if atmos.p_boa > atmos.gas_dat[g].prs_max
-                @warn "Surface pressure exceeds the valid range ($g EOS)"
+                @warn "Surface pressure exceeds the valid range ($g EOS; ≥$(atmos.gas_dat[g].prs_max) Pa)"
             end
             if maximum(atmos.tmp) > atmos.gas_dat[g].tmp_max
-                @warn "Temperature profile exceeds the valid range ($g EOS)"
+                @warn "Temperature profile exceeds the valid range ($g EOS; ≥$(atmos.gas_dat[g].tmp_max) K)"
             end
         end
 
@@ -2266,7 +2267,7 @@ module atmosphere
             if !isempty(gas_flags)
                 gas_flags = "($(gas_flags[1:end-1]))"
             end
-            @info @sprintf("    %3d %-7s %6.2e %s", i, g, atmos.gas_vmr[g][end], gas_flags)
+            @info @sprintf("    %3d %-8s %6.2e %s", i, g, atmos.gas_vmr[g][end], gas_flags)
         end
 
         # There must be at least one 'safe' gas

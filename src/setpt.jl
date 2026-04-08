@@ -21,7 +21,16 @@ module setpt
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
     """
-    Parse a temperature value from a string keyword (`"teq"`, `"tsurf"`, or a numeric string) or a numeric input.
+    **Parse temperature value from keyword or numeric input.**
+
+    Converts string keywords (`"teq"`, `"tsurf"`) or numeric values to Float64 temperature.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance.
+    - `tmp`                 temperature specification (keyword string, numeric string, or number).
+
+    Returns:
+    - `Float64`             parsed temperature [K].
     """
     function _parse_tmp_str(atmos::atmosphere.Atmos_t, tmp)::Float64
 
@@ -41,11 +50,29 @@ module setpt
     end
 
     """
-    Process a sequence of T(p) setup requests and apply them in order to the atmosphere.
+    **Process T(p) setup requests.**
 
-    Each element of `request` is a command string (`"dry"`, `"iso"`, `"str"`, `"loglin"`,
-    `"csv"`, `"ncdf"`, `"add"`, `"sat"`, `"surfsat"`, `"ana"`) optionally followed by
-    a parameter value.
+    Applies an ordered sequence of commands to set up the atmosphere temperature profile.
+    Each command may be followed by a parameter value.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `request::Array`      ordered list of commands and their parameters.
+
+    Available commands:
+    - `"dry"`: set to dry adiabat from surface
+    - `"iso"` + value: set isothermal profile at specified temperature
+    - `"str"` + value: apply isothermal stratosphere above tropopause
+    - `"loglin"` + value: log-linear profile from surface to top temperature
+    - `"csv"` + path: load T(p) from CSV file
+    - `"ncdf"` + path: load T(p) from NetCDF file
+    - `"add"` + value: add temperature offset to entire profile
+    - `"sat"` + gas: apply saturation for specified gas
+    - `"surfsat"`: ensure surface is not super-saturated
+    - `"ana"`: use Guillot (2010) analytic solution
+
+    Returns:
+    - `Bool`                success status.
     """
     function request!(atmos::atmosphere.Atmos_t, request::Array)::Bool
 
@@ -128,7 +155,19 @@ module setpt
     end
 
     """
-    Set the T(p) profile by log-pressure interpolation from given pressure [Pa] and temperature [K] arrays.
+    **Set T(p) by log-pressure interpolation.**
+
+    Interpolates temperature profile from given pressure and temperature arrays
+    using log-pressure space for smooth behavior across the atmospheric domain.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `pl::Array`           pressure array [Pa] at level edges.
+    - `tmpl::Array`         temperature array [K] at level edges.
+    - `extrap::Bool`        use linear extrapolation beyond array bounds (default: false).
+
+    Returns:
+    - `Bool`                success status.
     """
     function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array;
                             extrap::Bool=false)::Bool
@@ -182,7 +221,17 @@ module setpt
     end
 
     """
-    Set the T(p) profile by reading pressure [Pa] and temperature [K] columns from a CSV file.
+    **Set T(p) from CSV file.**
+
+    Reads pressure [Pa] and temperature [K] columns from a CSV file and interpolates
+    to the model grid. Lines starting with '#' and empty lines are ignored.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `fpath::String`       path to CSV file.
+
+    Returns:
+    - `Bool`                success status.
     """
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)::Bool
 
@@ -255,7 +304,17 @@ module setpt
     end
 
     """
-    Load atmosphere data from NetCDF file (must have same number of levels)
+    **Load T(p) from NetCDF file.**
+
+    Reads atmosphere data from a NetCDF file and interpolates to the model grid.
+    Also updates surface temperature from the file.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `fpath::String`       path to NetCDF file.
+
+    Returns:
+    - `Bool`                success status.
     """
     function fromncdf!(atmos::atmosphere.Atmos_t, fpath::String)::Bool
 
@@ -328,7 +387,16 @@ module setpt
     end # end load_ncdf
 
     """
-    Set the atmosphere to an isothermal profile at the given temperature.
+    **Set isothermal profile.**
+
+    Sets the entire atmosphere to a single constant temperature.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `set_tmp`             temperature [K] (numeric, or `"teq"`, `"tsurf"`).
+
+    Returns:
+    - `Bool`                success status.
     """
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp)
         if !(atmos.is_alloc && atmos.is_param)
@@ -346,7 +414,16 @@ module setpt
     end
 
     """
-    Add a constant temperature offset to every level of the T(p) profile.
+    **Add temperature offset to entire profile.**
+
+    Adds a constant temperature offset to every level in the atmosphere.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `delta`               temperature offset [K] to add.
+
+    Returns:
+    - `Bool`                success status.
     """
     function add!(atmos::atmosphere.Atmos_t, delta)::Bool
         if !(atmos.is_alloc && atmos.is_param)
@@ -363,7 +440,16 @@ module setpt
     end
 
     """
-    Set the T(p) profile to the dry adiabat, integrated upward from the surface temperature.
+    **Set T(p) to dry adiabat.**
+
+    Integrates upward from the surface temperature using the dry adiabatic lapse rate.
+    Uses real gas properties (cp, density) at each level based on current composition.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+
+    Returns:
+    - `Bool`                success status.
     """
     function dry_adiabat!(atmos::atmosphere.Atmos_t)::Bool
         # Validate input
@@ -409,38 +495,37 @@ module setpt
     end
 
     """
-    Cap temperatures above the tropopause to give an isothermal stratosphere at `strat_tmp` [K].
+    **Apply isothermal stratosphere.**
+
+    Clamps all temperatures to be at least `strat_tmp`, effectively creating
+    an isothermal stratosphere in regions where T < strat_tmp.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `strat_tmp`           stratospheric temperature [K] (numeric, or `"teq"`, `"tsurf"`).
+
+    Returns:
+    - `Bool`                success status.
     """
     function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp)::Bool
-
         strat_tmp = _parse_tmp_str(atmos, strat_tmp)
-
-        # Keep stratosphere below tmp_surf value
-        strat_tmp = min(strat_tmp, atmos.tmp_surf)
-
-        # Loop upwards from bottom of model
-        strat = false
-        for i in range(atmos.nlev_c,1,step=-1)
-            # Find tropopause
-            strat = strat || (atmos.tmp[i] < strat_tmp) || (atmos.tmpl[i+1] < strat_tmp)
-
-            # Apply stratosphere to this level if required
-            if strat
-                atmos.tmp[i]    = strat_tmp
-                atmos.tmpl[i+1] = strat_tmp
-            end
-        end
-
-        # Handle topmost level
-        if strat
-            atmos.tmpl[1] = strat_tmp
-        end
-
+        clamp!(atmos.tmp,  strat_tmp, atmos.tmp_ceiling)
+        clamp!(atmos.tmpl, strat_tmp, atmos.tmp_ceiling)
         return true
     end
 
     """
-    Set the T(p) profile to vary log-linearly with pressure from the surface temperature down to `top_tmp` [K] at the top.
+    **Set log-linear T(p) profile.**
+
+    Creates a temperature profile that varies linearly with log-pressure,
+    from the surface temperature down to `top_tmp` at the top of atmosphere.
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `top_tmp`             temperature at TOA [K] (numeric, or `"teq"`, `"tsurf"`).
+
+    Returns:
+    - `Bool`                success status.
     """
     function loglinear!(atmos::atmosphere.Atmos_t, top_tmp)::Bool
 
@@ -472,14 +557,18 @@ module setpt
 
 
     """
-    **Set T = max(T,T_dew) for a specified gas.**
+    **Enforce saturation constraint.**
 
-    Does not modify VMRs. Does update water-cloud locations.
+    Adjusts temperature profile to satisfy T ≥ T_dew for a specified gas.
+    Does not modify gas volume mixing ratios, only temperature.
 
     Arguments:
-    - `atmos`: Atmosphere object to modify.
-    - `gas`: Name of gas to check for saturation.
-    - `dTdew`: Tolerance for saturation check.
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+    - `gas::String`         name of gas to check for saturation (e.g., `"H2O"`, `"CO2"`).
+    - `dTdew::Float64`      temperature offset below dew point [K] for stability (default: 0.05).
+
+    Returns:
+    - `Bool`                success status.
     """
     function saturation!(atmos::atmosphere.Atmos_t, gas::String; dTdew::Float64=0.05)
 
@@ -541,7 +630,16 @@ module setpt
     end
 
     """
-    **Set temperature profile using Guillot (2010) analytic solution.**
+    **Set T(p) using Guillot (2010) analytic solution.**
+
+    Uses the analytical radiative-equilibrium solution from Guillot (2010)
+    for irradiated planetary atmospheres ( 	https://doi.org/10.1051/0004-6361/200913396 ).
+
+    Arguments:
+    - `atmos::Atmos_t`      atmosphere struct instance to modify.
+
+    Returns:
+    - `Bool`                success status.
     """
     function analytic!(atmos::atmosphere.Atmos_t)::Bool
 

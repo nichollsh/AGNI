@@ -378,6 +378,19 @@ module AGNI
             @error "Config: chemistry is incompatible with transparent atmosphere mode"
             return false
         end
+        use_all_vols::Bool = false
+        use_all_gases::Bool = false
+        if chem
+            # check if any input gases are in vap_list
+            #    if so, enable all gas species (vaps + vols)
+            for g in keys(mf_dict)
+                if g in consts.vaps_standard
+                    use_all_gases = true
+                end
+            end
+            # if chemistry is enabled, always include all volatile species
+            use_all_vols = true
+        end
 
         #    RFM radtrans
         rfm_parfile::String = atmosphere.UNSET_STR
@@ -528,6 +541,7 @@ module AGNI
                                 IO_DIR=io_dir,
                                 condensates=condensates,
                                 coldtrap=coldtrap,
+                                evap_efficiency=evap_efficiency,
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["physics"]["continua"],
                                 flag_rayleigh     = cfg["physics"]["rayleigh"],
@@ -537,7 +551,8 @@ module AGNI
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
-                                use_all_gases     = chem,
+                                use_all_vols      = use_all_vols,
+                                use_all_gases     = use_all_gases,
                                 surf_roughness=roughness, surf_windspeed=windspeed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
@@ -651,8 +666,6 @@ module AGNI
                                 conv_rtol=conv_rtol,
                                 method=Int(method_idx),
                                 rainout=rainout,
-                                coldtrap=coldtrap,
-                                evap_efficiency=evap_efficiency,
                                 oceans=oceans,
                                 dx_max=Float64(cfg["execution"]["dx_max"]),
                                 ls_method=Int(cfg["execution"]["linesearch"]),
@@ -785,7 +798,7 @@ module AGNI
         return_success = run_from_config(cfg)
 
         # Temp folders
-        if clean_output
+        if clean_output && return_success
             @debug "Cleaning output folder"
 
             # chemistry
