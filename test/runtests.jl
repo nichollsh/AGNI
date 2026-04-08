@@ -51,8 +51,6 @@ if !isdir(OUT_DIR) && !isfile(OUT_DIR)
     mkdir(OUT_DIR)
 end
 
-rtol   = 1e-3
-
 # Test module imported
 @test isdefined(AGNI.atmosphere, :setup!)
 
@@ -68,22 +66,18 @@ if suite == "none"
 
 elseif suite == "fast"
     # exclude slow tests
-    @info "Running only fast tests"
     for slow in SLOW_TESTS
         filter!(t -> !occursin(slow, t), test_names)
     end
 
 elseif suite in test_names
     # run only the specified test suite
-    @info "Running only test suite '$suite'"
     test_names = [suite]
 
 else
     if suite != "all"
         @error "Test suite '$suite' not found"
         exit(1)
-    else
-        @info "Running all tests"
     end
 end
 

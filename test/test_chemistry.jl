@@ -1052,11 +1052,12 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # -------------
     @testset "set_aerosol" begin
         mf_dict = Dict([
-            ("H2O" , 0.5),
+            ("HCN" , 0.3),
+            ("CH4" , 0.2),
             ("N2"  , 0.5)
         ])
 
-        aerosol_dict = Dict("soot" => 1e-4, "ice" => "H2O")
+        aerosol_dict = Dict("soot" => 1e-4, "biogenic" => "HCN")
 
         atmos = atmosphere.Atmos_t()
         atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
@@ -1066,7 +1067,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         gravity, radius,
                         nlev, p_surf, p_top,
                         mf_dict, "",
-                        condensates=["H2O"],
+                        condensates=["HCN"],
                         aerosol_species=aerosol_dict,
                         real_gas=false,
                         thermo_functions=true
@@ -1081,20 +1082,20 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         @test all(atmos.aerosol_arr_r["soot"] .== atmos.aerosol_val_r)
 
         # Reuse atmos: test condensate-based profile
-        atmos.cond_yield["H2O"][8] = 30.0
-        atmos.cond_yield["H2O"][9] = 60.0
+        atmos.cond_yield["HCN"][8] = 30.0
+        atmos.cond_yield["HCN"][9] = 60.0
         atmos.cloud_alpha = 0.4
         atmos.layer_σ .= 800.0
 
-        success2 = atmosphere.set_aerosol!(atmos, "ice", "H2O")
+        success2 = atmosphere.set_aerosol!(atmos, "biogenic", "HCN")
         @test success2 == true
 
-        # Check ice aerosol follows condensate
+        # Check biogenic aerosol follows condensate
         for i in 1:nlev
-            expected = atmosphere.calc_cond_mmr(atmos, "H2O", i)
-            @test atmos.aerosol_arr_l["ice"][i] == expected
+            expected = atmosphere.calc_cond_mmr(atmos, "HCN", i)
+            @test atmos.aerosol_arr_l["biogenic"][i] == expected
         end
-        @test atmos.aerosol_arr_l["ice"][9] > 0.0
+        @test atmos.aerosol_arr_l["biogenic"][9] > 0.0
 
         atmosphere.deallocate!(atmos)
     end
