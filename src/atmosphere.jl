@@ -40,11 +40,59 @@ module atmosphere
     HYDROGRAV_steps::Int64   = 2000      # total number of steps in height integration
     HYDROGRAV_maxdr::Float64 = 1e8       # maximum dz across each layer [m]
     HYDROGRAV_mindr::Float64 = 1e-5      # minimum dz across each layer [m]
-    HYDROGRAV_ming::Float64  = 1e-4     # minimum allowed gravity [m/s^2]
+    HYDROGRAV_ming::Float64  = 1e-4      # minimum allowed gravity [m/s^2]
     HYDROGRAV_constg::Bool   = false     # constant gravity with height?
     HYDROGRAV_selfg::Bool    = true      # include self-gravity of the atmosphere?
 
-    # Other constants
+    # Configuration defaults
+    const CFG_surface_material::String  = "greybody"
+    const CFG_albedo_s::Float64         = 0.0
+    const CFG_tmp_floor::Float64        = 2.0
+    const CFG_tmp_ceiling::Float64      = 2e4
+    const CFG_surf_roughness::Float64   = 0.001
+    const CFG_surf_windspeed::Float64   = 2.0
+    const CFG_Kzz_kbreak::Float64       = 1e5
+    const CFG_Kzz_pbreak::Float64       = 1e5 # 1 bar
+    const CFG_Kzz_type::Int             = 2
+    const CFG_mlt_asymptotic::Bool      = true
+    const CFG_mlt_criterion::Char       = 's'
+    const CFG_tmp_magma::Float64        = 3000.0
+    const CFG_skin_d::Float64           = 0.05
+    const CFG_skin_k::Float64           = 2.0
+    const CFG_overlap_method::String    = "ee"
+    const CFG_target_olr::Float64       = 250.0
+    const CFG_flux_int::Float64         = 0.0
+    const CFG_all_channels::Bool        = true
+    const CFG_flag_rayleigh::Bool       = true
+    const CFG_flag_gcontinuum::Bool     = true
+    const CFG_flag_aerosol::Bool        = false
+    const CFG_flag_cloud::Bool          = false
+    const CFG_phs_timescale::Float64    = 1e6
+    const CFG_evap_efficiency::Float64  = 0.05
+    const CFG_coldtrap::Bool            = true
+    const CFG_rainout::Bool             = false
+    const CFG_oceans::Bool              = false
+    const CFG_real_gas::Bool            = true
+    const CFG_demixing::Bool            = false
+    const CFG_chem::Bool                = false
+    const CFG_thermo_functions::Bool    = true
+    const CFG_use_all_gases::Bool       = false
+    const CFG_use_all_vols::Bool        = false
+    const CFG_check_integrity::Bool     = true
+    const CFG_rfm_wn_min::Float64       = 4000.0
+    const CFG_rfm_wn_max::Float64       = 4020.0
+    const CFG_κ_grey_lw::Float64        = 8e-4
+    const CFG_κ_grey_sw::Float64        = 2e-4
+    const CFG_fastchem_floor::Float64     = 400.0
+    const CFG_fastchem_maxiter_chem::Int  = 80000
+    const CFG_fastchem_maxiter_solv::Int  = 40000
+    const CFG_fastchem_xtol_chem::Float64 = 1e-3
+    const CFG_fastchem_xtol_elem::Float64 = 1e-3
+    const CFG_fastchem_wellmixed::Bool    = false
+    const CFG_ocean_ob_frac::Float64      = 0.6
+    const CFG_ocean_cs_height::Float64    = 3000.0
+
+    # Variable limits and defaults
     const UNSET_STR::String             = "__AGNI_UNSET_STR"
     const NLEV_minimum::Int             = 25        # minimum allowed number of levels
     const PHS_TIMESCALE_MIN::Float64    = 0.01      # minimum phase change timescale [s]
@@ -55,8 +103,6 @@ module atmosphere
     const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
     const COND_DISALLOWED::Array        = ["H2","He"]
     const T_INI_MAX::Float64            = 1500.0    # Maximum initial temperature [K]
-
-    # Pressure grid
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
     const PRESSURE_FACT_TOP::Float64    = 0.8      # Pressure factor at top layer
@@ -429,6 +475,7 @@ module atmosphere
     - `surf_roughness::Float64`         surface roughness length scale [m]
     - `surf_windspeed::Float64`         surface wind speed [m s-1].
     - `Kzz_kbreak::Float64`             reference eddy diffusion coefficient, SI units [m2 s-1]
+    - `Kzz_pbreak::Float64`             reference pressure for Kzz break point [Pa]
     - `Kzz_type::Int`                   parametrisation of Kzz. Options: 1 (constant), 2 (MLT wl), 3 (MLT Fc)
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
@@ -441,7 +488,6 @@ module atmosphere
     - `all_channels::Bool`              use all channels available for RT?
     - `flag_rayleigh::Bool`             include rayleigh scattering?
     - `flag_gcontinuum::Bool`           include generalised continuum absorption?
-    - `flag_continuum::Bool`            include continuum absorption?
     - `flag_aerosol::Bool`              include aerosols?
     - `aerosol_species::Dict`           aerosols MMR values or associated condensates
     - `flag_cloud::Bool`                include clouds?
@@ -478,56 +524,56 @@ module atmosphere
                     IO_DIR::String   =          UNSET_STR,
                     condensates =               String[],
                     metallicities::Dict =       Dict{String,Float64}(),
-                    surface_material::String =  "greybody",
-                    albedo_s::Float64 =         0.0,
-                    tmp_floor::Float64 =        2.0,
-                    tmp_ceiling::Float64 =      2e4,
-                    surf_roughness::Float64 =   0.001,
-                    surf_windspeed::Float64 =   2.0,
-                    Kzz_kbreak::Float64 =       1e5,
-                    Kzz_type::Int =             2,
-                    mlt_asymptotic::Bool =      true,
-                    mlt_criterion::Char =       's',
-                    tmp_magma::Float64 =        3000.0,
-                    skin_d::Float64 =           0.05,
-                    skin_k::Float64 =           2.0,
-                    overlap_method::String =    "ee",
-                    target_olr::Float64 =       0.0,
-                    flux_int::Float64 =         0.0,
-                    all_channels::Bool  =       true,
-                    flag_rayleigh::Bool =       false,
-                    flag_gcontinuum::Bool =     false,
-                    flag_continuum::Bool =      false,
-                    flag_aerosol::Bool =        false,
-                    flag_cloud::Bool =          false,
+                    surface_material::String =  CFG_surface_material,
+                    albedo_s::Float64 =         CFG_albedo_s,
+                    tmp_floor::Float64 =        CFG_tmp_floor,
+                    tmp_ceiling::Float64 =      CFG_tmp_ceiling,
+                    surf_roughness::Float64 =   CFG_surf_roughness,
+                    surf_windspeed::Float64 =   CFG_surf_windspeed,
+                    Kzz_kbreak::Float64 =       CFG_Kzz_kbreak,
+                    Kzz_pbreak::Float64 =       CFG_Kzz_pbreak,
+                    Kzz_type::Int =             CFG_Kzz_type,
+                    mlt_asymptotic::Bool =      CFG_mlt_asymptotic,
+                    mlt_criterion::Char =       CFG_mlt_criterion,
+                    tmp_magma::Float64 =        CFG_tmp_magma,
+                    skin_d::Float64 =           CFG_skin_d,
+                    skin_k::Float64 =           CFG_skin_k,
+                    overlap_method::String =    CFG_overlap_method,
+                    target_olr::Float64 =       CFG_target_olr,
+                    flux_int::Float64 =         CFG_flux_int,
+                    all_channels::Bool  =       CFG_all_channels,
+                    flag_rayleigh::Bool =       CFG_flag_rayleigh,
+                    flag_gcontinuum::Bool =     CFG_flag_gcontinuum,
+                    flag_aerosol::Bool =        CFG_flag_aerosol,
+                    flag_cloud::Bool =          CFG_flag_cloud,
                     aerosol_species::Dict =     Dict{String, Union{Float64,String}}(),
 
-                    phs_timescale::Float64 =    1e6,
-                    evap_efficiency::Float64 =  0.05,
+                    phs_timescale::Float64 =    CFG_phs_timescale,
+                    evap_efficiency::Float64 =  CFG_evap_efficiency,
 
-                    coldtrap::Bool =            true,
-                    real_gas::Bool =            true,
-                    demixing::Bool =            false,
-                    thermo_functions::Bool =    true,
-                    use_all_gases::Bool =       false,
-                    use_all_vols::Bool =        false,
-                    check_integrity::Bool =     true,
+                    coldtrap::Bool =            CFG_coldtrap,
+                    real_gas::Bool =            CFG_real_gas,
+                    demixing::Bool =            CFG_demixing,
+                    thermo_functions::Bool =    CFG_thermo_functions,
+                    use_all_gases::Bool =       CFG_use_all_gases,
+                    use_all_vols::Bool =        CFG_use_all_vols,
+                    check_integrity::Bool =     CFG_check_integrity,
 
-                    κ_grey_lw::Float64  =       8e-4,
-                    κ_grey_sw::Float64  =       2e-4,
+                    κ_grey_lw::Float64  =       CFG_κ_grey_lw,
+                    κ_grey_sw::Float64  =       CFG_κ_grey_sw,
 
                     fastchem_work::String       =  UNSET_STR,
-                    fastchem_floor::Float64     =  400.0,
-                    fastchem_maxiter_chem::Int  =  80000,
-                    fastchem_maxiter_solv::Int  =  40000,
-                    fastchem_xtol_chem::Float64 =  1.0e-3,
-                    fastchem_xtol_elem::Float64 =  1.0e-3,
-                    fastchem_wellmixed::Bool    =  false,
+                    fastchem_floor::Float64     =  CFG_fastchem_floor,
+                    fastchem_maxiter_chem::Int  =  CFG_fastchem_maxiter_chem,
+                    fastchem_maxiter_solv::Int  =  CFG_fastchem_maxiter_solv,
+                    fastchem_xtol_chem::Float64 =  CFG_fastchem_xtol_chem,
+                    fastchem_xtol_elem::Float64 =  CFG_fastchem_xtol_elem,
+                    fastchem_wellmixed::Bool    =  CFG_fastchem_wellmixed,
 
                     rfm_parfile::String =       UNSET_STR,
 
-                    ocean_ob_frac::Float64 =    0.6,
-                    ocean_cs_height::Float64 =  3000.0
+                    ocean_ob_frac::Float64 =    CFG_ocean_ob_frac,
+                    ocean_cs_height::Float64 =  CFG_ocean_cs_height
                     )::Bool
 
         # Say hello
@@ -691,7 +737,7 @@ module atmosphere
         atmos.κ_grey_sw = κ_grey_sw
         _check_range("Grey SW opacity", atmos.κ_grey_sw; min=0) || return false
 
-        atmos.Kzz_pbreak =      1e5 # 1 bar as default location for break point
+        atmos.Kzz_pbreak =      max(1.0, Kzz_pbreak)
         atmos.Kzz_kbreak =      max(0.0, Kzz_kbreak)
         atmos.Kzz_power =       -0.4
         atmos.Kzz_type =        Kzz_type
@@ -750,7 +796,7 @@ module atmosphere
         # absorption contributors
         atmos.control.l_gas::Bool =         true
         atmos.control.l_rayleigh::Bool =    flag_rayleigh
-        atmos.control.l_continuum::Bool =   flag_continuum
+        atmos.control.l_continuum::Bool =   false # legacy
         atmos.control.l_cont_gen::Bool =    flag_gcontinuum
         atmos.control.l_aerosol::Bool =     flag_aerosol
         atmos.control.l_cloud::Bool =       flag_cloud
@@ -801,7 +847,7 @@ module atmosphere
         atmos.evap_efficiency = evap_efficiency
         _check_range("Evaporation efficiency", atmos.evap_efficiency; min=0, max=1) || return false
 
-        # Hardcoded cloud properties
+        # Hardcoded default cloud properties
         atmos.cloud_alpha   = 0.01    # [INPUT] 1% of condensed water forms substantial clouds
         atmos.cloud_val_r   = 1.0e-5  # [INPUT] 10 micron droplets
         atmos.cloud_val_l   = 0.8     # [INPUT] Mass mixing ratio of water in each layer
@@ -1103,7 +1149,7 @@ module atmosphere
 
         # Set initial temperature profile to a small value which still keeps
         #   all of the gases supercritical. This should be a safe condition to
-        #   default to, although the user must specify a profile in the cfg.
+        #   default to, although the user must specify a profile in the CFG_
         for g in atmos.gas_names
             atmos.tmpl[end] = clamp(atmos.tmpl[end], atmos.gas_dat[g].T_crit+5.0, T_INI_MAX)
             fill!(atmos.tmpl, atmos.tmpl[end])

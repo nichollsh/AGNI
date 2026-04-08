@@ -264,12 +264,12 @@ module AGNI
 
         #    composition stuff (defaults to be overwritten)
         condensates::Array{String,1}        = String[]
-        demixing::Bool                      = false
-        chem::Bool                          = false
-        rainout::Bool                       = false
-        oceans::Bool                        = false
-        coldtrap::Bool                      = true
-        evap_efficiency::Float64            = 0.05
+        demixing::Bool                      = atmosphere.CFG_demixing
+        chem::Bool                          = atmosphere.CFG_chem
+        rainout::Bool                       = atmosphere.CFG_rainout
+        oceans::Bool                        = atmosphere.CFG_oceans
+        coldtrap::Bool                      = atmosphere.CFG_coldtrap
+        evap_efficiency::Float64            = atmosphere.CFG_evap_efficiency
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
         pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
@@ -277,7 +277,7 @@ module AGNI
         mf_path::String                     = ""
         metallicities::Dict{String, Float64}= Dict{String, Float64}()
         transparent::Bool                   = false
-        real_gas::Bool                      = false
+        real_gas::Bool                      = atmosphere.CFG_real_gas
 
         # transparent atmosphere?
         if haskey(cfg["composition"], "transparent")
@@ -398,8 +398,8 @@ module AGNI
 
         #    RFM radtrans
         rfm_parfile::String = atmosphere.UNSET_STR
-        rfm_wn_min::Float64 = 4000.0
-        rfm_wn_max::Float64 = 4020.0
+        rfm_wn_min::Float64 = atmosphere.CFG_rfm_wn_min
+        rfm_wn_max::Float64 = atmosphere.CFG_rfm_wn_max
         if haskey(cfg["files"],"rfm_parfile")
             rfm_parfile = cfg["files"]["rfm_parfile"]
             if haskey(cfg["execution"],"rfm_wn_min") && haskey(cfg["execution"],"rfm_wn_max")
@@ -413,8 +413,8 @@ module AGNI
         end
 
         #    double grey radtrans opacities
-        κ_grey_lw::Float64 = 1e-2  # this will be over-written
-        κ_grey_sw::Float64 = 1e-2  # ^
+        κ_grey_lw::Float64 = atmosphere.CFG_κ_grey_lw  # this will be over-written
+        κ_grey_sw::Float64 = atmosphere.CFG_κ_grey_sw  # ^
         if (lowercase(cfg["files"]["input_sf"]) == "greygas") || cfg["execution"]["grey_start"]
             if all(k in keys(cfg["physics"]) for k in ["grey_sw","grey_lw"])
                 κ_grey_lw = Float64(cfg["physics"]["grey_lw"])
@@ -463,7 +463,8 @@ module AGNI
 
         # Read OPTIONAL configuration options from dict
         #     sensible heat at the surface
-        roughness::Float64 = 0.001; windspeed::Float64 = 2.0
+        roughness::Float64 = atmosphere.CFG_surf_roughness
+        windspeed::Float64 = atmosphere.CFG_surf_windspeed
         if incl_sens && !transparent
             if ! all(k in keys(cfg["planet"]) for k in ["roughness","wind_speed"])
                 @error "Config: sensible heating included"
@@ -474,7 +475,9 @@ module AGNI
             windspeed = cfg["planet"]["wind_speed"]
         end
         #     conductive skin case
-        skin_k::Float64=2.0; skin_d::Float64=0.1; tmp_magma::Float64=3000.0  # will be overwritten
+        skin_k::Float64 = atmosphere.CFG_skin_k
+        skin_d::Float64 = atmosphere.CFG_skin_d
+        tmp_magma::Float64 = atmosphere.CFG_tmp_magma
         if sol_type == 2
             if ! all(k in keys(cfg["planet"]) for k in ["skin_k","skin_d","tmp_magma"])
                 @error "Config: solution type $sol_type selected"
@@ -486,7 +489,7 @@ module AGNI
             tmp_magma   = cfg["planet"]["tmp_magma"]
         end
         #     effective temperature case
-        flux_int::Float64 = 0.0
+        flux_int::Float64 = atmosphere.CFG_flux_int
         if sol_type == 3
             if ! haskey(cfg["planet"],"flux_int")
                 @error "Config: solution type $sol_type selected"
@@ -496,7 +499,7 @@ module AGNI
             flux_int = cfg["planet"]["flux_int"]
         end
         #     target OLR case
-        target_olr::Float64 = 250.0
+        target_olr::Float64 = atmosphere.CFG_target_olr
         if sol_type == 4
             if ! haskey(cfg["planet"],"target_olr")
                 @error "Config: solution type $sol_type selected"
