@@ -798,15 +798,15 @@ module phys
     This is a wrapper function which calls the appropriate demixing fit.
 
     Arguments:
-    - `gas::String`         the gas name
+    - `gas::Gas_t`          the gas struct
     - `p::Float64`          pressure [Pa]
     - `x::Float64`          molar fraction of the gas in the mixture
 
     Returns:
     - `Tdemix::Float64`     demixing temperature [K]
     """
-    function calc_Tdemix(gas::String, p::Float64, x::Float64)::Float64
-        if gas == "H2O"
+    function get_Tdemix(gas::Gas_t, p::Float64, x::Float64)::Float64
+        if gas.formula == "H2O"
             return _Tdemix_H2O(p, x)
         else
             return -1.0 * BIGFLOAT # always above this temperature

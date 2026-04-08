@@ -142,7 +142,7 @@ module chemistry
         for c in atmos.condensates
 
             # If de-mixed
-            if atmos.demixing && (phys.calc_Tdemix(c, atmos.p_boa, atmos.gas_vmr[c][end]) < atmos.tmp_surf)
+            if atmos.demixing && (atmos.tmp_surf < phys.get_Tdemix(atmos.gas_dat[c], atmos.p_boa, atmos.gas_vmr[c][end]))
                 # rainout completely, and skip condensation
                 dp = -p_gas[c]
                 atmos.p_boa += dp
@@ -260,7 +260,7 @@ module chemistry
             for c in atmos.condensates
 
                 # Handle de-mixing
-                if atmos.demixing && (phys.calc_Tdemix(c, atmos.p[i], atmos.gas_vmr[c][i]) < atmos.tmp[i])
+                if atmos.demixing && (atmos.tmp[i] < phys.get_Tdemix(atmos.gas_dat[c], atmos.p[i], atmos.gas_vmr[c][i]))
                     # rainout completely at this layer, and skip condensation
                     atmos.gas_vmr[c][i] = 0.0
                     atmos.gas_sat[c][i] = true
