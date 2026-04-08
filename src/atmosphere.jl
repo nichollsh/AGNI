@@ -63,8 +63,8 @@ module atmosphere
     const CFG_target_olr::Float64       = 250.0
     const CFG_flux_int::Float64         = 0.0
     const CFG_all_channels::Bool        = true
-    const CFG_flag_rayleigh::Bool       = true
-    const CFG_flag_gcontinuum::Bool     = true
+    const CFG_flag_rayleigh::Bool       = false
+    const CFG_flag_gcontinuum::Bool     = false
     const CFG_flag_aerosol::Bool        = false
     const CFG_flag_cloud::Bool          = false
     const CFG_phs_timescale::Float64    = 1e6
@@ -862,9 +862,13 @@ module atmosphere
         atmos.aerosol_setby = Dict{String, String}() # dictionary of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
         atmos.aerosol_names = String[] # list of species names, in same order as spectral file
         for (k, v) in aerosol_species
+            k = lowercase(k)
+            if haskey(atmos.aerosol_arr_l, k)
+                @error "Duplicated aerosol: $k"
+                return false
+            end
 
             # set to zero for now (true values will be set elsewhere)
-            k = lowercase(k)
             atmos.aerosol_arr_l[k] = zeros(Float64, atmos.nlev_c)
             atmos.aerosol_arr_r[k] = zeros(Float64, atmos.nlev_c)
             push!(atmos.aerosol_names, UNSET_STR) # set in allocate!
@@ -1147,9 +1151,7 @@ module atmosphere
         atmos.ocean_ob_frac = ocean_ob_frac
         _check_range("Ocean basin fraction", atmos.ocean_ob_frac; min=0, max=1) || return false
 
-        # Set initial temperature profile to a small value which still keeps
-        #   all of the gases supercritical. This should be a safe condition to
-        #   default to, although the user must specify a profile in the CFG_
+        # Set initial temperature profile to a high value, but less than T_INI_MAX
         for g in atmos.gas_names
             atmos.tmpl[end] = clamp(atmos.tmpl[end], atmos.gas_dat[g].T_crit+5.0, T_INI_MAX)
             fill!(atmos.tmpl, atmos.tmpl[end])
@@ -2978,8 +2980,10 @@ module atmosphere
         # Set mixing ratio profile for aerosol
         if isa(mmr, String)
             # set by species mmr
-            for i in collect(1:atmos.nlev_c)[idx_mask]
-                atmos.aerosol_arr_l[species][i] = atmosphere.calc_cond_mmr(atmos, mmr, i)
+            if mmr in atmos.condensates
+                for i in collect(1:atmos.nlev_c)[idx_mask]
+                    atmos.aerosol_arr_l[species][i] = atmosphere.calc_cond_mmr(atmos, mmr, i)
+                end
             end
         elseif isa(mmr, Float64)
             # constant profile
@@ -2987,7 +2991,7 @@ module atmosphere
         else
             # 1D profile
             if length(mmr) != length(atmos.p)
-                @error "Length of input mmr array does not match number of layers"
+                @warn "Length of input mmr array does not match number of layers"
                 return false
             end
             atmos.aerosol_arr_l[species][idx_mask] .= mmr[idx_mask]

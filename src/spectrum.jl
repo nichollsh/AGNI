@@ -233,8 +233,9 @@ module spectrum
             @warn "Stellar wavelength and flux arrays have different lengths"
             return false
         end
-        if len_wl < 500
-            @warn "Loaded stellar spectrum is very short!"
+        if len_wl < 2
+            @warn "Loaded stellar spectrum is too short!"
+            return false
         end
         if minimum(wl) < FLOAT_SML
             @warn "Minimum wavelength is too small"
@@ -245,6 +246,11 @@ module spectrum
             return false
         end
         clamp!(fl, FLOAT_SML, FLOAT_BIG)  # Clamp values
+
+        # warn about non-critical problems
+        if len_wl < 500
+            @warn "Loaded stellar spectrum is very short!"
+        end
 
         # Ensure that wl array has no duplicates
         # https://discourse.julialang.org/t/unique-indices-method-similar-to-matlab/34446/3

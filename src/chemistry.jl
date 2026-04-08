@@ -141,6 +141,8 @@ module chemistry
         # For each condensable volatile...
         for c in atmos.condensates
 
+            dp = 0.0
+
             # If de-mixed
             if atmos.demixing && (atmos.tmp_surf < phys.get_Tdemix(atmos.gas_dat[c], atmos.p_boa, atmos.gas_vmr[c][end]))
                 # rainout completely, and skip condensation
@@ -148,35 +150,36 @@ module chemistry
                 atmos.p_boa += dp
                 @debug @sprintf("            %s de-mixed, partial pressure += %+.3f bar", c, dp/1e5)
                 any_changed = true
-                continue
-            end
 
-            # If supercritical, skip
-            if atmos.tmp_surf > atmos.gas_dat[c].T_crit
-                continue
-            end
-
-            # Calculate partial pressure and saturation pressure for this condensable
-            #     Work out amount of sub(+) or super(-) saturation
-            dp = phys.get_Psat(atmos.gas_dat[c], atmos.tmp_surf) - p_gas[c]
-
-            # Negligible
-            if abs(dp) < SMALL_FLOAT
+            # If supercritical, do nothing
+            elseif atmos.tmp_surf > atmos.gas_dat[c].T_crit
                 continue
 
-            # Super-saturated at the surface...
-            elseif dp < 0
-                @debug @sprintf("            %s super-saturated, partial pressure += %+.3f bar", c, dp/1e5)
-
-            # Sub-saturated at the surface...
-            #     work out change in partial pressure based on initial reservoir amount
+            # Else, handle saturation normally
             else
-                dp = min(dp, atmos.ocean_ini[c] * atmos.grav_surf / (atmos.gas_dat[c].mmw/atmos.layer_μ[end]))
-                @debug @sprintf("            %s sub-saturated, partial pressure += %+.3f bar", c, dp/1e5)
-            end
 
-            # Record that at least one component has as changed
-            any_changed = true
+                # Calculate partial pressure and saturation pressure for this condensable
+                #     Work out amount of sub(+) or super(-) saturation
+                dp = phys.get_Psat(atmos.gas_dat[c], atmos.tmp_surf) - p_gas[c]
+
+                # Negligible
+                if abs(dp) < SMALL_FLOAT
+                    continue
+
+                # Super-saturated at the surface...
+                elseif dp < 0
+                    @debug @sprintf("            %s super-saturated, partial pressure += %+.3f bar", c, dp/1e5)
+
+                # Sub-saturated at the surface...
+                #     work out change in partial pressure based on initial reservoir amount
+                else
+                    dp = min(dp, atmos.ocean_ini[c] * atmos.grav_surf / (atmos.gas_dat[c].mmw/atmos.layer_μ[end]))
+                    @debug @sprintf("            %s sub-saturated, partial pressure += %+.3f bar", c, dp/1e5)
+                end
+
+                # Record that at least one component has as changed
+                any_changed = true
+            end
 
             # Reduce or increase total pressure and partial pressure
             atmos.p_boa += dp
@@ -184,7 +187,8 @@ module chemistry
 
             # Change in surface reservoir, with opposite sign to change in pressure
             atmos.ocean_tot[c] -= (dp / atmos.grav_surf) * (atmos.gas_dat[c].mmw/atmos.layer_μ[end])
-        end
+
+        end # end condensable
 
         # Exit now if nothing needs to be done
         if !any_changed

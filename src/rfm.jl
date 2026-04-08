@@ -242,7 +242,12 @@ module rfm
         cmd = pipeline(cmd, stdout=devnull) # hide rfm terminal output
 
         # Run subprocess
-        run(cmd)
+        try
+            run(cmd)
+        catch err
+            @error "Failed to run RFM" exception=(err, catch_backtrace())
+            return false
+        end
 
         # Get output from RFM
         return read_fluxes(atmos)
