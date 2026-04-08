@@ -765,15 +765,15 @@ module phys
     Source: https://www.aanda.org/articles/aa/pdf/2025/11/aa56322-25.pdf (Appendix A).
 
     Arguments:
-    - pBar::Float64         Pressure in bar
+    - p::Float64            Pressure in Pa (converted to kbar internally)
     - x::Float64            Molar fraction of H2O in the mixture (0-1)
 
     Returns:
     - Tdemix::Float64      Demixing temperature in K
     """
-    function calc_H2O_Tdemix(pBar::Float64, x::Float64)::Float64
+    function _Tdemix_H2O(p::Float64, x::Float64)::Float64
 
-        P::Float64 = pBar * 1e-3  # bar -> kbar
+        Pkbar::Float64 = p * 1e-8  # Pa -> kbar
 
         # Table A1 Coefficients
         a::Float64 = 1.2035e-4
@@ -787,9 +787,30 @@ module phys
         i::Float64 = 4.0719
 
         # Fitting function
-        pt1 = (a / pi) * 0.5 * (b + c * P) / ((x - d)^2.0 + (0.5 * b)^2.0)
-        pt2 = e * P^3.0 + f * P^2.0 + g * P + h
-        return pt1 * pt2 + i * P
+        pt1 = (a / pi) * 0.5 * (b + c * Pkbar) / ((x - d)^2.0 + (0.5 * b)^2.0)
+        pt2 = e * Pkbar^3.0 + f * Pkbar^2.0 + g * Pkbar + h
+        return pt1 * pt2 + i * Pkbar
+    end
+
+    """
+    **Calculate the gas demixing temperature, for a given pressure and molar fraction.**
+
+    This is a wrapper function which calls the appropriate demixing fit.
+
+    Arguments:
+    - `gas::String`         the gas name
+    - `p::Float64`          pressure [Pa]
+    - `x::Float64`          molar fraction of the gas in the mixture
+
+    Returns:
+    - `Tdemix::Float64`     demixing temperature [K]
+    """
+    function calc_Tdemix(gas::String, p::Float64, x::Float64)::Float64
+        if gas == "H2O"
+            return _Tdemix_H2O(p, x)
+        else
+            return -1.0 * BIGFLOAT # always above this temperature
+        end
     end
 
     """

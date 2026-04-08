@@ -82,8 +82,8 @@ Parameters that tell the model what to do.
 | `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
 | `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
 | `perturb_all`     | Perturb all rows of Jacobian matrix at each solver iteration? True=stable, False=fast. |
-| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] (optional). |
-| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] (optional). |
+| `rfm_wn_min`      | RFM radiative transfer minimum wavenumber [cm-1], (optional). |
+| `rfm_wn_max`      | RFM radiative transfer maximum wavenumber [cm-1], (optional). |
 
 ## `[physics]`
 Parameters that describe how the model should treat the physics.

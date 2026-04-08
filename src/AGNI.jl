@@ -268,7 +268,7 @@ module AGNI
         chem::Bool                          = false
         rainout::Bool                       = false
         oceans::Bool                        = false
-        coldtrap::Bool                      = false
+        coldtrap::Bool                      = true
         evap_efficiency::Float64            = 0.05
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
@@ -306,7 +306,7 @@ module AGNI
             if haskey(cfg["physics"], "evap_efficiency")
                 evap_efficiency = Float64(cfg["physics"]["evap_efficiency"])
             end
-            if hasfield(cfg["physics"], "demixing")
+            if haskey(cfg["physics"], "demixing")
                 demixing = Bool(cfg["physics"]["demixing"])
             end
 

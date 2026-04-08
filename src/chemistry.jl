@@ -141,6 +141,16 @@ module chemistry
         # For each condensable volatile...
         for c in atmos.condensates
 
+            # If de-mixed
+            if atmos.demixing && (phys.calc_Tdemix(c, atmos.p_boa, atmos.gas_vmr[c][end]) < atmos.tmp_surf)
+                # rainout completely, and skip condensation
+                dp = -p_gas[c]
+                atmos.p_boa += dp
+                @debug @sprintf("            %s de-mixed, partial pressure += %+.3f bar", c, dp/1e5)
+                any_changed = true
+                continue
+            end
+
             # If supercritical, skip
             if atmos.tmp_surf > atmos.gas_dat[c].T_crit
                 continue
@@ -248,6 +258,13 @@ module chemistry
 
             # For each condensate
             for c in atmos.condensates
+
+                # Handle de-mixing
+                if atmos.demixing && (phys.calc_Tdemix(c, atmos.p[i], atmos.gas_vmr[c][i]) < atmos.tmp[i])
+                    # rainout completely at this layer, and skip condensation
+                    atmos.gas_vmr[c][i] = 0.0
+                    atmos.gas_sat[c][i] = true
+                end
 
                 # check criticality
                 supcrit = atmos.tmp[i] > atmos.gas_dat[c].T_crit+1.0e-5
