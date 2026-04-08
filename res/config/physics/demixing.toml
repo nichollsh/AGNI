@@ -1,9 +1,9 @@
 # AGNI configuration file
-title = "Chemistry and condensation together"
+title = "Demixing of H2O-H2 test"
 
 [planet]
-    tmp_surf        = 1000.0
-    instellation    = 1500.0
+    tmp_surf        = 2500.0
+    instellation    = 2000.0
     albedo_b        = 0.0
     s0_fact         = 0.375
     zenith_angle    = 48.19
@@ -12,7 +12,7 @@ title = "Chemistry and condensation together"
     radius          = 6.37e6
     gravity         = 9.81
     flux_int        = 0.0
-    roughness       = 1.0e-2
+    roughness       = 1.0e-4
     wind_speed      = 10.0
     skin_k          = 2.0
     skin_d          = 0.01
@@ -20,35 +20,35 @@ title = "Chemistry and condensation together"
     star_Teff       = 5000.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"
+    input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"
     input_star      = "blackbody"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 7000.0
-    p_top           = 1e-4
-    vmr_dict        = { H2O=0.5, CO2=0.35, CH4=0.1, N2=0.05}
+    p_surf          = 2000.0
+    p_top           = 1e-5
+    vmr_dict        = { H2O=0.3, H2=0.7}
     condensates     = ["H2O"]
 
 [execution]
     clean_output    = true
-    verbosity       = 1
+    verbosity       = 2
     max_steps       = 300
     max_runtime     = 400
-    num_levels      = 40
+    num_levels      = 44
     solution_type   = 3
     solver          = "newton"
-    dx_max          = 300.0
-    initial_state   = ["iso","1000"]
+    dx_max          = 150.0
+    initial_state   = ["dry", "str","700"]
     linesearch      = 2
-    easy_start      = false
+    easy_start      = true
     grey_start      = false
     converge_atol   = 1.0
     converge_rtol   = 1.0e-2
     perturb_all     = true
 
 [physics]
-    chemistry       = true
+    chemistry       = false
     continua        = true
     rayleigh        = true
     cloud           = false
@@ -57,16 +57,13 @@ title = "Chemistry and condensation together"
     thermo_funct    = true
     sensible_heat   = true
     conduction      = true
+    latent_heat     = false
     convection      = true
-    convection_crit = "s"
-    grey_lw         = 5e-2
-    grey_sw         = 1e-2
+    convection_crit = "l"
     rainout         = true
     oceans          = true
-    latent_heat     = false
-    coldtrap        = false
-    demixing        = false
-
+    demixing        = true
+    coldtrap        = true
 
 [plots]
     at_runtime      = true

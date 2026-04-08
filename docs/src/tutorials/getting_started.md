@@ -16,21 +16,28 @@ GNU/Linux and MacOS (including ARM) are supported.
     Do not install Julia using your system package manager. Install only from julialang.org as below.
 
 ## Installation
-Follow the steps below in order to setup the code.
-1. Install Julia's package manager: `curl -fsSL https://install.julialang.org | sh`
-2. Switch to Julia 1.11: `juliaup add 1.11 && juliaup default 1.11`
-3. Download AGNI: `git clone https://github.com/nichollsh/AGNI.git`
+Follow the ordered steps below
+1. Install Julia's package manager
+    - `curl -fsSL https://install.julialang.org | sh`
+2. Switch to Julia 1.11
+    - `juliaup add 1.11 && juliaup default 1.11`
+3. Download AGNI
+    - `git clone https://github.com/nichollsh/AGNI.git`
 4. Change directory: `cd AGNI`
 5. Setup SOCRATES by doing either **ONE** of the following...
-    - Follow the instructions on the [SOCRATES GitHub](https://github.com/FormingWorlds/SOCRATES) page
-    - Run `./src/get_socrates.sh`
-6. Finally, install AGNI: `./src/get_agni.sh`
-AGNI is now installed as a package into the Julia environment of the AGNI
-directory. This will also have downloaded some basic input data and run the tests.
+    a. Follow the instructions on the [SOCRATES GitHub](https://github.com/FormingWorlds/SOCRATES) page
+    b. **OR**, run `./src/get_socrates.sh`
+6. Setup FastChem
+    - `./src/get_fastchem.sh`
+7. Add `RAD_DIR` and `FC_DIR` to your environment and bashrc file
+8. Finally, install AGNI
+    - `./src/get_agni.sh`
+
+AGNI is now installed as a package of the Julia environment in the `AGNI/`
+directory. These steps will have downloaded some basic input data.
 
 !!! warning
-    The `RAD_DIR` environment variable must be set to your SOCRATES path whenever AGNI is being used.
-    This is so that AGNI can locate the SOCRATES libraries.
+    The `RAD_DIR` environment variable must be set to your SOCRATES path whenever AGNI is being used. This is so that AGNI can locate the SOCRATES libraries.
 
 !!! tip
     Visit the [Troubleshooting](@ref) page if you encounter any problems. This page can

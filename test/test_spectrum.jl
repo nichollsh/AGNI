@@ -28,7 +28,7 @@ temp_sf = tempname() * ".sf"
     # Test count_gases with non-existent file
     @testset "count_gases_missing" begin
         rm(temp_sf, force=true)  # Ensure the file does not exist
-        num_gases = AGNI.spectrum.count_gases(temp_sf; quiet=true)
+        num_gases = AGNI.spectrum.count_gases(temp_sf)
         @test num_gases == -1
     end
 
@@ -36,7 +36,7 @@ temp_sf = tempname() * ".sf"
     @testset "count_gases_invalid" begin
         # Create a temporary file with invalid content
         write(temp_sf, "This is not a valid spectral file\nNo gas information here\n")
-        num_gases = AGNI.spectrum.count_gases(temp_sf; quiet=true)
+        num_gases = AGNI.spectrum.count_gases(temp_sf)
         @test num_gases == -1
         rm(temp_sf, force=true)
     end
@@ -44,7 +44,7 @@ temp_sf = tempname() * ".sf"
     # Test count_gases with malformed gas count line (wrong format)
     @testset "count_gases_malformed_line" begin
         write(temp_sf, "Total number of gaseous absorbers not_a_number\n")
-        num_gases = AGNI.spectrum.count_gases(temp_sf; quiet=true)
+        num_gases = AGNI.spectrum.count_gases(temp_sf)
         @test num_gases == -1
         rm(temp_sf, force=true)
     end
@@ -52,7 +52,7 @@ temp_sf = tempname() * ".sf"
     # Test count_gases with wrong split count
     @testset "count_gases_wrong_split" begin
         write(temp_sf, "Total number of gaseous absorbers = 5 = extra\n")
-        num_gases = AGNI.spectrum.count_gases(temp_sf; quiet=true)
+        num_gases = AGNI.spectrum.count_gases(temp_sf)
         @test num_gases == -1
         rm(temp_sf, force=true)
     end
@@ -60,7 +60,7 @@ temp_sf = tempname() * ".sf"
     # Test count_gases with unparseable number (to hit catch block)
     @testset "count_gases_unparseable" begin
         write(temp_sf, "Total number of gaseous absorbers = not_a_number\n")
-        num_gases = AGNI.spectrum.count_gases(temp_sf; quiet=true)
+        num_gases = AGNI.spectrum.count_gases(temp_sf)
         @test num_gases == -1
         rm(temp_sf, force=true)
     end

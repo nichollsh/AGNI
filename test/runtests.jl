@@ -22,6 +22,9 @@ using Test
 
 @info "Begin AGNI tests"
 
+# Configure
+SLOW_TESTS = ["integration", "chemistry", "deep_heating", "kzz", "spectrum"]
+
 # Prepare
 RES_DIR         = joinpath(ROOT_DIR,"res/")
 OUT_DIR         = joinpath(ROOT_DIR,"out/")
@@ -54,7 +57,8 @@ rtol   = 1e-3
 @test isdefined(AGNI.atmosphere, :setup!)
 
 # Find test names
-test_names = sort([replace(split(basename(f), ".jl")[1], "test_"=>"") for f in glob("test_*.jl", TEST_DIR)])
+test_names = sort([replace(split(basename(f), ".jl")[1], "test_"=>"")
+                        for f in glob("test_*.jl", TEST_DIR)])
 
 # Select tests
 if suite == "none"
@@ -63,21 +67,19 @@ if suite == "none"
     exit()
 
 elseif suite == "fast"
-    # exclude integration tests
-    @info "Running only fast tests"
-    filter!(t -> !occursin("integration", t), test_names)
+    # exclude slow tests
+    for slow in SLOW_TESTS
+        filter!(t -> !occursin(slow, t), test_names)
+    end
 
 elseif suite in test_names
     # run only the specified test suite
-    @info "Running only test suite '$suite'"
     test_names = [suite]
 
 else
     if suite != "all"
         @error "Test suite '$suite' not found"
         exit(1)
-    else
-        @info "Running all tests"
     end
 end
 
@@ -88,8 +90,8 @@ for test_name in test_names
 end
 @info "Collected tests: $(join(test_names, ", "))"
 
-# Configure logging to show only warnings and errors
-LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Warn))
+# Configure logging to show only error messages during tests
+LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Error))
 
 # Run tests
 for test_file in test_files

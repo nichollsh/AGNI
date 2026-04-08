@@ -26,7 +26,7 @@ julia agni.jl res/config/hotdry.toml  # use a specific config
 julia --project=. test/runtests.jl
 ```
 
-### Run fast tests only (skips integration tests)
+### Run fast tests only (skips integration tests, etc.)
 ```bash
 julia --project=. test/runtests.jl fast
 ```
@@ -110,4 +110,4 @@ Use Julia's `@info`, `@warn`, `@debug`, `@error` macros (not `println`). Verbosi
 - Temperatures in K, fluxes in W m⁻², lengths in m throughout the Julia code.
 
 ### Test suite structure
-Unit tests are individual files (`test_consts.jl`, `test_phys.jl`, etc.) included by `runtests.jl`. Integration tests (`test_integration.jl`) require SOCRATES data and are skipped with the `fast` argument. Add new unit test files by `include()`ing them in `runtests.jl`.
+Unit tests are individual files (`test_consts.jl`, `test_phys.jl`, etc.) included by `runtests.jl`. Slow tests, such as those requiring SOCRATES data, are skipped with the `fast` argument. Add new unit test files by `include()`ing them in `runtests.jl`.

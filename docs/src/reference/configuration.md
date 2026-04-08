@@ -12,7 +12,7 @@ General properties of the planet.
 | Parameter          | Description   |
 | -----------------: | :------------ |
 | `tmp_surf        ` | Temperature of the surface [kelvin].  |
-| `instellation    ` | Stellar flux at planet's orbital distance [W m-2]. |
+| `instellation    ` | Stellar flux at planet's orbital distance [W m$^{-2}$]. |
 | `albedo_b        ` | A pseudo bond-albedo which downscales the stellar flux by 1-albedo_b. |
 | `s0_fact         ` | Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13). |
 | `zenith_angle    ` | Characteristic zenith angle for incoming stellar radiation [degrees]. |
@@ -24,10 +24,10 @@ General properties of the planet.
 | `skin_d          ` | Thickness of the conductive boundary layer [m]. Used when `solution_type=2`. |
 | `skin_k          ` | Conductivity of the conductive boundary layer [W m-1 K-1]. Used when `solution_type=2`. |
 | `tmp_magma       ` | Temperature of the topmost layer of the planet's mantle [K]. Used when `solution_type=2`. |
-| `flux_int        ` | Internal flux [W m-2] to be solved-for when `solution_type=3`. |
+| `flux_int        ` | Internal flux [W m$^{-2}$] to be solved-for when `solution_type=3`. |
 | `roughness       ` | Surface roughness length scale [m]. |
 | `wind_speed      ` | Effective wind speed for sensible heat transport [m s-1]. |
-| `star_Teff       ` | Stellar photospheric temperature [K] used if `files.input_star=="blackbody"`. |
+| `star_Teff       ` | Stellar photospheric temperature [K] used if `input_star=="blackbody"`. |
 
 
 ## `[files]`
@@ -38,7 +38,8 @@ Input/output files and other paths.
 | `input_sf       `  | Path to the desired spectral file in `res/spectral_files/`. If "greygas", uses double-grey RT scheme. |
 | `input_star     `  | Path to stellar spectrum. If blank, spectrum assumed to be inside spectral file. If "blackbody" must provide `planet.star_Teff`. |
 | `output_dir     `  | Path to the output directory. |
-| `rfm_parfile  `    | Path to .par linelist file, for running line-by-line calculations with the RFM. |
+| `io_dir         `  | Path for fast I/O operations (optional, defaults to `output_dir`). |
+| `rfm_parfile    `  | Path to .par linelist file, for running line-by-line calculations with the RFM (optional). |
 
 
 ## `[composition]`
@@ -56,7 +57,7 @@ ratios (`vmr_dict` or `vmr_file`), or by metallicities (`metallicities`).
 | `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
 | `condensates   `  | List of volatiles which are allowed to condense. Can be used together with thermochemical equilibrium (`physics.chemistry = true`). |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
-| `aerosols      `  | Dictionary of aerosols and their mass mixing ratios [kg/kg]. |
+| `aerosols      `  | Dictionary of aerosols, and their mass mixing ratios [kg/kg] or associated condensate species. |
 
 
 
@@ -69,8 +70,8 @@ Parameters that tell the model what to do.
 | `verbosity     `  | Logging verbosity (0: quiet, 1: normal, 2: extra logging). |
 | `max_steps     `  | Maximum number of steps the solver should take before giving up (typically <200). |
 | `max_runtime   `  | Maximum wall-clock runtime [s] before giving up. |
-| `num_levels    `  | Number of model levels. Typically ~50, and ideally less than 100.  |
-| `converge_atol `  | Convergence criterion absolute tolerance [W m-2]. |
+| `num_levels    `  | Number of model levels. Typically ~40, and ideally less than 80.  |
+| `converge_atol `  | Convergence criterion absolute tolerance [W m$^{-2}$]. |
 | `converge_rtol `  | Convergence criterion relative tolerance [dimensionless]. |
 | `converge_type `  | Definition of convergence criterion (1: cost function, 2: median resid, 3: mean resid). |
 | `initial_state `  | Ordered list of requests describing the initial state of the atmosphere (see [Configuring AGNI](@ref)). |
@@ -81,8 +82,8 @@ Parameters that tell the model what to do.
 | `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
 | `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
 | `perturb_all`     | Perturb all rows of Jacobian matrix at each solver iteration? True=stable, False=fast. |
-| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1]. |
-| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1]. |
+| `rfm_wn_min`      | RFM radiative transfer minimum wavenumber [cm$^{-1}$], (optional). |
+| `rfm_wn_max`      | RFM radiative transfer maximum wavenumber [cm$^{-1}$], (optional). |
 
 ## `[physics]`
 Parameters that describe how the model should treat the physics.
@@ -100,11 +101,28 @@ Parameters that describe how the model should treat the physics.
 | `real_gas      `  | Use real-gas equation(s) of state where possible (true/false). |
 | `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false). |
 | `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false). |
+| `conduction    `  | Include thermal conductive heat transport (true/false). |
 | `convection    `  | Include vertical heat transport associated with convection (true/false). |
 | `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux. |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false). |
 | `rainout       `  | Enable condensation and evaporation of condensables aloft. Required for `latent_heat=true`. |
+| `coldtrap      `  | Enable cold-trapping effect on abundances aloft, so that VMR always decreases with height. |
+| `demixing      `  | Include immiscible demixing of atmospheric condensates where possible. |
+| `evap_efficiency` | Efficiency of re-evaporation of raindrops in dry regions [0-1]. |
 | `oceans        `  | Enable condensation and evaporation of condensables at the surface. |
+
+### `[physics.deep_heating]`
+Optional subsection for configuring deep atmospheric heating (e.g., from tidal dissipation or radiogenic heating in the interior).
+
+| Parameter         | Description   |
+| ----------------: | :------------ |
+| `Pmid          `  | Center pressure of the Gaussian heating profile [bar]. |
+| `Pwid          `  | Width of the Gaussian heating profile in log-Pascal units. |
+| `power_mode    `  | Power mode for heating: "off" (disabled), "rel" (relative to instellation), or "abs" (absolute flux). |
+| `norm_method   `  | Normalisation coordinate: "pressure" (legacy dF/dP), or "mass" (dm-weighted). |
+| `domain        `  | How to handle Pmid outside atmospheric domain: "clamp" or "boundary_flux". |
+| `flux_rel      `  | Fraction of instellation to deposit as deep heating [dimensionless]. Used when `power_mode="rel"`. |
+| `flux_abs      `  | Absolute heating flux to deposit [W m$^{-2}$]. Used when `power_mode="abs"`. |
 
 ## `[plots]`
 Configure plotting routines; all of these should be `true` or `false`.

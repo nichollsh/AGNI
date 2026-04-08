@@ -84,26 +84,37 @@ module plotting
                         legend=:top,
                         size=(size_x,size_y); plt_default...)
 
-        # Plot phase boundary
+        # Plot phase boundary and demixing binodal
         if atmos.condense_any
             sat_t::Array{Float64,1} = zeros(Float64, atmos.nlev_c)
+            dmx_t::Array{Float64,1} = zeros(Float64, atmos.nlev_c)
             for c in atmos.condensates
+                # demixing binodal for this condensate
+                if atmos.demixing
+                    for i in 1:atmos.nlev_c
+                        dmx_t[i] = phys.get_Tdemix(atmos.gas_dat[c], atmos.p[i], atmos.gas_vmr[c][i])
+                        if dmx_t[i] < 0.0
+                            dmx_t[i] = NaN
+                        end
+                    end
+                    if !all(isnan.(dmx_t))
+                        plot!(plt, dmx_t, atmos.p*1e-5, lc=atmos.gas_dat[c].plot_color, ls=:dash,
+                                label=atmos.gas_dat[c].plot_label*" dmx")
+                    end
+                end
 
+                # saturation curve
                 if atmos.gas_dat[c].no_sat
                     continue
                 end
-
                 for i in 1:atmos.nlev_c
                     sat_t[i] = phys.get_Tdew(atmos.gas_dat[c], atmos.p[i]*atmos.gas_vmr[c][i])
-                    # @info("    $c at $(atmos.p[i]/1e5) : Tdew=$(sat_t[i])K")
                     if sat_t[i] > atmos.gas_dat[c].T_crit-0.1
                         sat_t[i] = NaN
                     end
                 end
-
-                # plot phase boundary for this condensate
                 plot!(plt, sat_t, atmos.p*1e-5, lc=atmos.gas_dat[c].plot_color, ls=:dot,
-                            label=atmos.gas_dat[c].plot_label)
+                            label=atmos.gas_dat[c].plot_label*" sat")
             end
         end
 
@@ -114,10 +125,10 @@ module plotting
         end
 
         # Plot tmp_surf
-        scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
+        scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label="")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, y, lc="black", lw=2, label=L"T(p)")
+        plot!(plt, atmos.tmpl, y, lc="black", lw=2, label="")
 
         # Dummy Kzz plot for legend
         plot!(plt, [-1,-2], [1.0, 1.0], lc="darkgreen", lw=2, ls=:solid, label=L"K_{zz}")
@@ -127,7 +138,7 @@ module plotting
         @_plt_poboa
 
         # Decorate
-        xlims!(plt, (minimum(atmos.tmpl)-10.0, maximum(atmos.tmpl)+10.0))
+        xlims!(plt, (0.0, maximum(atmos.tmpl)+10.0))
         xlabel!(plt, "Temperature [K]")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
@@ -140,21 +151,29 @@ module plotting
         plt2 = twiny(plt)
 
         x = atmos.Kzz .* 1e4 # convert from m²/s to cm²/s for plotting
-        xmin = 2.0
+        xmin = 5.0
         if any(x .> 0.0)
             xmin = min(xmin, log10(minimum(x[x.>0])))
         end
         x = log10.(clamp.(x, 10.0 ^ xmin, Inf64))
-        mask = (atmos.flux_cdry .> 0.0)
+        x_con = copy(x)
+        x_rad = copy(x)
+        for i in 2:atmos.nlev_l-1
+            # convective regions, and adjacent layers
+            x_con[i] = any(atmos.flux_cdry[i-1:i+1] .> 0.0) ? x[i] : NaN
+            # radiative regions, strictly
+            x_rad[i] = atmos.flux_cdry[i] <= 0.0 ? x[i] : NaN
+        end
 
-        plot!(plt2, x, y,             lc="darkgreen", label="", ls=:dot)
-        plot!(plt2, x[mask], y[mask], lc="darkgreen", label="", ls=:solid)
-        xlabel!(plt2, "log₁₀ " * L"K_{zz}" * " [cm²/s]")
+        plot!(plt2, x_con, y, lc="darkgreen", label="", ls=:solid)
+        plot!(plt2, x_rad, y, lc="darkgreen", label="", ls=:dot)
+
+        xlabel!(plt2, "log₁₀ Kzz [cm²/s]")
         ylims!(plt2, _get_ylims(atmos))
         yticks!(plt2, _get_yticks(atmos))
         yflip!(plt2)
         yaxis!(plt2, yscale=:log10)
-        xlims!(plt2, (xmin, maximum(x)+1))
+        xaxis!(plt2, xlims=(xmin, maximum(x)+1), grid=false, gridalpha=0.0)
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -357,7 +376,7 @@ module plotting
     Plot the fluxes at each pressure level
     """
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int=550, size_y::Int=400,
+                            size_x::Int=500, size_y::Int=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
                             incl_deep::Bool=true,
@@ -489,7 +508,7 @@ module plotting
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
-            @error "Cannot plot emission spectrum because radiances have not been calculated"
+            @warn "Cannot plot emission spectrum because radiances have not been calculated"
             return
         end
 
@@ -555,7 +574,7 @@ module plotting
 
         # Check that we have data
         if !atmos.is_out_lw
-            @error "Cannot plot contrib func because radiances have not been calculated"
+            @warn "Cannot plot contrib func because radiances have not been calculated"
             return
         end
 
@@ -638,7 +657,7 @@ module plotting
 
         # Check that we have data
         if !atmos.is_out_lw
-            @error "Cannot plot contribution func because radiances have not been calculated"
+            @warn "Cannot plot contribution func because radiances have not been calculated"
             return
         end
 
@@ -711,7 +730,7 @@ module plotting
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
-            @error "Cannot plot spectral albedo because radiances have not been calculated"
+            @warn "Cannot plot spectral albedo because radiances have not been calculated"
             return
         end
 

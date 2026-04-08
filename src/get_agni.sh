@@ -5,7 +5,7 @@ set -e
 
 # User arguments
 if [ -z "$1" ]; then
-    testsuite="all" # default
+    testsuite="fast" # default
 else
     testsuite="$1" # requested test suite
 fi
@@ -21,10 +21,19 @@ if [ -n "$RAD_DIR" ]; then
     echo "Found SOCRATES path: yes"
 else
     echo "Found SOCRATES path: no"
-    echo "You need to install SOCRATES and set the RAD_DIR environment variable"
-    echo "This requires modifying your shell rc file to export RAD_DIR"
-    echo "Check the docs: https://www.h-nicholls.space/AGNI/"
+    echo "    You need to install SOCRATES and set the RAD_DIR environment variable"
+    echo "    This requires modifying your shell rc file to export RAD_DIR"
+    echo "    Check the docs: https://www.h-nicholls.space/AGNI/"
     exit 1
+fi
+
+# FastChem?
+if [ -n "$FC_DIR" ]; then
+    echo "Found FastChem path: yes"
+else
+    echo "Found FastChem path: no"
+    echo "    It is highly recommended that you install FastChem and set the FC_DIR environment variable"
+    echo "    Check the docs: https://www.h-nicholls.space/AGNI/"
 fi
 
 # Install

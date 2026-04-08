@@ -264,9 +264,12 @@ module AGNI
 
         #    composition stuff (defaults to be overwritten)
         condensates::Array{String,1}        = String[]
-        chem::Bool                          = false
-        rainout::Bool                       = false
-        oceans::Bool                        = false
+        demixing::Bool                      = atmosphere.CFG_demixing
+        chem::Bool                          = atmosphere.CFG_chem
+        rainout::Bool                       = atmosphere.CFG_rainout
+        oceans::Bool                        = atmosphere.CFG_oceans
+        coldtrap::Bool                      = atmosphere.CFG_coldtrap
+        evap_efficiency::Float64            = atmosphere.CFG_evap_efficiency
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
         pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
@@ -274,7 +277,7 @@ module AGNI
         mf_path::String                     = ""
         metallicities::Dict{String, Float64}= Dict{String, Float64}()
         transparent::Bool                   = false
-        real_gas::Bool                      = false
+        real_gas::Bool                      = atmosphere.CFG_real_gas
 
         # transparent atmosphere?
         if haskey(cfg["composition"], "transparent")
@@ -296,6 +299,16 @@ module AGNI
             rainout = Bool(cfg["physics"]["rainout"])
             oceans  = Bool(cfg["physics"]["oceans"])
             condensates = cfg["composition"]["condensates"]
+
+            if haskey(cfg["physics"], "coldtrap")
+                coldtrap = Bool(cfg["physics"]["coldtrap"])
+            end
+            if haskey(cfg["physics"], "evap_efficiency")
+                evap_efficiency = Float64(cfg["physics"]["evap_efficiency"])
+            end
+            if haskey(cfg["physics"], "demixing")
+                demixing = Bool(cfg["physics"]["demixing"])
+            end
 
             comp_set_by::Int = 0
 
@@ -369,11 +382,24 @@ module AGNI
             @error "Config: chemistry is incompatible with transparent atmosphere mode"
             return false
         end
+        use_all_vols::Bool = false
+        use_all_gases::Bool = false
+        if chem
+            # check if any input gases are in vap_list
+            #    if so, enable all gas species (vaps + vols)
+            for g in keys(mf_dict)
+                if g in consts.vaps_standard
+                    use_all_gases = true
+                end
+            end
+            # if chemistry is enabled, always include all volatile species
+            use_all_vols = true
+        end
 
         #    RFM radtrans
         rfm_parfile::String = atmosphere.UNSET_STR
-        rfm_wn_min::Float64 = 4000.0
-        rfm_wn_max::Float64 = 4020.0
+        rfm_wn_min::Float64 = atmosphere.CFG_rfm_wn_min
+        rfm_wn_max::Float64 = atmosphere.CFG_rfm_wn_max
         if haskey(cfg["files"],"rfm_parfile")
             rfm_parfile = cfg["files"]["rfm_parfile"]
             if haskey(cfg["execution"],"rfm_wn_min") && haskey(cfg["execution"],"rfm_wn_max")
@@ -387,8 +413,8 @@ module AGNI
         end
 
         #    double grey radtrans opacities
-        κ_grey_lw::Float64 = 1e-2  # this will be over-written
-        κ_grey_sw::Float64 = 1e-2  # ^
+        κ_grey_lw::Float64 = atmosphere.CFG_κ_grey_lw  # this will be over-written
+        κ_grey_sw::Float64 = atmosphere.CFG_κ_grey_sw  # ^
         if (lowercase(cfg["files"]["input_sf"]) == "greygas") || cfg["execution"]["grey_start"]
             if all(k in keys(cfg["physics"]) for k in ["grey_sw","grey_lw"])
                 κ_grey_lw = Float64(cfg["physics"]["grey_lw"])
@@ -437,7 +463,8 @@ module AGNI
 
         # Read OPTIONAL configuration options from dict
         #     sensible heat at the surface
-        roughness::Float64 = 0.001; windspeed::Float64 = 2.0
+        roughness::Float64 = atmosphere.CFG_surf_roughness
+        windspeed::Float64 = atmosphere.CFG_surf_windspeed
         if incl_sens && !transparent
             if ! all(k in keys(cfg["planet"]) for k in ["roughness","wind_speed"])
                 @error "Config: sensible heating included"
@@ -448,7 +475,9 @@ module AGNI
             windspeed = cfg["planet"]["wind_speed"]
         end
         #     conductive skin case
-        skin_k::Float64=2.0; skin_d::Float64=0.1; tmp_magma::Float64=3000.0  # will be overwritten
+        skin_k::Float64 = atmosphere.CFG_skin_k
+        skin_d::Float64 = atmosphere.CFG_skin_d
+        tmp_magma::Float64 = atmosphere.CFG_tmp_magma
         if sol_type == 2
             if ! all(k in keys(cfg["planet"]) for k in ["skin_k","skin_d","tmp_magma"])
                 @error "Config: solution type $sol_type selected"
@@ -460,7 +489,7 @@ module AGNI
             tmp_magma   = cfg["planet"]["tmp_magma"]
         end
         #     effective temperature case
-        flux_int::Float64 = 0.0
+        flux_int::Float64 = atmosphere.CFG_flux_int
         if sol_type == 3
             if ! haskey(cfg["planet"],"flux_int")
                 @error "Config: solution type $sol_type selected"
@@ -470,7 +499,7 @@ module AGNI
             flux_int = cfg["planet"]["flux_int"]
         end
         #     target OLR case
-        target_olr::Float64 = 250.0
+        target_olr::Float64 = atmosphere.CFG_target_olr
         if sol_type == 4
             if ! haskey(cfg["planet"],"target_olr")
                 @error "Config: solution type $sol_type selected"
@@ -490,10 +519,10 @@ module AGNI
         end
 
         # Optional aerosol parametrization controls
-        aerosol_species::Dict{String, Float64} = Dict{String, Float64}()
+        aerosol_species::Dict = Dict()
         if haskey(cfg["composition"], "aerosols")
             for (k, v) in cfg["composition"]["aerosols"]
-                aerosol_species[string(k)] = Float64(v)
+                aerosol_species[string(k)] = v
             end
         end
 
@@ -503,7 +532,7 @@ module AGNI
 
         # Setup atmosphere
         @debug "Setup atmosphere "
-        atmosphere.setup!(atmos, ROOT_DIR,output_dir,
+        if !atmosphere.setup!(atmos, ROOT_DIR,output_dir,
                                 String(cfg["files" ]["input_sf"]),
                                 Float64(cfg["planet"]["instellation"]),
                                 Float64(cfg["planet"]["s0_fact"]),
@@ -518,6 +547,8 @@ module AGNI
 
                                 IO_DIR=io_dir,
                                 condensates=condensates,
+                                coldtrap=coldtrap,
+                                evap_efficiency=evap_efficiency,
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["physics"]["continua"],
                                 flag_rayleigh     = cfg["physics"]["rayleigh"],
@@ -526,8 +557,10 @@ module AGNI
                                 aerosol_species   = aerosol_species,
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
+                                demixing          = demixing,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
-                                use_all_gases     = chem,
+                                use_all_vols      = use_all_vols,
+                                use_all_gases     = use_all_gases,
                                 surf_roughness=roughness, surf_windspeed=windspeed,
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
@@ -537,10 +570,16 @@ module AGNI
                                 rfm_parfile=rfm_parfile,
                                 κ_grey_lw=κ_grey_lw,
                                 κ_grey_sw=κ_grey_sw
-                        ) || return false
+                        )
+            @error "Could not setup atmosphere object"
+            return false
+        end
 
         # Allocate atmosphere
-        atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff) || return false
+        if !atmosphere.allocate!(atmos,star_file; stellar_Teff=star_Teff)
+            @error "Could not allocate atmosphere object"
+            return false
+        end
 
         # Configure deep atmospheric heating
         if haskey(cfg["physics"],"deep_heating")
@@ -571,14 +610,21 @@ module AGNI
         else
             # Set T(p) by looping over requests in the config.
             #     Each request may be a command, or an argument following a command
-            setpt.request!(atmos, cfg["execution"]["initial_state"]) || return false
+            if !setpt.request!(atmos, cfg["execution"]["initial_state"])
+                @error "Could not set initial temperature profile"
+                return false
+            end
         end
 
         # Write initial state
         save.write_profile(atmos, joinpath(atmos.OUT_DIR,"prof_initial.csv"))
 
         # Run chemistry in the first instance
-        chemistry.calc_composition!(atmos, oceans, chem, rainout)
+        chem_state = chemistry.calc_composition!(atmos, oceans, chem, rainout)
+        if chem_state == 1
+            @error "Chemistry failed!"
+            return false
+        end
 
         # Frame dir
         if plt_ani
@@ -588,7 +634,6 @@ module AGNI
         end
 
         # Loop over requested solvers
-        solver_success::Bool = true
         return_success::Bool = true
         allowed_solvers::Array{String,1} = ["newton", "gauss", "levenberg", "jacobinewton"]
         sol = strip(lowercase(cfg["execution"]["solver"]))
@@ -599,7 +644,7 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
-            energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
+            return_success &= energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
                                 convective=incl_convect, sens_heat=incl_sens,
                                 conductive=incl_conduct,
                                 deep=incl_deep,
@@ -607,7 +652,7 @@ module AGNI
 
         # Transparent atmosphere solver
         elseif sol == "transparent"
-            solver_success = solver.solve_transparent!(atmos, sol_type=sol_type,
+            return_success &= solver.solve_transparent!(atmos, sol_type=sol_type,
                                 conv_atol=conv_atol,
                                 conv_rtol=conv_rtol,
                                 max_steps=Int(cfg["execution"]["max_steps"]))
@@ -619,7 +664,7 @@ module AGNI
                 modplot = 1
             end
             method_idx = findfirst(==(sol), allowed_solvers)
-            solver_success = solver.solve_energy!(atmos, sol_type=sol_type,
+            return_success &= solver.solve_energy!(atmos, sol_type=sol_type,
                                 conduct=incl_conduct, chem=chem,
                                 convect=incl_convect, latent=incl_latent,
                                 sens_heat=incl_sens, deep=incl_deep,
@@ -642,18 +687,17 @@ module AGNI
 
         # Invalid selection
         else
-            @error "Invalid solver '$sol'"
+            @warn "Invalid solver '$sol'"
             return_success = false
         end
 
-        return_success &= solver_success
         @info "    done"
         @info "Total radiative transfer evaluations: $(atmos.num_rt_eval)"
 
         # RFM calculation?
         if atmos.flag_rfm
             @info "Running RFM line-by-line radiative transfer..."
-            rfm.run_rfm(atmos, rfm_wn_min, rfm_wn_max)
+            return_success &= rfm.run_rfm(atmos, rfm_wn_min, rfm_wn_max)
             @info "    done"
         end
 
@@ -762,7 +806,7 @@ module AGNI
         return_success = run_from_config(cfg)
 
         # Temp folders
-        if clean_output
+        if clean_output && return_success
             @debug "Cleaning output folder"
 
             # chemistry

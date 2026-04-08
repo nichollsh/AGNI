@@ -213,13 +213,16 @@ module rfm
     **Run RFM radiative transfer with nadir-viewing geometry**
 
     Parameters:
-    - `atmos::atmosphere.Atmos_t`       atmosphere data struct
-    - `numin::Float64`                  minimum wavenumber [cm-1]
-    - `numax::Float64`                  maximum wavenumber [cm-1]
-    - `nures::Float64`                  resolution on wavenumber [cm-1]
+    - `atmos::atmosphere.Atmos_t`   atmosphere data struct
+    - `numin::Float64`              minimum wavenumber [cm-1]
+    - `numax::Float64`              maximum wavenumber [cm-1]
+    - `nures::Float64`              resolution on wavenumber [cm-1]
+
+    Returns:
+    - `succ::Bool`                  success?
     """
     function run_rfm(atmos::atmosphere.Atmos_t,
-                        numin::Float64, numax::Float64; nures::Float64=1.0)
+                        numin::Float64, numax::Float64; nures::Float64=1.0)::Bool
         # Write required files
         write_profile(atmos)
         write_driver(atmos, numin, numax, nures)
@@ -239,23 +242,28 @@ module rfm
         cmd = pipeline(cmd, stdout=devnull) # hide rfm terminal output
 
         # Run subprocess
-        run(cmd)
+        try
+            run(cmd)
+        catch err
+            @error "Failed to run RFM" exception=(err, catch_backtrace())
+            return false
+        end
 
         # Get output from RFM
-        read_fluxes(atmos::atmosphere.Atmos_t)
+        return read_fluxes(atmos)
     end
 
     """
     **Read radiative fluxes calculated by RFM**
     """
-    function read_fluxes(atmos::atmosphere.Atmos_t)
+    function read_fluxes(atmos::atmosphere.Atmos_t)::Bool
         @debug "Read fluxes from RFM"
 
         # output file path
         outpath = joinpath(atmos.rfm_work, "fluxes.asc")
         if !isfile(outpath)
-            @error "Could not find RFM output file: $outpath"
-            return
+            @warn "Could not find RFM output file: $outpath"
+            return false
         end
 
         # file header info
@@ -297,8 +305,8 @@ module rfm
 
         # check grid regularity
         if nures <= 0
-            @error "Cannot parse irregular wavenumber grid"
-            return
+            @warn "Cannot parse irregular wavenumber grid"
+            return false
         end
 
         # set wavenumber array
@@ -312,6 +320,8 @@ module rfm
 
         # convert flux units to [erg/(s cm2 cm-1)]
         atmos.rfm_fl *= 1e-9 * 1e7 * pi
+
+        return true
     end
 
 end # end module

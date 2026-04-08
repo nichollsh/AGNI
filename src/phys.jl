@@ -119,7 +119,7 @@ module phys
         gas = Gas_t()
         gas.formula = formula
         gas.tmp_dep = tmp_dep
-        fail = false
+        gas.fail = false
 
         # Count atoms
         gas.atoms = count_atoms(formula)
@@ -177,8 +177,9 @@ module phys
 
         elseif ENABLE_CHECKSUM && check_integrity && !blake.valid_file(fpath)
             # file exists - check its integrity
-            @debug("    ncdf file is corrupt")
-            fail = true
+            @warn("    ncdf file is corrupt: '$fpath'")
+            gas.fail = true
+            return gas
 
         else
             # have data => load what we can find inside the file
@@ -191,14 +192,14 @@ module phys
                 # check date created
                 created::Int64 = 0
                 if !haskey(ds,"created")
-                    @error("Data file ($formula) has no creation date")
-                    fail = true
+                    @warn("Data file ($formula) has no creation date")
+                    gas.fail = true
                     return gas
                 end
                 created = ds["created"][1]
                 if created < MIN_DATA_VERSION
-                    @error("Data file ($formula) is outdated ($created < $MIN_DATA_VERSION)")
-                    fail = true
+                    @warn("Data file ($formula) is outdated ($created < $MIN_DATA_VERSION)")
+                    gas.fail = true
                     return gas
                 end
 
@@ -247,6 +248,7 @@ module phys
                             # aqua data found -  this is preferred
                         else
                             @warn("Could not find AQUA table for H2O equation of state")
+                            @warn("    Using ideal gas EOS for H2O")
                         end
                     end
 
@@ -257,6 +259,7 @@ module phys
                             # cms19 data found -  this is preferred
                         else
                             @warn("Could not find CMS19 table for H2 equation of state")
+                            @warn("    Using ideal gas EOS for H2")
                         end
                     end
 
@@ -284,25 +287,25 @@ module phys
 
                     # check shape
                     if !(length(gas.eos_ρ) == length(gas.eos_P) * length(gas.eos_T))
-                        @error("Could not parse $formula EOS data from file")
-                        @error("    temp. length = $(length(gas.eos_T))")
-                        @error("    pres. length = $(length(gas.eos_P))")
-                        @error("    dens. length = $(length(gas.eos_ρ))")
-                        fail = true
+                        @warn("Could not parse $formula EOS data from file")
+                        @warn("    temp. length = $(length(gas.eos_T))")
+                        @warn("    pres. length = $(length(gas.eos_P))")
+                        @warn("    dens. length = $(length(gas.eos_ρ))")
+                        gas.fail = true
                         return gas
                     end
 
                     # check ascending
                     if !issorted(gas.eos_P)
-                        @error("Could not parse $formula EOS data from file")
-                        @error("    Pressure array must be strictly ascending")
-                        fail = true
+                        @warn("Could not parse $formula EOS data from file")
+                        @warn("    Pressure array must be strictly ascending")
+                        gas.fail = true
                         return gas
                     end
                     if !issorted(gas.eos_T)
-                        @error("Could not parse $formula EOS data from file")
-                        @error("    Temperature array must be strictly ascending")
-                        fail = true
+                        @warn("Could not parse $formula EOS data from file")
+                        @warn("    Temperature array must be strictly ascending")
+                        gas.fail = true
                         return gas
                     end
 
@@ -331,7 +334,6 @@ module phys
 
         @debug("    using '$eos_name' equation of state")
         @debug("    done")
-        gas.fail = fail
         return gas
     end # end load_gas
 
@@ -701,12 +703,7 @@ module phys
     function calc_rho_mix(gas::Array{Gas_t,1}, vmr::Array{Float64,1},
                             tmp::Float64, prs::Float64, mmw::Float64)::Float64
 
-        # validate lengths
         ngas::Int = length(gas)
-        if ngas != length(vmr)
-            @error "The number of gases and the number of mixing ratios are different"
-            exit(1)
-        end
 
         # single gas case
         if ngas == 1
@@ -759,6 +756,61 @@ module phys
     """
     function _rho_ideal(tmp::Float64, prs::Float64, mmw::Float64)::Float64
         return prs * mmw / (tmp * R_gas)
+    end
+
+
+    """
+    **Calculate the demixing temperature for a given pressure and H2O molar fraction.**
+
+    Source: https://www.aanda.org/articles/aa/pdf/2025/11/aa56322-25.pdf (Appendix A).
+
+    Arguments:
+    - p::Float64            Pressure in Pa (converted to kbar internally)
+    - x::Float64            Molar fraction of H2O in the mixture (0-1)
+
+    Returns:
+    - Tdemix::Float64      Demixing temperature in K
+    """
+    function _Tdemix_H2O(p::Float64, x::Float64)::Float64
+
+        Pkbar::Float64 = p * 1e-8  # Pa -> kbar
+
+        # Table A1 Coefficients
+        a::Float64 = 1.2035e-4
+        b::Float64 = 0.5501
+        c::Float64 = 1.9163e-2
+        d::Float64 = 0.4498
+        e::Float64 = -6.2253e-2
+        f::Float64 = 74.5041
+        g::Float64 = -3.1495e-4
+        h::Float64 = 5.0828e6
+        i::Float64 = 4.0719
+
+        # Fitting function
+        pt1 = (a / pi) * 0.5 * (b + c * Pkbar) / ((x - d)^2.0 + (0.5 * b)^2.0)
+        pt2 = e * Pkbar^3.0 + f * Pkbar^2.0 + g * Pkbar + h
+        return pt1 * pt2 + i * Pkbar
+    end
+
+    """
+    **Calculate the gas demixing temperature, for a given pressure and molar fraction.**
+
+    This is a wrapper function which calls the appropriate demixing fit.
+
+    Arguments:
+    - `gas::Gas_t`          the gas struct
+    - `p::Float64`          pressure [Pa]
+    - `x::Float64`          molar fraction of the gas in the mixture
+
+    Returns:
+    - `Tdemix::Float64`     demixing temperature [K]
+    """
+    function get_Tdemix(gas::Gas_t, p::Float64, x::Float64)::Float64
+        if gas.formula == "H2O"
+            return _Tdemix_H2O(p, x)
+        else
+            return -1.0 * BIGFLOAT # always above this temperature
+        end
     end
 
     """
