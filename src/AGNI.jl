@@ -264,6 +264,7 @@ module AGNI
 
         #    composition stuff (defaults to be overwritten)
         condensates::Array{String,1}        = String[]
+        demixing::Bool                      = false
         chem::Bool                          = false
         rainout::Bool                       = false
         oceans::Bool                        = false
@@ -304,6 +305,9 @@ module AGNI
             end
             if haskey(cfg["physics"], "evap_efficiency")
                 evap_efficiency = Float64(cfg["physics"]["evap_efficiency"])
+            end
+            if hasfield(cfg["physics"], "demixing")
+                demixing = Bool(cfg["physics"]["demixing"])
             end
 
             comp_set_by::Int = 0
@@ -550,6 +554,7 @@ module AGNI
                                 aerosol_species   = aerosol_species,
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
+                                demixing          = demixing,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
                                 use_all_vols      = use_all_vols,
                                 use_all_gases     = use_all_gases,

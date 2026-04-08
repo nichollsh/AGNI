@@ -182,6 +182,7 @@ module atmosphere
         condensates::Array{String, 1}               # List of condensing gases (strings)
         condense_any::Bool                          # length(condensates)>0 ?
         coldtrap::Bool                              # keep cold-trapping effect of condensation on gas mixing ratios?
+        demixing::Bool                              # Include immiscible demixing of atmospheric condensates where possible.
 
         # Ocean tracking variables
         ocean_ini::Dict{String, Float64}    # INPUT: ocean reservoir from user [kg/m^2] - does not change
@@ -506,6 +507,7 @@ module atmosphere
 
                     coldtrap::Bool =            true,
                     real_gas::Bool =            true,
+                    demixing::Bool =            false,
                     thermo_functions::Bool =    true,
                     use_all_gases::Bool =       false,
                     use_all_vols::Bool =        false,
@@ -645,6 +647,7 @@ module atmosphere
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
 
+        atmos.demixing      = demixing
         atmos.real_gas      =   real_gas
         atmos.thermo_funct  =   thermo_functions
         atmos.coldtrap      =   coldtrap

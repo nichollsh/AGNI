@@ -758,6 +758,40 @@ module phys
         return prs * mmw / (tmp * R_gas)
     end
 
+
+    """
+    **Calculate the demixing temperature for a given pressure and H2O molar fraction.**
+
+    Source: https://www.aanda.org/articles/aa/pdf/2025/11/aa56322-25.pdf (Appendix A).
+
+    Arguments:
+    - pBar::Float64         Pressure in bar
+    - x::Float64            Molar fraction of H2O in the mixture (0-1)
+
+    Returns:
+    - Tdemix::Float64      Demixing temperature in K
+    """
+    function calc_H2O_Tdemix(pBar::Float64, x::Float64)::Float64
+
+        P::Float64 = pBar * 1e-3  # bar -> kbar
+
+        # Table A1 Coefficients
+        a::Float64 = 1.2035e-4
+        b::Float64 = 0.5501
+        c::Float64 = 1.9163e-2
+        d::Float64 = 0.4498
+        e::Float64 = -6.2253e-2
+        f::Float64 = 74.5041
+        g::Float64 = -3.1495e-4
+        h::Float64 = 5.0828e6
+        i::Float64 = 4.0719
+
+        # Fitting function
+        pt1 = (a / pi) * 0.5 * (b + c * P) / ((x - d)^2.0 + (0.5 * b)^2.0)
+        pt2 = e * P^3.0 + f * P^2.0 + g * P + h
+        return pt1 * pt2 + i * P
+    end
+
     """
     **Evaluate the Planck function at a given wavelength and temperature.**
 

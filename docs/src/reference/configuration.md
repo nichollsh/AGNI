@@ -107,6 +107,7 @@ Parameters that describe how the model should treat the physics.
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false). |
 | `rainout       `  | Enable condensation and evaporation of condensables aloft. Required for `latent_heat=true`. |
 | `coldtrap      `  | Enable cold-trapping effect on abundances aloft, so that VMR always decreases with height. |
+| `demixing      `  | Include immiscible demixing of atmospheric condensates where possible. |
 | `evap_efficiency` | Efficiency of re-evaporation of raindrops in dry regions [0-1]. |
 | `oceans        `  | Enable condensation and evaporation of condensables at the surface. |
 

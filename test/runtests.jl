@@ -51,6 +51,8 @@ if !isdir(OUT_DIR) && !isfile(OUT_DIR)
     mkdir(OUT_DIR)
 end
 
+rtol   = 1e-3
+
 # Test module imported
 @test isdefined(AGNI.atmosphere, :setup!)
 
