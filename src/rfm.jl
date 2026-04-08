@@ -245,7 +245,7 @@ module rfm
         run(cmd)
 
         # Get output from RFM
-        return read_fluxes(atmos::atmosphere.Atmos_t)
+        return read_fluxes(atmos)
     end
 
     """

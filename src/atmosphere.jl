@@ -679,7 +679,8 @@ module atmosphere
         atmos.target_olr =      max(1.0e-10, target_olr)
 
         atmos.phs_timescale =   phs_timescale
-        atmos.evap_efficiency = max(min(evap_efficiency, 1.0),0.0)
+        atmos.evap_efficiency = evap_efficiency
+        _check_range("Evaporation efficiency", atmos.evap_efficiency; min=0, max=1) || return false
 
         atmos.κ_grey_lw = κ_grey_lw
         _check_range("Grey LW opacity", atmos.κ_grey_lw; min=0) || return false

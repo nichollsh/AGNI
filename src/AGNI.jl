@@ -267,7 +267,8 @@ module AGNI
         chem::Bool                          = false
         rainout::Bool                       = false
         oceans::Bool                        = false
-        coldtrap::Bool                      = true
+        coldtrap::Bool                      = false
+        evap_efficiency::Float64            = 0.05
         p_surf::Float64                     = 0.0
         p_top::Float64                      = 0.0
         pp_dict::Dict{String, Float64}      = Dict{String, Float64}()
@@ -298,9 +299,11 @@ module AGNI
             oceans  = Bool(cfg["physics"]["oceans"])
             condensates = cfg["composition"]["condensates"]
 
-            coldtrap = true
             if haskey(cfg["physics"], "coldtrap")
                 coldtrap = Bool(cfg["physics"]["coldtrap"])
+            end
+            if haskey(cfg["physics"], "evap_efficiency")
+                evap_efficiency = Float64(cfg["physics"]["evap_efficiency"])
             end
 
             comp_set_by::Int = 0
@@ -649,6 +652,7 @@ module AGNI
                                 method=Int(method_idx),
                                 rainout=rainout,
                                 coldtrap=coldtrap,
+                                evap_efficiency=evap_efficiency,
                                 oceans=oceans,
                                 dx_max=Float64(cfg["execution"]["dx_max"]),
                                 ls_method=Int(cfg["execution"]["linesearch"]),

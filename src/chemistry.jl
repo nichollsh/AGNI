@@ -28,6 +28,7 @@ module chemistry
 
     # Constants
     const SMOOTH_SCALE::Float64 = 12.0      # smoothing scale for fastchem floor
+    const SMALL_FLOAT::Float64  = 1e-20     # small number for numerical stability
 
     """
     **Normalise gas VMRs, keeping condensates unchanged**
@@ -150,7 +151,7 @@ module chemistry
             dp = phys.get_Psat(atmos.gas_dat[c], atmos.tmp_surf) - p_gas[c]
 
             # Negligible
-            if abs(dp) < 1e-10
+            if abs(dp) < SMALL_FLOAT
                 continue
 
             # Super-saturated at the surface...
@@ -293,7 +294,7 @@ module chemistry
 
         end # end i levels
 
-        # Ensure that all yields are positive at this point
+        # Ensure that all yields are positive, at this point in the code
         for c in atmos.condensates
             clamp!(atmos.cond_yield[c], 0.0, Inf)
         end
@@ -304,8 +305,13 @@ module chemistry
             # set to zero at TOA
             atmos.cond_accum[c] = 0.0
 
+            # skip here if no evaporation
+            if atmos.evap_efficiency < SMALL_FLOAT
+                continue
+            end
+
             # no rain? go to next condensable
-            if sum(atmos.cond_yield[c]) < eps(1.0)
+            if sum(atmos.cond_yield[c]) < SMALL_FLOAT
                 continue
             end
 
@@ -323,7 +329,7 @@ module chemistry
                 # in a dry layer...
 
                 # skip if no rain entering from above
-                if atmos.cond_accum[c] < eps(1.0)
+                if atmos.cond_accum[c] < SMALL_FLOAT
                     continue
                 end
 
@@ -390,6 +396,9 @@ module chemistry
 
         # Set aerosol profiles at levels where condensation occurs
         for aer in atmos.aerosol_names
+            if !haskey(atmos.aerosol_setby, aer)
+                continue
+            end
             if atmos.aerosol_setby[aer] != "value"
                 atmosphere.set_aerosol!(atmos, aer, atmos.aerosol_setby[aer])
             end
@@ -505,7 +514,7 @@ module chemistry
                     fill!(N_inp_g, 0.0)
 
                     # non-zero abundance?
-                    if atmos.gas_vmr[gas][end] < 1e-30
+                    if atmos.gas_vmr[gas][end] < SMALL_FLOAT
                         continue
                     end
 
@@ -526,7 +535,7 @@ module chemistry
                 end
 
                 # Check that we have some hydrogen...
-                if N_inp_t[1] < 1e-30
+                if N_inp_t[1] < SMALL_FLOAT
                     @warn "Cannot calculate metallicity of hydrogen-free mixture!"
                     state = 1
                 end

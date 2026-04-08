@@ -251,9 +251,7 @@ module setpt
         end
 
         # Use fromarrays function to do the rest
-        fromarrays!(atmos, pl, tmpl)
-
-        return true
+        return fromarrays!(atmos, pl, tmpl)
     end
 
     """

@@ -52,7 +52,7 @@ module load
                 return false
             end
             if ngases != atmos.gas_num
-                @warn "Cannot load NetCDF file with mismatching nunmber of gases"
+                @warn "Cannot load NetCDF file with mismatching number of gases"
                 return false
             end
 

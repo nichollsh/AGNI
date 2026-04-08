@@ -17,11 +17,11 @@ title = "Aerosols radiative properties test"
     flux_int        = 0.0               # Planet's internal flux [W m-2]. Used when sol_type=3.
     roughness       = 0.001             # Surface roughness length scale [m]
     wind_speed      = 2.0               # Effective wind speed for sensible heat [m s-1].
-    stellar_Teff    = 4000.0            # Stellar effective temperature, if using `input_star="blackbody"`
+    star_Teff    = 4000.0               # Stellar effective temperature, if using `input_star="blackbody"`
 
 [files]
     input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"   # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
-    input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum. Set to "blackbody" to use `planet.stellar_Teff`.
+    input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum. Set to "blackbody" to use `planet.star_Teff`.
     output_dir      = "out/"                                            # Path to output directory.
     io_dir          = "out/"                                            # Path for fast file operations (optional).
 

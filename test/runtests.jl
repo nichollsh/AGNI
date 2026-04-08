@@ -23,7 +23,7 @@ using Test
 @info "Begin AGNI tests"
 
 # Configure
-SLOW_TESTS = ["integration", "chemistry", "deep_heating", "kzz"]
+SLOW_TESTS = ["integration", "chemistry", "deep_heating", "kzz", "spectrum"]
 
 # Prepare
 RES_DIR         = joinpath(ROOT_DIR,"res/")
@@ -57,7 +57,8 @@ rtol   = 1e-3
 @test isdefined(AGNI.atmosphere, :setup!)
 
 # Find test names
-test_names = sort([replace(split(basename(f), ".jl")[1], "test_"=>"") for f in glob("test_*.jl", TEST_DIR)])
+test_names = sort([replace(split(basename(f), ".jl")[1], "test_"=>"")
+                        for f in glob("test_*.jl", TEST_DIR)])
 
 # Select tests
 if suite == "none"
@@ -93,7 +94,7 @@ for test_name in test_names
 end
 @info "Collected tests: $(join(test_names, ", "))"
 
-# Configure logging to show only warnings and errors
+# Configure logging to show only error messages during tests
 LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Error))
 
 # Run tests

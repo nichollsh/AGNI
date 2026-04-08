@@ -38,7 +38,8 @@ Input/output files and other paths.
 | `input_sf       `  | Path to the desired spectral file in `res/spectral_files/`. If "greygas", uses double-grey RT scheme. |
 | `input_star     `  | Path to stellar spectrum. If blank, spectrum assumed to be inside spectral file. If "blackbody" must provide `planet.star_Teff`. |
 | `output_dir     `  | Path to the output directory. |
-| `rfm_parfile  `    | Path to .par linelist file, for running line-by-line calculations with the RFM. |
+| `io_dir         `  | Path for fast I/O operations (optional, defaults to `output_dir`). |
+| `rfm_parfile    `  | Path to .par linelist file, for running line-by-line calculations with the RFM (optional). |
 
 
 ## `[composition]`
@@ -81,8 +82,8 @@ Parameters that tell the model what to do.
 | `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
 | `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
 | `perturb_all`     | Perturb all rows of Jacobian matrix at each solver iteration? True=stable, False=fast. |
-| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1]. |
-| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1]. |
+| `rfm_wn_min`      | Line-by-line RFM radiative transfer, minimum wavenumber [cm-1] (optional, requires `files.rfm_parfile`). |
+| `rfm_wn_max`      | Line-by-line RFM radiative transfer, maximum wavenumber [cm-1] (optional, requires `files.rfm_parfile`). |
 
 ## `[physics]`
 Parameters that describe how the model should treat the physics.
@@ -100,12 +101,27 @@ Parameters that describe how the model should treat the physics.
 | `real_gas      `  | Use real-gas equation(s) of state where possible (true/false). |
 | `thermo_funct  `  | Use temperature-dependent thermodynamic properties (true/false). |
 | `sensible_heat `  | Include turbulent sensible heat transport at the surface (true/false). |
+| `conduction    `  | Include thermal conductive heat transport (true/false). |
 | `convection    `  | Include vertical heat transport associated with convection (true/false). |
 | `convection_crit` | Criterion for convective stability. Options: (s)chwarzschild, (l)edoux. |
 | `latent_heat   `  | Include vertical heat transport from condensation and evaporation (true/false). |
 | `rainout       `  | Enable condensation and evaporation of condensables aloft. Required for `latent_heat=true`. |
 | `coldtrap      `  | Enable cold-trapping effect on abundances aloft, so that VMR always decreases with height. |
+| `evap_efficiency` | Efficiency of re-evaporation of raindrops in dry regions [0-1]. |
 | `oceans        `  | Enable condensation and evaporation of condensables at the surface. |
+
+### `[physics.deep_heating]`
+Optional subsection for configuring deep atmospheric heating (e.g., from tidal dissipation or radiogenic heating in the interior).
+
+| Parameter         | Description   |
+| ----------------: | :------------ |
+| `Pmid          `  | Center pressure of the Gaussian heating profile [bar]. |
+| `Pwid          `  | Width of the Gaussian heating profile in log-Pascal units. |
+| `power_mode    `  | Power mode for heating: "off" (disabled), "rel" (relative to instellation), or "abs" (absolute flux). |
+| `norm_method   `  | Normalisation coordinate: "pressure" (legacy dF/dP), or "mass" (dm-weighted). |
+| `domain        `  | How to handle Pmid outside atmospheric domain: "clamp" or "boundary_flux". |
+| `flux_rel      `  | Fraction of instellation to deposit as deep heating [dimensionless]. Used when `power_mode="rel"`. |
+| `flux_abs      `  | Absolute heating flux to deposit [W m-2]. Used when `power_mode="abs"`. |
 
 ## `[plots]`
 Configure plotting routines; all of these should be `true` or `false`.
