@@ -40,7 +40,7 @@ module plotting
     """
     Format an integer as a plain decimal string.
     """
-    function _intstr(v::Int)::String
+    function _intstr(v::Int64)::String
         return @sprintf("%d",v)
     end
 
@@ -73,7 +73,7 @@ module plotting
     Plot the temperature-pressure and Kzz profile.
     """
     function plot_pt(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int=500, size_y::Int=400,
+                            size_x::Int64=500, size_y::Int64=400,
                             incl_magma::Bool=false,
                             title::String="")
 
@@ -185,7 +185,7 @@ module plotting
     Plot the radius vs pressure profile.
     """
     function plot_radius(atmos::atmosphere.Atmos_t, fname::String;
-                                size_x::Int=500, size_y::Int=400,
+                                size_x::Int64=500, size_y::Int64=400,
                                 title::String="")
 
         # Create plot
@@ -223,7 +223,7 @@ module plotting
     **Plot the cloud and aerosol mass mixing ratios.**
     """
     function plot_cloud(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int=500, size_y::Int=400,
+                            size_x::Int64=500, size_y::Int64=400,
                             title::String="")
 
         xlims = (-8.0, 0.0)
@@ -280,7 +280,7 @@ module plotting
     Plot the VMRs of the atmosphere at each cell-centre location.
     """
     function plot_vmr(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int=500, size_y::Int=400)
+                            size_x::Int64=500, size_y::Int64=400)
 
         # X-axis minimum allowed left-hand-side limit (log units)
         minmin_x::Float64 = -10
@@ -305,7 +305,7 @@ module plotting
             gas_xsurf[i] = log10(clamp(atmos.gas_vmr[gas][end], eps(0.0), phys.BIGFLOAT))
         end
 
-        num_plotted::Int = 0
+        num_plotted::Int64 = 0
         arr_x::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)
         min_x::Float64 = -3
         for i in reverse(sortperm(gas_xsurf))
@@ -376,7 +376,7 @@ module plotting
     Plot the fluxes at each pressure level
     """
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int=500, size_y::Int=400,
+                            size_x::Int64=500, size_y::Int64=400,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
                             incl_deep::Bool=true,
@@ -569,7 +569,7 @@ module plotting
     Plot contribution function at different bands.
     """
     function plot_contfunc1(atmos::atmosphere.Atmos_t, fname::String;
-                                    size_x::Int=500, size_y::Int=400,
+                                    size_x::Int64=500, size_y::Int64=400,
                                     cf_min::Float64=1e-6)
 
         # Check that we have data
@@ -761,7 +761,7 @@ module plotting
     Combined plot used for tracking behaviour of the solver
     """
     function combined(plt_pt, plt_fl, plt_mr, plt_ra, info::String, fname::String;
-                        size_x::Int=800, size_y::Int=700)
+                        size_x::Int64=800, size_y::Int64=700)
 
         # plt_info = plot(legend=false, showaxis=false, grid=false)
         # annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
@@ -797,7 +797,7 @@ module plotting
 
         # Find output files
         frames = glob("*.$frames_fmt",frames_dir)
-        nframes::Int = length(frames)
+        nframes::Int64 = length(frames)
 
         # Create animation
         if nframes < 1
@@ -815,10 +815,10 @@ module plotting
     Plot jacobian matrix
     """
     function jacobian(b::Array{Float64,2}, fname::String;
-                            perturb::Array{Bool,1}=Bool[], size_x::Int=600, size_y::Int=500)
+                            perturb::Array{Bool,1}=Bool[], size_x::Int64=600, size_y::Int64=500)
 
         lim::Float64 = maximum(abs.(b))     # colourbar limits
-        l::Int = length(perturb)            # show perturbed levels?
+        l::Int64 = length(perturb)            # show perturbed levels?
 
         plt = plot(size=(size_x, size_y),
                     title="∂r/∂x [W m⁻² K⁻¹]",

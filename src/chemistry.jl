@@ -37,9 +37,9 @@ module chemistry
 
     Parameters:
     - `atmos::atmosphere.Atmos_t`       atmosphere structure
-    - `i::Int`                          level index to normalise
+    - `i::Int64`                        level index to normalise
     """
-    function normalise_vmrs!(atmos::atmosphere.Atmos_t, i::Int)
+    function normalise_vmrs!(atmos::atmosphere.Atmos_t, i::Int64)
         # Work variables
         x_con::Float64 =    0.0
         x_dry::Float64 =    0.0
@@ -442,14 +442,14 @@ module chemistry
     - `write_cfg::Bool`                 write config and elements
 
     Returns:
-    - `state::Int`                      fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
+    - `state::Int64`                    fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
     function _chem_gas!(atmos::atmosphere.Atmos_t, write_cfg::Bool)::Int
 
         @debug "Running equilibrium chemistry"
 
         # Return code
-        state::Int = 0
+        state::Int64 = 0
 
         # Check fastchem enabled
         if !atmos.flag_fastchem
@@ -462,7 +462,7 @@ module chemistry
             @debug "Whole atmosphere too cold for FC (fc_floor=$(atmos.fastchem_floor))"
         end
 
-        count_elem_nonzero::Int = 0
+        count_elem_nonzero::Int64 = 0
 
         # Write config (fastchem is quite particular about the format)
         if write_cfg || !isfile(atmos.fastchem_conf)
@@ -676,7 +676,7 @@ module chemistry
 
         # Parse gas chemistry
         g_fc::String = atmosphere.UNSET_STR  # gas name in fastchem
-        d_fc::Dict = Dict{String, Int}()     # ^ broken in to atoms
+        d_fc::Dict = Dict{String, Int64}()     # ^ broken in to atoms
         g_in::String = atmosphere.UNSET_STR  # gas name in AGNI, matched by atom count
         match::Bool = false
 
@@ -782,12 +782,12 @@ module chemistry
     - `do_aloft::Bool`       do saturation cond/evap aloft
 
     Returns:
-    - `state::Int`           fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
+    - `state::Int64`         fastchem state (0: success, 1: critical_fail, 2: elem_fail, 3: conv_fail, 4: both_fail)
     """
     function calc_composition!(atmos::atmosphere.Atmos_t,
                                     do_surf::Bool, do_chem::Bool, do_aloft::Bool)::Int
 
-        state::Int = 0
+        state::Int64 = 0
 
         # reset composition
         restore_composition!(atmos)

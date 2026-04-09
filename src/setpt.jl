@@ -83,8 +83,8 @@ module setpt
 
         succ::Bool = true
 
-        num_req::Int = length(request)          # Number of requests
-        idx_req::Int = 1                        # Index of current request
+        num_req::Int64 = length(request)          # Number of requests
+        idx_req::Int64 = 1                        # Index of current request
         str_req::String = atmosphere.UNSET_STR  # String of current request
         prt_req::String = "Setting T(p): "
         while idx_req <= num_req
@@ -337,8 +337,8 @@ module setpt
             ds = Dataset(fpath,"r")
 
             # Allocate interleaved temperature profile
-            nlev_c::Int = length(ds["p"][:])
-            arr_n::Int = nlev_c + nlev_c + 1
+            nlev_c::Int64 = length(ds["p"][:])
+            arr_n::Int64 = nlev_c + nlev_c + 1
             arr_T::Array{Float64, 1} = zeros(Float64, arr_n)
             arr_P::Array{Float64, 1} = zeros(Float64, arr_n)
 
@@ -347,7 +347,7 @@ module setpt
             arr_P[1] = ds["pl"][1]
 
             # middle
-            idx::Int = 0
+            idx::Int64 = 0
             for i in 1:nlev_c
                 idx = (i-1)*2
                 arr_T[idx+1] = ds["tmpl"][i]

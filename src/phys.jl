@@ -55,7 +55,7 @@ module phys
         prs_max::Float64
 
         # Constituent atoms (dictionary of numbers)
-        atoms::Dict{String, Int}
+        atoms::Dict{String, Int64}
 
         # Mean molecular weight [kg mol-1]
         mmw::Float64
@@ -341,7 +341,7 @@ module phys
     """
     Get number of atoms from formula, returning a dictionary
     """
-    function count_atoms(molec::String)::Dict{String,Int}
+    function count_atoms(molec::String)::Dict{String,Int64}
 
         # Pre-defined molecules
         if haskey(_lookup_count_atoms, molec)
@@ -355,11 +355,11 @@ module phys
         end
 
         # Setup
-        out::Dict{String,Int} = Dict{String,Int}()
-        nchar::Int = length(m)
-        i::Int = 1
+        out::Dict{String,Int64} = Dict{String,Int64}()
+        nchar::Int64 = length(m)
+        i::Int64 = 1
         elem::String = ""
-        count::Int=-1
+        count::Int64=-1
         last::Bool=false
 
         # Loop through string
@@ -443,7 +443,7 @@ module phys
         end
 
         # get atoms
-        atoms::Dict{String, Int} = count_atoms(m)
+        atoms::Dict{String, Int64} = count_atoms(m)
 
         # add up atoms
         mmw::Float64 = 0.0
@@ -560,7 +560,7 @@ module phys
         p = log10(p)
 
         # Find closest value in array
-        i::Int = argmin(abs.(gas.sat_P .- p))
+        i::Int64 = argmin(abs.(gas.sat_P .- p))
         return min(gas.sat_T[i], gas.T_crit)
     end
 
@@ -703,7 +703,7 @@ module phys
     function calc_rho_mix(gas::Array{Gas_t,1}, vmr::Array{Float64,1},
                             tmp::Float64, prs::Float64, mmw::Float64)::Float64
 
-        ngas::Int = length(gas)
+        ngas::Int64 = length(gas)
 
         # single gas case
         if ngas == 1

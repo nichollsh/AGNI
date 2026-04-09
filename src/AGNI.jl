@@ -18,6 +18,7 @@ module AGNI
     include("phys.jl")
     include("spectrum.jl")
     include("atmosphere.jl")
+    include("multicol.jl")
     include("ocean.jl")
     include("chemistry.jl")
     include("rfm.jl")
@@ -34,6 +35,7 @@ module AGNI
     import .phys
     import .spectrum
     import .atmosphere
+    import .multicol
     import .setpt
     import .save
     import .plotting
@@ -49,6 +51,7 @@ module AGNI
     export phys
     export spectrum
     export atmosphere
+    export multicol
     export setpt
     export save
     export load
@@ -76,7 +79,7 @@ module AGNI
     function make_logger(outpath::String; to_term::Bool=true)
 
         # Formatting
-        color::Int = 39
+        color::Int64 = 39
         level::String = "UNSET"
         term_io::IO = stdout
 
@@ -144,9 +147,9 @@ module AGNI
 
     Arguments:
     - `outpath::String`     output file (empty to disable file logging)
-    - `verbosity::Int`      verbosity (0: silent, 1: normal, 2: debug)
+    - `verbosity::Int64`    verbosity (0: silent, 1: normal, 2: debug)
     """
-    function setup_logging(outpath::String, verbosity::Int)
+    function setup_logging(outpath::String, verbosity::Int64)
 
         # If silent
         if verbosity==0
@@ -310,7 +313,7 @@ module AGNI
                 demixing = Bool(cfg["physics"]["demixing"])
             end
 
-            comp_set_by::Int = 0
+            comp_set_by::Int64 = 0
 
             # composition set by VMRs and Psurf
             if haskey(cfg["composition"],"p_surf")
@@ -441,11 +444,11 @@ module AGNI
         incl_conduct::Bool     = cfg["physics"]["conduction"]
         incl_sens::Bool        = cfg["physics"]["sensible_heat"]
         incl_latent::Bool      = cfg["physics"]["latent_heat"]
-        sol_type::Int          = cfg["execution"]["solution_type"]
+        sol_type::Int64         = cfg["execution"]["solution_type"]
         perturb_all::Bool      = cfg["execution"]["perturb_all"]
         conv_atol::Float64     = cfg["execution"]["converge_atol"]
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
-        conv_type::Int         = 1
+        conv_type::Int64        = 1
         if haskey(cfg["execution"],"converge_type")
             conv_type = Int(cfg["execution"]["converge_type"])
         end
@@ -581,6 +584,13 @@ module AGNI
             return false
         end
 
+        # Frame dir
+        if plt_ani
+            @debug "Will animate"
+            rm(atmos.FRAMES_DIR,force=true,recursive=true)
+            mkdir(atmos.FRAMES_DIR)
+        end
+
         # Configure deep atmospheric heating
         if haskey(cfg["physics"],"deep_heating")
             dh = cfg["physics"]["deep_heating"]
@@ -626,12 +636,18 @@ module AGNI
             return false
         end
 
-        # Frame dir
-        if plt_ani
-            @debug "Will animate"
-            rm(atmos.FRAMES_DIR,force=true,recursive=true)
-            mkdir(atmos.FRAMES_DIR)
+        # Configure globe multicolumn calculation
+        do_multicol::Bool = haskey(cfg["planet"],"globe")
+        if do_multicol
+            @info "Performing multi-column simulation"
+            globe = multicol.Globe_t()
+
+            @debug "Setup globe"
+            multicol.construct!(globe, atmos,
+                                cfg["planet"]["globe"]["lons"],
+                                cfg["planet"]["globe"]["lats"])
         end
+
 
         # Loop over requested solvers
         return_success::Bool = true
@@ -659,7 +675,7 @@ module AGNI
 
         # Use the nonlinear requested solver
         elseif sol in allowed_solvers
-            modplot::Int = 0
+            modplot::Int64 = 0
             if cfg["plots"]["at_runtime"]
                 modplot = 1
             end
@@ -793,7 +809,7 @@ module AGNI
         end
 
         # Logging
-        verbosity::Int = cfg["execution"]["verbosity"]
+        verbosity::Int64 = cfg["execution"]["verbosity"]
         setup_logging(joinpath(output_dir, "agni.log"), verbosity)
 
         # Hello

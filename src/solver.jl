@@ -41,7 +41,7 @@ module solver
     - `succ`        Did search converge?
     """
     function gs_search(f::Function,a::Float64,b::Float64,
-                            dxtol::Float64,atol::Float64,max_steps::Int;
+                            dxtol::Float64,atol::Float64,max_steps::Int64;
                             warnings::Bool=false)::Tuple{Float64,Bool}
         c::Float64 = (-1+sqrt(5))/2
 
@@ -116,17 +116,17 @@ module solver
     #    jacobian
     perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
     perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
-    perturb_mod::Int =      5       # Do full jacobian at least this frequently
+    perturb_mod::Int64 =      5       # Do full jacobian at least this frequently
     fd_rel::Float64=        2e-5    # finite difference: relative width (dx/x) of the difference (rtol)
     fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
     #    plateau parameters
-    plateau_n::Int     =    4       # Plateau declared when plateau_i > plateau_n
+    plateau_n::Int64    =    4       # Plateau declared when plateau_i > plateau_n
     plateau_s::Float64 =    10.0     # Scale factor applied to x_dif when plateau_i > plateau_n
     plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
     #    linesearch
     ls_tau::Float64    =    0.5     # backtracking downscale size
     ls_increase::Float64 =  0.7     # threshold for change in the cost function, between steps, for triggering/converging linesearch (large values => do LS more often)
-    ls_max_steps::Int    =  12      # maximum steps undertaken by linesearch routine
+    ls_max_steps::Int64   =  12      # maximum steps undertaken by linesearch routine
     ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
     ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
     #    easy start
@@ -145,7 +145,7 @@ module solver
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
 
     Optional physics arguments:
-    - `sol_type::Int`                   solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
+    - `sol_type::Int64`                 solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
     - `chem::Bool`                      include eqm thermochemistry when solving for RCE?
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating at the surface
@@ -159,20 +159,20 @@ module solver
     - `dx_min::Float64`                 minimum step size [K]
     - `dx_max::Float64`                 maximum step size [K]
     - `tmp_pad::Float64`                padding around hard limits on temperature floor & ceiling values
-    - `max_steps::Int`                  maximum number of solver steps
+    - `max_steps::Int64`                maximum number of solver steps
     - `max_runtime::Float64`            maximum runtime in wall-clock seconds
     - `fdc::Bool`                       finite difference: central difference? otherwise use forward difference
-    - `fdo::Int`                        finite difference: scheme order (2nd or 4th)
-    - `method::Int`                     numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
+    - `fdo::Int64`                      finite difference: scheme order (2nd or 4th)
+    - `method::Int64`                   numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `easy_start::Bool`                improve convergence reliability; introduce convection and latent heat gradually
     - `grey_start::Bool`                improve convergence reliability; obtain double-grey solution first
-    - `ls_method::Int`                  linesearch algorithm (0: None, 1: golden, 2: backtracking)
-    - `conv_type::Int`                  convergence type (1: cost function, 2: median residual, 3: mean residual)
+    - `ls_method::Int64`                linesearch algorithm (0: None, 1: golden, 2: backtracking)
+    - `conv_type::Int64`                convergence type (1: cost function, 2: median residual, 3: mean residual)
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
-    - `modplot::Int`                    iteration frequency at which to make plots
+    - `modplot::Int64`                  iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
-    - `modprint::Int`                   iteration frequency at which to print info
+    - `modprint::Int64`                 iteration frequency at which to print info
     - `plot_jacobian::Bool`             plot jacobian too?
     - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
@@ -181,21 +181,21 @@ module solver
         Nothing
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
-                            sol_type::Int=1,
+                            sol_type::Int64=1,
                             chem::Bool=false,
                             convect::Bool=true, sens_heat::Bool=true,
                             conduct::Bool=true, latent::Bool=true, deep::Bool=true,
                             rainout::Bool=true, oceans::Bool=true,
                             dx_min::Float64=1e-7, dx_max::Float64=400.0,
                             tmp_pad::Float64 = 5.0,
-                            max_steps::Int=400, max_runtime::Float64=900.0,
-                            fdc::Bool=true, fdo::Int=2,
-                            method::Int=1,
+                            max_steps::Int64=400, max_runtime::Float64=900.0,
+                            fdc::Bool=true, fdo::Int64=2,
+                            method::Int64=1,
                             easy_start::Bool=false, grey_start::Bool=false,
-                            ls_method::Int=1, conv_type::Int=1,
+                            ls_method::Int64=1, conv_type::Int64=1,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
-                            modplot::Int=1, save_frames::Bool=true,
-                            modprint::Int=1, plot_jacobian::Bool=true,
+                            modplot::Int64=1, save_frames::Bool=true,
+                            modprint::Int64=1, plot_jacobian::Bool=true,
                             conv_atol::Float64=1.0e-1, conv_rtol::Float64=1.0e-3,
                             )::Bool
 
@@ -244,7 +244,7 @@ module solver
         path_jac::String = joinpath(atmos.OUT_DIR,"jacobian.png")
 
         # Dimensionality
-        arr_len::Int = atmos.nlev_c
+        arr_len::Int64 = atmos.nlev_c
         if sol_type in [2,3,4]  # states 2,3,4 also solve for tmp_surf
             arr_len += 1
         end
@@ -293,14 +293,14 @@ module solver
         fc_wm_default::Bool      = atmos.fastchem_wellmixed # should we aim for well-mixed composition?
 
         #     tracking
-        step::Int =             0       # Step number
+        step::Int64 =             0       # Step number
         code::STATUSCODE =      CODE_99 # Status code
         runtime::Float64  =     0.0     # Model runtime [s]
-        compose_retcode::Int =  0       # Composition calculation return code
+        compose_retcode::Int64 =  0       # Composition calculation return code
         step_ok::Bool =         true    # Current step was fine
         grey_step::Bool = grey_start    # double-grey RT enabled in this step
         easy_step::Bool =       false   # easy_start sf increased in this step
-        plateau_i::Int =        0       # Number of iterations for which step was small
+        plateau_i::Int64 =        0       # Number of iterations for which step was small
 
         #      statistics
         r_med::Float64 =        9.0     # Median residual
@@ -308,7 +308,7 @@ module solver
         c_max::Float64 =        0.0     # Maximum cost (sign agnostic)
         x_med::Float64 =        0.0     # Median solution
         x_max::Float64 =        0.0     # Maximum solution (sign agnostic)
-        iworst::Int =           0       # Level which is furthest from convergence
+        iworst::Int64 =           0       # Level which is furthest from convergence
         dx_stat::Float64 =      9.0     # Maximum change in solution array
         r_cur_2nm::Float64 =    0.01    # Two-norm of residuals
         r_old_2nm::Float64 =    0.02    # Previous ^
@@ -410,7 +410,7 @@ module solver
 
         # Calculate the jacobian and residuals at x using a 2nd order central-difference
         function _calc_jac_res!(x::Array{Float64, 1}, jacob::Array{Float64, 2},
-                                    resid::Array{Float64 ,1}, central::Bool, order::Int,
+                                    resid::Array{Float64 ,1}, central::Bool, order::Int64,
                                     which::Array{Bool,1})::Bool
 
             ok::Bool = true
@@ -1052,22 +1052,22 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`         the atmosphere struct instance to be used.
-    - `sol_type::Int`          solution types, same as solve_energy
-    - `atm_type::Int `         atmosphere prescription (1: isothermal, 2: adiabat, 3: adiabat+stratosphere)
+    - `sol_type::Int64`        solution types, same as solve_energy
+    - `atm_type::Int64 `         atmosphere prescription (1: isothermal, 2: adiabat, 3: adiabat+stratosphere)
     - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
     - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
-    - `max_steps::Int`         maximum number of solver steps
+    - `max_steps::Int64`       maximum number of solver steps
     - `tmp_upper::Float64`     upper-bound on Tsurf for golden-section search [K]
 
     Returns:
     - `Bool` indicating success
     """
     function solve_prescribed!(atmos::atmosphere.Atmos_t;
-                                    sol_type::Int=3,
-                                    atm_type::Int=1,
+                                    sol_type::Int64=3,
+                                    atm_type::Int64=1,
                                     conv_atol::Float64=1.0e-3,
                                     conv_rtol::Float64=1.0e-5,
-                                    max_steps::Int=300,
+                                    max_steps::Int64=300,
                                     tmp_upper::Float64=5000.0)::Bool
 
         # Validate sol_type (does not allow type=1 here)
@@ -1084,7 +1084,7 @@ module solver
         succ::Bool = false
 
         # Function to set atmosphere according to the desired prescription
-        function _prescribe!(atmos::atmosphere.Atmos_t, atm_type::Int, _tsurf::Float64)
+        function _prescribe!(atmos::atmosphere.Atmos_t, atm_type::Int64, _tsurf::Float64)
             # set tsurf
             atmos.tmp_surf  = deepcopy(_tsurf)
             atmos.tmpl[end] = deepcopy(_tsurf)
@@ -1205,20 +1205,20 @@ module solver
 
     Arguments:
     - `atmos::Atmos_t`         the atmosphere struct instance to be used.
-    - `sol_type::Int`          solution types, same as solve_energy
+    - `sol_type::Int64`        solution types, same as solve_energy
     - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
     - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
-    - `max_steps::Int`         maximum number of solver steps
+    - `max_steps::Int64`       maximum number of solver steps
     - `tmp_upper::Float64`     upper-bound on Tsurf for golden-section search [K]
 
     Returns:
     - `Bool` indicating success
     """
     function solve_transparent!(atmos::atmosphere.Atmos_t;
-                                    sol_type::Int=1,
+                                    sol_type::Int64=1,
                                     conv_atol::Float64=1.0e-3,
                                     conv_rtol::Float64=1.0e-5,
-                                    max_steps::Int=300,
+                                    max_steps::Int64=300,
                                     tmp_upper::Float64=5000.0)::Bool
 
 
