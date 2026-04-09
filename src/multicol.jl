@@ -134,13 +134,14 @@ module multicol
 
             # Check that arrays have correct length
             if length(globe.atmos_arr[i].tmp) != atmos.nlev_c
-                @warn "Globe column $i does not have expected number of vertical levels ($atmos.nlev_c)"
+                @warn "Globe column $i has unexpected number of vertical levels ($(length(globe.atmos_arr[i].tmp)))"
                 return false
             end
         end
 
         # Set the globe as constructed
         globe.is_constructed = true
+        @debug "Globe constructed with $(globe.num_cols) columns"
 
         return true
     end # end construct!

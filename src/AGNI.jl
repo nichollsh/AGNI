@@ -643,9 +643,12 @@ module AGNI
             globe = multicol.Globe_t()
 
             @debug "Setup globe"
-            multicol.construct!(globe, atmos,
+            if !multicol.construct!(globe, atmos,
                                 cfg["planet"]["globe"]["lons"],
                                 cfg["planet"]["globe"]["lats"])
+                @error "Could not construct globe object"
+                return false
+            end
         end
 
 

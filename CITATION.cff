@@ -3,14 +3,14 @@ message: "If you use this software, please cite it as below."
 authors:
 - family-names: "Nicholls"
   given-names: "Harrison"
-  affiliation: "University of Oxford"
+  affiliation: "University of Cambridge"
   orcid: "https://orcid.org/0000-0002-8368-4641"
 
 title: "AGNI: An open-source model for extreme atmospheres on rocky exoplanets"
 doi: 10.21105/joss.07726
 date-released: 2025-11-20
 
-version: 1.10
+version: 1.10.0
 url: "https://github.com/nichollsh/AGNI"
 type: software
 license: "GPL-3.0"

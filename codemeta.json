@@ -5,7 +5,7 @@
     {
       "@id": "https://orcid.org/0000-0002-8368-4641",
       "@type": "Person",
-      "email": "harrison.nicholls@ast.cam.ac.uk",
+      "email": "contact@h-nicholls.space",
       "name": "Harrison Nicholls",
       "affiliation": "University of Cambridge"
     }
@@ -19,5 +19,5 @@
   "keywords": "exoplanets, radiation, astronomy, atmosphere, optimization, julia, fortran, convection, chemistry, magma, planetary, physics",
   "license": "GPL-3.0",
   "title": "AGNI",
-  "version": "1.10"
+  "version": "1.10.0"
 }

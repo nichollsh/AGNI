@@ -111,6 +111,7 @@ module save
             ds.attrib["username"]           = get(ENV,"USER","UNKNOWN")
             ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
             ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
+            ds.attrib["name"]               = atmos.name
 
             plat::String = "Generic"
             if Sys.isapple()
@@ -133,7 +134,7 @@ module save
             defDim(ds, "nlev_c",    nlev_c)        # Cell centres
             defDim(ds, "nlev_l",    nlev_l)        # Cell edges
             defDim(ds, "ngases",    ngases)        # Gases
-            defDim(ds, "naeros",    naeros)  # Aerosols
+            defDim(ds, "naeros",    naeros)        # Aerosols
             defDim(ds, "nchars",    nchars)        # Length of string containing gas names
             defDim(ds, "nbands",    atmos.nbands)  # Number of spectral bands
             defDim(ds, "nchannels", atmos.dimen.nd_channel)  # Number of spectral channels
