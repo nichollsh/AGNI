@@ -722,8 +722,7 @@ module atmosphere
         atmos.s0_fact =         s0_fact
         _check_range("Stellar s0 factor", atmos.s0_fact; min=0, max=1) || return false
 
-        atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) *
-                                    s0_fact * cosd(atmos.zenith_degrees)
+        atmos.toa_heating =     calc_toa_heating(atmos)
 
         atmos.flux_int =        flux_int
         atmos.target_olr =      max(1.0e-10, target_olr)
@@ -1273,6 +1272,44 @@ module atmosphere
         return true
     end # end function setup
 
+    """
+    **Get TOA heating from atmosphere parameters.**
+
+    Return the effective irradiation flux at the top of the atmosphere (TOA).
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be accessed
+
+    Returns:
+    - `Float64` effective TOA heating [W m-2]
+    """
+    function calc_toa_heating(atmos::atmosphere.Atmosphere_t)::Float64
+
+        # Nightside hemisphere receives no instellation
+        if atmos.zenith_degrees >= 90.0
+            return 0.0
+        end
+
+        return atmos.instellation * atmos.s0_fact *
+                                (1.0 - atmos.albedo_b) * cosd(atmos.zenith_degrees)
+    end
+
+    """
+    **Get the solar zenith angle for a given longitude and latitude**
+
+    Assuming tidally locked planet with coordinate system centred on subsolar point.
+    Does not account for super-illumination in the twilight regions.
+
+    Arguments:
+    - `lon::Float64`    the longitude of location (degrees)
+    - `lat::Float64`    the latitude of location (degrees)
+
+    Returns:
+    - `zen::Float64`    the zenith angle for the location (degrees)
+    """
+    function calc_zenith_angle(lon::Float64, lat::Float64)::Float64
+        return acosd(cosd(lon)*cosd(lat))
+    end
 
     """
     **Set deep atmospheric heating parameters.**
