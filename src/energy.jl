@@ -21,41 +21,10 @@ module energy
     import ..multicol
 
     # Constants
+    SKIP_SW_THRESH::Float64         = 1e-9      # skip SW calculation if TOA heating is below this threshold [W m-2]
     FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
     CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [bar]
     CONVECT_REAL_GAS::Bool          = false     # use real gas EOS in convection scheme, if RG EOS enabled
-
-    # Union type
-    const AtmosGlobe = Union{atmosphere.Atmos_t, multicol.Globe_t}
-
-    """
-    **Wrapper for recursively calling a function across multiple columns**
-
-    Arguments:
-    - `globe::Globe_t`      globe struct instance containing the columns
-    - `func::Function`      function to call for each column, which must take an `Atmos_t` as its first argument
-    - `args...`             additional arguments to pass to the function, after the `Atmos_t` argument
-    - `kwargs...`           additional keyword arguments to pass to the function
-
-    Returns:
-    - `succ::Bool`         whether the function succeeded for all cases
-    """
-    function _call_for_globe!(globe::multicol.Globe_t,
-                                    func::Function, args...; kwargs...)::Bool
-
-        succ::Bool=true
-        for i in 1:globe.ncol
-            # Copy data from aux to worker
-            succ &= multicol.copy_atmos_fields!(globe.atmos_wrk, globe.atmos_arr[i])
-
-            # Run the function for this column
-            succ &= func(globe.atmos_arr[i], args...; kwargs...)
-
-            # Copy data from worker back to aux
-            succ &= multicol.copy_atmos_fields!(globe.atmos_arr[i], globe.atmos_wrk)
-        end
-        return succ
-    end
 
     """
     **Set non-finite values in an array equal to a given fill value**.
@@ -285,10 +254,16 @@ module energy
         clamp!(atmos.atm.gas_mix_ratio, 0.0, 1.0)
 
         # Do radiative transfer
-        atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control,
+        if !lw && (atmos.toa_heating < SKIP_SW_THRESH)
+            # If no stellar flux is reaching the atmosphere, skip the SW calculation
+            fill!(atmos.radout.flux_down, 0.0)
+            fill!(atmos.radout.flux_up, 0.0)
+        else
+            atmosphere.SOCRATES.radiance_calc(atmos.control,
                                                      atmos.dimen, atmos.spectrum,
                                                      atmos.atm, atmos.cld, atmos.aer,
                                                      atmos.bound, atmos.radout)
+        end
 
         # Check finite
         if !all(isfinite, atmos.radout.flux_down)
@@ -444,8 +419,7 @@ module energy
         end
 
         # Downward SW flux in atmosphere at TOA
-        atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) *
-                                    atmos.s0_fact * cosd(atmos.zenith_degrees)
+        # atmos.toa_heating = atmosphere.calc_toa_heating(atmos)
 
         # Set flux in surface emission, by band
         #     Equal to integral of planck function over band width, which in
@@ -1026,7 +1000,7 @@ module energy
     fastchem here.
 
     Arguments:
-    - `ag::AtmosGlobe`                  the atmosphere or globe instance to be used.
+    - `atmos::Atmos_t`                  the atmosphere instance to be used.
 
     Optional arguments:
     - `radiative::Bool`                 include radiation fluxes
@@ -1038,26 +1012,20 @@ module energy
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
+    - `calc_hr::Bool`                   calculate heating rates from fluxes?
 
     Returns:
     - `Bool`                            calculation succeeded
     """
-    function calc_fluxes!(ag::AtmosGlobe;
+    function calc_fluxes!(atmos::atmosphere.Atmos_t;
                           radiative::Bool=false, latent_heat::Bool=false, convective::Bool=false,
                           sens_heat::Bool=false, conductive::Bool=false, deep::Bool=false,
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
-                          calc_cf::Bool=false)::Bool
+                          calc_cf::Bool=false, calc_hr::Bool=false)::Bool
 
-        # Handle globe case by calling recursively on the atmosphere component
-        if ag isa multicol.Globe_t
-            _call_for_globe!(ag, calc_fluxes!;
-                                radiative=radiative, latent_heat=latent_heat, convective=convective,
-                                sens_heat=sens_heat, conductive=conductive, deep=deep,
-                                convect_sf=convect_sf, latent_sf=latent_sf, calc_cf=calc_cf)
-        end
 
         # Reset fluxes
-        reset_fluxes!(ag)
+        reset_fluxes!(atmos)
         ok::Bool = true
 
         # Warn if no flux terms are enabled
@@ -1068,38 +1036,38 @@ module energy
 
         # +Latent heating
         if latent_heat
-            ok &= latent!(ag)           # Calculate latent heat fluxes
-            ag.flux_l *= latent_sf           # Modulate for stability?
-            @. ag.flux_tot += ag.flux_l   # Add to total flux
+            ok &= latent!(atmos)           # Calculate latent heat fluxes
+            atmos.flux_l *= latent_sf           # Modulate for stability?
+            @. atmos.flux_tot += atmos.flux_l   # Add to total flux
         end
 
         # +Radiation
         if radiative
-            ok &= radtrans!(ag, true, calc_cf=calc_cf)   # Longwave
-            ok &= radtrans!(ag, false)                   # Shortwave
-            @. ag.flux_tot += ag.flux_n  # Add to total flux
+            ok &= radtrans!(atmos, true, calc_cf=calc_cf)   # Longwave
+            ok &= radtrans!(atmos, false)                   # Shortwave
+            @. atmos.flux_tot += atmos.flux_n  # Add to total flux
         end
 
         # +Dry convection
         if convective
-            ok &= convection!(ag)                          # Calc dry convection heat flux
-            ag.flux_cdry *= convect_sf               # Modulate for stability?
-            @. ag.flux_tot += ag.flux_cdry # Add to total flux
+            ok &= convection!(atmos)                          # Calc dry convection heat flux
+            atmos.flux_cdry *= convect_sf               # Modulate for stability?
+            @. atmos.flux_tot += atmos.flux_cdry # Add to total flux
         end
 
         # Calculate Kzz in non-convective regions
-        fill_Kzz!(ag)
+        fill_Kzz!(atmos)
 
         # +Surface turbulence
         if sens_heat
-            ok &= sensible!(ag)
-            ag.flux_tot[end] += ag.flux_sens
+            ok &= sensible!(atmos)
+            atmos.flux_tot[end] += atmos.flux_sens
         end
 
         # +Conduction
         if conductive
-            ok &= conduct!(ag)
-            @. ag.flux_tot += ag.flux_cdct
+            ok &= conduct!(atmos)
+            @. atmos.flux_tot += atmos.flux_cdct
         end
 
         # +Deep atmospheric heating
@@ -1108,12 +1076,17 @@ module energy
         # This prevents numerical artifacts ("hook" shape) in deep P-T profiles
         # because the heating doesn't propagate through flux_dif incorrectly.
         if deep
-            ok &= deep_heating!(ag)
+            ok &= deep_heating!(atmos)
         end
 
         # Flux difference across each level
         # Positive value => heating
-        ag.flux_dif[1:end] .= (ag.flux_tot[2:end] .- ag.flux_tot[1:end-1])
+        atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
+
+        # Heating rate
+        if calc_hr
+            ok &= calc_hrates!(atmos)
+        end
 
         return ok
     end
@@ -1121,7 +1094,7 @@ module energy
     """
     **Calculate heating rates at cell-centres from the total flux.**
 
-    Requires the total flux to have already been set (atmos.flux_tot). Heating
+    Requires the total flux to have already been set (atmos.flux_dif). Heating
     rates are calculated in units of kelvin per day.
 
     Arguments:
@@ -1131,16 +1104,9 @@ module energy
     - `Bool`                            whether the calculation succeeded
     """
     function calc_hrates!(atmos::atmosphere.Atmos_t)::Bool
-
-        dF::Float64 = 0.0
-        dp::Float64 = 0.0
-
-        fill!(atmos.heating_rate, 0.0)
-
         for i in 1:atmos.nlev_c
-            dF = atmos.flux_tot[i+1] - atmos.flux_tot[i]
-            dp = atmos.pl[i+1] - atmos.pl[i]
-            atmos.heating_rate[i] = (atmos.g[i] / atmos.layer_cp[i]) * dF/dp # K/s
+            atmos.heating_rate[i] = (atmos.g[i] / atmos.layer_cp[i]) *
+                                        atmos.flux_dif[i] / (atmos.pl[i+1] - atmos.pl[i])
         end
 
         atmos.heating_rate *= 86400.0 # K/day

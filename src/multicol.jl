@@ -26,6 +26,14 @@ module multicol
     import ..atmosphere
     import ..phys
 
+    # Constants
+    protect_fields = Symbol[:name, :num_rt_eval, :tim_rt_eval]
+    shared_fields = Symbol[]
+    for (field,type) in zip(fieldnames(atmosphere.Atmos_t), atmosphere.Atmos_t.types)
+        if (type <: Union{AbstractArray, Array, Vector, Number, Dict}) && !(field in protect_fields)
+            push!(shared_fields, field)
+        end
+    end
 
     # Contains data for the globe
     mutable struct Globe_t
@@ -37,8 +45,8 @@ module multicol
         atmos_wrk::atmosphere.Atmos_t      # worker atmosphere for calculations
 
         # Arrays of atmosphere columns
-        ncol::Int64                             # number of columns
-        atmos_arr::Array{atmosphere.Atmos_t,1} # auxiliary atmospheric columns
+        ncol::Int64                                 # number of columns
+        atmos_arr::Array{atmosphere.Atmos_t,1}      # auxiliary atmospheric columns
         lons_arr::Array{Float64,1}                  # longitudes for each column
         lats_arr::Array{Float64,1}                  # latitudes for each column
 
@@ -77,20 +85,15 @@ module multicol
     function construct!(globe::Globe_t, atmos::atmosphere.Atmos_t,
                             lons::Array{Float64,1}, lats::Array{Float64,1})::Bool
 
-        # Ensure that the globe is not already constructed
-        if globe.is_constructed
-            @warn "Cannot construct globe because it is already constructed"
-            return false
-        end
-
-        # Store reference to worker atmosphere
-        globe.atmos_wrk = atmos
-
-        # Ensure that worker is allocated
-        if !globe.atmos_wrk.is_alloc
+        # Fail safe
+        globe.is_constructed = false
+        if !atmos.is_alloc
             @warn "Cannot construct globe because initial atmosphere is not allocated"
             return false
         end
+
+        # Store reference to worker atmosphere - will be updated in place
+        globe.atmos_wrk = atmos
 
         # Set up the column locations
         globe.ncol  = length(lons)
@@ -113,14 +116,22 @@ module multicol
             end
         end
 
-        # Allocate array of auxiliary atmospheric columns
-        globe.atmos_arr = atmosphere.Atmos_t[atmosphere.Atmos_t() for i in 1:globe.ncol]
+        # Instantiate array of auxiliary atmospheric columns
+        globe.atmos_arr = atmosphere.Atmos_t[atmosphere.Atmos_t() for _ in 1:globe.ncol]
+
+        # Print shared fields
+        # @debug "Globe shared fields: $(shared_fields)"
 
         # Copy the original atmosphere to each column
         for i in 1:globe.ncol
 
             # Make copy of atmosphere for the column
             globe.atmos_arr[i] = deepcopy(atmos)
+
+            # Allocate arrays
+            for field in shared_fields
+                setfield!(globe.atmos_arr[i], field, deepcopy(getfield(atmos, field)))
+            end
 
             # Set name of atmosphere for the column
             globe.atmos_arr[i].name = atmos.name * @sprintf(".col%03d", i)
@@ -157,13 +168,66 @@ module multicol
     - `Bool`                whether the copy was successful
     """
     function copy_atmos_fields!(dst::atmosphere.Atmos_t, src::atmosphere.Atmos_t)::Bool
-        for field in fieldnames(src)
-            # Only copy fields which are of these types
-            if getfield(src, field) <: Union{Float64, Int64, Int, Bool, Dict, String, Char}
-                setfield!(dst, field, getfield(src, field))
-            end
+        for field in shared_fields
+            setfield!(dst, field, getfield(src, field))
         end
         return true
     end
+
+    """
+    **Wrapper calling a function across multiple columns in a globe**
+
+    Arguments:
+    - `globe::Globe_t`      globe struct instance containing the columns
+    - `func::Function`      function to call for each column, which must take an `Atmos_t` as its first argument
+    - `args...`             additional arguments to pass to the function, after the `Atmos_t` argument
+    - `kwargs...`           additional keyword arguments to pass to the function
+
+    Returns:
+    - `succ::Bool`         whether the function succeeded for all cases
+    """
+    function call_for_globe!(globe::multicol.Globe_t,
+                                    func::Function, args...; kwargs...)::Bool
+
+        succ::Bool=true
+        for i in 1:globe.ncol
+            # Copy data from aux to worker
+            succ &= copy_atmos_fields!(globe.atmos_wrk, globe.atmos_arr[i])
+
+            # Run the function for this column, using the worker
+            succ &= func(globe.atmos_wrk, args...; kwargs...)
+
+            # Copy data from worker back to aux
+            succ &= copy_atmos_fields!(globe.atmos_arr[i], globe.atmos_wrk)
+        end
+        return succ
+    end
+
+    """
+    **Wrapper for calling a function agnostically of either an atmosphere or globe**
+
+    If `ag` is a 1D-atmosphere type, `func` will be called directly on it. Alternatively,
+    if `ag` is a multicol globe type, `func` will be called for each column using `call_for_globe!`.
+
+    Arguments:
+    - `ag::Union{Atmos_t,Globe_t}`      either an atmosphere or globe instance
+    - `func::Function`                  function to call, which must take an `Atmos_t` as its first argument
+    - `args...`                         additional arguments to pass to the function
+    - `kwargs...`                       additional keyword arguments to pass to the function
+
+    Returns:
+    - `succ::Bool`                      whether the function succeeded for all cases
+    """
+    function call_agnostic!(ag::Union{atmosphere.Atmos_t,Globe_t}, func::Function, args...; kwargs...)::Bool
+        if ag isa atmosphere.Atmos_t
+            return func(ag, args...; kwargs...)
+        elseif ag isa Globe_t
+            return call_for_globe!(ag, func, args...; kwargs...)
+        else
+            @warn "Invalid type for call_agnostic!: $(typeof(ag))"
+            return false
+        end
+    end
+
 
 end # end module

@@ -135,7 +135,7 @@ module solver
     easy_ini::Float64  = 3e-4       # Initial value for easy_sf
 
     """
-    **Obtain radiative-convective equilibrium using a matrix method.**
+    **Solve for radiative-convective-chemical equilibrium by energy conservation.**
 
     Solves the non-linear system of equations defined by the flux field
     divergence, minimising flux loss across a cell by iterating the temperature
@@ -178,7 +178,7 @@ module solver
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
 
     Returns:
-        Nothing
+    - `Bool`                            whether the solver converged successfully
     """
     function solve_energy!(atmos::atmosphere.Atmos_t;
                             sol_type::Int64=1,
@@ -204,29 +204,28 @@ module solver
         # --------------------
         @debug "Reticulating splines..."
 
-
         # Validate sol_type
         if (sol_type < 1) || (sol_type > 4)
-            @error "Invalid solution type ($sol_type)."
+            @warn "Invalid solution type ($sol_type)."
             return false
         end
 
         # Validate finite difference fdo option
         if !(fdo in [2,4])
-            @error "Invalid finite-difference order ($fdo). Must be 2 or 4."
+            @warn "Invalid finite-difference order ($fdo). Must be 2 or 4."
             return false
         end
 
         # Validate if transparent
         if atmos.transparent
-            @error "Atmosphere is configured to be transparent."
-            @error "    Cannot use `solve_energy`. Use `solve_transparent` instead."
+            @warn "Atmosphere is configured to be transparent."
+            @warn "    Cannot use `solve_energy`. Use `solve_transparent` instead."
             return false
         end
 
         # Validate options for rainout (required for latent heat)
         if latent && !rainout
-            @error "Must enable rainout if also including latent heating"
+            @warn "Must enable rainout if also including latent heating"
             return false
         end
 
@@ -398,9 +397,9 @@ module solver
 
             # Check that residuals are real numbers
             if !all(isfinite, resid)
-                @error "Residual array contains NaNs and/or Infs"
-                @error "resid: $resid"
-                @error "flux_n: $(atmos.flux_n)"
+                @warn "Residual array contains NaNs and/or Infs"
+                @warn "resid: $resid"
+                @warn "flux_n: $(atmos.flux_n)"
                 code = CODE_NAN
                 return false
             end
@@ -827,7 +826,7 @@ module solver
                             end
                         end
                     else
-                        @error "Invalid linesearch algorithm $ls_method"
+                        @warn "Invalid linesearch algorithm $ls_method"
                         code = CODE_CFG
                         break
                     end
@@ -891,8 +890,8 @@ module solver
             elseif conv_type == 3
                 conv_val = mean(abs.(r_cur))
             else
-                @error "Invalid choice for convergence type"
-                @error "    Got $conv_type. Must be 1, 2, or 3"
+                @warn "Invalid choice for convergence type"
+                @warn "    Got $conv_type. Must be 1, 2, or 3"
                 code = CODE_CFG
                 break
             end
@@ -997,11 +996,11 @@ module solver
         # perform one last evaluation to set `atmos` given the final `x_cur`
         _set_tmps!(x_cur)
 
-        # calc heating rate profile
-        energy.calc_hrates!(atmos)
-
         # calc LW contribution function
         energy.radtrans!(atmos, true, calc_cf=true)
+
+        # calc heating rate profile
+        energy.calc_hrates!(atmos)
 
         # calc diagnostic quantities
         atmosphere.estimate_Ra!(atmos)
@@ -1072,12 +1071,12 @@ module solver
 
         # Validate sol_type (does not allow type=1 here)
         if (sol_type < 1) || (sol_type > 4)
-            @error "Invalid solution type ($sol_type)"
+            @warn "Invalid solution type ($sol_type)"
             return false
         end
         # Validate atm_type
         if (atm_type < 1) || (atm_type > 3)
-            @error "Invalid atmosphere prescription ($atm_type)"
+            @warn "Invalid atmosphere prescription ($atm_type)"
             return false
         end
 
@@ -1224,14 +1223,14 @@ module solver
 
         # Validate sol_type
         if (sol_type < 1) || (sol_type > 4)
-            @error "Invalid solution type ($sol_type)"
+            @warn "Invalid solution type ($sol_type)"
             return false
         end
 
         # Check if transparent
         if !atmos.transparent
-            @error "Atmosphere is NOT configured to be transparent"
-            @error "    Cannot use `solve_transparent`"
+            @warn "Atmosphere is NOT configured to be transparent"
+            @warn "    Cannot use `solve_transparent`"
             return false
         end
 

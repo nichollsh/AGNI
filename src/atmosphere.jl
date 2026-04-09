@@ -584,6 +584,12 @@ module atmosphere
         atmos.AGNI_VERSION = AGNI_VERSION
         @debug "AGNI VERSION = "*AGNI_VERSION
 
+        # Set as not allocated
+        atmos.is_alloc = false
+        atmos.is_param = false
+        atmos.is_solved = false
+        atmos.is_converged = false
+
         # -------------------------
         # Directories
         # -------------------------
@@ -591,10 +597,11 @@ module atmosphere
         # Set name of atmosphere
         name = strip(name)
         if (name == UNSET_STR) || isempty(name)
-            atmos.name = "atmos_"*bytes2hex(rand(UInt8, 4))
+            atmos.name = bytes2hex(rand(UInt8, 4))
         else
             atmos.name = name
         end
+        @debug "Struct name: '$(atmos.name)'"
 
         # Set AGNI root directory
         atmos.ROOT_DIR = abspath(ROOT_DIR)

@@ -16,8 +16,8 @@ title = "Multicolumn example"
     wind_speed      = 10.0
 
     [planet.globe]
-        lons  = [0.0, 30.0, 60.0, 90.0]
-        lats  = [0.0,  0.0,  0.0,  0.0]
+        lons  = [0.0, 60.0, 90.0, 180.0]
+        lats  = [0.0,  0.0,  0.0,   0.0]
 
 [files]
     input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"
@@ -25,7 +25,7 @@ title = "Multicolumn example"
     output_dir      = "out/"
 
 [composition]
-    p_surf          = 2700.0
+    p_surf          = 1000.0
     p_top           = 1e-5
     vmr_dict        = { H2O = 1.0}
     condensates     = []
@@ -37,9 +37,9 @@ title = "Multicolumn example"
     max_runtime     = 400
     num_levels      = 35
     solution_type   = 3
-    solver          = "newton"
+    solver          = ""
     dx_max          = 400.0
-    initial_state   = ["iso","2300"]
+    initial_state   = ["dry","str","1500"]
     linesearch      = 0
     easy_start      = false
     grey_start      = false

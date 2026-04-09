@@ -370,6 +370,7 @@ module AGNI
 
                 if haskey(cfg["composition"], "vmr_file") || haskey(cfg["composition"], "vmr_dict")
                     @error "Config: cannot provide partial pressures and mixing ratios"
+                    return false
                 end
 
             # most provide either VMR or partial pressures, if not transparent
@@ -639,9 +640,16 @@ module AGNI
 
         # Configure globe multicolumn calculation
         globe::Union{multicol.Globe_t,Nothing} = nothing
-        if haskey(cfg["planet"],"globe")
+        is_multicol = haskey(cfg["planet"],"globe")
+        if is_multicol
             @info "Performing multi-column simulation"
             globe = multicol.Globe_t()
+
+            # check that required keys are present
+            if !haskey(cfg["planet"]["globe"], "lons") || !haskey(cfg["planet"]["globe"], "lats")
+                @error "Config: must provide `globe.lons` and `globe.lats` for multicolumn simulation"
+                return false
+            end
 
             @debug "Setup globe"
             if !multicol.construct!(globe, atmos,
@@ -664,11 +672,14 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
-            return_success &= energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
-                                convective=incl_convect, sens_heat=incl_sens,
-                                conductive=incl_conduct,
-                                deep=incl_deep,
-                                calc_cf=Bool(cfg["plots"]["contribution"]))
+            multicol.call_agnostic!( is_multicol ? globe : atmos,
+                                    energy.calc_fluxes!,
+                                    radiative=true, latent_heat=incl_latent,
+                                    convective=incl_convect, sens_heat=incl_sens,
+                                    conductive=incl_conduct,
+                                    deep=incl_deep,
+                                    calc_cf=Bool(cfg["plots"]["contribution"]),
+                                    calc_hr=true)
 
         # Transparent atmosphere solver
         elseif sol == "transparent"
