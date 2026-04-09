@@ -591,7 +591,7 @@ module atmosphere
         # Set name of atmosphere
         name = strip(name)
         if (name == UNSET_STR) || isempty(name)
-            atmos.name = "atmos_"*string(rand(Int64))
+            atmos.name = "atmos_"*bytes2hex(rand(UInt8, 4))
         else
             atmos.name = name
         end

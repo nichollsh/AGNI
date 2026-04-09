@@ -51,7 +51,7 @@ module spectrum
         end
 
         # Read file and search for the gas count line
-        @debug "Counting gaseous absorbers in spectral file: '$spec_file'"
+        @debug "Counting gaseous absorbers in spectral file"
         lines = readlines(spec_file)
         for line in lines
             if contains(line, "Total number of gaseous absorbers")

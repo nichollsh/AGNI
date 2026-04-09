@@ -531,7 +531,7 @@ module AGNI
 
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
-        atmos = atmosphere.Atmos_t()
+        atmos::atmosphere.Atmos_t = atmosphere.Atmos_t()
 
         # Setup atmosphere
         @debug "Setup atmosphere "
@@ -637,8 +637,8 @@ module AGNI
         end
 
         # Configure globe multicolumn calculation
-        do_multicol::Bool = haskey(cfg["planet"],"globe")
-        if do_multicol
+        globe::Union{multicol.Globe_t,Nothing} = nothing
+        if haskey(cfg["planet"],"globe")
             @info "Performing multi-column simulation"
             globe = multicol.Globe_t()
 
@@ -740,7 +740,12 @@ module AGNI
 
         # Write arrays
         @info "Writing results"
-        save.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
+        save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
+        if !isnothing(globe)
+            for (i,a) in enumerate(globe.atmos_arr)
+                save.write_ncdf(a, joinpath(atmos.OUT_DIR,@sprintf("atm.col%03d.nc", i)))
+            end
+        end
 
         # Save plots
         @info "Plotting results"

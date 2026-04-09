@@ -123,7 +123,7 @@ module multicol
             globe.atmos_arr[i] = deepcopy(atmos)
 
             # Set name of atmosphere for the column
-            globe.atmos_arr[i].name = atmos.name * @sprintf("col_%03d", i)
+            globe.atmos_arr[i].name = atmos.name * @sprintf(".col%03d", i)
 
             # Set the zenith angle for the column based on its latitude and longitude
             globe.atmos_arr[i].zenith_degrees = atmosphere.calc_zenith_angle(globe.lons_arr[i], globe.lats_arr[i])
