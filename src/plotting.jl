@@ -18,14 +18,17 @@ module plotting
 
     import ..atmosphere
     import ..phys
+    import ..multicol
 
     # Default plotting configuration
+    const size_x_default::Int64 = 500
+    const size_y_default::Int64 = 400
     const plt_default = Dict(:fontfamily => "sans-serif",
                              :framestyle => :box,
                              :grid       => true,
                              :guidefontsize => 9,
                              :titlefontsize => 9,
-                             :dpi => 220)
+                             :dpi => 240)
 
     """
     Apply a symmetric log10 transform, returning zero for |v| < 1.
@@ -67,13 +70,19 @@ module plotting
         return esc(:(hline!(plt, [atmos.p_oboa/1e5], label="", color="black", ls=:dot)))
     end
 
-
-
     """
-    Plot the temperature-pressure and Kzz profile.
+    **Plot the temperature-pressure and Kzz profile.**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`               width of the plot in pixels
+    - `size_y::Int64`               height of the plot in pixels
+    - `incl_magma::Bool`            include the magma temperature as a scatter point
+    - `title::String`               title for the plot
     """
     function plot_pt(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int64=500, size_y::Int64=400,
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default,
                             incl_magma::Bool=false,
                             title::String="")
 
@@ -182,10 +191,17 @@ module plotting
     end
 
     """
-    Plot the radius vs pressure profile.
+    **Plot the radius vs pressure profile.**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`               width of the plot in pixels
+    - `size_y::Int64`               height of the plot in pixels
+    - `title::String`               title for the plot
     """
     function plot_radius(atmos::atmosphere.Atmos_t, fname::String;
-                                size_x::Int64=500, size_y::Int64=400,
+                                size_x::Int64=size_x_default, size_y::Int64=size_y_default,
                                 title::String="")
 
         # Create plot
@@ -221,9 +237,16 @@ module plotting
 
     """
     **Plot the cloud and aerosol mass mixing ratios.**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`               width of the plot in pixels
+    - `size_y::Int64`               height of the plot in pixels
+    - `title::String`               title for the plot
     """
     function plot_cloud(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int64=500, size_y::Int64=400,
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default,
                             title::String="")
 
         xlims = (-8.0, 0.0)
@@ -277,10 +300,16 @@ module plotting
     end
 
     """
-    Plot the VMRs of the atmosphere at each cell-centre location.
+    **Plot the gas phase volume mixing ratios at each cell-centre location.**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`               width of the plot in pixels
+    - `size_y::Int64`               height of the plot in pixels
     """
     function plot_vmr(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int64=500, size_y::Int64=400)
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
 
         # X-axis minimum allowed left-hand-side limit (log units)
         minmin_x::Float64 = -10
@@ -373,10 +402,22 @@ module plotting
     end
 
     """
-    Plot the fluxes at each pressure level
+    **Plot the fluxes at each pressure level**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`  atmosphere object
+    - `fname::String`              filename to save the plot (if empty, does not save)
+    - `size_x::Int64`              width of the plot in pixels
+    - `size_y::Int64`              height of the plot in pixels
+    - `incl_eff::Bool`             whether to include the intrinsic (or interior) heat flux as a dashed line
+    - `incl_mlt::Bool`             whether to include the convective flux as a solid line
+    - `incl_cdct::Bool`            whether to include the conductive flux as a solid line
+    - `incl_latent::Bool`          whether to include the latent heating flux as a solid line
+    - `incl_deep::Bool`            whether to include the deep heating flux as a solid line
+    - `title::String`              title for the plot
     """
     function plot_fluxes(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int64=500, size_y::Int64=400,
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default,
                             incl_eff::Bool=false, incl_mlt::Bool=true,
                             incl_cdct::Bool=true, incl_latent::Bool=true,
                             incl_deep::Bool=true,
@@ -502,7 +543,11 @@ module plotting
     end
 
     """
-    Plot emission spectrum at the TOA
+    **Plot emission spectrum at the TOA**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`    atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
     """
     function plot_emission(atmos::atmosphere.Atmos_t, fname::String)
 
@@ -566,10 +611,19 @@ module plotting
     end
 
     """
-    Plot contribution function at different bands.
+    **Plot contribution function at different bands.**
+
+    The contribution function is plotted with one line (vs pressure) per spectral band.
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`    atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`              width of the plot in pixels
+    - `size_y::Int64`              height of the plot in pixels
+    - `cf_min::Float64`            minimum contribution function value to plot (log10 units)
     """
     function plot_contfunc1(atmos::atmosphere.Atmos_t, fname::String;
-                                    size_x::Int64=500, size_y::Int64=400,
+                                    size_x::Int64=size_x_default, size_y::Int64=size_y_default,
                                     cf_min::Float64=1e-6)
 
         # Check that we have data
@@ -648,10 +702,14 @@ module plotting
     end
 
     """
-    Plot normalised contribution function (per band)
+    **Plot normalised contribution function (per band)**
 
     The data displayed in this plot are fine, but the x-axis ticks are labelled
     incorrectly by the plotting library. I don't know why this is.
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`    atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
     """
     function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String)
 
@@ -724,9 +782,16 @@ module plotting
     end
 
     """
-    Plot spectral albedo (ratio of SW_UP to SW_DN)
+    **Plot spectral albedo (ratio of SW_UP to SW_DN)**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`    atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`              width of the plot in pixels
+    - `size_y::Int64`              height of the plot in pixels
     """
-    function plot_albedo(atmos::atmosphere.Atmos_t, fname::String)
+    function plot_albedo(atmos::atmosphere.Atmos_t, fname::String;
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -740,7 +805,7 @@ module plotting
 
         # Make plot
         ylims  = (0.0, 100.0)
-        plt = plot(ylims=ylims; plt_default...)
+        plt = plot(ylims=ylims, size=(size_x, size_y); plt_default...)
 
         plot!(plt, atmos.bands_cen*1e9, y, color="black", label="")
 
@@ -758,7 +823,7 @@ module plotting
     end
 
     """
-    Combined plot used for tracking behaviour of the solver
+    **Combined multi-panel plot used for tracking behaviour of the solver at runtime.**
     """
     function combined(plt_pt, plt_fl, plt_mr, plt_ra, info::String, fname::String;
                         size_x::Int64=800, size_y::Int64=700)
@@ -769,6 +834,41 @@ module plotting
         plt = plot(plt_pt, plt_fl, plt_mr, plt_ra,
                         plot_title=info,
                         layout=(2,2), size=(size_x, size_y); plt_default...)
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt
+    end
+
+    """
+    **Globe plot of multi-column atmosphere climate and energy balance.**
+
+    Arguments:
+    - `globe::multicol.Globe_t`     globe object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`              width of the plot in pixels
+    - `size_y::Int64`              height of the plot in pixels
+    """
+    function plot_globe(globe::multicol.Globe_t, fname::String;
+        size_x::Int64=size_x_default, size_y::Int64=size_y_default)
+
+        # Create plot
+        plt = plot(size=(size_x, size_y); plt_default...)
+
+        # Create colormap
+        cmap = cgrad(:batlow, globe.ncol, categorical=true)
+
+        # Plot temperature profiles
+        for i in 1:globe.ncol
+            plot!(plt, globe.atmos_arr[i].tmp, globe.atmos_arr[i].p*1e-5,
+                    label=@sprintf("col%03d", i), lw=1.5, color=cmap[i])
+        end
+
+        xlabel!(plt, "Temperature [K]")
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10)
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -815,7 +915,8 @@ module plotting
     Plot jacobian matrix
     """
     function jacobian(b::Array{Float64,2}, fname::String;
-                            perturb::Array{Bool,1}=Bool[], size_x::Int64=600, size_y::Int64=500)
+                            perturb::Array{Bool,1}=Bool[],
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
 
         lim::Float64 = maximum(abs.(b))     # colourbar limits
         l::Int64 = length(perturb)            # show perturbed levels?

@@ -76,3 +76,4 @@ title = "Multicolumn example"
     animate         = true
     height          = true
     cloud           = false
+    globe           = true

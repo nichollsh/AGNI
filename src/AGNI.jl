@@ -454,6 +454,7 @@ module AGNI
         end
 
         #    plotting stuff
+        plt_glo::Bool          = get(cfg["plots"], "globe", false)
         plt_tmp::Bool          = cfg["plots"]["temperature"]
         plt_ani::Bool          = cfg["plots"]["animate"]
         plt_ani = plt_ani && plt_tmp
@@ -745,11 +746,19 @@ module AGNI
             for (i,a) in enumerate(globe.atmos_arr)
                 save.write_ncdf(a, joinpath(atmos.OUT_DIR,@sprintf("atm.col%03d.nc", i)))
             end
+        elseif plt_glo
+            @warn "Globe plotting requested for single-column simulation"
+            plt_glo = false
         end
 
         # Save plots
         @info "Plotting results"
         if !transparent
+
+            # globe plots
+            plt_glo && plotting.plot_globe(globe, joinpath(atmos.OUT_DIR,"plot_globe.png"))
+
+            # single column plots
             plt_ani && plotting.animate(atmos.OUT_DIR, atmos.FRAMES_DIR)
             cfg["plots"]["cloud"] && \
                 plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))

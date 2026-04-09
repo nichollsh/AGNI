@@ -44,7 +44,7 @@ module energy
                                     func::Function, args...; kwargs...)::Bool
 
         succ::Bool=true
-        for i in 1:globe.num_cols
+        for i in 1:globe.ncol
             # Copy data from aux to worker
             succ &= multicol.copy_atmos_fields!(globe.atmos_wrk, globe.atmos_arr[i])
 

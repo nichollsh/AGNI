@@ -37,7 +37,7 @@ module multicol
         atmos_wrk::atmosphere.Atmos_t      # worker atmosphere for calculations
 
         # Arrays of atmosphere columns
-        num_cols::Int64                             # number of columns
+        ncol::Int64                             # number of columns
         atmos_arr::Array{atmosphere.Atmos_t,1} # auxiliary atmospheric columns
         lons_arr::Array{Float64,1}                  # longitudes for each column
         lats_arr::Array{Float64,1}                  # latitudes for each column
@@ -93,16 +93,16 @@ module multicol
         end
 
         # Set up the column locations
-        globe.num_cols  = length(lons)
+        globe.ncol  = length(lons)
         globe.lons_arr  = lons
         globe.lats_arr  = lats
 
         # Check that the longitudes and latitudes are valid
-        if length(globe.lats_arr) != globe.num_cols
-            @warn "Number of longitudes and latitudes must match number of columns: $(globe.num_cols)"
+        if length(globe.lats_arr) != globe.ncol
+            @warn "Number of longitudes and latitudes must match number of columns: $(globe.ncol)"
             return false
         end
-        for i in 1:globe.num_cols
+        for i in 1:globe.ncol
             if !(0.0 <= globe.lons_arr[i] <= 360.0)
                 @warn "Invalid longitude $(globe.lons_arr[i]) for column $i"
                 return false
@@ -114,10 +114,10 @@ module multicol
         end
 
         # Allocate array of auxiliary atmospheric columns
-        globe.atmos_arr = atmosphere.Atmos_t[atmosphere.Atmos_t() for i in 1:globe.num_cols]
+        globe.atmos_arr = atmosphere.Atmos_t[atmosphere.Atmos_t() for i in 1:globe.ncol]
 
         # Copy the original atmosphere to each column
-        for i in 1:globe.num_cols
+        for i in 1:globe.ncol
 
             # Make copy of atmosphere for the column
             globe.atmos_arr[i] = deepcopy(atmos)
@@ -141,7 +141,7 @@ module multicol
 
         # Set the globe as constructed
         globe.is_constructed = true
-        @debug "Globe constructed with $(globe.num_cols) columns"
+        @debug "Globe constructed with $(globe.ncol) columns"
 
         return true
     end # end construct!
