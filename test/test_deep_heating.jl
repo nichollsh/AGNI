@@ -61,8 +61,11 @@ end
                                             :pressure, :boundary_flux, :abs)
         @test ok
 
-        energy.deep_heating!(atmos)
+        energy.calc_fluxes!(atmos; deep=true)
         @test all(isapprox.(atmos.flux_deep, 250.0; rtol=0.0, atol=1e-10))
+
+        diff = atmos.flux_deep .- atmos.flux_tot
+        @test all(isapprox.(diff, 0.0; atol=1e-10))
 
         atmosphere.deallocate!(atmos)
     end

@@ -1071,17 +1071,14 @@ module energy
         end
 
         # +Deep atmospheric heating
-        # Note: flux_deep is computed but NOT added to flux_tot.
-        # For sol_type>=3, heating is added directly to the solver residual.
-        # This prevents numerical artifacts ("hook" shape) in deep P-T profiles
-        # because the heating doesn't propagate through flux_dif incorrectly.
         if deep
             ok &= deep_heating!(atmos)
+            @. atmos.flux_tot += atmos.flux_deep
         end
 
         # Flux difference across each level
         # Positive value => heating
-        atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
+        atmos.flux_dif[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1]
 
         # Heating rate
         if calc_hr

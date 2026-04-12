@@ -378,18 +378,14 @@ module solver
                 # Energy balance for each layer:
                 # At equilibrium, heating deposited in a layer equals net flux divergence.
                 # flux_dif = flux_tot[i+1] - flux_tot[i] (positive = cooling)
-                # heating_div = flux_deep[i+1] - flux_deep[i] (positive = heating deposited)
-                # Residual = cooling - heating = flux_dif - heating_div
-                heating_term = atmos.flux_deep[2:end] .- atmos.flux_deep[1:end-1]
-                resid[1:end-1] .= atmos.flux_dif[1:end] .+ heating_term
+                resid[1:end-1] .= atmos.flux_dif[1:end]
 
                 # TOA boundary: total upward flux = internal + deep heating from below
                 # flux_deep[end] is the total heating flux entering from below the domain
                 resid[end] = atmos.flux_tot[end] - atmos.flux_int
             elseif (sol_type == 4)
                 # Same energy balance as sol_type=3
-                heating_term = atmos.flux_deep[2:end] .- atmos.flux_deep[1:end-1]
-                resid[1:end-1] .= atmos.flux_dif[1:end] .+ heating_term
+                resid[1:end-1] .= atmos.flux_dif[1:end] 
                 # OLR is equal to target_olr
                 resid[end] = atmos.target_olr - atmos.flux_u_lw[1]
 
