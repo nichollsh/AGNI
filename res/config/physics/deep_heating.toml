@@ -1,8 +1,7 @@
-# AGNI configuration file
-title = "Aerosols radiative properties test"
+title = "Deep heating demo"             # Name for this configuration file
 
 [planet]
-    tmp_surf        = 600.0            # Surface temperature [kelvin].
+    tmp_surf        = 2000.0            # Surface temperature [kelvin].
     instellation    = 44000.0           # Stellar flux at planet's orbital distance [W m-2].
     albedo_b        = 0.18              # Pseudo bond-albedo which downscales the stellar flux by 1-this_value.
     s0_fact         = 0.6652            # Stellar flux scale factor which accounts for planetary rotation (c.f. Cronin+13).
@@ -17,44 +16,46 @@ title = "Aerosols radiative properties test"
     flux_int        = 0.0               # Planet's internal flux [W m-2]. Used when sol_type=3.
     roughness       = 0.001             # Surface roughness length scale [m]
     wind_speed      = 2.0               # Effective wind speed for sensible heat [m s-1].
-    star_Teff    = 4000.0               # Stellar effective temperature, if using `input_star="blackbody"`
+    star_Teff       = 4000.0            # Stellar effective temperature, if using `input_star="blackbody"`
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/256/Dayspring.sf"   # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
+    input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"    # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum. Set to "blackbody" to use `planet.star_Teff`.
     output_dir      = "out/"                                            # Path to output directory.
     io_dir          = "out/"                                            # Path for fast file operations (optional).
 
 [composition]
-    p_surf          = 1000.0                     # Total surface pressure [bar].
+    p_surf          = 400.0                     # Total surface pressure [bar].
     p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
-    vmr_dict        = { H2=0.3, HCN=0.5, NH3=0.1, CO=0.05, H2O=0.05}               # Volatile volume mixing ratios (=mole fractions).
-    condensates     = ["HCN","NH3"]                        # List of volatiles which are allowed to condense.
-    aerosols        = { "soot"=1e-4, "nitrate"=1e-2, "biogenic"="HCN" }            # List of aerosols and default MMRs
+    vmr_dict        = { H2O=1.0 }               # Volatile volume mixing ratios (=mole fractions).
+    condensates     = []                        # List of volatiles which are allowed to condense.
+    aerosols        = { }                       # List of aerosols and default MMRs
 
 [execution]
     clean_output    = true                      # Clean the output folder at model startup.
-    verbosity       = 2                         # Log level (0: none, 1: normal, 2: debug)
+    verbosity       = 1                         # Log level (0: none, 1: normal, 2: debug)
     max_steps       = 20000                     # Maximum number of solver steps.
     max_runtime     = 400                       # Maximum wall-clock solver runtime [s].
-    num_levels      = 200                       # Number of model levels.
+    num_levels      = 50                       # Number of model levels.
     converge_atol   = 1.0e-3                    # Convergence criterion on absolute flux divergence [W m-2].
     converge_rtol   = 1.0e-1                    # Convergence criterion on relative flux divergence [dimensionless].
     converge_type   = 1                         # Method for measuring convergence (1: cost function, 2: median residual, 3: mean residual).
     solution_type   = 1                         # Solution type (see wiki).
-    solver          = ""                        # Solver to use (see wiki).
+    solver          = "newton"                        # Solver to use (see wiki).
     dx_max          = 200.0                     # Maximum step size [Kelvin], when using nonlinear solvers
-    initial_state   = ["dry"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
-    linesearch      = 0                         # Linesearch method to be used (0: None, 1: Golden, 2: Backtracking)
+    initial_state   = ["loglin","500"]     # Ordered list of requests describing the initial state of the atmosphere (see wiki).
+    linesearch      = 2                         # Linesearch method to be used (0: None, 1: Golden, 2: Backtracking)
     easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.
     grey_start      = false                     # Initially solve for RCE using double-grey rad trans.
     perturb_all     = false                     # Perturb all rows of jacobin matrix?
+    rfm_wn_min    = 100.0                     # Line-by-line RFM minimum wavenumber [cm-1] (optional).
+    rfm_wn_max    = 10000.0                   # Line-by-line RFM maximum wavenumber [cm-1] (optional).
 
 [physics]
     chemistry       = false                     # Solve for thermochemistry in atmosphere?
     continua        = true                      # Include absorption from continua?
-    rayleigh        = false                     # Include rayleigh scattering?
-    aerosol         = true                      # Include parametrised aerosols from SOCRATES spectral metadata?
+    rayleigh        = true                      # Include rayleigh scattering?
+    aerosol         = false                     # Include parametrised aerosols from SOCRATES spectral metadata?
     cloud           = false                     # Include water cloud radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
     grey_lw         = 1e-4                      # Grey longwave opacity, used when `input_sf="greygas"`
@@ -64,11 +65,22 @@ title = "Aerosols radiative properties test"
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     conduction      = true                      # Include thermal conductive heat transport?
     oceans          = false                     # Model ocean formation - check saturation at surface
-    rainout         = true                      # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
+    rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
     coldtrap        = true                      # Enable cold-trapping effect on abundances aloft
+    evap_efficiency = 0.05                      # Efficiency of re-evaporation of raindrops in dry regions
+    demixing        = false                     # Include immiscible demixing of atmospheric constituents?
     latent_heat     = false                     # Include heat release from phase change
     convection_crit = "s"                       # Stability criterion for convection. Options: (s)chwarzschild or (l)edoux.
     convection      = true                      # Include heat transport by convection
+
+    [physics.deep_heating]
+        Pmid            = 1.0              # Center of Gaussian heating profile [bar]
+        Pwid            = 1.0               # Width of Gaussian in log-Pascal units.
+        power_mode      = "abs"             # Power mode for heating (off, rel, abs)
+        norm_method     = "pressure"        # Normalisation coordinate: "pressure" (legacy dF/dP), or "mass" (dm-weighted).
+        domain          = "clamp"           # How to handle Pmid outside domain (clamp, boundary_flux)
+        flux_rel        = 0.0               # Set flux by fraction of instellation, used for power_mode="rel".
+        flux_abs        = 10.0              # Set flux by [W m-2], used for power_mode="abs".
 
 [plots]
     at_runtime      = true                      # Make some plots at runtime?

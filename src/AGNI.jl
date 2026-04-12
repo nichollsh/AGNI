@@ -779,9 +779,9 @@ module AGNI
                 plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.png"))
             cfg["plots"]["height"] && \
                 plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.png"))
+            plt_tmp && \
+                plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
         end
-        plt_tmp && \
-            plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
         cfg["plots"]["fluxes"] && \
             plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"),
                                     incl_mlt=incl_convect, incl_eff=(sol_type==3),
@@ -793,8 +793,11 @@ module AGNI
             plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.png"))
 
         # Deallocate atmosphere
-        @info "Deallocating memory"
+        @debug "Deallocating memory"
         atmosphere.deallocate!(atmos)
+        if !isnothing(globe)
+            multicol.deconstruct!(globe)
+        end
 
         return return_success
     end

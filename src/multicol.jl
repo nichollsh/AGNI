@@ -55,12 +55,14 @@ module multicol
 
 
     """
-    **Destruct the globe**
+    **De-construct the globe**
+
+    This resets the globe and deallocates memory for all atmosphere columns.
 
     Arguments:
-    - `globe::Globe_t`      the globe to destruct
+    - `globe::Globe_t`      the globe to de-construct
     """
-    function destruct!(globe::Globe_t)
+    function deconstruct!(globe::Globe_t)
         for atmos in globe.atmos_arr
             atmosphere.deallocate!(atmos)
         end
