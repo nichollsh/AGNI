@@ -20,6 +20,18 @@ module plotting
     import ..phys
     import ..multicol
 
+    # Allowed plot file extensions
+    const ALLOWED_EXTS::Set{String} = Set(["png", "pdf", "svg"])
+
+    # Colors
+    const col_r::String = "#c0c0c0"
+    const col_n::String = "#000000"
+    const col_c::String = "#6495ed"
+    const col_t::String = "#ff4400"
+    const col_o::String = "#66CD00"
+    const col_p::String = "#ecb000"
+    const col_d::String = "#8B008B"
+
     # Default plotting configuration
     const la::Float64 = 0.7
     const lw::Float64 = 1.9
@@ -442,15 +454,6 @@ module plotting
                     ylims=ylims, yticks=_get_yticks(atmos),
                     xticks=(xticks, xticklabels), xlims=xlims,
                     size=(size_x,size_y); plt_default...)
-
-
-        col_r::String = "#c0c0c0"
-        col_n::String = "#000000"
-        col_c::String = "#6495ed"
-        col_t::String = "#ff4400"
-        col_o::String = "#66CD00"
-        col_p::String = "#ecb000"
-        col_d::String = "#8B008B"
 
         # Legend dummy plots
         plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dot,   lw=lw, lc=col_r, label="SW")

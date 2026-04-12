@@ -41,7 +41,7 @@ end
         ok = atmosphere.set_deep_heating!(atmos,
                                             1.0e5, 0.7,
                                             0.1, 0.0,
-                                            :mass, :clamp, :rel)
+                                            "mass", "clamp", "rel")
         @test ok
 
         energy.deep_heating!(atmos)
@@ -58,7 +58,7 @@ end
         ok = atmosphere.set_deep_heating!(atmos,
                                             1.0e9, 0.5,
                                             0.0, 250.0,
-                                            :pressure, :boundary_flux, :abs)
+                                            "pressure", "boundary_flux", "abs")
         @test ok
 
         energy.calc_fluxes!(atmos; deep=true)
@@ -76,7 +76,7 @@ end
         ok = atmosphere.set_deep_heating!(atmos,
                                             1.0e5, 0.5,
                                             1.0, 999.0,
-                                            :mass, :clamp, :off)
+                                            "mass", "clamp", "off")
         @test ok
 
         energy.deep_heating!(atmos)

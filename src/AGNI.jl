@@ -455,10 +455,15 @@ module AGNI
         end
 
         #    plotting stuff
+        plt_EXT::String        = lowercase(get(cfg["plots"], "extension", "png"))
         plt_glo::Bool          = get(cfg["plots"], "globe", false)
         plt_tmp::Bool          = cfg["plots"]["temperature"]
         plt_ani::Bool          = cfg["plots"]["animate"]
         plt_ani = plt_ani && plt_tmp
+        if !( plt_EXT in plotting.ALLOWED_EXTS )
+            @error "Config: Plot extension must be one of $(plotting.ALLOWED_EXTS)"
+            return false
+        end
 
         #    latent heating
         if incl_latent && !rainout
@@ -594,7 +599,8 @@ module AGNI
         end
 
         # Configure deep atmospheric heating
-        if haskey(cfg["physics"],"deep_heating")
+        incl_deep::Bool = haskey(cfg["physics"],"deep_heating")
+        if incl_deep
             dh = cfg["physics"]["deep_heating"]
             if ! all(k in keys(dh) for k in ["Pmid","Pwid","flux_rel","flux_abs","norm_method","domain","power_mode"])
                 @error "Config: deep heating enabled but parameters are not set"
@@ -606,11 +612,10 @@ module AGNI
             atmosphere.set_deep_heating!(atmos,
                                             Float64(dh["Pmid"])*1e5, Float64(dh["Pwid"]),
                                             Float64(dh["flux_rel"]), Float64(dh["flux_abs"]),
-                                            Symbol(dh["norm_method"]),
-                                            Symbol(dh["domain"]),
-                                            Symbol(dh["power_mode"])) || return false
+                                            dh["norm_method"],
+                                            dh["domain"],
+                                            dh["power_mode"]; verbose=true) || return false
         end
-        incl_deep::Bool = atmos.deepheat_power_mode != :off
 
 
         # Set temperatures as appropriate
@@ -642,6 +647,14 @@ module AGNI
         globe::Union{multicol.Globe_t,Nothing} = nothing
         is_multicol = haskey(cfg["planet"],"globe")
         if is_multicol
+
+            # do not allow with single-column deep heating mode
+            if atmos.deepheat_power_mode != "off"
+                @error "Config: multi-column simulation incompatible with single-column deep heating mode"
+                return false
+            end
+            incl_deep = true # need these fluxes to be calculated
+
             @info "Performing multi-column simulation"
             globe = multicol.Globe_t()
 
@@ -651,6 +664,7 @@ module AGNI
                 return false
             end
 
+            # construct globe object
             @debug "Setup globe"
             if !multicol.construct!(globe, atmos,
                                 cfg["planet"]["globe"]["lons"],
@@ -658,6 +672,9 @@ module AGNI
                 @error "Could not construct globe object"
                 return false
             end
+
+            @debug "Set heat redist for globe"
+            multicol.set_redist!(globe, cfg["planet"]["globe"]["redist_flux"])
         end
 
 
@@ -753,7 +770,7 @@ module AGNI
         # Write arrays
         @info "Writing results"
         save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
-        if !isnothing(globe)
+        if is_multicol
             for (i,a) in enumerate(globe.atmos_arr)
                 save.write_ncdf(a, joinpath(atmos.OUT_DIR,@sprintf("atm.col%03d.nc", i)))
             end
@@ -767,35 +784,35 @@ module AGNI
         if !transparent
 
             # globe plots
-            plt_glo && plotting.plot_globe(globe, joinpath(atmos.OUT_DIR,"plot_globe.png"))
+            plt_glo && plotting.plot_globe(globe, joinpath(atmos.OUT_DIR,"plot_globe.$plt_EXT"))
 
             # single column plots
             plt_ani && plotting.animate(atmos.OUT_DIR, atmos.FRAMES_DIR)
             cfg["plots"]["cloud"] && \
-                plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
+                plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.$plt_EXT"))
             cfg["plots"]["mixing_ratios"] && \
-                plotting.plot_vmr(atmos, joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
+                plotting.plot_vmr(atmos, joinpath(atmos.OUT_DIR,"plot_vmrs.$plt_EXT"), size_x=600)
             cfg["plots"]["contribution"]  && \
-                plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.png"))
+                plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.$plt_EXT"))
             cfg["plots"]["height"] && \
-                plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.png"))
+                plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.$plt_EXT"))
             plt_tmp && \
-                plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
+                plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"plot_ptprofile.$plt_EXT"), incl_magma=(sol_type==2))
         end
         cfg["plots"]["fluxes"] && \
-            plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"),
+            plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.$plt_EXT"),
                                     incl_mlt=incl_convect, incl_eff=(sol_type==3),
                                     incl_cdct=incl_conduct, incl_latent=incl_latent,
                                     incl_deep=incl_deep)
         cfg["plots"]["emission"] && \
-            plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
+            plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.$plt_EXT"))
         cfg["plots"]["albedo"] && \
-            plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.png"))
+            plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.$plt_EXT"))
 
         # Deallocate atmosphere
         @debug "Deallocating memory"
         atmosphere.deallocate!(atmos)
-        if !isnothing(globe)
+        if !is_multicol
             multicol.deconstruct!(globe)
         end
 

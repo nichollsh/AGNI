@@ -26,11 +26,16 @@ module multicol
     import ..atmosphere
     import ..phys
 
-    # Constants
-    protect_fields = Symbol[:name, :num_rt_eval, :tim_rt_eval]
+    # Globals - TODO: make configurable
+    redist_Pmid::Float64 = 1e5      # 1 bar
+    redist_Pwid::Float64 = 1.0      # 1 log unit
+
+    # For copying variables between atmospheres
+    SHARED_TYPES     = Union{AbstractArray, AbstractVector, Number, AbstractDict, AbstractString}
+    PROTECTED_FIELDS = Symbol[:name, :num_rt_eval, :tim_rt_eval]
     shared_fields = Symbol[]
     for (field,type) in zip(fieldnames(atmosphere.Atmos_t), atmosphere.Atmos_t.types)
-        if (type <: Union{AbstractArray, Array, Vector, Number, Dict}) && !(field in protect_fields)
+        if (type <: SHARED_TYPES) && !(field in PROTECTED_FIELDS)
             push!(shared_fields, field)
         end
     end
@@ -85,7 +90,9 @@ module multicol
     - `Bool`                        globe was successfully constructed
     """
     function construct!(globe::Globe_t, atmos::atmosphere.Atmos_t,
-                            lons::Array{Float64,1}, lats::Array{Float64,1})::Bool
+                            lons::Array{Float64,1},
+                            lats::Array{Float64,1},
+                        )::Bool
 
         # Fail safe
         globe.is_constructed = false
@@ -98,9 +105,9 @@ module multicol
         globe.atmos_wrk = atmos
 
         # Set up the column locations
-        globe.ncol  = length(lons)
-        globe.lons_arr  = lons
-        globe.lats_arr  = lats
+        globe.ncol     = length(lons)
+        globe.lons_arr = lons
+        globe.lats_arr = lats
 
         # Check that the longitudes and latitudes are valid
         if length(globe.lats_arr) != globe.ncol
@@ -145,6 +152,14 @@ module multicol
             # Set TOA heating
             globe.atmos_arr[i].toa_heating = atmosphere.calc_toa_heating(globe.atmos_arr[i])
 
+            # Set deep heating
+            atmosphere.set_deep_heating!(globe.atmos_arr[i],
+                                            redist_Pmid,
+                                            redist_Pwid,
+                                            0.0, # always flux_rel = 0
+                                            0.0, # initially zero, but set later
+                                            "pressure", "boundary_flux", "abs")
+
             # Check that arrays have correct length
             if length(globe.atmos_arr[i].tmp) != atmos.nlev_c
                 @warn "Globe column $i has unexpected number of vertical levels ($(length(globe.atmos_arr[i].tmp)))"
@@ -160,7 +175,36 @@ module multicol
     end # end construct!
 
     """
-    **Copy arrays and other data from one atmosphere to another.**
+    **Set heat-redistribution flux profiles for globe's columns.**
+
+    Update heat-redistribution fluxes for all columns in globe.
+
+    Arguments:
+    - `globe::Globe_t`              globe struct containing the columns to update
+    - `fluxes::Array{Float64,1}`    single flux value for each column
+
+    Returns:
+    - `succ::Bool                   whether the update was successful
+    """
+    function set_redist!(globe::Globe_t, fluxes::Array{Float64,1})::Bool
+
+        succ::Bool = true
+
+        for (i,atmos) in enumerate(globe.atmos_arr)
+            succ &= atmosphere.set_deep_heating!(
+                        atmos,
+                        atmos.deepheat_Pmid, # do not change previously-stored value
+                        atmos.deepheat_Pwid, # ^
+                        0.0,                 # flux_rel = 0
+                        fluxes[i],           # flux_abs = redist flux for this column
+                        "pressure", "boundary_flux", "abs"
+                    )
+        end
+        return succ
+    end
+
+    """
+    **Copy arrays and other data from one atmosphere struct to another.**
 
     Arguments:
     - `dst::Atmos_t`        destination atmosphere to copy to

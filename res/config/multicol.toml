@@ -16,8 +16,9 @@ title = "Multicolumn example"
     wind_speed      = 10.0
 
     [planet.globe]
-        lons   = [0.0, 60.0, 90.0, 180.0]
-        lats   = [0.0,  0.0,  0.0,   0.0]
+        lons        = [  0.0,  60.0,  90.0, 180.0]      # longitudes [deg]
+        lats        = [  0.0,   0.0,   0.0,   0.0]      # latitudes [deg]
+        redist_flux = [ 30.0,  20.0,   10.0,   5.0]      # flux going into next column [W m-2]
 
 [files]
     input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"
@@ -66,6 +67,7 @@ title = "Multicolumn example"
     grey_sw         = 2e-3
 
 [plots]
+    extension       = "pdf"
     at_runtime      = true
     temperature     = true
     fluxes          = true
@@ -73,7 +75,7 @@ title = "Multicolumn example"
     emission        = true
     albedo          = true
     mixing_ratios   = true
-    animate         = true
+    animate         = false
     height          = true
     cloud           = false
     globe           = true

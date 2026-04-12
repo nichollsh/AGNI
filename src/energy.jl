@@ -523,8 +523,8 @@ module energy
     centered at `P_dep` with width `sigma_P`.
 
     Two power modes are supported:
-    - `:rel`        — total flux = `efficiency × instellation` (stellar efficiency)
-    - `:abs`        — total flux = `F_total` (fixed radiative flux in W m⁻²)
+    - `"rel"`   total flux = `efficiency * instellation` (stellar efficiency)
+    - `"abs"`   total flux = `F_total` (fixed radiative flux in W m⁻²)
 
     The flux gradient is defined as:
         dF_deep/dP = F_total / (sqrt(2π) * σ_P * P) * exp(-(ln(P) - ln(P_dep))² / (2 * σ_P²))
@@ -545,19 +545,18 @@ module energy
         sigma_P::Float64        = atmos.deepheat_Pwid
         efficiency::Float64     = atmos.deepheat_flux_rel
         F_total_in::Float64     = atmos.deepheat_flux_abs
-        normalisation::Symbol   = atmos.deepheat_norm_method
-        below_domain::Symbol    = atmos.deepheat_domain
+        below_domain::Bool      = atmos.deepheat_domain == "boundary_flux"
 
         # Determine total deposited flux [W m-2]
         F_total::Float64 = 0.0
-        if atmos.deepheat_power_mode == :rel
+        if atmos.deepheat_power_mode == "rel"
             # Stellar efficiency: define heating as a fraction of instellation (per unit area).
             eff::Float64 = clamp(efficiency, 0.0, 1.0)
             F_total = eff * atmos.instellation
-        elseif atmos.deepheat_power_mode == :abs
+        elseif atmos.deepheat_power_mode == "abs"
             # Fixed radiative flux [W m-2]
             F_total = max(F_total_in, 0.0)
-        elseif atmos.deepheat_power_mode == :off
+        elseif atmos.deepheat_power_mode == "off"
             # No deep heating
             return true
         else
@@ -565,17 +564,15 @@ module energy
             return false
         end
 
-        # If heating is effectively zero, do nothing
-        if F_total <= 0.0
-            return true
-        end
+        # If heating is zero, do nothing
+        # if abs(F_total) <= 1e-10
+        #     return true
+        # end
 
         # If deposition is outside the domain and requested, apply as a bottom boundary flux.
-        if below_domain == :boundary_flux
-            if (P_dep > atmos.p_boa) || (P_dep < atmos.p_toa)
-                atmos.flux_deep .= F_total
-                return true
-            end
+        if below_domain && ( (P_dep > atmos.p_boa) || (P_dep < atmos.p_toa) )
+            atmos.flux_deep .= F_total
+            return true
         end
 
         # Prepare log-pressure variables
@@ -585,7 +582,7 @@ module energy
         # Integrate from TOA downwards to get cumulative flux at each level edge
         atmos.flux_deep[1] = 0.0
 
-        if normalisation == :pressure
+        if atmos.deepheat_norm_method == "pressure"
             # Legacy: pressure-normalised dF/dP profile
             norm_factor::Float64 = 1.0 / (sqrt(2.0 * π) * sigma_P)
             dF_dP::Float64 = 0.0
@@ -600,7 +597,7 @@ module energy
                 atmos.flux_deep[i+1] = atmos.flux_deep[i] + dF_dP * dp
             end
 
-        elseif normalisation == :mass
+        elseif atmos.deepheat_norm_method == "mass"
             # dm-weighted normalisation: ensures Σ(ε_dep*dm) = F_total
             # Column mass per unit area for layer i: dm_i = dp_i / g_i  [kg m⁻²]
             denom::Float64 = 0.0
@@ -615,7 +612,7 @@ module energy
             end
 
             if denom <= 0.0
-                if below_domain == :boundary_flux
+                if below_domain
                     atmos.flux_deep .= F_total
                 end
                 return true
@@ -630,7 +627,7 @@ module energy
             end
 
         else
-            @warn "Invalid deep heating normalisation: $(normalisation)"
+            @warn "Invalid deep heating normalisation: $(atmos.deepheat_norm_method)"
             return false
         end
 

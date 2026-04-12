@@ -131,7 +131,6 @@ module atmosphere
         THERMO_DIR::String      # path to thermo data
         SCATTERING_DIR::String  # path to scattering data
         FC_DIR::String          # path to fastchem install folder
-        RFM_DIR::String         # path to RFM install folder
         FRAMES_DIR::String      # path to frames of animation
         IO_DIR::String          # path to temporary directory, for fast I/O
 
@@ -345,13 +344,13 @@ module atmosphere
         aerosol_phase_num::Int64                       # Number of phase-function moments retained when averaging
 
         # Deep atmospheric heating
-        deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
+        deepheat_norm_method::String    # Normalisation method for deep heating (pressure or mass)
         deepheat_Pmid::Float64          # Deposition pressure centre [Pa]
         deepheat_Pwid::Float64          # Width of Gaussian in log-pressure space [logPa]
-        deepheat_domain::Symbol         # Method for treating deep heating below the model domain (:clamp or :boundary_flux)
-        deepheat_power_mode::Symbol     # Method for setting total flux (:off, :rel, or :abs)
-        deepheat_flux_rel::Float64      # Total heating as fraction of instellation, used when `power_mode=:rel`.
-        deepheat_flux_abs::Float64      # Total heating flux [W m-2], used when `power_mode=:abs`.
+        deepheat_domain::String         # Method for treating deep heating below the model domain (clamp or boundary_flux)
+        deepheat_power_mode::String     # Method for setting total flux (off, rel, or abs)
+        deepheat_flux_rel::Float64      # Total heating as fraction of instellation, used when `power_mode="rel"`.
+        deepheat_flux_abs::Float64      # Total heating flux [W m-2], used when `power_mode="abs"`.
         flux_deep::Array{Float64,1}     # Deep heating flux at cell edges [W m-2] # should add at lw flux level
 
         # Total energy flux
@@ -385,7 +384,6 @@ module atmosphere
 
         # RFM radiative transfer
         flag_rfm::Bool                  # RFM enabled?
-        rfm_exec::String                # Path to rfm executable
         rfm_work::String                # Path to rfm working directory
         rfm_parfile::String             # Path to rfm parfile. If empty, do not run RFM.
 
@@ -1254,6 +1252,7 @@ module atmosphere
         # RFM
         atmos.flag_rfm = !(rfm_parfile == UNSET_STR)
         atmos.rfm_work = joinpath(atmos.IO_DIR, "rfm")
+        atmos.rfm_parfile = UNSET_STR
         if samefile(atmos.rfm_work, atmos.ROOT_DIR)
             @error "RFM working directory cannot be the AGNI root directory"
             return false
@@ -1273,11 +1272,11 @@ module atmosphere
         end
 
         # Deep atmospheric heating (default: disabled)
-        atmos.deepheat_norm_method  = :pressure
+        atmos.deepheat_norm_method  = "pressure"
         atmos.deepheat_Pmid         = 1e5
         atmos.deepheat_Pwid         = 1.0
-        atmos.deepheat_domain       = :clamp
-        atmos.deepheat_power_mode   = :off
+        atmos.deepheat_domain       = "clamp"
+        atmos.deepheat_power_mode   = "off"
         atmos.deepheat_flux_rel     = 0.0
         atmos.deepheat_flux_abs     = 0.0
 
@@ -1341,9 +1340,10 @@ module atmosphere
     - `Pwid::Float64`          width of Gaussian in log-pressure space [logPa].
     - `flux_rel::Float64`      heating flux relative to instellation.
     - `flux_abs::Float64`      heating flux absolute [W m-2].
-    - `norm_method::Symbol`    method for normalising the Gaussian (:pressure, :mass).
-    - `domain::Symbol`         how to handle deposition pressures outside the domain (:clamp, :boundary_flux).
-    - `power_mode::Symbol`     off, or relative/absolute flux (:off, :rel, :abs).
+    - `norm_method::String`    method for normalising the Gaussian (pressure, mass).
+    - `domain::String`         how to handle deposition pressures outside the domain (clamp, boundary_flux).
+    - `power_mode::String`     off, or relative/absolute flux (off, rel, abs).
+    - `verbose::Bool`          whether to show info messages about the configuration.
 
     Returns:
     - `Bool` indicating success or failure of the operation.
@@ -1353,23 +1353,24 @@ module atmosphere
                                 Pwid::Float64,
                                 flux_rel::Float64,
                                 flux_abs::Float64,
-                                norm_method::Symbol,
-                                domain::Symbol,
-                                power_mode::Symbol
+                                norm_method::String,
+                                domain::String,
+                                power_mode::String;
+                                verbose::Bool=false
                                 )::Bool
 
         # Fail safe mode
-        atmos.deepheat_power_mode = :off
-        if power_mode == :off
-            atmos.deepheat_power_mode = :off
+        atmos.deepheat_power_mode = "off"
+        if power_mode == "off"
+            atmos.deepheat_power_mode = "off"
             return true
-        elseif !(power_mode in (:rel, :abs))
+        elseif !(power_mode in ("rel", "abs"))
             @error "Invalid deep heating power mode: $(power_mode)"
             return false
         end
 
         # Normalisation coordinate
-        if !(norm_method in (:pressure, :mass))
+        if !(norm_method in ("pressure", "mass"))
             @error "Invalid deep heating normalisation: $(norm_method)"
             return false
         else
@@ -1381,9 +1382,9 @@ module atmosphere
         atmos.deepheat_Pwid = max(Pwid, 0.01)  # relative
 
         # Deposition pressure handling
-        if domain == :clamp
+        if domain == "clamp"
             atmos.deepheat_Pmid = clamp(atmos.deepheat_Pmid, atmos.p_toa, atmos.p_boa)
-        elseif domain == :boundary_flux
+        elseif domain == "boundary_flux"
             # Allow P outside domain
             atmos.deepheat_Pmid = max(atmos.deepheat_Pmid, atmos.p_toa)
         else
@@ -1396,16 +1397,19 @@ module atmosphere
         atmos.deepheat_power_mode = power_mode
         atmos.deepheat_flux_rel = flux_rel
         atmos.deepheat_flux_abs = flux_abs
-        @info "Deep heating configured with power_mode=$(atmos.deepheat_power_mode)"
-        if power_mode  == :rel
-            @info @sprintf("    Pmid=%.2e Pa, Pwid=%.2f, ε=%.4f",
-                            atmos.deepheat_Pmid, atmos.deepheat_Pwid, flux_rel)
-        elseif power_mode == :abs
-            @info @sprintf("    Pmid=%.2e Pa, Pwid=%.2f, F_total=%.4e W/m²",
-                            atmos.deepheat_Pmid, atmos.deepheat_Pwid, flux_abs)
-        end
-        @info "    norm_method=$(atmos.deepheat_norm_method), domain=$(atmos.deepheat_domain)"
 
+        # Print configuration
+        if verbose
+            @info "Deep heating configured with power_mode=$(atmos.deepheat_power_mode)"
+            if power_mode  == "rel"
+                @info @sprintf("    Pmid=%.2e Pa, Pwid=%.2f, ε=%.4f",
+                                atmos.deepheat_Pmid, atmos.deepheat_Pwid, flux_rel)
+            elseif power_mode == "abs"
+                @info @sprintf("    Pmid=%.2e Pa, Pwid=%.2f, F_total=%.4e W/m²",
+                                atmos.deepheat_Pmid, atmos.deepheat_Pwid, flux_abs)
+            end
+            @info "    norm_method=$(atmos.deepheat_norm_method), domain=$(atmos.deepheat_domain)"
+        end
 
         return true
     end
