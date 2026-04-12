@@ -16,8 +16,8 @@ title = "Multicolumn example"
     wind_speed      = 10.0
 
     [planet.globe]
-        lons  = [0.0, 60.0, 90.0, 180.0]
-        lats  = [0.0,  0.0,  0.0,   0.0]
+        lons   = [0.0, 60.0, 90.0, 180.0]
+        lats   = [0.0,  0.0,  0.0,   0.0]
 
 [files]
     input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf"

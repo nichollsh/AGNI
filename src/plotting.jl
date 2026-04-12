@@ -902,7 +902,7 @@ module plotting
 
         # decorate axes
         xaxis!(plt1, xlims=tlim, xlabel="Temperature [K]")
-        xaxis!(plt2, xlims=hlim, xlabel="log10 Heating Rate [K day⁻¹]")
+        xaxis!(plt2, xlims=hlim, xlabel="log Unsigned Heating [K day⁻¹]")
         ylabel!(plt1, "Pressure [bar]")
 
         annotate!(plt2, hlim[1]/2.0, ylims[1]*1.4, text("Cooling", :black, :center, 9))
