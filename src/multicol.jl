@@ -72,8 +72,6 @@ module multicol
             atmosphere.deallocate!(atmos)
         end
         globe.atmos_arr = Array{atmosphere.Atmos_t,1}(undef,0)
-        globe.lons_arr = Array{Float64,1}(undef,0)
-        globe.lats_arr  = Array{Float64,1}(undef,0)
         globe.is_constructed = false
     end
 
@@ -175,35 +173,6 @@ module multicol
     end # end construct!
 
     """
-    **Set heat-redistribution flux profiles for globe's columns.**
-
-    Update heat-redistribution fluxes for all columns in globe.
-
-    Arguments:
-    - `globe::Globe_t`              globe struct containing the columns to update
-    - `fluxes::Array{Float64,1}`    single flux value for each column
-
-    Returns:
-    - `succ::Bool                   whether the update was successful
-    """
-    function set_redist!(globe::Globe_t, fluxes::Array{Float64,1})::Bool
-
-        succ::Bool = true
-
-        for (i,atmos) in enumerate(globe.atmos_arr)
-            succ &= atmosphere.set_deep_heating!(
-                        atmos,
-                        atmos.deepheat_Pmid, # do not change previously-stored value
-                        atmos.deepheat_Pwid, # ^
-                        0.0,                 # flux_rel = 0
-                        fluxes[i],           # flux_abs = redist flux for this column
-                        "pressure", "boundary_flux", "abs"
-                    )
-        end
-        return succ
-    end
-
-    """
     **Copy arrays and other data from one atmosphere struct to another.**
 
     Arguments:
@@ -275,5 +244,33 @@ module multicol
         end
     end
 
+    """
+    **Set heat-redistribution flux profiles for globe's columns.**
+
+    Update heat-redistribution fluxes for all columns in globe.
+
+    Arguments:
+    - `globe::Globe_t`              globe struct containing the columns to update
+    - `fluxes::Array{Float64,1}`    single flux value for each column
+
+    Returns:
+    - `succ::Bool                   whether the update was successful
+    """
+    function set_redist!(globe::Globe_t, fluxes::Array{Float64,1})::Bool
+
+        succ::Bool = true
+
+        for (i,atmos) in enumerate(globe.atmos_arr)
+            succ &= atmosphere.set_deep_heating!(
+                        atmos,
+                        atmos.deepheat_Pmid, # do not change previously-stored value
+                        atmos.deepheat_Pwid, # ^
+                        0.0,                 # flux_rel = 0
+                        fluxes[i],           # flux_abs = redist flux for this column
+                        "pressure", "boundary_flux", "abs"
+                    )
+        end
+        return succ
+    end
 
 end # end module

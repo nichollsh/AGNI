@@ -712,26 +712,37 @@ module AGNI
                 modplot = 1
             end
             method_idx = findfirst(==(sol), allowed_solvers)
-            return_success &= solver.solve_energy!(atmos, sol_type=sol_type,
-                                conduct=incl_conduct, chem=chem,
-                                convect=incl_convect, latent=incl_latent,
-                                sens_heat=incl_sens, deep=incl_deep,
-                                max_steps=Int(cfg["execution"]["max_steps"]),
-                                max_runtime=Float64(cfg["execution"]["max_runtime"]),
-                                conv_atol=conv_atol,
-                                conv_rtol=conv_rtol,
-                                method=Int(method_idx),
-                                rainout=rainout,
-                                oceans=oceans,
-                                dx_max=Float64(cfg["execution"]["dx_max"]),
-                                ls_method=Int(cfg["execution"]["linesearch"]),
-                                conv_type=conv_type,
-                                easy_start=Bool(cfg["execution"]["easy_start"]),
-                                grey_start=Bool(cfg["execution"]["grey_start"]),
-                                modplot=modplot,
-                                save_frames=plt_ani,
-                                perturb_all=perturb_all
-                                )
+
+            # Store kwargs in dict
+            sol_kwargs = Dict()
+            sol_kwargs[:sol_type]   = sol_type
+            sol_kwargs[:conduct]    = incl_conduct
+            sol_kwargs[:chem]       = chem
+            sol_kwargs[:convect]    = incl_convect
+            sol_kwargs[:latent]     = incl_latent
+            sol_kwargs[:sens_heat]  = incl_sens
+            sol_kwargs[:deep]       = incl_deep
+            sol_kwargs[:max_steps]  = Int(cfg["execution"]["max_steps"])
+            sol_kwargs[:max_runtime] = Float64(cfg["execution"]["max_runtime"])
+            sol_kwargs[:conv_atol]  = conv_atol
+            sol_kwargs[:conv_rtol]  = conv_rtol
+            sol_kwargs[:method]     = Int(method_idx)
+            sol_kwargs[:rainout]    = rainout
+            sol_kwargs[:oceans]     = oceans
+            sol_kwargs[:dx_max]     = Float64(cfg["execution"]["dx_max"])
+            sol_kwargs[:ls_method]  = Int(cfg["execution"]["linesearch"])
+            sol_kwargs[:conv_type]  = conv_type
+            sol_kwargs[:easy_start] = Bool(cfg["execution"]["easy_start"])
+            sol_kwargs[:grey_start] = Bool(cfg["execution"]["grey_start"])
+            sol_kwargs[:modplot]    = modplot
+            sol_kwargs[:save_frames] = plt_ani
+            sol_kwargs[:perturb_all] = perturb_all
+
+            if is_multicol
+                return_success &= solver.solve_iterative!(globe; kwargs...)
+            else
+                return_success &= solver.solve_energy!(atmos; sol_kwargs...)
+            end
 
         # Invalid selection
         else
@@ -811,9 +822,10 @@ module AGNI
 
         # Deallocate atmosphere
         @debug "Deallocating memory"
-        atmosphere.deallocate!(atmos)
-        if !is_multicol
+        if is_multicol
             multicol.deconstruct!(globe)
+        else
+            atmosphere.deallocate!(atmos)
         end
 
         return return_success

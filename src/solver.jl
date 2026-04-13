@@ -20,6 +20,7 @@ module solver
     import ..plotting
     import ..chemistry
     import ..ocean
+    import ..multicol
 
     """
     **Golden section search algorithm**
@@ -385,7 +386,7 @@ module solver
                 resid[end] = atmos.flux_tot[end] - atmos.flux_int
             elseif (sol_type == 4)
                 # Same energy balance as sol_type=3
-                resid[1:end-1] .= atmos.flux_dif[1:end] 
+                resid[1:end-1] .= atmos.flux_dif[1:end]
                 # OLR is equal to target_olr
                 resid[end] = atmos.target_olr - atmos.flux_u_lw[1]
 
@@ -1320,5 +1321,45 @@ module solver
 
         return atmos.is_converged
     end  # end solve_transparent
+
+
+    """
+    **Solve iteratively for radiative-convective equilibrium across the globe**
+
+    Repeatedly call `solve_energy!` on each column, solving them as separate systems of
+    equations, until all columns are converged to the specified tolerance.
+
+    Arguments:
+    - `globe::Globe_t`              globe struct containing the columns to solve
+    - `globe_iters::Int`            maximum number of iterations to perform
+    - `globe_tol::Float64`          convergence tolerance for each column
+    - `kwargs...`                   additional keyword arguments to pass to `solve_energy!`
+
+    Returns:
+    - `succ::Bool`                 whether the solve was successful for all columns
+    """
+    function solve_iterative!(globe::multicol.Globe_t;
+                                globe_iters::Int=10, globe_tol::Float64=1e-4,
+                                kwargs...)::Bool
+
+        succ::Bool = true
+        conv::Bool = false
+        for iter in 1:globe_iters
+            @info "Starting iteration $iter of global solver"
+
+            # Solve each column independently
+            succ &= multicol.call_for_globe!(globe, solve_energy!, kwargs...)
+
+            # Check if any of the solvers failed
+            if !succ
+                @warn "Global solver partially failed during iteration $iter"
+            end
+
+            # Check convergence across all columns
+        end
+
+        @warn "Globe solve did not converge after $globe_iters iterations"
+        return false
+    end
 
 end
