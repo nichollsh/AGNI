@@ -225,7 +225,7 @@ module spectrum
 
         len_wl::Int64 = length(wl)
         len_fl::Int64 = length(fl)
-        socrates_nbins_max::Int64 = Int(1e5 - 3)  # do not change this
+        socrates_nbins_max::Int64 = Int64(1e5 - 3)  # do not change this
         tgt_bins::Int64 = min(nbins_max, len_wl, socrates_nbins_max)
 
         # Validate

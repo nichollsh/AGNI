@@ -26,13 +26,9 @@ module multicol
     import ..atmosphere
     import ..phys
 
-    # Globals - TODO: make configurable
-    redist_Pmid::Float64 = 1e5      # 1 bar
-    redist_Pwid::Float64 = 1.0      # 1 log unit
-
     # For copying variables between atmospheres
     SHARED_TYPES     = Union{AbstractArray, AbstractVector, Number, AbstractDict, AbstractString}
-    PROTECTED_FIELDS = Symbol[:name, :num_rt_eval, :tim_rt_eval]
+    PROTECTED_FIELDS = Symbol[:num_rt_eval, :tim_rt_eval]
     shared_fields = Symbol[]
     for (field,type) in zip(fieldnames(atmosphere.Atmos_t), atmosphere.Atmos_t.types)
         if (type <: SHARED_TYPES) && !(field in PROTECTED_FIELDS)
@@ -54,6 +50,10 @@ module multicol
         atmos_arr::Array{atmosphere.Atmos_t,1}      # auxiliary atmospheric columns
         lons_arr::Array{Float64,1}                  # longitudes for each column
         lats_arr::Array{Float64,1}                  # latitudes for each column
+
+        # Physics variables
+        redist_Pmid::Array{Float64,1}      # heat redistribution midpoints [Pa]
+        redist_Pwid::Array{Float64,1}      # heat redistribution widths [log pressure]
 
         Globe_t() = new()
     end # end Globe_t
@@ -123,11 +123,12 @@ module multicol
             end
         end
 
+        # Set up other variables
+        globe.redist_Pmid = ones(Float64, globe.ncol) * 1e5 # default to 1 bar
+        globe.redist_Pwid = ones(Float64, globe.ncol) * 1.0 # default to 1 decade
+
         # Instantiate array of auxiliary atmospheric columns
         globe.atmos_arr = atmosphere.Atmos_t[atmosphere.Atmos_t() for _ in 1:globe.ncol]
-
-        # Print shared fields
-        # @debug "Globe shared fields: $(shared_fields)"
 
         # Copy the original atmosphere to each column
         for i in 1:globe.ncol
@@ -152,8 +153,8 @@ module multicol
 
             # Set deep heating
             atmosphere.set_deep_heating!(globe.atmos_arr[i],
-                                            redist_Pmid,
-                                            redist_Pwid,
+                                            globe.redist_Pmid[i],
+                                            globe.redist_Pwid[i],
                                             0.0, # always flux_rel = 0
                                             0.0, # initially zero, but set later
                                             "pressure", "boundary_flux", "abs")
@@ -260,7 +261,10 @@ module multicol
 
         succ::Bool = true
 
+        # Loop through columns
         for (i,atmos) in enumerate(globe.atmos_arr)
+
+            # Set heating profile
             succ &= atmosphere.set_deep_heating!(
                         atmos,
                         atmos.deepheat_Pmid, # do not change previously-stored value
@@ -269,7 +273,11 @@ module multicol
                         fluxes[i],           # flux_abs = redist flux for this column
                         "pressure", "boundary_flux", "abs"
                     )
+
+            # Update boundary condition
+            atmos.flux_int = fluxes[i]
         end
+
         return succ
     end
 

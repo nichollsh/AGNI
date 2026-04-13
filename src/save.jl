@@ -125,7 +125,7 @@ module save
 
             # ----------------------
             # Create dimensions
-            nlev_c = Int(atmos.nlev_c)
+            nlev_c = Int64(atmos.nlev_c)
             nlev_l = nlev_c + 1
             ngases = atmos.gas_num
             naeros = max(1,length(atmos.aerosol_arr_l))

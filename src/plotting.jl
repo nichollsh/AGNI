@@ -111,7 +111,7 @@ module plotting
 
         # Create plot
         plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
-                        legend=:top,
+                        legend=:outerbottomright,
                         size=(size_x,size_y); plt_default...)
 
         # Plot phase boundary and demixing binodal
@@ -155,13 +155,10 @@ module plotting
         end
 
         # Plot tmp_surf
-        scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label="")
+        scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, y, lc="black", lw=lw, label="")
-
-        # Dummy Kzz plot for legend
-        plot!(plt, [-1,-2], [1.0, 1.0], lc="darkgreen", lw=lw, ls=:solid, label=L"K_{zz}")
+        plot!(plt, atmos.tmpl, y, lc="black", lw=lw, label=L"T(p)")
 
         # Plot current surface pressure and original
         @_plt_pboa
@@ -195,8 +192,9 @@ module plotting
             x_rad[i] = atmos.flux_cdry[i] <= 0.0 ? x[i] : NaN
         end
 
-        plot!(plt2, x_con, y, lc="darkgreen", label="", ls=:solid)
-        plot!(plt2, x_rad, y, lc="darkgreen", label="", ls=:dot)
+        plot!(plt2, [xmin, xmin], [1.0, 1.0], lc="darkgreen", lw=lw, ls=:solid, label=L"K_{zz}")
+        plot!(plt2, x_con, y, lc="darkgreen", label="Con.", ls=:solid)
+        plot!(plt2, x_rad, y, lc="darkgreen", label="Rad.", ls=:dot)
 
         xlabel!(plt2, "log₁₀ Kzz [cm²/s]")
         ylims!(plt2, _get_ylims(atmos))
@@ -204,6 +202,9 @@ module plotting
         yflip!(plt2)
         yaxis!(plt2, yscale=:log10)
         xaxis!(plt2, xlims=(xmin, maximum(x)+1), grid=false, gridalpha=0.0)
+
+        # ensures that axes spines are same size
+        plot!(plt2, legend=:outertopright, tick_direction=:out)
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -952,8 +953,7 @@ module plotting
 
         # Create animation
         if nframes < 1
-            @warn "Cannot create animation from solver"
-            @warn "    No frames found: $frames_dir"
+            @warn "Cannot create animation; no frames found in $frames_dir"
         else
             fps = Float64(nframes)/duration
             @ffmpeg_env run(`$(FFMPEG.ffmpeg) -loglevel quiet -framerate $fps -pattern_type glob -i "$frames_dir/*.$frames_fmt" -pix_fmt yuv420p -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white" -y $output_dir/animation.$output_fmt`)

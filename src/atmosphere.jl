@@ -2440,7 +2440,7 @@ module atmosphere
                 # loop over aerosols in spectral file
                 for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
                     # get name of this aerosol
-                    type_id = Int(atmos.spectrum.Aerosol.type_aerosol[i])
+                    type_id = Int64(atmos.spectrum.Aerosol.type_aerosol[i])
                     name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
 
                     # store name from index (for updating aerosol profiles in the future)
@@ -2925,7 +2925,7 @@ module atmosphere
         if atmos.control.l_aerosol
             @info "Available aerosol species:"
             for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
-                type_id = Int(atmos.spectrum.Aerosol.type_aerosol[i])
+                type_id = Int64(atmos.spectrum.Aerosol.type_aerosol[i])
                 name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
                 title = SOCRATES.input_head_pcf.aerosol_title[type_id]
                 @info @sprintf("    %10s - %s", name, strip(title))

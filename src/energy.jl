@@ -523,11 +523,11 @@ module energy
     centered at `P_dep` with width `sigma_P`.
 
     Two power modes are supported:
-    - `"rel"`   total flux = `efficiency * instellation` (stellar efficiency)
-    - `"abs"`   total flux = `F_total` (fixed radiative flux in W m⁻²)
+    - `"rel"`   total flux = `deepheat_flux_rel * instellation` (stellar efficiency)
+    - `"abs"`   total flux = `deepheat_flux_abs` (fixed radiative flux in W m⁻²)
 
     The flux gradient is defined as:
-        dF_deep/dP = F_total / (sqrt(2π) * σ_P * P) * exp(-(ln(P) - ln(P_dep))² / (2 * σ_P²))
+    dF_deep/dP = F_total / (sqrt(2π) * σ_P * P) * exp(-(ln(P) - ln(P_dep))² / (2 * σ_P²))
 
     This flux is integrated from the TOA downwards to obtain the cumulative
     flux at each cell edge, representing energy being deposited into the atmosphere.
@@ -543,19 +543,16 @@ module energy
         # Extract parameters
         P_dep::Float64          = atmos.deepheat_Pmid
         sigma_P::Float64        = atmos.deepheat_Pwid
-        efficiency::Float64     = atmos.deepheat_flux_rel
-        F_total_in::Float64     = atmos.deepheat_flux_abs
         below_domain::Bool      = atmos.deepheat_domain == "boundary_flux"
 
         # Determine total deposited flux [W m-2]
         F_total::Float64 = 0.0
         if atmos.deepheat_power_mode == "rel"
             # Stellar efficiency: define heating as a fraction of instellation (per unit area).
-            eff::Float64 = clamp(efficiency, 0.0, 1.0)
-            F_total = eff * atmos.instellation
+            F_total = atmos.deepheat_flux_rel * atmos.instellation
         elseif atmos.deepheat_power_mode == "abs"
             # Fixed radiative flux [W m-2]
-            F_total = max(F_total_in, 0.0)
+            F_total = atmos.deepheat_flux_abs
         elseif atmos.deepheat_power_mode == "off"
             # No deep heating
             return true

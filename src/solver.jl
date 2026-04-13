@@ -243,6 +243,11 @@ module solver
         path_plt::String = joinpath(atmos.OUT_DIR,"solver.png")
         path_jac::String = joinpath(atmos.OUT_DIR,"jacobian.png")
 
+        if save_frames && !isdir(atmos.FRAMES_DIR)
+            @warn "Frames directory does not exist at $(atmos.FRAMES_DIR)"
+            save_frames = false
+        end
+
         # Dimensionality
         arr_len::Int64 = atmos.nlev_c
         if sol_type in [2,3,4]  # states 2,3,4 also solve for tmp_surf
@@ -495,8 +500,9 @@ module solver
 
             # Info string
             plt_info::String = ""
-            plt_info *= @sprintf("Iteration:%d,  ",step)
-            plt_info *= @sprintf("Runtime:%.1f s,  ",runtime)
+            plt_info *= "[$(atmos.name)]   "
+            plt_info *= @sprintf("Iter:%d,  ",step)
+            plt_info *= @sprintf("Time:%.1fs,  ",runtime)
             plt_info *= @sprintf("Cost:%.2e  ",c_cur)
 
             # Make subplots (don't save to file)
@@ -1324,7 +1330,7 @@ module solver
 
 
     """
-    **Solve iteratively for radiative-convective equilibrium across the globe**
+    **Solve multi-column problem for radiative-convective equilibrium across the globe**
 
     Repeatedly call `solve_energy!` on each column, solving them as separate systems of
     equations, until all columns are converged to the specified tolerance.
@@ -1332,23 +1338,25 @@ module solver
     Arguments:
     - `globe::Globe_t`              globe struct containing the columns to solve
     - `globe_iters::Int`            maximum number of iterations to perform
-    - `globe_tol::Float64`          convergence tolerance for each column
-    - `kwargs...`                   additional keyword arguments to pass to `solve_energy!`
+    - `kwargs...`                   keyword arguments to pass to `solve_energy!`
 
     Returns:
     - `succ::Bool`                 whether the solve was successful for all columns
     """
-    function solve_iterative!(globe::multicol.Globe_t;
-                                globe_iters::Int=10, globe_tol::Float64=1e-4,
-                                kwargs...)::Bool
+    function solve_globe!(globe::multicol.Globe_t, globe_iters::Int=10; kwargs...)::Bool
+
+        # extract tolerance from kwargs
+        conv_atol::Float64 = get(kwargs, :conv_atol, 1.0e-3)
+        conv_rtol::Float64 = get(kwargs, :conv_rtol, 1.0e-5)
 
         succ::Bool = true
-        conv::Bool = false
         for iter in 1:globe_iters
-            @info "Starting iteration $iter of global solver"
+            @info "Starting iteration $iter/$globe_iters of globe solver"
+
+            # TODO: recalculate heating profiles
 
             # Solve each column independently
-            succ &= multicol.call_for_globe!(globe, solve_energy!, kwargs...)
+            succ &= multicol.call_for_globe!(globe, solve_energy!; kwargs...)
 
             # Check if any of the solvers failed
             if !succ
@@ -1356,6 +1364,9 @@ module solver
             end
 
             # Check convergence across all columns
+            # TODO: check this
+
+            @info "-------------------------------"
         end
 
         @warn "Globe solve did not converge after $globe_iters iterations"

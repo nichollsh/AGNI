@@ -451,7 +451,7 @@ module AGNI
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
         conv_type::Int64        = 1
         if haskey(cfg["execution"],"converge_type")
-            conv_type = Int(cfg["execution"]["converge_type"])
+            conv_type = Int64(cfg["execution"]["converge_type"])
         end
 
         #    plotting stuff
@@ -550,7 +550,7 @@ module AGNI
                                 Float64(cfg["planet"]["zenith_angle"]),
                                 Float64(cfg["planet"]["tmp_surf"]),
                                 gravity, radius,
-                                Int(cfg["execution"]["num_levels"]),
+                                Int64(cfg["execution"]["num_levels"]),
                                 p_surf,
                                 p_top,
                                 mf_dict, mf_path;
@@ -673,6 +673,7 @@ module AGNI
                 return false
             end
 
+            # configure globe redist
             @debug "Set heat redist for globe"
             multicol.set_redist!(globe, cfg["planet"]["globe"]["redist_flux"])
         end
@@ -703,7 +704,7 @@ module AGNI
             return_success &= solver.solve_transparent!(atmos, sol_type=sol_type,
                                 conv_atol=conv_atol,
                                 conv_rtol=conv_rtol,
-                                max_steps=Int(cfg["execution"]["max_steps"]))
+                                max_steps=Int64(cfg["execution"]["max_steps"]))
 
         # Use the nonlinear requested solver
         elseif sol in allowed_solvers
@@ -714,32 +715,35 @@ module AGNI
             method_idx = findfirst(==(sol), allowed_solvers)
 
             # Store kwargs in dict
-            sol_kwargs = Dict()
-            sol_kwargs[:sol_type]   = sol_type
-            sol_kwargs[:conduct]    = incl_conduct
-            sol_kwargs[:chem]       = chem
-            sol_kwargs[:convect]    = incl_convect
-            sol_kwargs[:latent]     = incl_latent
-            sol_kwargs[:sens_heat]  = incl_sens
-            sol_kwargs[:deep]       = incl_deep
-            sol_kwargs[:max_steps]  = Int(cfg["execution"]["max_steps"])
-            sol_kwargs[:max_runtime] = Float64(cfg["execution"]["max_runtime"])
-            sol_kwargs[:conv_atol]  = conv_atol
-            sol_kwargs[:conv_rtol]  = conv_rtol
-            sol_kwargs[:method]     = Int(method_idx)
-            sol_kwargs[:rainout]    = rainout
-            sol_kwargs[:oceans]     = oceans
-            sol_kwargs[:dx_max]     = Float64(cfg["execution"]["dx_max"])
-            sol_kwargs[:ls_method]  = Int(cfg["execution"]["linesearch"])
-            sol_kwargs[:conv_type]  = conv_type
-            sol_kwargs[:easy_start] = Bool(cfg["execution"]["easy_start"])
-            sol_kwargs[:grey_start] = Bool(cfg["execution"]["grey_start"])
-            sol_kwargs[:modplot]    = modplot
-            sol_kwargs[:save_frames] = plt_ani
-            sol_kwargs[:perturb_all] = perturb_all
+            sol_kwargs::Dict{Symbol,Any} = Dict(
+                :sol_type       => Int64(sol_type),
+                :conduct        => Bool(incl_conduct),
+                :chem           => Bool(chem),
+                :convect        => Bool(incl_convect),
+                :latent         => Bool(incl_latent),
+                :sens_heat      => Bool(incl_sens),
+                :deep           => Bool(incl_deep),
+                :max_steps      => Int64(cfg["execution"]["max_steps"]),
+                :max_runtime    => Float64(cfg["execution"]["max_runtime"]),
+                :conv_atol      => Float64(conv_atol),
+                :conv_rtol      => Float64(conv_rtol),
+                :method         => Int64(method_idx),
+                :rainout        => Bool(rainout),
+                :oceans         => Bool(oceans),
+                :dx_max         => Float64(cfg["execution"]["dx_max"]),
+                :ls_method      => Int64(cfg["execution"]["linesearch"]),
+                :conv_type      => Int64(conv_type),
+                :easy_start     => Bool(cfg["execution"]["easy_start"]),
+                :grey_start     => Bool(cfg["execution"]["grey_start"]),
+                :modplot        => Int64(modplot),
+                :save_frames    => Bool(plt_ani),
+                :perturb_all    => Bool(cfg["execution"]["perturb_all"]),
+            )
 
             if is_multicol
-                return_success &= solver.solve_iterative!(globe; kwargs...)
+                return_success &= solver.solve_globe!(globe,
+                                            cfg["execution"]["globe_iters"];
+                                            sol_kwargs...)
             else
                 return_success &= solver.solve_energy!(atmos; sol_kwargs...)
             end
