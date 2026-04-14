@@ -1986,6 +1986,9 @@ module atmosphere
             atmos.bands_wid = atmos.bands_max - atmos.bands_min
             atmos.bands_cen = Float64[1e-6,]
 
+            # dummy values for consistency with SOCRATES scheme
+            atmos.gas_soc_names = atmos.gas_names
+
         elseif atmos.rt_scheme == RT_SOCRATES
 
             # Validate files
@@ -2193,6 +2196,7 @@ module atmosphere
 
             # Set to true to enable custom surface emission through the
             #   variables `planck%flux_ground(l)` and `d_planck_flux_surface`.
+            # Otherwise, set by bound.flux_ground array.
             atmos.control.l_flux_ground = false
 
             SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)

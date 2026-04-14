@@ -446,7 +446,6 @@ module AGNI
         incl_sens::Bool        = cfg["physics"]["sensible_heat"]
         incl_latent::Bool      = cfg["physics"]["latent_heat"]
         sol_type::Int64         = cfg["execution"]["solution_type"]
-        perturb_all::Bool      = cfg["execution"]["perturb_all"]
         conv_atol::Float64     = cfg["execution"]["converge_atol"]
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
         conv_type::Int64        = 1

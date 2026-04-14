@@ -54,6 +54,7 @@ module multicol
         # Physics variables
         redist_Pmid::Array{Float64,1}      # heat redistribution midpoints [Pa]
         redist_Pwid::Array{Float64,1}      # heat redistribution widths [log pressure]
+        flux_int::Float64                  # global flux loss from planet
 
         Globe_t() = new()
     end # end Globe_t
@@ -124,6 +125,7 @@ module multicol
         end
 
         # Set up other variables
+        globe.flux_int    = atmos.flux_int # global flux loss
         globe.redist_Pmid = ones(Float64, globe.ncol) * 1e5 # default to 1 bar
         globe.redist_Pwid = ones(Float64, globe.ncol) * 1.0 # default to 1 decade
 
@@ -136,9 +138,14 @@ module multicol
             # Make copy of atmosphere for the column
             globe.atmos_arr[i] = deepcopy(atmos)
 
-            # Allocate arrays
+            # Allocate arrays and copy other variables
             for field in shared_fields
-                setfield!(globe.atmos_arr[i], field, deepcopy(getfield(atmos, field)))
+                try
+                    setfield!(globe.atmos_arr[i], field, deepcopy(getfield(atmos, field)))
+                catch e
+                    @warn "Cannot copy $field to column $i: $e"
+                    return false
+                end
             end
 
             # Set name of atmosphere for the column
@@ -278,9 +285,6 @@ module multicol
                         fluxes[i],           # flux_abs = redist flux for this column
                         "pressure", "boundary_flux", "abs"
                     )
-
-            # Update boundary condition
-            atmos.flux_int = fluxes[i]
         end
 
         return succ

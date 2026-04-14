@@ -157,7 +157,7 @@ module plotting
                     range(xlims[1],xlims[2],length=atmos.nlev_c),
                     fill(atmos.deepheat_Pmid * 1e-5 / band, atmos.nlev_c),
                     fillrange=fill(atmos.deepheat_Pmid * 1e-5 * band, atmos.nlev_c),
-                    fillalpha=0.1, color=col_d, label="DeepHeat", linewidth=0)
+                    fillalpha=0.1, color=col_d, label="DH", linewidth=0)
         end
 
         # Plot tmp_magma

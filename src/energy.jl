@@ -564,7 +564,7 @@ module energy
         F_total = atmos.flux_int - F_total
 
         # If deposition is outside the domain and requested, apply as a bottom boundary flux.
-        if below_domain && !( atmos.p_boa < atmos.deepheat_Pmid < atmos.p_toa )
+        if below_domain && !( atmos.p_boa > atmos.deepheat_Pmid > atmos.p_toa )
             fill!(atmos.flux_deep, F_total)
             return true
         end
@@ -601,11 +601,9 @@ module energy
                 denom += G * dm_i
             end
 
-            if denom <= 0.0
-                if below_domain
-                    atmos.flux_deep .= F_total
-                end
-                return true
+            if denom <= 1e-10
+                @warn "Deep heating normalisation factor has non-positive denominator: $denom"
+                return false
             end
 
             scale::Float64 = F_total / denom
