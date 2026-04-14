@@ -109,6 +109,8 @@ module plotting
 
         y = atmos.pl ./ 1e5 # pressure -> bar
 
+        xlims::Tuple{Float64,Float64} = (0.0, maximum(atmos.tmpl)+100.0)
+
         # Create plot
         plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
                         legend=:outerbottomright,
@@ -148,6 +150,16 @@ module plotting
             end
         end
 
+        # Fill deep heating region
+        if atmos.deepheat_power_mode != "off"
+            band = 10^atmos.deepheat_Pwid # 1 sigma width
+            plot!(plt,
+                    range(xlims[1],xlims[2],length=atmos.nlev_c),
+                    fill(atmos.deepheat_Pmid * 1e-5 / band, atmos.nlev_c),
+                    fillrange=fill(atmos.deepheat_Pmid * 1e-5 * band, atmos.nlev_c),
+                    fillalpha=0.1, color=col_d, label="DeepHeat", linewidth=0)
+        end
+
         # Plot tmp_magma
         if incl_magma
             scatter!(plt, [atmos.tmp_magma], [atmos.p_boa/1e5],
@@ -165,11 +177,9 @@ module plotting
         @_plt_poboa
 
         # Decorate
-        xlims!(plt, (0.0, maximum(atmos.tmpl)+15.0))
-        xlabel!(plt, "Temperature [K]")
-        ylabel!(plt, "Pressure [bar]")
+        xaxis!(plt, xlims=xlims, xlabel="Temperature [K]")
         yflip!(plt)
-        yaxis!(plt, yscale=:log10)
+        yaxis!(plt, yscale=:log10, ylabel="Pressure [bar]")
         if !isempty(title)
             title!(plt, title)
         end

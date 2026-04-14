@@ -784,14 +784,18 @@ module AGNI
 
         # Write arrays
         @info "Writing results"
-        save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
         if is_multicol
+            # write each column separately
             for (i,a) in enumerate(globe.atmos_arr)
                 save.write_ncdf(a, joinpath(atmos.OUT_DIR,@sprintf("atm.col%03d.nc", i)))
             end
-        elseif plt_glo
-            @warn "Globe plotting requested for single-column simulation"
-            plt_glo = false
+        else
+            # just one column to write
+            save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
+            if plt_glo
+                @warn "Globe plotting requested for single-column simulation"
+                plt_glo = false
+            end
         end
 
         # Save plots

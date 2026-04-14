@@ -541,7 +541,6 @@ module energy
         fill!(atmos.flux_deep, 0.0)
 
         # Extract parameters
-        P_dep::Float64          = atmos.deepheat_Pmid
         sigma_P::Float64        = atmos.deepheat_Pwid
         below_domain::Bool      = atmos.deepheat_domain == "boundary_flux"
 
@@ -561,20 +560,18 @@ module energy
             return false
         end
 
-        # If heating is zero, do nothing
-        # if abs(F_total) <= 1e-10
-        #     return true
-        # end
+        # Invert and subtract from net flux boundary condition
+        F_total = atmos.flux_int - F_total
 
         # If deposition is outside the domain and requested, apply as a bottom boundary flux.
-        if below_domain && ( (P_dep > atmos.p_boa) || (P_dep < atmos.p_toa) )
-            atmos.flux_deep .= F_total
+        if below_domain && !( atmos.p_boa < atmos.deepheat_Pmid < atmos.p_toa )
+            fill!(atmos.flux_deep, F_total)
             return true
         end
 
         # Prepare log-pressure variables
-        ln_P_dep::Float64 = log(P_dep)
-        ln_P::Float64 = 0.0
+        log_Pmid::Float64 = log10(atmos.deepheat_Pmid)
+        log_P::Array{Float64,1} = log10.(atmos.p)
 
         # Integrate from TOA downwards to get cumulative flux at each level edge
         atmos.flux_deep[1] = 0.0
@@ -584,14 +581,11 @@ module energy
             norm_factor::Float64 = 1.0 / (sqrt(2.0 * π) * sigma_P)
             dF_dP::Float64 = 0.0
             gaussian::Float64 = 0.0
-            dp::Float64 = 0.0
 
             @inbounds for i in 1:atmos.nlev_c
-                ln_P = log(atmos.p[i])
-                gaussian = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                gaussian = exp(-(log_P[i] - log_Pmid)^2 / (2.0 * sigma_P^2))
                 dF_dP = F_total * norm_factor * gaussian / atmos.p[i]
-                dp = atmos.pl[i+1] - atmos.pl[i]
-                atmos.flux_deep[i+1] = atmos.flux_deep[i] + dF_dP * dp
+                atmos.flux_deep[i+1] = atmos.flux_deep[i] + dF_dP * (atmos.pl[i+1] - atmos.pl[i])
             end
 
         elseif atmos.deepheat_norm_method == "mass"
@@ -602,8 +596,7 @@ module energy
             dm_i::Float64 = 0.0
 
             @inbounds for i in 1:atmos.nlev_c
-                ln_P = log(atmos.p[i])
-                G = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                G = exp(-(log_P[i] - log_Pmid)^2 / (2.0 * sigma_P^2))
                 dm_i = (atmos.pl[i+1] - atmos.pl[i]) / atmos.g[i]
                 denom += G * dm_i
             end
@@ -617,8 +610,7 @@ module energy
 
             scale::Float64 = F_total / denom
             @inbounds for i in 1:atmos.nlev_c
-                ln_P = log(atmos.p[i])
-                G = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                G = exp(-(log_P[i] - log_Pmid)^2 / (2.0 * sigma_P^2))
                 dm_i = (atmos.pl[i+1] - atmos.pl[i]) / atmos.g[i]
                 atmos.flux_deep[i+1] = atmos.flux_deep[i] + (scale * G * dm_i)
             end

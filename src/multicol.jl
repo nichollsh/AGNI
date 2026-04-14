@@ -261,6 +261,11 @@ module multicol
 
         succ::Bool = true
 
+        # Fluxes should sum to zero
+        if abs(sum(fluxes)) > 1e-10
+            @warn "Heat redist fluxes must sum to zero for energy conservation"
+        end
+
         # Loop through columns
         for (i,atmos) in enumerate(globe.atmos_arr)
 

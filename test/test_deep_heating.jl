@@ -45,8 +45,8 @@ end
         @test ok
 
         energy.deep_heating!(atmos)
-        @test isapprox(atmos.flux_deep[end], 100.0; rtol=1e-6, atol=1e-8)
-        @test all(diff(atmos.flux_deep) .>= 0.0)
+        @test isapprox(atmos.flux_deep[end], -100.0; rtol=1e-6, atol=1e-8)
+        @test all(diff(atmos.flux_deep) .<= 0.0)
         @test atmos.flux_deep[1] == 0.0
 
         atmosphere.deallocate!(atmos)
@@ -62,7 +62,7 @@ end
         @test ok
 
         energy.calc_fluxes!(atmos; deep=true)
-        @test all(isapprox.(atmos.flux_deep, 250.0; rtol=0.0, atol=1e-10))
+        @test all(isapprox.(atmos.flux_deep, -250.0; rtol=0.0, atol=1e-10))
 
         diff = atmos.flux_deep .- atmos.flux_tot
         @test all(isapprox.(diff, 0.0; atol=1e-10))
