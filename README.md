@@ -10,13 +10,19 @@
 </p>
 
 <p align="center" style="margin: 0px">
-  <a href="https://doi.org/10.1093/mnras/stae2772"><img src="https://img.shields.io/badge/DOI-10.1093%2Fmnras%2Fstae2772-blue"></a>
-  <a href="https://joss.theoj.org/papers/380d8e608e9f863b639af76ceebc7131"><img src="https://joss.theoj.org/papers/380d8e608e9f863b639af76ceebc7131/status.svg"></a>
-  <a href="https://ascl.net/2508.020"><img src="https://img.shields.io/badge/ascl-2508.020-navy.svg" alt="ascl:2508.020" /></a>
-  <a href="https://doi.org/10.5281/zenodo.15386789"><img src="https://img.shields.io/badge/Zenodo-17431569-blue.svg"></a>
+  <a href="https://doi.org/10.1093/mnras/stae2772"><img src="https://img.shields.io/badge/MNRAS%20Paper-10.1093%2Fmnras%2Fstae2772-red"></a>
+  <a href="https://doi.org/10.21105/joss.07726"><img src="https://img.shields.io/badge/JOSS%20Paper-10.21105%2Fjoss.07726-red"></a>
+
 </p>
 
-<p align="center" style="margin: -5px">
+<p align="center" style="margin: -4px">
+  <a href="https://ascl.net/2508.020"><img src="https://img.shields.io/badge/ASCL%20ID-2508.020-blue.svg" alt="ascl:2508.020" /></a>
+    <a href="https://emac.gsfc.nasa.gov?cid=2603-003"><img src="https://img.shields.io/badge/EMAC%20ID-2603.003-blue.svg" alt="ascl:2508.020" /></a>
+  <a href="https://doi.org/10.5281/zenodo.15386789"><img src="https://img.shields.io/badge/Zenodo-17431569-blue.svg"></a>
+
+</p>
+
+<p align="center" style="margin: -4px">
   <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/covbadge.svg"></a>
   <a href="https://www.h-nicholls.space/AGNI/"><img src="https://github.com/nichollsh/AGNI/actions/workflows/documentation.yml/badge.svg"></a>
   <a href="LICENSE.txt"><img src="https://img.shields.io/github/license/nichollsh/AGNI?label=License"></a>
@@ -24,7 +30,7 @@
 
 
 ## Overview
-AGNI's primary purpose is to simulate the atmospheric temperature-, height-, and compositional-structures of atmospheres overlying magma oceans. It does this while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere. SOCRATES is used to perform correlated-k radiative transfer including: shortwave irradiation from the star, surface emission, line absorption, Rayleigh scattering, clouds, aerosols, and collisional absorption. Mixing length theory is used to parametrise convection. AGNI also supports real gas equations of state, self-gravitation, and various spectral surface compositions. Accounting for these energy transport processes permits an energy-conserving calculation of atmospheric structure, obtained using numerical optimisation, which also yields realistic cooling rates for young rocky planets with magma oceans.
+AGNI's primary purpose is to simulate the atmospheric temperature-, height-, and compositional-structures of atmospheres overlying magma oceans. It does this while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere. [SOCRATES](https://proteus-framework.org/SOCRATES/) is used to perform correlated-k radiative transfer including: shortwave irradiation from the star, surface emission, line absorption, Rayleigh scattering, clouds, aerosols, and collisional absorption. Mixing length theory is used to parametrise convection. AGNI also supports real gas equations of state, self-gravitation, and various spectral surface compositions. Accounting for these energy transport processes permits an energy-conserving calculation of atmospheric structure, obtained using numerical optimisation, which also yields realistic cooling rates for young rocky planets with magma oceans.
 
 Consult the [AGNI documentation](https://www.h-nicholls.space/AGNI/) for information about the model, including usage, functionality, and how to contribute.
 
