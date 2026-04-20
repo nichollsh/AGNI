@@ -12,13 +12,11 @@
 <p align="center" style="margin: 0px">
   <a href="https://doi.org/10.1093/mnras/stae2772"><img src="https://img.shields.io/badge/MNRAS%20Paper-10.1093%2Fmnras%2Fstae2772-red"></a>
   <a href="https://doi.org/10.21105/joss.07726"><img src="https://img.shields.io/badge/JOSS%20Paper-10.21105%2Fjoss.07726-red"></a>
-
 </p>
 <p align="center" style="margin: -7px">
   <a href="https://ascl.net/2508.020"><img src="https://img.shields.io/badge/ASCL%20ID-2508.020-blue.svg" alt="ascl:2508.020" /></a>
     <a href="https://emac.gsfc.nasa.gov?cid=2603-003"><img src="https://img.shields.io/badge/EMAC%20ID-2603.003-blue.svg" alt="ascl:2508.020" /></a>
   <a href="https://doi.org/10.5281/zenodo.15386789"><img src="https://img.shields.io/badge/Zenodo-17431569-blue.svg"></a>
-
 </p>
 <p align="center" style="margin: -7px">
   <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/covbadge.svg"></a>
