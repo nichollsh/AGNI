@@ -3,7 +3,7 @@ title = "Multicolumn example"
 
 [planet]
     tmp_surf        = 2100.0
-    instellation    = 5e5
+    instellation    = 1e5
     albedo_b        = 0.18
     s0_fact         = 0.6652
     zenith_angle    = 60.0
@@ -11,23 +11,23 @@ title = "Multicolumn example"
     albedo_s        = 0.0
     radius          = 6.37e6
     gravity         = 9.81
-    flux_int        = 0.0
+    flux_int        = 10.0
     roughness       = 1.0e-2
     wind_speed      = 10.0
 
-    tmp_magma       = 2500.0
+    tmp_magma       = 3000.0
     skin_k          = 2.0
     skin_d          = 0.1
 
     [planet.globe]
         lons        = [  0.0,  60.0,  90.0, 180.0]      # longitudes [deg]
         lats        = [  0.0,   0.0,   0.0,   0.0]      # latitudes [deg]
-        redist_flux = [ -4.0,  -2.0,   1.0,   5.0]      # heat entering this column [W m-2]
+        redist_flux = [ -5.0,  -3.0,   2.0,   6.0]      # heat entering this column [W m-2]
         redist_Pmid = [  1e0,   1e0,   1e0,   1e0]      # pressure to apply deep heating [bar]
         redist_Pwid = [  4.0,   4.0,   4.0,   4.0]      # width of deep heating [log P]
 
 [files]
-    input_sf        = "greygas"
+    input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf" #"greygas"
     input_star      = "res/stellar_spectra/sun.txt"
     output_dir      = "out/"
 
@@ -41,12 +41,12 @@ title = "Multicolumn example"
     clean_output    = true
     verbosity       = 1
     max_steps       = 70
-    globe_iters     = 5
+    globe_iters     = 10
     max_runtime     = 400
-    num_levels      = 40
+    num_levels      = 35
     solution_type   = 2
     solver          = "newton"
-    dx_max          = 200.0
+    dx_max          = 300.0
     initial_state   = ["iso", "2000"]
     linesearch      = 1
     easy_start      = false

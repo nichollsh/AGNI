@@ -562,11 +562,11 @@ module energy
             return false
         end
 
-        # Invert and subtract from net flux boundary condition
-        #     This means that the deep heating flux will represent an additional
-        #     source of energy, which is separate from the other fluxes. The other fluxes
-        #     will equal flux_int when the model has obtained its energy-conserving solution.
-        F_total = atmos.flux_int - F_total
+        # Invert total flux for this internal-part of the calculation.
+        #     This means that the deep heating flux will represent an additional source.
+        #     Increasing the deep_heating then means that radiative (etc) fluxes will have
+        #     to increase, to achieve the same total flux.
+        F_total *= -1.0
 
         # If deposition is outside the domain and requested, apply as a bottom boundary flux.
         if below_domain && !( atmos.p_boa > atmos.deepheat_Pmid > atmos.p_toa )

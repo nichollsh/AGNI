@@ -10,7 +10,7 @@ module solver
 
     using Printf
     using LoggingExtras
-    using Statistics
+    using Statistics: median, mean
     using LinearAlgebra
 
     import ..atmosphere
@@ -523,16 +523,15 @@ module solver
         # ----------------------------------------------------------
         # Setup initial guess
         # ----------------------------------------------------------
-            @info @sprintf("    sol_type  = %d,    conv_type = %d", sol_type, conv_type)
+            @info @sprintf("    sol_type = %d,     conv_type = %d", sol_type, conv_type)
         if (sol_type == 1)
-            @info @sprintf("    tmp_surf  = %.2f K", atmos.tmp_surf)
+            @info @sprintf("    tmp_surf = %.2f K", atmos.tmp_surf)
         elseif (sol_type == 2)
-            @info @sprintf("    skin_d    = %.2f m",         atmos.skin_d)
-            @info @sprintf("    skin_k    = %.2f W K-1 m-1", atmos.skin_k)
+            @info @sprintf("    skin_d   = %.1e m, skin_k = %.2f W K-1 m-1",  atmos.skin_d, atmos.skin_k)
         elseif (sol_type == 3)
-            @info @sprintf("    flux_int  = %.2f W m-2", atmos.flux_int)
+            @info @sprintf("    flux_int = %.2f W m-2", atmos.flux_int)
         elseif (sol_type == 4)
-            @info @sprintf("    tgt_olr   = %.2f W m-2", atmos.target_olr)
+            @info @sprintf("    tgt_olr  = %.2f W m-2", atmos.target_olr)
         end
 
         # Allocate initial guess for the x array, as well as a,b arrays
@@ -1343,11 +1342,11 @@ module solver
     Returns:
     - `succ::Bool`                 whether the solve was successful for all columns
     """
-    function solve_globe!(globe::multicol.Globe_t, globe_iters::Int=10; kwargs...)::Bool
+    function solve_globe!(globe::multicol.Globe_t, globe_iters::Int; kwargs...)::Bool
 
-        # extract tolerance from kwargs
-        conv_atol::Float64 = get(kwargs, :conv_atol, 1.0e-3)
-        conv_rtol::Float64 = get(kwargs, :conv_rtol, 1.0e-5)
+        # extract convergence tolerances from kwargs
+        globe_atol::Float64 = kwargs[:conv_atol]
+        globe_rtol::Float64 = kwargs[:conv_rtol]
 
         # Track state of globe solver
         succ::Bool = true       # success during this specific iteration
@@ -1357,34 +1356,48 @@ module solver
         for iter in 1:globe_iters
             @info "Iteration $iter/$globe_iters of globe solver (ncol=$(globe.ncol))"
 
-            # Assume success
+            # Assume success during this iteration
             succ = true
 
             # Update boundary conditions, after first iteration
             if iter>1
                 succ &= multicol.set_surface_bc!(globe, kwargs[:sol_type])
-                @info "    Updated columns' surface boundary conditions"
+                @info "Updated columns' surface boundary conditions"
             end
 
             # Update heating profiles, after first iteration
             if iter>1
                 succ &= multicol.set_redist!(globe)
-                @info "    Updated columns' heat redistribution profiles"
+                @info "Updated columns' heat redistribution profiles"
             end
 
             # Solve each column independently
+            #    This function runs `solve_energy!` on each column independently
             succ &= multicol.call_for_globe!(globe, solve_energy!; kwargs...)
 
             # Check if any of the solvers failed
-            if !succ
-                @warn "Global solver partially failed during iteration $iter"
+            succ || @warn "Global solver partially failed during iteration $iter"
+
+            # Check convergence across all columns.
+            #   This is when all models agree on a single flux_tot value.
+            @info "Checking globe for convergence"
+            conv = succ
+
+            #   Determine a reasonable target value
+            conv_val = median([atmos.flux_tot[end] for atmos in globe.atmos_arr])
+            @info @sprintf("    Convergence target = %+.2e W m-2", conv_val)
+
+            #    Check all columns
+            for (iatmos,atmos) in enumerate(globe.atmos_arr)
+                resid_val = abs(atmos.flux_tot[end]-conv_val)
+                conv &= (resid_val < globe_atol + globe_rtol * conv_val)
+                @info @sprintf("    Column %d: value = %+.2e W m-2, resid = %+.2e W m-2",
+                                iatmos, atmos.flux_tot[1], resid_val
+                                )
             end
 
-            # Check convergence across all columns
-            conv = false # TODO: implement convergence check across columns
-            if conv
-                break
-            end
+            # Converged?
+            conv && break
 
             @info "-------------------------------"
             @info " "

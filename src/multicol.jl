@@ -21,6 +21,7 @@ module multicol
     # System libraries
     using Printf
     using Logging
+    using Statistics: median
 
     # Local files
     import ..atmosphere
@@ -300,7 +301,7 @@ module multicol
                 # Get median value of total flux across columns
                 #    After some number of iterations, they will eventually tend to a
                 #    consistent value, describing the total flux from the planet.
-                flux_tot_avg = sum([atmos.flux_tot[end] for atmos in globe.atmos_arr])/globe.ncol
+                flux_tot_avg = median([atmos.flux_tot[end] for atmos in globe.atmos_arr])
 
                 # Update the skin depth for this column
                 globe.atmos_arr[i].skin_d = skin_depth(globe.atmos_arr[i], flux_tot_avg)
@@ -339,7 +340,12 @@ module multicol
         succ::Bool = true
 
         # TODO: calculate redist_Pmid, redist_Pwid, and redist_flux
-        #       based on the globe's column locations and other parameters
+        #       based on the globe's column locations and other parameters.
+        # This will probably be determined by a scaling law depending on:
+        #   - column temperature
+        #   - column composition
+        #   - planet radius
+        #   - planet rotation rate
 
         # Loop through columns
         for (i,atmos) in enumerate(globe.atmos_arr)

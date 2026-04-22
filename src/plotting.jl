@@ -824,7 +824,7 @@ module plotting
         @. y = 100.0 * atmos.band_u_sw[1, :]/atmos.band_d_sw[1, :]
 
         # Make plot
-        ylims  = (0.0, 100.0)
+        ylims  = (-5.0, 100.0)
         plt = plot(ylims=ylims, size=(size_x, size_y); plt_default...)
 
         plot!(plt, atmos.bands_cen*1e9, y, color="black", label="")
