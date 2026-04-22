@@ -18,13 +18,15 @@ module energy
     import ..phys
     import ..chemistry
     import ..spectrum
-    import ..multicol
 
     # Constants
     SKIP_SW_THRESH::Float64         = 1e-9      # skip SW calculation if TOA heating is below this threshold [W m-2]
     FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
     CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [bar]
     CONVECT_REAL_GAS::Bool          = false     # use real gas EOS in convection scheme, if RG EOS enabled
+    MIN_SKIN_D::Float64             = 1e-6      # minimum skin depth for conductive flux calculation [m]
+    MAX_SKIN_D::Float64             = 1e6       # maximum skin depth for conductive flux calculation [m]
+    ROUGHNESS_EPS::Float64          = 1e-3      # avoid blow-up of exchange coefficient when height ≈ roughness
 
     """
     **Set non-finite values in an array equal to a given fill value**.
@@ -464,7 +466,7 @@ module energy
     - `C_d::Float64`        TKE exchange coefficient [dimensionless]
     """
     function eval_exchange_coeff(height::Float64, roughness::Float64)::Float64
-        return phys.k_vk^2 / log(max(height, roughness+1e-3)/roughness)
+        return phys.k_vk^2 / log(max(height, roughness+ROUGHNESS_EPS)/roughness)
     end
 
     """
@@ -561,6 +563,9 @@ module energy
         end
 
         # Invert and subtract from net flux boundary condition
+        #     This means that the deep heating flux will represent an additional
+        #     source of energy, which is separate from the other fluxes. The other fluxes
+        #     will equal flux_int when the model has obtained its energy-conserving solution.
         F_total = atmos.flux_int - F_total
 
         # If deposition is outside the domain and requested, apply as a bottom boundary flux.
@@ -909,10 +914,12 @@ module energy
     end
 
     """
-    **Calculate flux carried by conductive skin.**
+    **Calculate conductive flux carried by conductive skin boundary layer.**
 
     This is a simple implementation of fourier's conduction law, with fixed conductivity
     and thickness of the boundary layer. Parameters are set in the atmos struct.
+
+    F = k * ΔT / d
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -922,6 +929,28 @@ module energy
     """
     function skin_flux(atmos::atmosphere.Atmos_t)::Float64
         return (atmos.tmp_magma - atmos.tmp_surf) * atmos.skin_k / atmos.skin_d
+    end
+
+    """
+    **Calculate conductive skin boundary layer thickness, given a conductive flux.**
+
+    This is effectively the inverse of the `skin_flux` function, and can be used to
+    determine the thickness of the boundary layer.
+
+    d = k * ΔT / F
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    - `flux_skn::Float64`   the conductive flux through the skin layer [W m-2].
+
+    Returns:
+    - `skin_d::Float64`     conductive skin boundary layer thickness [m].
+    """
+    function skin_depth(atmos::atmosphere.Atmos_t, flux_skn::Float64)::Float64
+        return clamp(
+                    (atmos.tmp_magma - atmos.tmp_surf) * atmos.skin_k / flux_skn,
+                    MIN_SKIN_D, MAX_SKIN_D
+                )
     end
 
     """

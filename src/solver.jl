@@ -1351,9 +1351,13 @@ module solver
 
         succ::Bool = true
         for iter in 1:globe_iters
-            @info "Starting iteration $iter/$globe_iters of globe solver"
+            @info "Iteration $iter/$globe_iters of globe solver (ncol=$(globe.ncol))"
+
+            # Update boundary conditions
+            succ &= multicol.set_surface_bc!(globe, kwargs[:sol_type])
 
             # TODO: recalculate heating profiles
+            succ &= multicol.set_redist!(globe, )
 
             # Solve each column independently
             succ &= multicol.call_for_globe!(globe, solve_energy!; kwargs...)
@@ -1367,6 +1371,7 @@ module solver
             # TODO: check this
 
             @info "-------------------------------"
+            @info " "
         end
 
         @warn "Globe solve did not converge after $globe_iters iterations"

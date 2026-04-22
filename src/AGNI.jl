@@ -13,38 +13,21 @@ module AGNI
     using Printf
     import TOML:parsefile
 
-    # Include local jl files (order matters)
-    include("consts.jl")
-    include("phys.jl")
-    include("spectrum.jl")
-    include("atmosphere.jl")
-    include("multicol.jl")
-    include("ocean.jl")
-    include("chemistry.jl")
-    include("rfm.jl")
-    include("setpt.jl")
-    include("save.jl")
-    include("plotting.jl")
-    include("energy.jl")
-    include("solver.jl")
-    include("load.jl")
-
-
-    # Import submodules
-    import .consts
-    import .phys
-    import .spectrum
-    import .atmosphere
-    import .multicol
-    import .setpt
-    import .save
-    import .plotting
-    import .energy
-    import .solver
-    import .ocean
-    import .chemistry
-    import .rfm
-    import .load
+    # Include local jl files (submodule load-ordering matters here)
+    include("consts.jl"); import .consts
+    include("phys.jl"); import .phys
+    include("spectrum.jl"); import .spectrum
+    include("atmosphere.jl"); import .atmosphere
+    include("ocean.jl"); import .ocean
+    include("chemistry.jl"); import .chemistry
+    include("rfm.jl"); import .rfm
+    include("setpt.jl"); import .setpt
+    include("save.jl"); import .save
+    include("load.jl"); import .load
+    include("energy.jl"); import .energy
+    include("multicol.jl"); import .multicol
+    include("plotting.jl"); import .plotting
+    include("solver.jl"); import .solver
 
     # Export submodules (mostly for autodoc purposes)
     export consts
@@ -489,8 +472,8 @@ module AGNI
         tmp_magma::Float64 = atmosphere.CFG_tmp_magma
         if sol_type == 2
             if ! all(k in keys(cfg["planet"]) for k in ["skin_k","skin_d","tmp_magma"])
-                @error "Config: solution type $sol_type selected"
-                @error "        you must provide `planet.skin_k`, `skin_d`, `tmp_magma`"
+                @error "Config: solution_type $sol_type selected"
+                @error "        you must provide `planet.skin_k`, `planet.skin_d`, `planet.tmp_magma`"
                 return false
             end
             skin_k      = cfg["planet"]["skin_k"]
@@ -501,7 +484,7 @@ module AGNI
         flux_int::Float64 = atmosphere.CFG_flux_int
         if sol_type == 3
             if ! haskey(cfg["planet"],"flux_int")
-                @error "Config: solution type $sol_type selected"
+                @error "Config: solution_type $sol_type selected"
                 @error "        you must provide `planet.flux_int`"
                 return false
             end
@@ -511,7 +494,7 @@ module AGNI
         target_olr::Float64 = atmosphere.CFG_target_olr
         if sol_type == 4
             if ! haskey(cfg["planet"],"target_olr")
-                @error "Config: solution type $sol_type selected"
+                @error "Config: solution_type $sol_type selected"
                 @error "        you must provide `planet.target_olr`"
                 return false
             end
@@ -520,6 +503,7 @@ module AGNI
 
         # Output folder
         output_dir = abspath(cfg["files"]["output_dir"])
+        @debug "Output directory: $output_dir"
 
         # Optional IO folder
         io_dir::String = atmosphere.UNSET_STR
@@ -667,14 +651,19 @@ module AGNI
             @debug "Setup globe"
             if !multicol.construct!(globe, atmos,
                                 cfg["planet"]["globe"]["lons"],
-                                cfg["planet"]["globe"]["lats"])
+                                cfg["planet"]["globe"]["lats"],
+                                # TODO: arrays below should be calcualted in the multicol module, not provided by the user
+                                cfg["planet"]["globe"]["redist_flux"],
+                                cfg["planet"]["globe"]["redist_Pmid"] .* 1e5,
+                                cfg["planet"]["globe"]["redist_Pwid"]
+                                )
                 @error "Could not construct globe object"
                 return false
             end
 
             # configure globe redist
             @debug "Set heat redist for globe"
-            multicol.set_redist!(globe, cfg["planet"]["globe"]["redist_flux"])
+            multicol.set_redist!(globe)
         end
 
 

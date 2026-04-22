@@ -125,7 +125,9 @@ module phys
         gas.atoms = count_atoms(formula)
         for e in keys(gas.atoms)
             if !(e in elems_standard)
-                error("Gas '$formula' contains unsupported element '$e'")
+                @error "Gas '$formula' contains unsupported element '$e'"
+                gas.fail = true
+                return gas
             end
         end
 

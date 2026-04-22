@@ -25,6 +25,7 @@ module multicol
     # Local files
     import ..atmosphere
     import ..phys
+    import ..energy
 
     # For copying variables between atmospheres
     SHARED_TYPES     = Union{AbstractArray, AbstractVector, Number, AbstractDict, AbstractString}
@@ -51,10 +52,15 @@ module multicol
         lons_arr::Array{Float64,1}                  # longitudes for each column
         lats_arr::Array{Float64,1}                  # latitudes for each column
 
-        # Physics variables
-        redist_Pmid::Array{Float64,1}      # heat redistribution midpoints [Pa]
-        redist_Pwid::Array{Float64,1}      # heat redistribution widths [log pressure]
-        flux_int::Float64                  # global flux loss from planet
+        # Redistribution parameters
+        redist_Pmid::Array{Float64,1}              # pressure midpoints for heat redistribution [Pa]
+        redist_Pwid::Array{Float64,1}              # pressure widths for heat redistribution [log pressure]
+        redist_flux::Array{Float64,1}              # heat redistribution flux for each column [W m-2]
+
+        # Planetary boundary conditions (global)
+        flux_int::Float64                  # flux loss from planet [W m-2]
+        tmp_magma::Float64                 # magma ocean temperature [K]
+        tmp_surf::Float64                  # surface temperature [K]
 
         Globe_t() = new()
     end # end Globe_t
@@ -84,6 +90,9 @@ module multicol
     - `atmos::Atmos_t`              original 1D-atmosphere to use as a basis
     - `lons::Array{Float64,1}`      longitudes for each column (degrees)
     - `lats::Array{Float64,1}`      latitudes for each column (degrees)
+    - `redist_flux::Array{Float64,1}`  heat redistribution flux for each column [W m-2]
+    - `redist_Pmid::Array{Float64,1}`  pressure midpoints for heat redistribution [Pa]
+    - `redist_Pwid::Array{Float64,1}`  pressure widths for
 
     Returns:
     - `Bool`                        globe was successfully constructed
@@ -91,6 +100,9 @@ module multicol
     function construct!(globe::Globe_t, atmos::atmosphere.Atmos_t,
                             lons::Array{Float64,1},
                             lats::Array{Float64,1},
+                            redist_flux::Array{Float64,1},
+                            redist_Pmid::Array{Float64,1},
+                            redist_Pwid::Array{Float64,1}
                         )::Bool
 
         # Fail safe
@@ -125,9 +137,14 @@ module multicol
         end
 
         # Set up other variables
-        globe.flux_int    = atmos.flux_int # global flux loss
-        globe.redist_Pmid = ones(Float64, globe.ncol) * 1e5 # default to 1 bar
-        globe.redist_Pwid = ones(Float64, globe.ncol) * 1.0 # default to 1 decade
+        globe.tmp_magma   = atmos.tmp_magma # BC: magma ocean temperature
+        globe.tmp_surf    = atmos.tmp_surf  # BC: surface temperature, same for all
+        globe.flux_int    = atmos.flux_int  # BC: global flux loss
+
+        # TODO: should be calculated dynamically in set_redist! at some point
+        globe.redist_Pmid = redist_Pmid
+        globe.redist_Pwid = redist_Pwid
+        globe.redist_flux = redist_flux
 
         # Instantiate array of auxiliary atmospheric columns
         globe.atmos_arr = atmosphere.Atmos_t[atmosphere.Atmos_t() for _ in 1:globe.ncol]
@@ -162,8 +179,8 @@ module multicol
             atmosphere.set_deep_heating!(globe.atmos_arr[i],
                                             globe.redist_Pmid[i],
                                             globe.redist_Pwid[i],
-                                            0.0, # always flux_rel = 0
-                                            0.0, # initially zero, but set later
+                                            0.0,
+                                            globe.redist_flux[i],
                                             "pressure", "boundary_flux", "abs")
 
             # Check that arrays have correct length
@@ -253,25 +270,76 @@ module multicol
     end
 
     """
+    **Set surface boundary condition for columns in globe**
+
+    Arguments:
+    - `globe::Globe_t`      globe struct containing the columns to update
+    - `sol_type::Int64`     solution type for surface boundary condition (1: Tsurf, 2: Tmagma, 3: flux_int)
+
+    """
+    function set_surface_bc!(globe::Globe_t, sol_type::Int64)::Bool
+
+        flux_tot_avg::Float64 = globe.flux_int
+
+        # Set the surface boundary condition for each column based on the solution type
+        if sol_type == 1
+            # Enforce Tsurf
+            for i in 1:globe.ncol
+                globe.atmos_arr[i].tmp_surf = globe.tmp_surf
+            end
+
+        elseif sol_type == 2
+            # Enforce Tmagma, same for all columns, since we coule with a 1D interior.
+            #    To close the system, we update skin_d for all columns, which
+            #    depends on Tmagma and allows them to take different Tsurf. This requires
+            #    the total flux from each column to be consistent (~ flux_int).
+            for i in 1:globe.ncol
+                # Enforce Tmagma
+                globe.atmos_arr[i].tmp_magma = globe.tmp_magma
+
+                # Get median value of total flux across columns
+                #    After some number of iterations, they will eventually tend to a
+                #    consistent value, describing the total flux from the planet.
+                flux_tot_avg = sum([atmos.flux_tot[end] for atmos in globe.atmos_arr])/globe.ncol
+
+                # Update the skin depth for this column
+                globe.atmos_arr[i].skin_d = energy.skin_depth(globe.atmos_arr[i], flux_tot_avg)
+            end
+
+        elseif sol_type == 3
+            # Enforce flux_int
+            for i in 1:globe.ncol
+                globe.atmos_arr[i].flux_int = globe.flux_int
+            end
+
+        # TODO: elseif sol_type == 4
+        # TODO:     Enforce a particular OLR
+
+        else
+            @warn "Invalid solution type for surface BC: $sol_type"
+            return false
+        end
+
+        return true
+    end
+
+    """
     **Set heat-redistribution flux profiles for globe's columns.**
 
-    Update heat-redistribution fluxes for all columns in globe.
+    Update heat-redistribution fluxes and profiles for all columns in globe.
 
     Arguments:
     - `globe::Globe_t`              globe struct containing the columns to update
-    - `fluxes::Array{Float64,1}`    single flux value for each column
 
     Returns:
     - `succ::Bool                   whether the update was successful
     """
-    function set_redist!(globe::Globe_t, fluxes::Array{Float64,1})::Bool
+    function set_redist!(globe::Globe_t)::Bool
 
         succ::Bool = true
 
-        # Fluxes should sum to zero
-        if abs(sum(fluxes)) > 1e-10
-            @warn "Heat redist fluxes must sum to zero for energy conservation"
-        end
+        # TODO: calculate redist_Pmid, redist_Pwid, and redist_flux
+        #       based on the globe's column locations and other parameters
 
         # Loop through columns
         for (i,atmos) in enumerate(globe.atmos_arr)
@@ -279,10 +347,10 @@ module multicol
             # Set heating profile
             succ &= atmosphere.set_deep_heating!(
                         atmos,
-                        atmos.deepheat_Pmid, # do not change previously-stored value
-                        atmos.deepheat_Pwid, # ^
-                        0.0,                 # flux_rel = 0
-                        fluxes[i],           # flux_abs = redist flux for this column
+                        globe.redist_Pmid[i], # TODO: calculate in this function
+                        globe.redist_Pwid[i], # TODO: calculate in this function
+                        0.0,                  # flux_rel = 0, always
+                        globe.redist_flux[i], # TODO: calculate in this function
                         "pressure", "boundary_flux", "abs"
                     )
         end
