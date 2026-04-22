@@ -25,7 +25,7 @@ module multicol
     # Local files
     import ..atmosphere
     import ..phys
-    import ..energy
+    import ..energy: skin_depth
 
     # For copying variables between atmospheres
     SHARED_TYPES     = Union{AbstractArray, AbstractVector, Number, AbstractDict, AbstractString}
@@ -303,7 +303,7 @@ module multicol
                 flux_tot_avg = sum([atmos.flux_tot[end] for atmos in globe.atmos_arr])/globe.ncol
 
                 # Update the skin depth for this column
-                globe.atmos_arr[i].skin_d = energy.skin_depth(globe.atmos_arr[i], flux_tot_avg)
+                globe.atmos_arr[i].skin_d = skin_depth(globe.atmos_arr[i], flux_tot_avg)
             end
 
         elseif sol_type == 3

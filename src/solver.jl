@@ -1349,15 +1349,28 @@ module solver
         conv_atol::Float64 = get(kwargs, :conv_atol, 1.0e-3)
         conv_rtol::Float64 = get(kwargs, :conv_rtol, 1.0e-5)
 
-        succ::Bool = true
+        # Track state of globe solver
+        succ::Bool = true       # success during this specific iteration
+        conv::Bool = false      # globe converged
+
+        # Iterate until convergence, or until giving up
         for iter in 1:globe_iters
             @info "Iteration $iter/$globe_iters of globe solver (ncol=$(globe.ncol))"
 
-            # Update boundary conditions
-            succ &= multicol.set_surface_bc!(globe, kwargs[:sol_type])
+            # Assume success
+            succ = true
 
-            # TODO: recalculate heating profiles
-            succ &= multicol.set_redist!(globe, )
+            # Update boundary conditions, after first iteration
+            if iter>1
+                succ &= multicol.set_surface_bc!(globe, kwargs[:sol_type])
+                @info "    Updated columns' surface boundary conditions"
+            end
+
+            # Update heating profiles, after first iteration
+            if iter>1
+                succ &= multicol.set_redist!(globe)
+                @info "    Updated columns' heat redistribution profiles"
+            end
 
             # Solve each column independently
             succ &= multicol.call_for_globe!(globe, solve_energy!; kwargs...)
@@ -1368,14 +1381,21 @@ module solver
             end
 
             # Check convergence across all columns
-            # TODO: check this
+            conv = false # TODO: implement convergence check across columns
+            if conv
+                break
+            end
 
             @info "-------------------------------"
             @info " "
         end
 
-        @warn "Globe solve did not converge after $globe_iters iterations"
-        return false
+        if conv
+            @info "Globe solve converged"
+        else
+            @warn "Globe solve did not converge ($globe_iters iterations)"
+        end
+        return conv
     end
 
 end

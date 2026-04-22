@@ -23,8 +23,8 @@ title = "Multicolumn example"
         lons        = [  0.0,  60.0,  90.0, 180.0]      # longitudes [deg]
         lats        = [  0.0,   0.0,   0.0,   0.0]      # latitudes [deg]
         redist_flux = [ -4.0,  -2.0,   1.0,   5.0]      # heat entering this column [W m-2]
-        redist_Pmid = [  1e1,   1e1,   1e1,   1e1]      # pressure to apply deep heating [bar]
-        redist_Pwid = [  5.0,   5.0,   5.0,   5.0]      # width of deep heating [log P]
+        redist_Pmid = [  1e0,   1e0,   1e0,   1e0]      # pressure to apply deep heating [bar]
+        redist_Pwid = [  4.0,   4.0,   4.0,   4.0]      # width of deep heating [log P]
 
 [files]
     input_sf        = "greygas"
@@ -40,7 +40,7 @@ title = "Multicolumn example"
 [execution]
     clean_output    = true
     verbosity       = 1
-    max_steps       = 200
+    max_steps       = 70
     globe_iters     = 5
     max_runtime     = 400
     num_levels      = 40
@@ -48,7 +48,7 @@ title = "Multicolumn example"
     solver          = "newton"
     dx_max          = 200.0
     initial_state   = ["iso", "2000"]
-    linesearch      = 0
+    linesearch      = 1
     easy_start      = false
     grey_start      = false
     converge_atol   = 5.0e-1

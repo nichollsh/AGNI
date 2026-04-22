@@ -167,7 +167,10 @@ module setpt
                 return false
             end
 
-            succ &= atmosphere.calc_layer_props!(atmos)
+            # Calculate height (etc) but don't error if it fails, yet
+            if !atmosphere.calc_layer_props!(atmos)
+                @warn "Initial T(p) structure may be unbound"
+            end
 
             # iterate
             idx_req += 1

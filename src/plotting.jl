@@ -23,6 +23,9 @@ module plotting
     # Allowed plot file extensions
     const ALLOWED_EXTS::Set{String} = Set(["png", "pdf", "svg"])
 
+    # Axis margins
+    TMP_MARGIN::Float64 = 100.0
+
     # Colors
     const col_r::String = "#c0c0c0"
     const col_n::String = "#000000"
@@ -109,7 +112,7 @@ module plotting
 
         y = atmos.pl ./ 1e5 # pressure -> bar
 
-        xlims::Tuple{Float64,Float64} = (0.0, maximum(atmos.tmpl)+100.0)
+        xlims::Tuple{Float64,Float64} = (0.0, maximum(atmos.tmpl)+TMP_MARGIN)
 
         # Create plot
         plt = plot(ylims=_get_ylims(atmos), yticks=_get_yticks(atmos),
@@ -883,7 +886,7 @@ module plotting
 
         # Create plot
         plt1 = plot(size=(size_x/2, size_y), ylims=ylims, yticks=yticks,
-                        legend=:topright; plt_default...)
+                        legend=false; plt_default...)
         plt2 = plot(size=(size_x/2, size_y), ylims=ylims, yticks=(yticks,[]),
                         legend=false; plt_default...)
 
@@ -898,12 +901,20 @@ module plotting
             y = globe.atmos_arr[i].p * 1e-5 # pressure -> bar
 
             # temperature
-            plot!(plt1, globe.atmos_arr[i].tmp, y, color=c, lw=lw, linealpha=la,
-                    label=@sprintf("Lo=%4.1f°", globe.lons_arr[i]))
+            plot!(plt1, globe.atmos_arr[i].tmp, y, color=c, lw=lw, linealpha=la, label="")
+
+            # Annotate with column longitude and latitude
+            anno_idx = min(1+i*2, length(y))
+            annotate!(plt1,
+                        globe.atmos_arr[i].tmp[anno_idx], y[anno_idx],
+                        text(@sprintf("%g°W,%+g°N", globe.lons_arr[i], globe.lats_arr[i]),
+                                color=c, halign=:hcenter, valign=:vcenter,
+                                pointsize=7, rotation=-40)
+                    )
 
             # store min, max temperatures
-            tlim[1] = min(tlim[1], minimum(globe.atmos_arr[i].tmpl)+15.0)
-            tlim[2] = max(tlim[2], maximum(globe.atmos_arr[i].tmpl)+15.0)
+            tlim[1] = min(tlim[1], minimum(globe.atmos_arr[i].tmpl)-TMP_MARGIN)
+            tlim[2] = max(tlim[2], maximum(globe.atmos_arr[i].tmpl)+TMP_MARGIN)
 
             # heating rate
             hr = _symlog.(globe.atmos_arr[i].heating_rate) # transformed
@@ -1006,4 +1017,3 @@ module plotting
     end
 
 end # end module plotting
-

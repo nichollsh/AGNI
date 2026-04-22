@@ -402,7 +402,8 @@ module AGNI
         #    double grey radtrans opacities
         κ_grey_lw::Float64 = atmosphere.CFG_κ_grey_lw  # this will be over-written
         κ_grey_sw::Float64 = atmosphere.CFG_κ_grey_sw  # ^
-        if (lowercase(cfg["files"]["input_sf"]) == "greygas") || cfg["execution"]["grey_start"]
+        just_greygas::Bool = (lowercase(cfg["files"]["input_sf"]) == "greygas")
+        if just_greygas || cfg["execution"]["grey_start"]
             if all(k in keys(cfg["physics"]) for k in ["grey_sw","grey_lw"])
                 κ_grey_lw = Float64(cfg["physics"]["grey_lw"])
                 κ_grey_sw = Float64(cfg["physics"]["grey_sw"])
@@ -428,10 +429,10 @@ module AGNI
         incl_conduct::Bool     = cfg["physics"]["conduction"]
         incl_sens::Bool        = cfg["physics"]["sensible_heat"]
         incl_latent::Bool      = cfg["physics"]["latent_heat"]
-        sol_type::Int64         = cfg["execution"]["solution_type"]
+        sol_type::Int64        = cfg["execution"]["solution_type"]
         conv_atol::Float64     = cfg["execution"]["converge_atol"]
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
-        conv_type::Int64        = 1
+        conv_type::Int64       = 1
         if haskey(cfg["execution"],"converge_type")
             conv_type = Int64(cfg["execution"]["converge_type"])
         end
@@ -439,9 +440,15 @@ module AGNI
         #    plotting stuff
         plt_EXT::String        = lowercase(get(cfg["plots"], "extension", "png"))
         plt_glo::Bool          = get(cfg["plots"], "globe", false)
-        plt_tmp::Bool          = cfg["plots"]["temperature"]
-        plt_ani::Bool          = cfg["plots"]["animate"]
-        plt_ani = plt_ani && plt_tmp
+        plt_tmp::Bool          = get(cfg["plots"], "temperature", false)
+        plt_ani::Bool          = get(cfg["plots"], "animate", false) && plt_tmp
+        plt_flx::Bool          = get(cfg["plots"], "fluxes", false)
+        plt_vmr::Bool          = get(cfg["plots"], "mixing_ratios", false) && !transparent
+        plt_hgt::Bool          = get(cfg["plots"], "height", false) && !transparent
+        plt_emt::Bool          = get(cfg["plots"], "emission", false) && !just_greygas
+        plt_alb::Bool          = get(cfg["plots"], "albedo", false) && !just_greygas
+        plt_cld::Bool          = get(cfg["plots"], "cloud", false) && !transparent && !just_greygas
+        plt_cff::Bool          = get(cfg["plots"], "contribution", false) && !transparent && !just_greygas
         if !( plt_EXT in plotting.ALLOWED_EXTS )
             @error "Config: Plot extension must be one of $(plotting.ALLOWED_EXTS)"
             return false
@@ -770,51 +777,46 @@ module AGNI
                             atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
         end
 
-        # Write arrays
-        @info "Writing results"
+
+        # Paths and objects for saving/plotting
         if is_multicol
-            # write each column separately
-            for (i,a) in enumerate(globe.atmos_arr)
-                save.write_ncdf(a, joinpath(atmos.OUT_DIR,@sprintf("atm.col%03d.nc", i)))
-            end
+            arr_cols = globe.atmos_arr
+            arr_sfxs = [@sprintf(".col%03d", i) for i in 1:length(globe.atmos_arr)]
         else
-            # just one column to write
-            save.write_ncdf(atmos, joinpath(atmos.OUT_DIR,"atm.nc"))
+            arr_cols = [atmos]
+            arr_sfxs = [""]
             if plt_glo
                 @warn "Globe plotting requested for single-column simulation"
                 plt_glo = false
             end
         end
 
-        # Save plots
-        @info "Plotting results"
-        if !transparent
-
-            # globe plots
-            plt_glo && plotting.plot_globe(globe, joinpath(atmos.OUT_DIR,"plot_globe.$plt_EXT"))
-
-            # single column plots
-            plt_ani && plotting.animate(atmos.OUT_DIR, atmos.FRAMES_DIR)
-            cfg["plots"]["cloud"] && \
-                plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.$plt_EXT"))
-            cfg["plots"]["mixing_ratios"] && \
-                plotting.plot_vmr(atmos, joinpath(atmos.OUT_DIR,"plot_vmrs.$plt_EXT"), size_x=600)
-            cfg["plots"]["contribution"]  && \
-                plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.$plt_EXT"))
-            cfg["plots"]["height"] && \
-                plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.$plt_EXT"))
-            plt_tmp && \
-                plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"plot_ptprofile.$plt_EXT"), incl_magma=(sol_type==2))
+        # Write arrays
+        @info "Writing results"
+        for (a,s) in zip(arr_cols, arr_sfxs)
+            save.write_ncdf(a, joinpath(atmos.OUT_DIR,"atm$s.nc"))
         end
-        cfg["plots"]["fluxes"] && \
-            plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.$plt_EXT"),
-                                    incl_mlt=incl_convect, incl_eff=(sol_type==3),
-                                    incl_cdct=incl_conduct, incl_latent=incl_latent,
-                                    incl_deep=incl_deep)
-        cfg["plots"]["emission"] && \
-            plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.$plt_EXT"))
-        cfg["plots"]["albedo"] && \
-            plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.$plt_EXT"))
+
+        # Make plots
+        @info "Plotting results"
+        plt_glo && plotting.plot_globe(globe, joinpath(atmos.OUT_DIR,"plot_globe.$plt_EXT"))
+        plt_ani && plotting.animate(atmos.OUT_DIR, atmos.FRAMES_DIR)
+
+        for (a,s) in zip(arr_cols, arr_sfxs)
+            plt_cld && plotting.plot_cloud(a,       joinpath(a.OUT_DIR,"plot_cloud$s.$plt_EXT"))
+            plt_vmr && plotting.plot_vmr(a,         joinpath(a.OUT_DIR,"plot_vmrs$s.$plt_EXT"), size_x=600)
+            plt_cff && plotting.plot_contfunc1(a,   joinpath(a.OUT_DIR,"plot_contfunc1$s.$plt_EXT"))
+            plt_hgt && plotting.plot_radius(a,      joinpath(a.OUT_DIR,"plot_radius$s.$plt_EXT"))
+            plt_tmp && plotting.plot_pt(a,          joinpath(a.OUT_DIR,"plot_ptprofile$s.$plt_EXT"), incl_magma=(sol_type==2))
+
+            plt_flx && plotting.plot_fluxes(a, joinpath(a.OUT_DIR,"plot_fluxes$s.$plt_EXT"),
+                                                incl_mlt=incl_convect, incl_eff=(sol_type==3),
+                                                incl_cdct=incl_conduct, incl_latent=incl_latent,
+                                                incl_deep=incl_deep)
+            plt_emt && plotting.plot_emission(a, joinpath(a.OUT_DIR,"plot_emission$s.$plt_EXT"))
+            plt_alb && plotting.plot_albedo(a, joinpath(a.OUT_DIR,"plot_albedo$s.$plt_EXT"))
+        end
+
 
         # Deallocate atmosphere
         @debug "Deallocating memory"
