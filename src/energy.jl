@@ -502,7 +502,7 @@ module energy
     - `atmos::Atmos_t`          the atmosphere struct instance to be used
     """
     function conduct!(atmos::atmosphere.Atmos_t)::Bool
-        # top layer
+        # top layer (to space)
         atmos.flux_cdct[1] = 0.0
 
         # bulk layers
@@ -511,7 +511,7 @@ module energy
                                                         atmos.layer_thick[i]
         end
 
-        # bottom layer
+        # bottom layer (from surface)
         atmos.flux_cdct[end] = atmos.layer_kc[end] * (atmos.tmp[end]-atmos.tmp_surf) /
                                                       (atmos.r[end] - atmos.rp)
         return true

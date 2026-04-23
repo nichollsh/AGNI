@@ -1378,8 +1378,10 @@ module solver
             # Check if any of the solvers failed
             succ || @warn "Global solver partially failed during iteration $iter"
 
-            # Check convergence across all columns.
-            #   This is when all models agree on a single flux_tot value.
+            # Check that globe converged on state where all columns get same flux_tot.
+            #   For sol_type=1, system closed by updating heat_redist
+            #   For sol_type=2, system closed by updating surface BC and heat_redist
+            #   For sol_type=3, system closed by updating heat_redist
             @info "Checking globe for convergence"
             conv = succ
 
@@ -1389,10 +1391,10 @@ module solver
 
             #    Check all columns
             for (iatmos,atmos) in enumerate(globe.atmos_arr)
-                resid_val = abs(atmos.flux_tot[end]-conv_val)
-                conv &= (resid_val < globe_atol + globe_rtol * conv_val)
-                @info @sprintf("    Column %d: value = %+.2e W m-2, resid = %+.2e W m-2",
-                                iatmos, atmos.flux_tot[1], resid_val
+                resid_val = atmos.flux_tot[end]-conv_val
+                conv &= (abs(resid_val) < globe_atol + globe_rtol * conv_val)
+                @info @sprintf("    Column %d: resid = %+.2e W m-2 (%+.2f%%)",
+                                iatmos, resid_val, resid_val/conv_val*100
                                 )
             end
 

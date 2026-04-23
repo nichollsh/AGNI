@@ -660,13 +660,21 @@ module phys
         return gas.cap_I(t)
     end
 
-    # Constant prefactor used in `get_Kc`
-    const kc_prefactor::Float64 = 2.0 * (5 * k_B / 2) / (3 * pi^1.5)
-
     """
     **Get gas thermal conductivity at a given temperature.**
 
-    This assumes that the gas is within the ideal regime.
+    This assumes that the gas is within the ideal regime. An accurate accounting of
+    inter-particle effects is important here, and depends on the size of the particles,
+    their repulsion/attraction terms, and the number of atoms per molecule. This formulation
+    does a fairly good job while remaining simple, and gets the right order of magnitude
+    of kc for a range of gases.
+
+    Chapman-Enskog theory of transport properties of gases, can account for inter-particle
+    effects via the collision integral 'omega'. Here, we set `omega=1`.
+
+    - https://en.wikipedia.org/wiki/Thermal_conductivity_and_resistivity
+    - https://books.google.co.uk/books?id=Cbp5JP2OTrwC (page 164 ish)
+    - https://doi.org/10.1063/5.0244532
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -685,9 +693,18 @@ module phys
         # Temperature floor to avoid sqrt of negative number
         t = max(t, 0.0)
 
-        # Equation 5.255 from
-        #     https://farside.ph.utexas.edu/teaching/355/Surveyhtml/node221.html
-        return kc_prefactor * sqrt(k_B * t / gas.particle_m) / gas.particle_d^2
+        # Inter-particle effects are important, and complicated...
+        #  An evaluation of collision integral 'omega' must be done numerically.
+        kc_omega::Float64 = 1.0
+
+        # Start with prefactor which accounts for inter-particle effects via omega
+        kc_gas::Float64 = 25.0 / (32.0 * pi * kc_omega)
+
+        # Add boltzmann terms
+        kc_gas *= sqrt(pi * gas.particle_m * k_B * t) * get_Cp(gas,t) / gas.particle_d^2
+
+        # Estimate for kc
+        return kc_gas
     end
 
     """

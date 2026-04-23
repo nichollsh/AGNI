@@ -290,7 +290,7 @@ module multicol
             end
 
         elseif sol_type == 2
-            # Enforce Tmagma, same for all columns, since we coule with a 1D interior.
+            # Enforce Tmagma, same for all columns, since they couple with same interior.
             #    To close the system, we update skin_d for all columns, which
             #    depends on Tmagma and allows them to take different Tsurf. This requires
             #    the total flux from each column to be consistent (~ flux_int).
@@ -299,8 +299,8 @@ module multicol
                 globe.atmos_arr[i].tmp_magma = globe.tmp_magma
 
                 # Get median value of total flux across columns
-                #    After some number of iterations, they will eventually tend to a
-                #    consistent value, describing the total flux from the planet.
+                #    Will eventually tend to consistent value,
+                #    describing the total flux from the planet.
                 flux_tot_avg = median([atmos.flux_tot[end] for atmos in globe.atmos_arr])
 
                 # Update the skin depth for this column
