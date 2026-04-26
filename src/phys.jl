@@ -869,6 +869,8 @@ module phys
     """
     **Calculate gravitational acceleration.**
 
+    Using the Newtonian formula for universal gravitation in spherical geometry.
+
     Arguments:
     - `mass::Float64`       Enclosed mass [kg]
     - `radius::Float64`     Enclosed radius [m]
@@ -879,6 +881,39 @@ module phys
     function grav_accel(mass::Float64, radius::Float64)::Float64
         return G_grav * mass / (radius * radius)
     end
+
+    """
+    **Calculate radial component of centripetal acceleration.**
+
+    Note that this is only the component of the centripetal acceleration which
+    acts in the radial direction, and is relevant for calculating the effective
+    gravity at the surface of a rotating planet. This means `a_c` is zero at the poles.
+
+    The full centripetal acceleration is given by the equation below, where `d` is the
+    distance from the rotation axis and `p` is the rotation period.
+
+    `a_c = 4 * pi^2 * d / p^2`
+
+    The distance `d` is equal to `r * cos(θ)`, so the equation can be rewritten as:
+
+    `a_c = 4 * pi^2 * d * cos(θ) / p^2`
+
+    And then to get the radial component, we multiply by `cos(θ)` again:
+
+    `a_c = r * ( 2 * pi * cos(θ) / p )^2`
+
+    Arguments:
+    - `p::Float64`       Axial rotation period [s]
+    - `r::Float64`       Radius of this layer [m]
+    - `θ::Float64`       Latitude of this column [degrees]
+
+    Returns:
+    - `a_c::Float64`     Centripetal acceleration [m s-2]
+    """
+    function cent_accel(p::Float64, r::Float64, θ::Float64)::Float64
+        return r * ( 2 * pi * cosd(θ) / p )^2
+    end
+
 
     """
     **Evaluate the density of a liquid phase.**

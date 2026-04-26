@@ -50,8 +50,6 @@ module multicol
         # Arrays of atmosphere columns
         ncol::Int64                                 # number of columns
         atmos_arr::Array{atmosphere.Atmos_t,1}      # auxiliary atmospheric columns
-        lons_arr::Array{Float64,1}                  # longitudes for each column
-        lats_arr::Array{Float64,1}                  # latitudes for each column
 
         # Redistribution parameters
         redist_Pmid::Array{Float64,1}              # pressure midpoints for heat redistribution [Pa]
@@ -118,21 +116,19 @@ module multicol
 
         # Set up the column locations
         globe.ncol     = length(lons)
-        globe.lons_arr = lons
-        globe.lats_arr = lats
 
         # Check that the longitudes and latitudes are valid
-        if length(globe.lats_arr) != globe.ncol
-            @warn "Number of longitudes and latitudes must match number of columns: $(globe.ncol)"
+        if (length(lats) != globe.ncol) || (length(lons) != globe.ncol)
+            @warn "Num of longitudes & latitudes must match num of columns: $(globe.ncol)"
             return false
         end
         for i in 1:globe.ncol
-            if !(0.0 <= globe.lons_arr[i] <= 360.0)
-                @warn "Invalid longitude $(globe.lons_arr[i]) for column $i"
+            if !(0.0 <= lons[i] <= 360.0)
+                @warn "Invalid longitude $(lons[i]) for column $i"
                 return false
             end
-            if !( abs(globe.lats_arr[i]) <= 90.0)
-                @warn "Invalid latitude $(globe.lats_arr[i]) for column $i"
+            if !( abs(lats[i]) <= 90.0)
+                @warn "Invalid latitude $(lats[i]) for column $i"
                 return false
             end
         end
@@ -169,8 +165,12 @@ module multicol
             # Set name of atmosphere for the column
             globe.atmos_arr[i].name = atmos.name * @sprintf(".col%03d", i)
 
+            # Set the column's longitude and latitude
+            globe.atmos_arr[i].col_lon = lons[i]
+            globe.atmos_arr[i].col_lat = lats[i]
+
             # Set the zenith angle for the column based on its latitude and longitude
-            globe.atmos_arr[i].zenith_degrees = atmosphere.calc_zenith_angle(globe.lons_arr[i], globe.lats_arr[i])
+            globe.atmos_arr[i].zenith_degrees = atmosphere.calc_zenith_angle(lons[i], lats[i])
             globe.atmos_arr[i].s0_fact        = 1.0
 
             # Set TOA heating
@@ -212,6 +212,33 @@ module multicol
         for field in shared_fields
             setfield!(dst, field, getfield(src, field))
         end
+        return true
+    end
+
+    """Set a quantity to be a given value, for all columns in the globe**
+
+    Arguments:
+    - `globe::Globe_t`      globe struct containing the columns to update
+    - `quantity::Symbol`    the quantity to set (e.g. :tmp_surf, :flux_int)
+    - `value`               the value to set the quantity to for all columns
+
+    Returns:
+    - `succ::Bool`         whether the update was successful
+    """
+    function set_for_globe!(globe::Globe_t, quantity::Symbol, value)::Bool
+
+        # Check quantity exists
+        if !hasfield(atmosphere.Atmos_t, quantity)
+            @warn "Invalid quantity $quantity for atmosphere"
+            return false
+        end
+
+        # Set for worker and for all columns
+        setfield!(globe.atmos_wrk, quantity, value)
+        for i in 1:globe.ncol
+            setfield!(globe.atmos_arr[i], quantity, value)
+        end
+
         return true
     end
 

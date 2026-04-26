@@ -52,6 +52,18 @@ module consts
     const G_grav::Float64 = 6.67430e-11 # NIST CODATA
     export G_grav
 
+    # Length of an hour in seconds
+    const u_hour_sec::Float64 = 3600.0
+    export u_hour_sec
+
+    # Length of a day in seconds
+    const u_day_sec::Float64 = 24.0 * u_hour_sec
+    export u_day_sec
+
+    # Length of a year in seconds
+    const u_year_sec::Float64 = 365.25 * u_day_sec
+    export u_year_sec
+
     # Specific heat capacity for ideal gas [J mol-1 K-1]
     const Cp_ideal::Float64 = R_gas * 7/2 # assuming that it is diatomic
     export Cp_ideal

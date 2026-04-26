@@ -895,29 +895,29 @@ module plotting
 
         # Plot profiles
         cmap = cgrad(:batlow, globe.ncol, categorical=true, rev=true)
-        for i in 1:globe.ncol
+        for (i,atmos) in enumerate(globe.atmos_arr)
 
             c = cmap[i]
-            y = globe.atmos_arr[i].p * 1e-5 # pressure -> bar
+            y = atmos.p * 1e-5 # pressure -> bar
 
             # temperature
-            plot!(plt1, globe.atmos_arr[i].tmp, y, color=c, lw=lw, linealpha=la, label="")
+            plot!(plt1, atmos.tmp, y, color=c, lw=lw, linealpha=la, label="")
 
             # Annotate with column longitude and latitude
             anno_idx = min(1+i*2, length(y))
             annotate!(plt1,
-                        globe.atmos_arr[i].tmp[anno_idx], y[anno_idx],
-                        text(@sprintf("%g°W,%+g°N", globe.lons_arr[i], globe.lats_arr[i]),
+                        atmos.tmp[anno_idx], y[anno_idx],
+                        text(@sprintf("%g°W,%+g°N", atmos.col_lon, atmos.col_lat),
                                 color=c, halign=:hcenter, valign=:vcenter,
                                 pointsize=7, rotation=-40)
                     )
 
             # store min, max temperatures
-            tlim[1] = min(tlim[1], minimum(globe.atmos_arr[i].tmpl)-TMP_MARGIN)
-            tlim[2] = max(tlim[2], maximum(globe.atmos_arr[i].tmpl)+TMP_MARGIN)
+            tlim[1] = min(tlim[1], minimum(atmos.tmpl)-TMP_MARGIN)
+            tlim[2] = max(tlim[2], maximum(atmos.tmpl)+TMP_MARGIN)
 
             # heating rate
-            hr = _symlog.(globe.atmos_arr[i].heating_rate) # transformed
+            hr = _symlog.(atmos.heating_rate) # transformed
             plot!(plt2, hr, y, color=c, lw=lw, linealpha=la, label="")
 
             # store max heating rate

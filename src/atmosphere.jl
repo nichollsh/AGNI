@@ -51,8 +51,13 @@ module atmosphere
     const CFG_tmp_ceiling::Float64      = 2e4
     const CFG_surf_roughness::Float64   = 0.001
     const CFG_surf_windspeed::Float64   = 2.0
-    const CFG_Kzz_kbreak::Float64       = 1e5
-    const CFG_Kzz_pbreak::Float64       = 1e5 # 1 bar
+    const CFG_col_lat::Float64          = 0.0
+    const CFG_col_lon::Float64          = 0.0
+    const CFG_axial_period::Float64     = 1e9   # big default number for rotation period [s]
+    const CFG_latitude::Float64         = 0.0   # relative to substellar point
+    const CFG_longitude::Float64        = 0.0   # relative to substellar point
+    const CFG_Kzz_kbreak::Float64       = 1e5   # m2 s-1
+    const CFG_Kzz_pbreak::Float64       = 1e5   # 1 bar
     const CFG_Kzz_type::Int64           = 2
     const CFG_mlt_asymptotic::Bool      = true
     const CFG_mlt_criterion::Char       = 's'
@@ -186,6 +191,8 @@ module atmosphere
         pl::Array{Float64,1}    # ce pressure [Pa]
         r::Array{Float64,1}     # cc radius [m]
         rl::Array{Float64,1}    # ce radius [m]
+        a::Array{Float64,1}     # cc net acceleration [m s-2]
+        al::Array{Float64,1}    # ce net acceleration [m s-2]
         g::Array{Float64,1}     # cc gravity [m s-2]
         gl::Array{Float64,1}    # ce gravity [m s-2]
         m::Array{Float64,1}     # cc mass encl [kg]
@@ -205,6 +212,11 @@ module atmosphere
         skin_d::Float64                 # skin thickness [m]
         skin_k::Float64                 # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
         tmp_magma::Float64              # Mantle temperature [K]
+
+        # Rotation
+        col_lon::Float64               # longitude of column relative to substellar point [deg]
+        col_lat::Float64               # latitude of column relative to substellar point [deg]
+        axial_period::Float64          # axial rotation period [s], i.e. the day length
 
         # Gas tracking variables (incl gases which are not in spectralfile)
         gas_num::Int64                              # Number of gases
@@ -536,9 +548,15 @@ module atmosphere
                     Kzz_type::Int64 =           CFG_Kzz_type,
                     mlt_asymptotic::Bool =      CFG_mlt_asymptotic,
                     mlt_criterion::Char =       CFG_mlt_criterion,
+
                     tmp_magma::Float64 =        CFG_tmp_magma,
                     skin_d::Float64 =           CFG_skin_d,
                     skin_k::Float64 =           CFG_skin_k,
+
+                    axial_period::Float64 =     CFG_axial_period,
+                    latitude::Float64 =         CFG_latitude,
+                    longitude::Float64 =        CFG_longitude,
+
                     overlap_method::String =    CFG_overlap_method,
                     target_olr::Float64 =       CFG_target_olr,
                     flux_int::Float64 =         CFG_flux_int,
@@ -798,6 +816,14 @@ module atmosphere
         atmos.rp = radius
         _check_range("Planet surface radius", atmos.rp; min=RP_MIN) || return false
 
+        # rotation
+        atmos.axial_period = axial_period
+        _check_range("Axial period", atmos.axial_period; min=0.0) || return false
+        atmos.col_lat = latitude
+        _check_range("Latitude", atmos.col_lat; min=-90.0, max=90.0) || return false
+        atmos.col_lon = longitude
+        _check_range("Longitude", atmos.col_lon; min=0, max=360.0) || return false
+
         # derived statistics
         atmos.interior_mass  =  atmos.grav_surf * atmos.rp^2 / phys.G_grav
         atmos.interior_rho   =  3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
@@ -835,6 +861,9 @@ module atmosphere
         #    gravity
         atmos.g             = ones(Float64, atmos.nlev_c) * atmos.grav_surf
         atmos.gl            = ones(Float64, atmos.nlev_l) * atmos.grav_surf
+        #    net acceleration
+        atmos.a             = zeros(Float64, atmos.nlev_c)
+        atmos.al            = zeros(Float64, atmos.nlev_l)
         #    enclosed mass [kg]
         atmos.m             = ones(Float64, atmos.nlev_c) * atmos.interior_mass
         atmos.ml            = ones(Float64, atmos.nlev_l) * atmos.interior_mass
@@ -1328,6 +1357,7 @@ module atmosphere
         return acosd(cosd(lon)*cosd(lat))
     end
 
+
     """
     **Set deep atmospheric heating parameters.**
 
@@ -1600,11 +1630,17 @@ module atmosphere
     """
     function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
 
+        # Calculate net surface acceleration [m s-2]
+        a_surf::Float64 = atmos.grav_surf -
+                            phys.cent_accel(atmos.axial_period, atmos.rp, atmos.col_lat)
+
         # Reset arrays
         fill!(atmos.r         ,    atmos.rp)
         fill!(atmos.rl        ,    atmos.rp)
         fill!(atmos.g         ,    atmos.grav_surf)
         fill!(atmos.gl        ,    atmos.grav_surf)
+        fill!(atmos.a         ,    a_surf)
+        fill!(atmos.al        ,    a_surf)
         fill!(atmos.m         ,    atmos.interior_mass)
         fill!(atmos.ml        ,    atmos.interior_mass)
         fill!(atmos.layer_thick,   1.0)
@@ -1627,7 +1663,9 @@ module atmosphere
             # ------------
             # Integrate from lower edge to centre
             atmos.r[i], atmos.g[i], atmos.m[i] =
-                integ_hydrograv(atmos.rl[i+1], atmos.gl[i+1], atmos.ml[i+1], atmos.pl[i+1],
+                integ_hydrograv(atmos.rl[i+1],
+                                    atmos.gl[i+1], atmos.al[i+1],
+                                    atmos.ml[i+1], atmos.pl[i+1],
                                     atmos.p[i], atmos.layer_ρ[i], nsub)
 
             #   apply radius limiter
@@ -1639,17 +1677,23 @@ module atmosphere
 
             #   apply gravity limiter
             if HYDROGRAV_constg
-                atmos.g[i] = atmos.grav_surf
+                atmos.g[i]  = atmos.grav_surf
             end
             if atmos.g[i] < HYDROGRAV_ming
                 atmos.g[i] = HYDROGRAV_ming
                 atmos.layer_isbound[i] = false
             end
 
+            # calculate net acceleration at layer centre
+            atmos.a[i] = atmos.g[i] -
+                            phys.cent_accel(atmos.axial_period, atmos.r[i], atmos.col_lat)
+
             # ------------
             # Integrate from centre to upper edge
             atmos.rl[i], atmos.gl[i], atmos.ml[i] =
-                integ_hydrograv(atmos.r[i], atmos.g[i], atmos.m[i], atmos.p[i],
+                integ_hydrograv(atmos.r[i],
+                                    atmos.g[i], atmos.a[i],
+                                    atmos.m[i], atmos.p[i],
                                     atmos.pl[i], atmos.layer_ρ[i], nsub)
 
             #   apply radius limiter
@@ -1668,12 +1712,15 @@ module atmosphere
                 atmos.layer_isbound[i] = false
             end
 
+            #  calculate net acceleration at layer upper edge
+            atmos.al[i] = atmos.gl[i] -
+                            phys.cent_accel(atmos.axial_period, atmos.rl[i], atmos.col_lat)
+
             # Store: Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
             # Mass of layer, per unit area at layer-centre [kg m-2]
             atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
-            # atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.g[i]
         end
 
         return all(atmos.layer_isbound)
@@ -1684,9 +1731,14 @@ module atmosphere
 
     Uses the classic fourth-order Runge-Kutta method.
 
+    Internally, this function integrates from p0 to p1, which means that the pressure is
+    decreasing across the interval. The gravity is updated at each integration step,
+    and is offset by the centrifugal acceleration.
+
     Arguments:
     - `r0::Float64`     radius   at start of interval [m]
     - `g0::Float64`     gravity  at start of interval [m s-2]
+    - `a0::Float64`     net accel at start of interval (grav - cent) [m s-2]
     - `m0::Float64`     mass enc at start of interval [kg]
     - `p0::Float64`     pressure at start of interval [Pa]
     - `p1::Float64`     pressure at end   of interval [Pa]
@@ -1698,7 +1750,7 @@ module atmosphere
     - `gj::Float64`     gravity  at end of interval [kg]
     - `mj::Float64`     mass enc at end of interval [kg]
     """
-    function integ_hydrograv(r0::Float64, g0::Float64, m0::Float64, p0::Float64,
+    function integ_hydrograv(r0::Float64, g0::Float64, a0::Float64, m0::Float64, p0::Float64,
                                     p1::Float64, rho::Float64, n::Int64)::Tuple{Float64,Float64,Float64}
 
         # Work variables
@@ -1707,7 +1759,11 @@ module atmosphere
         gj::Float64 = g0    # rolling gravity  (incr, decr, or constant)
         mj::Float64 = m0    # rolling mass     (increasing)
 
-        # Get gravity at r
+        # Get centripetal acceleration's rotation factor, (2 pi cosθ / period)^2
+        # Backing-out the factor this way avoids extra trig function calls.
+        cent_fact::Float64 = (g0 - a0)/r0  # units: s-2
+
+        # Get gravitational acceleration at r
         function _grav(r)
             if HYDROGRAV_constg
                 # gravity is constant
@@ -1723,10 +1779,15 @@ module atmosphere
             end
         end
 
+        # Get net acceleration at r
+        function _accel(r)
+            return _grav(r) - r*cent_fact
+        end
+
         # Derivative to integrate
-        #   dr/dp = -1 / (rho * g(r))
+        #   dr/dp = -1 / (rho * a(r))
         function _drdp(p,r)
-            return -1 / (rho * _grav(r))
+            return -1 / (rho * _accel(r))
         end
 
         # Parameters
@@ -2213,8 +2274,8 @@ module atmosphere
             ###########################################
             atmos.atm.n_layer =     npd_layer
             atmos.atm.n_profile =   1
-            atmos.atm.lat[1] =      0.0
-            atmos.atm.lon[1] =      0.0
+            atmos.atm.lat[1] =      0.0 # SOCRATES is not made aware of these two values
+            atmos.atm.lon[1] =      0.0 # ^
 
             ###########################################
             # Range of bands

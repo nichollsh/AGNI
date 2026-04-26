@@ -220,6 +220,10 @@ module AGNI
             end
         end
 
+        # Output folder
+        output_dir = abspath(cfg["files"]["output_dir"])
+        @debug "Output directory: $output_dir"
+
         #    planet structure
         radius::Float64        = cfg["planet"]["radius"]
         gravity::Float64       = 0.0
@@ -238,6 +242,7 @@ module AGNI
             gravity = phys.grav_accel(mass, radius)
         end
 
+        # surface reflectance properties
         albedo_s::Float64      = 0.0
         surface_mat::String    = cfg["planet"]["surface_material"]
         if surface_mat == "greybody"
@@ -508,10 +513,6 @@ module AGNI
             target_olr = cfg["planet"]["target_olr"]
         end
 
-        # Output folder
-        output_dir = abspath(cfg["files"]["output_dir"])
-        @debug "Output directory: $output_dir"
-
         # Optional IO folder
         io_dir::String = atmosphere.UNSET_STR
         if haskey(cfg["files"], "io_dir")
@@ -524,6 +525,14 @@ module AGNI
             for (k, v) in cfg["composition"]["aerosols"]
                 aerosol_species[string(k)] = v
             end
+        end
+
+        # Axial rotation period and lon/lat, for centripetal acceleration
+        axial_period::Float64 = atmosphere.CFG_axial_period
+        longitude::Float64    = atmosphere.CFG_longitude
+        latitude::Float64     = atmosphere.CFG_latitude
+        if haskey(cfg["planet"], "axial_period")
+            axial_period = Float64(cfg["planet"]["axial_period"])
         end
 
         # Create atmosphere structure
@@ -565,6 +574,8 @@ module AGNI
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
                                 flux_int=flux_int,
+                                axial_period=axial_period,
+                                longitude=longitude, latitude=latitude,
                                 surface_material=surface_mat, albedo_s=albedo_s,
                                 mlt_criterion=only(cfg["physics"]["convection_crit"][1]),
                                 rfm_parfile=rfm_parfile,

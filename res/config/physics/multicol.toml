@@ -19,6 +19,8 @@ title = "Multicolumn example"
     skin_k          = 2.0
     skin_d          = 0.1
 
+    axial_period    = 1.0e6   # seconds
+
     [planet.globe]
         lons        = [  0.0,  60.0,  90.0, 180.0]      # longitudes [deg]
         lats        = [  0.0,   0.0,   0.0,   0.0]      # latitudes [deg]
@@ -64,7 +66,7 @@ title = "Multicolumn example"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
-    conduction      = true
+    conduction      = false
     latent_heat     = false
     convection      = false  # <-- !!
     convection_crit = "l"
