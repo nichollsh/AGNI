@@ -99,7 +99,7 @@ module atmosphere
 
     # Variable limits and defaults
     const UNSET_STR::String             = "__AGNI_UNSET_STR"
-    const NLEV_minimum::Int64           = 25        # minimum allowed number of levels
+    const NLEV_minimum::Int64           = 15        # minimum allowed number of levels
     const PHS_TIMESCALE_MIN::Float64    = 0.01      # minimum phase change timescale [s]
     const SURF_ROUGHNESS_MIN::Float64   = 1e-5      # [m]
     const SURF_WINDSPEED_MIN::Float64   = 1e-5      # [m/s]
