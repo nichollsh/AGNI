@@ -343,9 +343,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # -------------
     @testset "load_gas_unsupported_element" begin
         # Try to load a gas with an unsupported element (should error)
-        # This tests the error path in load_gas
-        # Use a fake element that's not in elems_standard
-        @test_throws ErrorException phys.load_gas("$RES_DIR/thermodynamics/", "Xz2", true, false)
+        # suppress error output for cleaner test logs
+        with_logger(MinLevelLogger(current_logger(), 999)) do
+            gas = phys.load_gas("$RES_DIR/thermodynamics/", "Xz2", true, false)
+            @test gas.fail == true
+        end
     end
 
 end

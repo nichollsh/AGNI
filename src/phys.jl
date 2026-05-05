@@ -103,7 +103,17 @@ module phys
     end # end gas struct
 
     """
-    Load gas data into a new struct
+    **Load gas data into a new struct.**
+
+    Arguments:
+    - `thermo_dir::String`      directory containing thermodynamic data files
+    - `formula::String`         molecular formula of the gas (e.g. "H2O")
+    - `tmp_dep::Bool`           enable temperature-dependent thermodynamic evaluations?
+    - `real_gas::Bool`          use a real-gas EOS if available
+    - `check_integrity::Bool`   check the integrity of the data file
+
+    Returns:
+    - `gas::Gas_t`              struct containing gas data
     """
     function load_gas(thermo_dir::String, formula::String,
                             tmp_dep::Bool, real_gas::Bool;
