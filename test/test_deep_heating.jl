@@ -41,12 +41,12 @@ end
         ok = atmosphere.set_deep_heating!(atmos,
                                             1.0e5, 0.7,
                                             0.1, 0.0,
-                                            :mass, :clamp, :rel)
+                                            "mass", "clamp", "rel")
         @test ok
 
         energy.deep_heating!(atmos)
-        @test isapprox(atmos.flux_deep[end], 100.0; rtol=1e-6, atol=1e-8)
-        @test all(diff(atmos.flux_deep) .>= 0.0)
+        @test isapprox(atmos.flux_deep[end], -100.0; rtol=1e-6, atol=1e-8)
+        @test all(diff(atmos.flux_deep) .<= 0.0)
         @test atmos.flux_deep[1] == 0.0
 
         atmosphere.deallocate!(atmos)
@@ -58,11 +58,14 @@ end
         ok = atmosphere.set_deep_heating!(atmos,
                                             1.0e9, 0.5,
                                             0.0, 250.0,
-                                            :pressure, :boundary_flux, :abs)
+                                            "pressure", "boundary_flux", "abs")
         @test ok
 
-        energy.deep_heating!(atmos)
-        @test all(isapprox.(atmos.flux_deep, 250.0; rtol=0.0, atol=1e-10))
+        energy.calc_fluxes!(atmos; deep=true)
+        @test all(isapprox.(atmos.flux_deep, -250.0; rtol=0.0, atol=1e-10))
+
+        diff = atmos.flux_deep .- atmos.flux_tot
+        @test all(isapprox.(diff, 0.0; atol=1e-10))
 
         atmosphere.deallocate!(atmos)
     end
@@ -73,7 +76,7 @@ end
         ok = atmosphere.set_deep_heating!(atmos,
                                             1.0e5, 0.5,
                                             1.0, 999.0,
-                                            :mass, :clamp, :off)
+                                            "mass", "clamp", "off")
         @test ok
 
         energy.deep_heating!(atmos)

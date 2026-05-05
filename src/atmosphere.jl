@@ -33,7 +33,7 @@ module atmosphere
     import ..spectrum
 
     # Code versions
-    const AGNI_VERSION::String     = "1.9.4"  # current agni version
+    const AGNI_VERSION::String     = "1.10.0"  # current agni version
     const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
@@ -51,9 +51,14 @@ module atmosphere
     const CFG_tmp_ceiling::Float64      = 2e4
     const CFG_surf_roughness::Float64   = 0.001
     const CFG_surf_windspeed::Float64   = 2.0
-    const CFG_Kzz_kbreak::Float64       = 1e5
-    const CFG_Kzz_pbreak::Float64       = 1e5 # 1 bar
-    const CFG_Kzz_type::Int             = 2
+    const CFG_col_lat::Float64          = 0.0
+    const CFG_col_lon::Float64          = 0.0
+    const CFG_axial_period::Float64     = 1e9   # big default number for rotation period [s]
+    const CFG_latitude::Float64         = 0.0   # relative to substellar point
+    const CFG_longitude::Float64        = 0.0   # relative to substellar point
+    const CFG_Kzz_kbreak::Float64       = 1e5   # m2 s-1
+    const CFG_Kzz_pbreak::Float64       = 1e5   # 1 bar
+    const CFG_Kzz_type::Int64           = 2
     const CFG_mlt_asymptotic::Bool      = true
     const CFG_mlt_criterion::Char       = 's'
     const CFG_tmp_magma::Float64        = 3000.0
@@ -83,18 +88,18 @@ module atmosphere
     const CFG_rfm_wn_max::Float64       = 4020.0
     const CFG_κ_grey_lw::Float64        = 8e-4
     const CFG_κ_grey_sw::Float64        = 2e-4
-    const CFG_fastchem_floor::Float64     = 400.0
-    const CFG_fastchem_maxiter_chem::Int  = 80000
-    const CFG_fastchem_maxiter_solv::Int  = 40000
-    const CFG_fastchem_xtol_chem::Float64 = 1e-3
-    const CFG_fastchem_xtol_elem::Float64 = 1e-3
-    const CFG_fastchem_wellmixed::Bool    = false
-    const CFG_ocean_ob_frac::Float64      = 0.6
-    const CFG_ocean_cs_height::Float64    = 3000.0
+    const CFG_fastchem_floor::Float64       = 400.0
+    const CFG_fastchem_maxiter_chem::Int64  = 80000
+    const CFG_fastchem_maxiter_solv::Int64  = 40000
+    const CFG_fastchem_xtol_chem::Float64   = 1e-3
+    const CFG_fastchem_xtol_elem::Float64   = 1e-3
+    const CFG_fastchem_wellmixed::Bool      = false
+    const CFG_ocean_ob_frac::Float64        = 0.6
+    const CFG_ocean_cs_height::Float64      = 3000.0
 
     # Variable limits and defaults
     const UNSET_STR::String             = "__AGNI_UNSET_STR"
-    const NLEV_minimum::Int             = 25        # minimum allowed number of levels
+    const NLEV_minimum::Int64           = 15        # minimum allowed number of levels
     const PHS_TIMESCALE_MIN::Float64    = 0.01      # minimum phase change timescale [s]
     const SURF_ROUGHNESS_MIN::Float64   = 1e-5      # [m]
     const SURF_WINDSPEED_MIN::Float64   = 1e-5      # [m/s]
@@ -117,6 +122,7 @@ module atmosphere
         AGNI_VERSION::String
 
         # Track state of atmos struct
+        name::String        # Name of the atmosphere (for output labelling)
         is_param::Bool      # Params have been set
         is_alloc::Bool      # Arrays have been allocated
         is_solved::Bool     # Current atmosphere state represents the result of a solver
@@ -130,7 +136,6 @@ module atmosphere
         THERMO_DIR::String      # path to thermo data
         SCATTERING_DIR::String  # path to scattering data
         FC_DIR::String          # path to fastchem install folder
-        RFM_DIR::String         # path to RFM install folder
         FRAMES_DIR::String      # path to frames of animation
         IO_DIR::String          # path to temporary directory, for fast I/O
 
@@ -148,7 +153,7 @@ module atmosphere
         # Radiation scheme
         rt_scheme::RTSCHEME             # RT scheme (1: SOCRATES, 2: Grey gas)
         benchmark::Bool                 # Benchmark RT?
-        num_rt_eval::Int                # Total number of RT evaluations
+        num_rt_eval::Int64              # Total number of RT evaluations
         tim_rt_eval::UInt64             # Total time spent doing RT evaluations [ns]
 
         # Radiation parameters
@@ -165,7 +170,7 @@ module atmosphere
         κ_grey_sw::Float64              # SW opacity used for grey-gas scheme [m2 kg-1]
 
         # Spectral bands
-        nbands::Int
+        nbands::Int64                  # Number of spectral bands
         bands_min::Array{Float64,1}    # Lower wavelength [m]
         bands_max::Array{Float64,1}    # Upper wavelength [m]
         bands_cen::Array{Float64,1}    # Midpoint [m]
@@ -175,8 +180,8 @@ module atmosphere
         transparent::Bool             # Atmosphere configured to be transparent?
 
         # Pressure-temperature grid (with i=1 at the top of the model)
-        nlev_c::Int             # Cell centre (count)
-        nlev_l::Int             # Cell edge (count)
+        nlev_c::Int64           # Cell centre (count)
+        nlev_l::Int64           # Cell edge (count)
         p_oboa::Float64         # Pressure at bottom [Pa], original
         p_boa::Float64          # Pressure at bottom [Pa], calculated
         p_toa::Float64          # Pressure at top [Pa]
@@ -186,6 +191,8 @@ module atmosphere
         pl::Array{Float64,1}    # ce pressure [Pa]
         r::Array{Float64,1}     # cc radius [m]
         rl::Array{Float64,1}    # ce radius [m]
+        a::Array{Float64,1}     # cc net acceleration [m s-2]
+        al::Array{Float64,1}    # ce net acceleration [m s-2]
         g::Array{Float64,1}     # cc gravity [m s-2]
         gl::Array{Float64,1}    # ce gravity [m s-2]
         m::Array{Float64,1}     # cc mass encl [kg]
@@ -206,8 +213,13 @@ module atmosphere
         skin_k::Float64                 # skin thermal conductivity [W m-1 K-1] (You can find reasonable values here: https://doi.org/10.1016/S1474-7065(03)00069-X)
         tmp_magma::Float64              # Mantle temperature [K]
 
+        # Rotation
+        col_lon::Float64               # longitude of column relative to substellar point [deg]
+        col_lat::Float64               # latitude of column relative to substellar point [deg]
+        axial_period::Float64          # axial rotation period [s], i.e. the day length
+
         # Gas tracking variables (incl gases which are not in spectralfile)
-        gas_num::Int                                # Number of gases
+        gas_num::Int64                              # Number of gases
         gas_names::Array{String,1}                  # List of gas names
         gas_dat::Dict{String, phys.Gas_t}           # Struct variables containing thermodynamic data for each gas
 
@@ -243,7 +255,7 @@ module atmosphere
         ocean_topliq::String                # OUTPUT: name of top-most ocean component
 
         # Gases (only those in SOCRATES spectralfile)
-        gas_soc_num::Int                    # number of gases
+        gas_soc_num::Int64                  # number of gases
         gas_soc_names::Array{String,1}      # names of each gas (as a list)
 
         # Layers' average properties
@@ -292,7 +304,7 @@ module atmosphere
         # RFM line-by-line calculation
         rfm_fl::Array{Float64,1}            # upward flux [erg/(s cm2 cm-1)]
         rfm_wn::Array{Float64,1}            # wavenumber array [cm-1]
-        rfm_npts::Int                       # number of points
+        rfm_npts::Int64                     # number of points
 
         # Sensible heating
         C_d::Float64                        # Turbulent exchange coefficient, to be calc'd
@@ -307,7 +319,7 @@ module atmosphere
         Kzz_pbreak::Float64                 # INPUT: Kzz break point pressure [Pa]
         Kzz_kbreak::Float64                 # INPUT: Kzz break point diffusion [m2 s-1]
         Kzz_power::Float64                  # INPUT: Power law index for Kzz scaling above reference point
-        Kzz_type::Int                       # INPUT: Parametrisation of Kzz
+        Kzz_type::Int64                     # INPUT: Parametrisation of Kzz
         mask_c::Array{Bool,1}               # OUT: Layers transporting convective flux
         flux_cdry::Array{Float64,1}         # OUT: Dry convective fluxes from MLT
         Kzz::Array{Float64,1}               # OUT: Eddy diffusion coefficient from MLT
@@ -339,18 +351,18 @@ module atmosphere
         aerosol_arr_r::Dict{String, Array{Float64,1}}  # Aerosol particle size profiles [m]
         aerosol_val_r::Float64                         # Default particle size for aerosol species, if not specified in array
         aerosol_setby::Dict{String, String}            # Dict of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
-        aerosol_names::Array{String,1}               # Map SOCRATES index (int) to name (string)
-        aerosol_relhumid::Float64                    # Mean relative humidity used by moist aerosol schemes [0,1]
-        aerosol_phase_num::Int                       # Number of phase-function moments retained when averaging
+        aerosol_names::Array{String,1}                 # Map SOCRATES index (int) to name (string)
+        aerosol_relhumid::Float64                      # Mean relative humidity used by moist aerosol schemes [0,1]
+        aerosol_phase_num::Int64                       # Number of phase-function moments retained when averaging
 
         # Deep atmospheric heating
-        deepheat_norm_method::Symbol    # Normalisation method for deep heating (:pressure or :mass)
+        deepheat_norm_method::String    # Normalisation method for deep heating (pressure or mass)
         deepheat_Pmid::Float64          # Deposition pressure centre [Pa]
         deepheat_Pwid::Float64          # Width of Gaussian in log-pressure space [logPa]
-        deepheat_domain::Symbol         # Method for treating deep heating below the model domain (:clamp or :boundary_flux)
-        deepheat_power_mode::Symbol     # Method for setting total flux (:off, :rel, or :abs)
-        deepheat_flux_rel::Float64      # Total heating as fraction of instellation, used when `power_mode=:rel`.
-        deepheat_flux_abs::Float64      # Total heating flux [W m-2], used when `power_mode=:abs`.
+        deepheat_domain::String         # Method for treating deep heating below the model domain (clamp or boundary_flux)
+        deepheat_power_mode::String     # Method for setting total flux (off, rel, or abs)
+        deepheat_flux_rel::Float64      # Total heating as fraction of instellation, used when `power_mode="rel"`.
+        deepheat_flux_abs::Float64      # Total heating flux [W m-2], used when `power_mode="abs"`.
         flux_deep::Array{Float64,1}     # Deep heating flux at cell edges [W m-2] # should add at lw flux level
 
         # Total energy flux
@@ -368,8 +380,8 @@ module atmosphere
         # FastChem equilibrium chemistry
         flag_fastchem::Bool             # Fastchem enabled?
         fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
-        fastchem_maxiter_chem::Int      # Maximum FC iterations (chemistry)
-        fastchem_maxiter_solv::Int      # Maximum FC iterations (internal solver)
+        fastchem_maxiter_chem::Int64    # Maximum FC iterations (chemistry)
+        fastchem_maxiter_solv::Int64    # Maximum FC iterations (internal solver)
         fastchem_xtol_chem::Float64     # FC solver tolerance (chemistry)
         fastchem_xtol_elem::Float64     # FC solver tolerance (elemental)
         fastchem_exec::String           # Path to executable
@@ -384,7 +396,6 @@ module atmosphere
 
         # RFM radiative transfer
         flag_rfm::Bool                  # RFM enabled?
-        rfm_exec::String                # Path to rfm executable
         rfm_work::String                # Path to rfm working directory
         rfm_parfile::String             # Path to rfm parfile. If empty, do not run RFM.
 
@@ -459,13 +470,14 @@ module atmosphere
     - `tmp_surf::Float64`               effective surface temperature to provide upward longwave flux at the bottom of the atmosphere [K].
     - `gravity::Float64`                gravitational acceleration at the surface [m s-2].
     - `radius::Float64`                 planet radius at the surface [m].
-    - `nlev_centre::Int`                number of model levels.
+    - `nlev_centre::Int64`              number of model levels.
     - `p_surf::Float64`                 total surface pressure [bar].
     - `p_top::Float64`                  total top of atmosphere pressure [bar].
     - `mf_dict::Dict`                   dictionary of VMRs in the format (key,value)=(gas,mf).
     - `mf_path::String`                 path to file containing VMRs at each level.
 
     Optional arguments:
+    - `name::String`                    name of the atmosphere (generates name if not provided).
     - `IO_DIR::String`                  directory used for fast file operations.
     - `condensates`                     list of condensates (gas names).
     - `metallicities::Dict`             dictionary of elemental metallicities (mass ratio rel to hydrogen)
@@ -476,7 +488,7 @@ module atmosphere
     - `surf_windspeed::Float64`         surface wind speed [m s-1].
     - `Kzz_kbreak::Float64`             reference eddy diffusion coefficient, SI units [m2 s-1]
     - `Kzz_pbreak::Float64`             reference pressure for Kzz break point [Pa]
-    - `Kzz_type::Int`                   parametrisation of Kzz. Options: 1 (constant), 2 (MLT wl), 3 (MLT Fc)
+    - `Kzz_type::Int64`                 parametrisation of Kzz. Options: 1 (constant), 2 (MLT wl), 3 (MLT Fc)
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
     - `tmp_magma::Float64`              mantle temperature [K] for sol_type==2.
@@ -518,9 +530,10 @@ module atmosphere
                     instellation::Float64, s0_fact::Float64, albedo_b::Float64,
                     zenith_degrees::Float64, tmp_surf::Float64,
                     gravity::Float64, radius::Float64,
-                    nlev_centre::Int, p_surf::Float64, p_top::Float64,
+                    nlev_centre::Int64, p_surf::Float64, p_top::Float64,
                     mf_dict, mf_path::String;
 
+                    name::String =              UNSET_STR,
                     IO_DIR::String   =          UNSET_STR,
                     condensates =               String[],
                     metallicities::Dict =       Dict{String,Float64}(),
@@ -532,12 +545,18 @@ module atmosphere
                     surf_windspeed::Float64 =   CFG_surf_windspeed,
                     Kzz_kbreak::Float64 =       CFG_Kzz_kbreak,
                     Kzz_pbreak::Float64 =       CFG_Kzz_pbreak,
-                    Kzz_type::Int =             CFG_Kzz_type,
+                    Kzz_type::Int64 =           CFG_Kzz_type,
                     mlt_asymptotic::Bool =      CFG_mlt_asymptotic,
                     mlt_criterion::Char =       CFG_mlt_criterion,
+
                     tmp_magma::Float64 =        CFG_tmp_magma,
                     skin_d::Float64 =           CFG_skin_d,
                     skin_k::Float64 =           CFG_skin_k,
+
+                    axial_period::Float64 =     CFG_axial_period,
+                    latitude::Float64 =         CFG_latitude,
+                    longitude::Float64 =        CFG_longitude,
+
                     overlap_method::String =    CFG_overlap_method,
                     target_olr::Float64 =       CFG_target_olr,
                     flux_int::Float64 =         CFG_flux_int,
@@ -562,13 +581,13 @@ module atmosphere
                     κ_grey_lw::Float64  =       CFG_κ_grey_lw,
                     κ_grey_sw::Float64  =       CFG_κ_grey_sw,
 
-                    fastchem_work::String       =  UNSET_STR,
-                    fastchem_floor::Float64     =  CFG_fastchem_floor,
-                    fastchem_maxiter_chem::Int  =  CFG_fastchem_maxiter_chem,
-                    fastchem_maxiter_solv::Int  =  CFG_fastchem_maxiter_solv,
-                    fastchem_xtol_chem::Float64 =  CFG_fastchem_xtol_chem,
-                    fastchem_xtol_elem::Float64 =  CFG_fastchem_xtol_elem,
-                    fastchem_wellmixed::Bool    =  CFG_fastchem_wellmixed,
+                    fastchem_work::String        = UNSET_STR,
+                    fastchem_floor::Float64      = CFG_fastchem_floor,
+                    fastchem_maxiter_chem::Int64 = CFG_fastchem_maxiter_chem,
+                    fastchem_maxiter_solv::Int64 = CFG_fastchem_maxiter_solv,
+                    fastchem_xtol_chem::Float64  = CFG_fastchem_xtol_chem,
+                    fastchem_xtol_elem::Float64  = CFG_fastchem_xtol_elem,
+                    fastchem_wellmixed::Bool     = CFG_fastchem_wellmixed,
 
                     rfm_parfile::String =       UNSET_STR,
 
@@ -581,9 +600,24 @@ module atmosphere
         atmos.AGNI_VERSION = AGNI_VERSION
         @debug "AGNI VERSION = "*AGNI_VERSION
 
+        # Set as not allocated
+        atmos.is_alloc = false
+        atmos.is_param = false
+        atmos.is_solved = false
+        atmos.is_converged = false
+
         # -------------------------
         # Directories
         # -------------------------
+
+        # Set name of atmosphere
+        name = strip(name)
+        if (name == UNSET_STR) || isempty(name)
+            atmos.name = bytes2hex(rand(UInt8, 4))
+        else
+            atmos.name = name
+        end
+        @debug "Struct name: '$(atmos.name)'"
 
         # Set AGNI root directory
         atmos.ROOT_DIR = abspath(ROOT_DIR)
@@ -722,8 +756,7 @@ module atmosphere
         atmos.s0_fact =         s0_fact
         _check_range("Stellar s0 factor", atmos.s0_fact; min=0, max=1) || return false
 
-        atmos.toa_heating =     atmos.instellation * (1.0 - atmos.albedo_b) *
-                                    s0_fact * cosd(atmos.zenith_degrees)
+        atmos.toa_heating =     calc_toa_heating(atmos)
 
         atmos.flux_int =        flux_int
         atmos.target_olr =      max(1.0e-10, target_olr)
@@ -783,6 +816,14 @@ module atmosphere
         atmos.rp = radius
         _check_range("Planet surface radius", atmos.rp; min=RP_MIN) || return false
 
+        # rotation
+        atmos.axial_period = axial_period
+        _check_range("Axial period", atmos.axial_period; min=0.0) || return false
+        atmos.col_lat = latitude
+        _check_range("Latitude", atmos.col_lat; min=-90.0, max=90.0) || return false
+        atmos.col_lon = longitude
+        _check_range("Longitude", atmos.col_lon; min=0, max=360.0) || return false
+
         # derived statistics
         atmos.interior_mass  =  atmos.grav_surf * atmos.rp^2 / phys.G_grav
         atmos.interior_rho   =  3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
@@ -820,6 +861,9 @@ module atmosphere
         #    gravity
         atmos.g             = ones(Float64, atmos.nlev_c) * atmos.grav_surf
         atmos.gl            = ones(Float64, atmos.nlev_l) * atmos.grav_surf
+        #    net acceleration
+        atmos.a             = zeros(Float64, atmos.nlev_c)
+        atmos.al            = zeros(Float64, atmos.nlev_l)
         #    enclosed mass [kg]
         atmos.m             = ones(Float64, atmos.nlev_c) * atmos.interior_mass
         atmos.ml            = ones(Float64, atmos.nlev_l) * atmos.interior_mass
@@ -902,7 +946,7 @@ module atmosphere
             return false
         end
 
-        mf_source::Int = 1  # source for mf (0: dict, 1: file)
+        mf_source::Int64 = 1  # source for mf (0: dict, 1: file)
         if isempty(mf_path)
             mf_source = 0
         end
@@ -1237,6 +1281,7 @@ module atmosphere
         # RFM
         atmos.flag_rfm = !(rfm_parfile == UNSET_STR)
         atmos.rfm_work = joinpath(atmos.IO_DIR, "rfm")
+        atmos.rfm_parfile = UNSET_STR
         if samefile(atmos.rfm_work, atmos.ROOT_DIR)
             @error "RFM working directory cannot be the AGNI root directory"
             return false
@@ -1256,11 +1301,11 @@ module atmosphere
         end
 
         # Deep atmospheric heating (default: disabled)
-        atmos.deepheat_norm_method  = :pressure
+        atmos.deepheat_norm_method  = "pressure"
         atmos.deepheat_Pmid         = 1e5
         atmos.deepheat_Pwid         = 1.0
-        atmos.deepheat_domain       = :clamp
-        atmos.deepheat_power_mode   = :off
+        atmos.deepheat_domain       = "clamp"
+        atmos.deepheat_power_mode   = "off"
         atmos.deepheat_flux_rel     = 0.0
         atmos.deepheat_flux_abs     = 0.0
 
@@ -1272,6 +1317,45 @@ module atmosphere
         @debug "Setup complete"
         return true
     end # end function setup
+
+    """
+    **Get TOA heating from atmosphere parameters.**
+
+    Return the effective irradiation flux at the top of the atmosphere (TOA).
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be accessed
+
+    Returns:
+    - `Float64` effective TOA heating [W m-2]
+    """
+    function calc_toa_heating(atmos::atmosphere.Atmos_t)::Float64
+
+        # Nightside hemisphere receives no instellation
+        if atmos.zenith_degrees >= 90.0
+            return 0.0
+        end
+
+        return atmos.instellation * atmos.s0_fact *
+                                (1.0 - atmos.albedo_b) * cosd(atmos.zenith_degrees)
+    end
+
+    """
+    **Get the solar zenith angle for a given longitude and latitude**
+
+    Assuming tidally locked planet with coordinate system centred on subsolar point.
+    Does not account for super-illumination in the twilight regions.
+
+    Arguments:
+    - `lon::Float64`    the longitude of location (degrees)
+    - `lat::Float64`    the latitude of location (degrees)
+
+    Returns:
+    - `zen::Float64`    the zenith angle for the location (degrees)
+    """
+    function calc_zenith_angle(lon::Float64, lat::Float64)::Float64
+        return acosd(cosd(lon)*cosd(lat))
+    end
 
 
     """
@@ -1286,9 +1370,10 @@ module atmosphere
     - `Pwid::Float64`          width of Gaussian in log-pressure space [logPa].
     - `flux_rel::Float64`      heating flux relative to instellation.
     - `flux_abs::Float64`      heating flux absolute [W m-2].
-    - `norm_method::Symbol`    method for normalising the Gaussian (:pressure, :mass).
-    - `domain::Symbol`         how to handle deposition pressures outside the domain (:clamp, :boundary_flux).
-    - `power_mode::Symbol`     off, or relative/absolute flux (:off, :rel, :abs).
+    - `norm_method::String`    method for normalising the Gaussian (pressure, mass).
+    - `domain::String`         how to handle deposition pressures outside the domain (clamp, boundary_flux).
+    - `power_mode::String`     off, or relative/absolute flux (off, rel, abs).
+    - `verbose::Bool`          whether to show info messages about the configuration.
 
     Returns:
     - `Bool` indicating success or failure of the operation.
@@ -1298,23 +1383,24 @@ module atmosphere
                                 Pwid::Float64,
                                 flux_rel::Float64,
                                 flux_abs::Float64,
-                                norm_method::Symbol,
-                                domain::Symbol,
-                                power_mode::Symbol
+                                norm_method::String,
+                                domain::String,
+                                power_mode::String;
+                                verbose::Bool=false
                                 )::Bool
 
         # Fail safe mode
-        atmos.deepheat_power_mode = :off
-        if power_mode == :off
-            atmos.deepheat_power_mode = :off
+        atmos.deepheat_power_mode = "off"
+        if power_mode == "off"
+            atmos.deepheat_power_mode = "off"
             return true
-        elseif !(power_mode in (:rel, :abs))
+        elseif !(power_mode in ("rel", "abs"))
             @error "Invalid deep heating power mode: $(power_mode)"
             return false
         end
 
         # Normalisation coordinate
-        if !(norm_method in (:pressure, :mass))
+        if !(norm_method in ("pressure", "mass"))
             @error "Invalid deep heating normalisation: $(norm_method)"
             return false
         else
@@ -1326,9 +1412,9 @@ module atmosphere
         atmos.deepheat_Pwid = max(Pwid, 0.01)  # relative
 
         # Deposition pressure handling
-        if domain == :clamp
+        if domain == "clamp"
             atmos.deepheat_Pmid = clamp(atmos.deepheat_Pmid, atmos.p_toa, atmos.p_boa)
-        elseif domain == :boundary_flux
+        elseif domain == "boundary_flux"
             # Allow P outside domain
             atmos.deepheat_Pmid = max(atmos.deepheat_Pmid, atmos.p_toa)
         else
@@ -1341,16 +1427,19 @@ module atmosphere
         atmos.deepheat_power_mode = power_mode
         atmos.deepheat_flux_rel = flux_rel
         atmos.deepheat_flux_abs = flux_abs
-        @info "Deep heating configured with power_mode=$(atmos.deepheat_power_mode)"
-        if power_mode  == :rel
-            @info @sprintf("    Pmid=%.2e Pa, Pwid=%.2f, ε=%.4f",
-                            atmos.deepheat_Pmid, atmos.deepheat_Pwid, flux_rel)
-        elseif power_mode == :abs
-            @info @sprintf("    Pmid=%.2e Pa, Pwid=%.2f, F_total=%.4e W/m²",
-                            atmos.deepheat_Pmid, atmos.deepheat_Pwid, flux_abs)
-        end
-        @info "    norm_method=$(atmos.deepheat_norm_method), domain=$(atmos.deepheat_domain)"
 
+        # Print configuration
+        if verbose
+            @info "Deep heating configured with power_mode=$(atmos.deepheat_power_mode)"
+            if power_mode  == "rel"
+                @info @sprintf("    Pmid=%.2e Pa, Pwid=%.2f, ε=%.4f",
+                                atmos.deepheat_Pmid, atmos.deepheat_Pwid, flux_rel)
+            elseif power_mode == "abs"
+                @info @sprintf("    Pmid=%.2e Pa, Pwid=%.2f, F_total=%.4e W/m²",
+                                atmos.deepheat_Pmid, atmos.deepheat_Pwid, flux_abs)
+            end
+            @info "    norm_method=$(atmos.deepheat_norm_method), domain=$(atmos.deepheat_domain)"
+        end
 
         return true
     end
@@ -1430,7 +1519,7 @@ module atmosphere
         # estimate_photosphere!(atmos)
 
         # get the observed height
-        idx::Int = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
+        idx::Int64 = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
         atmos.transspec_r    = atmos.r[idx]
         atmos.transspec_μ    = atmos.layer_μ[idx]
         atmos.transspec_tmp  = atmos.tmp[idx]
@@ -1541,11 +1630,17 @@ module atmosphere
     """
     function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
 
+        # Calculate net surface acceleration [m s-2]
+        a_surf::Float64 = atmos.grav_surf -
+                            phys.cent_accel(atmos.axial_period, atmos.rp, atmos.col_lat)
+
         # Reset arrays
         fill!(atmos.r         ,    atmos.rp)
         fill!(atmos.rl        ,    atmos.rp)
         fill!(atmos.g         ,    atmos.grav_surf)
         fill!(atmos.gl        ,    atmos.grav_surf)
+        fill!(atmos.a         ,    a_surf)
+        fill!(atmos.al        ,    a_surf)
         fill!(atmos.m         ,    atmos.interior_mass)
         fill!(atmos.ml        ,    atmos.interior_mass)
         fill!(atmos.layer_thick,   1.0)
@@ -1560,7 +1655,7 @@ module atmosphere
         end
 
         # Temporary values
-        nsub::Int = round(Int, HYDROGRAV_steps/atmos.nlev_c, RoundUp)
+        nsub::Int64 = round(Int64, HYDROGRAV_steps/atmos.nlev_c, RoundUp)
 
         # Integrate from surface upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
@@ -1568,7 +1663,9 @@ module atmosphere
             # ------------
             # Integrate from lower edge to centre
             atmos.r[i], atmos.g[i], atmos.m[i] =
-                integ_hydrograv(atmos.rl[i+1], atmos.gl[i+1], atmos.ml[i+1], atmos.pl[i+1],
+                integ_hydrograv(atmos.rl[i+1],
+                                    atmos.gl[i+1], atmos.al[i+1],
+                                    atmos.ml[i+1], atmos.pl[i+1],
                                     atmos.p[i], atmos.layer_ρ[i], nsub)
 
             #   apply radius limiter
@@ -1580,17 +1677,23 @@ module atmosphere
 
             #   apply gravity limiter
             if HYDROGRAV_constg
-                atmos.g[i] = atmos.grav_surf
+                atmos.g[i]  = atmos.grav_surf
             end
             if atmos.g[i] < HYDROGRAV_ming
                 atmos.g[i] = HYDROGRAV_ming
                 atmos.layer_isbound[i] = false
             end
 
+            # calculate net acceleration at layer centre
+            atmos.a[i] = atmos.g[i] -
+                            phys.cent_accel(atmos.axial_period, atmos.r[i], atmos.col_lat)
+
             # ------------
             # Integrate from centre to upper edge
             atmos.rl[i], atmos.gl[i], atmos.ml[i] =
-                integ_hydrograv(atmos.r[i], atmos.g[i], atmos.m[i], atmos.p[i],
+                integ_hydrograv(atmos.r[i],
+                                    atmos.g[i], atmos.a[i],
+                                    atmos.m[i], atmos.p[i],
                                     atmos.pl[i], atmos.layer_ρ[i], nsub)
 
             #   apply radius limiter
@@ -1609,12 +1712,15 @@ module atmosphere
                 atmos.layer_isbound[i] = false
             end
 
+            #  calculate net acceleration at layer upper edge
+            atmos.al[i] = atmos.gl[i] -
+                            phys.cent_accel(atmos.axial_period, atmos.rl[i], atmos.col_lat)
+
             # Store: Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
             # Mass of layer, per unit area at layer-centre [kg m-2]
             atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
-            # atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i])/atmos.g[i]
         end
 
         return all(atmos.layer_isbound)
@@ -1625,22 +1731,27 @@ module atmosphere
 
     Uses the classic fourth-order Runge-Kutta method.
 
+    Internally, this function integrates from p0 to p1, which means that the pressure is
+    decreasing across the interval. The gravity is updated at each integration step,
+    and is offset by the centrifugal acceleration.
+
     Arguments:
     - `r0::Float64`     radius   at start of interval [m]
     - `g0::Float64`     gravity  at start of interval [m s-2]
+    - `a0::Float64`     net accel at start of interval (grav - cent) [m s-2]
     - `m0::Float64`     mass enc at start of interval [kg]
     - `p0::Float64`     pressure at start of interval [Pa]
     - `p1::Float64`     pressure at end   of interval [Pa]
     - `rho::Float64`    density throughout interval, constant [kg m-3]
-    - `n::Int`          number of steps for integration (n >= 2)
+    - `n::Int64`        number of steps for integration (n >= 2)
 
     Returns:
     - `rj::Float64`     radius   at end of interval [m]
     - `gj::Float64`     gravity  at end of interval [kg]
     - `mj::Float64`     mass enc at end of interval [kg]
     """
-    function integ_hydrograv(r0::Float64, g0::Float64, m0::Float64, p0::Float64,
-                                    p1::Float64, rho::Float64, n::Int)::Tuple{Float64,Float64,Float64}
+    function integ_hydrograv(r0::Float64, g0::Float64, a0::Float64, m0::Float64, p0::Float64,
+                                    p1::Float64, rho::Float64, n::Int64)::Tuple{Float64,Float64,Float64}
 
         # Work variables
         pj::Float64 = p0    # rolling pressure (decreasing)
@@ -1648,7 +1759,11 @@ module atmosphere
         gj::Float64 = g0    # rolling gravity  (incr, decr, or constant)
         mj::Float64 = m0    # rolling mass     (increasing)
 
-        # Get gravity at r
+        # Get centripetal acceleration's rotation factor, (2 pi cosθ / period)^2
+        # Backing-out the factor this way avoids extra trig function calls.
+        cent_fact::Float64 = (g0 - a0)/r0  # units: s-2
+
+        # Get gravitational acceleration at r
         function _grav(r)
             if HYDROGRAV_constg
                 # gravity is constant
@@ -1664,10 +1779,15 @@ module atmosphere
             end
         end
 
+        # Get net acceleration at r
+        function _accel(r)
+            return _grav(r) - r*cent_fact
+        end
+
         # Derivative to integrate
-        #   dr/dp = -1 / (rho * g(r))
+        #   dr/dp = -1 / (rho * a(r))
         function _drdp(p,r)
-            return -1 / (rho * _grav(r))
+            return -1 / (rho * _accel(r))
         end
 
         # Parameters
@@ -1740,9 +1860,9 @@ module atmosphere
 
     Arguments:
         - `atmos::Atmos_t`      the atmosphere struct instance to be used.
-        - `idx::Int`            index of the layer
+        - `idx::Int64`          index of the layer
     """
-    function calc_single_cpkc!(atmos::atmosphere.Atmos_t, idx::Int)
+    function calc_single_cpkc!(atmos::atmosphere.Atmos_t, idx::Int64)
         # Reset
         mmr::Float64 = 0.0
         atmos.layer_cp[idx] = 0.0
@@ -1779,9 +1899,9 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`      the atmosphere struct instance to be used.
-    - `idx::Int`            index of the layer
+    - `idx::Int64`          index of the layer
     """
-    function calc_single_density!(atmos::atmosphere.Atmos_t, idx::Int)
+    function calc_single_density!(atmos::atmosphere.Atmos_t, idx::Int64)
         # Array of gas properties
         gas_arr = [atmos.gas_dat[gas]      for gas in atmos.gas_names]
         vmr_arr = [atmos.gas_vmr[gas][idx] for gas in atmos.gas_names]
@@ -1818,9 +1938,9 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`      the atmosphere struct instance to be used.
-    - `idx::Int`            index of the layer
+    - `idx::Int64`          index of the layer
     """
-    function calc_single_Hp!(atmos::atmosphere.Atmos_t, idx::Int)
+    function calc_single_Hp!(atmos::atmosphere.Atmos_t, idx::Int64)
         if atmos.real_gas
             atmos.layer_Hp[idx] = atmos.p[idx] / (atmos.layer_ρ[idx] * atmos.g[idx])
         else
@@ -1926,6 +2046,9 @@ module atmosphere
             atmos.bands_min = Float64[1e-9,] # m
             atmos.bands_wid = atmos.bands_max - atmos.bands_min
             atmos.bands_cen = Float64[1e-6,]
+
+            # dummy values for consistency with SOCRATES scheme
+            atmos.gas_soc_names = atmos.gas_names
 
         elseif atmos.rt_scheme == RT_SOCRATES
 
@@ -2134,6 +2257,7 @@ module atmosphere
 
             # Set to true to enable custom surface emission through the
             #   variables `planck%flux_ground(l)` and `d_planck_flux_surface`.
+            # Otherwise, set by bound.flux_ground array.
             atmos.control.l_flux_ground = false
 
             SOCRATES.allocate_atm(  atmos.atm,   atmos.dimen, atmos.spectrum)
@@ -2150,8 +2274,8 @@ module atmosphere
             ###########################################
             atmos.atm.n_layer =     npd_layer
             atmos.atm.n_profile =   1
-            atmos.atm.lat[1] =      0.0
-            atmos.atm.lon[1] =      0.0
+            atmos.atm.lat[1] =      0.0 # SOCRATES is not made aware of these two values
+            atmos.atm.lon[1] =      0.0 # ^
 
             ###########################################
             # Range of bands
@@ -2381,7 +2505,7 @@ module atmosphere
                 # loop over aerosols in spectral file
                 for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
                     # get name of this aerosol
-                    type_id = Int(atmos.spectrum.Aerosol.type_aerosol[i])
+                    type_id = Int64(atmos.spectrum.Aerosol.type_aerosol[i])
                     name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
 
                     # store name from index (for updating aerosol profiles in the future)
@@ -2758,7 +2882,7 @@ module atmosphere
         arr_R::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         arr_T::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
         arr_P::Array{Float64, 1} = zeros(Float64, atmos.nlev_c + atmos.nlev_l)
-        idx::Int = 1
+        idx::Int64 = 1
 
         # top
         arr_R[1] = atmos.rl[1]
@@ -2866,7 +2990,7 @@ module atmosphere
         if atmos.control.l_aerosol
             @info "Available aerosol species:"
             for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
-                type_id = Int(atmos.spectrum.Aerosol.type_aerosol[i])
+                type_id = Int64(atmos.spectrum.Aerosol.type_aerosol[i])
                 name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
                 title = SOCRATES.input_head_pcf.aerosol_title[type_id]
                 @info @sprintf("    %10s - %s", name, strip(title))
@@ -2896,7 +3020,7 @@ module atmosphere
     Arguments:
     - `atmos::atmosphere.Atmos_t`   atmosphere struct instance to be used.
     - `c::String`                   condensate species to calculate for (e.g. "H2O")
-    - `i::Int`                      layer index
+    - `i::Int64`                    layer index
 
     Returns:
     - `cond_mmr::Float64`           condensate `c` mass mixing ratio at layer `i`

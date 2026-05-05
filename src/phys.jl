@@ -55,7 +55,7 @@ module phys
         prs_max::Float64
 
         # Constituent atoms (dictionary of numbers)
-        atoms::Dict{String, Int}
+        atoms::Dict{String, Int64}
 
         # Mean molecular weight [kg mol-1]
         mmw::Float64
@@ -103,7 +103,17 @@ module phys
     end # end gas struct
 
     """
-    Load gas data into a new struct
+    **Load gas data into a new struct.**
+
+    Arguments:
+    - `thermo_dir::String`      directory containing thermodynamic data files
+    - `formula::String`         molecular formula of the gas (e.g. "H2O")
+    - `tmp_dep::Bool`           enable temperature-dependent thermodynamic evaluations?
+    - `real_gas::Bool`          use a real-gas EOS if available
+    - `check_integrity::Bool`   check the integrity of the data file
+
+    Returns:
+    - `gas::Gas_t`              struct containing gas data
     """
     function load_gas(thermo_dir::String, formula::String,
                             tmp_dep::Bool, real_gas::Bool;
@@ -125,7 +135,9 @@ module phys
         gas.atoms = count_atoms(formula)
         for e in keys(gas.atoms)
             if !(e in elems_standard)
-                error("Gas '$formula' contains unsupported element '$e'")
+                @error "Gas '$formula' contains unsupported element '$e'"
+                gas.fail = true
+                return gas
             end
         end
 
@@ -341,7 +353,7 @@ module phys
     """
     Get number of atoms from formula, returning a dictionary
     """
-    function count_atoms(molec::String)::Dict{String,Int}
+    function count_atoms(molec::String)::Dict{String,Int64}
 
         # Pre-defined molecules
         if haskey(_lookup_count_atoms, molec)
@@ -355,11 +367,11 @@ module phys
         end
 
         # Setup
-        out::Dict{String,Int} = Dict{String,Int}()
-        nchar::Int = length(m)
-        i::Int = 1
+        out::Dict{String,Int64} = Dict{String,Int64}()
+        nchar::Int64 = length(m)
+        i::Int64 = 1
         elem::String = ""
-        count::Int=-1
+        count::Int64=-1
         last::Bool=false
 
         # Loop through string
@@ -443,7 +455,7 @@ module phys
         end
 
         # get atoms
-        atoms::Dict{String, Int} = count_atoms(m)
+        atoms::Dict{String, Int64} = count_atoms(m)
 
         # add up atoms
         mmw::Float64 = 0.0
@@ -560,7 +572,7 @@ module phys
         p = log10(p)
 
         # Find closest value in array
-        i::Int = argmin(abs.(gas.sat_P .- p))
+        i::Int64 = argmin(abs.(gas.sat_P .- p))
         return min(gas.sat_T[i], gas.T_crit)
     end
 
@@ -658,13 +670,21 @@ module phys
         return gas.cap_I(t)
     end
 
-    # Constant prefactor used in `get_Kc`
-    const kc_prefactor::Float64 = 2.0 * (5 * k_B / 2) / (3 * pi^1.5)
-
     """
     **Get gas thermal conductivity at a given temperature.**
 
-    This assumes that the gas is within the ideal regime.
+    This assumes that the gas is within the ideal regime. An accurate accounting of
+    inter-particle effects is important here, and depends on the size of the particles,
+    their repulsion/attraction terms, and the number of atoms per molecule. This formulation
+    does a fairly good job while remaining simple, and gets the right order of magnitude
+    of kc for a range of gases.
+
+    Chapman-Enskog theory of transport properties of gases, can account for inter-particle
+    effects via the collision integral 'omega'. Here, we set `omega=1`.
+
+    - https://en.wikipedia.org/wiki/Thermal_conductivity_and_resistivity
+    - https://books.google.co.uk/books?id=Cbp5JP2OTrwC (page 164 ish)
+    - https://doi.org/10.1063/5.0244532
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -683,9 +703,18 @@ module phys
         # Temperature floor to avoid sqrt of negative number
         t = max(t, 0.0)
 
-        # Equation 5.255 from
-        #     https://farside.ph.utexas.edu/teaching/355/Surveyhtml/node221.html
-        return kc_prefactor * sqrt(k_B * t / gas.particle_m) / gas.particle_d^2
+        # Inter-particle effects are important, and complicated...
+        #  An evaluation of collision integral 'omega' must be done numerically.
+        kc_omega::Float64 = 1.0
+
+        # Start with prefactor which accounts for inter-particle effects via omega
+        kc_gas::Float64 = 25.0 / (32.0 * pi * kc_omega)
+
+        # Add boltzmann terms
+        kc_gas *= sqrt(pi * gas.particle_m * k_B * t) * get_Cp(gas,t) / gas.particle_d^2
+
+        # Estimate for kc
+        return kc_gas
     end
 
     """
@@ -703,7 +732,7 @@ module phys
     function calc_rho_mix(gas::Array{Gas_t,1}, vmr::Array{Float64,1},
                             tmp::Float64, prs::Float64, mmw::Float64)::Float64
 
-        ngas::Int = length(gas)
+        ngas::Int64 = length(gas)
 
         # single gas case
         if ngas == 1
@@ -850,6 +879,8 @@ module phys
     """
     **Calculate gravitational acceleration.**
 
+    Using the Newtonian formula for universal gravitation in spherical geometry.
+
     Arguments:
     - `mass::Float64`       Enclosed mass [kg]
     - `radius::Float64`     Enclosed radius [m]
@@ -860,6 +891,39 @@ module phys
     function grav_accel(mass::Float64, radius::Float64)::Float64
         return G_grav * mass / (radius * radius)
     end
+
+    """
+    **Calculate radial component of centripetal acceleration.**
+
+    Note that this is only the component of the centripetal acceleration which
+    acts in the radial direction, and is relevant for calculating the effective
+    gravity at the surface of a rotating planet. This means `a_c` is zero at the poles.
+
+    The full centripetal acceleration is given by the equation below, where `d` is the
+    distance from the rotation axis and `p` is the rotation period.
+
+    `a_c = 4 * pi^2 * d / p^2`
+
+    The distance `d` is equal to `r * cos(θ)`, so the equation can be rewritten as:
+
+    `a_c = 4 * pi^2 * d * cos(θ) / p^2`
+
+    And then to get the radial component, we multiply by `cos(θ)` again:
+
+    `a_c = r * ( 2 * pi * cos(θ) / p )^2`
+
+    Arguments:
+    - `p::Float64`       Axial rotation period [s]
+    - `r::Float64`       Radius of this layer [m]
+    - `θ::Float64`       Latitude of this column [degrees]
+
+    Returns:
+    - `a_c::Float64`     Centripetal acceleration [m s-2]
+    """
+    function cent_accel(p::Float64, r::Float64, θ::Float64)::Float64
+        return r * ( 2 * pi * cosd(θ) / p )^2
+    end
+
 
     """
     **Evaluate the density of a liquid phase.**

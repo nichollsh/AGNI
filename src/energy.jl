@@ -20,9 +20,13 @@ module energy
     import ..spectrum
 
     # Constants
+    SKIP_SW_THRESH::Float64         = 1e-9      # skip SW calculation if TOA heating is below this threshold [W m-2]
     FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
     CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [bar]
     CONVECT_REAL_GAS::Bool          = false     # use real gas EOS in convection scheme, if RG EOS enabled
+    MIN_SKIN_D::Float64             = 1e-6      # minimum skin depth for conductive flux calculation [m]
+    MAX_SKIN_D::Float64             = 1e6       # maximum skin depth for conductive flux calculation [m]
+    ROUGHNESS_EPS::Float64          = 1e-3      # avoid blow-up of exchange coefficient when height ≈ roughness
 
     """
     **Set non-finite values in an array equal to a given fill value**.
@@ -31,7 +35,7 @@ module energy
     - `arr`      array potentially containing non-finite values
     - `fill`     replacement value to fill with
     """
-    function make_finite!(arr, val)
+    function _make_finite!(arr, val)
         arr[findall(x -> !isfinite(x), arr)] .= val
     end
 
@@ -52,7 +56,8 @@ module energy
     function _radtrans_socrates!(atmos::atmosphere.Atmos_t, lw::Bool;
                                             calc_cf::Bool=false,
                                             gauss_ir::Bool=false,
-                                            rescale_pf::Bool=false)
+                                            rescale_pf::Bool=false)::Bool
+
 
         # Longwave or shortwave calculation?
         if lw
@@ -74,8 +79,8 @@ module energy
 
             # Check spectral file is ok
             if !Bool(atmos.spectrum.Basic.l_present[6])
-                error("The spectral file contains no data for the Planck function.
-                       Check that the file contains a stellar spectrum.")
+                @warn("The spectral file contains no data for the Planck function. Check that the file contains a stellar spectrum.")
+                return false
             end
             if Bool(atmos.spectrum.Basic.l_present[2])
                 atmos.control.l_solar_tail_flux = true
@@ -102,7 +107,8 @@ module energy
 
             # Check spectral file is ok
             if !Bool(atmos.spectrum.Basic.l_present[2])
-                error("The spectral file contains no solar spectral data.")
+                @warn ("The spectral file contains no solar spectral data.")
+                return false
             end
         end
 
@@ -250,10 +256,16 @@ module energy
         clamp!(atmos.atm.gas_mix_ratio, 0.0, 1.0)
 
         # Do radiative transfer
-        atmosphere.atmosphere.SOCRATES.radiance_calc(atmos.control,
+        if !lw && (atmos.toa_heating < SKIP_SW_THRESH)
+            # If no stellar flux is reaching the atmosphere, skip the SW calculation
+            fill!(atmos.radout.flux_down, 0.0)
+            fill!(atmos.radout.flux_up, 0.0)
+        else
+            atmosphere.SOCRATES.radiance_calc(atmos.control,
                                                      atmos.dimen, atmos.spectrum,
                                                      atmos.atm, atmos.cld, atmos.aer,
                                                      atmos.bound, atmos.radout)
+        end
 
         # Check finite
         if !all(isfinite, atmos.radout.flux_down)
@@ -262,7 +274,7 @@ module energy
             else
                 @warn "Non-finite value in SW DN flux array"
             end
-            make_finite!(atmos.radout.flux_down, FILL_FINITE_FLUX)
+            _make_finite!(atmos.radout.flux_down, FILL_FINITE_FLUX)
         end
         if !all(isfinite, atmos.radout.flux_up)
             if lw
@@ -270,11 +282,11 @@ module energy
             else
                 @warn "Non-finite value in SW UP flux array"
             end
-            make_finite!(atmos.radout.flux_up, FILL_FINITE_FLUX)
+            _make_finite!(atmos.radout.flux_up, FILL_FINITE_FLUX)
         end
 
         # Store new fluxes in atmos struct
-        idx::Int = 1
+        idx::Int64 = 1
         if lw
             # LW case
             for lv in 1:atmos.nlev_l      # sum over levels
@@ -321,6 +333,8 @@ module energy
             atmos.flux_u = atmos.flux_u_lw + atmos.flux_u_sw
             atmos.flux_n = atmos.flux_n_lw + atmos.flux_n_sw
         end
+
+        return true
     end
 
     """
@@ -336,7 +350,7 @@ module energy
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     """
-    function _radtrans_greygas!(atmos)
+    function _radtrans_greygas!(atmos::atmosphere.Atmos_t)::Bool
 
         # Working layer transmissivity and emissivity
         trans::Float64 = 0.0
@@ -372,6 +386,8 @@ module energy
         atmos.flux_n_lw = atmos.flux_u_lw - atmos.flux_d_lw  # net lw
         atmos.flux_n_sw = atmos.flux_u_sw - atmos.flux_d_sw  # net sw
         atmos.flux_n    = atmos.flux_n_lw + atmos.flux_n_sw  # net
+
+        return true
     end
 
     """
@@ -384,13 +400,18 @@ module energy
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `lw::Bool`                        longwave calculation? Else: shortwave
     - `calc_cf::Bool=false`             also calculate contribution function?
+
+    Returns:
+    - `Bool`                            whether the calculation succeeded
     """
-    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)
+    function radtrans!(atmos::atmosphere.Atmos_t, lw::Bool; calc_cf::Bool=false)::Bool
         if !atmos.is_alloc
-            error("atmosphere arrays have not been allocated")
+            @warn "Atmosphere arrays have not been allocated"
+            return false
         end
         if !atmos.is_param
-            error("atmosphere parameters have not been set")
+            @warn "Atmosphere parameters have not been set"
+            return false
         end
 
         atmos.num_rt_eval += 1
@@ -400,8 +421,7 @@ module energy
         end
 
         # Downward SW flux in atmosphere at TOA
-        atmos.toa_heating = atmos.instellation * (1.0 - atmos.albedo_b) *
-                                    atmos.s0_fact * cosd(atmos.zenith_degrees)
+        # atmos.toa_heating = atmosphere.calc_toa_heating(atmos)
 
         # Set flux in surface emission, by band
         #     Equal to integral of planck function over band width, which in
@@ -420,6 +440,7 @@ module energy
 
         else
             @error "Invalid RT scheme: $(atmos.rt_scheme)"
+            return false
         end
 
         # Store time
@@ -427,7 +448,7 @@ module energy
             atmos.tim_rt_eval += time_ns() - time_start
         end
 
-        return nothing
+        return true
     end # end of radtrans
 
     """
@@ -445,7 +466,7 @@ module energy
     - `C_d::Float64`        TKE exchange coefficient [dimensionless]
     """
     function eval_exchange_coeff(height::Float64, roughness::Float64)::Float64
-        return phys.k_vk^2 / log(max(height, roughness+1e-3)/roughness)
+        return phys.k_vk^2 / log(max(height, roughness+ROUGHNESS_EPS)/roughness)
     end
 
     """
@@ -456,7 +477,7 @@ module energy
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used
     """
-    function sensible!(atmos::atmosphere.Atmos_t)
+    function sensible!(atmos::atmosphere.Atmos_t)::Bool
 
         # Set TKE exchange coefficient
         atmos.C_d = eval_exchange_coeff(atmos.r[end]-atmos.rp, atmos.surf_roughness)
@@ -468,7 +489,7 @@ module energy
                             atmos.p[end]/(phys.R_gas*atmos.tmp[end]) *
                             atmos.C_d * atmos.surf_windspeed *
                             (atmos.tmp_surf-atmos.tmp[end])
-        return nothing
+        return true
     end
 
 
@@ -480,8 +501,8 @@ module energy
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used
     """
-    function conduct!(atmos::atmosphere.Atmos_t)
-        # top layer
+    function conduct!(atmos::atmosphere.Atmos_t)::Bool
+        # top layer (to space)
         atmos.flux_cdct[1] = 0.0
 
         # bulk layers
@@ -490,10 +511,10 @@ module energy
                                                         atmos.layer_thick[i]
         end
 
-        # bottom layer
+        # bottom layer (from surface)
         atmos.flux_cdct[end] = atmos.layer_kc[end] * (atmos.tmp[end]-atmos.tmp_surf) /
                                                       (atmos.r[end] - atmos.rp)
-        return nothing
+        return true
     end
 
 
@@ -504,11 +525,11 @@ module energy
     centered at `P_dep` with width `sigma_P`.
 
     Two power modes are supported:
-    - `:rel`        — total flux = `efficiency × instellation` (stellar efficiency)
-    - `:abs`        — total flux = `F_total` (fixed radiative flux in W m⁻²)
+    - `"rel"`   total flux = `deepheat_flux_rel * instellation` (stellar efficiency)
+    - `"abs"`   total flux = `deepheat_flux_abs` (fixed radiative flux in W m⁻²)
 
     The flux gradient is defined as:
-        dF_deep/dP = F_total / (sqrt(2π) * σ_P * P) * exp(-(ln(P) - ln(P_dep))² / (2 * σ_P²))
+    dF_deep/dP = F_total / (sqrt(2π) * σ_P * P) * exp(-(ln(P) - ln(P_dep))² / (2 * σ_P²))
 
     This flux is integrated from the TOA downwards to obtain the cumulative
     flux at each cell edge, representing energy being deposited into the atmosphere.
@@ -516,71 +537,63 @@ module energy
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
-    function deep_heating!(atmos::atmosphere.Atmos_t)
+    function deep_heating!(atmos::atmosphere.Atmos_t)::Bool
 
         # Reset flux array
         fill!(atmos.flux_deep, 0.0)
 
         # Extract parameters
-        P_dep::Float64          = atmos.deepheat_Pmid
         sigma_P::Float64        = atmos.deepheat_Pwid
-        efficiency::Float64     = atmos.deepheat_flux_rel
-        F_total_in::Float64     = atmos.deepheat_flux_abs
-        normalisation::Symbol   = atmos.deepheat_norm_method
-        below_domain::Symbol    = atmos.deepheat_domain
+        below_domain::Bool      = atmos.deepheat_domain == "boundary_flux"
 
         # Determine total deposited flux [W m-2]
         F_total::Float64 = 0.0
-        if atmos.deepheat_power_mode == :rel
+        if atmos.deepheat_power_mode == "rel"
             # Stellar efficiency: define heating as a fraction of instellation (per unit area).
-            eff::Float64 = clamp(efficiency, 0.0, 1.0)
-            F_total = eff * atmos.instellation
-        elseif atmos.deepheat_power_mode == :abs
+            F_total = atmos.deepheat_flux_rel * atmos.instellation
+        elseif atmos.deepheat_power_mode == "abs"
             # Fixed radiative flux [W m-2]
-            F_total = max(F_total_in, 0.0)
-        elseif atmos.deepheat_power_mode == :off
+            F_total = atmos.deepheat_flux_abs
+        elseif atmos.deepheat_power_mode == "off"
             # No deep heating
-            return nothing
+            return true
         else
-            error("Invalid deep heating power_mode: $(atmos.deepheat_power_mode)")
+            @warn "Invalid deep heating power_mode: $(atmos.deepheat_power_mode)"
+            return false
         end
 
-        # If heating is effectively zero, do nothing
-        if F_total <= 0.0
-            return nothing
-        end
+        # Invert total flux for this internal-part of the calculation.
+        #     This means that the deep heating flux will represent an additional source.
+        #     Increasing the deep_heating then means that radiative (etc) fluxes will have
+        #     to increase, to achieve the same total flux.
+        F_total *= -1.0
 
         # If deposition is outside the domain and requested, apply as a bottom boundary flux.
-        if below_domain == :boundary_flux
-            if (P_dep > atmos.p_boa) || (P_dep < atmos.p_toa)
-                atmos.flux_deep .= F_total
-                return nothing
-            end
+        if below_domain && !( atmos.p_boa > atmos.deepheat_Pmid > atmos.p_toa )
+            fill!(atmos.flux_deep, F_total)
+            return true
         end
 
         # Prepare log-pressure variables
-        ln_P_dep::Float64 = log(P_dep)
-        ln_P::Float64 = 0.0
+        log_Pmid::Float64 = log10(atmos.deepheat_Pmid)
+        log_P::Array{Float64,1} = log10.(atmos.p)
 
         # Integrate from TOA downwards to get cumulative flux at each level edge
         atmos.flux_deep[1] = 0.0
 
-        if normalisation == :pressure
+        if atmos.deepheat_norm_method == "pressure"
             # Legacy: pressure-normalised dF/dP profile
             norm_factor::Float64 = 1.0 / (sqrt(2.0 * π) * sigma_P)
             dF_dP::Float64 = 0.0
             gaussian::Float64 = 0.0
-            dp::Float64 = 0.0
 
             @inbounds for i in 1:atmos.nlev_c
-                ln_P = log(atmos.p[i])
-                gaussian = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                gaussian = exp(-(log_P[i] - log_Pmid)^2 / (2.0 * sigma_P^2))
                 dF_dP = F_total * norm_factor * gaussian / atmos.p[i]
-                dp = atmos.pl[i+1] - atmos.pl[i]
-                atmos.flux_deep[i+1] = atmos.flux_deep[i] + dF_dP * dp
+                atmos.flux_deep[i+1] = atmos.flux_deep[i] + dF_dP * (atmos.pl[i+1] - atmos.pl[i])
             end
 
-        elseif normalisation == :mass
+        elseif atmos.deepheat_norm_method == "mass"
             # dm-weighted normalisation: ensures Σ(ε_dep*dm) = F_total
             # Column mass per unit area for layer i: dm_i = dp_i / g_i  [kg m⁻²]
             denom::Float64 = 0.0
@@ -588,32 +601,29 @@ module energy
             dm_i::Float64 = 0.0
 
             @inbounds for i in 1:atmos.nlev_c
-                ln_P = log(atmos.p[i])
-                G = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                G = exp(-(log_P[i] - log_Pmid)^2 / (2.0 * sigma_P^2))
                 dm_i = (atmos.pl[i+1] - atmos.pl[i]) / atmos.g[i]
                 denom += G * dm_i
             end
 
-            if denom <= 0.0
-                if below_domain == :boundary_flux
-                    atmos.flux_deep .= F_total
-                end
-                return nothing
+            if denom <= 1e-10
+                @warn "Deep heating normalisation factor has non-positive denominator: $denom"
+                return false
             end
 
             scale::Float64 = F_total / denom
             @inbounds for i in 1:atmos.nlev_c
-                ln_P = log(atmos.p[i])
-                G = exp(-(ln_P - ln_P_dep)^2 / (2.0 * sigma_P^2))
+                G = exp(-(log_P[i] - log_Pmid)^2 / (2.0 * sigma_P^2))
                 dm_i = (atmos.pl[i+1] - atmos.pl[i]) / atmos.g[i]
                 atmos.flux_deep[i+1] = atmos.flux_deep[i] + (scale * G * dm_i)
             end
 
         else
-            error("Invalid deep heating normalisation: $(normalisation)")
+            @warn "Invalid deep heating normalisation: $(atmos.deepheat_norm_method)"
+            return false
         end
 
-        return nothing
+        return true
     end
 
 
@@ -657,8 +667,11 @@ module energy
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+    - `Bool`                    whether the calculation succeeded
     """
-    function convection!(atmos::atmosphere.Atmos_t)
+    function convection!(atmos::atmosphere.Atmos_t)::Bool
 
         # Reset arrays
         fill!(atmos.mask_c,     false)
@@ -751,7 +764,8 @@ module energy
                     # Eq16 from Charnay+15
                     atmos.Kzz[i] = (Hp/3.0) * (atmos.λ_conv[i]/Hp)^(4.0/3.0) * (phys.R_gas*atmos.flux_cdry[i]/(mu*rho*c_p))^(1.0/3.0)
                 else
-                    @error "Invalid Kzz_type parameter: $(atmos.Kzz_type)"
+                    @warn "Invalid Kzz_type parameter: $(atmos.Kzz_type)"
+                    return false
                 end
             end
         end
@@ -761,7 +775,7 @@ module energy
         atmos.λ_conv[end]    = 0.0
         atmos.flux_cdry[end] = 0.0
 
-        return nothing
+        return true
     end # end of mlt
 
     """
@@ -777,8 +791,7 @@ module energy
     - `atmos::Atmos_t`      the atmosphere struct instance to be used.
 
     Returns:
-    - `ok::Bool`            function executed successfully
-
+    - `Bool`                function executed successfully
     """
     function fill_Kzz!(atmos::atmosphere.Atmos_t)::Bool
 
@@ -789,8 +802,8 @@ module energy
         Kzz_eps::Float64 = 1.0e-10
 
         # Find reference index for extension of Kzz, starting from convective regions
-        i_Kzz_top::Int = atmos.nlev_l # default
-        i_Kzz_bot::Int = atmos.nlev_l # default
+        i_Kzz_top::Int64 = atmos.nlev_l # default
+        i_Kzz_bot::Int64 = atmos.nlev_l # default
         if any(atmos.Kzz .> Kzz_eps)
             # set to top of convective region
             i_Kzz_top = findfirst(x -> x > Kzz_eps, atmos.Kzz)
@@ -838,12 +851,15 @@ module energy
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+    - `Bool`                    whether the calculation succeeded
     """
-    function latent!(atmos::atmosphere.Atmos_t)
+    function latent!(atmos::atmosphere.Atmos_t)::Bool
 
         # Check if there are no condensates enabled
         if !atmos.condense_any
-            return nothing
+            return true
         end
 
         fill!(atmos.flux_l, 0.0)
@@ -894,14 +910,16 @@ module energy
 
         end # go to next condensable
 
-        return nothing
+        return true
     end
 
     """
-    **Calculate flux carried by conductive skin.**
+    **Calculate conductive flux carried by conductive skin boundary layer.**
 
     This is a simple implementation of fourier's conduction law, with fixed conductivity
     and thickness of the boundary layer. Parameters are set in the atmos struct.
+
+    F = k * ΔT / d
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
@@ -914,9 +932,31 @@ module energy
     end
 
     """
+    **Calculate conductive skin boundary layer thickness, given a conductive flux.**
+
+    This is effectively the inverse of the `skin_flux` function, and can be used to
+    determine the thickness of the boundary layer.
+
+    d = k * ΔT / F
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    - `flux_skn::Float64`   the conductive flux through the skin layer [W m-2].
+
+    Returns:
+    - `skin_d::Float64`     conductive skin boundary layer thickness [m].
+    """
+    function skin_depth(atmos::atmosphere.Atmos_t, flux_skn::Float64)::Float64
+        return clamp(
+                    (atmos.tmp_magma - atmos.tmp_surf) * atmos.skin_k / flux_skn,
+                    MIN_SKIN_D, MAX_SKIN_D
+                )
+    end
+
+    """
     **Reset energy fluxes to zero.**
     """
-    function reset_fluxes!(atmos::atmosphere.Atmos_t)
+    function reset_fluxes!(atmos::atmosphere.Atmos_t)::Bool
 
         # sensible heating
         atmos.flux_sens = 0.0
@@ -959,7 +999,7 @@ module energy
         fill!(atmos.flux_tot, 0.0)
         fill!(atmos.flux_dif, 0.0)
 
-        return nothing
+        return true
     end
 
 
@@ -973,7 +1013,7 @@ module energy
     fastchem here.
 
     Arguments:
-    - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+    - `atmos::Atmos_t`                  the atmosphere instance to be used.
 
     Optional arguments:
     - `radiative::Bool`                 include radiation fluxes
@@ -985,15 +1025,17 @@ module energy
     - `convect_sf::Float64`             scale factor applied to convection fluxes
     - `latent_sf::Float64`              scale factor applied to phase change fluxes
     - `calc_cf::Bool`                   calculate LW contribution function?
+    - `calc_hr::Bool`                   calculate heating rates from fluxes?
 
     Returns:
-    - `ok::Bool`                        calculation performed ok?
+    - `Bool`                            calculation succeeded
     """
     function calc_fluxes!(atmos::atmosphere.Atmos_t;
                           radiative::Bool=false, latent_heat::Bool=false, convective::Bool=false,
                           sens_heat::Bool=false, conductive::Bool=false, deep::Bool=false,
                           convect_sf::Float64=1.0, latent_sf::Float64=1.0,
-                          calc_cf::Bool=false)::Bool
+                          calc_cf::Bool=false, calc_hr::Bool=false)::Bool
+
 
         # Reset fluxes
         reset_fluxes!(atmos)
@@ -1007,21 +1049,21 @@ module energy
 
         # +Latent heating
         if latent_heat
-            latent!(atmos)           # Calculate latent heat fluxes
+            ok &= latent!(atmos)           # Calculate latent heat fluxes
             atmos.flux_l *= latent_sf           # Modulate for stability?
             @. atmos.flux_tot += atmos.flux_l   # Add to total flux
         end
 
         # +Radiation
         if radiative
-            radtrans!(atmos, true, calc_cf=calc_cf)   # Longwave
-            radtrans!(atmos, false)                   # Shortwave
+            ok &= radtrans!(atmos, true, calc_cf=calc_cf)   # Longwave
+            ok &= radtrans!(atmos, false)                   # Shortwave
             @. atmos.flux_tot += atmos.flux_n  # Add to total flux
         end
 
         # +Dry convection
         if convective
-            convection!(atmos)                          # Calc dry convection heat flux
+            ok &= convection!(atmos)                          # Calc dry convection heat flux
             atmos.flux_cdry *= convect_sf               # Modulate for stability?
             @. atmos.flux_tot += atmos.flux_cdry # Add to total flux
         end
@@ -1031,28 +1073,30 @@ module energy
 
         # +Surface turbulence
         if sens_heat
-            sensible!(atmos)
+            ok &= sensible!(atmos)
             atmos.flux_tot[end] += atmos.flux_sens
         end
 
         # +Conduction
         if conductive
-            conduct!(atmos)
+            ok &= conduct!(atmos)
             @. atmos.flux_tot += atmos.flux_cdct
         end
 
         # +Deep atmospheric heating
-        # Note: flux_deep is computed but NOT added to flux_tot.
-        # For sol_type>=3, heating is added directly to the solver residual.
-        # This prevents numerical artifacts ("hook" shape) in deep P-T profiles
-        # because the heating doesn't propagate through flux_dif incorrectly.
         if deep
-            deep_heating!(atmos)
+            ok &= deep_heating!(atmos)
+            @. atmos.flux_tot += atmos.flux_deep
         end
 
         # Flux difference across each level
         # Positive value => heating
-        atmos.flux_dif[1:end] .= (atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1])
+        atmos.flux_dif[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1]
+
+        # Heating rate
+        if calc_hr
+            ok &= calc_hrates!(atmos)
+        end
 
         return ok
     end
@@ -1060,28 +1104,24 @@ module energy
     """
     **Calculate heating rates at cell-centres from the total flux.**
 
-    Requires the total flux to have already been set (atmos.flux_tot). Heating
+    Requires the total flux to have already been set (atmos.flux_dif). Heating
     rates are calculated in units of kelvin per day.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
+
+    Returns:
+    - `Bool`                            whether the calculation succeeded
     """
-    function calc_hrates!(atmos::atmosphere.Atmos_t)
-
-        dF::Float64 = 0.0
-        dp::Float64 = 0.0
-
-        fill!(atmos.heating_rate, 0.0)
-
+    function calc_hrates!(atmos::atmosphere.Atmos_t)::Bool
         for i in 1:atmos.nlev_c
-            dF = atmos.flux_tot[i+1] - atmos.flux_tot[i]
-            dp = atmos.pl[i+1] - atmos.pl[i]
-            atmos.heating_rate[i] = (atmos.g[i] / atmos.layer_cp[i]) * dF/dp # K/s
+            atmos.heating_rate[i] = (atmos.g[i] / atmos.layer_cp[i]) *
+                                        atmos.flux_dif[i] / (atmos.pl[i+1] - atmos.pl[i])
         end
 
         atmos.heating_rate *= 86400.0 # K/day
 
-        return nothing
+        return true
     end
 
 end # end module

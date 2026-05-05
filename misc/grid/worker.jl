@@ -747,7 +747,7 @@ for (i,p) in enumerate(grid_flat)
     @info @sprintf("    using p_surf = %.2e bar",atmos.p_boa/1e5)
 
     # Set temperature array based on interpolation from last solution
-    max_steps   = Int(cfg["execution"]["max_steps"])
+    max_steps   = Int64(cfg["execution"]["max_steps"])
     max_runtime = Float64(cfg["execution"]["max_runtime"])
     if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
@@ -782,8 +782,8 @@ for (i,p) in enumerate(grid_flat)
                                             oceans=Bool(cfg["physics"]["oceans"]),
                                             dx_max=Float64(cfg["execution"]["dx_max"]),
                                             dx_min=Float64(cfg["execution"]["dx_min"]),
-                                            ls_method=Int(cfg["execution"]["linesearch"]),
-                                            conv_type=Int(cfg["execution"]["converge_type"]),
+                                            ls_method=Int64(cfg["execution"]["linesearch"]),
+                                            conv_type=Int64(cfg["execution"]["converge_type"]),
                                             easy_start=easy_start,
                                             modplot=modplot,
                                             save_frames=false,

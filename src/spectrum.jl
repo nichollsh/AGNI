@@ -41,7 +41,7 @@ module spectrum
     - `spec_file::String`   Path to spectral file
 
     Returns:
-    - `num_gases::Int`      Number of gaseous absorbers, or -1 if not found
+    - `num_gases::Int64`    Number of gaseous absorbers, or -1 if not found
     """
     function count_gases(spec_file::String)::Int
 
@@ -51,7 +51,7 @@ module spectrum
         end
 
         # Read file and search for the gas count line
-        @debug "Counting gaseous absorbers in spectral file: '$spec_file'"
+        @debug "Counting gaseous absorbers in spectral file"
         lines = readlines(spec_file)
         for line in lines
             if contains(line, "Total number of gaseous absorbers")
@@ -215,18 +215,18 @@ module spectrum
     - `wl::Array`           Wavelength array [nm]
     - `fl::Array`           Flux array [erg s-1 cm-2 nm-1]
     - `star_file::String`   Path to output file
-    - `nbins_max::Int`      Maximum number of points in the spectrum
+    - `nbins_max::Int64`    Maximum number of points in the spectrum
 
     Returns:
     - `success::Bool`       function executed successfully
     """
     function write_to_socrates_format(wl::Array{Float64,1}, fl::Array{Float64,1},
-                                        star_file::String, nbins_max::Int=99900)::Bool
+                                        star_file::String, nbins_max::Int64=99900)::Bool
 
-        len_wl::Int = length(wl)
-        len_fl::Int = length(fl)
-        socrates_nbins_max::Int = Int(1e5 - 3)  # do not change this
-        tgt_bins::Int = min(nbins_max, len_wl, socrates_nbins_max)
+        len_wl::Int64 = length(wl)
+        len_fl::Int64 = length(fl)
+        socrates_nbins_max::Int64 = Int64(1e5 - 3)  # do not change this
+        tgt_bins::Int64 = min(nbins_max, len_wl, socrates_nbins_max)
 
         # Validate
         if len_wl != len_fl
@@ -254,7 +254,7 @@ module spectrum
 
         # Ensure that wl array has no duplicates
         # https://discourse.julialang.org/t/unique-indices-method-similar-to-matlab/34446/3
-        unique_mask::Array{Int} = unique(z -> wl[z], 1:length(wl))
+        unique_mask::Array{Int64} = unique(z -> wl[z], 1:length(wl))
         wl = wl[unique_mask]
         fl = fl[unique_mask]
 
@@ -282,7 +282,7 @@ module spectrum
 
         # Write file
         @debug "Writing stellar spectrum to SOCRATES format"
-        len_new::Int = length(owl)
+        len_new::Int64 = length(owl)
         open(star_file, "w") do f
 
             # Header
@@ -459,7 +459,7 @@ module spectrum
     - `orig_file::String`             Original spectral file
     - `species::Array{String,1}`      List of aerosol species
     - `output_dir::String`            Directory where output `.avg` files are written
-    - `phase_moments::Int`            Number of phase-function moments to retain
+    - `phase_moments::Int64`          Number of phase-function moments to retain
     - `star_file::String`             Solar spectrum file for SW-weighted averaging
     - `scattering_dir::String`        Directory containing scattering files (.mon)
 
@@ -469,7 +469,7 @@ module spectrum
     function generate_aerosol_avg_files(orig_file::String,
                                         species::Array{String,1},
                                         output_dir::String,
-                                        phase_moments::Int,
+                                        phase_moments::Int64,
                                         star_file::String,
                                         scattering_dir::String)::Dict{String,String}
 

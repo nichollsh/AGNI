@@ -111,6 +111,7 @@ module save
             ds.attrib["username"]           = get(ENV,"USER","UNKNOWN")
             ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
             ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
+            ds.attrib["name"]               = atmos.name
 
             plat::String = "Generic"
             if Sys.isapple()
@@ -124,7 +125,7 @@ module save
 
             # ----------------------
             # Create dimensions
-            nlev_c = Int(atmos.nlev_c)
+            nlev_c = Int64(atmos.nlev_c)
             nlev_l = nlev_c + 1
             ngases = atmos.gas_num
             naeros = max(1,length(atmos.aerosol_arr_l))
@@ -133,7 +134,7 @@ module save
             defDim(ds, "nlev_c",    nlev_c)        # Cell centres
             defDim(ds, "nlev_l",    nlev_l)        # Cell edges
             defDim(ds, "ngases",    ngases)        # Gases
-            defDim(ds, "naeros",    naeros)  # Aerosols
+            defDim(ds, "naeros",    naeros)        # Aerosols
             defDim(ds, "nchars",    nchars)        # Length of string containing gas names
             defDim(ds, "nbands",    atmos.nbands)  # Number of spectral bands
             defDim(ds, "nchannels", atmos.dimen.nd_channel)  # Number of spectral channels
@@ -263,7 +264,8 @@ module save
             var_r =         defVar(ds, "r",         Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_rl =        defVar(ds, "rl",        Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_thick =     defVar(ds, "dz",        Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
-            var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m s-2"))
+            var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m s-2", "long_name" => "Gravity at cell centres"))
+            var_accel =     defVar(ds, "net_accel", Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m s-2", "long_name" => "Net acceleration at cell centres, positive downwards"))
             var_rho =       defVar(ds, "density",   Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg m-3", "long_name" => "Density of the dry phase at cell centres"))
             var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "J K-1 kg-1"))
             var_mmw =       defVar(ds, "mmw",       Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg mol-1"))
@@ -316,6 +318,7 @@ module save
             var_cp[:]  =    atmos.layer_cp
             var_rho[:]  =   atmos.layer_ρ
             var_grav[:]  =  atmos.g
+            var_accel[:] =  atmos.a
             var_thick[:]  = atmos.layer_thick
 
             # Composition
