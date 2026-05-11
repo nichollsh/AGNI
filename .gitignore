@@ -58,6 +58,8 @@ nogit*
 .conda
 .ipynb_checkpoints
 
+.github/badges/
+
 # RFM
 rfm
 RFM

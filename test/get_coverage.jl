@@ -16,9 +16,56 @@ using LoggingExtras
 using Coverage
 using Printf
 using Dates
+using Glob
 
 target_good = 80.0
 target_bad  = 50.0
+
+TEST_DIR = joinpath(ROOT_DIR, "test")
+BADGE_DIR = joinpath(ROOT_DIR, ".github", "badges")
+
+function count_test_macros(path::String)::Int
+    text = read(path, String)
+    # Count plain @test usages while excluding @testset.
+    return count(_ -> true, eachmatch(r"@test(?!set\b)", text))
+end
+
+function write_test_badge(path::String, label::String, value::Int)
+    open(path, "w") do io
+        println(io, "{")
+        println(io, "  \"schemaVersion\": 1,")
+        println(io, "  \"label\": \"$(label)\",")
+        println(io, "  \"message\": \"$(value)\",")
+        println(io, "  \"color\": \"blue\"")
+        println(io, "}")
+    end
+end
+
+function write_test_badges()
+    test_files = glob("test_*.jl", TEST_DIR)
+    unit_tests = 0
+    integration_tests = 0
+
+    for tf in test_files
+        suite = replace(basename(tf), "test_" => "", ".jl" => "")
+        ntests = count_test_macros(tf)
+        if suite == "integration"
+            integration_tests += ntests
+        else
+            unit_tests += ntests
+        end
+    end
+
+    total_tests = unit_tests + integration_tests
+    mkpath(BADGE_DIR)
+    write_test_badge(joinpath(BADGE_DIR, "tests-unit.json"), "unit tests", unit_tests)
+    write_test_badge(joinpath(BADGE_DIR, "tests-integration.json"), "integration tests", integration_tests)
+    write_test_badge(joinpath(BADGE_DIR, "tests-total.json"), "tests", total_tests)
+
+    @info "Wrote test badges: unit=$unit_tests integration=$integration_tests total=$total_tests"
+end
+
+write_test_badges()
 
 
 # process '*.cov' files
