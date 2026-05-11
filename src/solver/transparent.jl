@@ -134,6 +134,7 @@ module solve_transparent
 
         return atmos.is_converged
     end  # end solve_transparent
+    export solve_transparent!
 
 
 end

@@ -92,5 +92,6 @@ module solve_globe
         end
         return conv
     end
+    export solve_globe!
 
 end

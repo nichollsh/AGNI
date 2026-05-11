@@ -164,6 +164,6 @@ module solve_prescribed
 
         return atmos.is_converged
     end # end solve_prescribed
-    export solve_prescribed
+    export solve_prescribed!
 
 end

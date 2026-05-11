@@ -965,6 +965,6 @@ module solve_energy
 
         return atmos.is_converged
     end # end solve_energy
-    export solve_energy
+    export solve_energy!
 
 end
