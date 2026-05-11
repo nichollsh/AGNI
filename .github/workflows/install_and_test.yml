@@ -62,7 +62,7 @@ jobs:
           cd ..
 
       - name: Get FastChem
-        run: ./src/get_fastchem.sh
+        run: ./src/get_fastchem.sh -y
 
       - name: Build AGNI
         run: |

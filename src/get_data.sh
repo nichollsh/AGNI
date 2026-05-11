@@ -124,7 +124,7 @@ function zenodo {
     # try again at downloading the file?
     echo "Trying again to download the file"
     sleep 1
-    wget --user-agent $ua-qO $tgt $url
+    wget --user-agent $ua -qO $tgt $url
 
     # check if command failed or if file does not exist
     if [ $? -ne 0 ]; then
