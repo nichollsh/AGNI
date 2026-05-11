@@ -930,7 +930,7 @@ module solve_energy
         diagnostics.estimate_timescale_rad!(atmos)
 
         # calc radius of photosphere, and correspondingly the bulk density of the planet
-        diagnostics.calc_observed_rho!(atmos)
+        atmosphere.calc_observed_rho!(atmos)
 
         # calc ocean scalar quantities
         atmos.ocean_layers = ocean.dist_surf_liq(atmos.ocean_tot,

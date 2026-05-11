@@ -30,8 +30,8 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Coverage = "1.8.1"
-OpenSSL_jll = "= 3.0.16"
+# OpenSSL_jll = "= 3.0.16"
 SpecialFunctions = "2.5.0"
 Tables = "1.12.1"
 Test = "1.11.0"
-julia = "~1.11"
+# julia = "~1.11"
