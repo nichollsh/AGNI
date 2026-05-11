@@ -2,10 +2,11 @@ module solve_globe
 
     using Printf
     using LoggingExtras
+    using Statistics: median
 
     import ..atmosphere
     import ..multicol
-    include("energy.jl"); import .solve_energy: solve_energy!
+    import ..solve_energy: solve_energy!
 
     """
     **Solve multi-column problem for radiative-convective equilibrium across the globe**
