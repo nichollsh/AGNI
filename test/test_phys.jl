@@ -5,34 +5,38 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
 RES_DIR         = joinpath(ROOT_DIR,"res/")
 OUT_DIR         = joinpath(ROOT_DIR,"out/")
 TEST_DIR        = joinpath(ROOT_DIR,"test/")
+const lookup_mmw = AGNI.formulae._lookup_mmw
+const lookup_count_atoms = AGNI.formulae._lookup_count_atoms
+const lookup_colour = AGNI.style._lookup_colour
+const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
 
 @testset "phys" begin
     # atom counting
-    @test AGNI.phys.count_atoms("H2O") == AGNI.consts._lookup_count_atoms["H2O"]
-    @test AGNI.phys.count_atoms("CO2") == AGNI.consts._lookup_count_atoms["CO2"]
+    @test AGNI.formulae.count_atoms("H2O") == lookup_count_atoms["H2O"]
+    @test AGNI.formulae.count_atoms("CO2") == lookup_count_atoms["CO2"]
 
     # all molecules
     for molec in AGNI.consts.vols_standard
-        @test length(AGNI.phys.count_atoms(molec)) > 0
-        @test AGNI.phys.get_mmw(molec) > 0.0
+        @test length(AGNI.formulae.count_atoms(molec)) > 0
+        @test AGNI.formulae.get_mmw(molec) > 0.0
     end
 
     # same_atoms
-    @test AGNI.phys.same_atoms(Dict("H"=>2, "O"=>1), Dict("O"=>1, "H"=>2))
+    @test AGNI.formulae.same_atoms(Dict("H"=>2, "O"=>1), Dict("O"=>1, "H"=>2))
 
     # mean molecular weight
-    @test isapprox(AGNI.phys.get_mmw("H2O"), AGNI.consts._lookup_mmw["H2O"]; rtol=1e-12)
+    @test isapprox(AGNI.formulae.get_mmw("H2O"), lookup_mmw["H2O"]; rtol=1e-12)
 
     # pretty name replaces digits (subscript unicode); ensure result differs
-    pn = AGNI.phys._pretty_name("H2O")
+    pn = AGNI.style.pretty_name("H2O")
     @test pn != "H2O"
     @test !occursin("2", pn)
 
     # pretty colour for known gas
-    @test AGNI.phys._pretty_colour("H2O") == AGNI.consts._lookup_colour["H2O"]
+    @test AGNI.style.pretty_colour("H2O") == lookup_colour["H2O"]
 
     # ideal density positive
-    rho = AGNI.phys._rho_ideal(300.0, 1e5, AGNI.consts._lookup_mmw["CO2"])
+    rho = AGNI.phys.density._rho_ideal(300.0, 1e5, lookup_mmw["CO2"])
     @test isfinite(rho) && rho > 0.0
 
     # planck positive
@@ -44,8 +48,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     @test isapprox(g, 9.81; atol=1.0)
 
     # liquid density table and fallback
-    @test AGNI.phys.liquid_rho("H2O") == AGNI.consts._lookup_liquid_rho["H2O"]
-    @test AGNI.phys.liquid_rho("UNKNOWN") == AGNI.phys.BIGFLOAT
+    @test AGNI.phys.density.liquid_rho("H2O") == lookup_liquid_rho["H2O"]
+    @test AGNI.phys.density.liquid_rho("UNKNOWN") == AGNI.consts.BIGFLOAT
 
     # thermal diffusivity
     α = AGNI.phys.calc_therm_diffus(0.6, 1000.0, 1000.0)
@@ -259,9 +263,9 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # -------------
     @testset "pretty_colour" begin
         # known lookup entry
-        @test phys._pretty_colour("CO2") == AGNI.consts._lookup_colour["CO2"]
+        @test style.pretty_colour("CO2") == lookup_colour["CO2"]
         # unknown molecule: must return a 7-character hex code starting with '#'
-        col_sio = phys._pretty_colour("SiO")
+        col_sio = style.pretty_colour("SiO")
         @test length(col_sio) == 7
         @test col_sio[1] == '#'
     end
@@ -309,9 +313,9 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # -------------
     @testset "get_mmw" begin
         # Test known molecules
-        @test isapprox(phys.get_mmw("H2O"), AGNI.consts._lookup_mmw["H2O"]; rtol=1e-12)
-        @test isapprox(phys.get_mmw("CO2"), AGNI.consts._lookup_mmw["CO2"]; rtol=1e-12)
-        @test isapprox(phys.get_mmw("N2"), AGNI.consts._lookup_mmw["N2"]; rtol=1e-12)
+        @test isapprox(phys.get_mmw("H2O"), lookup_mmw["H2O"]; rtol=1e-12)
+        @test isapprox(phys.get_mmw("CO2"), lookup_mmw["CO2"]; rtol=1e-12)
+        @test isapprox(phys.get_mmw("N2"), lookup_mmw["N2"]; rtol=1e-12)
 
         # Test that MMW is positive
         @test phys.get_mmw("CH4") > 0.0
@@ -324,16 +328,16 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # -------------
     @testset "pretty_name" begin
         # Function replaces digits with unicode subscripts
-        pn_h2o = phys._pretty_name("H2O")
+        pn_h2o = style.pretty_name("H2O")
         @test pn_h2o != "H2O"  # should be different due to subscript
         @test !occursin("2", pn_h2o)  # regular '2' should be gone
 
-        pn_co2 = phys._pretty_name("CO2")
+        pn_co2 = style.pretty_name("CO2")
         @test pn_co2 != "CO2"
         @test !occursin("2", pn_co2)
 
         # Molecule without numbers stays same (except unicode conversion)
-        pn_o = phys._pretty_name("O")
+        pn_o = style.pretty_name("O")
         @test length(pn_o) >= 1
     end
 
@@ -344,7 +348,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     @testset "load_gas_unsupported_element" begin
         # Try to load a gas with an unsupported element (should error)
         # suppress error output for cleaner test logs
-        with_logger(MinLevelLogger(current_logger(), 999)) do
+        with_logger(MinLevelLogger(current_logger(), Test.Logging.Error+1)) do
             gas = phys.load_gas("$RES_DIR/thermodynamics/", "Xz2", true, false)
             @test gas.fail == true
         end

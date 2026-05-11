@@ -52,7 +52,7 @@ rm(OUT_DIR,force=true,recursive=true)
 if !isdir(OUT_DIR) && !isfile(OUT_DIR)
     mkdir(OUT_DIR)
 end
-for f in glob("*.cov", [TEST_DIR, SRC_DIR])
+for f in vcat(glob("*.cov", TEST_DIR), glob("*.cov", SRC_DIR))
     rm(f, force=true)
 end
 for f in glob("coverage.*", ROOT_DIR)

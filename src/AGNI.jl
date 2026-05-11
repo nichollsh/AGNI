@@ -29,6 +29,8 @@ module AGNI
     include("interface/load.jl"); import .load; export load
     include("energy/energy.jl"); import .energy; export energy
     include("state/multicol.jl"); import .multicol; export multicol
+    include("phys/formulae.jl"); import .formulae; export formulae
+    include("util/style.jl"); import .style; export style
     include("interface/plotting.jl"); import .plotting; export plotting
     include("solver/solver.jl"); import .solver; export solver
 

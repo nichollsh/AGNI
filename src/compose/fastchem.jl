@@ -11,6 +11,7 @@ module fastchem
 
     # Constants
     const SMOOTH_SCALE::Float64 = 12.0      # smoothing scale for fastchem floor
+    const SMALL_ABUND::Float64  = 1e-20     # small number for checking zero abundance
 
     """
     **Smoothly transform temperature around floor**
@@ -110,7 +111,7 @@ module fastchem
                     fill!(N_inp_g, 0.0)
 
                     # non-zero abundance?
-                    if atmos.gas_vmr[gas][end] < SMALL_FLOAT
+                    if atmos.gas_vmr[gas][end] < SMALL_ABUND
                         continue
                     end
 
@@ -131,7 +132,7 @@ module fastchem
                 end
 
                 # Check that we have some hydrogen...
-                if N_inp_t[1] < SMALL_FLOAT
+                if N_inp_t[1] < SMALL_ABUND
                     @warn "Cannot calculate metallicity of hydrogen-free mixture!"
                     state = 1
                 end

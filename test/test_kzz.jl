@@ -99,7 +99,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             Hp   = atmos.layer_Hp[i] * m2 + atmos.layer_Hp[i-1] * m1
 
             expected_Kzz = (Hp/3.0) * (atmos.λ_conv[i]/Hp)^(4.0/3.0) *
-                            (phys.R_gas*atmos.flux_cdry[i]/(mu*rho*c_p))^(1.0/3.0)
+                            (consts.R_gas*atmos.flux_cdry[i]/(mu*rho*c_p))^(1.0/3.0)
 
             @test isapprox(atmos.Kzz[i], expected_Kzz; rtol=0.05)
         end
