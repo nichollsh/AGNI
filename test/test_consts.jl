@@ -1,11 +1,6 @@
 using Test
 using AGNI
 
-const lookup_mmw = AGNI.phys.formulae._lookup_mmw
-const lookup_count_atoms = AGNI.phys.formulae._lookup_count_atoms
-const lookup_colour = AGNI.phys.species.style._lookup_colour
-const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
-
 @testset "consts" begin
 
     # -------------
@@ -44,7 +39,7 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
         ("H2",  2.015880e-03),
     ]
     for (gas, expected) in mmw_cases
-        @test isapprox(lookup_mmw[gas], expected; rtol=1e-6)
+        @test isapprox(AGNI.phys.formulae._lookup_mmw[gas], expected; rtol=1e-6)
     end
 
     # Test elements MMW
@@ -55,25 +50,25 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
         ("Fe",  5.584500e-02),
     ]
     for (elem, expected) in element_mmw_cases
-        @test isapprox(lookup_mmw[elem], expected; rtol=1e-6)
+        @test isapprox(AGNI.phys.formulae._lookup_mmw[elem], expected; rtol=1e-6)
     end
 
     # All MMW values should be positive
-    for (species, mmw) in lookup_mmw
+    for (species, mmw) in AGNI.phys.formulae._lookup_mmw
         @test mmw > 0.0  # MMW for all species should be positive
     end
 
     # -------------
     # Atom counts for key molecules
     # -------------
-    @test lookup_count_atoms["H2O"]["H"] == 2
-    @test lookup_count_atoms["H2O"]["O"] == 1
-    @test lookup_count_atoms["CO2"]["C"] == 1
-    @test lookup_count_atoms["CO2"]["O"] == 2
-    @test lookup_count_atoms["S8"]["S"] == 8
+    @test AGNI.phys.formulae._lookup_count_atoms["H2O"]["H"] == 2
+    @test AGNI.phys.formulae._lookup_count_atoms["H2O"]["O"] == 1
+    @test AGNI.phys.formulae._lookup_count_atoms["CO2"]["C"] == 1
+    @test AGNI.phys.formulae._lookup_count_atoms["CO2"]["O"] == 2
+    @test AGNI.phys.formulae._lookup_count_atoms["S8"]["S"] == 8
 
     # All atom counts should be positive integers
-    for (molecule, atoms) in lookup_count_atoms
+    for (molecule, atoms) in AGNI.phys.formulae._lookup_count_atoms
         for (element, count) in atoms
             @test count > 0  # Atom counts should be positive
             @test count == floor(count)  # Atom counts should be integers
@@ -161,7 +156,7 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # -------------
     # Color assignments: all colors should be valid hex codes
     # -------------
-    for (species, color) in lookup_colour
+    for (species, color) in AGNI.phys.species.style._lookup_colour
         @test occursin(r"^#[0-9A-Fa-f]{6}$", color)  # Valid hex color format
     end
 
@@ -170,7 +165,7 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # -------------
     # Species with MMW should include key atmospheric gases
     for gas in ["H2O", "CO2", "H2", "N2", "CH4", "O2"]
-        @test haskey(lookup_mmw, gas)
+        @test haskey(AGNI.phys.formulae._lookup_mmw, gas)
     end
 
     # gases_standard should contain most species without significant duplication
