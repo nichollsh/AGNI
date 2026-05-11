@@ -55,17 +55,17 @@ module setpt
     **Parse required argument from request list.**
 
     Arguments:
-    - `request::Array{String,1}`   list of request commands and parameters.
+    - `request::Array{Any,1}`   list of request commands and parameters.
     - `idx::Int64`                index of the required argument to retrieve.
 
     Returns:
-    - `String`                    the required argument at the specified index
+    - `Union{String,Number}`                    the required argument at the specified index
     """
-    function _verb_arg(request::Array{String,1}, idx::Int64)::String
+    function _verb_arg(request::Array{Any,1}, idx::Int)::Union{String,Number}
         if idx > length(request)
             @warn "Request for initial T(p) structure badly formatted"
             @warn "    Got: $(request)"
-            @warn "    Check that all verbs have required parameters (e.g: \"iso\", \"1000\")"
+            @warn "    Check that all verbs have required parameters (e.g: \"iso\", \"300\")"
             return atmosphere.UNSET_STR # to intentionally trigger an error
         end
         return request[idx]

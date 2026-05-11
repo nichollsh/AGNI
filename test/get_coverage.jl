@@ -197,3 +197,8 @@ end
 println("Coverage report written to: $output_file")
 println(@sprintf("Overall coverage: %.1f%% (%d / %d lines)",
     overall_pct, total_covered, total_lines))
+
+println("Uploading to Codecov...")
+Coverage.upload_to_codecov(coverage)
+
+println("Done")
