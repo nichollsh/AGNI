@@ -19,8 +19,13 @@ if ! [ -x "$(command -v unzip)" ]; then
   exit 1
 fi
 
+# User agent string to identify the script to Zenodo
+os=$(uname -s)
+arch=$(uname -m)
+ua="AGNI_get_data/1.0 ($os $arch)"
+
 # Check internet connectivity
-header=$(wget --spider -S "https://zenodo.org" 2>&1 | grep "HTTP")
+header=$(wget --user-agent $ua --spider -S "https://zenodo.org" 2>&1 | grep "HTTP")
 # echo $header
 if ! [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* || $header == *"response 2"* || $header == *"response 3"* ]]; then
     # Return error if we don't get a positive HTTP response from Zenodo
@@ -105,7 +110,7 @@ function zenodo {
     # get data
     echo "    zenodo/$1 > $tgt"
     mkdir -p $2
-    wget -qO $tgt $url
+    wget --user-agent $ua -qO $tgt $url
 
     # check if command failed or if file does not exist
     if [ $? -ne 0 ]; then
@@ -119,7 +124,7 @@ function zenodo {
     # try again at downloading the file?
     echo "Trying again to download the file"
     sleep 1
-    wget -qO $tgt $url
+    wget --user-agent $ua-qO $tgt $url
 
     # check if command failed or if file does not exist
     if [ $? -ne 0 ]; then
@@ -166,7 +171,7 @@ function zenodo_all {
     # get data
     echo "    zenodo/$1 > $tgt"
     mkdir -p $2
-    wget -qO $tgt $url
+    wget --user-agent $ua -qO $tgt $url
 
     # check if command failed or if file does not exist
     if [ $? -ne 0 ]; then
@@ -181,7 +186,7 @@ function zenodo_all {
     # try again at downloading the file?
     echo "Trying again to download the file"
     sleep 1
-    wget -qO $tgt $url
+    wget --user-agent $ua -qO $tgt $url
 
     # check if command failed or if file does not exist
     if [ $? -ne 0 ]; then
