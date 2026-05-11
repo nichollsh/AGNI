@@ -52,7 +52,7 @@ module style
         out::String = ""
         for c in gas
             if isnumeric(c)
-                d = parse(Int, c)
+                d = parse(Int, string(c))
                 out *= Char(parse(Int,"208$d", base=16))
             else
                 out *= c

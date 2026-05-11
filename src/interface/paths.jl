@@ -15,8 +15,16 @@ module paths
     const FWL_DATA::String = joinpath(get(ENV, "FWL_DATA", RES_DIR))
     export FWL_DATA
 
-    # Get path to other data dirs (can be overridden)
-    function get_dir(name::String)::String
+    """
+    **Get path to other data dirs (can be overridden)**
+
+    Arguments:
+    - `name::String` name of the directory to get
+
+    Returns:
+    - `String` path to the requested directory, or `nothing` if the name is unknown.
+    """
+    function get_dir(name::String)::Union{String, Nothing}
 
         if name == "thermodynamics"
             return joinpath(RES_DIR, "thermodynamics")

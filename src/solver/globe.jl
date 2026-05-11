@@ -3,8 +3,9 @@ module solve_globe
     using Printf
     using LoggingExtras
 
-    import ..multicol
     import ..atmosphere
+    import ..multicol
+    include("energy.jl"); import .solve_energy: solve_energy!
 
     """
     **Solve multi-column problem for radiative-convective equilibrium across the globe**
@@ -64,13 +65,14 @@ module solve_globe
             conv = succ
 
             #   Determine a reasonable target value
-            conv_val = median([atmos.flux_tot[end] for atmos in globe.atmos_arr])
+            conv_val = median([atmos.flux_tot[1] for atmos in globe.atmos_arr])
             @info @sprintf("    Convergence target = %+.2e W m-2", conv_val)
 
             #    Check all columns
             for (iatmos,atmos) in enumerate(globe.atmos_arr)
-                resid_val = atmos.flux_tot[end]-conv_val
-                conv &= (abs(resid_val) < globe_atol + globe_rtol * conv_val)
+                resid_val = atmos.flux_tot[1]-conv_val
+                conv_val  = globe_atol + globe_rtol * abs(conv_val)
+                conv &= (abs(resid_val) < conv_val)
                 @info @sprintf("    Column %d: resid = %+.2e W m-2 (%+.2f%%)",
                                 iatmos, resid_val, resid_val/conv_val*100
                                 )

@@ -5,6 +5,7 @@ module solve_transparent
 
     import ..atmosphere
     import ..energy
+    import ..golden: gs_search
 
     """
     **Solve for energy balance with a transparent atmosphere.**
@@ -62,7 +63,7 @@ module solve_transparent
 
                 # Residual = radiative flux minus skin flux
                 energy.calc_fluxes!(atmos, radiative=true)
-                return (atmos.flux_tot[end-1] - energy.skin_flux(atmos))^2
+                return (atmos.flux_tot[1] - energy.skin_flux(atmos))^2
             end
 
             # Find solution for T_surf
@@ -84,7 +85,7 @@ module solve_transparent
 
                 # Residual = radiative flux minus desired flux
                 energy.calc_fluxes!(atmos, radiative=true)
-                return (atmos.flux_tot[end-1] - atmos.flux_int)^2
+                return (atmos.flux_tot[1] - atmos.flux_int)^2
             end
 
             # Find solution for T_surf
@@ -106,7 +107,7 @@ module solve_transparent
 
                 # Residual = radiative flux minus desired flux
                 energy.calc_fluxes!(atmos, radiative=true)
-                return (atmos.flux_u_lw[end-1] - atmos.target_olr)^2
+                return (atmos.flux_u_lw[1] - atmos.target_olr)^2
             end
 
             # Find solution for T_surf

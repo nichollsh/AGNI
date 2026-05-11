@@ -207,10 +207,11 @@ module layers
             else
                 if HYDROGRAV_selfg
                     # gravity changes with mass and radius
-                    return phys.grav_accel(mj, rj)
+                    # approximate mass as constant for this part of the integration
+                    return phys.grav_accel(mj, r)
                 else
                     # gravity changes with radius only
-                    return g0 * (r0/rj)^2
+                    return g0 * (r0/r)^2
                 end
             end
         end
@@ -243,7 +244,7 @@ module layers
             rj += dp/6 * (k1 + 2*k2 + 2*k3 + k4)
 
             # Integrate mass enclosed ...
-            mj += 4 * pi * rj^2 * (-1 * dp) / gj
+            mj += 4 * pi * rj^2 * (-1 * dp) / _accel(rj) 
 
             # Integrate pressure (negative change )
             pj += dp

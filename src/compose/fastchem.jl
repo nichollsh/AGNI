@@ -170,9 +170,9 @@ module fastchem
         end # end write metallicities
 
         # Work out which indices are visited by fc
-        fc_levels::Array{Int,1} = Float64[atmos.nlev_c]
+        fc_levels::Array{Int64,1} = Int64[atmos.nlev_c]
         if !atmos.fastchem_wellmixed
-            fc_levels = collect(Float64,1:atmos.nlev_c)
+            fc_levels = collect(Int64,1:atmos.nlev_c)
         end
 
         # Write PT profile every time

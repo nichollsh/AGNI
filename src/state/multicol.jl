@@ -26,7 +26,7 @@ module multicol
     SHARED_TYPES     = Union{AbstractArray, AbstractVector, Number, AbstractDict, AbstractString}
     PROTECTED_FIELDS = Symbol[:num_rt_eval, :tim_rt_eval]
     shared_fields = Symbol[]
-    for (field,type) in zip(fieldnames(atmosphere.Atmos_t), atmosphere.Atmos_t.types)
+    for (field,type) in zip(fieldnames(atmosphere.Atmos_t), fieldtypes(atmosphere.Atmos_t))
         if (type <: SHARED_TYPES) && !(field in PROTECTED_FIELDS)
             push!(shared_fields, field)
         end
@@ -204,7 +204,11 @@ module multicol
     """
     function copy_atmos_fields!(dst::atmosphere.Atmos_t, src::atmosphere.Atmos_t)::Bool
         for field in shared_fields
-            setfield!(dst, field, getfield(src, field))
+            if isa(getfield(src, field), AbstractArray)
+                copyto!(getfield(dst, field), getfield(src, field))
+            else
+                setfield!(dst, field, getfield(src, field))
+            end
         end
         return true
     end
