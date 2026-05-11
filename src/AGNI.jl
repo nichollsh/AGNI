@@ -14,22 +14,24 @@ module AGNI
     import TOML:parsefile
 
     # Include local jl files (submodule load-ordering matters here)
-    include("consts.jl"); import .consts
-    include("phys.jl"); import .phys
+    include("interface/paths.jl"); import .paths
+    include("phys/consts.jl"); import .consts
+    include("phys/phys.jl"); import .phys
     include("spectrum.jl"); import .spectrum
     include("atmosphere.jl"); import .atmosphere
-    include("ocean.jl"); import .ocean
-    include("chemistry.jl"); import .chemistry
+    include("compose/ocean.jl"); import .ocean
+    include("compose/chemistry.jl"); import .chemistry
     include("rfm.jl"); import .rfm
-    include("setpt.jl"); import .setpt
-    include("save.jl"); import .save
-    include("load.jl"); import .load
+    include("interface/setpt.jl"); import .setpt
+    include("interface/save.jl"); import .save
+    include("interface/load.jl"); import .load
     include("energy.jl"); import .energy
     include("multicol.jl"); import .multicol
-    include("plotting.jl"); import .plotting
+    include("interface/plotting.jl"); import .plotting
     include("solver.jl"); import .solver
 
     # Export submodules (mostly for autodoc purposes)
+    export paths
     export consts
     export phys
     export spectrum
@@ -40,12 +42,9 @@ module AGNI
     export load
     export plotting
     export energy
-    export ocean
     export chemistry
     export rfm
     export solver
-
-    const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../")
 
     """
     **Create a logger object and return it**
@@ -181,7 +180,7 @@ module AGNI
         out_path = abspath(cfg_dict["files"]["output_dir"])
 
         # check if this is a dangerous path
-        if ispath(joinpath(out_path, ".git")) || (joinpath(out_path) == pwd()) || samefile(out_path, ROOT_DIR)
+        if ispath(joinpath(out_path, ".git")) || (joinpath(out_path) == pwd()) || samefile(out_path, paths.ROOT_DIR)
             error("Output directory is unsafe")
         end
 
@@ -541,7 +540,7 @@ module AGNI
 
         # Setup atmosphere
         @debug "Setup atmosphere "
-        if !atmosphere.setup!(atmos, ROOT_DIR,output_dir,
+        if !atmosphere.setup!(atmos, paths.ROOT_DIR, output_dir,
                                 String(cfg["files" ]["input_sf"]),
                                 Float64(cfg["planet"]["instellation"]),
                                 Float64(cfg["planet"]["s0_fact"]),
@@ -860,7 +859,7 @@ module AGNI
         clean_output::Bool = false
 
         # Open and validate config file
-        cfg_path::String = joinpath(ROOT_DIR, "res", "config", "default.toml")
+        cfg_path::String = joinpath(paths.ROOT_DIR, "res", "config", "default.toml")
         if length(ARGS)>0
             cfg_path = ARGS[1]
         end

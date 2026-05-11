@@ -12,8 +12,7 @@ module setpt
     import ..atmosphere
     import ..chemistry
 
-    include("guillot.jl")
-    import .guillot
+    include("../phys/guillot.jl"); import .guillot
 
     using NCDatasets
     using Printf
@@ -55,13 +54,13 @@ module setpt
     **Parse required argument from request list.**
 
     Arguments:
-    - `request::Array{Any,1}`   list of request commands and parameters.
-    - `idx::Int64`                index of the required argument to retrieve.
+    - `request::Array`      list of request commands and parameters.
+    - `idx::Int64`          index of the required argument to retrieve.
 
     Returns:
     - `Union{String,Number}`                    the required argument at the specified index
     """
-    function _verb_arg(request::Array{Any,1}, idx::Int)::Union{String,Number}
+    function _verb_arg(request::Array, idx::Int)::Union{String,Number}
         if idx > length(request)
             @warn "Request for initial T(p) structure badly formatted"
             @warn "    Got: $(request)"

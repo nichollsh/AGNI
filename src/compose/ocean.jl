@@ -19,6 +19,8 @@ for a shelf area distribution which changes with height (i.e. sloped shelf edges
 """
 module ocean
 
+    using Logging
+
     import ..phys
 
     """
@@ -96,6 +98,7 @@ module ocean
 
         return output
     end # end dist_surf_liq
+    export dist_surf_liq
 
     """
     **Get component of topmost ocean layer.**
@@ -109,6 +112,7 @@ module ocean
             return layers[end][2]
         end
     end
+    export get_topliq
 
     """
     **Get ocean depth [m] at deepest point of ocean**
@@ -121,6 +125,7 @@ module ocean
             return sum([la[3]+la[4] for la in layers])
         end
     end
+    export get_maxdepth
 
     """
     **Get area-fraction of the planet that is covered by oceans.**
@@ -146,5 +151,6 @@ module ocean
             end
         end
     end
+    export get_areacov
 
 end

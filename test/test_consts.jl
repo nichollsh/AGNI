@@ -79,10 +79,10 @@ using AGNI
     # Plotting colours: known gases and key elements must be present
     # -------------
     for gas in ["H2O", "CO2", "H2"]
-        @test haskey(AGNI.consts._lookup_color, gas)
+        @test haskey(AGNI.consts._lookup_colour, gas)
     end
     for elem in ["H", "C", "O", "N", "S", "Fe", "Si"]
-        @test haskey(AGNI.consts._lookup_color, elem)
+        @test haskey(AGNI.consts._lookup_colour, elem)
     end
 
     # -------------
@@ -103,7 +103,7 @@ using AGNI
     for (molecule, atoms_dict) in AGNI.consts._lookup_count_atoms
         for element in keys(atoms_dict)
             @test element in AGNI.consts.elems_standard
-            @test haskey(AGNI.consts._lookup_color, element)
+            @test haskey(AGNI.consts._lookup_colour, element)
         end
     end
 
@@ -113,7 +113,7 @@ using AGNI
         # Check if it's a single element (1-2 character string, starts with uppercase)
         if length(species) <= 2 && occursin(r"^[A-Z][a-z]?$", species)
             @test species in AGNI.consts.elems_standard
-            @test haskey(AGNI.consts._lookup_color, species)
+            @test haskey(AGNI.consts._lookup_colour, species)
         end
     end
 
@@ -156,7 +156,7 @@ using AGNI
     # -------------
     # Color assignments: all colors should be valid hex codes
     # -------------
-    for (species, color) in AGNI.consts._lookup_color
+    for (species, color) in AGNI.consts._lookup_colour
         @test occursin(r"^#[0-9A-Fa-f]{6}$", color)  # Valid hex color format
     end
 

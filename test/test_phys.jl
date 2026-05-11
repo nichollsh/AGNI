@@ -14,14 +14,14 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # all molecules
     for molec in AGNI.consts.vols_standard
         @test length(AGNI.phys.count_atoms(molec)) > 0
-        @test AGNI.phys._get_mmw(molec) > 0.0
+        @test AGNI.phys.get_mmw(molec) > 0.0
     end
 
     # same_atoms
     @test AGNI.phys.same_atoms(Dict("H"=>2, "O"=>1), Dict("O"=>1, "H"=>2))
 
     # mean molecular weight
-    @test isapprox(AGNI.phys._get_mmw("H2O"), AGNI.consts._lookup_mmw["H2O"]; rtol=1e-12)
+    @test isapprox(AGNI.phys.get_mmw("H2O"), AGNI.consts._lookup_mmw["H2O"]; rtol=1e-12)
 
     # pretty name replaces digits (subscript unicode); ensure result differs
     pn = AGNI.phys._pretty_name("H2O")
@@ -29,7 +29,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     @test !occursin("2", pn)
 
     # pretty colour for known gas
-    @test AGNI.phys._pretty_color("H2O") == AGNI.consts._lookup_color["H2O"]
+    @test AGNI.phys._pretty_colour("H2O") == AGNI.consts._lookup_colour["H2O"]
 
     # ideal density positive
     rho = AGNI.phys._rho_ideal(300.0, 1e5, AGNI.consts._lookup_mmw["CO2"])
@@ -254,14 +254,14 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 
 
     # -------------
-    # Test _pretty_color
+    # Test _pretty_colour
     # Known gases return their lookup colour; unknown gases return a valid hex string
     # -------------
-    @testset "pretty_color" begin
+    @testset "pretty_colour" begin
         # known lookup entry
-        @test phys._pretty_color("CO2") == AGNI.consts._lookup_color["CO2"]
+        @test phys._pretty_colour("CO2") == AGNI.consts._lookup_colour["CO2"]
         # unknown molecule: must return a 7-character hex code starting with '#'
-        col_sio = phys._pretty_color("SiO")
+        col_sio = phys._pretty_colour("SiO")
         @test length(col_sio) == 7
         @test col_sio[1] == '#'
     end
@@ -309,13 +309,13 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # -------------
     @testset "get_mmw" begin
         # Test known molecules
-        @test isapprox(phys._get_mmw("H2O"), AGNI.consts._lookup_mmw["H2O"]; rtol=1e-12)
-        @test isapprox(phys._get_mmw("CO2"), AGNI.consts._lookup_mmw["CO2"]; rtol=1e-12)
-        @test isapprox(phys._get_mmw("N2"), AGNI.consts._lookup_mmw["N2"]; rtol=1e-12)
+        @test isapprox(phys.get_mmw("H2O"), AGNI.consts._lookup_mmw["H2O"]; rtol=1e-12)
+        @test isapprox(phys.get_mmw("CO2"), AGNI.consts._lookup_mmw["CO2"]; rtol=1e-12)
+        @test isapprox(phys.get_mmw("N2"), AGNI.consts._lookup_mmw["N2"]; rtol=1e-12)
 
         # Test that MMW is positive
-        @test phys._get_mmw("CH4") > 0.0
-        @test phys._get_mmw("O2") > 0.0
+        @test phys.get_mmw("CH4") > 0.0
+        @test phys.get_mmw("O2") > 0.0
     end
 
 

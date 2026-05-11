@@ -31,6 +31,7 @@ module atmosphere
     # Local modules
     import ..phys
     import ..spectrum
+    import ..paths
 
     # Code versions
     const AGNI_VERSION::String     = "1.10.0"  # current agni version
@@ -966,7 +967,7 @@ module atmosphere
         atmos.metal_calc =  Dict{String, Float64}()          # calculated metallicities (empty for now)
         for k in keys(metallicities)
             # mass -> mole, by scaling factor mu
-            atmos.metal_orig[k] = metallicities[k] * phys._get_mmw("H") / phys._get_mmw(k)
+            atmos.metal_orig[k] = metallicities[k] * phys.get_mmw("H") / phys.get_mmw(k)
         end
 
         if haskey(atmos.metal_orig, "H") && (atmos.metal_orig["H"] != 1.0)

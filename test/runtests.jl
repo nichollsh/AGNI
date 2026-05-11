@@ -26,6 +26,7 @@ using Test
 SLOW_TESTS = ["integration", "chemistry", "deep_heating", "kzz", "spectrum"]
 
 # Prepare
+SRC_DIR         = joinpath(ROOT_DIR,"src/")
 RES_DIR         = joinpath(ROOT_DIR,"res/")
 OUT_DIR         = joinpath(ROOT_DIR,"out/")
 TEST_DIR        = joinpath(ROOT_DIR,"test/")
@@ -46,11 +47,19 @@ if length(ARGS)>0
 end
 @info "Requested test suite '$suite'"
 
+# remove old files
 rm(OUT_DIR,force=true,recursive=true)
 if !isdir(OUT_DIR) && !isfile(OUT_DIR)
     mkdir(OUT_DIR)
 end
+for f in glob("*.cov", [TEST_DIR, SRC_DIR])
+    rm(f, force=true)
+end
+for f in glob("coverage.*", ROOT_DIR)
+    rm(f, force=true)
+end
 
+# Parameters for test suite
 rtol   = 1e-3
 
 # Test module imported

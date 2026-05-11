@@ -7,7 +7,7 @@ module blake
 
     # Path to executable blob
     const exec_path::String = abspath(dirname(@__FILE__),
-                                        "..", "res", "blobs", "b2sum-amd64-linux")
+                                        "..", "..", "res", "blobs", "b2sum-amd64-linux")
 
 
     """
@@ -33,6 +33,7 @@ module blake
         content = strip(read(`$exec_path $fpath`, String))
         return split(content, " ")[1]
     end
+    export hash_file
 
     """
     **Validate the integrity of a file using its BLAKE2b hash.**
@@ -73,6 +74,7 @@ module blake
         end
         return true
     end
+    export valid_file
 
 end # end module
 
