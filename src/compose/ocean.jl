@@ -1,11 +1,5 @@
 # Contains module handling surface oceans
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
 """
 **This module handles ocean formation**
 
@@ -53,7 +47,7 @@ module ocean
 
         # Get liquid densities
         liqs::Array{String, 1} = collect(keys(sigs))
-        rhos::Array{Float64,1} = Float64[ phys.liquid_rho(l) for l in liqs]
+        rhos::Array{Float64,1} = Float64[ phys.density.liquid_rho(l) for l in liqs]
 
         # Sort liquids by decreasing density
         mask::Array{Int, 1} = reverse(sortperm(rhos))

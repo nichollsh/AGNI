@@ -35,7 +35,6 @@ module density
             return BIGFLOAT
         end
     end
-    export liquid_rho
 
     """
     **Evaluate the density of a single gas using the ideal gas EOS.**
@@ -69,12 +68,9 @@ module density
             return _rho_ideal(tmp, prs, gas.mmw)
         else
             # otherwise, will use tabulated real-gas EOS to evaluate the density
-            println(gas.eos)
-            println(gas.eos == EOS_IDEAL)
             return gas.eos_I(tmp, log10(prs))
         end
     end
-    export calc_rho_gas
 
     """
     **Calculate the density of a mixture of gases using Amagat's law.**
@@ -109,6 +105,5 @@ module density
         # add them together, assuming ideal additive volumes (inverse density)
         return 1.0 / sum(mmr[:] ./ rho[:])
     end
-    export calc_rho_mix
 
 end

@@ -1,14 +1,9 @@
 # Load atmosphere from NetCDF file
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
 module load
 
     import ..atmosphere
+    import ..layers: calc_layer_props!
 
     using NCDatasets
     using LoggingExtras
@@ -104,7 +99,7 @@ module load
             end
 
             # recalculate remaining layer properties
-            atmosphere.calc_layer_props!(atmos)
+            calc_layer_props!(atmos)
 
             close(ds)
 

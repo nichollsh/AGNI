@@ -93,7 +93,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
-            v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], ideal_H2O)
+            v_obs[i] = phys.density.calc_rho_gas(t_test[i], p_test[i], ideal_H2O)
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3, atol=1e-12)
         end
 
@@ -115,7 +115,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
-            v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], aqua_H2O)
+            v_obs[i] = phys.density.calc_rho_gas(t_test[i], p_test[i], aqua_H2O)
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3)
         end
 
@@ -137,7 +137,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
-            v_obs[i] = phys.calc_rho_gas(t_test[i], p_test[i], vdw_CO2)
+            v_obs[i] = phys.density.calc_rho_gas(t_test[i], p_test[i], vdw_CO2)
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3)
         end
         if !test_pass

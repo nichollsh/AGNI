@@ -85,7 +85,7 @@ The package entry point is `src/AGNI.jl`, which `include()`s submodule files **i
 ## Key Conventions
 
 ### Module files must not be run directly
-Every `src/*.jl` file begins with:
+The `src/AGNI.jl` file begins with:
 ```julia
 if (abspath(PROGRAM_FILE) == @__FILE__)
     thisfile = @__FILE__

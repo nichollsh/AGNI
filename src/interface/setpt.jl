@@ -1,16 +1,11 @@
 # Contains functions for setting-up the temperature profile analytically
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
 module setpt
 
     import ..phys
     import ..atmosphere
     import ..chemistry
+    import ..layers
 
     include("../phys/guillot.jl"); import .guillot
 
@@ -167,7 +162,7 @@ module setpt
             end
 
             # Calculate height (etc) but don't error if it fails, yet
-            if !atmosphere.calc_layer_props!(atmos)
+            if !layers.calc_layer_props!(atmos)
                 @warn "Initial T(p) structure may be unbound"
             end
 
@@ -488,7 +483,7 @@ module setpt
         atmos.tmpl[end] = atmos.tmp_surf
 
         # Set mmw
-        atmosphere.calc_profile_mmw!(atmos)
+        layers.calc_profile_mmw!(atmos)
 
         # Lapse rate dT/dp
         grad::Float64 = 0.0
@@ -501,8 +496,8 @@ module setpt
             if i < atmos.nlev_c
                 atmos.tmp[i] = atmos.tmp[i+1]
             end
-            atmosphere.calc_single_cpkc!(atmos, i)
-            atmosphere.calc_single_density!(atmos, i)
+            layers.calc_single_cpkc!(atmos, i)
+            layers.calc_single_density!(atmos, i)
 
             # Evaluate lapse rate dT/dp
             grad = 1 / (atmos.layer_ρ[i] * atmos.layer_cp[i])

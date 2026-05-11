@@ -1,11 +1,5 @@
 # Contains module for Guillot analytical T(p) profiles
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
 module guillot
 
     import SpecialFunctions:expinti

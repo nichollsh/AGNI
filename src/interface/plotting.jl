@@ -1,11 +1,5 @@
 # Contains functions for plotting/diagnosing the atmosphere
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
 module plotting
 
     # Import stuff

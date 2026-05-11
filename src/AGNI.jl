@@ -14,37 +14,23 @@ module AGNI
     import TOML:parsefile
 
     # Include local jl files (submodule load-ordering matters here)
-    include("interface/paths.jl"); import .paths
-    include("phys/consts.jl"); import .consts
-    include("phys/phys.jl"); import .phys
-    include("spectrum.jl"); import .spectrum
-    include("atmosphere.jl"); import .atmosphere
-    include("compose/ocean.jl"); import .ocean
-    include("compose/chemistry.jl"); import .chemistry
-    include("rfm.jl"); import .rfm
-    include("interface/setpt.jl"); import .setpt
-    include("interface/save.jl"); import .save
-    include("interface/load.jl"); import .load
-    include("energy.jl"); import .energy
-    include("multicol.jl"); import .multicol
-    include("interface/plotting.jl"); import .plotting
-    include("solver.jl"); import .solver
-
-    # Export submodules (mostly for autodoc purposes)
-    export paths
-    export consts
-    export phys
-    export spectrum
-    export atmosphere
-    export multicol
-    export setpt
-    export save
-    export load
-    export plotting
-    export energy
-    export chemistry
-    export rfm
-    export solver
+    include("interface/paths.jl"); import .paths; export paths
+    include("phys/consts.jl"); import .consts; export consts
+    include("phys/phys.jl"); import .phys; export phys
+    include("energy/spectrum.jl"); import .spectrum; export spectrum
+    include("state/atmosphere.jl"); import .atmosphere; export atmosphere
+    include("state/diagnostics.jl"); import .diagnostics; export diagnostics
+    include("state/layers.jl"); import .layers; export layers
+    include("compose/ocean.jl"); import .ocean; export ocean
+    include("compose/chemistry.jl"); import .chemistry; export chemistry
+    include("energy/rfm.jl"); import .rfm; export rfm
+    include("interface/setpt.jl"); import .setpt; export setpt
+    include("interface/save.jl"); import .save; export save
+    include("interface/load.jl"); import .load; export load
+    include("energy/energy.jl"); import .energy; export energy
+    include("state/multicol.jl"); import .multicol; export multicol
+    include("interface/plotting.jl"); import .plotting; export plotting
+    include("solver/solver.jl"); import .solver; export solver
 
     """
     **Create a logger object and return it**
@@ -180,8 +166,8 @@ module AGNI
         out_path = abspath(cfg_dict["files"]["output_dir"])
 
         # check if this is a dangerous path
-        if ispath(joinpath(out_path, ".git")) || (joinpath(out_path) == pwd()) || samefile(out_path, paths.ROOT_DIR)
-            error("Output directory is unsafe")
+        if !paths.is_safe_dir(out_path)
+            error("Output directory is unsafe; cannot be used!")
         end
 
         # looks good
@@ -388,7 +374,7 @@ module AGNI
         end
 
         #    RFM radtrans
-        rfm_parfile::String = atmosphere.UNSET_STR
+        rfm_parfile::String = consts.UNSET_STR
         rfm_wn_min::Float64 = atmosphere.CFG_rfm_wn_min
         rfm_wn_max::Float64 = atmosphere.CFG_rfm_wn_max
         if haskey(cfg["files"],"rfm_parfile")
@@ -513,10 +499,7 @@ module AGNI
         end
 
         # Optional IO folder
-        io_dir::String = atmosphere.UNSET_STR
-        if haskey(cfg["files"], "io_dir")
-            io_dir = cfg["files"]["io_dir"]
-        end
+        io_dir::String = get(cfg["files"], "io_dir", atmosphere.UNSET_STR)
 
         # Optional aerosol parametrization controls
         aerosol_species::Dict = Dict()
@@ -855,11 +838,11 @@ module AGNI
         tbegin = time()
 
         # Variables
-        output_dir::String = atmosphere.UNSET_STR
+        output_dir::String = consts.UNSET_STR
         clean_output::Bool = false
 
         # Open and validate config file
-        cfg_path::String = joinpath(paths.ROOT_DIR, "res", "config", "default.toml")
+        cfg_path::String = joinpath(paths.RES_DIR, "config", "default.toml")
         if length(ARGS)>0
             cfg_path = ARGS[1]
         end

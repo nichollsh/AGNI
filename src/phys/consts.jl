@@ -1,12 +1,16 @@
 # Contains physical constants
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
 module consts
+
+    # Misc constants
+    const UNSET_STR::String = "__AGNI_UNSET_STR"
+    export UNSET_STR
+
+    # Code versions
+    const AGNI_VERSION::String     = "1.10.0"  # current agni version
+    export AGNI_VERSION
+    const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
+    export SOCVER_minimum
 
     # A large floating point number
     const BIGFLOAT::Float64     = 1e99

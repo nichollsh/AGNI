@@ -1,12 +1,4 @@
-# Contains code for obtaining energy balance (nonlinear method)
-
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
-module solver
+module solve_energy
 
     using Printf
     using LoggingExtras
@@ -14,85 +6,13 @@ module solver
     using LinearAlgebra
 
     import ..atmosphere
-    import ..setpt
+    import ..layers
+    import ..diagnostics
     import ..energy
-    import ..phys
     import ..plotting
     import ..chemistry
     import ..ocean
-    import ..multicol
-
-    """
-    **Golden section search algorithm**
-
-    Minimises a function `f` between the bounds `a` and `b`.
-    The function `f` must return a positive scalar.
-
-    Arguments:
-    - `f`           Function to be minimised
-    - `a`           Initial bracket, lower value
-    - `b`           Initial bracket, upper valuie
-    - `dxtol`       Convergence: exit when bracket is smaller than this size
-    - `atol`        Convergence: absolute tolerance on minimum
-    - `max_steps`   Maximum number of iterations
-    - `warnings`    Print warning if search does not converge before `max_steps`` are taken.
-
-    Returns:
-    - `sol`         Best solution found by search.
-    - `succ`        Did search converge?
-    """
-    function gs_search(f::Function,a::Float64,b::Float64,
-                            dxtol::Float64,atol::Float64,max_steps::Int64;
-                            warnings::Bool=false)::Tuple{Float64,Bool}
-        c::Float64 = (-1+sqrt(5))/2
-
-        x1::Float64 = c*a + (1-c)*b
-        x2::Float64 = (1-c)*a + c*b
-
-        fx1::Float64 = f(x1)
-        fx2::Float64 = f(x2)
-
-        midp::Float64 = 0.5*(a+b)
-
-        for i in 1:max_steps
-            if fx1 < fx2
-                b = x2
-                x2 = x1
-                fx2 = fx1
-                x1 = c*a + (1-c)*b
-                fx1 = f(x1)
-            else
-                a = x1
-                x1 = x2
-                fx1 = fx2
-                x2 = (1-c)*a + c*b
-                fx2 = f(x2)
-            end
-
-
-            if fx1 < atol
-                # @debug "GS search found minimum. $(i+2) function evaluations, best = $x1"
-                return (x1, true)
-            end
-
-            if fx2 < atol
-                # @debug "GS search found minimum. $(i+2) function evaluations, best = $x2"
-                return (x2, true)
-            end
-
-            midp = 0.5*(a+b)
-
-            if abs(b-a) < dxtol
-                # @debug "GS search reached minimum bracket size. $(i+2) function evaluations, best = $best"
-                return (midp, false)
-            end
-        end
-
-        if warnings
-            @warn "GS search did not converge"
-        end
-        return (midp, false)
-    end
+    import ..golden: gs_search
 
     # Status codes for solver
     @enum STATUSCODE begin
@@ -359,7 +279,7 @@ module solver
                 chemistry._sat_aloft!(atmos)
 
             elseif !compose_here
-                atmosphere.calc_layer_props!(atmos)
+                layers.calc_layer_props!(atmos)
             end
 
             # Calculate fluxes
@@ -855,7 +775,7 @@ module solver
             _fev!(x_cur, r_cur, compose=true)
 
             # Recalculate layer properties
-            if ! atmosphere.calc_layer_props!(atmos)
+            if ! layers.calc_layer_props!(atmos)
                 code = CODE_HYD
                 step_ok = false
                 stepflags *= "Ub-"
@@ -1005,12 +925,12 @@ module solver
         energy.calc_hrates!(atmos)
 
         # calc diagnostic quantities
-        atmosphere.estimate_Ra!(atmos)
-        atmosphere.estimate_timescale_conv!(atmos)
-        atmosphere.estimate_timescale_rad!(atmos)
+        diagnostics.estimate_Ra!(atmos)
+        diagnostics.estimate_timescale_conv!(atmos)
+        diagnostics.estimate_timescale_rad!(atmos)
 
         # calc radius of photosphere, and correspondingly the bulk density of the planet
-        atmosphere.calc_observed_rho!(atmos)
+        diagnostics.calc_observed_rho!(atmos)
 
         # calc ocean scalar quantities
         atmos.ocean_layers = ocean.dist_surf_liq(atmos.ocean_tot,
@@ -1045,372 +965,6 @@ module solver
 
         return atmos.is_converged
     end # end solve_energy
-
-    """
-    **Solve for global (not local) balance with a prescribed atmosphere structure.**
-
-    Comparable to solve_transparent, but with an opaque prescribed atmospheric structure.
-
-    Arguments:
-    - `atmos::Atmos_t`         the atmosphere struct instance to be used.
-    - `sol_type::Int64`        solution types, same as solve_energy
-    - `atm_type::Int64 `         atmosphere prescription (1: isothermal, 2: adiabat, 3: adiabat+stratosphere)
-    - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
-    - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
-    - `max_steps::Int64`       maximum number of solver steps
-    - `tmp_upper::Float64`     upper-bound on Tsurf for golden-section search [K]
-
-    Returns:
-    - `Bool` indicating success
-    """
-    function solve_prescribed!(atmos::atmosphere.Atmos_t;
-                                    sol_type::Int64=3,
-                                    atm_type::Int64=1,
-                                    conv_atol::Float64=1.0e-3,
-                                    conv_rtol::Float64=1.0e-5,
-                                    max_steps::Int64=300,
-                                    tmp_upper::Float64=5000.0)::Bool
-
-        # Validate sol_type (does not allow type=1 here)
-        if (sol_type < 1) || (sol_type > 4)
-            @warn "Invalid solution type ($sol_type)"
-            return false
-        end
-        # Validate atm_type
-        if (atm_type < 1) || (atm_type > 3)
-            @warn "Invalid atmosphere prescription ($atm_type)"
-            return false
-        end
-
-        succ::Bool = false
-
-        # Function to set atmosphere according to the desired prescription
-        function _prescribe!(atmos::atmosphere.Atmos_t, atm_type::Int64, _tsurf::Float64)
-            # set tsurf
-            atmos.tmp_surf  = deepcopy(_tsurf)
-            atmos.tmpl[end] = deepcopy(_tsurf)
-            # @debug "    try tmp_surf = $_tsurf K"
-
-            # set profile
-            if atm_type == 1
-                setpt.isothermal!(atmos, atmos.tmp_surf)
-            elseif atm_type == 2
-                setpt.dry_adiabat!(atmos)
-            elseif atm_type == 3
-                setpt.dry_adiabat!(atmos)
-                setpt.stratosphere!(atmos, phys.calc_Tskin(atmos.instellation, atmos.albedo_b))
-            end
-
-            # layer properties
-            atmosphere.calc_layer_props!(atmos)
-        end
-
-        # Handle different solution types
-        if sol_type == 1
-            # Constant surface temperature, which is trivial
-            _prescribe!(atmos, atm_type, atmos.tmp_surf)
-            energy.calc_fluxes!(atmos, radiative=true)
-            succ = true
-
-        elseif sol_type == 2
-            # Conductive boundary layer => find Tsurf based on Tmagma
-
-            function _skinfunc!(_tsurf::Float64)::Float64
-                # Cost function, to be minimised. Takes _tsurf and returns the
-                # difference between total flux and conductive skin flux
-
-                # Set temperature
-                _prescribe!(atmos, atm_type, _tsurf)
-
-                # Residual = radiative flux minus skin flux
-                energy.calc_fluxes!(atmos, radiative=true)
-                return (atmos.flux_tot[1] - energy.skin_flux(atmos))^2
-            end
-
-            # Find solution for T_surf
-            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            (T_surf,succ) = gs_search(_skinfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
-                                        0.0, tol, max_steps; warnings=true)
-
-            # Store final result
-            _skinfunc!(T_surf)
-
-        elseif sol_type == 3
-
-            function _intfunc!(_tsurf::Float64)::Float64
-                # Cost function, to be minimised. Takes _tsurf and returns the
-                # difference between total flux and required total flux
-
-                # Set temperature
-                _prescribe!(atmos, atm_type, _tsurf)
-
-                # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, radiative=true)
-
-                @debug "    flux_tot = $(atmos.flux_tot[1])"
-                return (atmos.flux_tot[1] - atmos.flux_int)^2
-            end
-
-            # Find solution for T_surf
-            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            (T_surf,succ) = gs_search(_intfunc!, atmos.tmp_floor, tmp_upper,
-                                        0.0, tol, max_steps; warnings=true)
-
-            # Store final result
-            _intfunc!(T_surf)
-
-        elseif sol_type == 4
-
-            function _olrfunc!(_tsurf::Float64)::Float64
-                # Cost function, to be minimised. Takes _tsurf and returns the
-                # difference between calculated OLR and required OLR
-
-                # Set temperature
-                _prescribe!(atmos, atm_type, _tsurf)
-
-                # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, radiative=true)
-                return (atmos.flux_u_lw[1] - atmos.target_olr)^2
-            end
-
-            # Find solution for T_surf
-            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_u_lw))
-            (T_surf,succ) = gs_search(_olrfunc!, atmos.tmp_floor, tmp_upper,
-                                        0.0, tol, max_steps; warnings=true)
-
-            # Store final result
-            _olrfunc!(T_surf)
-        end
-
-        # Flag as solved
-        atmos.is_converged = succ
-        atmos.is_solved = true
-
-        # Print info
-        # @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
-        if (sol_type == 2)
-            F_skin = energy.skin_flux(atmos)
-            @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", F_skin)
-        end
-        @info @sprintf("    total flux         = %+.2e W m-2     ", atmos.flux_tot[1])
-        @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
-        @info @sprintf("    surf pressure      = %.1e bar      ", atmos.p_boa/1e5)
-
-        return atmos.is_converged
-    end # end solve_prescribed
-
-    """
-    **Solve for energy balance with a transparent atmosphere.**
-
-    This will use an isothermal temperature profile, and only modify T_surf.
-
-    Arguments:
-    - `atmos::Atmos_t`         the atmosphere struct instance to be used.
-    - `sol_type::Int64`        solution types, same as solve_energy
-    - `conv_atol::Float64`     convergence: absolute tolerance on global flux [W m-2]
-    - `conv_rtol::Float64`     convergence: relative tolerance on global flux [dimensionless]
-    - `max_steps::Int64`       maximum number of solver steps
-    - `tmp_upper::Float64`     upper-bound on Tsurf for golden-section search [K]
-
-    Returns:
-    - `Bool` indicating success
-    """
-    function solve_transparent!(atmos::atmosphere.Atmos_t;
-                                    sol_type::Int64=1,
-                                    conv_atol::Float64=1.0e-3,
-                                    conv_rtol::Float64=1.0e-5,
-                                    max_steps::Int64=300,
-                                    tmp_upper::Float64=5000.0)::Bool
-
-
-        # Validate sol_type
-        if (sol_type < 1) || (sol_type > 4)
-            @warn "Invalid solution type ($sol_type)"
-            return false
-        end
-
-        # Check if transparent
-        if !atmos.transparent
-            @warn "Atmosphere is NOT configured to be transparent"
-            @warn "    Cannot use `solve_transparent`"
-            return false
-        end
-
-        succ::Bool = false
-
-        # Handle different solution types
-        if sol_type == 1
-            # Fixed temperature case => just calculate radiative fluxes
-            energy.calc_fluxes!(atmos, radiative=true)
-
-        elseif sol_type == 2
-            # Conductive boundary layer => find Tsurf based on Tmagma
-
-            function _skinfunc!(_tsurf::Float64)::Float64
-                # Cost function, to be minimised. Takes _tsurf and returns the
-                # difference between total flux and conductive skin flux
-
-                # Set temperature
-                atmos.tmp_surf = _tsurf
-
-                # Residual = radiative flux minus skin flux
-                energy.calc_fluxes!(atmos, radiative=true)
-                return (atmos.flux_tot[end-1] - energy.skin_flux(atmos))^2
-            end
-
-            # Find solution for T_surf
-            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            (T_surf,succ) = gs_search(_skinfunc!, atmos.tmp_floor, atmos.tmp_ceiling,
-                                        0.0, tol, max_steps; warnings=true)
-
-            # Store final result
-            _skinfunc!(T_surf)
-
-        elseif sol_type == 3
-
-            function _intfunc!(_tsurf::Float64)::Float64
-                # Cost function, to be minimised. Takes _tsurf and returns the
-                # difference between total flux and required total flux
-
-                # Set temperature
-                atmos.tmp_surf = _tsurf
-
-                # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, radiative=true)
-                return (atmos.flux_tot[end-1] - atmos.flux_int)^2
-            end
-
-            # Find solution for T_surf
-            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_tot))
-            (T_surf,succ) = gs_search(_intfunc!, atmos.tmp_floor, tmp_upper,
-                                        0.0, tol, max_steps; warnings=true)
-
-            # Store final result
-            _intfunc!(T_surf)
-
-        elseif sol_type == 4
-
-            function _olrfunc!(_tsurf::Float64)::Float64
-                # Cost function, to be minimised. Takes _tsurf and returns the
-                # difference between calculated OLR and required OLR
-
-                # Set temperature
-                atmos.tmp_surf = _tsurf
-
-                # Residual = radiative flux minus desired flux
-                energy.calc_fluxes!(atmos, radiative=true)
-                return (atmos.flux_u_lw[end-1] - atmos.target_olr)^2
-            end
-
-            # Find solution for T_surf
-            tol = conv_atol + conv_rtol * maximum(abs.(atmos.flux_u_lw))
-            (T_surf,succ) = gs_search(_olrfunc!, atmos.tmp_floor, tmp_upper,
-                                        0.0, tol, max_steps; warnings=true)
-
-            # Store final result
-            _olrfunc!(T_surf)
-        end
-
-        # Flag as solved
-        atmos.is_converged = succ
-        atmos.is_solved = true
-
-        # Print info
-        @info @sprintf("    outgoing LW flux   = %+.2e W m-2     ", atmos.flux_u_lw[1])
-        if (sol_type == 2)
-            F_skin = energy.skin_flux(atmos)
-            @info @sprintf("    conduct. skin flux = %+.2e W m-2 ", F_skin)
-        end
-        @info @sprintf("    total flux         = %+.2e W m-2     ", atmos.flux_tot[1])
-        @info @sprintf("    surf temperature   = %-9.3f K        ", atmos.tmp_surf)
-
-        return atmos.is_converged
-    end  # end solve_transparent
-
-
-    """
-    **Solve multi-column problem for radiative-convective equilibrium across the globe**
-
-    Repeatedly call `solve_energy!` on each column, solving them as separate systems of
-    equations, until all columns are converged to the specified tolerance.
-
-    Arguments:
-    - `globe::Globe_t`              globe struct containing the columns to solve
-    - `globe_iters::Int`            maximum number of iterations to perform
-    - `kwargs...`                   keyword arguments to pass to `solve_energy!`
-
-    Returns:
-    - `succ::Bool`                 whether the solve was successful for all columns
-    """
-    function solve_globe!(globe::multicol.Globe_t, globe_iters::Int; kwargs...)::Bool
-
-        # extract convergence tolerances from kwargs
-        globe_atol::Float64 = kwargs[:conv_atol]
-        globe_rtol::Float64 = kwargs[:conv_rtol]
-
-        # Track state of globe solver
-        succ::Bool = true       # success during this specific iteration
-        conv::Bool = false      # globe converged
-
-        # Iterate until convergence, or until giving up
-        for iter in 1:globe_iters
-            @info "Iteration $iter/$globe_iters of globe solver (ncol=$(globe.ncol))"
-
-            # Assume success during this iteration
-            succ = true
-
-            # Update boundary conditions, after first iteration
-            if iter>1
-                succ &= multicol.set_surface_bc!(globe, kwargs[:sol_type])
-                @info "Updated columns' surface boundary conditions"
-            end
-
-            # Update heating profiles, after first iteration
-            if iter>1
-                succ &= multicol.set_redist!(globe)
-                @info "Updated columns' heat redistribution profiles"
-            end
-
-            # Solve each column independently
-            #    This function runs `solve_energy!` on each column independently
-            succ &= multicol.call_for_globe!(globe, solve_energy!; kwargs...)
-
-            # Check if any of the solvers failed
-            succ || @warn "Global solver partially failed during iteration $iter"
-
-            # Check that globe converged on state where all columns get same flux_tot.
-            #   For sol_type=1, system closed by updating heat_redist
-            #   For sol_type=2, system closed by updating surface BC and heat_redist
-            #   For sol_type=3, system closed by updating heat_redist
-            @info "Checking globe for convergence"
-            conv = succ
-
-            #   Determine a reasonable target value
-            conv_val = median([atmos.flux_tot[end] for atmos in globe.atmos_arr])
-            @info @sprintf("    Convergence target = %+.2e W m-2", conv_val)
-
-            #    Check all columns
-            for (iatmos,atmos) in enumerate(globe.atmos_arr)
-                resid_val = atmos.flux_tot[end]-conv_val
-                conv &= (abs(resid_val) < globe_atol + globe_rtol * conv_val)
-                @info @sprintf("    Column %d: resid = %+.2e W m-2 (%+.2f%%)",
-                                iatmos, resid_val, resid_val/conv_val*100
-                                )
-            end
-
-            # Converged?
-            conv && break
-
-            @info "-------------------------------"
-            @info " "
-        end
-
-        if conv
-            @info "Globe solve converged"
-        else
-            @warn "Globe solve did not converge ($globe_iters iterations)"
-        end
-        return conv
-    end
+    export solve_energy
 
 end

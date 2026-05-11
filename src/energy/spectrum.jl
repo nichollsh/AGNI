@@ -1,13 +1,6 @@
 # Contains the spectrum module, for updating the SOCRATES spectral file at
 # runtime with the solar flux / thermal source function, and scattering.
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
-
 module spectrum
 
     using LoggingExtras

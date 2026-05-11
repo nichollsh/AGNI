@@ -1,11 +1,5 @@
 # Contains things relating to atmospheric chemistry
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
 """
 This module handles chemistry, condensation, and evaporation.
 
@@ -23,6 +17,7 @@ module chemistry
     # Local files
     using ..phys
     import ..atmosphere
+    import ..layers
     include("ocean.jl"); using .ocean
     include("fastchem.jl"); import .fastchem: run_fastchem!
 
@@ -100,7 +95,7 @@ module chemistry
         atmosphere.generate_pgrid!(atmos)
 
         # Layer properties
-        atmosphere.calc_layer_props!(atmos)
+        layers.calc_layer_props!(atmos)
     end
 
 
@@ -211,7 +206,7 @@ module chemistry
         atmosphere.generate_pgrid!(atmos)
 
         # Calculate new values for layer properties
-        atmosphere.calc_layer_props!(atmos)
+        layers.calc_layer_props!(atmos)
 
         return any_changed
     end
@@ -305,7 +300,7 @@ module chemistry
                 end # end saturation check
 
                 # recalculate layer properties after raining-out this species
-                atmosphere.calc_layer_props!(atmos)
+                layers.calc_layer_props!(atmos)
 
             end # end condensate
 
@@ -399,7 +394,7 @@ module chemistry
             end # go to next j level (below)
 
             # Layer properties
-            atmosphere.calc_layer_props!(atmos)
+            layers.calc_layer_props!(atmos)
 
         end # end loop over condensates
 
@@ -407,7 +402,7 @@ module chemistry
         for i in 1:atmos.nlev_c
             normalise_vmrs!(atmos, i)
         end
-        atmosphere.calc_layer_props!(atmos)
+        layers.calc_layer_props!(atmos)
 
         # Set water clouds at levels where condensation occurs
         if "H2O" in atmos.condensates
@@ -462,7 +457,7 @@ module chemistry
         end
 
         # Call fastchem wrapper
-        state = run_fastchem!(atmos, write_cfg)
+        state = fastchem.run_fastchem!(atmos, write_cfg)
 
         # Also record this result in gas_cvmr dictionary
         for g in atmos.gas_names
@@ -470,7 +465,7 @@ module chemistry
         end
 
         # recalculate layer properties
-        atmosphere.calc_layer_props!(atmos)
+        layers.calc_layer_props!(atmos)
 
         # Warn on failure
         if state > 0

@@ -301,6 +301,5 @@ module fastchem
 
         return state
     end # /function
-    export run_fastchem!
 
 end
