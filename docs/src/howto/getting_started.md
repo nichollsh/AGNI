@@ -16,21 +16,22 @@ GNU/Linux and MacOS (including ARM) are supported.
     Do not install Julia using your system package manager. Install only from julialang.org as below.
 
 ## Installation
+
 Follow the ordered steps below
 1. Install Julia's package manager
     - `curl -fsSL https://install.julialang.org | sh`
-2. Switch to Julia 1.11
-    - `juliaup add 1.11 && juliaup default 1.11`
-3. Download AGNI
-    - `git clone https://github.com/nichollsh/AGNI.git`
-4. Change directory: `cd AGNI`
-5. Setup SOCRATES by doing either **ONE** of the following...
-    a. Follow the instructions on the [SOCRATES GitHub](https://github.com/FormingWorlds/SOCRATES) page
-    b. **OR**, run `./src/get_socrates.sh`
-6. Setup FastChem
+
+2. Download AGNI
+    - `git clone https://github.com/nichollsh/AGNI.git && cd AGNI`
+
+3. Setup SOCRATES by doing either **ONE** of the following...
+    - a) Follow the instructions on the [SOCRATES GitHub](https://github.com/FormingWorlds/SOCRATES) page
+    - b) **OR**, run `./src/get_socrates.sh`
+
+4. Setup FastChem
     - `./src/get_fastchem.sh`
-7. Add `RAD_DIR` and `FC_DIR` to your environment and bashrc file
-8. Finally, install AGNI
+
+5. Install AGNI
     - `./src/get_agni.sh`
 
 AGNI is now installed as a package of the Julia environment in the `AGNI/`
@@ -46,7 +47,7 @@ directory. These steps will have downloaded some basic input data.
 ## Testing
 If you want to run the tests manually, simply use the script in the `test/` folder...
 ```bash
-julia test/runtests.jl
+julia --project=. test/runtests.jl
 ```
 This will print information on whether tests passed or failed.
 
@@ -97,5 +98,5 @@ Potential flags for each species are:
 * `COND` - this gas is allowed to condense
 
 Output files are written to the directory specified in the configuration file (default: `out/`).
-See [Example outputs](@ref) for illustrative results, and [How-to guides](@ref) for
+See [Tutorials](@ref) for illustrative results, and [How-to guides](@ref) for
 next steps such as configuring the model for your own science case.

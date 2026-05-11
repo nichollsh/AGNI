@@ -14,8 +14,8 @@ The documentation is structured following the [Diátaxis](https://diataxis.fr/) 
 
 | Section | Purpose |
 | :---: | :---|
-| [**Tutorials**](@ref "Getting started") | Step-by-step guides. Start here to install the code and run your first simulation. |
 | [**How-to guides**](@ref "How-to guides") | Task-oriented recipes for specific goals; e.g. configuration, grid runs. |
+| [**Tutorials**](@ref "Tutorials") | Step-by-step guides. Start here to install the code and run your first simulation. |
 | [**Explanation**](@ref "Model description") | Background reading on the physics, numerics, and ecosystem context. |
 | [**Reference**](@ref "Reference") | Complete code API and config-file reference for people who like details. |
 

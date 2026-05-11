@@ -30,9 +30,9 @@ jobs:
 
       # Setup Julia
       - name: Setup Julia
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
         with:
-          version: '1.11'
+          version: '1.12'
 
       - name: Cache Julia
         uses: julia-actions/cache@v3
