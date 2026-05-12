@@ -47,6 +47,9 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         result = AGNI.setpt._parse_tmp_str(atmos, "teq")
         expected_teq = AGNI.phys.calc_Teq(atmos.instellation, atmos.albedo_b)
         @test isapprox(result, expected_teq; rtol=1e-3)
+
+        # invalid keyword-like string
+        @test isnothing(AGNI.setpt._parse_tmp_str(atmos, "definitely_not_a_temperature"))
     end
 
     @testset "isothermal!" begin
@@ -158,6 +161,11 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         # Test extrapolation option
         AGNI.setpt.fromarrays!(atmos, test_pl, test_tmpl; extrap=true)
         @test all(atmos.tmp .> 0.0)
+
+        # Non-monotonic pressure array should fail
+        bad_pl = [1e2, 1e4, 1e3, 1e5]
+        bad_t = [150.0, 200.0, 250.0, 300.0]
+        @test AGNI.setpt.fromarrays!(atmos, bad_pl, bad_t) == false
     end
 
     @testset "fromcsv!" begin
@@ -182,7 +190,36 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         end
 
         # Test with non-existent file (should log error but not throw)
-        AGNI.setpt.fromcsv!(atmos, "/nonexistent/file.csv")
+        @test AGNI.setpt.fromcsv!(atmos, "/nonexistent/file.csv") == false
+
+        # Too few data rows
+        tiny_csv = tempname() * ".csv"
+        open(tiny_csv, "w") do io
+            println(io, "1e2, 150.0")
+            println(io, "1e3, 200.0")
+        end
+        try
+            @test AGNI.setpt.fromcsv!(atmos, tiny_csv) == false
+        finally
+            rm(tiny_csv, force=true)
+        end
+
+        # Invalid values in CSV
+        bad_csv = tempname() * ".csv"
+        open(bad_csv, "w") do io
+            println(io, "1e2, 150.0")
+            println(io, "-1e3, 200.0")
+            println(io, "1e4, 250.0")
+        end
+        try
+            @test AGNI.setpt.fromcsv!(atmos, bad_csv) == false
+        finally
+            rm(bad_csv, force=true)
+        end
+    end
+
+    @testset "fromncdf!" begin
+        @test AGNI.setpt.fromncdf!(atmos, "/nonexistent/file.nc") == false
     end
 
     @testset "request!" begin
@@ -221,6 +258,13 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         # Test saturation request (requires gas in atmosphere)
         result = AGNI.setpt.request!(atmos, Any["sat", "H2O"])
         @test result == true
+
+        # Test missing argument path for a verb
+        @test AGNI.setpt.request!(atmos, Any["iso"]) == false
+
+        # csv/ncdf verbs with missing files should fail
+        @test AGNI.setpt.request!(atmos, Any["csv", "/nonexistent/file.csv"]) == false
+        @test AGNI.setpt.request!(atmos, Any["ncdf", "/nonexistent/file.nc"]) == false
     end
 
     @testset "saturation!" begin
@@ -254,6 +298,24 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         # Temperatures should be in a reasonable range
         @test all(atmos.tmp .< 2000.0)  # Not extremely hot
         @test all(atmos.tmp .> 50.0)    # Not extremely cold
+    end
+
+    @testset "guard_paths_and_helpers" begin
+        # _verb_arg helper out-of-range returns UNSET sentinel string
+        @test AGNI.setpt._verb_arg(Any["iso"], 3) == AGNI.atmosphere.UNSET_STR
+
+        # Methods should return false when atmosphere is not setup/allocated
+        atmos_unalloc = AGNI.atmosphere.Atmos_t()
+        @test AGNI.setpt.request!(atmos_unalloc, Any["iso", 300.0]) == false
+        @test AGNI.setpt.isothermal!(atmos_unalloc, 300.0) == false
+        @test AGNI.setpt.add!(atmos_unalloc, 10.0) == false
+        @test AGNI.setpt.dry_adiabat!(atmos_unalloc) == false
+        @test AGNI.setpt.loglinear!(atmos_unalloc, 200.0) == false
+        @test AGNI.setpt.saturation!(atmos_unalloc, "H2O") == false
+        @test AGNI.setpt.analytic!(atmos_unalloc) == false
+        @test AGNI.setpt.fromarrays!(atmos_unalloc, [1.0, 2.0, 3.0], [100.0, 100.0, 100.0]) == false
+        @test AGNI.setpt.fromcsv!(atmos_unalloc, "/nonexistent/file.csv") == false
+        @test AGNI.setpt.fromncdf!(atmos_unalloc, "/nonexistent/file.nc") == false
     end
 
     atmosphere.deallocate!(atmos)  # Clean up

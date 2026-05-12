@@ -220,3 +220,67 @@ Some more content
     rm(temp_sf, force=true)
 
 end
+
+@testset "spectrum_insert_blocks_and_aerosol_guards" begin
+    tmpdir = mktempdir()
+    try
+        orig = joinpath(tmpdir, "base.sf")
+        star = joinpath(tmpdir, "star.dat")
+        outp = joinpath(tmpdir, "out.sf")
+
+        # insert_blocks: missing original file
+        @test !AGNI.spectrum.insert_blocks(
+            orig, star, outp, false, false; aerosol_avg_files=Dict{String,String}()
+        )
+
+        # write minimal original + _k to pass cp step, but missing star file should fail
+        write(orig, "Total number of gaseous absorbers = 1\n*END\n")
+        write(orig * "_k", "dummy k-table\n")
+        @test !AGNI.spectrum.insert_blocks(
+            orig, star, outp, false, false; aerosol_avg_files=Dict{String,String}()
+        )
+
+        # write star file, but malformed spectral file => gas count parse failure
+        write(star, "header\nheader\n1.0 1.0\n")
+        write(orig, "No gas count line here\n*END\n")
+        @test !AGNI.spectrum.insert_blocks(
+            orig, star, outp, false, false; aerosol_avg_files=Dict{String,String}()
+        )
+
+        # valid gas-count line, but missing prep binaries / execution path should still be handled
+        write(orig, "Total number of gaseous absorbers = 1\n*END\n")
+        @test !AGNI.spectrum.insert_blocks(
+            orig, star, outp, true, false; aerosol_avg_files=Dict{String,String}()
+        )
+
+        # generate_aerosol_avg_files guard paths
+        missing_orig = joinpath(tmpdir, "missing.sf")
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+            missing_orig, ["dust"], tmpdir, 2, star, tmpdir
+        ))
+
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+            orig, ["dust"], tmpdir, 0, star, tmpdir
+        ))
+
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+            orig, ["dust"], tmpdir, 2, "", tmpdir
+        ))
+
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+            orig, ["dust"], tmpdir, 2, joinpath(tmpdir, "missing_star.dat"), tmpdir
+        ))
+
+        # no species => early empty return without external tool
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+            orig, String[], tmpdir, 2, star, tmpdir
+        ))
+
+        # species provided but missing .mon file
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+            orig, ["dust"], tmpdir, 2, star, tmpdir
+        ))
+    finally
+        rm(tmpdir; force=true, recursive=true)
+    end
+end
