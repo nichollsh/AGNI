@@ -58,9 +58,9 @@ function write_test_badges()
 
     total_tests = unit_tests + integration_tests
     mkpath(BADGE_DIR)
-    write_test_badge(joinpath(BADGE_DIR, "tests-unit.json"), "unit tests", unit_tests)
-    write_test_badge(joinpath(BADGE_DIR, "tests-integration.json"), "integration tests", integration_tests)
-    write_test_badge(joinpath(BADGE_DIR, "tests-total.json"), "tests", total_tests)
+    write_test_badge(joinpath(BADGE_DIR, "tests-unit.json"), "Unit tests", unit_tests)
+    write_test_badge(joinpath(BADGE_DIR, "tests-integration.json"), "Integration tests", integration_tests)
+    write_test_badge(joinpath(BADGE_DIR, "tests-total.json"), "Tests", total_tests)
 
     @info "Wrote test badges: unit=$unit_tests integration=$integration_tests total=$total_tests"
 end
