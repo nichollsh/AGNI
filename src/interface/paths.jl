@@ -61,14 +61,29 @@ module paths
     - Bool                          true if the path is safe for removal
     """
     function is_safe_dir(path::String)::Bool
-        return !(isempty(path) ||                    # empty path
-                 ispath(joinpath(path, ".git")) ||   # contains git repo
-                 (joinpath(path) == pwd()) ||        # is current working directory
-                 samefile(path, "/") ||              # is system root directory
-                 samefile(path, homedir()) ||        # is user home directory
-                 samefile(path, paths.ROOT_DIR) ||   # is AGNI root directory
-                 samefile(path, paths.RES_DIR)       # is AGNI resources directory
-                )
+        # Do not allow empty paths
+        !isempty(path) || return false
+
+        # Normalise path for other checks...
+        path = abspath(path)
+
+        # Contains git repo
+        ispath(joinpath(path, ".git")) && return false
+
+        # Is current working directory
+        (joinpath(path) == pwd()) && return false
+
+        # Is system root directory
+        (path == "/") && return false
+
+        # Is user home directory
+        (path == homedir()) && return false
+
+        # Is AGNI root directory
+        (path == abspath(paths.ROOT_DIR)) && return false
+
+        # Is AGNI resources directory
+        (path == abspath(paths.RES_DIR)) && return false
     end
     export is_safe_dir
 
