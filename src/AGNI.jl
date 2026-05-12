@@ -173,7 +173,7 @@ module AGNI
 
         # check if this is a dangerous path
         if !paths.is_safe_dir(out_path)
-            error("Output directory is unsafe; cannot be used!")
+            error("Output directory is unsafe; cannot be used!\n       Got: $out_path")
         end
 
         # looks good

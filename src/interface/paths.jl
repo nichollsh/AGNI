@@ -4,15 +4,15 @@ module paths
     using LoggingExtras
 
     # AGNI root directory (constant)
-    const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "..", "..")
+    const ROOT_DIR::String = normpath(abspath(dirname(abspath(@__FILE__)), "..", ".."))
     export ROOT_DIR
 
     # Resources directory (constant)
-    const RES_DIR::String = joinpath(ROOT_DIR, "res")
+    const RES_DIR::String = normpath(joinpath(ROOT_DIR, "res"))
     export RES_DIR
 
     # FWL_DATA folder (fall back to RES_DIR if not set)
-    const FWL_DATA::String = joinpath(get(ENV, "FWL_DATA", RES_DIR))
+    const FWL_DATA::String = normpath(joinpath(get(ENV, "FWL_DATA", RES_DIR)))
     export FWL_DATA
 
     """
@@ -62,28 +62,30 @@ module paths
     """
     function is_safe_dir(path::String)::Bool
         # Do not allow empty paths
-        !isempty(path) || return false
+        isempty(path) && return false
 
         # Normalise path for other checks...
-        path = abspath(path)
+        path = normpath(abspath(path))
 
         # Contains git repo
         ispath(joinpath(path, ".git")) && return false
 
         # Is current working directory
-        (joinpath(path) == pwd()) && return false
+        (path == pwd()) && return false
 
         # Is system root directory
-        (path == "/") && return false
+        (path == normpath("/")) && return false
 
         # Is user home directory
         (path == homedir()) && return false
 
         # Is AGNI root directory
-        (path == abspath(paths.ROOT_DIR)) && return false
+        (path == paths.ROOT_DIR) && return false
 
         # Is AGNI resources directory
-        (path == abspath(paths.RES_DIR)) && return false
+        (path == paths.RES_DIR) && return false
+
+        return true
     end
     export is_safe_dir
 
