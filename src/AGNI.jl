@@ -584,6 +584,10 @@ module AGNI
         # Frame dir
         if plt_ani
             @debug "Will animate"
+            if !paths.is_safe_dir(atmos.FRAMES_DIR)
+                @error "Frame directory is unsafe! Got: $(atmos.FRAMES_DIR)"
+                return false
+            end
             rm(atmos.FRAMES_DIR,force=true,recursive=true)
             mkdir(atmos.FRAMES_DIR)
         end
@@ -862,6 +866,9 @@ module AGNI
         output_dir = abspath(cfg["files"]["output_dir"])
         clean_output = Bool(cfg["execution"]["clean_output"])
         if clean_output || !isdir(output_dir)
+            if !paths.is_safe_dir(output_dir)
+                error("Output directory is unsafe! Got: $output_dir")
+            end
             rm(output_dir,force=true,recursive=true)
             mkdir(output_dir)
         end

@@ -5,11 +5,11 @@
 """
 module load
 
-    import ..atmosphere
-
     using NCDatasets
     using LoggingExtras
     using Printf
+
+    import ..atmosphere
 
     """
     **Load atmosphere data from a NetCDF file.**
@@ -101,7 +101,7 @@ module load
             end
 
             # recalculate remaining layer properties
-            calc_layer_props!(atmos)
+            atmosphere.calc_layer_props!(atmos)
 
             close(ds)
 

@@ -619,7 +619,7 @@ module atmosphere
         atmos.OUT_DIR = abspath(OUT_DIR)
         if !paths.is_safe_dir(atmos.OUT_DIR)
             @error "Output directory is not safe to write to!"
-            @error "    OUT_DIR=$(atmos.OUT_DIR)"
+            @error "    Got: $(atmos.OUT_DIR)"
             return false
         end
         if !isdir(atmos.OUT_DIR) && !isfile(atmos.OUT_DIR)
@@ -1233,6 +1233,10 @@ module atmosphere
             end
 
             # re-make FC working directory
+            if !paths.is_safe_dir(atmos.fastchem_work)
+                @error "Cannot use FastChem working directory! Got: $(atmos.fastchem_work)"
+                return false
+            end
             rm(atmos.fastchem_work,force=true,recursive=true)
             mkdir(atmos.fastchem_work)
         else
@@ -1276,6 +1280,10 @@ module atmosphere
             end
 
             # re-make working directory
+            if !paths.is_safe_dir(atmos.rfm_work)
+                @error "Cannot use RFM working directory! Got: $(atmos.rfm_work)"
+                return false
+            end
             rm(atmos.rfm_work,force=true,recursive=true)
             mkdir(atmos.rfm_work)
         end
