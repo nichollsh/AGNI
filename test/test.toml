@@ -32,7 +32,7 @@ title = "Unit tests configuration"
     condensates     = ["H2O"]
 
 [execution]
-    clean_output    = true
+    clean_output    = false
     verbosity       = 1
     max_steps       = 300
     max_runtime     = 400

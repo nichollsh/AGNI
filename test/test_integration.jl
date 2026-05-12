@@ -46,7 +46,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         val_o = atmos.flux_d_sw[1]
         test_check = isapprox(val_e, val_o; atol=2)
         if !test_check
-            @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
+            @error ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
         @test test_check
 
@@ -57,7 +57,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         @info "Modelled value = $(val_o) W m-2"
         test_check = isapprox(val_e,val_o; atol=1.0e-10)
         if !test_check
-            @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
+            @error ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
         @test test_check
         atmosphere.deallocate!(atmos)
@@ -110,7 +110,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 
             test_check = isapprox(val_e, val_o; rtol=rtol)
             if !test_check
-                @warn ("Expected value = $(val_e) m \n Modelled value = $(val_o) m")
+                @error ("Expected value = $(val_e) m \n Modelled value = $(val_o) m")
             end
             @test test_check
         end
@@ -124,7 +124,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             val_o = atmos.flux_u_lw[1]
             test_check = ( val_o > val_e[1]) && (val_o < val_e[2])
             if !test_check
-                @warn ("Expected range = $(val_e) W m-2 \n Modelled value = $(val_o) W m-2")
+                @error ("Expected range = $(val_e) W m-2 \n Modelled value = $(val_o) W m-2")
             end
             @test test_check
         end
@@ -138,7 +138,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             val_o = atmos.flux_u_sw[end] # bottom level
             test_check = isapprox(val_e, val_o; rtol=1e-3)
             if !test_check
-                @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
+                @error ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
             end
             @test test_check
         end
@@ -151,12 +151,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             out_path::String = joinpath(OUT_DIR,"agni_atm.nc")
             rm(out_path, force=true)
             save.write_ncdf(atmos, out_path)
-            if isfile(out_path)
-                rm(out_path, force=true)
-                @test true
-            else
-                @test false
-            end
+            @test isfile(out_path)
+            rm(out_path, force=true)
         end
 
         # -------------
@@ -313,7 +309,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         val_o = atmos.flux_u_sw[20]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
-            @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
+            @error ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
         atmosphere.deallocate!(atmos)
         @test test_check
@@ -362,7 +358,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         val_o = atmos.heating_rate[atmos.nlev_c-10]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
-            @warn ("Expected value = $(val_e) K/day\n Modelled value = $(val_o) K/day")
+            @error ("Expected value = $(val_e) K/day\n Modelled value = $(val_o) K/day")
         end
         @test test_check
 
@@ -375,7 +371,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         val_o = atmos.flux_tot[atmos.nlev_c-10]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
-            @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
+            @error ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
         @test test_check
 
@@ -391,7 +387,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         val_o = atmos.flux_u_lw[1]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
-            @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
+            @error ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
         @test test_check
 
@@ -405,7 +401,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         val_o = atmos.flux_tot[1]
         test_check = isapprox(val_e, val_o; rtol=1e-2, atol=0.5)
         if !test_check
-            @warn ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
+            @error ("Expected value = $(val_e) W m-2\n Modelled value = $(val_o) W m-2")
         end
         @test test_check
     end
