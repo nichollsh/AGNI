@@ -1,6 +1,7 @@
 ```@raw html
     <img class="display-light-only" src="assets/logo_title_light.svg" width=32% alt="AGNI logo, light mode"/>
     <img class="display-dark-only"  src="assets/logo_title_dark.svg"  width=32% alt="AGNI logo, dark mode"/>
+
     <p align="center">
         <b>An open-source model for extreme atmospheres on rocky exoplanets</b>
     </p>
@@ -14,8 +15,8 @@ The documentation is structured following the [Diátaxis](https://diataxis.fr/) 
 
 | Section | Purpose |
 | :---: | :---|
-| [**Tutorials**](@ref "Getting started") | Step-by-step guides. Start here to install the code and run your first simulation. |
 | [**How-to guides**](@ref "How-to guides") | Task-oriented recipes for specific goals; e.g. configuration, grid runs. |
+| [**Tutorials**](@ref "Tutorials") | Step-by-step guides. Start here to install the code and run your first simulation. |
 | [**Explanation**](@ref "Model description") | Background reading on the physics, numerics, and ecosystem context. |
 | [**Reference**](@ref "Reference") | Complete code API and config-file reference for people who like details. |
 
@@ -29,4 +30,3 @@ If you use AGNI, please cite the following papers:
 * Nicholls et al. (2026)   - doi:[10.1038/s41550-026-02815-8](https://doi.org/10.1038/s41550-026-02815-8)
 
 This software is available under the GPLv3. Copyright © 2023-2026 Harrison Nicholls.
-

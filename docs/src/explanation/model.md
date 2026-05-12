@@ -4,21 +4,24 @@ AGNI models a planetary atmosphere by treating it as a single column (1D) and sp
 ## Height structure
 The atmosphere is assumed to be hydrostatically supported. The density of the gas mixture is calculated using Amagat's additive volume law to combine the densities of the components. The densities of each gas component are nominally calculated using the Van der Waals equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
 
-The height at each pressure level is obtained by integrating from the surface upwards using a fourth order Runge-Kutta method. This solves the coupled system:
+The radius at each pressure level is obtained by integrating from the surface upwards using a fourth order Runge-Kutta method. This solves the coupled system:
 ```math
-\frac{dz}{dP} = -\frac{1}{\rho g}
+\frac{dr}{dp} = -\frac{1}{\rho a}
 ```
 ```math
 \frac{dg}{dr} = -\frac{G M(r)}{r^2}
 ```
-where $z$ is height, $P$ is pressure, $\rho$ is density, $g$ is local gravitational acceleration, $r$ is radial distance from planet centre, $G$ is the gravitational constant, and $M(r)$ is the mass enclosed within radius $r$. This includes self-gravitational attraction, and makes AGNI applicable as an atmospheric structure model.
+```math
+a = g - r ( 2 \pi  \cos(\theta) / d )^2
+```
+where  $r$ is radial distance from planet centre, $p$ is pressure, $\rho$ is density, $g$ is local gravitational acceleration, $G$ is the gravitational constant, $M(r)$ is the mass enclosed within radius $r$, $\theta$ is latitude, and $d$ is the planet's axial rotation period (day length). This includes self-gravitational attraction, and makes AGNI applicable as an atmospheric structure model.
 
 ## Radiative transfer
 Radiative transfer (RT) refers to the transport of radiation energy through a medium subject to the characteristics of the medium. Radiation passing through an atmosphere is absorbed, emitted, scattered, and reflected. In the context of planetary atmospheres, we also have to handle their surfaces, cloud formation, and radiation from the host star.
 
 AGNI nominally simulates RT using a bespoke version of [SOCRATES](https://proteus-framework.org/SOCRATES/): a suite of numerical codes primarily developed by the UK Met Office. SOCRATES solves the RT equation using a two-stream solution, and is accessed here using a Julia interface. Opacity is handled using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases.
 
-The model uses k-terms fitted to spectral absorption cross-section data from [DACE](https://dace.unige.ch/opacityDatabase/?#). The MT_CKD model is used to estimate water continuum absorption cross-sections. Other continua are derived from the HITRAN tables. Rayleigh scattering, water cloud radiative properties, and aerosol parametrisations are also included. For aerosols, generates band-averaged optical properties files at runtime using `scatter_average_90`, then inserts these into the runtime spectral file using `prep_spec`, alongside the stellar spectrum and Rayleigh scattering terms. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/FormingWorlds/SOCRATES) on GitHub. The flowchart below outlines how these absorption data are converted into a 'spectral file'.
+The model uses k-terms fitted to spectral absorption cross-section data from [DACE](https://dace.unige.ch/opacityDatabase/?#). The MT\_CKD model is used to estimate water continuum absorption cross-sections. Other continua are derived from the HITRAN tables. Rayleigh scattering, water cloud radiative properties, and aerosol parametrisations are also included. For aerosols, generates band-averaged optical properties files at runtime using `scatter_average_90`, then inserts these into the runtime spectral file using `prep_spec`, alongside the stellar spectrum and Rayleigh scattering terms. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/FormingWorlds/SOCRATES) on GitHub. The flowchart below outlines how these absorption data are converted into a 'spectral file'.
 
 The monochromatic scattering properties are stored in `SOCRATES/data/aerosol/*.mon` files. New `.mon` files can be generated using the `SOCRATES/sbin/Cscatter` script, which can allow the creation of new aerosol data.
 
@@ -91,7 +94,7 @@ F_{\text{latent}}(p) = \int_0^p L_v(T) \frac{dq}{dt} dp
 ```
 where $L_v(T)$ is the temperature-dependent latent heat of vaporisation, $q$ is the mixing ratio of the condensable species, and the integral is performed from the top of atmosphere downwards. The integrated condensable heat flux is balanced by evaporation at deeper layers which closes the energy balance.
 
-Latent heats are temperature-dependent, using values derived from Coker (2007) and Wagner & Pruß ([2001](https://doi.org/10.1063/1.1461829)). Heat capacities are also temperature-dependent, using values derived from the JANAF database. See the [ThermoTools repo](https://github.com/nichollsh/ThermoTools) for scripts. This method is conceptually similar to Derras-Chouk+[2025](https://arxiv.org/abs/2508.16750).
+Latent heats are temperature-dependent, using values derived from Coker ([2007](https://doi.org/10.1016/B978-0-7506-7766-0.X5000-3)) and Wagner & Pruß ([2001](https://doi.org/10.1063/1.1461829)). Heat capacities are also temperature-dependent, using values derived from the JANAF database. See the [ThermoTools repo](https://github.com/nichollsh/ThermoTools) for scripts. This method is conceptually similar to Derras-Chouk+[2025](https://arxiv.org/abs/2508.16750).
 
 AGNI assumes that no work is done during phase changes aloft, $p dV \approx 0$, so enthalpy and latent heat become equivalent.
 

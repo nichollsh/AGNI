@@ -1,10 +1,5 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 # Contains module handling surface oceans
-
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
 
 """
 **This module handles ocean formation**
@@ -19,7 +14,10 @@ for a shelf area distribution which changes with height (i.e. sloped shelf edges
 """
 module ocean
 
+    using Logging
+
     import ..phys
+    import ..density
 
     """
     **Determine the layering structure of surface condensates**
@@ -51,7 +49,7 @@ module ocean
 
         # Get liquid densities
         liqs::Array{String, 1} = collect(keys(sigs))
-        rhos::Array{Float64,1} = Float64[ phys.liquid_rho(l) for l in liqs]
+        rhos::Array{Float64,1} = Float64[ density.liquid_rho(l) for l in liqs]
 
         # Sort liquids by decreasing density
         mask::Array{Int, 1} = reverse(sortperm(rhos))
@@ -96,6 +94,7 @@ module ocean
 
         return output
     end # end dist_surf_liq
+    export dist_surf_liq
 
     """
     **Get component of topmost ocean layer.**
@@ -109,6 +108,7 @@ module ocean
             return layers[end][2]
         end
     end
+    export get_topliq
 
     """
     **Get ocean depth [m] at deepest point of ocean**
@@ -121,6 +121,7 @@ module ocean
             return sum([la[3]+la[4] for la in layers])
         end
     end
+    export get_maxdepth
 
     """
     **Get area-fraction of the planet that is covered by oceans.**
@@ -146,5 +147,6 @@ module ocean
             end
         end
     end
+    export get_areacov
 
 end

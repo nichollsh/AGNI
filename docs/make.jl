@@ -16,13 +16,8 @@ makedocs(
     pages = [
         "Home" => "index.md",
 
-        PageNode("Tutorials" => "tutorials/index.md", [
-            "Getting started"  => "tutorials/getting_started.md",
-            "Example outputs"  => "tutorials/examples.md",
-            ]
-        ),
-
         PageNode("How-to guides" => "howto/index.md", [
+            "Getting started"  => "howto/getting_started.md",
             "Obtaining input data"        => "howto/data.md",
             "Configuring AGNI"            => "howto/configure.md",
             "Using FastChem"              => "howto/fastchem.md",
@@ -32,6 +27,11 @@ makedocs(
             "Troubleshooting"             => "howto/troubleshoot.md",
             "Contributing to AGNI"        => "howto/contribute.md",
             ],
+        ),
+
+        PageNode("Tutorials" => "tutorials/index.md", [
+            "Example outputs"  => "tutorials/index.md",
+            ]
         ),
 
         PageNode("Explanation" => "explanation/index.md", [

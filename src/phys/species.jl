@@ -1,37 +1,39 @@
-# Contains physical data
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
+"""
+**Module for handling gas/vapour species data and properties.**
 
-module phys
+Defines the `Gas_t` struct, which contains all relevant data for a single
+species, and functions to load this data from files and evaluate properties such as
+saturation pressure, heat capacity, and thermal conductivity.
 
-    # Import external modules
+Note that 'gas' here refers to any vapour species, including super-critical phases.
+"""
+module species
+
+    # Import packages
     using NCDatasets
     using LoggingExtras
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
 
-    # Import internal modules
-    include("blake.jl")
-    import .blake
+    # Import local modules
     using ..consts
-
-    # A large floating point number
-    const BIGFLOAT::Float64     = 1e99
-    const BIGLOGFLOAT::Float64  = 99.0
+    using ..formulae
+    import ..blake: valid_file
+    import ..style: pretty_colour, pretty_name
 
     # Minimum data file version [YYYYMMDD, as integer]
     const MIN_DATA_VERSION::Int64 = 20260201
+
+    # Enumerate potential equations of state
+    @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3 EOS_CMS19=4
+    export EOS, EOS_IDEAL, EOS_VDW, EOS_AQUA, EOS_CMS19
+
 
     # Enable/disable flags
     ENABLE_CHECKSUM::Bool = true  # can still be disabled when function is called
     ENABLE_AQUA::Bool     = true
     ENABLE_CMS19::Bool    = true
-
-    # Enumerate potential equations of state
-    @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3 EOS_CMS19=4
 
     # Structure containing data for a single gas
     mutable struct Gas_t
@@ -55,7 +57,7 @@ module phys
         prs_max::Float64
 
         # Constituent atoms (dictionary of numbers)
-        atoms::Dict{String, Int}
+        atoms::Dict{String, Int64}
 
         # Mean molecular weight [kg mol-1]
         mmw::Float64
@@ -101,9 +103,20 @@ module phys
 
         Gas_t() = new()
     end # end gas struct
+    export Gas_t
 
     """
-    Load gas data into a new struct
+    **Load gas data into a new struct.**
+
+    Arguments:
+    - `thermo_dir::String`      directory containing thermodynamic data files
+    - `formula::String`         molecular formula of the gas (e.g. "H2O")
+    - `tmp_dep::Bool`           enable temperature-dependent thermodynamic evaluations?
+    - `real_gas::Bool`          use a real-gas EOS if available
+    - `check_integrity::Bool`   check the integrity of the data file
+
+    Returns:
+    - `gas::Gas_t`              struct containing gas data
     """
     function load_gas(thermo_dir::String, formula::String,
                             tmp_dep::Bool, real_gas::Bool;
@@ -125,19 +138,21 @@ module phys
         gas.atoms = count_atoms(formula)
         for e in keys(gas.atoms)
             if !(e in elems_standard)
-                error("Gas '$formula' contains unsupported element '$e'")
+                @error "Gas '$formula' contains unsupported element '$e'"
+                gas.fail = true
+                return gas
             end
         end
 
         # Set plotting color and label
-        gas.plot_color = _pretty_color(formula)
-        gas.plot_label = _pretty_name(formula)
+        gas.plot_color = pretty_colour(formula)
+        gas.plot_label = pretty_name(formula)
 
         # Fastchem name (to be learned later)
         gas.fastchem_name = "_unknown"
 
         # Default parameters, assuming we have no data...
-        gas.mmw = _get_mmw(formula)
+        gas.mmw = get_mmw(formula)
         gas.JANAF_name = "_unknown"
 
         # Calculate particle mass [kg], taking mmw as atomic mass units
@@ -175,7 +190,7 @@ module phys
             # no data
             @debug("    stub")
 
-        elseif ENABLE_CHECKSUM && check_integrity && !blake.valid_file(fpath)
+        elseif ENABLE_CHECKSUM && check_integrity && !valid_file(fpath)
             # file exists - check its integrity
             @warn("    ncdf file is corrupt: '$fpath'")
             gas.fail = true
@@ -336,173 +351,7 @@ module phys
         @debug("    done")
         return gas
     end # end load_gas
-
-
-    """
-    Get number of atoms from formula, returning a dictionary
-    """
-    function count_atoms(molec::String)::Dict{String,Int}
-
-        # Pre-defined molecules
-        if haskey(_lookup_count_atoms, molec)
-            return _lookup_count_atoms[molec]
-        end
-
-        # Remove unsafe chars
-        m = String(molec)
-        for c in ['(',')','[',']','{','}','-','+',' ']
-            m = replace(m, c => "")
-        end
-
-        # Setup
-        out::Dict{String,Int} = Dict{String,Int}()
-        nchar::Int = length(m)
-        i::Int = 1
-        elem::String = ""
-        count::Int=-1
-        last::Bool=false
-
-        # Loop through string
-        while i <= nchar
-            last = (i == nchar)
-
-            # new element
-            if isuppercase(m[i])
-                count = 0
-                elem = string(m[i])
-                if !last && islowercase(m[i+1])  # two letter element name
-                    elem = elem*string(m[i+1])
-                    i += 1
-                end
-            end
-
-            last = (i == nchar)
-
-            # get count
-            if count == 0   # expecting number
-                # number of atoms
-                if last || isletter(m[i+1]) # got letter => count=1
-                    count = 1
-                else
-                    count = parse(Int, m[i+1])
-                end
-                # repeated element
-                if elem in keys(out)
-                    out[elem] += count
-                else
-                    out[elem] = count
-                end
-                # reset
-                elem = ""
-                count = -1
-            end
-            i += 1
-        end
-
-        return out
-    end
-
-    """
-    Check if two gas atom dicts are equivalent
-    """
-    function same_atoms(d1::Dict, d2::Dict)::Bool
-
-        # check if have same atoms at all
-        for k in keys(d1)
-            if !(k in keys(d2))
-                return false
-            end
-        end
-
-        # ^^ reverse combination
-        for k in keys(d2)
-            if !(k in keys(d1))
-                return false
-            end
-        end
-
-        # check counts
-        for k in keys(d1)
-            if d1[k] != d2[k]
-                return false
-            end
-        end
-
-        # if we haven't returned false so far, then it must be true
-        return true
-    end
-
-    """
-    Calculate species mean molecular weight [kg mol-1] from formula or use known value
-    """
-    function _get_mmw(m::String)::Float64
-
-        # already defined?
-        if m in keys(consts._lookup_mmw)
-           return consts._lookup_mmw[m]
-        end
-
-        # get atoms
-        atoms::Dict{String, Int} = count_atoms(m)
-
-        # add up atoms
-        mmw::Float64 = 0.0
-        for k in keys(atoms)
-            mmw += consts._lookup_mmw[k]*atoms[k]
-        end
-
-        return mmw
-    end
-
-    """
-    Convert formula to pretty unicode string
-    """
-    function _pretty_name(gas::String)::String
-        out::String = ""
-        for c in gas
-            if isnumeric(c)
-                d = parse(Int, c)
-                out *= Char(parse(Int,"208$d", base=16))
-            else
-                out *= c
-            end
-        end
-        return out
-    end
-
-    """
-    Generate a colour hex code from a molecular formula
-    """
-    function _pretty_color(gas::String)::String
-        # Defined
-        if gas in keys(consts._lookup_color)
-            return consts._lookup_color[gas]
-        end
-
-        # Else, generate colour from atoms
-        atoms = count_atoms(gas)
-        r::Float64 = 0.0
-        g::Float64 = 0.0
-        b::Float64 = 0.0
-        for e in keys(atoms)
-            r += parse(Int,consts._lookup_color[e][2:3],base=16)*atoms[e]
-            g += parse(Int,consts._lookup_color[e][4:5],base=16)*atoms[e]
-            b += parse(Int,consts._lookup_color[e][6:7],base=16)*atoms[e]
-        end
-        m::Float64 = max(r,g,b)
-
-        # prevents the colour getting too close to white
-        if r+g+b > 705
-            m *= 255.0/235.0
-        end
-
-        # convert to hex code
-        out::String = "#"
-        out *= string(floor(Int,255 * r/m),base=16,pad=2)
-        out *= string(floor(Int,255 * g/m),base=16,pad=2)
-        out *= string(floor(Int,255 * b/m),base=16,pad=2)
-        return out
-    end
+    export load_gas
 
     """
     **Get gas saturation pressure for a given temperature.**
@@ -536,6 +385,7 @@ module phys
         # Get value from interpolator
         return 10.0 ^ gas.sat_I(t)
     end
+    export get_Psat
 
     """
     **Get gas dew point temperature for a given partial pressure.**
@@ -560,9 +410,10 @@ module phys
         p = log10(p)
 
         # Find closest value in array
-        i::Int = argmin(abs.(gas.sat_P .- p))
+        i::Int64 = argmin(abs.(gas.sat_P .- p))
         return min(gas.sat_T[i], gas.T_crit)
     end
+    export get_Tdew
 
     """
     **Check if pressure-temperature coordinate is within the vapour regime.**
@@ -592,6 +443,7 @@ module phys
         # Saturated by pressure? (with offset to account for transition)
         return Bool(p > 10.0 ^ gas.sat_I(t+0.2))
     end
+    export is_vapour
 
     """
     **Get gas enthalpy (latent heat) of phase change.**
@@ -626,6 +478,7 @@ module phys
         # Get value from interpolator
         return gas.lat_I(t)
     end
+    export get_Lv
 
     """
     **Get gas heat capacity for a given temperature.**
@@ -657,14 +510,23 @@ module phys
         # Get value from interpolator
         return gas.cap_I(t)
     end
-
-    # Constant prefactor used in `get_Kc`
-    const kc_prefactor::Float64 = 2.0 * (5 * k_B / 2) / (3 * pi^1.5)
+    export get_Cp
 
     """
     **Get gas thermal conductivity at a given temperature.**
 
-    This assumes that the gas is within the ideal regime.
+    This assumes that the gas is within the ideal regime. An accurate accounting of
+    inter-particle effects is important here, and depends on the size of the particles,
+    their repulsion/attraction terms, and the number of atoms per molecule. This formulation
+    does a fairly good job while remaining simple, and gets the right order of magnitude
+    of kc for a range of gases.
+
+    Chapman-Enskog theory of transport properties of gases, can account for inter-particle
+    effects via the collision integral 'omega'. Here, we set `omega=1`.
+
+    - https://en.wikipedia.org/wiki/Thermal_conductivity_and_resistivity
+    - https://books.google.co.uk/books?id=Cbp5JP2OTrwC (page 164 ish)
+    - https://doi.org/10.1063/5.0244532
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -683,80 +545,20 @@ module phys
         # Temperature floor to avoid sqrt of negative number
         t = max(t, 0.0)
 
-        # Equation 5.255 from
-        #     https://farside.ph.utexas.edu/teaching/355/Surveyhtml/node221.html
-        return kc_prefactor * sqrt(k_B * t / gas.particle_m) / gas.particle_d^2
+        # Inter-particle effects are important, and complicated...
+        #  An evaluation of collision integral 'omega' must be done numerically.
+        kc_omega::Float64 = 1.0
+
+        # Start with prefactor which accounts for inter-particle effects via omega
+        kc_gas::Float64 = 25.0 / (32.0 * pi * kc_omega)
+
+        # Add boltzmann terms
+        kc_gas *= sqrt(pi * gas.particle_m * k_B * t) * get_Cp(gas,t) / gas.particle_d^2
+
+        # Estimate for kc
+        return kc_gas
     end
-
-    """
-    **Calculate the density of a mixture of gases using Amagat's law.**
-
-    Arguments:
-    - `gas::Array{Gas_t,1}`     array of gases
-    - `vmr::Array{Float64,1}`   array of volume mixing ratios
-    - `tmp::Float64`            temperature [K]
-    - `prs::Float64`            pressure [Pa]
-
-    Returns:
-    - `rho::Float64`            mass density [kg m-3]
-    """
-    function calc_rho_mix(gas::Array{Gas_t,1}, vmr::Array{Float64,1},
-                            tmp::Float64, prs::Float64, mmw::Float64)::Float64
-
-        ngas::Int = length(gas)
-
-        # single gas case
-        if ngas == 1
-            return calc_rho_gas(tmp, prs, gas[1])
-        end
-
-        # calculate the density (and mass-mixing ratio) of each gas
-        rho::Array{Float64, 1} = zeros(Float64, ngas)
-        mmr::Array{Float64, 1} = zeros(Float64, ngas)
-        for i in 1:ngas
-            rho[i] = calc_rho_gas(tmp, prs, gas[i])
-            mmr[i] = vmr[i] * gas[i].mmw / mmw
-        end
-
-        # add them together, assuming ideal additive volumes (inverse density)
-        return 1.0 / sum(mmr[:] ./ rho[:])
-    end
-
-    """
-    **Calculate the density of a gas using the most appropriate equation of state.**
-
-    Arguments:
-    - `tmp::Float64`        temperature [K]
-    - `prs::Float64`        pressure [Pa]
-    - `gas::Gas_t`          the gas struct to be used
-
-    Returns:
-    - `rho::Float64`        mass density [kg m-3]
-    """
-    function calc_rho_gas(tmp::Float64, prs::Float64, gas::Gas_t)::Float64
-        if (gas.eos == EOS_IDEAL) || !is_vapour(gas, tmp, prs)
-            # analytical form of ideal gas equation of state
-            return _rho_ideal(tmp, prs, gas.mmw)
-        else
-            # otherwise, will use tabulated real-gas EOS to evaluate the density
-            return gas.eos_I(tmp, log10(prs))
-        end
-    end
-
-    """
-    **Evaluate the density of a single gas using the ideal gas EOS.**
-
-    Arguments:
-    - `tmp::Float64`        temperature [K]
-    - `prs::Float64`        pressure [Pa]
-    - `mmw::Float64`        mean molecular weight [kg mol-1]
-
-    Returns:
-    - `rho::Float64`        mass density [kg m-3]
-    """
-    function _rho_ideal(tmp::Float64, prs::Float64, mmw::Float64)::Float64
-        return prs * mmw / (tmp * R_gas)
-    end
+    export get_Kc
 
 
     """
@@ -812,121 +614,7 @@ module phys
             return -1.0 * BIGFLOAT # always above this temperature
         end
     end
+    export get_Tdemix
 
-    """
-    **Evaluate the Planck function at a given wavelength and temperature.**
 
-    Integrated over a hemisphere.
-
-    Arguments:
-    - `wave::Float64`       Wavelength [nm]
-    - `tmp::Float64`        Temperature [K]
-
-    Returns:
-    - `flx::Float64`        Spectral flux density [W m-2 nm-1]
-    """
-    function evaluate_planck(wav::Float64, tmp::Float64)::Float64
-
-        # Output value
-        flx::Float64 = 0.0
-
-        # Convert nm to m
-        wav = wav * 1.0e-9
-
-        # Optimisation variables
-        wav5::Float64 = wav*wav*wav*wav*wav
-        hc::Float64   = h_pl * c_vac
-
-        # Calculate planck function value [W m-2 sr-1 m-1]
-        # http://spiff.rit.edu/classes/phys317/lectures/planck.html
-        flx = 2.0 * hc * (c_vac / wav5) / ( exp(hc / (wav * k_B * tmp)) - 1.0)
-
-        # Integrate solid angle (hemisphere), convert units
-        flx = flx * pi * 1.0e-9 # [W m-2 nm-1]
-
-        return flx
-    end
-
-    """
-    **Calculate gravitational acceleration.**
-
-    Arguments:
-    - `mass::Float64`       Enclosed mass [kg]
-    - `radius::Float64`     Enclosed radius [m]
-
-    Returns:
-    - `grav::Float64`       Gravitational acceleration [m s-2]
-    """
-    function grav_accel(mass::Float64, radius::Float64)::Float64
-        return G_grav * mass / (radius * radius)
-    end
-
-    """
-    **Evaluate the density of a liquid phase.**
-
-    Returns BIGFLOAT density for unsupported phases, to avoid divide-by-zero error
-
-    Arguments:
-    - `name::String`    Name of liquid
-
-    Returns:
-    - `rho::Float64`    Density of liquid phase [kg m-3]
-    """
-    function liquid_rho(name::String)::Float64
-        if name in keys(consts._lookup_liquid_rho)
-            return consts._lookup_liquid_rho[name]
-        else
-            return BIGFLOAT
-        end
-    end
-
-    """
-    **Calculate thermal diffusivity.**
-
-    https://en.wikipedia.org/wiki/Thermal_diffusivity?useskin=vector
-
-    Arguments:
-    - `k::Float64`       Thermal conductivity [W m-1 K-1]
-    - `ρ::Float64`       Density [kg m-3]
-    - `cp::Float64`      Specific heat capacity [J K-1 kg-1]
-
-    Returns:
-    - `α::Float64`       Thermal diffusivity [m2 s-1]
-    """
-    function calc_therm_diffus(k::Float64, ρ::Float64, cp::Float64)::Float64
-        return k / (ρ * cp)
-    end
-
-    """
-    **Calculate planetary equilibrium temperature.**
-
-    https://en.wikipedia.org/wiki/Planetary_equilibrium_temperature?useskin=vector
-
-    Arguments:
-    - `S::Float64`       Bolometric instellation [W m-2]
-    - `α::Float64`       Bond albedo
-
-    Returns:
-    - `Teq::Float64`     Planetary equilibrium temperature [K]
-    """
-    function calc_Teq(S::Float64, α::Float64)::Float64
-        return (S*(1-α)/(4*consts.σSB))^0.25
-    end
-
-    """
-    **Calculate planetary *skin* temperature.**
-
-    https://en.wikipedia.org/wiki/Skin_temperature_(atmosphere)?useskin=vector
-
-    Arguments:
-    - `S::Float64`       Bolometric instellation [W m-2]
-    - `α::Float64`       Bond albedo
-
-    Returns:
-    - `Tskin::Float64`   Planetary skin temperature [K]
-    """
-    function calc_Tskin(S::Float64, α::Float64)::Float64
-        return calc_Teq(S, α) * (0.5^0.25)
-    end
-
-end # end module
+end

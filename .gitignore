@@ -57,6 +57,9 @@ nogit*
 .venv
 .conda
 .ipynb_checkpoints
+zenodo.org
+zenodo.org/
+.github/badges/
 
 # RFM
 rfm

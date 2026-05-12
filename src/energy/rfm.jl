@@ -1,11 +1,13 @@
-# Contains module and functions for performing radiative transfer with RFM
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
 
+"""
+**Module and functions for performing radiative transfer with RFM**
+
+The RFM (Reference Forward Model) is a line-by-line radiative transfer code developed
+by Anu Dudhia at Oxford. This module contains writies the required input files, runs it,
+and parses the output to update the radiative fluxes in AGNI for post-processing.
+"""
 module rfm
 
     # Import modules
@@ -48,8 +50,8 @@ module rfm
         z_arr::Array{Float64} = reverse(atmos.rl .- atmos.rl[end]) / 1e3 # km
 
         # file counters
-        ir::Int = 0
-        nr::Int = 5
+        ir::Int64 = 0
+        nr::Int64 = 5
 
         # header
         outstr::String =  ""
@@ -275,7 +277,7 @@ module rfm
         datastr::String = ""   # ASCII, full flux data
         open(outpath,"r") do f
             # loop through lines
-            idx::Int = -1
+            idx::Int64 = -1
             linestr::String = ""   # string containing content from line
             while !eof(f)
                 # read next line

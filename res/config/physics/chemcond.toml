@@ -27,7 +27,7 @@ title = "Chemistry and condensation together"
 [composition]
     p_surf          = 7000.0
     p_top           = 1e-4
-    vmr_dict        = { H2O=0.5, CO2=0.35, CH4=0.1, N2=0.05}
+    vmr_dict        = { H2O=0.3, CO2=0.55, CH4=0.1, N2=0.05}
     condensates     = ["H2O"]
 
 [execution]
@@ -51,7 +51,7 @@ title = "Chemistry and condensation together"
     chemistry       = true
     continua        = true
     rayleigh        = true
-    cloud           = false
+    cloud           = true
     overlap_method  = "ee"
     real_gas        = false
     thermo_funct    = true

@@ -1,19 +1,15 @@
-# Contains functions for setting-up the temperature profile analytically
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
+"""
+**Contains functions for setting-up the temperature profile analytically**
+"""
 module setpt
 
     import ..phys
+    import ..species
     import ..atmosphere
     import ..chemistry
-
-    include("guillot.jl")
-    import .guillot
+    import ..guillot
 
     using NCDatasets
     using Printf
@@ -26,13 +22,14 @@ module setpt
     Converts string keywords (`"teq"`, `"tsurf"`) or numeric values to Float64 temperature.
 
     Arguments:
-    - `atmos::Atmos_t`      atmosphere struct instance.
-    - `tmp`                 temperature specification (keyword string, numeric string, or number).
+    - `atmos::Atmos_t`              atmosphere struct instance.
+    - `tmp::Union{String, Number}`  temperature (keyword string, numeric string, or number).
 
     Returns:
-    - `Float64`             parsed temperature [K].
+    - `Union{Float64, Nothing}` temperature [K], or `nothing` if invalid input.
     """
-    function _parse_tmp_str(atmos::atmosphere.Atmos_t, tmp)::Float64
+    function _parse_tmp_str(atmos::atmosphere.Atmos_t,
+                                tmp::Union{String, Number})::Union{Float64, Nothing}
 
         if tmp isa String
             if lowercase(tmp) == "teq"
@@ -40,13 +37,34 @@ module setpt
             elseif lowercase(tmp) == "tsurf"
                 return atmos.tmp_surf
             else
-                return parse(Float64, tmp)
+                return tryparse(Float64, tmp)
             end
         elseif tmp isa Number
             return Float64(tmp)
         else
-            error("Invalid temperature choice '$(tmp)'")
+            @warn "Invalid temperature choice '$(tmp)'"
+            return nothing
         end
+    end
+
+    """
+    **Parse required argument from request list.**
+
+    Arguments:
+    - `request::Array`      list of request commands and parameters.
+    - `idx::Int64`          index of the required argument to retrieve.
+
+    Returns:
+    - `Union{String,Number}`                    the required argument at the specified index
+    """
+    function _verb_arg(request::Array, idx::Int)::Union{String,Number}
+        if idx > length(request)
+            @warn "Request for initial T(p) structure badly formatted"
+            @warn "    Got: $(request)"
+            @warn "    Check that all verbs have required parameters (e.g: \"iso\", \"300\")"
+            return atmosphere.UNSET_STR # to intentionally trigger an error
+        end
+        return request[idx]
     end
 
     """
@@ -83,8 +101,8 @@ module setpt
 
         succ::Bool = true
 
-        num_req::Int = length(request)          # Number of requests
-        idx_req::Int = 1                        # Index of current request
+        num_req::Int64 = length(request)          # Number of requests
+        idx_req::Int64 = 1                        # Index of current request
         str_req::String = atmosphere.UNSET_STR  # String of current request
         prt_req::String = "Setting T(p): "
         while idx_req <= num_req
@@ -100,32 +118,32 @@ module setpt
             elseif str_req == "str"
                 # isothermal stratosphere
                 idx_req += 1
-                succ &= setpt.stratosphere!(atmos, request[idx_req])
+                succ &= setpt.stratosphere!(atmos, _verb_arg(request, idx_req))
 
             elseif str_req == "loglin"
                 # log-linear profile between T_surf and T_top
                 idx_req += 1
-                succ &= setpt.loglinear!(atmos, request[idx_req])
+                succ &= setpt.loglinear!(atmos, _verb_arg(request, idx_req))
 
             elseif str_req == "iso"
                 # isothermal profile
                 idx_req += 1
-                succ &= setpt.isothermal!(atmos, request[idx_req])
+                succ &= setpt.isothermal!(atmos, _verb_arg(request, idx_req))
 
             elseif str_req == "csv"
                 # set from csv file
                 idx_req += 1
-                succ &= setpt.fromcsv!(atmos,request[idx_req])
+                succ &= setpt.fromcsv!(atmos,_verb_arg(request, idx_req))
 
             elseif str_req == "ncdf"
                 # set from NetCDF file
                 idx_req += 1
-                succ &= setpt.fromncdf!(atmos,request[idx_req])
+                succ &= setpt.fromncdf!(atmos,_verb_arg(request, idx_req))
 
             elseif str_req == "add"
                 # add X kelvin from the currently stored T(p)
                 idx_req += 1
-                succ &= setpt.add!(atmos,request[idx_req])
+                succ &= setpt.add!(atmos,_verb_arg(request, idx_req))
 
             elseif str_req == "surfsat"
                 # ensure surface is not super-saturated
@@ -135,7 +153,7 @@ module setpt
             elseif str_req == "sat"
                 # condensing a volatile
                 idx_req += 1
-                succ &= setpt.saturation!(atmos, request[idx_req])
+                succ &= setpt.saturation!(atmos, _verb_arg(request, idx_req))
 
             elseif str_req == "ana"
                 # analytic solution
@@ -145,7 +163,10 @@ module setpt
                 return false
             end
 
-            succ &= atmosphere.calc_layer_props!(atmos)
+            # Calculate height (etc) but don't error if it fails, yet
+            if !atmosphere.calc_layer_props!(atmos)
+                @warn "Initial T(p) structure may be unbound"
+            end
 
             # iterate
             idx_req += 1
@@ -337,8 +358,8 @@ module setpt
             ds = Dataset(fpath,"r")
 
             # Allocate interleaved temperature profile
-            nlev_c::Int = length(ds["p"][:])
-            arr_n::Int = nlev_c + nlev_c + 1
+            nlev_c::Int64 = length(ds["p"][:])
+            arr_n::Int64 = nlev_c + nlev_c + 1
             arr_T::Array{Float64, 1} = zeros(Float64, arr_n)
             arr_P::Array{Float64, 1} = zeros(Float64, arr_n)
 
@@ -347,7 +368,7 @@ module setpt
             arr_P[1] = ds["pl"][1]
 
             # middle
-            idx::Int = 0
+            idx::Int64 = 0
             for i in 1:nlev_c
                 idx = (i-1)*2
                 arr_T[idx+1] = ds["tmpl"][i]
@@ -406,6 +427,7 @@ module setpt
 
 
         set_tmp = _parse_tmp_str(atmos, set_tmp)
+        isnothing(set_tmp) && (return false)
 
         fill!(atmos.tmpl, set_tmp)
         fill!(atmos.tmp , set_tmp)
@@ -432,6 +454,7 @@ module setpt
         end
 
         delta = _parse_tmp_str(atmos, delta)
+        isnothing(delta) && (return false)
 
         @. atmos.tmpl += delta
         @. atmos.tmp  += delta
@@ -509,6 +532,8 @@ module setpt
     """
     function stratosphere!(atmos::atmosphere.Atmos_t, strat_tmp)::Bool
         strat_tmp = _parse_tmp_str(atmos, strat_tmp)
+        isnothing(strat_tmp) && (return false)
+
         clamp!(atmos.tmp,  strat_tmp, atmos.tmp_ceiling)
         clamp!(atmos.tmpl, strat_tmp, atmos.tmp_ceiling)
         return true
@@ -535,6 +560,7 @@ module setpt
         end
 
         top_tmp = _parse_tmp_str(atmos, top_tmp)
+        isnothing(top_tmp) && (return false)
 
         # Keep top_tmp below tmp_surf value
         top_tmp = min(top_tmp, atmos.tmp_surf)
@@ -597,7 +623,7 @@ module setpt
             end
 
             # Otherwise...
-            Tdew = phys.get_Tdew(atmos.gas_dat[gas], pgas)
+            Tdew = species.get_Tdew(atmos.gas_dat[gas], pgas)
             if tmp <= Tdew + dTdew
                 return (Tdew - dTdew, true)
             else

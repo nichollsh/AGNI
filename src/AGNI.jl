@@ -1,3 +1,4 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 # Core file containing functions for running the model
 
 # Not for direct execution
@@ -13,53 +14,30 @@ module AGNI
     using Printf
     import TOML:parsefile
 
-    # Include local jl files (order matters)
-    include("consts.jl")
-    include("phys.jl")
-    include("spectrum.jl")
-    include("atmosphere.jl")
-    include("ocean.jl")
-    include("chemistry.jl")
-    include("rfm.jl")
-    include("setpt.jl")
-    include("save.jl")
-    include("plotting.jl")
-    include("energy.jl")
-    include("solver.jl")
-    include("load.jl")
-
-
-    # Import submodules
-    import .consts
-    import .phys
-    import .spectrum
-    import .atmosphere
-    import .setpt
-    import .save
-    import .plotting
-    import .energy
-    import .solver
-    import .ocean
-    import .chemistry
-    import .rfm
-    import .load
-
-    # Export submodules (mostly for autodoc purposes)
-    export consts
-    export phys
-    export spectrum
-    export atmosphere
-    export setpt
-    export save
-    export load
-    export plotting
-    export energy
-    export ocean
-    export chemistry
-    export rfm
-    export solver
-
-    const ROOT_DIR::String = abspath(dirname(abspath(@__FILE__)), "../")
+    # Include local jl files (submodule load-ordering matters here)
+    include("util/blake.jl"); import .blake; export blake
+    include("interface/paths.jl"); import .paths; export paths
+    include("phys/consts.jl"); import .consts; export consts
+    include("phys/formulae.jl"); import .formulae; export formulae
+    include("util/style.jl"); import .style; export style
+    include("phys/species.jl"); import .species; export species
+    include("phys/density.jl"); import .density; export density
+    include("phys/phys.jl"); import .phys; export phys
+    include("phys/guillot.jl"); import .guillot; export guillot
+    include("energy/spectrum.jl"); import .spectrum; export spectrum
+    include("state/atmosphere.jl"); import .atmosphere; export atmosphere
+    include("state/diagnostics.jl"); import .diagnostics; export diagnostics
+    include("compose/ocean.jl"); import .ocean; export ocean
+    include("compose/fastchem.jl"); import .fastchem; export fastchem
+    include("compose/chemistry.jl"); import .chemistry; export chemistry
+    include("energy/rfm.jl"); import .rfm; export rfm
+    include("interface/setpt.jl"); import .setpt; export setpt
+    include("interface/save.jl"); import .save; export save
+    include("interface/load.jl"); import .load; export load
+    include("energy/energy.jl"); import .energy; export energy
+    include("state/multicol.jl"); import .multicol; export multicol
+    include("interface/plotting.jl"); import .plotting; export plotting
+    include("solver/solver.jl"); import .solver; export solver
 
     """
     **Create a logger object and return it**
@@ -76,7 +54,7 @@ module AGNI
     function make_logger(outpath::String; to_term::Bool=true)
 
         # Formatting
-        color::Int = 39
+        color::Int64 = 39
         level::String = "UNSET"
         term_io::IO = stdout
 
@@ -144,9 +122,9 @@ module AGNI
 
     Arguments:
     - `outpath::String`     output file (empty to disable file logging)
-    - `verbosity::Int`      verbosity (0: silent, 1: normal, 2: debug)
+    - `verbosity::Int64`    verbosity (0: silent, 1: normal, 2: debug)
     """
-    function setup_logging(outpath::String, verbosity::Int)
+    function setup_logging(outpath::String, verbosity::Int64)
 
         # If silent
         if verbosity==0
@@ -195,8 +173,8 @@ module AGNI
         out_path = abspath(cfg_dict["files"]["output_dir"])
 
         # check if this is a dangerous path
-        if ispath(joinpath(out_path, ".git")) || (joinpath(out_path) == pwd()) || samefile(out_path, ROOT_DIR)
-            error("Output directory is unsafe")
+        if !paths.is_safe_dir(out_path)
+            error("Output directory is unsafe; cannot be used!\n       Got: $out_path")
         end
 
         # looks good
@@ -234,6 +212,10 @@ module AGNI
             end
         end
 
+        # Output folder
+        output_dir = abspath(cfg["files"]["output_dir"])
+        @debug "Output directory: $output_dir"
+
         #    planet structure
         radius::Float64        = cfg["planet"]["radius"]
         gravity::Float64       = 0.0
@@ -252,6 +234,7 @@ module AGNI
             gravity = phys.grav_accel(mass, radius)
         end
 
+        # surface reflectance properties
         albedo_s::Float64      = 0.0
         surface_mat::String    = cfg["planet"]["surface_material"]
         if surface_mat == "greybody"
@@ -310,7 +293,7 @@ module AGNI
                 demixing = Bool(cfg["physics"]["demixing"])
             end
 
-            comp_set_by::Int = 0
+            comp_set_by::Int64 = 0
 
             # composition set by VMRs and Psurf
             if haskey(cfg["composition"],"p_surf")
@@ -367,6 +350,7 @@ module AGNI
 
                 if haskey(cfg["composition"], "vmr_file") || haskey(cfg["composition"], "vmr_dict")
                     @error "Config: cannot provide partial pressures and mixing ratios"
+                    return false
                 end
 
             # most provide either VMR or partial pressures, if not transparent
@@ -397,7 +381,7 @@ module AGNI
         end
 
         #    RFM radtrans
-        rfm_parfile::String = atmosphere.UNSET_STR
+        rfm_parfile::String = consts.UNSET_STR
         rfm_wn_min::Float64 = atmosphere.CFG_rfm_wn_min
         rfm_wn_max::Float64 = atmosphere.CFG_rfm_wn_max
         if haskey(cfg["files"],"rfm_parfile")
@@ -415,7 +399,8 @@ module AGNI
         #    double grey radtrans opacities
         κ_grey_lw::Float64 = atmosphere.CFG_κ_grey_lw  # this will be over-written
         κ_grey_sw::Float64 = atmosphere.CFG_κ_grey_sw  # ^
-        if (lowercase(cfg["files"]["input_sf"]) == "greygas") || cfg["execution"]["grey_start"]
+        just_greygas::Bool = (lowercase(cfg["files"]["input_sf"]) == "greygas")
+        if just_greygas || cfg["execution"]["grey_start"]
             if all(k in keys(cfg["physics"]) for k in ["grey_sw","grey_lw"])
                 κ_grey_lw = Float64(cfg["physics"]["grey_lw"])
                 κ_grey_sw = Float64(cfg["physics"]["grey_sw"])
@@ -441,19 +426,30 @@ module AGNI
         incl_conduct::Bool     = cfg["physics"]["conduction"]
         incl_sens::Bool        = cfg["physics"]["sensible_heat"]
         incl_latent::Bool      = cfg["physics"]["latent_heat"]
-        sol_type::Int          = cfg["execution"]["solution_type"]
-        perturb_all::Bool      = cfg["execution"]["perturb_all"]
+        sol_type::Int64        = cfg["execution"]["solution_type"]
         conv_atol::Float64     = cfg["execution"]["converge_atol"]
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
-        conv_type::Int         = 1
+        conv_type::Int64       = 1
         if haskey(cfg["execution"],"converge_type")
-            conv_type = Int(cfg["execution"]["converge_type"])
+            conv_type = Int64(cfg["execution"]["converge_type"])
         end
 
         #    plotting stuff
-        plt_tmp::Bool          = cfg["plots"]["temperature"]
-        plt_ani::Bool          = cfg["plots"]["animate"]
-        plt_ani = plt_ani && plt_tmp
+        plt_EXT::String        = lowercase(get(cfg["plots"], "extension", "png"))
+        plt_glo::Bool          = get(cfg["plots"], "globe", false)
+        plt_tmp::Bool          = get(cfg["plots"], "temperature", false)
+        plt_ani::Bool          = get(cfg["plots"], "animate", false) && plt_tmp
+        plt_flx::Bool          = get(cfg["plots"], "fluxes", false)
+        plt_vmr::Bool          = get(cfg["plots"], "mixing_ratios", false) && !transparent
+        plt_hgt::Bool          = get(cfg["plots"], "height", false) && !transparent
+        plt_emt::Bool          = get(cfg["plots"], "emission", false) && !just_greygas
+        plt_alb::Bool          = get(cfg["plots"], "albedo", false) && !just_greygas
+        plt_cld::Bool          = get(cfg["plots"], "cloud", false) && !transparent && !just_greygas
+        plt_cff::Bool          = get(cfg["plots"], "contribution", false) && !transparent && !just_greygas
+        if !( plt_EXT in plotting.ALLOWED_EXTS )
+            @error "Config: Plot extension must be one of $(plotting.ALLOWED_EXTS)"
+            return false
+        end
 
         #    latent heating
         if incl_latent && !rainout
@@ -480,8 +476,8 @@ module AGNI
         tmp_magma::Float64 = atmosphere.CFG_tmp_magma
         if sol_type == 2
             if ! all(k in keys(cfg["planet"]) for k in ["skin_k","skin_d","tmp_magma"])
-                @error "Config: solution type $sol_type selected"
-                @error "        you must provide `planet.skin_k`, `skin_d`, `tmp_magma`"
+                @error "Config: solution_type $sol_type selected"
+                @error "        you must provide `planet.skin_k`, `planet.skin_d`, `planet.tmp_magma`"
                 return false
             end
             skin_k      = cfg["planet"]["skin_k"]
@@ -492,7 +488,7 @@ module AGNI
         flux_int::Float64 = atmosphere.CFG_flux_int
         if sol_type == 3
             if ! haskey(cfg["planet"],"flux_int")
-                @error "Config: solution type $sol_type selected"
+                @error "Config: solution_type $sol_type selected"
                 @error "        you must provide `planet.flux_int`"
                 return false
             end
@@ -502,21 +498,15 @@ module AGNI
         target_olr::Float64 = atmosphere.CFG_target_olr
         if sol_type == 4
             if ! haskey(cfg["planet"],"target_olr")
-                @error "Config: solution type $sol_type selected"
+                @error "Config: solution_type $sol_type selected"
                 @error "        you must provide `planet.target_olr`"
                 return false
             end
             target_olr = cfg["planet"]["target_olr"]
         end
 
-        # Output folder
-        output_dir = abspath(cfg["files"]["output_dir"])
-
         # Optional IO folder
-        io_dir::String = atmosphere.UNSET_STR
-        if haskey(cfg["files"], "io_dir")
-            io_dir = cfg["files"]["io_dir"]
-        end
+        io_dir::String = get(cfg["files"], "io_dir", atmosphere.UNSET_STR)
 
         # Optional aerosol parametrization controls
         aerosol_species::Dict = Dict()
@@ -526,13 +516,21 @@ module AGNI
             end
         end
 
+        # Axial rotation period and lon/lat, for centripetal acceleration
+        axial_period::Float64 = atmosphere.CFG_axial_period
+        longitude::Float64    = atmosphere.CFG_longitude
+        latitude::Float64     = atmosphere.CFG_latitude
+        if haskey(cfg["planet"], "axial_period")
+            axial_period = Float64(cfg["planet"]["axial_period"])
+        end
+
         # Create atmosphere structure
         @debug "Instantiate atmosphere"
-        atmos = atmosphere.Atmos_t()
+        atmos::atmosphere.Atmos_t = atmosphere.Atmos_t()
 
         # Setup atmosphere
         @debug "Setup atmosphere "
-        if !atmosphere.setup!(atmos, ROOT_DIR,output_dir,
+        if !atmosphere.setup!(atmos, paths.ROOT_DIR, output_dir,
                                 String(cfg["files" ]["input_sf"]),
                                 Float64(cfg["planet"]["instellation"]),
                                 Float64(cfg["planet"]["s0_fact"]),
@@ -540,7 +538,7 @@ module AGNI
                                 Float64(cfg["planet"]["zenith_angle"]),
                                 Float64(cfg["planet"]["tmp_surf"]),
                                 gravity, radius,
-                                Int(cfg["execution"]["num_levels"]),
+                                Int64(cfg["execution"]["num_levels"]),
                                 p_surf,
                                 p_top,
                                 mf_dict, mf_path;
@@ -565,6 +563,8 @@ module AGNI
                                 skin_d=skin_d, skin_k=skin_k, tmp_magma=tmp_magma,
                                 target_olr=target_olr,
                                 flux_int=flux_int,
+                                axial_period=axial_period,
+                                longitude=longitude, latitude=latitude,
                                 surface_material=surface_mat, albedo_s=albedo_s,
                                 mlt_criterion=only(cfg["physics"]["convection_crit"][1]),
                                 rfm_parfile=rfm_parfile,
@@ -581,8 +581,20 @@ module AGNI
             return false
         end
 
+        # Frame dir
+        if plt_ani
+            @debug "Will animate"
+            if !paths.is_safe_dir(atmos.FRAMES_DIR)
+                @error "Frame directory is unsafe! Got: $(atmos.FRAMES_DIR)"
+                return false
+            end
+            rm(atmos.FRAMES_DIR,force=true,recursive=true)
+            mkdir(atmos.FRAMES_DIR)
+        end
+
         # Configure deep atmospheric heating
-        if haskey(cfg["physics"],"deep_heating")
+        incl_deep::Bool = haskey(cfg["physics"],"deep_heating")
+        if incl_deep
             dh = cfg["physics"]["deep_heating"]
             if ! all(k in keys(dh) for k in ["Pmid","Pwid","flux_rel","flux_abs","norm_method","domain","power_mode"])
                 @error "Config: deep heating enabled but parameters are not set"
@@ -594,11 +606,10 @@ module AGNI
             atmosphere.set_deep_heating!(atmos,
                                             Float64(dh["Pmid"])*1e5, Float64(dh["Pwid"]),
                                             Float64(dh["flux_rel"]), Float64(dh["flux_abs"]),
-                                            Symbol(dh["norm_method"]),
-                                            Symbol(dh["domain"]),
-                                            Symbol(dh["power_mode"])) || return false
+                                            dh["norm_method"],
+                                            dh["domain"],
+                                            dh["power_mode"]; verbose=true) || return false
         end
-        incl_deep::Bool = atmos.deepheat_power_mode != :off
 
 
         # Set temperatures as appropriate
@@ -626,12 +637,46 @@ module AGNI
             return false
         end
 
-        # Frame dir
-        if plt_ani
-            @debug "Will animate"
-            rm(atmos.FRAMES_DIR,force=true,recursive=true)
-            mkdir(atmos.FRAMES_DIR)
+        # Configure globe multicolumn calculation
+        globe::Union{multicol.Globe_t,Nothing} = nothing
+        is_multicol = haskey(cfg["planet"],"globe")
+        if is_multicol
+
+            # do not allow with single-column deep heating mode
+            if atmos.deepheat_power_mode != "off"
+                @error "Config: multi-column simulation incompatible with single-column deep heating mode"
+                return false
+            end
+            incl_deep = true # need these fluxes to be calculated
+
+            @info "Performing multi-column simulation"
+            globe = multicol.Globe_t()
+
+            # check that required keys are present
+            if !haskey(cfg["planet"]["globe"], "lons") || !haskey(cfg["planet"]["globe"], "lats")
+                @error "Config: must provide `globe.lons` and `globe.lats` for multicolumn simulation"
+                return false
+            end
+
+            # construct globe object
+            @debug "Setup globe"
+            if !multicol.construct!(globe, atmos,
+                                cfg["planet"]["globe"]["lons"],
+                                cfg["planet"]["globe"]["lats"],
+                                # TODO: arrays below should be calcualted in the multicol module, not provided by the user
+                                cfg["planet"]["globe"]["redist_flux"],
+                                cfg["planet"]["globe"]["redist_Pmid"] .* 1e5,
+                                cfg["planet"]["globe"]["redist_Pwid"]
+                                )
+                @error "Could not construct globe object"
+                return false
+            end
+
+            # configure globe redist
+            @debug "Set heat redist for globe"
+            multicol.set_redist!(globe)
         end
+
 
         # Loop over requested solvers
         return_success::Bool = true
@@ -644,46 +689,63 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
-            return_success &= energy.calc_fluxes!(atmos, radiative=true, latent_heat=incl_latent,
-                                convective=incl_convect, sens_heat=incl_sens,
-                                conductive=incl_conduct,
-                                deep=incl_deep,
-                                calc_cf=Bool(cfg["plots"]["contribution"]))
+            multicol.call_agnostic!( is_multicol ? globe : atmos,
+                                    energy.calc_fluxes!,
+                                    radiative=true, latent_heat=incl_latent,
+                                    convective=incl_convect, sens_heat=incl_sens,
+                                    conductive=incl_conduct,
+                                    deep=incl_deep,
+                                    calc_cf=Bool(cfg["plots"]["contribution"]),
+                                    calc_hr=true)
 
         # Transparent atmosphere solver
         elseif sol == "transparent"
             return_success &= solver.solve_transparent!(atmos, sol_type=sol_type,
                                 conv_atol=conv_atol,
                                 conv_rtol=conv_rtol,
-                                max_steps=Int(cfg["execution"]["max_steps"]))
+                                max_steps=Int64(cfg["execution"]["max_steps"]))
 
         # Use the nonlinear requested solver
         elseif sol in allowed_solvers
-            modplot::Int = 0
+            modplot::Int64 = 0
             if cfg["plots"]["at_runtime"]
                 modplot = 1
             end
             method_idx = findfirst(==(sol), allowed_solvers)
-            return_success &= solver.solve_energy!(atmos, sol_type=sol_type,
-                                conduct=incl_conduct, chem=chem,
-                                convect=incl_convect, latent=incl_latent,
-                                sens_heat=incl_sens, deep=incl_deep,
-                                max_steps=Int(cfg["execution"]["max_steps"]),
-                                max_runtime=Float64(cfg["execution"]["max_runtime"]),
-                                conv_atol=conv_atol,
-                                conv_rtol=conv_rtol,
-                                method=Int(method_idx),
-                                rainout=rainout,
-                                oceans=oceans,
-                                dx_max=Float64(cfg["execution"]["dx_max"]),
-                                ls_method=Int(cfg["execution"]["linesearch"]),
-                                conv_type=conv_type,
-                                easy_start=Bool(cfg["execution"]["easy_start"]),
-                                grey_start=Bool(cfg["execution"]["grey_start"]),
-                                modplot=modplot,
-                                save_frames=plt_ani,
-                                perturb_all=perturb_all
-                                )
+
+            # Store kwargs in dict
+            sol_kwargs::Dict{Symbol,Any} = Dict(
+                :sol_type       => Int64(sol_type),
+                :conduct        => Bool(incl_conduct),
+                :chem           => Bool(chem),
+                :convect        => Bool(incl_convect),
+                :latent         => Bool(incl_latent),
+                :sens_heat      => Bool(incl_sens),
+                :deep           => Bool(incl_deep),
+                :max_steps      => Int64(cfg["execution"]["max_steps"]),
+                :max_runtime    => Float64(cfg["execution"]["max_runtime"]),
+                :conv_atol      => Float64(conv_atol),
+                :conv_rtol      => Float64(conv_rtol),
+                :method         => Int64(method_idx),
+                :rainout        => Bool(rainout),
+                :oceans         => Bool(oceans),
+                :dx_max         => Float64(cfg["execution"]["dx_max"]),
+                :ls_method      => Int64(cfg["execution"]["linesearch"]),
+                :conv_type      => Int64(conv_type),
+                :easy_start     => Bool(cfg["execution"]["easy_start"]),
+                :grey_start     => Bool(cfg["execution"]["grey_start"]),
+                :modplot        => Int64(modplot),
+                :save_frames    => Bool(plt_ani),
+                :perturb_all    => Bool(cfg["execution"]["perturb_all"]),
+            )
+
+            if is_multicol
+                return_success &= solver.solve_globe!(globe,
+                                            cfg["execution"]["globe_iters"];
+                                            sol_kwargs...)
+            else
+                return_success &= solver.solve_energy!(atmos; sol_kwargs...)
+            end
 
         # Invalid selection
         else
@@ -719,38 +781,54 @@ module AGNI
                             atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
         end
 
+
+        # Paths and objects for saving/plotting
+        if is_multicol
+            arr_cols = globe.atmos_arr
+            arr_sfxs = [@sprintf(".col%03d", i) for i in 1:length(globe.atmos_arr)]
+        else
+            arr_cols = [atmos]
+            arr_sfxs = [""]
+            if plt_glo
+                @warn "Globe plotting requested for single-column simulation"
+                plt_glo = false
+            end
+        end
+
         # Write arrays
         @info "Writing results"
-        save.write_ncdf(atmos,    joinpath(atmos.OUT_DIR,"atm.nc"))
-
-        # Save plots
-        @info "Plotting results"
-        if !transparent
-            plt_ani && plotting.animate(atmos.OUT_DIR, atmos.FRAMES_DIR)
-            cfg["plots"]["cloud"] && \
-                plotting.plot_cloud(atmos,     joinpath(atmos.OUT_DIR,"plot_cloud.png"))
-            cfg["plots"]["mixing_ratios"] && \
-                plotting.plot_vmr(atmos, joinpath(atmos.OUT_DIR,"plot_vmrs.png"), size_x=600)
-            cfg["plots"]["contribution"]  && \
-                plotting.plot_contfunc1(atmos, joinpath(atmos.OUT_DIR,"plot_contfunc1.png"))
-            cfg["plots"]["height"] && \
-                plotting.plot_radius(atmos, joinpath(atmos.OUT_DIR,"plot_radius.png"))
+        for (a,s) in zip(arr_cols, arr_sfxs)
+            save.write_ncdf(a, joinpath(atmos.OUT_DIR,"atm$s.nc"))
         end
-        plt_tmp && \
-            plotting.plot_pt(atmos, joinpath(atmos.OUT_DIR,"plot_ptprofile.png"), incl_magma=(sol_type==2))
-        cfg["plots"]["fluxes"] && \
-            plotting.plot_fluxes(atmos, joinpath(atmos.OUT_DIR,"plot_fluxes.png"),
-                                    incl_mlt=incl_convect, incl_eff=(sol_type==3),
-                                    incl_cdct=incl_conduct, incl_latent=incl_latent,
-                                    incl_deep=incl_deep)
-        cfg["plots"]["emission"] && \
-            plotting.plot_emission(atmos, joinpath(atmos.OUT_DIR,"plot_emission.png"))
-        cfg["plots"]["albedo"] && \
-            plotting.plot_albedo(atmos, joinpath(atmos.OUT_DIR,"plot_albedo.png"))
+
+        # Make plots
+        @info "Plotting results"
+        plt_glo && plotting.plot_globe(globe, joinpath(atmos.OUT_DIR,"plot_globe.$plt_EXT"))
+        plt_ani && plotting.animate(atmos.OUT_DIR, atmos.FRAMES_DIR)
+
+        for (a,s) in zip(arr_cols, arr_sfxs)
+            plt_cld && plotting.plot_cloud(a,       joinpath(a.OUT_DIR,"plot_cloud$s.$plt_EXT"))
+            plt_vmr && plotting.plot_vmr(a,         joinpath(a.OUT_DIR,"plot_vmrs$s.$plt_EXT"), size_x=600)
+            plt_cff && plotting.plot_contfunc1(a,   joinpath(a.OUT_DIR,"plot_contfunc1$s.$plt_EXT"))
+            plt_hgt && plotting.plot_radius(a,      joinpath(a.OUT_DIR,"plot_radius$s.$plt_EXT"))
+            plt_tmp && plotting.plot_pt(a,          joinpath(a.OUT_DIR,"plot_ptprofile$s.$plt_EXT"), incl_magma=(sol_type==2))
+
+            plt_flx && plotting.plot_fluxes(a, joinpath(a.OUT_DIR,"plot_fluxes$s.$plt_EXT"),
+                                                incl_mlt=incl_convect, incl_eff=(sol_type==3),
+                                                incl_cdct=incl_conduct, incl_latent=incl_latent,
+                                                incl_deep=incl_deep)
+            plt_emt && plotting.plot_emission(a, joinpath(a.OUT_DIR,"plot_emission$s.$plt_EXT"))
+            plt_alb && plotting.plot_albedo(a, joinpath(a.OUT_DIR,"plot_albedo$s.$plt_EXT"))
+        end
+
 
         # Deallocate atmosphere
-        @info "Deallocating memory"
-        atmosphere.deallocate!(atmos)
+        @debug "Deallocating memory"
+        if is_multicol
+            multicol.deconstruct!(globe)
+        else
+            atmosphere.deallocate!(atmos)
+        end
 
         return return_success
     end
@@ -771,11 +849,11 @@ module AGNI
         tbegin = time()
 
         # Variables
-        output_dir::String = atmosphere.UNSET_STR
+        output_dir::String = consts.UNSET_STR
         clean_output::Bool = false
 
         # Open and validate config file
-        cfg_path::String = joinpath(ROOT_DIR, "res", "config", "default.toml")
+        cfg_path::String = joinpath(paths.RES_DIR, "config", "default.toml")
         if length(ARGS)>0
             cfg_path = ARGS[1]
         end
@@ -788,12 +866,15 @@ module AGNI
         output_dir = abspath(cfg["files"]["output_dir"])
         clean_output = Bool(cfg["execution"]["clean_output"])
         if clean_output || !isdir(output_dir)
+            if !paths.is_safe_dir(output_dir)
+                error("Output directory is unsafe! Got: $output_dir")
+            end
             rm(output_dir,force=true,recursive=true)
             mkdir(output_dir)
         end
 
         # Logging
-        verbosity::Int = cfg["execution"]["verbosity"]
+        verbosity::Int64 = cfg["execution"]["verbosity"]
         setup_logging(joinpath(output_dir, "agni.log"), verbosity)
 
         # Hello

@@ -1,0 +1,90 @@
+# AGNI configuration file
+title = "Multicolumn example"
+
+[planet]
+    tmp_surf        = 2100.0
+    instellation    = 1e5
+    albedo_b        = 0.18
+    s0_fact         = 0.6652
+    zenith_angle    = 60.0
+    surface_material= "res/surface_albedos/lunarmarebasalt.dat"
+    albedo_s        = 0.0
+    radius          = 6.37e6
+    gravity         = 9.81
+    flux_int        = 10.0
+    roughness       = 1.0e-2
+    wind_speed      = 10.0
+
+    tmp_magma       = 3000.0
+    skin_k          = 2.0
+    skin_d          = 0.1
+
+    axial_period    = 1.0e6   # seconds
+
+    [planet.globe]
+        lons        = [  0.0,  60.0,  90.0, 180.0]      # longitudes [deg]
+        lats        = [  0.0,   0.0,   0.0,   0.0]      # latitudes [deg]
+        redist_flux = [ -5.0,  -3.0,   2.0,   6.0]      # heat entering this column [W m-2]
+        redist_Pmid = [  1e0,   1e0,   1e0,   1e0]      # pressure to apply deep heating [bar]
+        redist_Pwid = [  4.0,   4.0,   4.0,   4.0]      # width of deep heating [log P]
+
+[files]
+    input_sf        = "res/spectral_files/Frostflow/16/Frostflow.sf" #"greygas"
+    input_star      = "res/stellar_spectra/sun.txt"
+    output_dir      = "out/"
+
+[composition]
+    p_surf          = 1000.0
+    p_top           = 1e-3
+    vmr_dict        = { H2O = 1.0}
+    condensates     = []
+
+[execution]
+    clean_output    = true
+    verbosity       = 1
+    max_steps       = 70
+    globe_iters     = 10
+    max_runtime     = 400
+    num_levels      = 35
+    solution_type   = 2
+    solver          = "newton"
+    dx_max          = 300.0
+    initial_state   = ["iso", "2000"]
+    linesearch      = 1
+    easy_start      = false
+    grey_start      = false
+    converge_atol   = 5.0e-1
+    converge_rtol   = 1.0e-2
+    perturb_all     = true
+
+[physics]
+    chemistry       = false
+    continua        = true
+    rayleigh        = false
+    cloud           = false
+    overlap_method  = "ee"
+    real_gas        = false
+    thermo_funct    = true
+    sensible_heat   = true
+    conduction      = false
+    latent_heat     = false
+    convection      = false  # <-- !!
+    convection_crit = "l"
+    rainout         = false
+    oceans          = false
+    grey_lw         = 5e-3
+    grey_sw         = 2e-3
+
+[plots]
+    extension       = "pdf"
+    at_runtime      = true
+    temperature     = true
+    fluxes          = true
+    contribution    = true
+    emission        = true
+    albedo          = true
+    mixing_ratios   = true
+    animate         = false
+    height          = true
+    cloud           = false
+    globe           = true

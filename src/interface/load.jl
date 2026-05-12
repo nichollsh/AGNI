@@ -1,18 +1,15 @@
-# Load atmosphere from NetCDF file
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
+"""
+**Module for loading atmospheric states from NetCDF and CSV files.**
+"""
 module load
-
-    import ..atmosphere
 
     using NCDatasets
     using LoggingExtras
     using Printf
+
+    import ..atmosphere
 
     """
     **Load atmosphere data from a NetCDF file.**
@@ -43,8 +40,8 @@ module load
 
             # ----------------------
             # Get dimensions
-            nlev_c::Int = ds.dim["nlev_c"]
-            ngases::Int = ds.dim["ngases"]
+            nlev_c::Int64 = ds.dim["nlev_c"]
+            ngases::Int64 = ds.dim["ngases"]
 
             # Check that these are the same as the allocated atmos struct
             if nlev_c != atmos.nlev_c
@@ -89,7 +86,7 @@ module load
 
             #   gas names
             raw_gases::Array{Char,2} = ds["gases"][:,:]
-            num_gas::Int = size(raw_gases)[2]
+            num_gas::Int64 = size(raw_gases)[2]
             input_gases::Array{String,1} = []
             for i in 1:num_gas
                 push!(input_gases, strip(String(raw_gases[:,i])))

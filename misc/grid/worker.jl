@@ -476,8 +476,8 @@ function update_metallicity!(atmos, _logZ, _logCO)
     S_to_H_MOLAR = 10^(7.12-12)
 
     # Convert to mass ratios
-    N_to_H = N_to_H_MOLAR * phys._get_mmw("N") / phys._get_mmw("H")
-    S_to_H = S_to_H_MOLAR * phys._get_mmw("S") / phys._get_mmw("H")
+    N_to_H = N_to_H_MOLAR * formulae.get_mmw("N") / formulae.get_mmw("H")
+    S_to_H = S_to_H_MOLAR * formulae.get_mmw("S") / formulae.get_mmw("H")
 
     # ------------------------
     # Convert Z and C/O (by mass) from log-scaled to actual values
@@ -498,10 +498,10 @@ function update_metallicity!(atmos, _logZ, _logCO)
     # pass to dictionary used for FC input
     # metallicity is by mass frac, but atmosphere stores value by mol frac
     atmos.metal_orig["H"] = 1.0
-    atmos.metal_orig["C"] = C_to_H * phys._get_mmw("H") / phys._get_mmw("C")
-    atmos.metal_orig["O"] = O_to_H * phys._get_mmw("H") / phys._get_mmw("O")
-    atmos.metal_orig["S"] = S_to_H * phys._get_mmw("H") / phys._get_mmw("S")
-    atmos.metal_orig["N"] = N_to_H * phys._get_mmw("H") / phys._get_mmw("N")
+    atmos.metal_orig["C"] = C_to_H * formulae.get_mmw("H") / formulae.get_mmw("C")
+    atmos.metal_orig["O"] = O_to_H * formulae.get_mmw("H") / formulae.get_mmw("O")
+    atmos.metal_orig["S"] = S_to_H * formulae.get_mmw("H") / formulae.get_mmw("S")
+    atmos.metal_orig["N"] = N_to_H * formulae.get_mmw("H") / formulae.get_mmw("N")
 
     # remove FC input file to force update
     rm(atmos.fastchem_elem, force=true)
@@ -747,7 +747,7 @@ for (i,p) in enumerate(grid_flat)
     @info @sprintf("    using p_surf = %.2e bar",atmos.p_boa/1e5)
 
     # Set temperature array based on interpolation from last solution
-    max_steps   = Int(cfg["execution"]["max_steps"])
+    max_steps   = Int64(cfg["execution"]["max_steps"])
     max_runtime = Float64(cfg["execution"]["max_runtime"])
     if succ_last && (i>1) && haskey(result_profs[i-1],"p") && (i_counter != 1)
         # last iter was successful
@@ -782,8 +782,8 @@ for (i,p) in enumerate(grid_flat)
                                             oceans=Bool(cfg["physics"]["oceans"]),
                                             dx_max=Float64(cfg["execution"]["dx_max"]),
                                             dx_min=Float64(cfg["execution"]["dx_min"]),
-                                            ls_method=Int(cfg["execution"]["linesearch"]),
-                                            conv_type=Int(cfg["execution"]["converge_type"]),
+                                            ls_method=Int64(cfg["execution"]["linesearch"]),
+                                            conv_type=Int64(cfg["execution"]["converge_type"]),
                                             easy_start=easy_start,
                                             modplot=modplot,
                                             save_frames=false,

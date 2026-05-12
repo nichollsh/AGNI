@@ -46,8 +46,17 @@ julia --project=. test/get_coverage.jl
 
 The package entry point is `src/AGNI.jl`, which `include()`s submodule files **in a fixed order** (order matters for dependencies) and then imports them. The executable `agni.jl` activates the project, imports `AGNI`, and calls `AGNI.main()`.
 
+The source tree is split hierarchically by responsibility:
+- `src/phys/` for constants, formulae, density/EOS, and analytic profiles
+- `src/state/` for model state structs and layer/diagnostic utilities
+- `src/compose/` for chemistry/ocean composition logic
+- `src/energy/` for RT, fluxes, spectrum, and optional RFM handling
+- `src/interface/` for I/O, plotting, config-path helpers, and T(p) setup verbs
+- `src/solver/` for solver front-end plus method-specific implementations
+- `src/util/` for shared helpers (style, checksums)
+
 ### Central data structure
-`atmosphere.Atmos_t` (defined in `src/atmosphere.jl`) is a mutable struct that holds all model state: pressure/temperature grids, flux arrays, gas mixing ratios, solver flags, file paths, and physics options. Nearly every function takes an `atmos::Atmos_t` as its first argument and mutates it.
+`atmosphere.Atmos_t` (defined in `src/state/atmosphere.jl`) is a mutable struct that holds all model state: pressure/temperature grids, flux arrays, gas mixing ratios, solver flags, file paths, and physics options. Nearly every function takes an `atmos::Atmos_t` as its first argument and mutates it.
 
 ### Typical execution flow (`AGNI.run_from_config`)
 1. Parse and validate the TOML config dict
@@ -59,23 +68,16 @@ The package entry point is `src/AGNI.jl`, which `include()`s submodule files **i
 7. Write outputs: `save.write_ncdf`, `save.write_profile`, then plotting functions
 
 ### Submodule responsibilities
-| Module | Role |
+| Module path | Role |
 |---|---|
-| `atmosphere` | `Atmos_t` struct, setup/allocate/deallocate, hydrostatic integrator |
-| `energy` | Flux calculations: SOCRATES RT, MLT convection, conduction, latent/sensible heat |
-| `solver` | Core solver module for radiative-convective equilibrium. Using Newton, Gauss-Newton, or Levenberg-Marquardt; with damping and linesearch |
-| `setpt` | Setting initial T(p) profiles (dry adiabat, saturation, Guillot, custom) |
-| `spectrum` | Spectral file loading and management |
-| `chemistry` | Thermochemical equilibrium via FastChem; rainout logic |
-| `ocean` | Surface liquid ocean formation and distribution |
-| `rfm` | Optional line-by-line RT via the RFM code |
-| `phys` | Physical utility functions (EOS, thermodynamics) |
-| `consts` | Physical constants |
-| `save` | NetCDF and CSV output |
-| `plotting` | Julia GR-based plots and animations |
-| `load` | Reading atmosphere profiles |
-| `guillot` | Analytic T(p) profile implementations |
-| `blake` | Blake2b checksum utilities for file integrity verification |
+| `state/atmosphere.jl` | `Atmos_t` struct, setup/allocate/deallocate, hydrostatic integrator |
+| `state/layers.jl`, `state/diagnostics.jl`, `state/multicol.jl` | Layer properties, diagnostics, and globe/multicol state |
+| `phys/consts.jl`, `phys/phys.jl`, `phys/formulae.jl`, `phys/density.jl`, `phys/species.jl`, `phys/guillot.jl` | Constants, EOS/thermo utilities, species data, analytic profile pieces |
+| `compose/chemistry.jl`, `compose/fastchem.jl`, `compose/ocean.jl` | Thermochemical equilibrium (FastChem), rainout/condensation, surface oceans |
+| `energy/energy.jl`, `energy/spectrum.jl`, `energy/rfm.jl` | SOCRATES/RFM RT interfaces, fluxes/heating, spectrum utilities |
+| `interface/setpt.jl`, `interface/save.jl`, `interface/load.jl`, `interface/plotting.jl`, `interface/paths.jl` | T(p) setup verbs, I/O, plotting, and path safety helpers |
+| `solver/solver.jl` + `solver/*.jl` | Solver front-end and method-specific implementations (energy, transparent, globe, etc.) |
+| `util/blake.jl`, `util/style.jl` | Shared utility helpers (hash checks, style/label/color helpers) |
 
 ### External dependencies
 - **SOCRATES** (Fortran RT code, loaded at runtime via `include(ENV["RAD_DIR"]/julia/src/SOCRATES.jl)`). The `atmosphere` module hard-includes this path on load.
@@ -85,7 +87,7 @@ The package entry point is `src/AGNI.jl`, which `include()`s submodule files **i
 ## Key Conventions
 
 ### Module files must not be run directly
-Every `src/*.jl` file begins with:
+The `src/AGNI.jl` file begins with:
 ```julia
 if (abspath(PROGRAM_FILE) == @__FILE__)
     thisfile = @__FILE__
@@ -94,7 +96,7 @@ end
 ```
 
 ### `include()` order in `src/AGNI.jl` is load-order dependent
-New source files must be added at the correct position in `AGNI.jl`'s `include` list (dependencies before dependents) and then explicitly `import`ed and `export`ed.
+New source files must be added at the correct position in `AGNI.jl`'s `include` list (dependencies before dependents) and then explicitly `import`ed and `export`ed. All includes are at the top of `AGNI.jl` before any code, and other modules will import from `AGNI` rather than each other. Thie ensures a single load order and avoids circular dependencies.
 
 ### Bang (`!`) functions mutate `Atmos_t`
 Functions like `setup!`, `allocate!`, `deallocate!`, `set_deep_heating!` follow the Julia convention of mutating their primary argument in place.

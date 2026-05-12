@@ -4,8 +4,8 @@ This page may be useful if you are having problems. Double check that you follow
 of the [Getting started](@ref) instructions first.
 
 ## Julia version is incompatible / Errors about OpenSSL library
-You must use Julia version 1.11 because there are incompatibilities between the OpenSSL
-library required by Julia 1.12 and Python.
+There have historically been incompatibilities between the OpenSSL
+library required by Julia and by Python.
 
 Switch Julia versions using the `juliaup` command. E.g:
 ```bash
