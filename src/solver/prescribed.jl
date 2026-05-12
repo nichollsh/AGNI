@@ -1,3 +1,12 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Solves for global (not local) balance with a prescribed atmosphere structure.**
+
+For example, this can be used to find the surface temperature of an atmosphere with a
+prescribed temperature profile, such that the outgoing flux matches the incoming flux, or
+such that the outgoing longwave radiation matches a target value.
+"""
 module solve_prescribed
 
     using Printf
@@ -6,7 +15,6 @@ module solve_prescribed
     using LinearAlgebra
 
     import ..atmosphere
-    import ..layers
     import ..energy
     import ..setpt
     import ..phys
@@ -68,7 +76,7 @@ module solve_prescribed
             end
 
             # layer properties
-            layers.calc_layer_props!(atmos)
+            atmosphere.calc_layer_props!(atmos)
         end
 
         # Handle different solution types

@@ -1,3 +1,8 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Wrapper module around the various solver modules.**
+"""
 module solver
 
     using Printf
@@ -7,7 +12,6 @@ module solver
 
     import ..atmosphere
     import ..diagnostics
-    import ..layers
     import ..setpt
     import ..energy
     import ..phys

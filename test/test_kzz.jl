@@ -40,7 +40,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     setpt.stratosphere!(atmos, 200.0)
 
     # Calculate layer properties (density, cp, etc)
-    layers.calc_layer_props!(atmos)
+    atmosphere.calc_layer_props!(atmos)
 
     # Run MLT to calculate convection and Kzz
     energy.convection!(atmos)
@@ -77,7 +77,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     atmos.Kzz_type = 3
 
     # Calculate hydrostatic structure
-    layers.calc_layer_props!(atmos)
+    atmosphere.calc_layer_props!(atmos)
 
     # Run MLT
     energy.convection!(atmos)
@@ -121,7 +121,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     # -------------
 
     # Calculate hydrostatic structure
-    layers.calc_layer_props!(atmos)
+    atmosphere.calc_layer_props!(atmos)
 
     # Run MLT and fill_Kzz
     energy.convection!(atmos)
@@ -158,7 +158,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     setpt.isothermal!(atmos, 500.0)
 
     # Calculate hydrostatic structure
-    layers.calc_layer_props!(atmos)
+    atmosphere.calc_layer_props!(atmos)
 
     # Run MLT (should find no convection)
     energy.convection!(atmos)

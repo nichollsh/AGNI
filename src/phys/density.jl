@@ -1,3 +1,12 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Module for calculating the density of liquids and gases.**
+
+Contains functions for evaluating equation of state for liquids and gases, and calculating
+the density of a mixture of gases using Amagat's law. Also contains lookup tables and
+ideal gas calculations for liquid and gas densities.
+"""
 module density
 
     import ..consts: BIGFLOAT, R_gas

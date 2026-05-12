@@ -1,5 +1,8 @@
-# Write atmosphere to NetCDF or CSV file
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+"""
+**Write atmosphere to NetCDF or CSV files**
+"""
 module save
 
     import ..atmosphere

@@ -1,5 +1,8 @@
-# Contains physical constants
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+"""
+**Module for defining physical and numerical constants.**
+"""
 module consts
 
     # Misc constants
@@ -135,7 +138,7 @@ module consts
     # Solar metallicities taken from FastChem source files
     # These are log10 molar (number) ratios relative to hydrogen, offset by 12 dex
     # https://www.aanda.org/articles/aa/pdf/2021/09/aa40445-21.pdf
-    const _solar_metallicity::Dict{String, Float64} = Dict([
+    const solar_metallicity::Dict{String, Float64} = Dict([
         ("Al" , 6.43),
         ("Ar" , 6.38),
         ("C"  , 8.46),

@@ -140,9 +140,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         @test typeof(changed) == Bool
 
         # If condensate formed, pressure should change
-        if changed
-            @test atmos.p_boa != orig_p_boa
-        end
+        @test (!changed) || (changed && (atmos.p_boa != orig_p_boa))
 
         # Check that VMRs still sum to ~1.0 at surface
         x_tot = sum([atmos.gas_vmr[g][end] for g in atmos.gas_names])

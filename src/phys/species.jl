@@ -1,3 +1,14 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Module for handling gas/vapour species data and properties.**
+
+Defines the `Gas_t` struct, which contains all relevant data for a single
+species, and functions to load this data from files and evaluate properties such as
+saturation pressure, heat capacity, and thermal conductivity.
+
+Note that 'gas' here refers to any vapour species, including super-critical phases.
+"""
 module species
 
     # Import packages

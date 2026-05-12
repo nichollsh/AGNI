@@ -1,5 +1,8 @@
-# Contains physical data
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+"""
+**Provides self-contained physical formulae and calculations.**
+"""
 module phys
 
     # Import packages
@@ -122,7 +125,7 @@ module phys
     - `Teq::Float64`     Planetary equilibrium temperature [K]
     """
     function calc_Teq(S::Float64, α::Float64)::Float64
-        return (S*(1-α)/(4*consts.σSB))^0.25
+        return (S*(1-α)/(4*σSB))^0.25
     end
     export calc_Teq
 

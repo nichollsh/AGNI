@@ -1,4 +1,4 @@
-# Contains things relating to atmospheric chemistry
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
 """
 This module handles chemistry, condensation, and evaporation.
@@ -17,10 +17,9 @@ module chemistry
     # Local files
     import ..phys
     import ..atmosphere
-    import ..layers
     import ..species
     import ..ocean
-    include("fastchem.jl"); import .fastchem
+    import ..fastchem
 
     # Constants
     const SMALL_FLOAT::Float64  = 1e-20     # small number for numerical stability
@@ -96,7 +95,7 @@ module chemistry
         atmosphere.generate_pgrid!(atmos)
 
         # Layer properties
-        layers.calc_layer_props!(atmos)
+        atmosphere.calc_layer_props!(atmos)
     end
 
 
@@ -143,7 +142,7 @@ module chemistry
                 # rainout completely, and skip condensation
                 dp = -p_gas[c]
                 atmos.p_boa += dp
-                @debug @sprintf("            %s de-mixed, partial pressure += %+.3f bar", c, dp/1e5)
+                @debug @sprintf("            %s de-mixed, partial pressure += %+.3e bar", c, dp/1e5)
                 any_changed = true
 
             # If supercritical, do nothing
@@ -163,13 +162,13 @@ module chemistry
 
                 # Super-saturated at the surface...
                 elseif dp < 0
-                    @debug @sprintf("            %s super-saturated, partial pressure += %+.3f bar", c, dp/1e5)
+                    @debug @sprintf("            %s super-saturated, partial pressure += %+.3e bar", c, dp/1e5)
 
                 # Sub-saturated at the surface...
                 #     work out change in partial pressure based on initial reservoir amount
                 else
                     dp = min(dp, atmos.ocean_ini[c] * atmos.grav_surf / (atmos.gas_dat[c].mmw/atmos.layer_μ[end]))
-                    @debug @sprintf("            %s sub-saturated, partial pressure += %+.3f bar", c, dp/1e5)
+                    @debug @sprintf("            %s sub-saturated, partial pressure += %+.3e bar", c, dp/1e5)
                 end
 
                 # Record that at least one component has as changed
@@ -207,7 +206,7 @@ module chemistry
         atmosphere.generate_pgrid!(atmos)
 
         # Calculate new values for layer properties
-        layers.calc_layer_props!(atmos)
+        atmosphere.calc_layer_props!(atmos)
 
         return any_changed
     end
@@ -301,7 +300,7 @@ module chemistry
                 end # end saturation check
 
                 # recalculate layer properties after raining-out this species
-                layers.calc_layer_props!(atmos)
+                atmosphere.calc_layer_props!(atmos)
 
             end # end condensate
 
@@ -395,7 +394,7 @@ module chemistry
             end # go to next j level (below)
 
             # Layer properties
-            layers.calc_layer_props!(atmos)
+            atmosphere.calc_layer_props!(atmos)
 
         end # end loop over condensates
 
@@ -403,7 +402,7 @@ module chemistry
         for i in 1:atmos.nlev_c
             normalise_vmrs!(atmos, i)
         end
-        layers.calc_layer_props!(atmos)
+        atmosphere.calc_layer_props!(atmos)
 
         # Set water clouds at levels where condensation occurs
         if "H2O" in atmos.condensates
@@ -466,7 +465,7 @@ module chemistry
         end
 
         # recalculate layer properties
-        layers.calc_layer_props!(atmos)
+        atmosphere.calc_layer_props!(atmos)
 
         # Warn on failure
         if state > 0

@@ -1,6 +1,24 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Module for defining styles for plotting and printing.**
+"""
 module style
 
     import ..formulae: count_atoms
+
+    # Colors for plotting
+    const col_r::String = "#c0c0c0"; export col_r
+    const col_n::String = "#000000"; export col_n
+    const col_c::String = "#6495ed"; export col_c
+    const col_t::String = "#ff4400"; export col_t
+    const col_o::String = "#66CD00"; export col_o
+    const col_p::String = "#ecb000"; export col_p
+    const col_d::String = "#8B008B"; export col_d
+
+    # Allowed plot file extensions
+    const ALLOWED_EXTS::Set{String} = Set(["png", "pdf", "svg"])
+    export ALLOWED_EXTS
 
     # Table of pre-defined colors for plotting
     const _lookup_colour::Dict{String, String} = Dict([

@@ -1,3 +1,12 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Run FastChem to solve gas phase chemistry.**
+
+FastChem is a fast and robust chemical equilibrium solver, designed for use in exoplanet
+and brown dwarf atmospheres. This module writes the necessary input files for FastChem,
+runs the code, and parses the output to update the gas phase composition.
+"""
 module fastchem
 
     # Import packages
@@ -6,8 +15,10 @@ module fastchem
     import DelimitedFiles:readdlm
 
     # Include local modules
-    using ..atmosphere
-    using ..phys
+    import ..atmosphere
+    import ..phys
+    import ..consts
+    import ..formulae
 
     # Constants
     const SMOOTH_SCALE::Float64 = 12.0      # smoothing scale for fastchem floor
@@ -93,7 +104,7 @@ module fastchem
                 @debug "Elements set by user-provided metallicities"
 
                 # copy original to calculated; set elem to zero if it was not provided
-                for e in phys.elems_standard
+                for e in consts.elems_standard
                     atmos.metal_calc[e] = get(atmos.metal_orig, e, 0.0)
                 end
                 atmos.metal_calc["H"] = 1.0
@@ -104,8 +115,8 @@ module fastchem
 
                 # Calculate elemental abundances from surface mixing ratios [molecules/m^3]
                 #   assuming ideal gas: N/V = P*x/(Kb*T) , where x is the VMR
-                N_inp_t = zeros(Float64, length(phys.elems_standard)) # total atoms in all gases
-                N_inp_g = zeros(Float64, length(phys.elems_standard)) # atoms in current gas
+                N_inp_t = zeros(Float64, length(consts.elems_standard)) # total atoms in all gases
+                N_inp_g = zeros(Float64, length(consts.elems_standard)) # atoms in current gas
                 #    loop over gases
                 for gas in atmos.gas_names
                     fill!(N_inp_g, 0.0)
@@ -116,8 +127,8 @@ module fastchem
                     end
 
                     # count atoms in this gas
-                    d = phys.count_atoms(gas)
-                    for (i,e) in enumerate(phys.elems_standard)
+                    d = formulae.count_atoms(gas)
+                    for (i,e) in enumerate(consts.elems_standard)
                         if haskey(d, e)
                             N_inp_g[i] += d[e] # N_inp_g stores num of atoms in this gas
                         end
@@ -125,7 +136,7 @@ module fastchem
 
                     # Get gas abundance from original VMR value
                     #    scale number of atoms by the abundance of the gas (p = Ng kB T)
-                    N_inp_g *= atmos.gas_vmr[gas][end] * atmos.p[end] / (phys.k_B * atmos.tmp[end])
+                    N_inp_g *= atmos.gas_vmr[gas][end] * atmos.p[end] / (consts.k_B * atmos.tmp[end])
 
                     # Add atoms from this gas to total atoms in the mixture
                     N_inp_t += N_inp_g
@@ -138,7 +149,7 @@ module fastchem
                 end
 
                 # Convert elemental abundances to metallicity number ratios, rel to hydrogen
-                for (i,e) in enumerate(phys.elems_standard)
+                for (i,e) in enumerate(consts.elems_standard)
                     atmos.metal_calc[e] = N_inp_t[i]/N_inp_t[1]
                 end
             end
@@ -148,7 +159,7 @@ module fastchem
             #     for each element `e`, value = log10(N_e/N_H) + 12
             open(atmos.fastchem_elem,"w") do f
                 write(f,"# Elemental abundances file written by AGNI \n")
-                for e in phys.elems_standard
+                for e in consts.elems_standard
 
                     # skip this element if its abundance is too small
                     if atmos.metal_calc[e] < 1.0e-30
@@ -160,7 +171,7 @@ module fastchem
                         write(f, @sprintf("%s    %.3f \n",e,log10(atmos.metal_calc[e]) + 12.0))
                     else
                         @warn "Got non-finite metallicity for $e - adopting solar value"
-                        write(f, @sprintf("%s    %.3f \n",e,phys.consts._solar_metallicity[e]))
+                        write(f, @sprintf("%s    %.3f \n",e,consts.solar_metallicity[e]))
                     end
 
                     count_elem_nonzero += 1
@@ -276,10 +287,10 @@ module fastchem
 
             # not stored => search based on atoms
             if !match
-                d_fc = phys.count_atoms(g_fc)  # get atoms dict from FC name
+                d_fc = formulae.count_atoms(g_fc)  # get atoms dict from FC name
 
                 for g in atmos.gas_names
-                    if phys.same_atoms(d_fc, atmos.gas_dat[g].atoms)
+                    if formulae.same_atoms(d_fc, atmos.gas_dat[g].atoms)
                         match = true
                         g_in = g
                         break

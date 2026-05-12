@@ -1,5 +1,8 @@
-# Contains functions for plotting/diagnosing the atmosphere
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+"""
+**Contains functions for plotting/diagnosing the atmosphere**
+"""
 module plotting
 
     # Import stuff
@@ -14,21 +17,10 @@ module plotting
     import ..phys
     import ..species
     import ..multicol
-
-    # Allowed plot file extensions
-    const ALLOWED_EXTS::Set{String} = Set(["png", "pdf", "svg"])
+    using ..style
 
     # Axis margins
     TMP_MARGIN::Float64 = 100.0
-
-    # Colors
-    const col_r::String = "#c0c0c0"
-    const col_n::String = "#000000"
-    const col_c::String = "#6495ed"
-    const col_t::String = "#ff4400"
-    const col_o::String = "#66CD00"
-    const col_p::String = "#ecb000"
-    const col_d::String = "#8B008B"
 
     # Default plotting configuration
     const la::Float64 = 0.7

@@ -1,3 +1,8 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Core solver and helper functions for radiative-convective-chemical equilibrium.**
+"""
 module solve_energy
 
     using Printf
@@ -6,7 +11,6 @@ module solve_energy
     using LinearAlgebra
 
     import ..atmosphere
-    import ..layers
     import ..diagnostics
     import ..energy
     import ..plotting
@@ -279,7 +283,7 @@ module solve_energy
                 chemistry._sat_aloft!(atmos)
 
             elseif !compose_here
-                layers.calc_layer_props!(atmos)
+                atmosphere.calc_layer_props!(atmos)
             end
 
             # Calculate fluxes
@@ -775,7 +779,7 @@ module solve_energy
             _fev!(x_cur, r_cur, compose=true)
 
             # Recalculate layer properties
-            if ! layers.calc_layer_props!(atmos)
+            if ! atmosphere.calc_layer_props!(atmos)
                 code = CODE_HYD
                 step_ok = false
                 stepflags *= "Ub-"

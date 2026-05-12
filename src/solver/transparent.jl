@@ -1,3 +1,12 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Solve for surface states on a planet with no atmosphere.**
+
+This is a simple wrapper which imposes a transparent atmosphere, by setting the surface
+temperature such that the outgoing flux matches the incoming flux, or such that the
+outgoing longwave radiation matches a target value.
+"""
 module solve_transparent
 
     using Printf

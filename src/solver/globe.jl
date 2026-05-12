@@ -1,3 +1,8 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Module for solving the multi-column problem across the globe**
+"""
 module solve_globe
 
     using Printf

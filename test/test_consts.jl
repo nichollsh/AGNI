@@ -120,8 +120,8 @@ using AGNI
     # -------------
     # Solar metallicities: hydrogen is anchored at 12.00 by definition
     # -------------
-    @test isapprox(AGNI.consts._solar_metallicity["H"], 12.00; atol=1e-10)
-    @test haskey(AGNI.consts._solar_metallicity, "Fe")
+    @test isapprox(AGNI.consts.solar_metallicity["H"], 12.00; atol=1e-10)
+    @test haskey(AGNI.consts.solar_metallicity, "Fe")
 
     # Test key solar metallicity values (important for atmospheric chemistry)
     solar_metal_cases = [
@@ -134,12 +134,12 @@ using AGNI
         ("Mg", 7.55),
     ]
     for (elem, expected) in solar_metal_cases
-        @test isapprox(AGNI.consts._solar_metallicity[elem], expected; atol=1e-10)
+        @test isapprox(AGNI.consts.solar_metallicity[elem], expected; atol=1e-10)
     end
 
     # Most elements in elems_standard should have solar metallicity values
-    # Note: D is currently missing from _solar_metallicity
-    elem_with_metals = filter(e -> haskey(AGNI.consts._solar_metallicity, e), AGNI.consts.elems_standard)
+    # Note: D is currently missing from solar_metallicity
+    elem_with_metals = filter(e -> haskey(AGNI.consts.solar_metallicity, e), AGNI.consts.elems_standard)
     @test length(elem_with_metals) >= 21  # Most elements should have solar metallicity data
 
     # -------------

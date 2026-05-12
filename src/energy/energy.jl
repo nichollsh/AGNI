@@ -1,5 +1,12 @@
-# Contains the energy module, for everything relating to energy transport
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+
+"""
+**Contains the energy module, for everything relating to energy transport**
+
+Calculates radiative, convective, conductive, etc, flux terms. Combines them together
+self-consistently to update the temperature profile.
+"""
 module energy
 
     # System libraries

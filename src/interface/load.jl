@@ -1,9 +1,11 @@
-# Load atmosphere from NetCDF file
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+"""
+**Module for loading atmospheric states from NetCDF and CSV files.**
+"""
 module load
 
     import ..atmosphere
-    import ..layers: calc_layer_props!
 
     using NCDatasets
     using LoggingExtras

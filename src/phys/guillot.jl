@@ -1,11 +1,30 @@
-# Contains module for Guillot analytical T(p) profiles
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+"""
+**Contains module for Guillot analytical T(p) profiles**
 
+Calculate analytical temperature profiles using radiative grey solutions from Guillot (2010).
+These are used for testing and benchmarking, and can set the initial state for the model.
+
+Paper: https://arxiv.org/abs/1006.4702
+
+```bibtex
+@article{guillot_on_2010,
+	author = {Guillot, T.},
+	title = {{On the radiative equilibrium of irradiated planetary atmospheres}},
+	journal = {Astron. Astrophys.},
+	volume = {520},
+	pages = {A27},
+	year = {2010},
+	month = sep,
+	issn = {0004-6361},
+	publisher = {EDP Sciences},
+	doi = {10.1051/0004-6361/200913396}
+}
+```
+"""
 module guillot
 
     import SpecialFunctions:expinti
-
-    # These functions implement the grey-gas analytical solutions from Guillot (2010)
-    #   Paper here: https://arxiv.org/pdf/1006.4702
 
     # Constants
     const κ_vs::Float64 = 4e-3 * 10  # SW opacity [m2/kg]

@@ -1,5 +1,13 @@
-# Contains module and functions for performing hashing with BLAKE2b
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+"""
+**Module for performing hashing with BLAKE2b.**
+
+Blake2b is a cryptographic hash function, which can be used to verify the integrity
+of files. More information about BLAKE2b here: https://www.blake2.net/
+
+Not supported on all platforms.
+"""
 module blake
 
     # Import modules

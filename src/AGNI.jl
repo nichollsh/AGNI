@@ -1,3 +1,4 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 # Core file containing functions for running the model
 
 # Not for direct execution
@@ -26,8 +27,8 @@ module AGNI
     include("energy/spectrum.jl"); import .spectrum; export spectrum
     include("state/atmosphere.jl"); import .atmosphere; export atmosphere
     include("state/diagnostics.jl"); import .diagnostics; export diagnostics
-    include("state/layers.jl"); import .layers; export layers
     include("compose/ocean.jl"); import .ocean; export ocean
+    include("compose/fastchem.jl"); import .fastchem; export fastchem
     include("compose/chemistry.jl"); import .chemistry; export chemistry
     include("energy/rfm.jl"); import .rfm; export rfm
     include("interface/setpt.jl"); import .setpt; export setpt

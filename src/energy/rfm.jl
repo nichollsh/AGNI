@@ -1,5 +1,13 @@
-# Contains module and functions for performing radiative transfer with RFM
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+
+"""
+**Module and functions for performing radiative transfer with RFM**
+
+The RFM (Reference Forward Model) is a line-by-line radiative transfer code developed
+by Anu Dudhia at Oxford. This module contains writies the required input files, runs it,
+and parses the output to update the radiative fluxes in AGNI for post-processing.
+"""
 module rfm
 
     # Import modules

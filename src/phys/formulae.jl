@@ -1,3 +1,12 @@
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+
+"""
+**Module for handling chemical formulae and related properties.**
+
+Contains functions for parsing chemical formulae, counting atoms, and calculating mean
+molecular weight from formula or using known values. Also includes lookup tables for
+common molecules and elements.
+"""
 module formulae
 
     # Atom counts in some standard species
@@ -17,7 +26,6 @@ module formulae
         "S8"  => Dict("S"=>8),
     ]
     )
-
 
     # Table of gas molecule mean molecular weights, kg mol-1
     const _lookup_mmw::Dict{String, Float64} = Dict([

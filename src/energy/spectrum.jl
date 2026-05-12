@@ -1,6 +1,12 @@
-# Contains the spectrum module, for updating the SOCRATES spectral file at
-# runtime with the solar flux / thermal source function, and scattering.
+# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
 
+
+"""
+**Contains the spectrum module, for updating the SOCRATES spectral files**
+
+Specifically for SOCRATES. Inserts solar flux, thermal source function, and scattering
+data into the spectral files using SOCRATES utilities.
+"""
 module spectrum
 
     using LoggingExtras
