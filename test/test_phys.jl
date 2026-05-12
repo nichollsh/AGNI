@@ -8,7 +8,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 const lookup_mmw = AGNI.formulae._lookup_mmw
 const lookup_count_atoms = AGNI.formulae._lookup_count_atoms
 const lookup_colour = AGNI.style._lookup_colour
-const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
+const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
 
 @testset "phys" begin
     # atom counting
@@ -36,7 +36,7 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     @test AGNI.style.pretty_colour("H2O") == lookup_colour["H2O"]
 
     # ideal density positive
-    rho = AGNI.phys.density._rho_ideal(300.0, 1e5, lookup_mmw["CO2"])
+    rho = AGNI.density._rho_ideal(300.0, 1e5, lookup_mmw["CO2"])
     @test isfinite(rho) && rho > 0.0
 
     # planck positive
@@ -48,8 +48,8 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     @test isapprox(g, 9.81; atol=1.0)
 
     # liquid density table and fallback
-    @test AGNI.phys.density.liquid_rho("H2O") == lookup_liquid_rho["H2O"]
-    @test AGNI.phys.density.liquid_rho("UNKNOWN") == AGNI.consts.BIGFLOAT
+    @test AGNI.density.liquid_rho("H2O") == lookup_liquid_rho["H2O"]
+    @test AGNI.density.liquid_rho("UNKNOWN") == AGNI.consts.BIGFLOAT
 
     # thermal diffusivity
     α = AGNI.phys.calc_therm_diffus(0.6, 1000.0, 1000.0)
@@ -65,7 +65,7 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # -------------
     # Test thermodynamic lookup data validity
     # -------------
-    ideal_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+    ideal_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
     @test !ideal_H2O.fail
 
 
@@ -78,7 +78,7 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
         v_obs   = zero(t_test)
         test_pass = true
         for i in 1:5
-            v_obs[i] = phys.get_Cp(ideal_H2O, t_test[i]) * ideal_H2O.mmw # get value and convert units
+            v_obs[i] = species.get_Cp(ideal_H2O, t_test[i]) * ideal_H2O.mmw # get value and convert units
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3)
         end
         if !test_pass
@@ -97,7 +97,7 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
-            v_obs[i] = phys.density.calc_rho_gas(t_test[i], p_test[i], ideal_H2O)
+            v_obs[i] = density.calc_rho_gas(t_test[i], p_test[i], ideal_H2O)
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3, atol=1e-12)
         end
 
@@ -112,14 +112,14 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # Test AQUA equation of state
     # -------------
     @testset "AQUA_EOS" begin
-        aqua_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
+        aqua_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
         t_test = [200.0,  300.0, 500.0,   1273.0,  3200.0] # Tested values of temperature [K]
         p_test = [1e0,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
         v_expt = [926.12116198786, 0.007222354920, 0.4333412952269, 17.038999553692, 66.87150907049]
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
-            v_obs[i] = phys.density.calc_rho_gas(t_test[i], p_test[i], aqua_H2O)
+            v_obs[i] = density.calc_rho_gas(t_test[i], p_test[i], aqua_H2O)
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3)
         end
 
@@ -134,14 +134,14 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # Test VdW equation of state
     # -------------
     @testset "vdw_EOS" begin
-        vdw_CO2::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "CO2", true, true)
+        vdw_CO2::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "CO2", true, true)
         t_test = [200.0,  300.0, 500.0,   1273.0,  3200.0] # Tested values of temperature [K]
         p_test = [1e0,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
         v_expt = [2.646533036586e-5, 0.01764355357724, 1.061227115599, 41.2385376189, 147.631823888]
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
-            v_obs[i] = phys.density.calc_rho_gas(t_test[i], p_test[i], vdw_CO2)
+            v_obs[i] = density.calc_rho_gas(t_test[i], p_test[i], vdw_CO2)
             test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3)
         end
         if !test_pass
@@ -204,10 +204,10 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # At the boiling point of water (373.15 K) Psat should be ~1 atm = 101325 Pa
     # -------------
     @testset "Psat" begin
-        gas_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+        gas_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
         T_boil  = 373.15  # [K]
         Psat_e  = 101325.0  # expected ~1 atm [Pa]
-        Psat_o  = phys.get_Psat(gas_H2O, T_boil)
+        Psat_o  = species.get_Psat(gas_H2O, T_boil)
         @test isfinite(Psat_o)
         @test Psat_o > 0.0
         @test isapprox(Psat_o, Psat_e; rtol=0.05)
@@ -219,10 +219,10 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # At the boiling point of water (373.15 K) Lv ≈ 2.256e6 J/kg
     # -------------
     @testset "Lv" begin
-        gas_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+        gas_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
         T_boil  = 373.15   # [K]
         Lv_e    = 2.256e6  # expected latent heat [J/kg]
-        Lv_o    = phys.get_Lv(gas_H2O, T_boil)
+        Lv_o    = species.get_Lv(gas_H2O, T_boil)
         @test isfinite(Lv_o)
         @test Lv_o > 0.0
         @test isapprox(Lv_o, Lv_e; rtol=0.05)
@@ -234,14 +234,14 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # Must be positive and in a physically reasonable range for water vapour
     # -------------
     @testset "Kc" begin
-        gas_H2O::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+        gas_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
         t_test  = [200.0, 500.0, 1000.0]  # [K]
         for t in t_test
-            Kc = phys.get_Kc(gas_H2O, t)
+            Kc = species.get_Kc(gas_H2O, t)
             @test isfinite(Kc) && Kc > 0.0
         end
         # conductivity must increase with temperature (∝ sqrt(T))
-        @test phys.get_Kc(gas_H2O, 500.0) > phys.get_Kc(gas_H2O, 200.0)
+        @test species.get_Kc(gas_H2O, 500.0) > species.get_Kc(gas_H2O, 200.0)
     end
 
 
@@ -250,10 +250,10 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # Ideal gas is always in the vapour phase (no real-gas condensation)
     # -------------
     @testset "is_vapour" begin
-        gas_N2::phys.Gas_t = phys.load_gas("$RES_DIR/thermodynamics/", "N2", true, false)
+        gas_N2::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "N2", true, false)
         # ideal / no-sat stub is always vapour
-        @test phys.is_vapour(gas_N2, 300.0, 1e5)
-        @test phys.is_vapour(gas_N2, 100.0, 1e8)
+        @test species.is_vapour(gas_N2, 300.0, 1e5)
+        @test species.is_vapour(gas_N2, 100.0, 1e8)
     end
 
 
@@ -276,24 +276,34 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # -------------
     @testset "count_atoms_extended" begin
         # Simple molecules
-        @test phys.count_atoms("O2") == Dict("O" => 2)
-        @test phys.count_atoms("N2") == Dict("N" => 2)
+        @test formulae.count_atoms("O2") == Dict("O" => 2)
+        @test formulae.count_atoms("N2") == Dict("N" => 2)
 
         # Molecules with parentheses/brackets (should be skipped by parser)
-        atoms_nh3 = phys.count_atoms("NH3")
+        atoms_nh3 = formulae.count_atoms("NH3")
         @test atoms_nh3["N"] == 1
         @test atoms_nh3["H"] == 3
 
         # Two-letter element names
-        atoms_ch4 = phys.count_atoms("CH4")
+        atoms_ch4 = formulae.count_atoms("CH4")
         @test atoms_ch4["C"] == 1
         @test atoms_ch4["H"] == 4
 
         # Complex molecule
-        atoms_h2so4 = phys.count_atoms("H2SO4")
+        atoms_h2so4 = formulae.count_atoms("H2SO4")
         @test atoms_h2so4["H"] == 2
         @test atoms_h2so4["S"] == 1
         @test atoms_h2so4["O"] == 4
+
+        # Multi-digit stoichiometry
+        atoms_glucose = formulae.count_atoms("C6H12O6")
+        @test atoms_glucose == Dict("C" => 6, "H" => 12, "O" => 6)
+
+        atoms_sucrose = formulae.count_atoms("C12H22O11")
+        @test atoms_sucrose == Dict("C" => 12, "H" => 22, "O" => 11)
+
+        atoms_c60 = formulae.count_atoms("C60")
+        @test atoms_c60 == Dict("C" => 60)
     end
 
 
@@ -301,10 +311,10 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # Test same_atoms function
     # -------------
     @testset "same_atoms" begin
-        @test phys.same_atoms(Dict("H"=>2, "O"=>1), Dict("O"=>1, "H"=>2)) == true
-        @test phys.same_atoms(Dict("C"=>1, "O"=>2), Dict("C"=>1, "O"=>2)) == true
-        @test phys.same_atoms(Dict("H"=>2, "O"=>1), Dict("H"=>2, "O"=>2)) == false
-        @test phys.same_atoms(Dict("H"=>2), Dict("H"=>2, "O"=>1)) == false
+        @test formulae.same_atoms(Dict("H"=>2, "O"=>1), Dict("O"=>1, "H"=>2)) == true
+        @test formulae.same_atoms(Dict("C"=>1, "O"=>2), Dict("C"=>1, "O"=>2)) == true
+        @test formulae.same_atoms(Dict("H"=>2, "O"=>1), Dict("H"=>2, "O"=>2)) == false
+        @test formulae.same_atoms(Dict("H"=>2), Dict("H"=>2, "O"=>1)) == false
     end
 
 
@@ -313,13 +323,13 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
     # -------------
     @testset "get_mmw" begin
         # Test known molecules
-        @test isapprox(phys.get_mmw("H2O"), lookup_mmw["H2O"]; rtol=1e-12)
-        @test isapprox(phys.get_mmw("CO2"), lookup_mmw["CO2"]; rtol=1e-12)
-        @test isapprox(phys.get_mmw("N2"), lookup_mmw["N2"]; rtol=1e-12)
+        @test isapprox(formulae.get_mmw("H2O"), lookup_mmw["H2O"]; rtol=1e-12)
+        @test isapprox(formulae.get_mmw("CO2"), lookup_mmw["CO2"]; rtol=1e-12)
+        @test isapprox(formulae.get_mmw("N2"), lookup_mmw["N2"]; rtol=1e-12)
 
         # Test that MMW is positive
-        @test phys.get_mmw("CH4") > 0.0
-        @test phys.get_mmw("O2") > 0.0
+        @test formulae.get_mmw("CH4") > 0.0
+        @test formulae.get_mmw("O2") > 0.0
     end
 
 
@@ -349,7 +359,7 @@ const lookup_liquid_rho = AGNI.phys.density._lookup_liquid_rho
         # Try to load a gas with an unsupported element (should error)
         # suppress error output for cleaner test logs
         with_logger(MinLevelLogger(current_logger(), Test.Logging.Error+1)) do
-            gas = phys.load_gas("$RES_DIR/thermodynamics/", "Xz2", true, false)
+            gas = species.load_gas("$RES_DIR/thermodynamics/", "Xz2", true, false)
             @test gas.fail == true
         end
     end

@@ -8,8 +8,8 @@ module species
     # Import local modules
     using ..consts
     using ..formulae
-    include("../util/blake.jl"); import .blake: valid_file
-    include("../util/style.jl"); import .style: pretty_colour, pretty_name
+    import ..blake: valid_file
+    import ..style: pretty_colour, pretty_name
 
     # Minimum data file version [YYYYMMDD, as integer]
     const MIN_DATA_VERSION::Int64 = 20260201

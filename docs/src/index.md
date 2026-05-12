@@ -4,6 +4,11 @@
     <p align="center">
         <b>An open-source model for extreme atmospheres on rocky exoplanets</b>
     </p>
+    <p align="center">
+        <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/covbadge.svg" alt="test coverage badge"/></a>
+        <a href="https://codecov.io/gh/nichollsh/AGNI"><img src="https://codecov.io/gh/nichollsh/AGNI/graph/badge.svg" alt="codecov badge"/></a>
+        <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/tests-total.json" alt="number of tests badge"/></a>
+    </p>
 ```
 
 AGNI's primary purpose is to simulate the atmospheric temperature-, height-, and compositional-structures of atmospheres overlying magma oceans. It does this while ensuring that radiative-convective equilibrium is maintained throughout the atmosphere. [SOCRATES](https://proteus-framework.org/SOCRATES/) is used to perform correlated-k radiative transfer including: shortwave irradiation from the star, surface emission, line absorption, Rayleigh scattering, clouds, aerosols, and collisional absorption. Mixing length theory is used to parametrise convection. AGNI also supports real gas equations of state, self-gravitation, and various spectral surface compositions. Accounting for these energy transport processes permits an energy-conserving calculation of atmospheric structure, obtained using numerical optimisation, which also yields realistic cooling rates for young rocky planets with magma oceans.
@@ -29,4 +34,3 @@ If you use AGNI, please cite the following papers:
 * Nicholls et al. (2026)   - doi:[10.1038/s41550-026-02815-8](https://doi.org/10.1038/s41550-026-02815-8)
 
 This software is available under the GPLv3. Copyright © 2023-2026 Harrison Nicholls.
-

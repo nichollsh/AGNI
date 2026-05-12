@@ -16,6 +16,7 @@ module ocean
     using Logging
 
     import ..phys
+    import ..density
 
     """
     **Determine the layering structure of surface condensates**
@@ -47,7 +48,7 @@ module ocean
 
         # Get liquid densities
         liqs::Array{String, 1} = collect(keys(sigs))
-        rhos::Array{Float64,1} = Float64[ phys.density.liquid_rho(l) for l in liqs]
+        rhos::Array{Float64,1} = Float64[ density.liquid_rho(l) for l in liqs]
 
         # Sort liquids by decreasing density
         mask::Array{Int, 1} = reverse(sortperm(rhos))

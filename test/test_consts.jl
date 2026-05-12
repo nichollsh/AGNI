@@ -39,7 +39,7 @@ using AGNI
         ("H2",  2.015880e-03),
     ]
     for (gas, expected) in mmw_cases
-        @test isapprox(AGNI.phys.formulae._lookup_mmw[gas], expected; rtol=1e-6)
+        @test isapprox(AGNI.formulae._lookup_mmw[gas], expected; rtol=1e-6)
     end
 
     # Test elements MMW
@@ -145,11 +145,11 @@ using AGNI
     # -------------
     # Liquid densities for ocean module
     # -------------
-    @test isapprox(AGNI.phys.density._lookup_liquid_rho["H2O"], 958.37; rtol=1e-5)
-    @test AGNI.phys.density._lookup_liquid_rho["CO2"] > AGNI.phys.density._lookup_liquid_rho["H2O"]
+    @test isapprox(AGNI.density._lookup_liquid_rho["H2O"], 958.37; rtol=1e-5)
+    @test AGNI.density._lookup_liquid_rho["CO2"] > AGNI.density._lookup_liquid_rho["H2O"]
 
     # All liquid densities should be positive
-    for (species, rho) in AGNI.phys.density._lookup_liquid_rho
+    for (species, rho) in AGNI.density._lookup_liquid_rho
         @test rho > 0.0  # All liquid densities should be positive
     end
 

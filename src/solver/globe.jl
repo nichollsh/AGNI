@@ -72,8 +72,7 @@ module solve_globe
             #    Check all columns
             for (iatmos,atmos) in enumerate(globe.atmos_arr)
                 resid_val = atmos.flux_tot[1]-conv_val
-                conv_val  = globe_atol + globe_rtol * abs(conv_val)
-                conv &= (abs(resid_val) < conv_val)
+                conv &= (abs(resid_val) < globe_atol + globe_rtol * abs(conv_val))
                 @info @sprintf("    Column %d: resid = %+.2e W m-2 (%+.2f%%)",
                                 iatmos, resid_val, resid_val/conv_val*100
                                 )

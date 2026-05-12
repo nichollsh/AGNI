@@ -162,49 +162,13 @@ module formulae
             m = replace(m, c => "")
         end
 
-        # Setup
+        # Parse one element token at a time, allowing multi-digit stoichiometry
         out::Dict{String,Int64} = Dict{String,Int64}()
-        nchar::Int64 = length(m)
-        i::Int64 = 1
-        elem::String = ""
-        count::Int64=-1
-        last::Bool=false
-
-        # Loop through string
-        while i <= nchar
-            last = (i == nchar)
-
-            # new element
-            if isuppercase(m[i])
-                count = 0
-                elem = string(m[i])
-                if !last && islowercase(m[i+1])  # two letter element name
-                    elem = elem*string(m[i+1])
-                    i += 1
-                end
-            end
-
-            last = (i == nchar)
-
-            # get count
-            if count == 0   # expecting number
-                # number of atoms
-                if last || isletter(m[i+1]) # got letter => count=1
-                    count = 1
-                else
-                    count = parse(Int, m[i+1])
-                end
-                # repeated element
-                if elem in keys(out)
-                    out[elem] += count
-                else
-                    out[elem] = count
-                end
-                # reset
-                elem = ""
-                count = -1
-            end
-            i += 1
+        for mtch in eachmatch(r"([A-Z][a-z]?)(\d*)", m)
+            elem = mtch.captures[1]
+            count_str = mtch.captures[2]
+            count = isempty(count_str) ? 1 : parse(Int64, count_str)
+            out[elem] = get(out, elem, 0) + count
         end
 
         return out

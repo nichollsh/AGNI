@@ -20,6 +20,8 @@
 </p>
 <p align="center" style="margin: -7px">
   <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/covbadge.svg"></a>
+  <a href="https://codecov.io/gh/nichollsh/AGNI"><img src="https://codecov.io/gh/nichollsh/AGNI/graph/badge.svg"></a>
+  <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/tests-total.json"></a>
   <a href="https://www.h-nicholls.space/AGNI/"><img src="https://github.com/nichollsh/AGNI/actions/workflows/documentation.yml/badge.svg"></a>
   <a href="LICENSE.txt"><img src="https://img.shields.io/github/license/nichollsh/AGNI?label=License"></a>
 </p>

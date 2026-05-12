@@ -7,9 +7,6 @@ module phys
 
     # Include internal modules
     using ..consts
-    include("formulae.jl"); using .formulae
-    include("species.jl"); using .species
-    include("density.jl"); using .density
 
     """
     **Evaluate the Planck function at a given wavelength and temperature.**

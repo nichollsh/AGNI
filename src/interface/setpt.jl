@@ -3,11 +3,11 @@
 module setpt
 
     import ..phys
+    import ..species
     import ..atmosphere
     import ..chemistry
     import ..layers
-
-    include("../phys/guillot.jl"); import .guillot
+    import ..guillot
 
     using NCDatasets
     using Printf
@@ -621,7 +621,7 @@ module setpt
             end
 
             # Otherwise...
-            Tdew = phys.get_Tdew(atmos.gas_dat[gas], pgas)
+            Tdew = species.get_Tdew(atmos.gas_dat[gas], pgas)
             if tmp <= Tdew + dTdew
                 return (Tdew - dTdew, true)
             else

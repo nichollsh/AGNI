@@ -12,6 +12,7 @@ module energy
     import ..phys
     import ..chemistry
     import ..spectrum
+    import ..species
 
     # Constants
     SKIP_SW_THRESH::Float64         = 1e-9      # skip SW calculation if TOA heating is below this threshold [W m-2]
@@ -875,7 +876,7 @@ module energy
 
                 # Calculate latent heat release at this level from the contributions
                 #   of condensation (+) and evaporation (-), and a fixed timescale.
-                atmos.phs_wrk_df[i] += phys.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) *
+                atmos.phs_wrk_df[i] += species.get_Lv(atmos.gas_dat[c], atmos.tmp[i]) *
                                     (atmos.cond_yield[c][i] / atmos.phs_timescale)
 
             end # go to next level

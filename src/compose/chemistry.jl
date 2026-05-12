@@ -15,11 +15,12 @@ module chemistry
     using Logging
 
     # Local files
-    using ..phys
+    import ..phys
     import ..atmosphere
     import ..layers
-    include("ocean.jl"); using .ocean
-    include("fastchem.jl"); import .fastchem: run_fastchem!
+    import ..species
+    import ..ocean
+    include("fastchem.jl"); import .fastchem
 
     # Constants
     const SMALL_FLOAT::Float64  = 1e-20     # small number for numerical stability
@@ -138,7 +139,7 @@ module chemistry
             dp = 0.0
 
             # If de-mixed
-            if atmos.demixing && (atmos.tmp_surf < phys.get_Tdemix(atmos.gas_dat[c], atmos.p_boa, atmos.gas_vmr[c][end]))
+            if atmos.demixing && (atmos.tmp_surf < species.get_Tdemix(atmos.gas_dat[c], atmos.p_boa, atmos.gas_vmr[c][end]))
                 # rainout completely, and skip condensation
                 dp = -p_gas[c]
                 atmos.p_boa += dp
@@ -154,7 +155,7 @@ module chemistry
 
                 # Calculate partial pressure and saturation pressure for this condensable
                 #     Work out amount of sub(+) or super(-) saturation
-                dp = phys.get_Psat(atmos.gas_dat[c], atmos.tmp_surf) - p_gas[c]
+                dp = species.get_Psat(atmos.gas_dat[c], atmos.tmp_surf) - p_gas[c]
 
                 # Negligible
                 if abs(dp) < SMALL_FLOAT
@@ -258,7 +259,7 @@ module chemistry
             for c in atmos.condensates
 
                 # Handle de-mixing
-                if atmos.demixing && (atmos.tmp[i] < phys.get_Tdemix(atmos.gas_dat[c], atmos.p[i], atmos.gas_vmr[c][i]))
+                if atmos.demixing && (atmos.tmp[i] < species.get_Tdemix(atmos.gas_dat[c], atmos.p[i], atmos.gas_vmr[c][i]))
                     # rainout completely at this layer, and skip condensation
                     atmos.gas_vmr[c][i] = 0.0
                     atmos.gas_sat[c][i] = true
@@ -268,7 +269,7 @@ module chemistry
                 supcrit = atmos.tmp[i] > atmos.gas_dat[c].T_crit+1.0e-5
 
                 # saturation mixing ratio
-                x_sat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[i]) / atmos.p[i]
+                x_sat = species.get_Psat(atmos.gas_dat[c], atmos.tmp[i]) / atmos.p[i]
 
                 # Apply cold trap, implicitly accounting for condensable not making it
                 #   this high up by vertical dynamical-transport processes.
@@ -355,7 +356,7 @@ module chemistry
                 end
 
                 # change in partial pressure that would saturate
-                dp_sat = phys.get_Psat(atmos.gas_dat[c], atmos.tmp[j]) -
+                dp_sat = species.get_Psat(atmos.gas_dat[c], atmos.tmp[j]) -
                                                 atmos.gas_vmr[c][j]*atmos.p[j]
 
                 # production of gas mass (kg/m2) that would saturate

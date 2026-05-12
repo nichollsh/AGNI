@@ -12,6 +12,7 @@ module plotting
 
     import ..atmosphere
     import ..phys
+    import ..species
     import ..multicol
 
     # Allowed plot file extensions
@@ -121,7 +122,7 @@ module plotting
                 # demixing binodal for this condensate
                 if atmos.demixing
                     for i in 1:atmos.nlev_c
-                        dmx_t[i] = phys.get_Tdemix(atmos.gas_dat[c], atmos.p[i], atmos.gas_vmr[c][i])
+                        dmx_t[i] = species.get_Tdemix(atmos.gas_dat[c], atmos.p[i], atmos.gas_vmr[c][i])
                         if dmx_t[i] < 0.0
                             dmx_t[i] = NaN
                         end
@@ -137,7 +138,7 @@ module plotting
                     continue
                 end
                 for i in 1:atmos.nlev_c
-                    sat_t[i] = phys.get_Tdew(atmos.gas_dat[c], atmos.p[i]*atmos.gas_vmr[c][i])
+                    sat_t[i] = species.get_Tdew(atmos.gas_dat[c], atmos.p[i]*atmos.gas_vmr[c][i])
                     if sat_t[i] > atmos.gas_dat[c].T_crit-0.1
                         sat_t[i] = NaN
                     end

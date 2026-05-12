@@ -2,6 +2,8 @@ module layers
 
     import ..atmosphere
     import ..phys
+    import ..density
+    import ..species
 
     # Hydrostatic+gravity+mass calculation (constants and limits)
     HYDROGRAV_steps::Int64   = 2000      # total number of steps in height integration
@@ -244,7 +246,7 @@ module layers
             rj += dp/6 * (k1 + 2*k2 + 2*k3 + k4)
 
             # Integrate mass enclosed ...
-            mj += 4 * pi * rj^2 * (-1 * dp) / _accel(rj) 
+            mj += 4 * pi * rj^2 * (-1 * dp) / _accel(rj)
 
             # Integrate pressure (negative change )
             pj += dp
@@ -307,8 +309,8 @@ module layers
         # Loop over gases
         for gas in atmos.gas_names
             mmr = atmos.gas_vmr[gas][idx] * atmos.gas_dat[gas].mmw/atmos.layer_μ[idx]
-            atmos.layer_cp[idx] += mmr * phys.get_Cp(atmos.gas_dat[gas], atmos.tmp[idx])
-            atmos.layer_kc[idx] += mmr * phys.get_Kc(atmos.gas_dat[gas], atmos.tmp[idx])
+            atmos.layer_cp[idx] += mmr * species.get_Cp(atmos.gas_dat[gas], atmos.tmp[idx])
+            atmos.layer_kc[idx] += mmr * species.get_Kc(atmos.gas_dat[gas], atmos.tmp[idx])
         end
         return nothing
     end
@@ -339,17 +341,12 @@ module layers
     - `idx::Int64`          index of the layer
     """
     function calc_single_density!(atmos::atmosphere.Atmos_t, idx::Int64)
-        # Array of gas properties
-        gas_arr = [atmos.gas_dat[gas]      for gas in atmos.gas_names]
-        vmr_arr = [atmos.gas_vmr[gas][idx] for gas in atmos.gas_names]
-
-        # Evaluate density
-        atmos.layer_ρ[idx] = phys.density.calc_rho_mix(
-                                                    gas_arr, vmr_arr,
-                                                    atmos.tmp[idx], atmos.p[idx],
-                                                    atmos.layer_μ[idx]
-                                                    )
-
+        atmos.layer_ρ[idx] = density.calc_rho_mix(
+                                    [atmos.gas_dat[gas] for gas in atmos.gas_names],
+                                    [atmos.gas_vmr[gas][idx] for gas in atmos.gas_names],
+                                    atmos.tmp[idx], atmos.p[idx],
+                                    atmos.layer_μ[idx]
+                                )
         return nothing
     end
 

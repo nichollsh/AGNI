@@ -14,9 +14,15 @@ module AGNI
     import TOML:parsefile
 
     # Include local jl files (submodule load-ordering matters here)
+    include("util/blake.jl"); import .blake; export blake
     include("interface/paths.jl"); import .paths; export paths
     include("phys/consts.jl"); import .consts; export consts
+    include("phys/formulae.jl"); import .formulae; export formulae
+    include("util/style.jl"); import .style; export style
+    include("phys/species.jl"); import .species; export species
+    include("phys/density.jl"); import .density; export density
     include("phys/phys.jl"); import .phys; export phys
+    include("phys/guillot.jl"); import .guillot; export guillot
     include("energy/spectrum.jl"); import .spectrum; export spectrum
     include("state/atmosphere.jl"); import .atmosphere; export atmosphere
     include("state/diagnostics.jl"); import .diagnostics; export diagnostics
@@ -29,8 +35,6 @@ module AGNI
     include("interface/load.jl"); import .load; export load
     include("energy/energy.jl"); import .energy; export energy
     include("state/multicol.jl"); import .multicol; export multicol
-    include("phys/formulae.jl"); import .formulae; export formulae
-    include("util/style.jl"); import .style; export style
     include("interface/plotting.jl"); import .plotting; export plotting
     include("solver/solver.jl"); import .solver; export solver
 

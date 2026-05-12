@@ -96,7 +96,7 @@ end
 ```
 
 ### `include()` order in `src/AGNI.jl` is load-order dependent
-New source files must be added at the correct position in `AGNI.jl`'s `include` list (dependencies before dependents) and then explicitly `import`ed and `export`ed.
+New source files must be added at the correct position in `AGNI.jl`'s `include` list (dependencies before dependents) and then explicitly `import`ed and `export`ed. All includes are at the top of `AGNI.jl` before any code, and other modules will import from `AGNI` rather than each other. Thie ensures a single load order and avoids circular dependencies.
 
 ### Bang (`!`) functions mutate `Atmos_t`
 Functions like `setup!`, `allocate!`, `deallocate!`, `set_deep_heating!` follow the Julia convention of mutating their primary argument in place.

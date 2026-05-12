@@ -476,8 +476,8 @@ function update_metallicity!(atmos, _logZ, _logCO)
     S_to_H_MOLAR = 10^(7.12-12)
 
     # Convert to mass ratios
-    N_to_H = N_to_H_MOLAR * phys.get_mmw("N") / phys.get_mmw("H")
-    S_to_H = S_to_H_MOLAR * phys.get_mmw("S") / phys.get_mmw("H")
+    N_to_H = N_to_H_MOLAR * formulae.get_mmw("N") / formulae.get_mmw("H")
+    S_to_H = S_to_H_MOLAR * formulae.get_mmw("S") / formulae.get_mmw("H")
 
     # ------------------------
     # Convert Z and C/O (by mass) from log-scaled to actual values
@@ -498,10 +498,10 @@ function update_metallicity!(atmos, _logZ, _logCO)
     # pass to dictionary used for FC input
     # metallicity is by mass frac, but atmosphere stores value by mol frac
     atmos.metal_orig["H"] = 1.0
-    atmos.metal_orig["C"] = C_to_H * phys.get_mmw("H") / phys.get_mmw("C")
-    atmos.metal_orig["O"] = O_to_H * phys.get_mmw("H") / phys.get_mmw("O")
-    atmos.metal_orig["S"] = S_to_H * phys.get_mmw("H") / phys.get_mmw("S")
-    atmos.metal_orig["N"] = N_to_H * phys.get_mmw("H") / phys.get_mmw("N")
+    atmos.metal_orig["C"] = C_to_H * formulae.get_mmw("H") / formulae.get_mmw("C")
+    atmos.metal_orig["O"] = O_to_H * formulae.get_mmw("H") / formulae.get_mmw("O")
+    atmos.metal_orig["S"] = S_to_H * formulae.get_mmw("H") / formulae.get_mmw("S")
+    atmos.metal_orig["N"] = N_to_H * formulae.get_mmw("H") / formulae.get_mmw("N")
 
     # remove FC input file to force update
     rm(atmos.fastchem_elem, force=true)

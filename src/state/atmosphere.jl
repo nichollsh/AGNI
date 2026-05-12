@@ -25,6 +25,8 @@ module atmosphere
     import ..spectrum
     import ..paths
     import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum
+    import ..formulae
+    import ..species
 
     # Configuration defaults
     const CFG_surface_material::String  = "greybody"
@@ -202,7 +204,7 @@ module atmosphere
         # Gas tracking variables (incl gases which are not in spectralfile)
         gas_num::Int64                              # Number of gases
         gas_names::Array{String,1}                  # List of gas names
-        gas_dat::Dict{String, phys.Gas_t}           # Struct variables containing thermodynamic data for each gas
+        gas_dat::Dict{String, species.Gas_t}           # Struct variables containing thermodynamic data for each gas
 
         # Chemistry and composition
         gas_vmr::Dict{String, Array{Float64,1}}     # runtime calculated VMRs in dict, (key,value) = (gas_name,array)
@@ -931,7 +933,7 @@ module atmosphere
         # Gas variables
         atmos.gas_num   =   0                                 # number of gases
         atmos.gas_names =   Array{String}(undef, 0)           # list of names
-        atmos.gas_dat =     Dict{String, phys.Gas_t}()        # dict of gas data structs
+        atmos.gas_dat =     Dict{String, species.Gas_t}()        # dict of gas data structs
         atmos.gas_vmr  =    Dict{String, Array{Float64,1}}()  # dict of VMR arrays
         atmos.gas_ovmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
         atmos.gas_cvmr  =   Dict{String, Array{Float64,1}}()  # ^ backup of initial values
@@ -943,7 +945,7 @@ module atmosphere
         atmos.metal_calc =  Dict{String, Float64}()          # calculated metallicities (empty for now)
         for k in keys(metallicities)
             # mass -> mole, by scaling factor mu
-            atmos.metal_orig[k] = metallicities[k] * phys.get_mmw("H") / phys.get_mmw(k)
+            atmos.metal_orig[k] = metallicities[k] * formulae.get_mmw("H") / formulae.get_mmw(k)
         end
 
         if haskey(atmos.metal_orig, "H") && (atmos.metal_orig["H"] != 1.0)
@@ -1135,7 +1137,7 @@ module atmosphere
         # Load gas thermodynamic data
         @info "Loading thermodynamic data"
         for g in atmos.gas_names
-            atmos.gas_dat[g] = phys.load_gas(atmos.THERMO_DIR, g,
+            atmos.gas_dat[g] = species.load_gas(atmos.THERMO_DIR, g,
                                                 atmos.thermo_funct, atmos.real_gas;
                                                 check_integrity=check_integrity)
 
@@ -2292,7 +2294,7 @@ module atmosphere
         # Set all gases to use ideal gas EOS
         # Avoid issues with partial pressures near zero
         for g in atmos.gas_names
-            atmos.gas_dat[g].eos = phys.EOS_IDEAL
+            atmos.gas_dat[g].eos = species.EOS_IDEAL
         end
 
         # Set surface pressure to be very small, but still larger than TOA pressure
