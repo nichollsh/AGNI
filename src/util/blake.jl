@@ -34,6 +34,9 @@ module blake
         if !Sys.islinux()
             return "ONLY_SUPPORTED_ON_LINUX"
         end
+        if Sys.ARCH != :x86_64
+            return "ONLY_SUPPORTED_ON_AMD64"
+        end
         if !isfile(fpath)
             quiet || @warn "File not found '$fpath'"
             return "FILE_NOT_FOUND:$fpath"
@@ -57,7 +60,7 @@ module blake
     """
     function valid_file(fpath::String; quiet::Bool=false)::Bool
         # Return true if unsupported
-        if !Sys.islinux()
+        if !Sys.islinux() || Sys.ARCH != :x86_64
             quiet || @debug "Skipping integrity check for '$fpath'"
             return true
         end
@@ -93,6 +96,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         @error("Invalid arguments: $(ARGS)")
     elseif !Sys.islinux()
         @error("File hashing is only supported on Linux")
+    elseif Sys.ARCH != :x86_64
+        @error("File hashing is only supported on AMD64 architecture")
     else
         @info("Computing BLAKE2b hash...")
         hash_obs = blake.hash_file(ARGS[1])
