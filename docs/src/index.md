@@ -1,13 +1,9 @@
 ```@raw html
     <img class="display-light-only" src="assets/logo_title_light.svg" width=32% alt="AGNI logo, light mode"/>
     <img class="display-dark-only"  src="assets/logo_title_dark.svg"  width=32% alt="AGNI logo, dark mode"/>
+
     <p align="center">
         <b>An open-source model for extreme atmospheres on rocky exoplanets</b>
-    </p>
-    <p align="center">
-        <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/covbadge.svg" alt="test coverage badge"/></a>
-        <a href="https://codecov.io/gh/nichollsh/AGNI"><img src="https://codecov.io/gh/nichollsh/AGNI/graph/badge.svg" alt="codecov badge"/></a>
-        <a href="https://github.com/nichollsh/AGNI/actions/workflows/install_and_test.yml"><img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/nichollsh/e20f4fa3c7811c75d34005311fef3696/raw/tests-total.json" alt="number of tests badge"/></a>
     </p>
 ```
 
