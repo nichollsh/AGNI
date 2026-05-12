@@ -1116,8 +1116,12 @@ module energy
     - `Bool`                            whether the calculation succeeded
     """
     function calc_hrates!(atmos::atmosphere.Atmos_t)::Bool
+        # Ensure flux difference has been calculated
+        atmos.flux_dif[1:end] .= atmos.flux_tot[2:end] .- atmos.flux_tot[1:end-1]
+
+        # Evaluate heating rate
         for i in 1:atmos.nlev_c
-            atmos.heating_rate[i] = (atmos.g[i] / atmos.layer_cp[i]) *
+            atmos.heating_rate[i] = (atmos.a[i] / atmos.layer_cp[i]) *
                                         atmos.flux_dif[i] / (atmos.pl[i+1] - atmos.pl[i])
         end
 

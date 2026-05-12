@@ -52,8 +52,13 @@ rm(OUT_DIR,force=true,recursive=true)
 if !isdir(OUT_DIR) && !isfile(OUT_DIR)
     mkdir(OUT_DIR)
 end
-for f in vcat(glob("*.cov", TEST_DIR), glob("*.cov", SRC_DIR))
-    rm(f, force=true)
+# remove stale coverage files recursively across repository
+for (dir, _, files) in walkdir(ROOT_DIR)
+    for f in files
+        if endswith(f, ".cov")
+            rm(joinpath(dir, f), force=true)
+        end
+    end
 end
 for f in glob("coverage.*", ROOT_DIR)
     rm(f, force=true)

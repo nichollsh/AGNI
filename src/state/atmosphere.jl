@@ -1937,7 +1937,7 @@ module atmosphere
         #    hydrostatic integrator, this can cause dr to blow up, especially
         #    with a low MMW gas. Should be okay as long as the T(p) provided
         #    by the user is more reasonable.
-        # calc_layer_props!(atmos)
+        calc_layer_props!(atmos)
 
         ################################
         # Aerosol processes
