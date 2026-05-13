@@ -234,12 +234,15 @@ module rfm
         end
 
         # Locate executable
-        if Sys.isapple()
+        if Sys.isapple() && Sys.ARCH == :aarch64
             @debug "Run RFM (MacOS binary)"
             execpath = joinpath(paths.get_dir("blobs"), "rfm-arm64-macos")
-        else
+        elseif Sys.islinux() && Sys.ARCH == :x86_64
             @debug "Run RFM (Linux binary)"
             execpath = joinpath(paths.get_dir("blobs"), "rfm-amd64-linux")
+        else
+            @warn "RFM is only supported on Linux(x86_64) and MacOS(ARM64) architectures"
+            return false
         end
 
         # Log file path
