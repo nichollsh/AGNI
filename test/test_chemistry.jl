@@ -654,12 +654,48 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     end
 
 
-    # ===========================================
-    # FASTCHEM TESTS (only if FC_DIR is set)
-    # ===========================================
+    # FASTCHEM tests
+    @testset "fastchem_integration" begin
+        # -------------
+        # Test direct FastChem wrapper
+        # -------------
+        @testset "run_fastchem_direct" begin
+            mf_dict = Dict([
+                ("H2O" , 0.5),
+                ("CO2" , 0.3),
+                ("N2"  , 0.2)
+            ])
 
-    if haskey(ENV, "FC_DIR") && isdir(ENV["FC_DIR"])
-        @info "FastChem found - running chemistry tests with FastChem"
+            atmos = atmosphere.Atmos_t()
+            atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                            spfile_name,
+                            toa_heating, 1.0, 0.0, theta,
+                            tmp_surf,
+                            gravity, radius,
+                            nlev, p_surf, p_top,
+                            mf_dict, "",
+                            real_gas=false,
+                            thermo_functions=true
+                    )
+            atmosphere.allocate!(atmos,"")
+            setpt.isothermal!(atmos, tmp_surf)
+
+            @test atmos.flag_fastchem == true
+            state = fastchem.run_fastchem!(atmos, true)
+            @test state in [0, 2, 3, 4]
+
+            @test isfile(atmos.fastchem_conf)
+            @test isfile(atmos.fastchem_elem)
+            @test isfile(atmos.fastchem_prof)
+            @test isfile(atmos.fastchem_moni)
+            @test isfile(atmos.fastchem_chem)
+
+            conf_str = read(atmos.fastchem_conf, String)
+            @test occursin("#Atmospheric profile input file", conf_str)
+            @test occursin(atmos.fastchem_prof, conf_str)
+
+            atmosphere.deallocate!(atmos)
+        end
 
         # -------------
         # Test _chem_gas! with fastchem
@@ -933,9 +969,6 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 
             atmosphere.deallocate!(atmos)
         end
-
-    else
-        @info "FC_DIR not set - skipping FastChem tests"
     end
 
 

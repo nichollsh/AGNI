@@ -16,6 +16,7 @@ module rfm
 
     # Local files
     import ..atmosphere
+    import ..paths
 
     # Species supported by RFM (https://eodg.atm.ox.ac.uk/RFM/rfm_spec.html#gaslist)
     const RFM_GASES::Array{String} = [
@@ -28,12 +29,6 @@ module rfm
         # Extra
         "ClONO2", "N2O5", "SF6", "CCl4", "HNO4", "SF5CF3", "BrONO2", "ClOOCl", "CH3OH",
         ]
-
-    # Executable paths
-    const RFM_LINUX::String = abspath(dirname(@__FILE__),
-                                            "..", "res", "blobs", "rfm-amd64-linux")
-    const RFM_MACOS::String = abspath(dirname(@__FILE__),
-                                            "..", "res", "blobs", "rfm-arm64-macos")
 
     """
     **Write atmospheric profile for RFM from current state.**
@@ -219,36 +214,58 @@ module rfm
     - `numin::Float64`              minimum wavenumber [cm-1]
     - `numax::Float64`              maximum wavenumber [cm-1]
     - `nures::Float64`              resolution on wavenumber [cm-1]
+    - `keeplog::Bool`               whether to keep RFM log file
 
     Returns:
     - `succ::Bool`                  success?
     """
     function run_rfm(atmos::atmosphere.Atmos_t,
-                        numin::Float64, numax::Float64; nures::Float64=1.0)::Bool
+                        numin::Float64, numax::Float64;
+                        nures::Float64=1.0,
+                        keeplog::Bool=false)::Bool
         # Write required files
         write_profile(atmos)
         write_driver(atmos, numin, numax, nures)
 
+        # Not supported on ARM
+        if Sys.ARCH != :x86_64
+            @warn "RFM is not supported on ARM architecture"
+            return false
+        end
+
         # Locate executable
         if Sys.isapple()
             @debug "Run RFM (MacOS binary)"
-            execpath = RFM_MACOS
+            execpath = joinpath(paths.get_dir("blobs"), "rfm-arm64-macos")
         else
             @debug "Run RFM (Linux binary)"
-            execpath = RFM_LINUX
+            execpath = joinpath(paths.get_dir("blobs"), "rfm-amd64-linux")
         end
+
+        # Log file path
+        rfm_log = joinpath(atmos.rfm_work, "rfm.log")
+        rm(rfm_log, force=true) # remove old log if exists
 
         # Construct command
         cmd = `$execpath` # path to RFM executable
         cmd = setenv(cmd, dir=atmos.rfm_work) # run inside working directory
-        cmd = pipeline(cmd, stdout=devnull) # hide rfm terminal output
+        cmd = pipeline(cmd, stdout=rfm_log) # pipe output to logfile
 
         # Run subprocess
         try
             run(cmd)
         catch err
-            @error "Failed to run RFM" exception=(err, catch_backtrace())
+            @warn "Failed to run RFM" exception=(err, catch_backtrace())
             return false
+        end
+
+        # Check that log file doesn't contain error messages
+        logstr = read(rfm_log, String)
+        if any([occursin(s, logstr) for s in ["F-", "error", "fail"]])
+            @warn "Failed to run RFM. Check log file for details: $rfm_log"
+            return false
+        elseif !keeplog
+            rm(rfm_log, force=true) # remove log file if successful
         end
 
         # Get output from RFM

@@ -79,6 +79,7 @@ jobs:
       - name: Run AGNI test suite
         run: |
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export FC_DIR="/home/runner/work/AGNI/AGNI/fastchem"
           export LD_LIBRARY_PATH=""
           julia --project=. --code-coverage test/runtests.jl
 

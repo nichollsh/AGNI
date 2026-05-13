@@ -23,7 +23,7 @@ using Test
 @info "Begin AGNI tests"
 
 # Configure
-SLOW_TESTS = ["integration", "chemistry", "deep_heating", "kzz", "spectrum"]
+SLOW_TESTS = ["integration", "chemistry", "deep_heating", "kzz", "spectrum", "rfm"]
 
 # Prepare
 SRC_DIR         = joinpath(ROOT_DIR,"src/")
@@ -45,7 +45,7 @@ if length(ARGS)>0
         suite = "fast"
     end
 end
-@info "Requested test suite '$suite'"
+@info "Requested suite '$suite'"
 
 # remove old files
 rm(OUT_DIR,force=true,recursive=true)
@@ -92,7 +92,7 @@ elseif suite in test_names
 
 else
     if suite != "all"
-        @error "Test suite '$suite' not found"
+        @error "Suite '$suite' not found"
         exit(1)
     end
 end
@@ -102,7 +102,8 @@ test_files = String[]
 for test_name in test_names
     push!(test_files, joinpath(TEST_DIR, "test_$test_name.jl"))
 end
-@info "Collected tests: $(join(test_names, ", "))"
+@info "Collected: $(join(test_names, ", "))"
+@info "Running tests..."
 
 # Configure logging to show only error messages during tests
 LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Error))
