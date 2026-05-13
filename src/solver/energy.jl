@@ -270,21 +270,20 @@ module solve_energy
             # Set new temperatures
             _set_tmps!(x)
 
+            # New layer properties
+            atmosphere.calc_layer_props!(atmos)
+
             # Do chemistry?
             compose_here = compose && (oceans || chem || rainout)
             if compose_here
-                chemistry.calc_composition!(atmos, oceans, chem, false)
+                chemistry.calc_composition!(atmos, oceans, chem, rainout)
             end
 
-            # Do saturation aloft here, only. Keep chemistry fixed.
-            if rainout
-                # reset back to post-chemistry mixing ratios
-                chemistry.reset_to_chem!(atmos)
-                chemistry._sat_aloft!(atmos)
+            # Set cloud profiles from condensation of H2O
+            atmosphere.set_cloud!(atmos; from_yield=true, mmr_sf=easy_sf)
 
-            elseif !compose_here
-                atmosphere.calc_layer_props!(atmos)
-            end
+            # Set aerosol profiles at levels where condensation occurs
+            atmosphere.set_aerosols!(atmos; mmr_sf=easy_sf)
 
             # Calculate fluxes
             step_ok &= energy.calc_fluxes!(atmos, radiative=true,
@@ -546,6 +545,11 @@ module solve_energy
                     step_ok = false
                 end
             end
+
+            # Set clouds and aerosols
+            atmosphere.set_cloud!(atmos; from_yield=true, mmr_sf=easy_sf)
+            atmosphere.set_aerosols!(atmos; mmr_sf=easy_sf)
+
 
             # Switch RT scheme?
             if grey_start & !grey_step
@@ -844,9 +848,16 @@ module solve_energy
                 @debug info_str
             end
 
+            # Check if surface temperature has collapsed to floor
+            if atmos.tmp_surf < atmos.tmp_floor + tmp_pad+1
+                @warn "Surface temperature collapsed! Resetting to initial guess..."
+                step_ok = false
+                @. x_cur = x_ini
+            end
+
             # Converged?
             @debug "        check convergence"
-            if (conv_val < conv_atol + conv_rtol * c_max)
+            if (conv_val < conv_atol + conv_rtol * c_max) && step_ok
                 # still using grey RT?
                 if grey_step
                     # switch to preferred RT scheme
@@ -858,7 +869,7 @@ module solve_energy
                 end
             end
 
-            # Show benchmark
+            # Show benchmark [nanoseconds -> ms]
             if atmos.benchmark
                 rt_avg = atmos.tim_rt_eval / atmos.num_rt_eval / 1e9 * 1e3
                 @debug @sprintf("Average RT time: %.3f ms", rt_avg)

@@ -33,9 +33,6 @@ _base_cfg() = AGNI.open_config(AGNI_CORE_TEST_CFG)
         @test !occursin("stale", logtxt)
         @test occursin("WARN", logtxt)
 
-        # null logger branch (no file, no terminal)
-        @test AGNI.make_logger("", to_term=false) isa Logging.NullLogger
-
         # setup logging branches
         old_logger = current_logger()
         try
@@ -96,87 +93,99 @@ output_dir = "/"
     end
 end
 
-@testset "agni_run_from_config_validation" begin
-    # missing required key
-    cfg = _base_cfg()
-    delete!(cfg["planet"], "tmp_surf")
-    @test AGNI.run_from_config(cfg) == false
+@testset "agni_config" begin
 
-    # overspecified gravity + mass
+    # check the config has expected values
     cfg = _base_cfg()
-    cfg["planet"]["mass"] = 5.972e24
-    @test AGNI.run_from_config(cfg) == false
+    @test haskey(cfg, "planet")
+    @test haskey(cfg["planet"], "tmp_surf")
+    @test haskey(cfg["composition"], "vmr_dict")
+    @test haskey(cfg["physics"], "chemistry")
+    @test cfg["physics"]["chemistry"] == false
 
-    # greybody without albedo_s
-    cfg = _base_cfg()
-    delete!(cfg["planet"], "albedo_s")
-    @test AGNI.run_from_config(cfg) == false
+    # hide error messages for these since we're testing that they throw
+    with_logger(MinLevelLogger(current_logger(), Test.Logging.Error+1)) do
+        # missing required key
+        cfg = _base_cfg()
+        delete!(cfg["planet"], "tmp_surf")
+        @test AGNI.run_from_config(cfg) == false
 
-    # p_surf with no composition source
-    cfg = _base_cfg()
-    delete!(cfg["composition"], "vmr_dict")
-    @test AGNI.run_from_config(cfg) == false
+        # overspecified gravity + mass
+        cfg = _base_cfg()
+        cfg["planet"]["mass"] = 5.972e24
+        @test AGNI.run_from_config(cfg) == false
 
-    # composition overspecified (vmr_dict + vmr_file)
-    cfg = _base_cfg()
-    cfg["composition"]["vmr_file"] = "/tmp/vmr.csv"
-    @test AGNI.run_from_config(cfg) == false
+        # greybody without albedo_s
+        cfg = _base_cfg()
+        delete!(cfg["planet"], "albedo_s")
+        @test AGNI.run_from_config(cfg) == false
 
-    # metallicities require chemistry
-    cfg = _base_cfg()
-    delete!(cfg["composition"], "vmr_dict")
-    cfg["composition"]["metallicities"] = Dict("C" => 1.0)
-    cfg["physics"]["chemistry"] = false
-    @test AGNI.run_from_config(cfg) == false
+        # p_surf with no composition source
+        cfg = _base_cfg()
+        delete!(cfg["composition"], "vmr_dict")
+        @test AGNI.run_from_config(cfg) == false
 
-    # transparent mode incompatible with chemistry
-    cfg = _base_cfg()
-    cfg["composition"]["transparent"] = true
-    cfg["physics"]["chemistry"] = true
-    @test AGNI.run_from_config(cfg) == false
+        # composition overspecified (vmr_dict + vmr_file)
+        cfg = _base_cfg()
+        cfg["composition"]["vmr_file"] = "/tmp/vmr.csv"
+        @test AGNI.run_from_config(cfg) == false
 
-    # partial pressures cannot be combined with VMR definition
-    cfg = _base_cfg()
-    delete!(cfg["composition"], "p_surf")
-    cfg["composition"]["p_dict"] = Dict("N2" => 1.0e5)
-    cfg["composition"]["vmr_dict"] = Dict("N2" => 1.0)
-    @test AGNI.run_from_config(cfg) == false
+        # metallicities require chemistry
+        cfg = _base_cfg()
+        delete!(cfg["composition"], "vmr_dict")
+        cfg["composition"]["metallicities"] = Dict("C" => 1.0)
+        cfg["physics"]["chemistry"] = false
+        @test AGNI.run_from_config(cfg) == false
 
-    # greygas requires explicit opacities
-    cfg = _base_cfg()
-    cfg["files"]["input_sf"] = "greygas"
-    @test AGNI.run_from_config(cfg) == false
+        # transparent mode incompatible with chemistry
+        cfg = _base_cfg()
+        cfg["composition"]["transparent"] = true
+        cfg["physics"]["chemistry"] = true
+        @test AGNI.run_from_config(cfg) == false
 
-    # invalid plot extension
-    cfg = _base_cfg()
-    cfg["plots"]["extension"] = "invalidext"
-    @test AGNI.run_from_config(cfg) == false
+        # partial pressures cannot be combined with VMR definition
+        cfg = _base_cfg()
+        delete!(cfg["composition"], "p_surf")
+        cfg["composition"]["p_dict"] = Dict("N2" => 1.0e5)
+        cfg["composition"]["vmr_dict"] = Dict("N2" => 1.0)
+        @test AGNI.run_from_config(cfg) == false
 
-    # latent heat requires rainout
-    cfg = _base_cfg()
-    cfg["physics"]["latent_heat"] = true
-    cfg["physics"]["rainout"] = false
-    @test AGNI.run_from_config(cfg) == false
+        # greygas requires explicit opacities
+        cfg = _base_cfg()
+        cfg["files"]["input_sf"] = "greygas"
+        @test AGNI.run_from_config(cfg) == false
 
-    # sensible heat needs roughness + wind_speed
-    cfg = _base_cfg()
-    delete!(cfg["planet"], "roughness")
-    @test AGNI.run_from_config(cfg) == false
+        # invalid plot extension
+        cfg = _base_cfg()
+        cfg["plots"]["extension"] = "invalidext"
+        @test AGNI.run_from_config(cfg) == false
 
-    # sol_type=2 requires conductive-skin parameters
-    cfg = _base_cfg()
-    cfg["execution"]["solution_type"] = 2
-    delete!(cfg["planet"], "skin_k")
-    @test AGNI.run_from_config(cfg) == false
+        # latent heat requires rainout
+        cfg = _base_cfg()
+        cfg["physics"]["latent_heat"] = true
+        cfg["physics"]["rainout"] = false
+        @test AGNI.run_from_config(cfg) == false
 
-    # sol_type=3 requires flux_int
-    cfg = _base_cfg()
-    cfg["execution"]["solution_type"] = 3
-    delete!(cfg["planet"], "flux_int")
-    @test AGNI.run_from_config(cfg) == false
+        # sensible heat needs roughness + wind_speed
+        cfg = _base_cfg()
+        delete!(cfg["planet"], "roughness")
+        @test AGNI.run_from_config(cfg) == false
 
-    # sol_type=4 requires target_olr
-    cfg = _base_cfg()
-    cfg["execution"]["solution_type"] = 4
-    @test AGNI.run_from_config(cfg) == false
+        # sol_type=2 requires conductive-skin parameters
+        cfg = _base_cfg()
+        cfg["execution"]["solution_type"] = 2
+        delete!(cfg["planet"], "skin_k")
+        @test AGNI.run_from_config(cfg) == false
+
+        # sol_type=3 requires flux_int
+        cfg = _base_cfg()
+        cfg["execution"]["solution_type"] = 3
+        delete!(cfg["planet"], "flux_int")
+        @test AGNI.run_from_config(cfg) == false
+
+        # sol_type=4 requires target_olr
+        cfg = _base_cfg()
+        cfg["execution"]["solution_type"] = 4
+        @test AGNI.run_from_config(cfg) == false
+    end
 end

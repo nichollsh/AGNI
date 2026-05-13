@@ -2837,12 +2837,19 @@ module atmosphere
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used.
-    - `from_yield::Bool`              set cloud properties based on condensation yield
+    - `from_yield::Bool`            set cloud properties based on condensation yield
+    - `mmr_sf::Float64`             scaling factor to apply to cloud MMR
 
     Returns:
     - `any_cloud::Bool`  whether any clouds are present
     """
-    function set_cloud!(atmos::atmosphere.Atmos_t; from_yield::Bool=true)::Bool
+    function set_cloud!(atmos::atmosphere.Atmos_t;
+                            from_yield::Bool=true, mmr_sf::Float64=1.0)::Bool
+
+        # Do we have water?
+        if !("H2O" in atmos.condensates)
+            return false
+        end
 
         # Reset profiles
         fill!(atmos.cloud_arr_r, 0.0)
@@ -2860,6 +2867,9 @@ module atmosphere
                 atmos.cloud_arr_l[i] = atmos.gas_sat["H2O"][i] ? atmos.cloud_val_l : 0.0
             end
         end
+
+        # Scale
+        atmos.cloud_arr_l .*= mmr_sf
         clamp!(atmos.cloud_arr_l, 0.0, 1.0)
 
         # Set droplet radius and area fraction (fixed values)
@@ -2878,19 +2888,24 @@ module atmosphere
     """
     **Set aerosol MMR profiles for a given species.**
 
+    Aerosol in the singular form.
+
     Arguments:
     - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used
     - `species::String`             the name of the aerosol species to set
     - `mmr`                         the mixing ratio to assign (1D array, or Float, or species String)
+    - `pmin::Float64`               the minimum pressure to set aerosol at [Pa]
+    - `pmax::Float64`               the maximum pressure to set aerosol at[Pa]
+    - `mmr_sf::Float64`             scaling factor to apply to aerosol MMR
 
-    Optional arguments
-    - `pmin::Float64`  the minimum pressure [Pa]
-    - `pmax::Float64`  the maximum pressure [Pa]
+    Returns:
+    - `any_aerosol::Bool`           whether aerosol is present after setting
 
     """
     function set_aerosol!(atmos::atmosphere.Atmos_t, species::String,
                             mmr::Union{Array{Float64, 1}, Float64, String} = 0.0;
-                            pmin::Float64 = 0.0, pmax::Float64 = 1e9)::Bool
+                            pmin::Float64 = 0.0, pmax::Float64 = 1e9,
+                            mmr_sf::Float64 = 1.0)::Bool
 
 
         # Reset
@@ -2915,38 +2930,80 @@ module atmosphere
             # 1D profile
             if length(mmr) != length(atmos.p)
                 @warn "Length of input mmr array does not match number of layers"
-                return false
             end
             atmos.aerosol_arr_l[species][idx_mask] .= mmr[idx_mask]
         end
 
+        # Scale and clamp
+        atmos.aerosol_arr_l[species] .*= mmr_sf
+        clamp!(atmos.aerosol_arr_l[species], 0.0, 1.0)
+
         # Set constant size
         fill!(atmos.aerosol_arr_r[species], atmos.aerosol_val_r)
 
-        return true
+        return any(atmos.aerosol_arr_l[species] .> 0.0) # Return whether aerosol is present
+    end
+
+    """
+    **Loop over all available aerosols and set profiles based on condensate yields.**]
+
+    Aerosols in the plural form.
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used
+    - `mmr_sf::Float64`         scaling factor to apply to all aerosol MMR profiles
+
+    Returns:
+    - `any_aerosol::Bool`           whether any aerosols are present after setting
+    """
+    function set_aerosols!(atmos::atmosphere.Atmos_t; mmr_sf::Float64 = 1.0)::Bool
+
+        any_aerosol::Bool = false
+
+        # loop through available aerosols
+        for aer in atmos.aerosol_names
+            # do we have it mapped to something?
+            if !haskey(atmos.aerosol_setby, aer)
+                continue
+            end
+
+            # is it set by a condensate?
+            # yes...
+            if atmos.aerosol_setby[aer] != "value"
+                any_aerosol |= atmosphere.set_aerosol!(
+                                    atmos, aer, atmos.aerosol_setby[aer];
+                                    mmr_sf=mmr_sf
+                                )
+            end
+            # no...
+            #     do not update it
+        end
+
+        # any present?
+        return any_aerosol
     end
 
 
 
     """
-    **Estimate photosphere.**
+    **Estimate photosphere pressure level.**
 
     Estimates the location of the photosphere by finding the median of the contribution
-    function in each band (0.2 um to 150 um), and then finding the pressure level at which
+    function in each band (0.2 μm to 150 μm), and then finding the pressure level at which
     these median values are maximised.
 
     Arguments:
-        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
 
     Returns:
-        - `p_ref::Float64`          pressure level of photosphere [Pa]
+    - `p_ref::Float64`          pressure level of photosphere [Pa]
     """
     function estimate_photosphere!(atmos::atmosphere.Atmos_t)::Float64
 
         # Params
-        wl_min::Float64  = 0.2 * 1e-6 # 200 nm
-        wl_max::Float64  = 150 * 1e-6 # 150 um
-        p_min::Float64   = 10.0 # 1e-4 bar
+        wl_min::Float64  = 0.2 * 1e-6 # 200 nanometer
+        wl_max::Float64  = 150 * 1e-6 # 150 micron
+        p_min::Float64   = 10.0       # 10 Pa = 1e-4 bar
 
         # tracking
         cff_max::Float64 = 0.0

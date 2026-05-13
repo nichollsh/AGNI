@@ -839,7 +839,7 @@ module energy
     """
     **Analytical diffusion scheme for condensation and evaporation energy.**
 
-    Updates fluxes. Requires `chemistry.rainout_and_evaporate` to be called first.
+    Updates fluxes. Requires `chemistry._sat_aloft` to be called first.
 
     Integrates from bottom of model upwards. Based on the amount of
     phase change at each level, a phase change flux is calculated by assuming
