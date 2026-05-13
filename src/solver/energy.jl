@@ -36,13 +36,13 @@ module solve_energy
     # Solver constants and parameters
     cost_exponent::Real   = 4
     #    chemistry
-    compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
+    compose_jac::Bool     = true   # Do chem/condensation for every jacobian call
     compose_ls::Bool      = true    # Do chem/comp for every linesearch step
     #    jacobian
     perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
     perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
     perturb_mod::Int64 =      5       # Do full jacobian at least this frequently
-    fd_rel::Float64=        2e-5    # finite difference: relative width (dx/x) of the difference (rtol)
+    fd_rel::Float64=        2e-4    # finite difference: relative width (dx/x) of the difference (rtol)
     fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
     #    plateau parameters
     plateau_n::Int64    =    4       # Plateau declared when plateau_i > plateau_n
@@ -98,7 +98,7 @@ module solve_energy
     - `modplot::Int64`                  iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
     - `modprint::Int64`                 iteration frequency at which to print info
-    - `plot_jacobian::Bool`             plot jacobian too?
+    - `plot_jacobian::Bool`             [deprecated]
     - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
 
@@ -165,8 +165,6 @@ module solve_energy
 
         # Plot paths
         path_plt::String = joinpath(atmos.OUT_DIR,"solver.png")
-        path_jac::String = joinpath(atmos.OUT_DIR,"jacobian.png")
-
         if save_frames && !isdir(atmos.FRAMES_DIR)
             @warn "Frames directory does not exist at $(atmos.FRAMES_DIR)"
             save_frames = false
@@ -419,8 +417,6 @@ module solve_energy
         # Plot current state
         function plot_step()
 
-            # plotting.plot_cloud(atmos, "out/cloud.png")
-
             # Info string
             plt_info::String = ""
             plt_info *= "[$(atmos.name)]   "
@@ -433,9 +429,12 @@ module solve_energy
             plt_fl = plotting.plot_fluxes(atmos, "", incl_eff=(sol_type==3), incl_cdct=conduct, incl_latent=latent)
             plt_mr = plotting.plot_vmr(atmos,    "")
             plt_ra = plotting.plot_radius(atmos, "")
+            plt_cld = plotting.plot_cloud(atmos, "")
+            plt_jac = plotting.jacobian(b, "", perturb=perturb)
 
             # Combined plot
-            plotting.combined(plt_pt, plt_fl, plt_mr, plt_ra, plt_info, path_plt)
+            plotting.combined(plt_pt, plt_fl, plt_mr, plt_ra, plt_cld, plt_jac,
+                                plt_info, path_plt)
 
             if save_frames
                 cp(path_plt,@sprintf("%s/%04d.png",atmos.FRAMES_DIR,step))
@@ -479,7 +478,7 @@ module solve_energy
         energy.reset_fluxes!(atmos)     # reset energy fluxes
 
         # Modulate convection and phase change?
-        easy_start = easy_start && (convect || latent)
+        easy_start = easy_start && (convect || latent || rainout)
         if !easy_start
             easy_sf = 1.0
         else
@@ -487,9 +486,9 @@ module solve_energy
         end
 
         # Initial plot
-        if modplot > 0
-            plot_step()
-        end
+        # if modplot > 0
+        #     plot_step()
+        # end
 
         if modprint > 0
             @info @sprintf("    step  |res_med|    cost     flux_OLR   max(x)     max(|dx|)  flags")
@@ -829,9 +828,6 @@ module solve_energy
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
                 plot_step()
-                if plot_jacobian
-                    plotting.jacobian(b, path_jac, perturb=perturb)
-                end
             end
 
             # Inform user
@@ -895,13 +891,11 @@ module solve_energy
             @info "    success in $step steps"
             atmos.is_converged = true
             rm(path_plt, force=true)
-            rm(path_jac, force=true)
         elseif code == CODE_ITE
             @warn "    failure (maximum iterations)"
             plot_step()
         elseif code == CODE_SIN
             @warn "    failure (singular jacobian)"
-            plotting.jacobian(b, path_jac)
             plot_step()
         elseif code == CODE_TIM
             @warn "    failure (maximum time)"

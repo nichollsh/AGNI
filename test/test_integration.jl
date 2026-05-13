@@ -224,11 +224,6 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             plt_cf2 = plotting.plot_contfunc2(atmos, out_path)
             _assert_plot_output(out_path, plt_cf2)
 
-            out_path = joinpath(OUT_DIR, "agni_plot_combined.png")
-            rm(out_path, force=true)
-            plt_combo = plotting.combined(plt_pt, plt_fl, plt_vmr, plt_ra, "integration diagnostics", out_path)
-            _assert_plot_output(out_path, plt_combo)
-
             out_path = joinpath(OUT_DIR, "agni_plot_jacobian.png")
             rm(out_path, force=true)
             jac = reshape(collect(range(-5.0, 5.0, length=100)), 10, 10)
@@ -236,6 +231,11 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             pert[2:2:end] .= false
             plt_jac = plotting.jacobian(jac, out_path; perturb=pert)
             _assert_plot_output(out_path, plt_jac)
+
+            out_path = joinpath(OUT_DIR, "agni_plot_combined.png")
+            rm(out_path, force=true)
+            plt_combo = plotting.combined(plt_pt, plt_fl, plt_vmr, plt_ra, plt_cld, plt_jac, "integration diagnostics", out_path)
+            _assert_plot_output(out_path, plt_combo)
 
             # Guard branches when radiance outputs are unavailable
             orig_is_out_lw = atmos.is_out_lw

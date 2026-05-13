@@ -167,7 +167,7 @@ module energy
             #   w_cloud              -> Total cloud area fraction in layers, in [0, 1] (dimensionless)
             #   condensed_mix_ratio  -> Mass mixing ratios of condensate [kg kg-1], (LWC)
             #   condensed_dim_char   -> Characteristic dimensions of condensed species [m], (radius)
-            # The LWC is the mass of condensate per mass of dry air
+            # The LWC is the mass of condensate per mass of air
             #   Refer to opt_propt_water_cloud.f90 (L234); c.f. Slingo & Schrecker (1982) Eq 15,16,17
             atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]
             atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]

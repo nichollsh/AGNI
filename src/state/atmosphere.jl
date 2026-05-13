@@ -62,6 +62,11 @@ module atmosphere
     const CFG_coldtrap::Bool            = true
     const CFG_rainout::Bool             = false
     const CFG_oceans::Bool              = false
+    const CFG_cloud_f::Float64          = 1.0
+    const CFG_cloud_r::Float64          = 1e-6
+    const CFG_cloud_l::Float64          = 1e-8
+    const CFG_cloud_alpha::Float64      = 1e-7
+    const CFG_aerosol_r::Float64        = 1e-5
     const CFG_real_gas::Bool            = true
     const CFG_demixing::Bool            = false
     const CFG_chem::Bool                = false
@@ -551,6 +556,12 @@ module atmosphere
                     flag_cloud::Bool =          CFG_flag_cloud,
                     aerosol_species::Dict =     Dict{String, Union{Float64,String}}(),
 
+                    cloud_alpha::Float64 =      CFG_cloud_alpha,
+                    cloud_r::Float64 =          CFG_cloud_r,
+                    cloud_l::Float64 =          CFG_cloud_l,
+                    cloud_f::Float64 =          CFG_cloud_f,
+                    aerosol_r::Float64 =        CFG_aerosol_r,
+
                     phs_timescale::Float64 =    CFG_phs_timescale,
                     evap_efficiency::Float64 =  CFG_evap_efficiency,
 
@@ -872,15 +883,19 @@ module atmosphere
         _check_range("Evaporation efficiency", atmos.evap_efficiency; min=0, max=1) || return false
 
         # Hardcoded default cloud properties
-        atmos.cloud_alpha   = 0.01    # [INPUT] 1% of condensed water forms substantial clouds
-        atmos.cloud_val_r   = 1.0e-5  # [INPUT] 10 micron droplets
-        atmos.cloud_val_l   = 0.8     # [INPUT] Mass mixing ratio of water in each layer
-        atmos.cloud_val_f   = 0.8     # [INPUT] 100% of the cell "area" is cloud
+        atmos.cloud_alpha   = cloud_alpha   # [INPUT] 1% of condensed water forms substantial clouds
+        atmos.cloud_val_r   = cloud_r       # [INPUT] 10 micron droplets
+        atmos.cloud_val_l   = cloud_l       # [INPUT] Mass mixing ratio of water in each layer
+        atmos.cloud_val_f   = cloud_f       # [INPUT] 100% of the cell "area" is cloud
+        _check_range("Cloud mass mixing ratio", atmos.cloud_val_l; min=0) || return false
+        _check_range("Cloud area fraction", atmos.cloud_val_f; min=0, max=1) || return false
+        _check_range("Cloud particle radius", atmos.cloud_val_r; min=0) || return false
+        _check_range("Cloud condensation efficiency", atmos.cloud_alpha; min=0, max=1) || return false
 
         # Aerosol parameters
         atmos.aerosol_phase_num = 1    # [INPUT] number of phase-function moments
         atmos.aerosol_relhumid  = 0.0  # [INPUT] relative humidity used by moist aerosol schemes
-        atmos.aerosol_val_r = 1.0e-5   # [INPUT] default particle size for aerosol species
+        atmos.aerosol_val_r = aerosol_r   # [INPUT] default particle size for aerosol species
         atmos.aerosol_arr_l = Dict{String, Array{Float64,1}}() # list of MMR profiles
         atmos.aerosol_arr_r = Dict{String, Array{Float64,1}}() # list of particle size profiles
         atmos.aerosol_setby = Dict{String, String}() # dictionary of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
@@ -2826,7 +2841,8 @@ module atmosphere
     """
     function calc_cond_mmr(atmos::atmosphere.Atmos_t, c::String, i::Int64)::Float64
         if atmos.cond_yield[c][i] > 0.0
-            return atmos.cond_yield[c][i]*atmos.cloud_alpha / atmos.layer_σ[i]
+            numer = atmos.cond_yield[c][i]*atmos.cloud_alpha
+            return numer / (atmos.layer_σ[i] + numer)
         else
             return 0.0
         end

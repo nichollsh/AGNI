@@ -271,7 +271,7 @@ module plotting
                             size_x::Int64=size_x_default, size_y::Int64=size_y_default,
                             title::String="")
 
-        xlims = (-8.0, 0.0)
+        xlims = (-10.0, 0.0)
         xticks = collect(range(start=xlims[1], stop=xlims[2], step=1))
 
         y = atmos.p * 1e-5 # pressure -> bar
@@ -304,7 +304,7 @@ module plotting
         @_plt_poboa
 
         # Decorate
-        xlabel!(plt, "log₁₀ Mass mixing ratio)")
+        xlabel!(plt, "log₁₀ Mass mixing ratio")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
@@ -830,17 +830,72 @@ module plotting
     end
 
     """
+    **Plot jacobian matrix**
+
+    Arguments:
+    - `b::Array{Float64,2}`        jacobian matrix (∂r/∂x) to plot as a colormap
+    - `fname::String`              filename to save the plot
+    - `perturb::Array{Bool,1}`     boolean array indicating which levels were perturbed
+    """
+    function jacobian(b::Array{Float64,2}, fname::String;
+                            perturb::Array{Bool,1}=Bool[],
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
+
+
+        # make copy for plotting (transposed on heatmap)
+        bplt = deepcopy(b)
+
+        # threshold value sets dynamic range of heatmap
+        thresh = 1e-8
+        bplt[abs.(bplt) .<= thresh] .= thresh
+
+        # symmetric log scale
+        sign_mask = sign.(bplt)
+        @. bplt = sign_mask * log10(abs(bplt))
+
+        # scale for plotting
+        lim = ceil(maximum(abs.(bplt)))
+        l::Int64 = length(perturb)
+
+        # init plot
+        plt = plot(size=(size_x, size_y),
+                    title="Jacobian (log normalised ∂resid/∂temp)",
+                    clim=(-lim,lim), yflip=true; plt_default...)
+
+        # show jacobian
+        heatmap!(plt, bplt, color=:bam, label="")
+
+        # show perturbed levels
+        if l > 0
+            scatter!(plt, collect(1:l)[perturb], ones(Float64, l)[perturb]*(l+1),
+                        color=:gold,markershape=:utriangle, markersize=4,
+                        markerstrokewidth=0.0,
+                        label="")
+        end
+
+        yaxis!(plt, ylabel="Level index (perturbed)")
+        xaxis!(plt, xlabel="Level index (residual)")
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+
+        return plt
+    end
+
+    """
     **Combined multi-panel plot used for tracking behaviour of the solver at runtime.**
     """
-    function combined(plt_pt, plt_fl, plt_mr, plt_ra, info::String, fname::String;
-                        size_x::Int64=800, size_y::Int64=700)
+    function combined(plt_pt, plt_fl, plt_mr, plt_ra, plt_cld, plt_jac,
+                        info::String, fname::String;
+                        size_x::Int64=900, size_y::Int64=900)
 
         # plt_info = plot(legend=false, showaxis=false, grid=false)
         # annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
 
-        plt = plot(plt_pt, plt_fl, plt_mr, plt_ra,
+        plt = plot(plt_pt, plt_fl, plt_mr, plt_ra, plt_cld, plt_jac,
                         plot_title=info,
-                        layout=(2,2), size=(size_x, size_y); plt_default...)
+                        layout=(3,2), size=(size_x, size_y); plt_default...)
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -970,37 +1025,6 @@ module plotting
         return nothing
     end
 
-    """
-    Plot jacobian matrix
-    """
-    function jacobian(b::Array{Float64,2}, fname::String;
-                            perturb::Array{Bool,1}=Bool[],
-                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
 
-        lim::Float64 = maximum(abs.(b))     # colourbar limits
-        l::Int64 = length(perturb)            # show perturbed levels?
-
-        plt = plot(size=(size_x, size_y),
-                    title="∂r/∂x [W m⁻² K⁻¹]",
-                    clim=(-lim,lim), yflip=true; plt_default...)
-
-        # show jacobian
-        heatmap!(plt, b, color=:RdBu, label="")
-
-        # show perturbed levels
-        if l > 0
-            scatter!(plt, collect(1:l)[perturb], ones(Float64, l)[perturb]*(l+1),
-                        color=:black,markershape=:utriangle, label="")
-        end
-
-        xlabel!(plt, "Cell-centre index")
-        ylabel!(plt, "Cell-centre index")
-
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
-
-        return plt
-    end
 
 end # end module plotting
