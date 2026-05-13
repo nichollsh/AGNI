@@ -227,13 +227,9 @@ module rfm
         write_profile(atmos)
         write_driver(atmos, numin, numax, nures)
 
-        # Not supported on ARM
-        if Sys.ARCH != :x86_64
-            @warn "RFM is not supported on ARM architecture"
-            return false
-        end
-
         # Locate executable
+        #     Options for Julia ARCH variable:
+        #     https://github.com/JuliaLang/julia/blob/f6d725adbf6d03a0ddd85ac5a2594be6ef8db69a/src/Makefile#L45
         if Sys.isapple() && Sys.ARCH == :aarch64
             @debug "Run RFM (MacOS binary)"
             execpath = joinpath(paths.get_dir("blobs"), "rfm-arm64-macos")
@@ -241,7 +237,7 @@ module rfm
             @debug "Run RFM (Linux binary)"
             execpath = joinpath(paths.get_dir("blobs"), "rfm-amd64-linux")
         else
-            @warn "RFM is only supported on Linux(x86_64) and MacOS(ARM64) architectures"
+            @warn "Only Linux(x86_64) and MacOS(ARM64) architectures are supported"
             return false
         end
 

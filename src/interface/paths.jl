@@ -53,7 +53,7 @@ module paths
             return joinpath(ROOT_DIR, "out")
 
         else
-            @error "Unknown directory name: $name"
+            @warn "Unknown directory name: $name"
             return nothing
         end
     end
