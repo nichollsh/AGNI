@@ -97,8 +97,6 @@ module plotting
                             incl_magma::Bool=false,
                             title::String="")
 
-        y = atmos.pl ./ 1e5 # pressure -> bar
-
         xlims::Tuple{Float64,Float64} = (0.0, maximum(atmos.tmpl)+TMP_MARGIN)
 
         # Create plot
@@ -160,7 +158,8 @@ module plotting
         scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, y, lc="black", lw=lw, label=L"T(p)")
+        plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=lw, label=L"T(pl)")
+        plot!(plt, atmos.tmp,  atmos.p*1e-5,  lc="grey",  lw=lw, ls=:dot, label=L"T(p)")
 
         # Plot current surface pressure and original
         @_plt_pboa
@@ -193,8 +192,8 @@ module plotting
         end
 
         plot!(plt2, [xmin, xmin], [1.0, 1.0], lc="darkgreen", lw=lw, ls=:solid, label=L"K_{zz}")
-        plot!(plt2, x_con, y, lc="darkgreen", label="Con.", ls=:solid)
-        plot!(plt2, x_rad, y, lc="darkgreen", label="Rad.", ls=:dot)
+        plot!(plt2, x_con, atmos.pl*1e-5, lc="darkgreen", label="Con.", ls=:solid)
+        plot!(plt2, x_rad, atmos.pl*1e-5, lc="darkgreen", label="Rad.", ls=:dot)
 
         xlabel!(plt2, "log₁₀ Kzz [cm²/s]")
         ylims!(plt2, _get_ylims(atmos))

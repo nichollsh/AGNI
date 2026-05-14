@@ -58,15 +58,15 @@ module atmosphere
     const CFG_flag_aerosol::Bool        = false
     const CFG_flag_cloud::Bool          = false
     const CFG_phs_timescale::Float64    = 1e6
-    const CFG_evap_efficiency::Float64  = 0.05
+    const CFG_evap_efficiency::Float64  = 0.0
     const CFG_coldtrap::Bool            = true
     const CFG_rainout::Bool             = false
     const CFG_oceans::Bool              = false
     const CFG_cloud_f::Float64          = 1.0
-    const CFG_cloud_r::Float64          = 1e-6
+    const CFG_cloud_r::Float64          = 1e-6 # typically ~ 1 um
     const CFG_cloud_l::Float64          = 1e-8
-    const CFG_cloud_alpha::Float64      = 1e-7
-    const CFG_aerosol_r::Float64        = 1e-5
+    const CFG_cloud_alpha::Float64      = 0.01
+    const CFG_aerosol_r::Float64        = 1e-7 # typically ~100 nm
     const CFG_real_gas::Bool            = true
     const CFG_demixing::Bool            = false
     const CFG_chem::Bool                = false
@@ -96,6 +96,7 @@ module atmosphere
     const SKIN_D_MIN::Float64           = 1e-6      # [m]
     const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
     const COND_DISALLOWED::Array        = ["H2","He"]
+    const CLOUD_MMR_FLOOR::Float64      = 1e-40     # Minimum cloud MMR if clouds present
     const T_INI_MAX::Float64            = 1500.0    # Maximum initial temperature [K]
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
@@ -1807,9 +1808,8 @@ module atmosphere
 
             # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
             # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
-            atmos.control.i_direct_tau = 1
+            atmos.control.i_direct_tau = SOCRATES.rad_pcf.ip_direct_delta_scaling
             atmos.control.n_order_forward = 2
-
 
             ############################################
             # Check Options
@@ -2045,12 +2045,16 @@ module atmosphere
             if atmos.control.l_cloud
                 # Cloud representation (input_cloud_cdf/set_cld): 1=homogeneous mixed phase.
                 atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_homogen
+
                 # Vertical cloud solver option (input_cloud_cdf): max-random mixed-column treatment.
                 atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_mix_max
+
                 # Cloud overlap assumption for the mixed-column solver.
                 atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand
+
                 # Sub-grid condensate inhomogeneity switch (0/1 style selector in SOCRATES).
                 atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous
+
                 # Microphysical optical parametrization IDs from spectrum metadata (water and ice).
                 atmos.control.i_st_water  = 5
                 atmos.control.i_cnv_water = 5
@@ -2860,7 +2864,8 @@ module atmosphere
     - `any_cloud::Bool`  whether any clouds are present
     """
     function set_cloud!(atmos::atmosphere.Atmos_t;
-                            from_yield::Bool=true, mmr_sf::Float64=1.0)::Bool
+                            from_yield::Bool=true,
+                            mmr_sf::Float64=1.0)::Bool
 
         # Do we have water?
         if !("H2O" in atmos.condensates)
@@ -2869,8 +2874,9 @@ module atmosphere
 
         # Reset profiles
         fill!(atmos.cloud_arr_r, 0.0)
-        fill!(atmos.cloud_arr_l, 0.0)
         fill!(atmos.cloud_arr_f, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        any_cloud::Bool = false
 
         # Loop through layers and set cloud properties based on condensation yield
         for i in 1:atmos.nlev_c-1
@@ -2882,15 +2888,23 @@ module atmosphere
                 # set by mask
                 atmos.cloud_arr_l[i] = atmos.gas_sat["H2O"][i] ? atmos.cloud_val_l : 0.0
             end
+            any_cloud |= atmos.cloud_arr_l[i] > 0.0
         end
 
         # Scale
         atmos.cloud_arr_l .*= mmr_sf
         clamp!(atmos.cloud_arr_l, 0.0, 1.0)
 
+        # If any of the regions are cloudy, none of the layers can have l=0,
+        #    because this causes numerical problems in SOCRATES.
+        #    So we set them to a small value.
+        if any_cloud
+            atmos.cloud_arr_l[atmos.cloud_arr_l .< CLOUD_MMR_FLOOR] .= CLOUD_MMR_FLOOR
+        end
+
         # Set droplet radius and area fraction (fixed values)
-        atmos.cloud_arr_r[atmos.cloud_arr_l .> 0] .= atmos.cloud_val_r
-        atmos.cloud_arr_f[atmos.cloud_arr_l .> 0] .= atmos.cloud_val_f
+        atmos.cloud_arr_r[atmos.cloud_arr_l .> 0.0] .= atmos.cloud_val_r
+        atmos.cloud_arr_f[atmos.cloud_arr_l .> 0.0] .= atmos.cloud_val_f
 
         # Clamp
         clamp!(atmos.cloud_arr_f, 0.0, 1.0)
@@ -2898,7 +2912,7 @@ module atmosphere
             @warn "Negative cloud particle size"
         end
 
-        return any(atmos.cloud_arr_l .> 0.0) # Return whether any clouds are present
+        return any_cloud
     end
 
     """

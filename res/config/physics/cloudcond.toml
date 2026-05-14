@@ -3,7 +3,7 @@ title = "Clouds and condensation together"
 
 [planet]
     tmp_surf        = 1000.0
-    instellation    = 2400.0
+    instellation    = 2000.0
     albedo_b        = 0.0
     s0_fact         = 0.375
     zenith_angle    = 48.19
@@ -11,7 +11,7 @@ title = "Clouds and condensation together"
     albedo_s        = 0.2
     radius          = 6.37e6
     gravity         = 9.81
-    flux_int        = 5.0
+    flux_int        = 4.0
     roughness       = 1.0e-2
     wind_speed      = 10.0
     skin_k          = 2.0
@@ -26,8 +26,8 @@ title = "Clouds and condensation together"
 
 [composition]
     p_surf          = 5000.0
-    p_top           = 1e-3
-    vmr_dict        = { H2O=0.2, CO2=0.65, CH4=0.1, N2=0.05}
+    p_top           = 1e-4
+    vmr_dict        = { H2O=0.6, CO2=0.25, CH4=0.1, N2=0.05}
     condensates     = ["H2O"]
 
 [execution]
@@ -35,12 +35,12 @@ title = "Clouds and condensation together"
     verbosity       = 1
     max_steps       = 300
     max_runtime     = 400
-    num_levels      = 42
+    num_levels      = 38
     solution_type   = 3
     solver          = "newton"
     dx_max          = 200.0
     initial_state   = ["iso","1500"]
-    linesearch      = 1
+    linesearch      = 2
     easy_start      = true
     grey_start      = false
     converge_atol   = 1.0
@@ -50,13 +50,13 @@ title = "Clouds and condensation together"
 [physics]
     chemistry       = false
     continua        = true
-    rayleigh        = true
+    rayleigh        = false
     cloud           = true
     overlap_method  = "ee"
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
-    conduction      = false
+    conduction      = true
     convection      = false
     convection_crit = "s"
     grey_lw         = 5e-2

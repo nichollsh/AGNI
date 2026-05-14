@@ -75,9 +75,7 @@ module energy
 
             # Eddington's approximation
             # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
-            # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
             atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
-
 
             # Check spectral file is ok
             if !Bool(atmos.spectrum.Basic.l_present[6])
@@ -96,7 +94,6 @@ module energy
 
             # Eddington's approximation
             # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
-            # Practical improved flux method (original form of 1980)
             atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
 
             # SOCRATES requires this to be passed as two variables, since it
@@ -134,8 +131,8 @@ module energy
             # 13 is recommended for clear-sky (Direct solution in a homogeneous column)
             atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_homogen_direct
 
-            # 1 is also possible (Pentadiagonal solver for homogeneous column)
-            # atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_pentadiagonal
+            # Direct mixed column scheme for full fluxes
+            # atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_mix_direct
         end
 
 

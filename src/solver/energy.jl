@@ -36,13 +36,13 @@ module solve_energy
     # Solver constants and parameters
     cost_exponent::Real   = 4
     #    chemistry
-    compose_jac::Bool     = true   # Do chem/condensation for every jacobian call
-    compose_ls::Bool      = true    # Do chem/comp for every linesearch step
+    compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
+    compose_ls::Bool      = false    # Do chem/comp for every linesearch step
     #    jacobian
     perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
     perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
     perturb_mod::Int64 =      5       # Do full jacobian at least this frequently
-    fd_rel::Float64=        2e-4    # finite difference: relative width (dx/x) of the difference (rtol)
+    fd_rel::Float64=        1e-4    # finite difference: relative width (dx/x) of the difference (rtol)
     fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
     #    plateau parameters
     plateau_n::Int64    =    4       # Plateau declared when plateau_i > plateau_n
@@ -689,7 +689,7 @@ module solve_energy
             #    Otherwise, this perturbation can still help.
             plateau_apply = (plateau_i > plateau_n)
             if plateau_apply
-                @. x_dif *= plateau_s
+                @. x_dif *= min(plateau_s, minimum(x_old)/2)
                 plateau_i = 0
                 stepflags *= "P-"
             end
