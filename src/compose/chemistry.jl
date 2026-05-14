@@ -228,6 +228,8 @@ module chemistry
 
     This function can be called *after* the fastchem calculation.
 
+    Does not update aerosols or clouds, which should be handled separately.
+
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
     """
@@ -404,21 +406,6 @@ module chemistry
         end
         atmosphere.calc_layer_props!(atmos)
 
-        # Set water clouds at levels where condensation occurs
-        if "H2O" in atmos.condensates
-            atmosphere.set_cloud!(atmos; from_yield=true)
-        end
-
-        # Set aerosol profiles at levels where condensation occurs
-        for aer in atmos.aerosol_names
-            if !haskey(atmos.aerosol_setby, aer)
-                continue
-            end
-            if atmos.aerosol_setby[aer] != "value"
-                atmosphere.set_aerosol!(atmos, aer, atmos.aerosol_setby[aer])
-            end
-        end
-
         return nothing
     end
 
@@ -498,6 +485,7 @@ module chemistry
     1. call `_sat_surf!` to handle saturation at the surface, and adjust the pressure grid
     2. call `_chem_gas!` to handle gas-phase chemistry in the column
     3. call `_sat_aloft!` to handle saturation aloft, above the surface.
+    4. update aerosols and clouds
 
     Arguments:
     - `atmos::Atmos_t`       the atmosphere struct instance to be used.

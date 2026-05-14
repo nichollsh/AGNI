@@ -43,6 +43,7 @@ module atmosphere
     const CFG_longitude::Float64        = 0.0   # relative to substellar point
     const CFG_Kzz_kbreak::Float64       = 1e5   # m2 s-1
     const CFG_Kzz_pbreak::Float64       = 1e5   # 1 bar
+    const CFG_Kzz_floor::Float64        = 0.0
     const CFG_Kzz_type::Int64           = 2
     const CFG_mlt_asymptotic::Bool      = true
     const CFG_mlt_criterion::Char       = 's'
@@ -58,10 +59,15 @@ module atmosphere
     const CFG_flag_aerosol::Bool        = false
     const CFG_flag_cloud::Bool          = false
     const CFG_phs_timescale::Float64    = 1e6
-    const CFG_evap_efficiency::Float64  = 0.05
+    const CFG_evap_efficiency::Float64  = 0.0
     const CFG_coldtrap::Bool            = true
     const CFG_rainout::Bool             = false
     const CFG_oceans::Bool              = false
+    const CFG_cloud_f::Float64          = 1.0
+    const CFG_cloud_r::Float64          = 1e-6 # typically ~ 1 um
+    const CFG_cloud_l::Float64          = 1e-8
+    const CFG_cloud_alpha::Float64      = 0.01
+    const CFG_aerosol_r::Float64        = 1e-7 # typically ~100 nm
     const CFG_real_gas::Bool            = true
     const CFG_demixing::Bool            = false
     const CFG_chem::Bool                = false
@@ -91,6 +97,7 @@ module atmosphere
     const SKIN_D_MIN::Float64           = 1e-6      # [m]
     const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
     const COND_DISALLOWED::Array        = ["H2","He"]
+    const CLOUD_MMR_FLOOR::Float64      = 1e-40     # Minimum cloud MMR if clouds present
     const T_INI_MAX::Float64            = 1500.0    # Maximum initial temperature [K]
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
@@ -302,6 +309,7 @@ module atmosphere
         mlt_criterion::Char                 # INPUT: Stability criterion. Options: (s)chwarzschild, (l)edoux
         Kzz_pbreak::Float64                 # INPUT: Kzz break point pressure [Pa]
         Kzz_kbreak::Float64                 # INPUT: Kzz break point diffusion [m2 s-1]
+        Kzz_floor::Float64                  # INPUT: Minimum Kzz value used for filling [m2 s-1]
         Kzz_power::Float64                  # INPUT: Power law index for Kzz scaling above reference point
         Kzz_type::Int64                     # INPUT: Parametrisation of Kzz
         mask_c::Array{Bool,1}               # OUT: Layers transporting convective flux
@@ -472,6 +480,7 @@ module atmosphere
     - `surf_windspeed::Float64`         surface wind speed [m s-1].
     - `Kzz_kbreak::Float64`             reference eddy diffusion coefficient, SI units [m2 s-1]
     - `Kzz_pbreak::Float64`             reference pressure for Kzz break point [Pa]
+    - `Kzz_floor::Float64`              minimum Kzz value used for filling [m2 s-1]
     - `Kzz_type::Int64`                 parametrisation of Kzz. Options: 1 (constant), 2 (MLT wl), 3 (MLT Fc)
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
@@ -529,6 +538,7 @@ module atmosphere
                     surf_windspeed::Float64 =   CFG_surf_windspeed,
                     Kzz_kbreak::Float64 =       CFG_Kzz_kbreak,
                     Kzz_pbreak::Float64 =       CFG_Kzz_pbreak,
+                    Kzz_floor::Float64 =        CFG_Kzz_floor,
                     Kzz_type::Int64 =           CFG_Kzz_type,
                     mlt_asymptotic::Bool =      CFG_mlt_asymptotic,
                     mlt_criterion::Char =       CFG_mlt_criterion,
@@ -550,6 +560,12 @@ module atmosphere
                     flag_aerosol::Bool =        CFG_flag_aerosol,
                     flag_cloud::Bool =          CFG_flag_cloud,
                     aerosol_species::Dict =     Dict{String, Union{Float64,String}}(),
+
+                    cloud_alpha::Float64 =      CFG_cloud_alpha,
+                    cloud_r::Float64 =          CFG_cloud_r,
+                    cloud_l::Float64 =          CFG_cloud_l,
+                    cloud_f::Float64 =          CFG_cloud_f,
+                    aerosol_r::Float64 =        CFG_aerosol_r,
 
                     phs_timescale::Float64 =    CFG_phs_timescale,
                     evap_efficiency::Float64 =  CFG_evap_efficiency,
@@ -752,6 +768,7 @@ module atmosphere
 
         atmos.Kzz_pbreak =      max(1.0, Kzz_pbreak)
         atmos.Kzz_kbreak =      max(0.0, Kzz_kbreak)
+        atmos.Kzz_floor =       max(0.0, Kzz_floor)
         atmos.Kzz_power =       -0.4
         atmos.Kzz_type =        Kzz_type
         atmos.mlt_asymptotic =  mlt_asymptotic
@@ -872,15 +889,19 @@ module atmosphere
         _check_range("Evaporation efficiency", atmos.evap_efficiency; min=0, max=1) || return false
 
         # Hardcoded default cloud properties
-        atmos.cloud_alpha   = 0.01    # [INPUT] 1% of condensed water forms substantial clouds
-        atmos.cloud_val_r   = 1.0e-5  # [INPUT] 10 micron droplets
-        atmos.cloud_val_l   = 0.8     # [INPUT] Mass mixing ratio of water in each layer
-        atmos.cloud_val_f   = 0.8     # [INPUT] 100% of the cell "area" is cloud
+        atmos.cloud_alpha   = cloud_alpha   # [INPUT] 1% of condensed water forms substantial clouds
+        atmos.cloud_val_r   = cloud_r       # [INPUT] 10 micron droplets
+        atmos.cloud_val_l   = cloud_l       # [INPUT] Mass mixing ratio of water in each layer
+        atmos.cloud_val_f   = cloud_f       # [INPUT] 100% of the cell "area" is cloud
+        _check_range("Cloud mass mixing ratio", atmos.cloud_val_l; min=0) || return false
+        _check_range("Cloud area fraction", atmos.cloud_val_f; min=0, max=1) || return false
+        _check_range("Cloud particle radius", atmos.cloud_val_r; min=0) || return false
+        _check_range("Cloud condensation efficiency", atmos.cloud_alpha; min=0, max=1) || return false
 
         # Aerosol parameters
         atmos.aerosol_phase_num = 1    # [INPUT] number of phase-function moments
         atmos.aerosol_relhumid  = 0.0  # [INPUT] relative humidity used by moist aerosol schemes
-        atmos.aerosol_val_r = 1.0e-5   # [INPUT] default particle size for aerosol species
+        atmos.aerosol_val_r = aerosol_r   # [INPUT] default particle size for aerosol species
         atmos.aerosol_arr_l = Dict{String, Array{Float64,1}}() # list of MMR profiles
         atmos.aerosol_arr_r = Dict{String, Array{Float64,1}}() # list of particle size profiles
         atmos.aerosol_setby = Dict{String, String}() # dictionary of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
@@ -1792,9 +1813,8 @@ module atmosphere
 
             # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
             # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
-            atmos.control.i_direct_tau = 1
+            atmos.control.i_direct_tau = SOCRATES.rad_pcf.ip_direct_delta_scaling
             atmos.control.n_order_forward = 2
-
 
             ############################################
             # Check Options
@@ -2030,12 +2050,16 @@ module atmosphere
             if atmos.control.l_cloud
                 # Cloud representation (input_cloud_cdf/set_cld): 1=homogeneous mixed phase.
                 atmos.control.i_cloud_representation = SOCRATES.rad_pcf.ip_cloud_homogen
+
                 # Vertical cloud solver option (input_cloud_cdf): max-random mixed-column treatment.
                 atmos.control.i_cloud     = SOCRATES.rad_pcf.ip_cloud_mix_max
+
                 # Cloud overlap assumption for the mixed-column solver.
                 atmos.control.i_overlap   = SOCRATES.rad_pcf.ip_max_rand
+
                 # Sub-grid condensate inhomogeneity switch (0/1 style selector in SOCRATES).
                 atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous
+
                 # Microphysical optical parametrization IDs from spectrum metadata (water and ice).
                 atmos.control.i_st_water  = 5
                 atmos.control.i_cnv_water = 5
@@ -2837,17 +2861,26 @@ module atmosphere
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used.
-    - `from_yield::Bool`              set cloud properties based on condensation yield
+    - `from_yield::Bool`            set cloud properties based on condensation yield
+    - `mmr_sf::Float64`             scaling factor to apply to cloud MMR
 
     Returns:
     - `any_cloud::Bool`  whether any clouds are present
     """
-    function set_cloud!(atmos::atmosphere.Atmos_t; from_yield::Bool=true)::Bool
+    function set_cloud!(atmos::atmosphere.Atmos_t;
+                            from_yield::Bool=true,
+                            mmr_sf::Float64=1.0)::Bool
+
+        # Do we have water?
+        if !("H2O" in atmos.condensates)
+            return false
+        end
 
         # Reset profiles
         fill!(atmos.cloud_arr_r, 0.0)
-        fill!(atmos.cloud_arr_l, 0.0)
         fill!(atmos.cloud_arr_f, 0.0)
+        fill!(atmos.cloud_arr_l, 0.0)
+        any_cloud::Bool = false
 
         # Loop through layers and set cloud properties based on condensation yield
         for i in 1:atmos.nlev_c-1
@@ -2859,12 +2892,23 @@ module atmosphere
                 # set by mask
                 atmos.cloud_arr_l[i] = atmos.gas_sat["H2O"][i] ? atmos.cloud_val_l : 0.0
             end
+            any_cloud |= atmos.cloud_arr_l[i] > 0.0
         end
+
+        # Scale
+        atmos.cloud_arr_l .*= mmr_sf
         clamp!(atmos.cloud_arr_l, 0.0, 1.0)
 
+        # If any of the regions are cloudy, none of the layers can have l=0,
+        #    because this causes numerical problems in SOCRATES.
+        #    So we set them to a small value.
+        if any_cloud
+            atmos.cloud_arr_l[atmos.cloud_arr_l .< CLOUD_MMR_FLOOR] .= CLOUD_MMR_FLOOR
+        end
+
         # Set droplet radius and area fraction (fixed values)
-        atmos.cloud_arr_r[atmos.cloud_arr_l .> 0] .= atmos.cloud_val_r
-        atmos.cloud_arr_f[atmos.cloud_arr_l .> 0] .= atmos.cloud_val_f
+        atmos.cloud_arr_r[atmos.cloud_arr_l .> 0.0] .= atmos.cloud_val_r
+        atmos.cloud_arr_f[atmos.cloud_arr_l .> 0.0] .= atmos.cloud_val_f
 
         # Clamp
         clamp!(atmos.cloud_arr_f, 0.0, 1.0)
@@ -2872,25 +2916,30 @@ module atmosphere
             @warn "Negative cloud particle size"
         end
 
-        return any(atmos.cloud_arr_l .> 0.0) # Return whether any clouds are present
+        return any_cloud
     end
 
     """
     **Set aerosol MMR profiles for a given species.**
 
+    Aerosol in the singular form.
+
     Arguments:
     - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used
     - `species::String`             the name of the aerosol species to set
     - `mmr`                         the mixing ratio to assign (1D array, or Float, or species String)
+    - `pmin::Float64`               the minimum pressure to set aerosol at [Pa]
+    - `pmax::Float64`               the maximum pressure to set aerosol at[Pa]
+    - `mmr_sf::Float64`             scaling factor to apply to aerosol MMR
 
-    Optional arguments
-    - `pmin::Float64`  the minimum pressure [Pa]
-    - `pmax::Float64`  the maximum pressure [Pa]
+    Returns:
+    - `any_aerosol::Bool`           whether aerosol is present after setting
 
     """
     function set_aerosol!(atmos::atmosphere.Atmos_t, species::String,
                             mmr::Union{Array{Float64, 1}, Float64, String} = 0.0;
-                            pmin::Float64 = 0.0, pmax::Float64 = 1e9)::Bool
+                            pmin::Float64 = 0.0, pmax::Float64 = 1e9,
+                            mmr_sf::Float64 = 1.0)::Bool
 
 
         # Reset
@@ -2915,38 +2964,80 @@ module atmosphere
             # 1D profile
             if length(mmr) != length(atmos.p)
                 @warn "Length of input mmr array does not match number of layers"
-                return false
             end
             atmos.aerosol_arr_l[species][idx_mask] .= mmr[idx_mask]
         end
 
+        # Scale and clamp
+        atmos.aerosol_arr_l[species] .*= mmr_sf
+        clamp!(atmos.aerosol_arr_l[species], 0.0, 1.0)
+
         # Set constant size
         fill!(atmos.aerosol_arr_r[species], atmos.aerosol_val_r)
 
-        return true
+        return any(atmos.aerosol_arr_l[species] .> 0.0) # Return whether aerosol is present
+    end
+
+    """
+    **Loop over all available aerosols and set profiles based on condensate yields.**]
+
+    Aerosols in the plural form.
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance to be used
+    - `mmr_sf::Float64`         scaling factor to apply to all aerosol MMR profiles
+
+    Returns:
+    - `any_aerosol::Bool`           whether any aerosols are present after setting
+    """
+    function set_aerosols!(atmos::atmosphere.Atmos_t; mmr_sf::Float64 = 1.0)::Bool
+
+        any_aerosol::Bool = false
+
+        # loop through available aerosols
+        for aer in atmos.aerosol_names
+            # do we have it mapped to something?
+            if !haskey(atmos.aerosol_setby, aer)
+                continue
+            end
+
+            # is it set by a condensate?
+            # yes...
+            if atmos.aerosol_setby[aer] != "value"
+                any_aerosol |= atmosphere.set_aerosol!(
+                                    atmos, aer, atmos.aerosol_setby[aer];
+                                    mmr_sf=mmr_sf
+                                )
+            end
+            # no...
+            #     do not update it
+        end
+
+        # any present?
+        return any_aerosol
     end
 
 
 
     """
-    **Estimate photosphere.**
+    **Estimate photosphere pressure level.**
 
     Estimates the location of the photosphere by finding the median of the contribution
-    function in each band (0.2 um to 150 um), and then finding the pressure level at which
+    function in each band (0.2 μm to 150 μm), and then finding the pressure level at which
     these median values are maximised.
 
     Arguments:
-        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
 
     Returns:
-        - `p_ref::Float64`          pressure level of photosphere [Pa]
+    - `p_ref::Float64`          pressure level of photosphere [Pa]
     """
     function estimate_photosphere!(atmos::atmosphere.Atmos_t)::Float64
 
         # Params
-        wl_min::Float64  = 0.2 * 1e-6 # 200 nm
-        wl_max::Float64  = 150 * 1e-6 # 150 um
-        p_min::Float64   = 10.0 # 1e-4 bar
+        wl_min::Float64  = 0.2 * 1e-6 # 200 nanometer
+        wl_max::Float64  = 150 * 1e-6 # 150 micron
+        p_min::Float64   = 10.0       # 10 Pa = 1e-4 bar
 
         # tracking
         cff_max::Float64 = 0.0

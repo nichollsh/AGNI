@@ -78,8 +78,8 @@ const mlt_asymptotic::Bool   = true
 atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
 
-solver.ls_increase = 1.02
-solver.easy_incr  = 1/solver.easy_ini
+solver.solve_energy.ls_increase = 1.02
+solver.solve_energy.easy_incr  = 1/solver.solve_energy.easy_ini
 
 # energy.CONVECT_MIN_PRESSURE = 1e-3 * 1e5    # 1 mbar -> Pa
 
@@ -116,7 +116,7 @@ output_dir = joinpath(ROOT_DIR, cfg["files"]["output_dir"])
 if id_work==1
     println("Creating output folder: $output_dir")
     rm(output_dir, force=true, recursive=true)
-    mkdir(output_dir)
+    mkpath(output_dir)
 end
 if !isdir(output_dir)
     println(stderr, "Could not find output folder '$output_dir'")
@@ -867,9 +867,9 @@ for (i,p) in enumerate(grid_flat)
         elseif k == "Kzz_max"
             result_table[i][k] = maximum(atmos.Kzz)
         elseif k == "conv_ptop"
-            result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[1]
+            result_table[i][k] = diagnostics.estimate_convective_zone(atmos)[1]
         elseif k == "conv_pbot"
-            result_table[i][k] = atmosphere.estimate_convective_zone(atmos)[2]
+            result_table[i][k] = diagnostics.estimate_convective_zone(atmos)[2]
         else
             @error "Unhandled output variable: $k"
             exit(1)

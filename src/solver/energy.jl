@@ -37,12 +37,12 @@ module solve_energy
     cost_exponent::Real   = 4
     #    chemistry
     compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
-    compose_ls::Bool      = true    # Do chem/comp for every linesearch step
+    compose_ls::Bool      = false    # Do chem/comp for every linesearch step
     #    jacobian
     perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
     perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
     perturb_mod::Int64 =      5       # Do full jacobian at least this frequently
-    fd_rel::Float64=        2e-5    # finite difference: relative width (dx/x) of the difference (rtol)
+    fd_rel::Float64=        1e-4    # finite difference: relative width (dx/x) of the difference (rtol)
     fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
     #    plateau parameters
     plateau_n::Int64    =    4       # Plateau declared when plateau_i > plateau_n
@@ -98,7 +98,7 @@ module solve_energy
     - `modplot::Int64`                  iteration frequency at which to make plots
     - `save_frames::Bool`               save plotting frames
     - `modprint::Int64`                 iteration frequency at which to print info
-    - `plot_jacobian::Bool`             plot jacobian too?
+    - `plot_jacobian::Bool`             [deprecated]
     - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
 
@@ -165,8 +165,6 @@ module solve_energy
 
         # Plot paths
         path_plt::String = joinpath(atmos.OUT_DIR,"solver.png")
-        path_jac::String = joinpath(atmos.OUT_DIR,"jacobian.png")
-
         if save_frames && !isdir(atmos.FRAMES_DIR)
             @warn "Frames directory does not exist at $(atmos.FRAMES_DIR)"
             save_frames = false
@@ -270,21 +268,20 @@ module solve_energy
             # Set new temperatures
             _set_tmps!(x)
 
+            # New layer properties
+            atmosphere.calc_layer_props!(atmos)
+
             # Do chemistry?
             compose_here = compose && (oceans || chem || rainout)
             if compose_here
-                chemistry.calc_composition!(atmos, oceans, chem, false)
+                chemistry.calc_composition!(atmos, oceans, chem, rainout)
             end
 
-            # Do saturation aloft here, only. Keep chemistry fixed.
-            if rainout
-                # reset back to post-chemistry mixing ratios
-                chemistry.reset_to_chem!(atmos)
-                chemistry._sat_aloft!(atmos)
+            # Set cloud profiles from condensation of H2O
+            atmosphere.set_cloud!(atmos; from_yield=true, mmr_sf=easy_sf)
 
-            elseif !compose_here
-                atmosphere.calc_layer_props!(atmos)
-            end
+            # Set aerosol profiles at levels where condensation occurs
+            atmosphere.set_aerosols!(atmos; mmr_sf=easy_sf)
 
             # Calculate fluxes
             step_ok &= energy.calc_fluxes!(atmos, radiative=true,
@@ -420,8 +417,6 @@ module solve_energy
         # Plot current state
         function plot_step()
 
-            # plotting.plot_cloud(atmos, "out/cloud.png")
-
             # Info string
             plt_info::String = ""
             plt_info *= "[$(atmos.name)]   "
@@ -434,9 +429,12 @@ module solve_energy
             plt_fl = plotting.plot_fluxes(atmos, "", incl_eff=(sol_type==3), incl_cdct=conduct, incl_latent=latent)
             plt_mr = plotting.plot_vmr(atmos,    "")
             plt_ra = plotting.plot_radius(atmos, "")
+            plt_cld = plotting.plot_cloud(atmos, "")
+            plt_jac = plotting.jacobian(b, "", perturb=perturb)
 
             # Combined plot
-            plotting.combined(plt_pt, plt_fl, plt_mr, plt_ra, plt_info, path_plt)
+            plotting.combined(plt_pt, plt_fl, plt_mr, plt_ra, plt_cld, plt_jac,
+                                plt_info, path_plt)
 
             if save_frames
                 cp(path_plt,@sprintf("%s/%04d.png",atmos.FRAMES_DIR,step))
@@ -480,7 +478,7 @@ module solve_energy
         energy.reset_fluxes!(atmos)     # reset energy fluxes
 
         # Modulate convection and phase change?
-        easy_start = easy_start && (convect || latent)
+        easy_start = easy_start && (convect || latent || rainout)
         if !easy_start
             easy_sf = 1.0
         else
@@ -488,9 +486,9 @@ module solve_energy
         end
 
         # Initial plot
-        if modplot > 0
-            plot_step()
-        end
+        # if modplot > 0
+        #     plot_step()
+        # end
 
         if modprint > 0
             @info @sprintf("    step  |res_med|    cost     flux_OLR   max(x)     max(|dx|)  flags")
@@ -546,6 +544,11 @@ module solve_energy
                     step_ok = false
                 end
             end
+
+            # Set clouds and aerosols
+            atmosphere.set_cloud!(atmos; from_yield=true, mmr_sf=easy_sf)
+            atmosphere.set_aerosols!(atmos; mmr_sf=easy_sf)
+
 
             # Switch RT scheme?
             if grey_start & !grey_step
@@ -686,7 +689,7 @@ module solve_energy
             #    Otherwise, this perturbation can still help.
             plateau_apply = (plateau_i > plateau_n)
             if plateau_apply
-                @. x_dif *= plateau_s
+                @. x_dif *= min(plateau_s, minimum(x_old)/2)
                 plateau_i = 0
                 stepflags *= "P-"
             end
@@ -825,9 +828,6 @@ module solve_energy
             # Plot
             if (modplot > 0) && (mod(step, modplot) == 0)
                 plot_step()
-                if plot_jacobian
-                    plotting.jacobian(b, path_jac, perturb=perturb)
-                end
             end
 
             # Inform user
@@ -844,9 +844,16 @@ module solve_energy
                 @debug info_str
             end
 
+            # Check if surface temperature has collapsed to floor
+            if atmos.tmp_surf < atmos.tmp_floor + tmp_pad+1
+                @warn "Surface temperature collapsed! Resetting to initial guess..."
+                step_ok = false
+                @. x_cur = x_ini
+            end
+
             # Converged?
             @debug "        check convergence"
-            if (conv_val < conv_atol + conv_rtol * c_max)
+            if (conv_val < conv_atol + conv_rtol * c_max) && step_ok
                 # still using grey RT?
                 if grey_step
                     # switch to preferred RT scheme
@@ -858,7 +865,7 @@ module solve_energy
                 end
             end
 
-            # Show benchmark
+            # Show benchmark [nanoseconds -> ms]
             if atmos.benchmark
                 rt_avg = atmos.tim_rt_eval / atmos.num_rt_eval / 1e9 * 1e3
                 @debug @sprintf("Average RT time: %.3f ms", rt_avg)
@@ -884,13 +891,11 @@ module solve_energy
             @info "    success in $step steps"
             atmos.is_converged = true
             rm(path_plt, force=true)
-            rm(path_jac, force=true)
         elseif code == CODE_ITE
             @warn "    failure (maximum iterations)"
             plot_step()
         elseif code == CODE_SIN
             @warn "    failure (singular jacobian)"
-            plotting.jacobian(b, path_jac)
             plot_step()
         elseif code == CODE_TIM
             @warn "    failure (maximum time)"

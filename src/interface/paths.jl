@@ -46,11 +46,14 @@ module paths
         elseif name == "spectral_files"
             return joinpath(RES_DIR, "spectral_files")
 
+        elseif name == "blobs"
+            return joinpath(RES_DIR, "blobs")
+
         elseif name == "out"
             return joinpath(ROOT_DIR, "out")
 
         else
-            @error "Unknown directory name: $name"
+            @warn "Unknown directory name: $name"
             return nothing
         end
     end

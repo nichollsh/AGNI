@@ -75,9 +75,7 @@ module energy
 
             # Eddington's approximation
             # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
-            # Practical improved flux method (1985) with Elsasser's diffusivity (D=1.66)
             atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_elsasser
-
 
             # Check spectral file is ok
             if !Bool(atmos.spectrum.Basic.l_present[6])
@@ -96,7 +94,6 @@ module energy
 
             # Eddington's approximation
             # atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_eddington
-            # Practical improved flux method (original form of 1980)
             atmos.control.i_2stream = atmosphere.SOCRATES.rad_pcf.ip_pifm80
 
             # SOCRATES requires this to be passed as two variables, since it
@@ -134,8 +131,8 @@ module energy
             # 13 is recommended for clear-sky (Direct solution in a homogeneous column)
             atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_homogen_direct
 
-            # 1 is also possible (Pentadiagonal solver for homogeneous column)
-            # atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_pentadiagonal
+            # Direct mixed column scheme for full fluxes
+            # atmos.control.i_solver = atmosphere.SOCRATES.rad_pcf.ip_solver_mix_direct
         end
 
 
@@ -167,7 +164,7 @@ module energy
             #   w_cloud              -> Total cloud area fraction in layers, in [0, 1] (dimensionless)
             #   condensed_mix_ratio  -> Mass mixing ratios of condensate [kg kg-1], (LWC)
             #   condensed_dim_char   -> Characteristic dimensions of condensed species [m], (radius)
-            # The LWC is the mass of condensate per mass of dry air
+            # The LWC is the mass of condensate per mass of air
             #   Refer to opt_propt_water_cloud.f90 (L234); c.f. Slingo & Schrecker (1982) Eq 15,16,17
             atmos.cld.w_cloud[1,:]               .= atmos.cloud_arr_f[:]
             atmos.cld.condensed_mix_ratio[1,:,1] .= atmos.cloud_arr_l[:]
@@ -798,10 +795,10 @@ module energy
     function fill_Kzz!(atmos::atmosphere.Atmos_t)::Bool
 
         # Temporary value
-        Kzz_min::Float64  = 0.0
+        Kzz_min::Float64  = atmos.Kzz_floor
 
         # Near-zero value
-        Kzz_eps::Float64 = 1.0e-10
+        Kzz_eps::Float64 = 1.0e-20
 
         # Find reference index for extension of Kzz, starting from convective regions
         i_Kzz_top::Int64 = atmos.nlev_l # default
@@ -812,7 +809,7 @@ module energy
             # set to bottom of convective region
             i_Kzz_bot = findlast(x -> x > Kzz_eps, atmos.Kzz)
             # get minimum value, for filling intermediate zones
-            Kzz_min = minimum(atmos.Kzz[atmos.Kzz .> Kzz_eps])
+            Kzz_min = max(minimum(atmos.Kzz[atmos.Kzz .> Kzz_eps]), Kzz_min)
         else
             # otherwise, set to reference pressure
             i_Kzz_top = findmin(abs.(atmos.pl .- atmos.Kzz_pbreak))[2]
@@ -839,7 +836,7 @@ module energy
     """
     **Analytical diffusion scheme for condensation and evaporation energy.**
 
-    Updates fluxes. Requires `chemistry.rainout_and_evaporate` to be called first.
+    Updates fluxes. Requires `chemistry._sat_aloft` to be called first.
 
     Integrates from bottom of model upwards. Based on the amount of
     phase change at each level, a phase change flux is calculated by assuming

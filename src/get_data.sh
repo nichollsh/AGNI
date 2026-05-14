@@ -305,8 +305,11 @@ function handle_request {
             anyspec Dayspring 48
 
             zenodo 17981836 $stellar sun.txt
+
             handle_request "thermodynamics"
             handle_request "scattering"
+
+            zenodo 15806626 $parfiles h2o-co2_4000-5000.par
             ;;
 
         "highres")

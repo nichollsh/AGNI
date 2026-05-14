@@ -97,8 +97,6 @@ module plotting
                             incl_magma::Bool=false,
                             title::String="")
 
-        y = atmos.pl ./ 1e5 # pressure -> bar
-
         xlims::Tuple{Float64,Float64} = (0.0, maximum(atmos.tmpl)+TMP_MARGIN)
 
         # Create plot
@@ -160,7 +158,8 @@ module plotting
         scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, y, lc="black", lw=lw, label=L"T(p)")
+        plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=lw, label=L"T(pl)")
+        plot!(plt, atmos.tmp,  atmos.p*1e-5,  lc="grey",  lw=lw, ls=:dot, label=L"T(p)")
 
         # Plot current surface pressure and original
         @_plt_pboa
@@ -193,8 +192,8 @@ module plotting
         end
 
         plot!(plt2, [xmin, xmin], [1.0, 1.0], lc="darkgreen", lw=lw, ls=:solid, label=L"K_{zz}")
-        plot!(plt2, x_con, y, lc="darkgreen", label="Con.", ls=:solid)
-        plot!(plt2, x_rad, y, lc="darkgreen", label="Rad.", ls=:dot)
+        plot!(plt2, x_con, atmos.pl*1e-5, lc="darkgreen", label="Con.", ls=:solid)
+        plot!(plt2, x_rad, atmos.pl*1e-5, lc="darkgreen", label="Rad.", ls=:dot)
 
         xlabel!(plt2, "log₁₀ Kzz [cm²/s]")
         ylims!(plt2, _get_ylims(atmos))
@@ -271,7 +270,7 @@ module plotting
                             size_x::Int64=size_x_default, size_y::Int64=size_y_default,
                             title::String="")
 
-        xlims = (-8.0, 0.0)
+        xlims = (-10.0, 0.0)
         xticks = collect(range(start=xlims[1], stop=xlims[2], step=1))
 
         y = atmos.p * 1e-5 # pressure -> bar
@@ -304,7 +303,7 @@ module plotting
         @_plt_poboa
 
         # Decorate
-        xlabel!(plt, "log₁₀ Mass mixing ratio)")
+        xlabel!(plt, "log₁₀ Mass mixing ratio")
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
@@ -830,17 +829,72 @@ module plotting
     end
 
     """
+    **Plot jacobian matrix**
+
+    Arguments:
+    - `b::Array{Float64,2}`        jacobian matrix (∂r/∂x) to plot as a colormap
+    - `fname::String`              filename to save the plot
+    - `perturb::Array{Bool,1}`     boolean array indicating which levels were perturbed
+    """
+    function jacobian(b::Array{Float64,2}, fname::String;
+                            perturb::Array{Bool,1}=Bool[],
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
+
+
+        # make copy for plotting (transposed on heatmap)
+        bplt = deepcopy(b)
+
+        # threshold value sets dynamic range of heatmap
+        thresh = 1e-8
+        bplt[abs.(bplt) .<= thresh] .= thresh
+
+        # symmetric log scale
+        sign_mask = sign.(bplt)
+        @. bplt = sign_mask * log10(abs(bplt))
+
+        # scale for plotting
+        lim = ceil(maximum(abs.(bplt)))
+        l::Int64 = length(perturb)
+
+        # init plot
+        plt = plot(size=(size_x, size_y),
+                    title="Jacobian (log normalised ∂resid/∂temp)",
+                    clim=(-lim,lim), yflip=true; plt_default...)
+
+        # show jacobian
+        heatmap!(plt, bplt, color=:bam, label="")
+
+        # show perturbed levels
+        if l > 0
+            scatter!(plt, collect(1:l)[perturb], ones(Float64, l)[perturb]*(l+1),
+                        color=:gold,markershape=:utriangle, markersize=4,
+                        markerstrokewidth=0.0,
+                        label="")
+        end
+
+        yaxis!(plt, ylabel="Level index (perturbed)")
+        xaxis!(plt, xlabel="Level index (residual)")
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+
+        return plt
+    end
+
+    """
     **Combined multi-panel plot used for tracking behaviour of the solver at runtime.**
     """
-    function combined(plt_pt, plt_fl, plt_mr, plt_ra, info::String, fname::String;
-                        size_x::Int64=800, size_y::Int64=700)
+    function combined(plt_pt, plt_fl, plt_mr, plt_ra, plt_cld, plt_jac,
+                        info::String, fname::String;
+                        size_x::Int64=900, size_y::Int64=900)
 
         # plt_info = plot(legend=false, showaxis=false, grid=false)
         # annotate!(plt_info, (0.02, 0.7, text(info, family="Courier", :black, :left, 10)))
 
-        plt = plot(plt_pt, plt_fl, plt_mr, plt_ra,
+        plt = plot(plt_pt, plt_fl, plt_mr, plt_ra, plt_cld, plt_jac,
                         plot_title=info,
-                        layout=(2,2), size=(size_x, size_y); plt_default...)
+                        layout=(3,2), size=(size_x, size_y); plt_default...)
 
         if !isempty(fname)
             savefig(plt, fname)
@@ -970,37 +1024,6 @@ module plotting
         return nothing
     end
 
-    """
-    Plot jacobian matrix
-    """
-    function jacobian(b::Array{Float64,2}, fname::String;
-                            perturb::Array{Bool,1}=Bool[],
-                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
 
-        lim::Float64 = maximum(abs.(b))     # colourbar limits
-        l::Int64 = length(perturb)            # show perturbed levels?
-
-        plt = plot(size=(size_x, size_y),
-                    title="∂r/∂x [W m⁻² K⁻¹]",
-                    clim=(-lim,lim), yflip=true; plt_default...)
-
-        # show jacobian
-        heatmap!(plt, b, color=:RdBu, label="")
-
-        # show perturbed levels
-        if l > 0
-            scatter!(plt, collect(1:l)[perturb], ones(Float64, l)[perturb]*(l+1),
-                        color=:black,markershape=:utriangle, label="")
-        end
-
-        xlabel!(plt, "Cell-centre index")
-        ylabel!(plt, "Cell-centre index")
-
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
-
-        return plt
-    end
 
 end # end module plotting

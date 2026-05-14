@@ -1,7 +1,7 @@
 #!/bin/bash
 # Download and compile fastchem
 
-tag="v3.1.3"
+tag="main" # Tag or branch
 
 set -e
 
@@ -86,7 +86,7 @@ fi
 mkdir -p "$(dirname "$fcpath")"
 rm -rf "$fcpath"
 
-git clone --depth 1 --branch "$tag" https://github.com/NewStrangeWorlds/FastChem.git "$fcpath"
+git clone --depth 1 --branch "$tag" https://github.com/FormingWorlds/FastChem.git "$fcpath"
 
 # Compile FastChem
 cd "$fcpath"
