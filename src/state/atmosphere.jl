@@ -43,6 +43,7 @@ module atmosphere
     const CFG_longitude::Float64        = 0.0   # relative to substellar point
     const CFG_Kzz_kbreak::Float64       = 1e5   # m2 s-1
     const CFG_Kzz_pbreak::Float64       = 1e5   # 1 bar
+    const CFG_Kzz_floor::Float64        = 0.0
     const CFG_Kzz_type::Int64           = 2
     const CFG_mlt_asymptotic::Bool      = true
     const CFG_mlt_criterion::Char       = 's'
