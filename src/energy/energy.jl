@@ -795,10 +795,10 @@ module energy
     function fill_Kzz!(atmos::atmosphere.Atmos_t)::Bool
 
         # Temporary value
-        Kzz_min::Float64  = 0.0
+        Kzz_min::Float64  = atmos.Kzz_floor
 
         # Near-zero value
-        Kzz_eps::Float64 = 1.0e-10
+        Kzz_eps::Float64 = 1.0e-20
 
         # Find reference index for extension of Kzz, starting from convective regions
         i_Kzz_top::Int64 = atmos.nlev_l # default
@@ -809,7 +809,7 @@ module energy
             # set to bottom of convective region
             i_Kzz_bot = findlast(x -> x > Kzz_eps, atmos.Kzz)
             # get minimum value, for filling intermediate zones
-            Kzz_min = minimum(atmos.Kzz[atmos.Kzz .> Kzz_eps])
+            Kzz_min = max(minimum(atmos.Kzz[atmos.Kzz .> Kzz_eps]), Kzz_min)
         else
             # otherwise, set to reference pressure
             i_Kzz_top = findmin(abs.(atmos.pl .- atmos.Kzz_pbreak))[2]

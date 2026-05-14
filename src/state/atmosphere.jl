@@ -308,6 +308,7 @@ module atmosphere
         mlt_criterion::Char                 # INPUT: Stability criterion. Options: (s)chwarzschild, (l)edoux
         Kzz_pbreak::Float64                 # INPUT: Kzz break point pressure [Pa]
         Kzz_kbreak::Float64                 # INPUT: Kzz break point diffusion [m2 s-1]
+        Kzz_floor::Float64                  # INPUT: Minimum Kzz value used for filling [m2 s-1]
         Kzz_power::Float64                  # INPUT: Power law index for Kzz scaling above reference point
         Kzz_type::Int64                     # INPUT: Parametrisation of Kzz
         mask_c::Array{Bool,1}               # OUT: Layers transporting convective flux
@@ -478,6 +479,7 @@ module atmosphere
     - `surf_windspeed::Float64`         surface wind speed [m s-1].
     - `Kzz_kbreak::Float64`             reference eddy diffusion coefficient, SI units [m2 s-1]
     - `Kzz_pbreak::Float64`             reference pressure for Kzz break point [Pa]
+    - `Kzz_floor::Float64`              minimum Kzz value used for filling [m2 s-1]
     - `Kzz_type::Int64`                 parametrisation of Kzz. Options: 1 (constant), 2 (MLT wl), 3 (MLT Fc)
     - `mlt_asymptotic::Bool`            mixing length scales asymptotically, but ~0 near ground
     - `mlt_criterion::Char`             MLT stability criterion. Options: (s)chwarzschild, (l)edoux.
@@ -535,6 +537,7 @@ module atmosphere
                     surf_windspeed::Float64 =   CFG_surf_windspeed,
                     Kzz_kbreak::Float64 =       CFG_Kzz_kbreak,
                     Kzz_pbreak::Float64 =       CFG_Kzz_pbreak,
+                    Kzz_floor::Float64 =        CFG_Kzz_floor,
                     Kzz_type::Int64 =           CFG_Kzz_type,
                     mlt_asymptotic::Bool =      CFG_mlt_asymptotic,
                     mlt_criterion::Char =       CFG_mlt_criterion,
@@ -764,6 +767,7 @@ module atmosphere
 
         atmos.Kzz_pbreak =      max(1.0, Kzz_pbreak)
         atmos.Kzz_kbreak =      max(0.0, Kzz_kbreak)
+        atmos.Kzz_floor =       max(0.0, Kzz_floor)
         atmos.Kzz_power =       -0.4
         atmos.Kzz_type =        Kzz_type
         atmos.mlt_asymptotic =  mlt_asymptotic
@@ -2845,8 +2849,7 @@ module atmosphere
     """
     function calc_cond_mmr(atmos::atmosphere.Atmos_t, c::String, i::Int64)::Float64
         if atmos.cond_yield[c][i] > 0.0
-            numer = atmos.cond_yield[c][i]*atmos.cloud_alpha
-            return numer / (atmos.layer_σ[i] + numer)
+            return atmos.cond_yield[c][i]*atmos.cloud_alpha / atmos.layer_σ[i]
         else
             return 0.0
         end
