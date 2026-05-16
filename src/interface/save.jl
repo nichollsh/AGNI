@@ -298,6 +298,8 @@ module save
             var_bds =       defVar(ds, "ba_D_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_bus =       defVar(ds, "ba_U_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
             var_bns =       defVar(ds, "ba_N_SW",   Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "W m-2"))
+            var_tau_lw =    defVar(ds, "ba_tau_LW", Float64, ("nbands","nlev_c") ;  nc_comp..., attrib = OrderedDict("units" => "1"))
+            var_tau_sw =    defVar(ds, "ba_tau_SW", Float64, ("nbands","nlev_c") ;  nc_comp..., attrib = OrderedDict("units" => "1"))
             var_rfm_wn =    defVar(ds, "rfm_wn",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "cm-1"))
             var_rfm_fl =    defVar(ds, "rfm_fl",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "erg/(s cm2 cm-1)"))
             var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c") ;  nc_comp..., attrib = OrderedDict("units" => "1"))
@@ -405,6 +407,14 @@ module save
             for lc in 1:atmos.nlev_c
                 for ba in 1:atmos.nbands
                     var_cfn[ba, lc] = atmos.contfunc_band[lc, ba]
+                end
+            end
+
+            # SOCRATES optical depth
+            for lc in 1:atmos.nlev_c
+                for ba in 1:atmos.nbands
+                    var_tau_lw[ba, lc] = atmos.band_tau_lw[lc, ba]
+                    var_tau_sw[ba, lc] = atmos.band_tau_sw[lc, ba]
                 end
             end
 

@@ -788,6 +788,135 @@ module plotting
     end
 
     """
+    **Plot optical depth per band as heatmap (LW + SW)**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`    atmosphere object
+    - `fname::String`                filename to save the plot (if empty, does not save)
+    - `size_x::Int64`                width of each plot panel in pixels
+    - `size_y::Int64`                height of each plot panel in pixels
+    """
+    function plot_tau(atmos::atmosphere.Atmos_t, fname::String;
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
+
+        # Check that we have data
+        if !atmos.is_out_lw && !atmos.is_out_sw
+            @warn "Cannot plot optical depth because radiances have not been calculated"
+            return
+        end
+
+        # Get data dimensions
+        x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
+        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)    # pressure levels
+
+        # Min, max tau for plotting
+        tau_min::Float64 = 1e-6  # dimensionless
+        tau_max::Float64 = 1e3   # dimensionless
+        climits = (log10(tau_min), log10(tau_max))
+
+        # Reversed?
+        reversed::Bool = (atmos.bands_min[1] > atmos.bands_min[end])
+
+        # x value - band centres [nm]
+        for ba in 1:atmos.nbands
+            if reversed
+                br = atmos.nbands - ba + 1
+            else
+                br = ba
+            end
+            x[br] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
+        end
+
+        # y value - pressures [bar]
+        for i in 1:atmos.nlev_c
+            y[i] = atmos.p[i] * 1.0e-5
+        end
+
+        # Make LW plot
+        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_c, atmos.nbands))
+        for ba in 1:atmos.nbands
+            if reversed
+                br = atmos.nbands - ba + 1
+            else
+                br = ba
+            end
+            for i in 1:atmos.nlev_c
+                z[i,br] = atmos.band_tau_lw[i,ba]
+            end
+        end
+        clamp!(z, tau_min, tau_max)
+        z[:] = log10.(z[:])
+
+        plt_lw = plot(colorbar_title="log₁₀ τ (LW)", size=(size_x, size_y); plt_default...)
+        heatmap!(plt_lw, x, y, z, c=:devon, label="", climits=climits)
+
+        xlims  = (minimum(x), maximum(x))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        xaxis!(plt_lw, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+
+        ylims  = (y[1], y[end])
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        ylabel!(plt_lw, "Pressure [bar]")
+        yflip!(plt_lw)
+        yaxis!(plt_lw, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
+
+        # Make SW plot
+        for ba in 1:atmos.nbands
+            if reversed
+                br = atmos.nbands - ba + 1
+            else
+                br = ba
+            end
+            for i in 1:atmos.nlev_c
+                z[i,br] = atmos.band_tau_sw[i,ba]
+            end
+        end
+        clamp!(z, tau_min, tau_max)
+        z[:] = log10.(z[:])
+
+        plt_sw = plot(colorbar_title="log₁₀ τ (SW)", size=(size_x, size_y); plt_default...)
+        heatmap!(plt_sw, x, y, z, c=:devon, label="", climits=climits)
+
+        xaxis!(plt_sw, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+        ylabel!(plt_sw, "Pressure [bar]")
+        yflip!(plt_sw)
+        yaxis!(plt_sw, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
+
+        # LW and SW components together
+        for ba in 1:atmos.nbands
+            if reversed
+                br = atmos.nbands - ba + 1
+            else
+                br = ba
+            end
+            for i in 1:atmos.nlev_c
+                z[i,br] = atmos.band_tau_lw[i,ba] + atmos.band_tau_sw[i,ba]
+            end
+        end
+        clamp!(z, tau_min, tau_max)
+        z[:] = log10.(z[:])
+
+        plt_bo = plot(colorbar_title="log₁₀ τ (Both)", size=(size_x, size_y); plt_default...)
+        heatmap!(plt_bo, x, y, z, c=:devon, label="", climits=climits)
+
+        xlabel!(plt_bo, "Wavelength [nm]")
+        xaxis!(plt_bo, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+        ylabel!(plt_bo, "Pressure [bar]")
+        yflip!(plt_bo)
+        yaxis!(plt_bo, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
+
+        # Combine panels vertically
+        plt = plot(plt_lw, plt_sw, plt_bo, layout=(3,1),
+                    size=(size_x, size_y*3),
+                    left_margin=[1*Plots.mm -4*Plots.mm]; plt_default...)
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt
+    end
+
+    """
     **Plot spectral albedo (ratio of SW_UP to SW_DN)**
 
     Arguments:
@@ -989,6 +1118,8 @@ module plotting
         end
         return plt
     end
+
+
 
     """
     **Convert still-frame images into an animation**

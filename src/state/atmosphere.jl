@@ -286,6 +286,10 @@ module atmosphere
         band_u_sw::Array{Float64,2}         # up component, sw
         band_n_sw::Array{Float64,2}         # net upward, sw
 
+        # Calculated per-band optical depth
+        band_tau_lw::Array{Float64,2}       # optical depth per band, lw (all-sky)
+        band_tau_sw::Array{Float64,2}       # optical depth per band, sw (all-sky)
+
         # Surface planck emission (incl. emissivity)
         surf_flux::Array{Float64, 1}
 
@@ -1813,7 +1817,7 @@ module atmosphere
 
             # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
             # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
-            atmos.control.i_direct_tau = SOCRATES.rad_pcf.ip_direct_delta_scaling
+            atmos.control.i_direct_tau = 0 # SOCRATES.rad_pcf.ip_direct_delta_scaling
             atmos.control.n_order_forward = 2
 
             ############################################
@@ -2267,6 +2271,9 @@ module atmosphere
         atmos.band_d_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
         atmos.band_u_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
         atmos.band_n_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
+
+        atmos.band_tau_lw =       zeros(Float64, (atmos.nlev_c,atmos.nbands))
+        atmos.band_tau_sw =       zeros(Float64, (atmos.nlev_c,atmos.nbands))
 
         atmos.surf_flux =         zeros(Float64, atmos.nbands)
 

@@ -235,6 +235,12 @@ module energy
         # Calculate contribution function?
         atmos.control.l_contrib_func_band = calc_cf
 
+        # Enable optical depth output, if supported
+        has_tau::Bool = hasproperty(atmos.radout, :tau_band)
+        if has_tau
+            atmos.control.l_tau_band = true
+        end
+
         # Set composition for each gas,level
         for (i_gas,s_gas) in enumerate(atmos.gas_soc_names)
             for i in 1:atmos.nlev_c
@@ -309,6 +315,15 @@ module energy
                     end
                 end
             end
+
+            # Extract optical depth (LW)
+            if has_tau
+                for ba in 1:atmos.dimen.nd_channel
+                    for lv in 1:atmos.nlev_c
+                        atmos.band_tau_lw[lv,ba] = sum(atmos.radout.tau_band_clr[1,1:lv,ba])
+                    end
+                end
+            end
             atmos.is_out_lw = true
         else
             # SW case
@@ -323,6 +338,15 @@ module energy
             end
             atmos.band_n_sw = atmos.band_u_sw - atmos.band_d_sw
             atmos.flux_n_sw = atmos.flux_u_sw - atmos.flux_d_sw
+
+            # Extract optical depth (SW)
+            if has_tau
+                for ba in 1:atmos.dimen.nd_channel
+                    for lv in 1:atmos.nlev_c
+                        atmos.band_tau_sw[lv,ba] = sum(atmos.radout.tau_band_clr_dir[1,1:lv,ba])
+                    end
+                end
+            end
             atmos.is_out_sw = true
         end
 
