@@ -235,12 +235,6 @@ module energy
         # Calculate contribution function?
         atmos.control.l_contrib_func_band = calc_cf
 
-        # Enable optical depth output, if supported
-        has_tau::Bool = hasproperty(atmos.radout, :tau_band)
-        if has_tau
-            atmos.control.l_tau_band = true
-        end
-
         # Set composition for each gas,level
         for (i_gas,s_gas) in enumerate(atmos.gas_soc_names)
             for i in 1:atmos.nlev_c
@@ -306,22 +300,32 @@ module energy
             atmos.band_n_lw = atmos.band_u_lw - atmos.band_d_lw
             atmos.flux_n_lw = atmos.flux_u_lw - atmos.flux_d_lw
 
-            # Contribution function (only LW stream contributes)
-            fill!(atmos.contfunc_band,0.0)
+            # Contribution function
+            fill!(atmos.contfunc_band ,0.0)
+            fill!(atmos.tau_band, 0.0)
             if calc_cf
+                # get contribution function
                 for ba in 1:atmos.dimen.nd_channel
                     for lv in 1:atmos.nlev_c
                         atmos.contfunc_band[lv,ba] = atmos.radout.contrib_funcf_band[1,lv,ba]
                     end
                 end
-            end
 
-            # Extract optical depth (LW)
-            if has_tau
+
+                # get optical depth from contribution function
+                df = 2.0
                 for ba in 1:atmos.dimen.nd_channel
-                    for lv in 1:atmos.nlev_c
-                        atmos.band_tau_lw[lv,ba] = sum(atmos.radout.tau_band_clr[1,1:lv,ba])
+                    atmos.tau_band[1,ba] = 0.0
+                    for lv in 2:atmos.nlev_c
+                        wav = atmos.bands_cen[ba] * 1e9 # convert from m to nm
+                        atmos.tau_band[lv,ba] = atmos.tau_band[1,ba] +
+                                                atmos.contfunc_band[lv,ba] * df /
+                                                (2 * phys.evaluate_planck(wav,atmos.atm.t_level[1,lv])) *
+                                                log10(atmos.atm.p_level[1,lv-1]/atmos.atm.p_level[1,lv])
                     end
+
+                    # convert exp(-df*tau) to tau
+                    atmos.tau_band[:,ba] = log.(-atmos.tau_band[:,ba]) / df
                 end
             end
             atmos.is_out_lw = true
@@ -338,15 +342,6 @@ module energy
             end
             atmos.band_n_sw = atmos.band_u_sw - atmos.band_d_sw
             atmos.flux_n_sw = atmos.flux_u_sw - atmos.flux_d_sw
-
-            # Extract optical depth (SW)
-            if has_tau
-                for ba in 1:atmos.dimen.nd_channel
-                    for lv in 1:atmos.nlev_c
-                        atmos.band_tau_sw[lv,ba] = sum(atmos.radout.tau_band_clr_dir[1,1:lv,ba])
-                    end
-                end
-            end
             atmos.is_out_sw = true
         end
 

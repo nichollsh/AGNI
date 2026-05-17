@@ -287,8 +287,7 @@ module atmosphere
         band_n_sw::Array{Float64,2}         # net upward, sw
 
         # Calculated per-band optical depth
-        band_tau_lw::Array{Float64,2}       # optical depth per band, lw (all-sky)
-        band_tau_sw::Array{Float64,2}       # optical depth per band, sw (all-sky)
+        tau_band::Array{Float64,2}          # optical depth per band, lw (all-sky)
 
         # Surface planck emission (incl. emissivity)
         surf_flux::Array{Float64, 1}
@@ -1817,13 +1816,13 @@ module atmosphere
 
             # 'Entre treatment of optical depth for direct solar flux (0/1/2)'
             # '0: no scaling; 1: delta-scaling; 2: circumsolar scaling'
-            atmos.control.i_direct_tau = 0 # SOCRATES.rad_pcf.ip_direct_delta_scaling
+            atmos.control.i_direct_tau = SOCRATES.rad_pcf.ip_direct_delta_scaling
             atmos.control.n_order_forward = 2
 
             ############################################
             # Check Options
             ############################################
-
+``
             if atmos.control.l_rayleigh
                 if !Bool(atmos.spectrum.Basic.l_present[3])
                     @error "The spectral file contains no rayleigh scattering data"
@@ -2272,11 +2271,10 @@ module atmosphere
         atmos.band_u_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
         atmos.band_n_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
 
-        atmos.band_tau_lw =       zeros(Float64, (atmos.nlev_c,atmos.nbands))
-        atmos.band_tau_sw =       zeros(Float64, (atmos.nlev_c,atmos.nbands))
 
         atmos.surf_flux =         zeros(Float64, atmos.nbands)
 
+        atmos.tau_band  =         zeros(Float64, (atmos.nlev_c,atmos.nbands))
         atmos.contfunc_band =     zeros(Float64, (atmos.nlev_c,atmos.nbands))
 
         atmos.flux_sens =         0.0

@@ -553,9 +553,14 @@ module plotting
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`    atmosphere object
-    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `fname::String`                filename to save the plot (if empty, does not save)
+    - `size_x::Int64`                width of the plot in pixels
+    - `size_y::Int64`                height of the plot in pixels
+    - `wl_max::Float64`              maximum wavelength to plot [nm]
     """
-    function plot_emission(atmos::atmosphere.Atmos_t, fname::String)
+    function plot_emission(atmos::atmosphere.Atmos_t, fname::String;
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default,
+                            wl_max::Float64=70e3)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -590,7 +595,7 @@ module plotting
         @. yp = phys.evaluate_planck(xe, atmos.tmp_surf) * 1000.0
 
         # Make plot
-        plt = plot(size=(600,400); plt_default...)
+        plt = plot(size=(size_x, size_y); plt_default...)
 
         plot!(plt, xe, yp, label=L"Planck @ $T_s$",  color="green")
         plot!(plt, xe, ye, label="Surface LW+SW",    color="green", ls=:dash)
@@ -599,7 +604,8 @@ module plotting
         plot!(plt, xe, yl, lw=0.9, label="Planetary LW",    color="red" )
         plot!(plt, xe, yt, lw=0.5, label="Planetary LW+SW", color="black")
 
-        xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 70000.0))
+        wl_max = max(wl_max, minimum(xe)+1)
+        xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), wl_max))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         ylims  = (max(1.0e-10,minimum(yt)) / 2, max(maximum(yt),maximum(yp)) * 2)
@@ -715,17 +721,20 @@ module plotting
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`    atmosphere object
-    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `fname::String`                filename to save the plot (if empty, does not save)
+    - `size_x::Int64`                width of the plot in pixels
+    - `size_y::Int64`                height of the plot in pixels
+    - `wl_max::Float64`              maximum wavelength to plot [nm]
     """
-    function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String)
+    function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String;
+                                    size_x::Int64=size_x_default, size_y::Int64=size_y_default,
+                                    wl_max::Float64=700e3)
 
         # Check that we have data
         if !atmos.is_out_lw
             @warn "Cannot plot contribution func because radiances have not been calculated"
             return
         end
-
-        @warn "Contribution func 2D colormesh x-axis is incorrect!"
 
         # Get data
         x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
@@ -770,7 +779,7 @@ module plotting
 
         heatmap!(plt, x,y,z, c=:devon, label="")
 
-        xlims  = (minimum(x), maximum(x))
+        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
@@ -795,9 +804,11 @@ module plotting
     - `fname::String`                filename to save the plot (if empty, does not save)
     - `size_x::Int64`                width of each plot panel in pixels
     - `size_y::Int64`                height of each plot panel in pixels
+    - `wl_max::Float64`              maximum wavelength to plot [nm]
     """
     function plot_tau(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default,
+                            wl_max::Float64=700e3)
 
         # Check that we have data
         if !atmos.is_out_lw && !atmos.is_out_sw
@@ -808,16 +819,18 @@ module plotting
         # Get data dimensions
         x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
         y::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)    # pressure levels
+        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_c, atmos.nbands))
 
         # Min, max tau for plotting
-        tau_min::Float64 = 1e-6  # dimensionless
-        tau_max::Float64 = 1e3   # dimensionless
+        tau_min::Float64 = 1e-4
+        tau_max::Float64 = 1e8
         climits = (log10(tau_min), log10(tau_max))
 
         # Reversed?
         reversed::Bool = (atmos.bands_min[1] > atmos.bands_min[end])
 
         # x value - band centres [nm]
+        # z value - log10 optical depth (LW + SW)
         for ba in 1:atmos.nbands
             if reversed
                 br = atmos.nbands - ba + 1
@@ -825,90 +838,32 @@ module plotting
                 br = ba
             end
             x[br] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
+            for i in 1:atmos.nlev_c
+                z[i,br] = atmos.tau_band[i,ba]
+            end
         end
+        clamp!(z, tau_min, tau_max)
+        z[:] = log10.(z[:])
 
         # y value - pressures [bar]
         for i in 1:atmos.nlev_c
             y[i] = atmos.p[i] * 1.0e-5
         end
 
-        # Make LW plot
-        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_c, atmos.nbands))
-        for ba in 1:atmos.nbands
-            if reversed
-                br = atmos.nbands - ba + 1
-            else
-                br = ba
-            end
-            for i in 1:atmos.nlev_c
-                z[i,br] = atmos.band_tau_lw[i,ba]
-            end
-        end
-        clamp!(z, tau_min, tau_max)
-        z[:] = log10.(z[:])
-
-        plt_lw = plot(colorbar_title="log₁₀ τ (LW)", size=(size_x, size_y); plt_default...)
-        heatmap!(plt_lw, x, y, z, c=:devon, label="", climits=climits)
-
-        xlims  = (minimum(x), maximum(x))
+        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
-        xaxis!(plt_lw, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
-        ylabel!(plt_lw, "Pressure [bar]")
-        yflip!(plt_lw)
-        yaxis!(plt_lw, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
 
-        # Make SW plot
-        for ba in 1:atmos.nbands
-            if reversed
-                br = atmos.nbands - ba + 1
-            else
-                br = ba
-            end
-            for i in 1:atmos.nlev_c
-                z[i,br] = atmos.band_tau_sw[i,ba]
-            end
-        end
-        clamp!(z, tau_min, tau_max)
-        z[:] = log10.(z[:])
+        plt = plot(colorbar_title="log₁₀ τ", size=(size_x, size_y/2); plt_default...)
+        heatmap!(plt, x, y, z, c=:devon, label="", climits=climits)
 
-        plt_sw = plot(colorbar_title="log₁₀ τ (SW)", size=(size_x, size_y); plt_default...)
-        heatmap!(plt_sw, x, y, z, c=:devon, label="", climits=climits)
-
-        xaxis!(plt_sw, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
-        ylabel!(plt_sw, "Pressure [bar]")
-        yflip!(plt_sw)
-        yaxis!(plt_sw, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
-
-        # LW and SW components together
-        for ba in 1:atmos.nbands
-            if reversed
-                br = atmos.nbands - ba + 1
-            else
-                br = ba
-            end
-            for i in 1:atmos.nlev_c
-                z[i,br] = atmos.band_tau_lw[i,ba] + atmos.band_tau_sw[i,ba]
-            end
-        end
-        clamp!(z, tau_min, tau_max)
-        z[:] = log10.(z[:])
-
-        plt_bo = plot(colorbar_title="log₁₀ τ (Both)", size=(size_x, size_y); plt_default...)
-        heatmap!(plt_bo, x, y, z, c=:devon, label="", climits=climits)
-
-        xlabel!(plt_bo, "Wavelength [nm]")
-        xaxis!(plt_bo, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
-        ylabel!(plt_bo, "Pressure [bar]")
-        yflip!(plt_bo)
-        yaxis!(plt_bo, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
-
-        # Combine panels vertically
-        plt = plot(plt_lw, plt_sw, plt_bo, layout=(3,1),
-                    size=(size_x, size_y*3),
-                    left_margin=[1*Plots.mm -4*Plots.mm]; plt_default...)
+        xlabel!(plt, "Wavelength [nm]")
+        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
 
         if !isempty(fname)
             savefig(plt, fname)

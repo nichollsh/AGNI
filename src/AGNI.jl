@@ -811,6 +811,7 @@ module AGNI
             plt_cld && plotting.plot_cloud(a,       joinpath(a.OUT_DIR,"plot_cloud$s.$plt_EXT"))
             plt_vmr && plotting.plot_vmr(a,         joinpath(a.OUT_DIR,"plot_vmrs$s.$plt_EXT"), size_x=600)
             plt_cff && plotting.plot_contfunc1(a,   joinpath(a.OUT_DIR,"plot_contfunc1$s.$plt_EXT"))
+            plt_cff && plotting.plot_contfunc2(a,   joinpath(a.OUT_DIR,"plot_contfunc2$s.$plt_EXT"))
             plt_tau && plotting.plot_tau(a,        joinpath(a.OUT_DIR,"plot_tau$s.$plt_EXT"))
             plt_hgt && plotting.plot_radius(a,      joinpath(a.OUT_DIR,"plot_radius$s.$plt_EXT"))
             plt_tmp && plotting.plot_pt(a,          joinpath(a.OUT_DIR,"plot_ptprofile$s.$plt_EXT"), incl_magma=(sol_type==2))
