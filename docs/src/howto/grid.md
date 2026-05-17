@@ -9,7 +9,7 @@ the `worker.jl` file directly.
 
 For example, to run worker ID=1 and allocate two workers to the whole grid:
 ```console
-julia --project=. misc/grid/worker.jl 1 2
+julia --project misc/grid/worker.jl 1 2
 ```
 
 ## Running a managed parallel grid

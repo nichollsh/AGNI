@@ -73,7 +73,7 @@ jobs:
           export RAD_BIN="$RAD_DIR/bin/"
           export LD_LIBRARY_PATH=""
           export FC=$(command -v gfortran)
-          julia --project=. -e 'using Pkg; Pkg.build()'
+          julia --project -e 'using Pkg; Pkg.build()'
 
       # Run the tests
       - name: Run AGNI test suite
@@ -81,12 +81,12 @@ jobs:
           export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
           export FC_DIR="/home/runner/work/AGNI/AGNI/fastchem"
           export LD_LIBRARY_PATH=""
-          julia --project=. --code-coverage test/runtests.jl
+          julia --project --code-coverage test/runtests.jl
 
       - name: Get coverage
         run: |
           export CODECOV_TOKEN="${{ secrets.CODECOV_TOKEN }}"
-          julia --project=. test/get_coverage.jl
+          julia --project test/runcoverage.jl
           export total=$(cat coverage.total)
           echo "total=$total" >> $GITHUB_ENV
           cat coverage.md >> "$GITHUB_STEP_SUMMARY"
