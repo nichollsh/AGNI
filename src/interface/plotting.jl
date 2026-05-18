@@ -775,9 +775,16 @@ module plotting
         z[:] = log10.(z[:])
 
         # Make plot
-        plt = plot(colorbar_title="log " * L"\widehat {cf}(\lambda, p)"; plt_default...)
+        plt = plot(colorbar_title="Normalised, log₁₀ Contrib Function",
+                        size=(size_x, size_y*0.8); plt_default...)
 
+        # plot contribution function as 2D heatmap
         heatmap!(plt, x,y,z, c=:devon, label="")
+
+        # plot band limits
+        for ba in 1:atmos.nbands
+            vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
+        end
 
         xlims  = (minimum(x), max(wl_max, minimum(x)+1))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
@@ -807,7 +814,8 @@ module plotting
     - `wl_max::Float64`              maximum wavelength to plot [nm]
     """
     function plot_tau(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int64=size_x_default, size_y::Int64=size_y_default,
+                            size_x::Int64=size_x_default,
+                            size_y::Int64=size_y_default,
                             wl_max::Float64=700e3)
 
         # Check that we have data
@@ -822,9 +830,8 @@ module plotting
         z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_c, atmos.nbands))
 
         # Min, max tau for plotting
-        tau_min::Float64 = 1e-4
-        tau_max::Float64 = 1e8
-        climits = (log10(tau_min), log10(tau_max))
+        tau_min::Float64 = 1e-3
+        tau_max::Float64 = 1e6
 
         # Reversed?
         reversed::Bool = (atmos.bands_min[1] > atmos.bands_min[end])
@@ -842,6 +849,11 @@ module plotting
                 z[i,br] = atmos.tau_band[i,ba]
             end
         end
+
+        # clamp tau values for plotting
+        tau_min = max(tau_min, minimum(z))
+        tau_max = min(tau_max, maximum(z))
+        tau_max = max(tau_max, tau_min*10)
         clamp!(z, tau_min, tau_max)
         z[:] = log10.(z[:])
 
@@ -856,8 +868,15 @@ module plotting
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
-        plt = plot(colorbar_title="log₁₀ τ", size=(size_x, size_y/2); plt_default...)
-        heatmap!(plt, x, y, z, c=:devon, label="", climits=climits)
+        plt = plot(colorbar_title="log₁₀ τ (LW)", size=(size_x, size_y*0.8); plt_default...)
+
+        # plot tau as heatmap
+        heatmap!(plt, x, y, z, c=:devon, label="", climits=(log10(tau_min), log10(tau_max)))
+
+        # plot band limits
+        for ba in 1:atmos.nbands
+            vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
+        end
 
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)

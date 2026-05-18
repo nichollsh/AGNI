@@ -23,7 +23,7 @@ using Test
 @info "Begin AGNI tests"
 
 # Configure
-SLOW_TESTS = ["integration", "chemistry", "deep_heating", "kzz", "spectrum", "rfm"]
+SLOW_TESTS = ["integration", "radtrans", "chemistry", "deep_heating", "kzz", "spectrum", "rfm"]
 
 # Prepare
 SRC_DIR         = joinpath(ROOT_DIR,"src/")

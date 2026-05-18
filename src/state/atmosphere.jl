@@ -140,6 +140,7 @@ module atmosphere
         aer::SOCRATES.StrAer
         bound::SOCRATES.StrBound
         radout::SOCRATES.StrOut
+        planck::SOCRATES.StrPlanck
 
         # Radiation scheme
         rt_scheme::RTSCHEME             # RT scheme (1: SOCRATES, 2: Grey gas)
@@ -422,6 +423,8 @@ module atmosphere
 
         SOCRATES.deallocate_bound(   atmos.bound)
         SOCRATES.deallocate_out(     atmos.radout)
+
+        SOCRATES.deallocate_planck(  atmos.planck)
 
         atmos.is_alloc = false
         return nothing
@@ -722,6 +725,7 @@ module atmosphere
         atmos.aer =         SOCRATES.StrAer()
         atmos.bound =       SOCRATES.StrBound()
         atmos.radout =      SOCRATES.StrOut()
+        atmos.planck =      SOCRATES.StrPlanck()
 
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
@@ -2141,6 +2145,10 @@ module atmosphere
                 fill!(atmos.cld.i_cloud_type, 0)
                 fill!(atmos.cld.frac_cloud, 0.0)
             end
+
+            # Allocate arrays for planck function thermal emission calculator
+            SOCRATES.allocate_planck(atmos.planck, atmos.dimen)
+
         end # end socrates only
 
         ###########################################
