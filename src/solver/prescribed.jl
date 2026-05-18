@@ -16,6 +16,7 @@ module solve_prescribed
 
     import ..atmosphere
     import ..energy
+    import ..diagnostics
     import ..setpt
     import ..phys
     import ..golden: gs_search
