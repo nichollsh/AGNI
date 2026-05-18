@@ -56,6 +56,34 @@ The `coverage.md` file outlines:
 - Quick wins (small files with 0% coverage)
 - Lists of uncovered line numbers
 
+## Profiling a Test Configuration Run
+
+AGNI includes a standalone profiling tool that runs a single model solve from `test/test.toml` and writes an interactive HTML profile using [StatProfilerHTML.jl](https://github.com/tkluck/StatProfilerHTML.jl).
+
+### Install profiler dependency (one-time)
+
+```bash
+julia --project -e 'using Pkg; Pkg.add("StatProfilerHTML")'
+```
+
+### Run the profiler tool
+
+From the AGNI root directory:
+
+```bash
+julia --project test/runprofiler.jl
+```
+
+This writes:
+- model outputs to `out/`
+- profiling report files to `profile_report/` (open `index.html` in a browser)
+
+Optional arguments:
+
+```bash
+julia --project test/runprofiler.jl <config_path> <report_dir>
+```
+
 ### Test Design Principles
 
 1. **Fast by default**: Most tests avoid expensive operations like full atmosphere allocation
