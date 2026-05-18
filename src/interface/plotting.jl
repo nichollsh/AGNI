@@ -775,7 +775,7 @@ module plotting
         z[:] = log10.(z[:])
 
         # Make plot
-        plt = plot(colorbar_title="Normalised, log₁₀ Contrib Function",
+        plt = plot(title="Normalised, log₁₀ Contrib Function",
                         size=(size_x, size_y*0.8); plt_default...)
 
         # plot contribution function as 2D heatmap
@@ -868,7 +868,7 @@ module plotting
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
-        plt = plot(colorbar_title="log₁₀ τ (LW)", size=(size_x, size_y*0.8); plt_default...)
+        plt = plot(title="log₁₀ τ (LW)", size=(size_x, size_y*0.8); plt_default...)
 
         # plot tau as heatmap
         heatmap!(plt, x, y, z, c=:devon, label="", climits=(log10(tau_min), log10(tau_max)))
