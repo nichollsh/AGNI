@@ -12,5 +12,6 @@ See [Getting started](@ref) if you have not yet installed the model.
 | [Accessing AGNI from Python](@ref) | Call AGNI from a Python script |
 | [Running a grid of models](@ref) | Parallelise many configurations |
 | [Line-by-line radiative transfer](@ref) | Validate with the Reference Forward Model |
+| [Testing in AGNI](@ref) | Run tests, coverage, and profiling tools |
 | [Troubleshooting](@ref) | Diagnose and fix common problems |
 | [Contributing to AGNI](@ref) | Report bugs, submit patches, add features |

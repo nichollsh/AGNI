@@ -15,14 +15,14 @@ export RAD_DIR=/path/to/SOCRATES
 From the AGNI root directory:
 
 ```bash
-julia --project=. test/runtests.jl
+julia --project test/runtests.jl
 ```
 
 ### Run Fast Tests Only
 The fast test suite excludes expensive integration tests:
 
 ```bash
-julia --project=. test/runtests.jl fast
+julia --project test/runtests.jl fast
 ```
 
 ## Test Coverage
@@ -33,14 +33,14 @@ julia --project=. test/runtests.jl fast
 From the AGNI root directory:
 
 ```bash
-julia --project=. --code-coverage test/runtests.jl
+julia --project --code-coverage test/runtests.jl
 ```
 
 #### Process Coverage Data
 From the AGNI root directory:
 
 ```bash
-julia --project=. test/get_coverage.jl
+julia --project test/runcoverage.jl
 ```
 
 This generates:
@@ -55,6 +55,34 @@ The `coverage.md` file outlines:
 - Files needing attention (<50% coverage)
 - Quick wins (small files with 0% coverage)
 - Lists of uncovered line numbers
+
+## Profiling a Test Configuration Run
+
+AGNI includes a standalone profiling tool that runs a single model solve from `test/test.toml` and writes an interactive HTML profile using [StatProfilerHTML.jl](https://github.com/tkluck/StatProfilerHTML.jl).
+
+### Install profiler dependency (one-time)
+
+```bash
+julia --project -e 'using Pkg; Pkg.add("StatProfilerHTML")'
+```
+
+### Run the profiler tool
+
+From the AGNI root directory:
+
+```bash
+julia --project test/runprofiler.jl
+```
+
+This writes:
+- model outputs to `out/`
+- profiling report files to `profile_report/` (open `index.html` in a browser)
+
+Optional arguments:
+
+```bash
+julia --project test/runprofiler.jl <config_path> <report_dir>
+```
 
 ### Test Design Principles
 
@@ -124,7 +152,7 @@ The test suite expects spectral files in `res/spectral_files/`. Ensure AGNI's re
 
 ### Coverage is 0% or unexpectedly low
 - Make sure you ran tests with `--code-coverage` flag
-- Run `get_coverage.jl` from the AGNI root directory (not `test/`)
+- Run `runcoverage.jl` from the AGNI root directory (not `test/`)
 - Check that `.cov` files were generated in `src/` and `test/`
 
 ## Test Maintenance

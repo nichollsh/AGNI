@@ -140,6 +140,7 @@ module atmosphere
         aer::SOCRATES.StrAer
         bound::SOCRATES.StrBound
         radout::SOCRATES.StrOut
+        planck::SOCRATES.StrPlanck
 
         # Radiation scheme
         rt_scheme::RTSCHEME             # RT scheme (1: SOCRATES, 2: Grey gas)
@@ -286,6 +287,9 @@ module atmosphere
         band_u_sw::Array{Float64,2}         # up component, sw
         band_n_sw::Array{Float64,2}         # net upward, sw
 
+        # Calculated per-band optical depth
+        tau_band::Array{Float64,2}          # optical depth per band, lw (all-sky)
+
         # Surface planck emission (incl. emissivity)
         surf_flux::Array{Float64, 1}
 
@@ -419,6 +423,8 @@ module atmosphere
 
         SOCRATES.deallocate_bound(   atmos.bound)
         SOCRATES.deallocate_out(     atmos.radout)
+
+        SOCRATES.deallocate_planck(  atmos.planck)
 
         atmos.is_alloc = false
         return nothing
@@ -719,6 +725,7 @@ module atmosphere
         atmos.aer =         SOCRATES.StrAer()
         atmos.bound =       SOCRATES.StrBound()
         atmos.radout =      SOCRATES.StrOut()
+        atmos.planck =      SOCRATES.StrPlanck()
 
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
@@ -1819,7 +1826,7 @@ module atmosphere
             ############################################
             # Check Options
             ############################################
-
+``
             if atmos.control.l_rayleigh
                 if !Bool(atmos.spectrum.Basic.l_present[3])
                     @error "The spectral file contains no rayleigh scattering data"
@@ -2138,6 +2145,10 @@ module atmosphere
                 fill!(atmos.cld.i_cloud_type, 0)
                 fill!(atmos.cld.frac_cloud, 0.0)
             end
+
+            # Allocate arrays for planck function thermal emission calculator
+            SOCRATES.allocate_planck(atmos.planck, atmos.dimen)
+
         end # end socrates only
 
         ###########################################
@@ -2268,8 +2279,10 @@ module atmosphere
         atmos.band_u_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
         atmos.band_n_sw =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
 
+
         atmos.surf_flux =         zeros(Float64, atmos.nbands)
 
+        atmos.tau_band  =         zeros(Float64, (atmos.nlev_c,atmos.nbands))
         atmos.contfunc_band =     zeros(Float64, (atmos.nlev_c,atmos.nbands))
 
         atmos.flux_sens =         0.0

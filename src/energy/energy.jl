@@ -22,6 +22,8 @@ module energy
     import ..species
 
     # Constants
+    SMALL_TRANS::Float64            = 1e-10     # minimum transmissivity
+    DFSVTY_FCTR::Float64            = 2.0       # diffusivity factor
     SKIP_SW_THRESH::Float64         = 1e-9      # skip SW calculation if TOA heating is below this threshold [W m-2]
     FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
     CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [bar]
@@ -51,7 +53,7 @@ module energy
     - `lw::Bool`                True: longwave calculation. False: shortwave calculation.
 
     Optional arguments:
-    - `calc_cf::Bool`           also calculate contribution function?
+    - `calc_cf::Bool`           calculate contribution function and store optical depths?
     - `gauss_ir::Bool`          using gaussian angular integration in IR, otherwise uses two-stream approximation
     - `rescale_pf::Bool`        perform rescaling on phase function
     """
@@ -286,6 +288,8 @@ module energy
 
         # Store new fluxes in atmos struct
         idx::Int64 = 1
+        trans_prev::Float64 = 1.0
+        dlog10p::Float64 = 0.0
         if lw
             # LW case
             for lv in 1:atmos.nlev_l      # sum over levels
@@ -300,12 +304,47 @@ module energy
             atmos.band_n_lw = atmos.band_u_lw - atmos.band_d_lw
             atmos.flux_n_lw = atmos.flux_u_lw - atmos.flux_d_lw
 
-            # Contribution function (only LW stream contributes)
-            fill!(atmos.contfunc_band,0.0)
+            # Contribution function
+            fill!(atmos.contfunc_band ,0.0)
+            fill!(atmos.tau_band, 0.0)
             if calc_cf
+                # get contribution function
                 for ba in 1:atmos.dimen.nd_channel
                     for lv in 1:atmos.nlev_c
                         atmos.contfunc_band[lv,ba] = atmos.radout.contrib_funcf_band[1,lv,ba]
+                    end
+                end
+
+                # get optical depth from contribution function
+                for ba in 1:atmos.dimen.nd_channel
+
+                    # calculate source function in this band
+                    atmosphere.SOCRATES.diff_planck_source(
+                        atmos.control, atmos.dimen, atmos.spectrum,
+                        atmos.atm, atmos.bound, ba, atmos.planck
+                    )
+
+                    # loop through layers from TOA downwards
+                    trans_prev = 1.0 # reset transmissivity at TOA, to unity
+                    for lv in 1:atmos.nlev_c
+                        # pressure change across level
+                        dlog10p = log10(atmos.atm.p_level[1, lv]) -
+                                        log10(atmos.atm.p_level[1, lv-1])
+
+                        # transmissivity change from cff
+                        # dT = cff * dffsvty * d(log pressure) / (2 * source function)
+                        delta_trans = atmos.contfunc_band[lv, ba] *
+                                        DFSVTY_FCTR * dlog10p /
+                                        (2.0 * max(atmos.planck.flux[1, lv], SMALL_TRANS))
+
+                        # decrease transmissivity
+                        trans_now = clamp(trans_prev - delta_trans, SMALL_TRANS, 1.0)
+                        trans_prev = trans_now
+
+                        # set optical depth from transmissivity
+                        #   trans = exp(-tau * diffusivity_factor)
+                        atmos.tau_band[lv, ba] = -log(trans_now) / DFSVTY_FCTR
+
                     end
                 end
             end

@@ -553,9 +553,14 @@ module plotting
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`    atmosphere object
-    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `fname::String`                filename to save the plot (if empty, does not save)
+    - `size_x::Int64`                width of the plot in pixels
+    - `size_y::Int64`                height of the plot in pixels
+    - `wl_max::Float64`              maximum wavelength to plot [nm]
     """
-    function plot_emission(atmos::atmosphere.Atmos_t, fname::String)
+    function plot_emission(atmos::atmosphere.Atmos_t, fname::String;
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default,
+                            wl_max::Float64=70e3)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -590,7 +595,7 @@ module plotting
         @. yp = phys.evaluate_planck(xe, atmos.tmp_surf) * 1000.0
 
         # Make plot
-        plt = plot(size=(600,400); plt_default...)
+        plt = plot(size=(size_x, size_y); plt_default...)
 
         plot!(plt, xe, yp, label=L"Planck @ $T_s$",  color="green")
         plot!(plt, xe, ye, label="Surface LW+SW",    color="green", ls=:dash)
@@ -599,7 +604,8 @@ module plotting
         plot!(plt, xe, yl, lw=0.9, label="Planetary LW",    color="red" )
         plot!(plt, xe, yt, lw=0.5, label="Planetary LW+SW", color="black")
 
-        xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), 70000.0))
+        wl_max = max(wl_max, minimum(xe)+1)
+        xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), wl_max))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
         ylims  = (max(1.0e-10,minimum(yt)) / 2, max(maximum(yt),maximum(yp)) * 2)
@@ -715,17 +721,20 @@ module plotting
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`    atmosphere object
-    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `fname::String`                filename to save the plot (if empty, does not save)
+    - `size_x::Int64`                width of the plot in pixels
+    - `size_y::Int64`                height of the plot in pixels
+    - `wl_max::Float64`              maximum wavelength to plot [nm]
     """
-    function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String)
+    function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String;
+                                    size_x::Int64=size_x_default, size_y::Int64=size_y_default,
+                                    wl_max::Float64=700e3)
 
         # Check that we have data
         if !atmos.is_out_lw
             @warn "Cannot plot contribution func because radiances have not been calculated"
             return
         end
-
-        @warn "Contribution func 2D colormesh x-axis is incorrect!"
 
         # Get data
         x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
@@ -766,17 +775,111 @@ module plotting
         z[:] = log10.(z[:])
 
         # Make plot
-        plt = plot(colorbar_title="log " * L"\widehat {cf}(\lambda, p)"; plt_default...)
+        plt = plot(title="Normalised, log₁₀ Contrib Function",
+                        size=(size_x, size_y*0.8); plt_default...)
 
+        # plot contribution function as 2D heatmap
         heatmap!(plt, x,y,z, c=:devon, label="")
 
-        xlims  = (minimum(x), maximum(x))
+        # plot band limits
+        for ba in 1:atmos.nbands
+            vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
+        end
+
+        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+        ylabel!(plt, "Pressure [bar]")
+        yflip!(plt)
+        yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
+
+        if !isempty(fname)
+            savefig(plt, fname)
+        end
+        return plt
+    end
+
+    """
+    **Plot optical depth per band as heatmap (LW + SW)**
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`    atmosphere object
+    - `fname::String`                filename to save the plot (if empty, does not save)
+    - `size_x::Int64`                width of each plot panel in pixels
+    - `size_y::Int64`                height of each plot panel in pixels
+    - `wl_max::Float64`              maximum wavelength to plot [nm]
+    """
+    function plot_tau(atmos::atmosphere.Atmos_t, fname::String;
+                            size_x::Int64=size_x_default,
+                            size_y::Int64=size_y_default,
+                            wl_max::Float64=700e3)
+
+        # Check that we have data
+        if !atmos.is_out_lw && !atmos.is_out_sw
+            @warn "Cannot plot optical depth because radiances have not been calculated"
+            return
+        end
+
+        # Get data dimensions
+        x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
+        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)    # pressure levels
+        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_c, atmos.nbands))
+
+        # Min, max tau for plotting
+        tau_min::Float64 = 1e-3
+        tau_max::Float64 = 1e6
+
+        # Reversed?
+        reversed::Bool = (atmos.bands_min[1] > atmos.bands_min[end])
+
+        # x value - band centres [nm]
+        # z value - log10 optical depth (LW + SW)
+        for ba in 1:atmos.nbands
+            if reversed
+                br = atmos.nbands - ba + 1
+            else
+                br = ba
+            end
+            x[br] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
+            for i in 1:atmos.nlev_c
+                z[i,br] = atmos.tau_band[i,ba]
+            end
+        end
+
+        # clamp tau values for plotting
+        tau_min = max(tau_min, minimum(z))
+        tau_max = min(tau_max, maximum(z))
+        tau_max = max(tau_max, tau_min*10)
+        clamp!(z, tau_min, tau_max)
+        z[:] = log10.(z[:])
+
+        # y value - pressures [bar]
+        for i in 1:atmos.nlev_c
+            y[i] = atmos.p[i] * 1.0e-5
+        end
+
+        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+
+        ylims  = (y[1], y[end])
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
+        plt = plot(title="log₁₀ τ (LW)", size=(size_x, size_y*0.8); plt_default...)
+
+        # plot tau as heatmap
+        heatmap!(plt, x, y, z, c=:devon, label="", climits=(log10(tau_min), log10(tau_max)))
+
+        # plot band limits
+        for ba in 1:atmos.nbands
+            vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
+        end
+
+        xlabel!(plt, "Wavelength [nm]")
+        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
@@ -989,6 +1092,8 @@ module plotting
         end
         return plt
     end
+
+
 
     """
     **Convert still-frame images into an animation**

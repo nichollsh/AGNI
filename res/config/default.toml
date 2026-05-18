@@ -91,6 +91,7 @@ title = "Default"                       # Name for this configuration file
     temperature     = true                      # Plot temperature profile?
     fluxes          = true                      # Plot fluxes?
     contribution    = true                      # Plot spectral contribution function?
+    optical_depth   = true                      # Plot spectral optical depth?
     emission        = true                      # Plot emission spectrum?
     albedo          = true                      # Plot spectral albedo?
     mixing_ratios   = true                      # Plot mixing ratios?

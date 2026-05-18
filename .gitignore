@@ -47,6 +47,7 @@ slurm*.out
 slurm*.log
 sbatch*.out
 sbatch*.log
+profile_report/
 
 # Misc files
 .DS_Store

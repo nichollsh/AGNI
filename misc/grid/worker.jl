@@ -4,7 +4,7 @@
 # First command line argument must be the worker ID
 
 # e.g. to run worker 1 of 3
-#   julia --project=. misc/grid/worker.jl 1 3
+#   julia --project misc/grid/worker.jl 1 3
 
 using .Iterators
 using LoggingExtras

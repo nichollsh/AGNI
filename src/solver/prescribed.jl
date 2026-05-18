@@ -16,6 +16,7 @@ module solve_prescribed
 
     import ..atmosphere
     import ..energy
+    import ..diagnostics
     import ..setpt
     import ..phys
     import ..golden: gs_search
@@ -155,6 +156,17 @@ module solve_prescribed
             # Store final result
             _olrfunc!(T_surf)
         end
+
+        # calc LW contribution function
+        energy.calc_fluxes!(atmos,  radiative=true,
+                                latent_heat=true, convective=true, sens_heat=true,
+                                conductive=true, deep=true,
+                                calc_cf=true, calc_hr=true)
+
+        # calc diagnostic quantities
+        diagnostics.estimate_Ra!(atmos)
+        diagnostics.estimate_timescale_conv!(atmos)
+        diagnostics.estimate_timescale_rad!(atmos)
 
         # Flag as solved
         atmos.is_converged = succ
