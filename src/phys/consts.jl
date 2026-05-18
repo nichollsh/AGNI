@@ -10,9 +10,9 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String     = "1.10.1"  # current agni version
+    const AGNI_VERSION::String     = "1.10.2"  # current agni version
     export AGNI_VERSION
-    const SOCVER_minimum::Float64  = 2407.2    # minimum required socrates version
+    const SOCVER_minimum::Float64  = 2603.6    # minimum required socrates version
     export SOCVER_minimum
 
     # A large floating point number
