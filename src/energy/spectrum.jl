@@ -16,7 +16,6 @@ module spectrum
     import DelimitedFiles:readdlm
 
     import ..phys
-
     include(joinpath(ENV["RAD_DIR"], "julia", "gen", "input_head_pcf.jl"))
 
     # Constants
@@ -26,11 +25,19 @@ module spectrum
     """
     **Get the version of SOCRATES being used.**
 
+    Arguments:
+    - `RAD_DIR::String`  Path to SOCRATES directory
+
     Returns:
     - `version::String`  Version string from SOCRATES `version` file
     """
-    function get_socrates_version()::String
-        return readchomp(joinpath(ENV["RAD_DIR"],"version"))
+    function get_socrates_version(RAD_DIR::String)::String
+        version_file::String = joinpath(RAD_DIR, "version")
+        if !isfile(version_file)
+            @warn "SOCRATES version not found: '$(version_file)'"
+            return UNSET_STR
+        end
+        return readchomp(version_file)
     end
 
     """
@@ -313,6 +320,7 @@ module spectrum
     The aerosol .avg files must already exist. The stellar spectrum must already exist.
 
     Arguments:
+    - `RAD_DIR::String`          Path to SOCRATES directory.
     - `orig_file::String`        Path to original spectral file.
     - `star_file::String`        Path to file containing stellar spectrum in SOC format.
     - `outp_file::String`        Path to output spectral file.
@@ -323,12 +331,13 @@ module spectrum
     Returns:
     - `success::Bool`            function executed successfully
     """
-    function insert_blocks(orig_file::String, star_file::String, outp_file::String,
+    function insert_blocks(RAD_DIR::String,
+                            orig_file::String, star_file::String, outp_file::String,
                             insert_rscatter::Bool, insert_aerosol::Bool;
                             aerosol_avg_files::Dict{String,String}=Dict())::Bool
 
         # Inputs to prep_spec
-        prep_spec = abspath(ENV["RAD_DIR"],"bin","prep_spec")
+        prep_spec = abspath(RAD_DIR,"bin","prep_spec")
         @debug "Using prep_spec at: "*prep_spec
         star_inputs = [
             "6","n","T",            # ask prep_spec to tabulate the thermal source function
@@ -401,7 +410,7 @@ module spectrum
                 write(f, "a \n")       #  all gases
 
                 # If there's only one gas, add an extra 'y' confirmation
-                if (num_gases == 1) && !startswith(get_socrates_version(), "24")
+                if (num_gases == 1) && !startswith(get_socrates_version(RAD_DIR), "24")
                     write(f, "y \n")
                 end
             end
@@ -455,6 +464,7 @@ module spectrum
     solar-weighted averaging (`-S <solar> -w`). Does not modify the spectral file.
 
     Arguments:
+    - `RAD_DIR::String`               Path to SOCRATES directory.
     - `orig_file::String`             Original spectral file
     - `species::Array{String,1}`      List of aerosol species
     - `output_dir::String`            Directory where output `.avg` files are written
@@ -465,7 +475,8 @@ module spectrum
     Returns:
     - `avg_files::Dict{String,String}` Mapping from aerosol species to generated `.avg` file paths.
     """
-    function generate_aerosol_avg_files(orig_file::String,
+    function generate_aerosol_avg_files(RAD_DIR::String,
+                                        orig_file::String,
                                         species::Array{String,1},
                                         output_dir::String,
                                         phase_moments::Int64,
@@ -492,7 +503,7 @@ module spectrum
             return avg_files
         end
 
-        scat_av_90 = abspath(ENV["RAD_DIR"], "bin", "scatter_average_90")
+        scat_av_90 = joinpath(RAD_DIR, "bin", "scatter_average_90")
 
         # check mon files exist
         for s in species

@@ -14,6 +14,7 @@ module solver
     import ..diagnostics
     import ..setpt
     import ..energy
+    import ..consts
     import ..phys
     import ..plotting
     import ..chemistry

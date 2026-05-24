@@ -944,7 +944,7 @@ module energy
             @. atmos.flux_l += atmos.phs_wrk_fl
 
             # calculate mask
-            @. atmos.mask_l = (abs(atmos.flux_l) > 1.0e-30)
+            @. atmos.mask_l = (abs(atmos.flux_l) > eps(Float32))
 
         end # go to next condensable
 

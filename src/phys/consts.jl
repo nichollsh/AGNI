@@ -16,10 +16,14 @@ module consts
     export SOCVER_minimum
 
     # A large floating point number
-    const BIGFLOAT::Float64     = 1e99
+    const BIGFLOAT::Float64     = floatmax(Float32)/2.0
     export BIGFLOAT
-    const BIGLOGFLOAT::Float64  = 99.0
+    const BIGLOGFLOAT::Float64  = log(BIGFLOAT)
     export BIGLOGFLOAT
+
+    # A small positive floating point number
+    const SMALLFLOAT::Float64   = floatmin(Float32)*2.0
+    export SMALLFLOAT
 
     # Sources:
     # - Pierrehumbert (2010)

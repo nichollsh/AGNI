@@ -107,6 +107,7 @@ module save
             ds.attrib["username"]           = get(ENV,"USER","UNKNOWN")
             ds.attrib["AGNI_version"]       = atmos.AGNI_VERSION
             ds.attrib["SOCRATES_version"]   = atmos.SOCRATES_VERSION
+            ds.attrib["SOCRATES_precision"] = atmos.SOCRATES_PRECISION
             ds.attrib["name"]               = atmos.name
 
             plat::String = "Generic"

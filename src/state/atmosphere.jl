@@ -17,7 +17,8 @@ module atmosphere
     import DelimitedFiles:readdlm
 
     # SOCRATES library
-    const SOCRATESjl = abspath(ENV["RAD_DIR"], "julia","src","SOCRATES.jl")
+    const RAD_DIR    = abspath(ENV["RAD_DIR"])
+    const SOCRATESjl = joinpath(RAD_DIR, "julia","src","SOCRATES.jl")
     include(SOCRATESjl)
 
     # Local modules
@@ -132,6 +133,7 @@ module atmosphere
 
         # SOCRATES objects
         SOCRATES_VERSION::String
+        SOCRATES_PRECISION::String
         dimen::SOCRATES.StrDim
         control::SOCRATES.StrCtrl
         spectrum::SOCRATES.StrSpecData
@@ -682,8 +684,11 @@ module atmosphere
         if strip(lowercase(spfile)) == "greygas"
             atmos.rt_scheme = RT_GREYGAS
             atmos.spectral_file = "greygas"
-            atmos.SOCRATES_VERSION = "0000"
             @info "Using grey-gas radiative transfer scheme"
+
+            # Dummy values for SOCRATES
+            atmos.SOCRATES_PRECISION = UNSET_STR
+            atmos.SOCRATES_VERSION = "0000"
 
             # check options
             if flag_rayleigh || flag_cloud || flag_aerosol
@@ -696,16 +701,26 @@ module atmosphere
             atmos.rt_scheme = RT_SOCRATES
             atmos.spectral_file = abspath(spfile)
 
-            @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
+            @debug "Using SOCRATES at $(RAD_DIR)"
+
+            # Check SOCRATES is present
+            if !isdir(RAD_DIR) || !isfile(joinpath(RAD_DIR,"version"))
+                @error "SOCRATES is not found in the specified directory!"
+                @error "    Got: $(RAD_DIR)"
+                return false
+            end
 
             # Get SOCRATES version
-            atmos.SOCRATES_VERSION = spectrum.get_socrates_version()
+            atmos.SOCRATES_VERSION = spectrum.get_socrates_version(RAD_DIR)
             @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
+
+            # Get SOCRATES precision
+            atmos.SOCRATES_PRECISION = string(SOCRATES.SOCRATES_REAL_BYTES)
 
             # Check SOCRATES version is valid
             if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
                 @error "SOCRATES is out of date and cannot be used!"
-                @error "    found at $(ENV["RAD_DIR"])"
+                @error "    found at $(RAD_DIR)"
                 @error "    version is "*atmos.SOCRATES_VERSION
                 return false
             end
@@ -1631,6 +1646,7 @@ module atmosphere
                 if atmos.control.l_aerosol
                     @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
+                        RAD_DIR,
                         atmos.spectral_file,
                         [s for s in keys(atmos.aerosol_arr_l)],
                         atmos.IO_DIR,
@@ -1649,7 +1665,8 @@ module atmosphere
 
                 # Insert blocks into spectral file
                 @debug "Inserting required blocks into runtime spectral file"
-                spectrum.insert_blocks(atmos.spectral_file,
+                spectrum.insert_blocks(RAD_DIR,
+                                        atmos.spectral_file,
                                         socstar, spectral_file_run,
                                         atmos.control.l_rayleigh,
                                         atmos.control.l_aerosol;

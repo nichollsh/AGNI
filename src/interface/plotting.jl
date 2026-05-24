@@ -13,6 +13,7 @@ module plotting
     using Statistics
     import Glob:glob
 
+    import ..consts: BIGFLOAT
     import ..atmosphere
     import ..phys
     import ..species
@@ -456,10 +457,10 @@ module plotting
                     size=(size_x,size_y); plt_default...)
 
         # Legend dummy plots
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dot,   lw=lw, lc=col_r, label="SW")
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dash,  lw=lw, lc=col_r, label="LW")
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=lw, lc=col_r, label="LW+SW")
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=lw, lc=col_n, label="UP-DN")
+        plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:dot,   lw=lw, lc=col_r, label="SW")
+        plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:dash,  lw=lw, lc=col_r, label="LW")
+        plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:solid, lw=lw, lc=col_r, label="LW+SW")
+        plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:solid, lw=lw, lc=col_n, label="UP-DN")
 
         # Zero line
         vline!(plt, [0.0], lw=0.4, lc="black", label="")
