@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="66.324905mm"
+   height="29.631559mm"
+   viewBox="0 0 66.324906 29.631559"
+   version="1.1"
+   id="svg8"
+   sodipodi:docname="logo_title_dark.svg"
+   inkscape:version="1.2.2 (b0a84865, 2022-12-01)"
+   inkscape:export-filename="logo_title_dark.png"
+   inkscape:export-xdpi="700.03998"
+   inkscape:export-ydpi="700.03998"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <defs
+     id="defs2">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient4621">
+      <stop
+         style="stop-color:#9558b2;stop-opacity:1;"
+         offset="0"
+         id="stop4617" />
+      <stop
+         style="stop-color:#9558b2;stop-opacity:0;"
+         offset="1"
+         id="stop4619" />
+    </linearGradient>
+    <inkscape:path-effect
+       effect="bspline"
+       id="path-effect3735"
+       is_visible="true"
+       weight="33.333333"
+       steps="2"
+       helper_size="0"
+       apply_no_weight="true"
+       apply_with_weight="true"
+       only_selected="false" />
+    <inkscape:path-effect
+       effect="bspline"
+       id="path-effect3731"
+       is_visible="true"
+       weight="33.333333"
+       steps="2"
+       helper_size="0"
+       apply_no_weight="true"
+       apply_with_weight="true"
+       only_selected="false" />
+    <inkscape:path-effect
+       effect="bspline"
+       id="path-effect3727"
+       is_visible="true"
+       weight="33.333333"
+       steps="2"
+       helper_size="0"
+       apply_no_weight="true"
+       apply_with_weight="true"
+       only_selected="false" />
+    <inkscape:path-effect
+       effect="bspline"
+       id="path-effect3723"
+       is_visible="true"
+       weight="33.333333"
+       steps="2"
+       helper_size="0"
+       apply_no_weight="true"
+       apply_with_weight="true"
+       only_selected="false" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4621"
+       id="linearGradient4623"
+       x1="20.878035"
+       y1="63.459793"
+       x2="20.556471"
+       y2="38.296799"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1,0,0,1.1977487,0.09367702,-8.4548765)" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="1.979899"
+     inkscape:cx="102.78302"
+     inkscape:cy="63.63961"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer3"
+     showgrid="false"
+     inkscape:snap-text-baseline="true"
+     inkscape:window-width="1512"
+     inkscape:window-height="916"
+     inkscape:window-x="0"
+     inkscape:window-y="38"
+     inkscape:window-maximized="0"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:showpageshadow="2"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1" />
+  <metadata
+     id="metadata5">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:groupmode="layer"
+     id="layer3"
+     inkscape:label="Layer 3"
+     transform="translate(-12.285122,-38.731603)">
+    <path
+       style="fill:url(#linearGradient4623);fill-opacity:1;stroke:#389826;stroke-width:0.7317006;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="m 8.41899,44.029391 c 1.2475223,0 2.49478,0 3.385471,1.536368 0.890691,1.536368 1.425343,4.610619 2.071328,4.632738 0.645985,0.02212 1.403197,-3.006728 2.383221,-4.543374 0.980024,-1.536647 2.182861,-1.581197 3.162617,3.718318 0.979757,5.299515 1.737193,15.948179 3.207232,13.943462 1.470038,-2.004718 3.652689,-16.659658 5.478966,-21.915928 1.826278,-5.256271 3.296289,-1.11351 4.766326,3.029321"
+       id="path3733"
+       inkscape:connector-curvature="0"
+       inkscape:path-effect="#path-effect3735"
+       inkscape:original-d="m 8.41899,44.029391 c 1.2475223,-2.64e-4 2.49478,-2.64e-4 3.741773,0 0.534691,3.072683 1.069343,6.146935 1.603617,9.220798 0.757581,-3.029527 1.514792,-6.058373 2.271792,-9.087162 1.202853,-0.0448 2.40569,-0.08935 3.608138,-0.133636 0.757356,10.643545 1.514792,21.292209 2.271791,31.938709 2.183016,-14.655882 4.365667,-29.310822 6.548104,-43.965836 1.470216,4.142327 2.940228,8.285088 4.409946,12.428032"
+       transform="matrix(1.426548,0,0,1.0597155,0.27502817,0.61964347)" />
+    <flowRoot
+       xml:space="preserve"
+       id="flowRoot4625"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       transform="scale(0.26458333)"><flowRegion
+         id="flowRegion4627"><rect
+           id="rect4629"
+           width="165.66502"
+           height="44.446712"
+           x="146.47212"
+           y="205.30118" /></flowRegion><flowPara
+         id="flowPara4631">AGNI</flowPara></flowRoot>
+    <g
+       aria-label="AGNI"
+       style="font-style:normal;font-weight:normal;font-size:17.05537224px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#f5f5f5;fill-opacity:1;stroke:none;stroke-width:0.42638433"
+       id="text4635">
+      <path
+         d="m 45.207101,59.627042 h -4.513684 l -0.716193,2.26517 h -2.898085 l 4.147259,-12.43345 h 3.439394 l 4.147259,12.43345 H 45.906638 Z M 41.40961,57.320233 h 3.064642 l -1.523993,-4.94673 z"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:semi-condensed;font-size:17.05539513px;font-family:'DejaVu Sans';-inkscape-font-specification:'DejaVu Sans, Bold Semi-Condensed';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.42638433;fill:#f5f5f5;fill-opacity:1"
+         id="path34" />
+      <path
+         d="m 60.347095,60.967823 q -1.082617,0.582948 -2.248514,0.874422 -1.157568,0.291474 -2.390087,0.291474 -2.79815,0 -4.430405,-1.732189 -1.632255,-1.740516 -1.632255,-4.713551 0,-3.006347 1.657238,-4.730207 1.665566,-1.723861 4.563651,-1.723861 1.115929,0 2.140252,0.233179 1.024323,0.233179 1.932057,0.69121 v 2.573299 q -0.941045,-0.591276 -1.865434,-0.88275 -0.924389,-0.291474 -1.857106,-0.291474 -1.723861,0 -2.656578,1.07429 -0.932717,1.065963 -0.932717,3.056314 0,1.973695 0.899406,3.047985 0.899406,1.074291 2.556644,1.074291 0.449702,0 0.832783,-0.0583 0.391408,-0.06662 0.691209,-0.199868 v -2.415071 h -1.757172 v -2.14858 h 4.497028 z"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:semi-condensed;font-size:17.05539513px;font-family:'DejaVu Sans';-inkscape-font-specification:'DejaVu Sans, Bold Semi-Condensed';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.42638433;fill:#f5f5f5;fill-opacity:1"
+         id="path36" />
+      <path
+         d="m 62.878755,49.458762 h 3.22287 l 4.072309,8.527698 v -8.527698 h 2.731528 v 12.43345 h -3.22287 l -4.063981,-8.527698 v 8.527698 h -2.739856 z"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:semi-condensed;font-size:17.05539513px;font-family:'DejaVu Sans';-inkscape-font-specification:'DejaVu Sans, Bold Semi-Condensed';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.42638433;fill:#f5f5f5;fill-opacity:1"
+         id="path38" />
+      <path
+         d="m 75.720269,49.458762 h 2.889757 v 12.43345 h -2.889757 z"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:semi-condensed;font-size:17.05539513px;font-family:'DejaVu Sans';-inkscape-font-specification:'DejaVu Sans, Bold Semi-Condensed';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;writing-mode:lr-tb;text-anchor:start;stroke-width:0.42638433;fill:#f5f5f5;fill-opacity:1"
+         id="path40" />
+    </g>
+    <flowRoot
+       xml:space="preserve"
+       id="flowRoot26"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       transform="matrix(0.26458333,0,0,0.26458333,12.285122,38.731603)"><flowRegion
+         id="flowRegion28"><rect
+           id="rect30"
+           width="327.28943"
+           height="150.00764"
+           x="-24.24366"
+           y="-22.356993" /></flowRegion><flowPara
+         id="flowPara32" /></flowRoot>
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="Layer 2"
+     transform="translate(-12.285122,-38.731603)">
+    <circle
+       style="fill:#4063d8;fill-opacity:1;stroke:none;stroke-width:0.22292496;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path3713-3-6"
+       cx="30.067823"
+       cy="43.933186"
+       r="5.2015829" />
+  </g>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-12.285122,-38.731603)">
+    <circle
+       style="fill:#cb3c33;fill-opacity:1;stroke:none;stroke-width:0.14861664;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="path3713-3"
+       cx="30.016047"
+       cy="43.933186"
+       r="3.4677219" />
+  </g>
+</svg>
