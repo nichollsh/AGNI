@@ -382,6 +382,7 @@ module spectrum
 
         # Write executable
         execpath::String = tempname() * "_agni_insert_stellar.sh"
+        execlog::String = execpath * ".log"
         @debug "Wrapping script: $execpath"
         rm(execpath, force=true)
         open(execpath, "w") do f
@@ -437,11 +438,27 @@ module spectrum
         # Run executable
         @debug "Running prep_spec now"
         try
-            ps = run(pipeline(`bash $execpath`, stdout=devnull))
+            ps = run(pipeline(`bash $execpath`, stdout=execlog, stderr=execlog))
 
             if !success(ps)
                 @warn "prep_spec failed with exit code $(ps.exitcode)"
                 @warn "Command: bash $execpath"
+                return false
+            end
+
+            # Check if command produced any output
+            if !isfile(execlog)
+                @warn "prep_spec failed to produce log file"
+                @warn "Command: bash $execpath"
+                return false
+            end
+
+            # Check that log does not contain errors
+            logstr = read(execlog, String)
+            if any([occursin(s, logstr) for s in ["F-", "error", "Error"]])
+                @warn "prep_spec logged a failure"
+                @warn "Command: bash $execpath"
+                @warn "Log content: $logstr"
                 return false
             end
 
@@ -452,7 +469,8 @@ module spectrum
         end
 
         # Tidy up
-        rm(execpath)
+        rm(execlog, force=true)
+        rm(execpath, force=true)
         return true
     end
 
@@ -517,6 +535,7 @@ module spectrum
 
         # Write executable
         execpath::String = tempname() * "_agni_aerosol_scatter.sh"
+        execlog::String = execpath * ".log"
         @debug "Wrapping script: $execpath"
         rm(execpath, force=true)
         open(execpath, "w") do f
@@ -565,11 +584,28 @@ module spectrum
         # Run executable
         @debug "Running scatter_average_90 now"
         try
-            ps = run(pipeline(`bash $execpath`, stdout=devnull))
+            ps = run(pipeline(`bash $execpath`, stdout=execlog, stderr=execlog))
 
+            # Check return code
             if !success(ps)
                 @warn "scatter_average_90 failed with exit code $(ps.exitcode)"
                 @warn "Command: bash $execpath"
+                return avg_files
+            end
+
+            # Check if command produced any output
+            if !isfile(execlog)
+                @warn "scatter_average_90 failed to produce log file"
+                @warn "Command: bash $execpath"
+                return avg_files
+            end
+
+            # Check that log does not contain errors
+            logstr = read(execlog, String)
+            if any([occursin(s, logstr) for s in ["F-", "error", "Error"]])
+                @warn "scatter_average_90 logged a failure"
+                @warn "Command: bash $execpath"
+                @warn "Log content: $logstr"
                 return avg_files
             end
 
@@ -580,7 +616,8 @@ module spectrum
         end
 
         # Tidy up
-        rm(execpath)
+        rm(execpath, force=true)
+        rm(execlog, force=true)
         return avg_files
     end
 

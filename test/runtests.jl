@@ -23,6 +23,7 @@ using Test
 @info "Begin AGNI tests"
 
 # Configure
+LOG_LEVEL = Logging.Error
 SLOW_TESTS = ["integration", "radtrans", "chemistry", "deep_heating", "kzz", "spectrum", "rfm"]
 
 # Prepare
@@ -106,7 +107,7 @@ end
 @info "Running tests..."
 
 # Configure logging to show only error messages during tests
-LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Error))
+LoggingExtras.global_logger(Logging.SimpleLogger(LOG_LEVEL))
 
 # Run tests
 for test_file in test_files

@@ -28,6 +28,15 @@ Follow the ordered steps below
     - a) Follow the instructions on the [SOCRATES GitHub](https://github.com/FormingWorlds/SOCRATES) page
     - b) **OR**, run `./src/get_socrates.sh`
 
+### SOCRATES floating point precision
+SOCRATES can be compiled in single or double precision. The Julia interface exposes this
+via `SOCRATES_REAL_BYTES`:
+- `4` means single precision.
+- `8` means double precision.
+
+AGNI records the value in outputs as `SOCRATES_precision`. If the SOCRATES Julia
+interface does not define `SOCRATES_REAL_BYTES`, AGNI assumes double precision (`8`).
+
 4. Setup FastChem
     - `./src/get_fastchem.sh`
 
