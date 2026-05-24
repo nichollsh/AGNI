@@ -127,12 +127,12 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             @test all(atmos.layer_isbound)
 
             # check known value
-            val_e = 1.0487713813847492e7   # known from previous tests
-            val_o = atmos.r[1] # height of topmost layer-centre
+            val_e = 1.0487713813847492e7 / AGNI.consts.R_earth
+            val_o = atmos.r[1] / AGNI.consts.R_earth # height of topmost layer-centre
 
             test_check = isapprox(val_e, val_o; rtol=rtol)
             if !test_check
-                @error ("Expected value = $(val_e) m \n Modelled value = $(val_o) m")
+                @error ("Expected value = $(val_e) Rearth \n Modelled value = $(val_o) Rearth")
             end
             @test test_check
         end

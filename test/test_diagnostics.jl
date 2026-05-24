@@ -4,8 +4,6 @@ using AGNI
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
 OUT_DIR = joinpath(ROOT_DIR, "out/")
 
-rtol = eps(Float32)
-
 # helper to create a simple grey gas atmosphere for testing diagnostics and energy utilities
 function _make_greygas_atmos(; instellation::Float64=1200.0,
                                nlev_c::Int64=30,

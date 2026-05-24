@@ -86,6 +86,10 @@ module consts
     const Cp_ideal::Float64 = R_gas * 7/2 # assuming that it is diatomic
     export Cp_ideal
 
+    # Earth radius [m]
+    const R_earth::Float64 = 6378137.0 # m
+    export R_earth
+
     # Proton mass [kg]
     const proton_mass::Float64 = 1.67262192595e-27 # NIST CODATA
     export proton_mass
