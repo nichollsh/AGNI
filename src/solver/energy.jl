@@ -866,12 +866,6 @@ module solve_energy
                 end
             end
 
-            # Show benchmark [nanoseconds -> ms]
-            if atmos.benchmark
-                rt_avg = atmos.tim_rt_eval / atmos.num_rt_eval / 1e9 * 1e3
-                @debug @sprintf("Average RT time: %.3f ms", rt_avg)
-            end
-
             # Record that this step not ok
             if (code == 0) && !step_ok
                 code = CODE_STP

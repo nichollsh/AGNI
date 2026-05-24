@@ -551,9 +551,10 @@ module AGNI
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["physics"]["continua"],
                                 flag_rayleigh     = cfg["physics"]["rayleigh"],
-                                flag_aerosol      = get(cfg["physics"], "aerosol", false),
+                                flag_aerosol      = get(cfg["physics"], "aerosol", atmosphere.CFG_flag_aerosol),
                                 flag_cloud        = cfg["physics"]["cloud"],
                                 aerosol_species   = aerosol_species,
+                                benchmark_rt      = get(cfg["execution"], "benchmark_rt", atmosphere.CFG_benchmark_rt),
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
                                 demixing          = demixing,
@@ -755,7 +756,12 @@ module AGNI
         end
 
         @info "    done"
-        @info "Total radiative transfer evaluations: $(atmos.num_rt_eval)"
+        if atmos.benchmark
+            @info "Radiative transfer benchmarking statistics..."
+            @info "    total RT evals:  $(atmos.num_rt_eval)"
+            @info "    cumulative time: $(atmos.tim_rt_eval/1e9) secs" # ns->s
+            @info "    time per eval:   $(atmos.tim_rt_eval/atmos.num_rt_eval/1e9*1e3) ms"
+        end
 
         # RFM calculation?
         if atmos.flag_rfm

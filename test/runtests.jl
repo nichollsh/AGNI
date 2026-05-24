@@ -24,7 +24,8 @@ using Test
 
 # Configure
 LOG_LEVEL = Logging.Error
-SLOW_TESTS = ["integration", "radtrans", "chemistry", "deep_heating", "kzz", "spectrum", "rfm"]
+SLOW_TESTS = ["integration", "radtrans", "chemistry",
+                "deep_heating", "kzz", "spectrum", "rfm"]
 
 # Prepare
 SRC_DIR         = joinpath(ROOT_DIR,"src/")

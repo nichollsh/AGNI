@@ -51,6 +51,7 @@ module atmosphere
     const CFG_tmp_magma::Float64        = 3000.0
     const CFG_skin_d::Float64           = 0.05
     const CFG_skin_k::Float64           = 2.0
+    const CFG_benchmark_rt::Bool        = false
     const CFG_overlap_method::String    = "ee"
     const CFG_target_olr::Float64       = 250.0
     const CFG_flux_int::Float64         = 0.0
@@ -559,6 +560,7 @@ module atmosphere
                     latitude::Float64 =         CFG_latitude,
                     longitude::Float64 =        CFG_longitude,
 
+                    benchmark_rt::Bool =        CFG_benchmark_rt,
                     overlap_method::String =    CFG_overlap_method,
                     target_olr::Float64 =       CFG_target_olr,
                     flux_int::Float64 =         CFG_flux_int,
@@ -676,7 +678,7 @@ module atmosphere
         # -------------------------
 
         # Set parameters for benchmarking
-        atmos.benchmark   = false
+        atmos.benchmark   = benchmark_rt
         atmos.num_rt_eval = 0
         atmos.tim_rt_eval = 0.0
 
