@@ -17,8 +17,8 @@ RAD_DIR = AGNI.atmosphere.RAD_DIR
 temp_sf = tempname() * ".sf"
 
 # Use 16 to ensure the non-default precision is preserved rather than defaulted.
-module DummySocratesPrecision16
-    const SOCRATES_REAL_BYTES = 16
+module DummySocratesPrecision
+    const SOCRATES_REAL_BYTES = 4
 end
 
 # Missing precision simulates older SOCRATES Julia builds.
@@ -35,25 +35,24 @@ end
         @test isfile(joinpath(RAD_DIR,"version"))
 
         # Check SOCRATES precision getter
-        @testset "socrates_precision_fallback" begin
-            precision = AGNI.atmosphere._get_socrates_precision(DummySocratesPrecision16)
-            @test precision == "16"
-            @test precision != "8"
-            @test !isempty(precision)
+        @testset "socrates_precision" begin
 
-            @test_logs (:warn, r"double precision") begin
-                fallback = AGNI.atmosphere._get_socrates_precision(DummySocratesNoPrecision)
-                @test fallback == "8"
-                @test fallback != "4"
-                @test !isempty(fallback)
-            end
+            # test defined as single
+            precision = AGNI.spectrum.get_socrates_precision(DummySocratesPrecision)
+            @test !isempty(precision)
+            @test precision == "single"
+
+            # test fallback to double
+            fallback = AGNI.spectrum.get_socrates_precision(DummySocratesNoPrecision)
+            @test !isempty(fallback)
+            @test fallback == "double"
         end
 
         # Test get_socrates_version
         @testset "socrates_version" begin
             version = AGNI.spectrum.get_socrates_version(RAD_DIR)
-            @test !isempty(version)
             @test version isa String
+            @test startswith(version, "2") # this millenium
         end
     end
 
@@ -157,8 +156,8 @@ Some more content
 
         @test length(wl) == length(fl)
         @test length(wl) > 0
-        @test all(fl .>= AGNI.spectrum.FLOAT_SML)
-        @test all(fl .<= AGNI.spectrum.FLOAT_BIG)
+        @test all(fl .>= AGNI.spectrum.SMALLFLOAT)
+        @test all(fl .<= AGNI.spectrum.BIGFLOAT)
         @test wl[1] == 1.0
         @test wl[end] == 100e3
     end

@@ -15,12 +15,12 @@ module spectrum
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
+    import ..consts: SMALLFLOAT, BIGFLOAT
     import ..phys
     include(joinpath(ENV["RAD_DIR"], "julia", "gen", "input_head_pcf.jl"))
 
     # Constants
-    const FLOAT_SML = 1.0e-45
-    const FLOAT_BIG = 1.0e45
+    const PRECISION_DEFAULT::String = "double"
 
     """
     **Get the version of SOCRATES being used.**
@@ -38,6 +38,33 @@ module spectrum
             return UNSET_STR
         end
         return readchomp(version_file)
+    end
+
+    """
+    **Get SOCRATES precision as a string**
+
+    Arguments:
+    - `SOCRATES`        The main module of the SOCRATES julia library
+
+    Returns:
+    - `prec::String`    Floating point precision (quad, double, single)
+    """
+    function get_socrates_precision(SOCRATES)::String
+        if !isdefined(SOCRATES, :SOCRATES_REAL_BYTES)
+            @warn "SOCRATES precision not defined; assuming double"
+            return PRECISION_DEFAULT
+        end
+
+        if SOCRATES.SOCRATES_REAL_BYTES == 16
+            return "quad"
+        elseif SOCRATES.SOCRATES_REAL_BYTES == 8
+            return PRECISION_DEFAULT
+        elseif SOCRATES.SOCRATES_REAL_BYTES == 4
+            return "single"
+        else
+            @warn "SOCRATES precision unrecognised; assuming double"
+            return PRECISION_DEFAULT
+        end
     end
 
     """
@@ -180,7 +207,7 @@ module spectrum
         fl *= S0 / ( phys.σSB * Teff^4)
 
         # Limit range on fl to prevent numerical problems
-        clamp!(fl, FLOAT_SML, FLOAT_BIG)
+        clamp!(fl, SMALLFLOAT, BIGFLOAT)
 
         return wl, fl
     end
@@ -243,7 +270,7 @@ module spectrum
             @warn "Loaded stellar spectrum is too short!"
             return false
         end
-        if minimum(wl) < FLOAT_SML
+        if minimum(wl) < SMALLFLOAT
             @warn "Minimum wavelength is too small"
             return false
         end
@@ -251,7 +278,7 @@ module spectrum
             @warn "Stellar wavelength array must be strictly ascending"
             return false
         end
-        clamp!(fl, FLOAT_SML, FLOAT_BIG)  # Clamp values
+        clamp!(fl, SMALLFLOAT, BIGFLOAT)  # Clamp values
 
         # warn about non-critical problems
         if len_wl < 500

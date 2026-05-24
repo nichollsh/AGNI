@@ -107,17 +107,6 @@ module atmosphere
     # Enum of available radiative transfer schemes
     @enum RTSCHEME RT_SOCRATES=1 RT_GREYGAS=2
 
-    """
-    Return SOCRATES precision string, defaulting to double precision when undefined.
-    """
-    function _get_socrates_precision(socrates_mod)::String
-        if isdefined(socrates_mod, :SOCRATES_REAL_BYTES)
-            return string(getfield(socrates_mod, :SOCRATES_REAL_BYTES))
-        end
-        @warn "SOCRATES precision not defined in SOCRATES module; assuming double precision."
-        return "8"
-    end
-
     # Contains data pertaining to the atmosphere (fluxes, temperature, etc.)
     mutable struct Atmos_t
 
@@ -726,7 +715,7 @@ module atmosphere
             @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
             # Get SOCRATES precision
-            atmos.SOCRATES_PRECISION = _get_socrates_precision(SOCRATES)
+            atmos.SOCRATES_PRECISION = spectrum.get_socrates_precision(SOCRATES)
 
             # Check SOCRATES version is valid
             if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
