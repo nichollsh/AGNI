@@ -30,7 +30,7 @@ makedocs(
         ),
 
         PageNode("Tutorials" => "tutorials/index.md", [
-            "Example outputs"  => "tutorials/index.md",
+            "Examples"  => "tutorials/index.md",
             ]
         ),
 

@@ -11,12 +11,14 @@ AGNI's primary purpose is to simulate the atmospheric temperature-, height-, and
 
 Pronounced as _ag-nee_. Named after the fire deity of Hinduism.
 
-The documentation is structured following the [Diátaxis](https://diataxis.fr/) framework:
+The documentation is structured following the [Diátaxis](https://diataxis.fr/) framework.
+
+To get started, visit the [Getting started](@ref) page.
 
 | Section | Purpose |
 | :---: | :---|
-| [**How-to guides**](@ref "How-to guides") | Task-oriented recipes for specific goals; e.g. configuration, grid runs. |
-| [**Tutorials**](@ref "Tutorials") | Step-by-step guides. Start here to install the code and run your first simulation. |
+| [**How-to guides**](@ref "How-to guides") | Task-oriented recipes for specific goals. |
+| [**Tutorials**](@ref "Tutorials") | Step-by-step guides to follow after installing AGNI. |
 | [**Explanation**](@ref "Model description") | Background reading on the physics, numerics, and ecosystem context. |
 | [**Reference**](@ref "Reference") | Complete code API and config-file reference for people who like details. |
 
