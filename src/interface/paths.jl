@@ -20,6 +20,10 @@ module paths
     const FWL_DATA::String = normpath(joinpath(get(ENV, "FWL_DATA", RES_DIR)))
     export FWL_DATA
 
+    # RAD_DIR (socrates root directory)
+    const RAD_DIR::String = abspath(ENV["RAD_DIR"])
+    export RAD_DIR
+
     """
     **Get path to other data dirs (can be overridden)**
 

@@ -16,7 +16,7 @@ RAD_DIR = AGNI.atmosphere.RAD_DIR
 
 temp_sf = tempname() * ".sf"
 
-# Use 16 to ensure the non-default precision is preserved rather than defaulted.
+# Use 4 bytes as test of single precision
 module DummySocratesPrecision
     const SOCRATES_REAL_BYTES = 4
 end

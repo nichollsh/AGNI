@@ -15,9 +15,10 @@ module spectrum
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
+    import ..paths: RAD_DIR
     import ..consts: SMALLFLOAT, BIGFLOAT
     import ..phys
-    include(joinpath(ENV["RAD_DIR"], "julia", "gen", "input_head_pcf.jl"))
+    include(joinpath(RAD_DIR, "julia", "gen", "input_head_pcf.jl"))
 
     # Constants
     const PRECISION_DEFAULT::String = "double"

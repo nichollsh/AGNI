@@ -17,14 +17,13 @@ module atmosphere
     import DelimitedFiles:readdlm
 
     # SOCRATES library
-    const RAD_DIR    = abspath(ENV["RAD_DIR"])
-    const SOCRATESjl = joinpath(RAD_DIR, "julia","src","SOCRATES.jl")
+    import ..paths
+    const SOCRATESjl = joinpath(paths.RAD_DIR, "julia","src","SOCRATES.jl")
     include(SOCRATESjl)
 
     # Local modules
     import ..phys
     import ..spectrum
-    import ..paths
     import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum
     import ..formulae
     import ..species
@@ -703,17 +702,17 @@ module atmosphere
             atmos.rt_scheme = RT_SOCRATES
             atmos.spectral_file = abspath(spfile)
 
-            @debug "Using SOCRATES at $(RAD_DIR)"
+            @debug "Using SOCRATES at $(paths.RAD_DIR)"
 
             # Check SOCRATES is present
-            if !isdir(RAD_DIR) || !isfile(joinpath(RAD_DIR,"version"))
+            if !isdir(paths.RAD_DIR) || !isfile(joinpath(paths.RAD_DIR,"version"))
                 @error "SOCRATES is not found in the specified directory!"
-                @error "    Got: $(RAD_DIR)"
+                @error "    Got: $(paths.RAD_DIR)"
                 return false
             end
 
             # Get SOCRATES version
-            atmos.SOCRATES_VERSION = spectrum.get_socrates_version(RAD_DIR)
+            atmos.SOCRATES_VERSION = spectrum.get_socrates_version(paths.RAD_DIR)
             @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
 
             # Get SOCRATES precision
@@ -722,7 +721,7 @@ module atmosphere
             # Check SOCRATES version is valid
             if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
                 @error "SOCRATES is out of date and cannot be used!"
-                @error "    found at $(RAD_DIR)"
+                @error "    found at $(paths.RAD_DIR)"
                 @error "    version is "*atmos.SOCRATES_VERSION
                 return false
             end
@@ -1648,7 +1647,7 @@ module atmosphere
                 if atmos.control.l_aerosol
                     @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
-                        RAD_DIR,
+                        paths.RAD_DIR,
                         atmos.spectral_file,
                         [s for s in keys(atmos.aerosol_arr_l)],
                         atmos.IO_DIR,
@@ -1667,7 +1666,7 @@ module atmosphere
 
                 # Insert blocks into spectral file
                 @debug "Inserting required blocks into runtime spectral file"
-                spectrum.insert_blocks(RAD_DIR,
+                spectrum.insert_blocks(paths.RAD_DIR,
                                         atmos.spectral_file,
                                         socstar, spectral_file_run,
                                         atmos.control.l_rayleigh,

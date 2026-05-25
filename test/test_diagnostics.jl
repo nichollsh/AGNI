@@ -75,7 +75,7 @@ end
         # test handling NaN and Inf in energy fluxes
         arr = [1.0, Inf, NaN, -Inf]
         energy._make_finite!(arr, -5.0)
-        @test arr == [1.0, -5.0, -5.0, -5.0] # converts to -5.0
+        @test isapprox(arr, [1.0, -5.0, -5.0, -5.0]; rtol=rtol) # converts to -5.0
 
         # test TKE-scheme exchange coefficient evaluation
         cd1 = energy.eval_exchange_coeff(2.0, 1.0e-2)

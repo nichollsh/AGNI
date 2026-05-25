@@ -28,15 +28,6 @@ Follow the ordered steps below
     - a) Follow the instructions on the [SOCRATES GitHub](https://github.com/FormingWorlds/SOCRATES) page
     - b) **OR**, run `./src/get_socrates.sh`
 
-### SOCRATES floating point precision
-SOCRATES can be compiled in single or double precision. The Julia interface exposes this
-via `SOCRATES_REAL_BYTES`:
-- `4` means single precision.
-- `8` means double precision.
-
-AGNI records the value in outputs as `SOCRATES_precision`. If the SOCRATES Julia
-interface does not define `SOCRATES_REAL_BYTES`, AGNI assumes double precision (`8`).
-
 4. Setup FastChem
     - `./src/get_fastchem.sh`
 
@@ -68,44 +59,13 @@ automatically pull changes from GitHub and download any required data files.
 ./src/get_agni.sh
 ```
 
-## Your first model run
+## What next?
 
-The environment variable `RAD_DIR` must point to the SOCRATES installation
-directory. The best way to do this is to add `RAD_DIR=path/to/socrates/folder/` to your
-shell rc file (e.g. `~/.bashrc`).
-
-Then run AGNI with the default configuration file:
+To run AGNI with the default configuration file:
 ```bash
-./agni.jl
+./agni.jl res/config/default.toml
 ```
-
-You should see the following output:
-```log
-[ INFO  ] Using configuration 'Default'
-[ INFO  ] Setting-up a new atmosphere struct
-[ INFO  ] Loading thermodyamic data
-[ INFO  ] Inserting stellar spectrum and Rayleigh coefficients
-[ INFO  ] Allocating atmosphere with composition:
-[ INFO  ]       1 H2O     1.00e+00 (EOS_AQUA)
-[ INFO  ] Setting T(p): dry, sat
-[ INFO  ] Solving with 'none'
-[ INFO  ]     done
-[ INFO  ] Total RT evalulations: 2
-[ INFO  ] Writing results
-[ INFO  ] Plotting results
-[ INFO  ] Deallocating memory
-[ INFO  ] Model runtime: 16.60 seconds
-```
-
-The line following "Allocating atmosphere with composition" is a table of gases, their
-volume mixing ratios, and flags. In this case there is only one gas.
-
-Potential flags for each species are:
-* `EOS_[XX]` - using the `[XX]` equation of state (e.g. ideal gas, AQUA)
-* `NO_OPACITY` - no opacity data available, but can contribute to the thermodynamics
-* `NO_THERMO` - no thermodynamic data available, so will be treated as a diatomic ideal gas
-* `COND` - this gas is allowed to condense
 
 Output files are written to the directory specified in the configuration file (default: `out/`).
-See [Tutorials](@ref) for illustrative results, and [How-to guides](@ref) for
-next steps such as configuring the model for your own science case.
+
+See [Tutorials](@ref) for a guided introduction to AGNI with example outputs results. Refer to the other [How-to guides](@ref) for steps on configuring the model for your own science cases.
