@@ -12,7 +12,7 @@ using AGNI
 
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
 RES_DIR = joinpath(ROOT_DIR,"res/")
-RAD_DIR = AGNI.atmosphere.RAD_DIR
+RAD_DIR = AGNI.paths.RAD_DIR
 
 temp_sf = tempname() * ".sf"
 
