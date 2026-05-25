@@ -39,6 +39,9 @@ module AGNI
     include("interface/plotting.jl"); import .plotting; export plotting
     include("solver/solver.jl"); import .solver; export solver
 
+    # Constants
+    CFG_PATH_DEFAULT::String = joinpath(paths.RES_DIR, "config", "default.toml")
+
     """
     **Create a logger object and return it**
 
@@ -413,13 +416,7 @@ module AGNI
 
         # star stuff
         star_file::String   = cfg["files" ]["input_star"]
-        star_Teff::Float64  = -1.0
-        if "star_Teff" in keys(cfg["planet"])
-            star_Teff = Float64(cfg["planet"]["star_Teff"])
-            if !(lowercase(cfg["files"]["input_star"]) == "blackbody") && (star_Teff>1)
-                @warn "Stellar temperature is set by user, but blackbody star isn't enabled"
-            end
-        end
+        star_Teff::Float64  = Float64(get(cfg["planet"], "star_Teff", -1.0))
 
         #    solver stuff
         incl_convect::Bool     = cfg["physics"]["convection"]
@@ -429,10 +426,7 @@ module AGNI
         sol_type::Int64        = cfg["execution"]["solution_type"]
         conv_atol::Float64     = cfg["execution"]["converge_atol"]
         conv_rtol::Float64     = cfg["execution"]["converge_rtol"]
-        conv_type::Int64       = 1
-        if haskey(cfg["execution"],"converge_type")
-            conv_type = Int64(cfg["execution"]["converge_type"])
-        end
+        conv_type::Int64       = Int64(get(cfg["execution"], "converge_type", 1))
 
         #    plotting stuff
         plt_EXT::String        = lowercase(get(cfg["plots"], "extension", "png"))
@@ -551,9 +545,10 @@ module AGNI
                                 metallicities=metallicities,
                                 flag_gcontinuum   = cfg["physics"]["continua"],
                                 flag_rayleigh     = cfg["physics"]["rayleigh"],
-                                flag_aerosol      = get(cfg["physics"], "aerosol", false),
+                                flag_aerosol      = get(cfg["physics"], "aerosol", atmosphere.CFG_flag_aerosol),
                                 flag_cloud        = cfg["physics"]["cloud"],
                                 aerosol_species   = aerosol_species,
+                                benchmark_rt      = get(cfg["execution"], "benchmark_rt", atmosphere.CFG_benchmark_rt),
                                 overlap_method    = cfg["physics"]["overlap_method"],
                                 real_gas          = real_gas,
                                 demixing          = demixing,
@@ -755,7 +750,12 @@ module AGNI
         end
 
         @info "    done"
-        @info "Total radiative transfer evaluations: $(atmos.num_rt_eval)"
+        if atmos.benchmark
+            @info "Radiative transfer benchmarking statistics..."
+            @info "    total RT evals:  $(atmos.num_rt_eval)"
+            @info "    cumulative time: $(atmos.tim_rt_eval/1e9) secs" # ns->s
+            @info "    time per eval:   $(atmos.tim_rt_eval/atmos.num_rt_eval/1e9*1e3) ms"
+        end
 
         # RFM calculation?
         if atmos.flag_rfm
@@ -846,7 +846,7 @@ module AGNI
     Returns:
     - `return_success::Bool`        flag for model success
     """
-    function main()::Bool
+    function main(;cfg_path::String=consts.UNSET_STR)::Bool
 
         # Record start time
         tbegin = time()
@@ -856,9 +856,13 @@ module AGNI
         clean_output::Bool = false
 
         # Open and validate config file
-        cfg_path::String = joinpath(paths.RES_DIR, "config", "default.toml")
-        if length(ARGS)>0
-            cfg_path = ARGS[1]
+        if cfg_path == consts.UNSET_STR
+            if length(ARGS)>0
+                cfg_path = ARGS[1]
+            else
+                cfg_path = CFG_PATH_DEFAULT
+            end
+            @debug "Using configuration file at '$cfg_path'"
         end
         if !ispath(cfg_path)
             error("Cannot find configuration file at '$cfg_path'")

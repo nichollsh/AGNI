@@ -17,13 +17,13 @@ module atmosphere
     import DelimitedFiles:readdlm
 
     # SOCRATES library
-    const SOCRATESjl = abspath(ENV["RAD_DIR"], "julia","src","SOCRATES.jl")
+    import ..paths
+    const SOCRATESjl = joinpath(paths.RAD_DIR, "julia","src","SOCRATES.jl")
     include(SOCRATESjl)
 
     # Local modules
     import ..phys
     import ..spectrum
-    import ..paths
     import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum
     import ..formulae
     import ..species
@@ -50,6 +50,7 @@ module atmosphere
     const CFG_tmp_magma::Float64        = 3000.0
     const CFG_skin_d::Float64           = 0.05
     const CFG_skin_k::Float64           = 2.0
+    const CFG_benchmark_rt::Bool        = false
     const CFG_overlap_method::String    = "ee"
     const CFG_target_olr::Float64       = 250.0
     const CFG_flux_int::Float64         = 0.0
@@ -132,6 +133,7 @@ module atmosphere
 
         # SOCRATES objects
         SOCRATES_VERSION::String
+        SOCRATES_PRECISION::String
         dimen::SOCRATES.StrDim
         control::SOCRATES.StrCtrl
         spectrum::SOCRATES.StrSpecData
@@ -557,6 +559,7 @@ module atmosphere
                     latitude::Float64 =         CFG_latitude,
                     longitude::Float64 =        CFG_longitude,
 
+                    benchmark_rt::Bool =        CFG_benchmark_rt,
                     overlap_method::String =    CFG_overlap_method,
                     target_olr::Float64 =       CFG_target_olr,
                     flux_int::Float64 =         CFG_flux_int,
@@ -674,7 +677,7 @@ module atmosphere
         # -------------------------
 
         # Set parameters for benchmarking
-        atmos.benchmark   = false
+        atmos.benchmark   = benchmark_rt
         atmos.num_rt_eval = 0
         atmos.tim_rt_eval = 0.0
 
@@ -682,8 +685,11 @@ module atmosphere
         if strip(lowercase(spfile)) == "greygas"
             atmos.rt_scheme = RT_GREYGAS
             atmos.spectral_file = "greygas"
-            atmos.SOCRATES_VERSION = "0000"
             @info "Using grey-gas radiative transfer scheme"
+
+            # Dummy values for SOCRATES
+            atmos.SOCRATES_PRECISION = UNSET_STR
+            atmos.SOCRATES_VERSION = "0000"
 
             # check options
             if flag_rayleigh || flag_cloud || flag_aerosol
@@ -696,16 +702,26 @@ module atmosphere
             atmos.rt_scheme = RT_SOCRATES
             atmos.spectral_file = abspath(spfile)
 
-            @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
+            @debug "Using SOCRATES at $(paths.RAD_DIR)"
+
+            # Check SOCRATES is present
+            if !isdir(paths.RAD_DIR) || !isfile(joinpath(paths.RAD_DIR,"version"))
+                @error "SOCRATES is not found in the specified directory!"
+                @error "    Got: $(paths.RAD_DIR)"
+                return false
+            end
 
             # Get SOCRATES version
-            atmos.SOCRATES_VERSION = spectrum.get_socrates_version()
+            atmos.SOCRATES_VERSION = spectrum.get_socrates_version(paths.RAD_DIR)
             @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
+
+            # Get SOCRATES precision
+            atmos.SOCRATES_PRECISION = spectrum.get_socrates_precision(SOCRATES)
 
             # Check SOCRATES version is valid
             if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
                 @error "SOCRATES is out of date and cannot be used!"
-                @error "    found at $(ENV["RAD_DIR"])"
+                @error "    found at $(paths.RAD_DIR)"
                 @error "    version is "*atmos.SOCRATES_VERSION
                 return false
             end
@@ -1631,6 +1647,7 @@ module atmosphere
                 if atmos.control.l_aerosol
                     @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
+                        paths.RAD_DIR,
                         atmos.spectral_file,
                         [s for s in keys(atmos.aerosol_arr_l)],
                         atmos.IO_DIR,
@@ -1649,7 +1666,8 @@ module atmosphere
 
                 # Insert blocks into spectral file
                 @debug "Inserting required blocks into runtime spectral file"
-                spectrum.insert_blocks(atmos.spectral_file,
+                spectrum.insert_blocks(paths.RAD_DIR,
+                                        atmos.spectral_file,
                                         socstar, spectral_file_run,
                                         atmos.control.l_rayleigh,
                                         atmos.control.l_aerosol;

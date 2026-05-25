@@ -99,7 +99,7 @@ module diagnostics
     function estimate_timescale_conv!(atmos::atmosphere.Atmos_t)
 
         @inbounds for i in 1:atmos.nlev_c
-            atmos.timescale_conv[i] = atmos.λ_conv[i] / max(atmos.w_conv[i], 1e-300)
+            atmos.timescale_conv[i] = atmos.λ_conv[i] / max(atmos.w_conv[i], eps(Float32))
         end
 
         return nothing

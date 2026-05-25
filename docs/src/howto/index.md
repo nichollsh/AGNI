@@ -2,7 +2,9 @@
 
 How-to guides are **task-oriented**. They provide concise directions for accomplishing a
 specific goal, assuming you already have AGNI installed and running.
-See [Getting started](@ref) if you have not yet installed the model.
+
+!!! info
+    See [Getting started](@ref) if you have not yet installed the model.
 
 | Guide | Description |
 |:------|:------------|

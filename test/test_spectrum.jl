@@ -1,18 +1,59 @@
+"""
+Tests for `src/energy/spectrum.jl`.
+
+Invariants exercised:
+- Spectral file parsing and block insertion succeed with valid inputs.
+- Aerosol headers and aerosol averaging produce non-empty outputs.
+- Guard paths return gracefully on invalid inputs.
+"""
+const _SPECTRUM_TESTS_DOC = nothing
 using Test
 using AGNI
 
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
 RES_DIR = joinpath(ROOT_DIR,"res/")
+RAD_DIR = AGNI.paths.RAD_DIR
 
 temp_sf = tempname() * ".sf"
 
+# Use 4 bytes as test of single precision
+module DummySocratesPrecision
+    const SOCRATES_REAL_BYTES = 4
+end
+
+# Missing precision simulates older SOCRATES Julia builds.
+module DummySocratesNoPrecision
+end
+
+
 @testset "spectrum" begin
 
-    # Test get_socrates_version
-    @testset "socrates_version" begin
-        version = AGNI.spectrum.get_socrates_version()
-        @test !isempty(version)
-        @test version isa String
+    # Check SOCRATES metainfo
+    @testset "socrates_meta" begin
+
+        # Check socrates was found
+        @test isfile(joinpath(RAD_DIR,"version"))
+
+        # Check SOCRATES precision getter
+        @testset "socrates_precision" begin
+
+            # test defined as single
+            precision = AGNI.spectrum.get_socrates_precision(DummySocratesPrecision)
+            @test !isempty(precision)
+            @test precision == "single"
+
+            # test fallback to double
+            fallback = AGNI.spectrum.get_socrates_precision(DummySocratesNoPrecision)
+            @test !isempty(fallback)
+            @test fallback == "double"
+        end
+
+        # Test get_socrates_version
+        @testset "socrates_version" begin
+            version = AGNI.spectrum.get_socrates_version(RAD_DIR)
+            @test version isa String
+            @test startswith(version, "2") # this millenium
+        end
     end
 
     # Test count_gases with a real spectral file
@@ -115,8 +156,8 @@ Some more content
 
         @test length(wl) == length(fl)
         @test length(wl) > 0
-        @test all(fl .>= AGNI.spectrum.FLOAT_SML)
-        @test all(fl .<= AGNI.spectrum.FLOAT_BIG)
+        @test all(fl .>= AGNI.spectrum.SMALLFLOAT)
+        @test all(fl .<= AGNI.spectrum.BIGFLOAT)
         @test wl[1] == 1.0
         @test wl[end] == 100e3
     end
@@ -219,68 +260,135 @@ Some more content
     # Clean up any remaining temp files
     rm(temp_sf, force=true)
 
-end
 
-@testset "spectrum_insert_blocks_and_aerosol_guards" begin
-    tmpdir = mktempdir()
-    try
+    @testset "aerosol_guard_invalid_input" begin
+        tmpdir = mktempdir()
         orig = joinpath(tmpdir, "base.sf")
         star = joinpath(tmpdir, "star.dat")
         outp = joinpath(tmpdir, "out.sf")
 
         # insert_blocks: missing original file
-        @test !AGNI.spectrum.insert_blocks(
+        @test !AGNI.spectrum.insert_blocks( RAD_DIR,
             orig, star, outp, false, false; aerosol_avg_files=Dict{String,String}()
         )
 
         # write minimal original + _k to pass cp step, but missing star file should fail
         write(orig, "Total number of gaseous absorbers = 1\n*END\n")
         write(orig * "_k", "dummy k-table\n")
-        @test !AGNI.spectrum.insert_blocks(
+        @test !AGNI.spectrum.insert_blocks( RAD_DIR,
             orig, star, outp, false, false; aerosol_avg_files=Dict{String,String}()
         )
 
         # write star file, but malformed spectral file => gas count parse failure
         write(star, "header\nheader\n1.0 1.0\n")
         write(orig, "No gas count line here\n*END\n")
-        @test !AGNI.spectrum.insert_blocks(
+        @test !AGNI.spectrum.insert_blocks( RAD_DIR,
             orig, star, outp, false, false; aerosol_avg_files=Dict{String,String}()
         )
 
         # valid gas-count line, but missing prep binaries / execution path should still be handled
         write(orig, "Total number of gaseous absorbers = 1\n*END\n")
-        @test !AGNI.spectrum.insert_blocks(
+        @test !AGNI.spectrum.insert_blocks( RAD_DIR,
             orig, star, outp, true, false; aerosol_avg_files=Dict{String,String}()
         )
 
         # generate_aerosol_avg_files guard paths
         missing_orig = joinpath(tmpdir, "missing.sf")
-        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files( RAD_DIR,
             missing_orig, ["dust"], tmpdir, 2, star, tmpdir
         ))
 
-        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(RAD_DIR,
             orig, ["dust"], tmpdir, 0, star, tmpdir
         ))
 
-        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(RAD_DIR,
             orig, ["dust"], tmpdir, 2, "", tmpdir
         ))
 
-        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(RAD_DIR,
             orig, ["dust"], tmpdir, 2, joinpath(tmpdir, "missing_star.dat"), tmpdir
         ))
 
         # no species => early empty return without external tool
-        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(RAD_DIR,
             orig, String[], tmpdir, 2, star, tmpdir
         ))
 
         # species provided but missing .mon file
-        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(
+        @test isempty(AGNI.spectrum.generate_aerosol_avg_files(RAD_DIR,
             orig, ["dust"], tmpdir, 2, star, tmpdir
         ))
-    finally
+
         rm(tmpdir; force=true, recursive=true)
     end
+
+    # Check successful data insersion
+    @testset "aerosol_insertion_success" begin
+
+        # Setup paths
+        tmpdir = mktempdir()
+        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+
+        # A real spectral file
+        @test isfile(spfile)
+        @test isfile(spfile * "_k")
+
+        # Some SOCRATES scattering data is pre-computed
+        scattering_dir = joinpath(RES_DIR, "scattering")
+        @test isdir(scattering_dir)
+
+        # Choose the 1,2 aerosol species with a matching .mon file in the repo data.
+        available_species = [
+            s for s in AGNI.spectrum.input_head_pcf.aerosol_suffix
+            if isfile(joinpath(scattering_dir, s * ".mon"))
+        ]
+        @test !isempty(available_species)
+        species = [available_species[1], available_species[2]] # first two
+
+        # Get stellar spectrum
+        star_file = joinpath(tmpdir, "star.dat")
+        wl = collect(range(100.0, 1000.0, length=1000))
+        fl = ones(Float64, 1000) .* 1e10
+        @test AGNI.spectrum.write_to_socrates_format(wl, fl, star_file, 500)
+        @test isfile(star_file)
+
+        # Generate aerosol average-properties file(s)
+        avg_files = AGNI.spectrum.generate_aerosol_avg_files(
+            RAD_DIR, spfile, species, tmpdir, 1, star_file, scattering_dir
+        )
+
+        # should be 2
+        @test length(avg_files) == length(species)
+
+        # check output from input
+        @test haskey(avg_files, species[1])
+        avg_file = avg_files[species[1]]
+        @test isfile(avg_file)
+        @test filesize(avg_file) > 0
+        @test length(readlines(avg_file)) > 1
+
+        # insert data into spectral file
+        outp_file = joinpath(tmpdir, "runtime.sf")
+        success = AGNI.spectrum.insert_blocks(
+            RAD_DIR, spfile, star_file, outp_file, false, true;
+            aerosol_avg_files=avg_files
+        )
+
+        # check the spectral file
+        @test success
+        @test isfile(outp_file)
+        @test isfile(outp_file * "_k")
+        @test filesize(outp_file) > 0
+        @test filesize(outp_file * "_k") > 0
+
+        # check the spectral file contains aerosol data
+        out_lines = readlines(outp_file)
+        @test any(contains.(out_lines, "Total number of aerosols"))
+        @test any(contains.(out_lines, "List of indexing numbers of aerosols"))
+
+        # remove this folder
+        rm(tmpdir; force=true, recursive=true)
+    end
+
 end

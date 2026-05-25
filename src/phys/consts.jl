@@ -10,16 +10,20 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String     = "1.10.2"  # current agni version
+    const AGNI_VERSION::String     = "1.10.3"  # current agni version
     export AGNI_VERSION
     const SOCVER_minimum::Float64  = 2603.6    # minimum required socrates version
     export SOCVER_minimum
 
     # A large floating point number
-    const BIGFLOAT::Float64     = 1e99
+    const BIGFLOAT::Float64     = floatmax(Float32)/2.0
     export BIGFLOAT
-    const BIGLOGFLOAT::Float64  = 99.0
+    const BIGLOGFLOAT::Float64  = log(BIGFLOAT)
     export BIGLOGFLOAT
+
+    # A small positive floating point number
+    const SMALLFLOAT::Float64   = floatmin(Float32)*2.0
+    export SMALLFLOAT
 
     # Sources:
     # - Pierrehumbert (2010)
@@ -81,6 +85,10 @@ module consts
     # Specific heat capacity for ideal gas [J mol-1 K-1]
     const Cp_ideal::Float64 = R_gas * 7/2 # assuming that it is diatomic
     export Cp_ideal
+
+    # Earth radius [m]
+    const R_earth::Float64 = 6378137.0 # m
+    export R_earth
 
     # Proton mass [kg]
     const proton_mass::Float64 = 1.67262192595e-27 # NIST CODATA

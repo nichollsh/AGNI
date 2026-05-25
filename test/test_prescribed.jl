@@ -26,21 +26,19 @@ function _make_prescribed_atmos(; instellation::Float64=1200.0,
     return atmos
 end
 
-@testset "prescribed_solver" begin
+@testset "prescribed" begin
     atmos = _make_prescribed_atmos()
-    try
-        # validation branches
-        @test !solver.solve_prescribed!(atmos; sol_type=0, atm_type=1)
-        @test !solver.solve_prescribed!(atmos; sol_type=1, atm_type=99)
+    # validation branches
+    @test !solver.solve_prescribed!(atmos; sol_type=0, atm_type=1)
+    @test !solver.solve_prescribed!(atmos; sol_type=1, atm_type=99)
 
-        # prescribed solver basic solve path
-        atmos.tmp_surf = 700.0
-        @test solver.solve_prescribed!(atmos; sol_type=1, atm_type=1)
-        @test atmos.is_solved
-        @test atmos.is_converged
-        @test all(atmos.tmp .≈ atmos.tmp_surf)
-        @test all(atmos.tmpl .≈ atmos.tmp_surf)
-    finally
-        atmosphere.deallocate!(atmos)
-    end
+    # prescribed solver basic solve path
+    atmos.tmp_surf = 700.0
+    @test solver.solve_prescribed!(atmos; sol_type=1, atm_type=1)
+    @test atmos.is_solved
+    @test atmos.is_converged
+    @test all(atmos.tmp .≈ atmos.tmp_surf)
+    @test all(atmos.tmpl .≈ atmos.tmp_surf)
+    
+    atmosphere.deallocate!(atmos)
 end

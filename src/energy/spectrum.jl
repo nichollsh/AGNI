@@ -15,22 +15,57 @@ module spectrum
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
+    import ..paths: RAD_DIR
+    import ..consts: SMALLFLOAT, BIGFLOAT
     import ..phys
-
-    include(joinpath(ENV["RAD_DIR"], "julia", "gen", "input_head_pcf.jl"))
+    include(joinpath(RAD_DIR, "julia", "gen", "input_head_pcf.jl"))
 
     # Constants
-    const FLOAT_SML = 1.0e-45
-    const FLOAT_BIG = 1.0e45
+    const PRECISION_DEFAULT::String = "double"
 
     """
     **Get the version of SOCRATES being used.**
 
+    Arguments:
+    - `RAD_DIR::String`  Path to SOCRATES directory
+
     Returns:
     - `version::String`  Version string from SOCRATES `version` file
     """
-    function get_socrates_version()::String
-        return readchomp(joinpath(ENV["RAD_DIR"],"version"))
+    function get_socrates_version(RAD_DIR::String)::String
+        version_file::String = joinpath(RAD_DIR, "version")
+        if !isfile(version_file)
+            @warn "SOCRATES version not found: '$(version_file)'"
+            return UNSET_STR
+        end
+        return readchomp(version_file)
+    end
+
+    """
+    **Get SOCRATES precision as a string**
+
+    Arguments:
+    - `SOCRATES`        The main module of the SOCRATES julia library
+
+    Returns:
+    - `prec::String`    Floating point precision (quad, double, single)
+    """
+    function get_socrates_precision(SOCRATES)::String
+        if !isdefined(SOCRATES, :SOCRATES_REAL_BYTES)
+            @warn "SOCRATES precision not defined; assuming double"
+            return PRECISION_DEFAULT
+        end
+
+        if SOCRATES.SOCRATES_REAL_BYTES == 16
+            return "quad"
+        elseif SOCRATES.SOCRATES_REAL_BYTES == 8
+            return PRECISION_DEFAULT
+        elseif SOCRATES.SOCRATES_REAL_BYTES == 4
+            return "single"
+        else
+            @warn "SOCRATES precision unrecognised; assuming double"
+            return PRECISION_DEFAULT
+        end
     end
 
     """
@@ -173,7 +208,7 @@ module spectrum
         fl *= S0 / ( phys.σSB * Teff^4)
 
         # Limit range on fl to prevent numerical problems
-        clamp!(fl, FLOAT_SML, FLOAT_BIG)
+        clamp!(fl, SMALLFLOAT, BIGFLOAT)
 
         return wl, fl
     end
@@ -236,7 +271,7 @@ module spectrum
             @warn "Loaded stellar spectrum is too short!"
             return false
         end
-        if minimum(wl) < FLOAT_SML
+        if minimum(wl) < SMALLFLOAT
             @warn "Minimum wavelength is too small"
             return false
         end
@@ -244,7 +279,7 @@ module spectrum
             @warn "Stellar wavelength array must be strictly ascending"
             return false
         end
-        clamp!(fl, FLOAT_SML, FLOAT_BIG)  # Clamp values
+        clamp!(fl, SMALLFLOAT, BIGFLOAT)  # Clamp values
 
         # warn about non-critical problems
         if len_wl < 500
@@ -313,6 +348,7 @@ module spectrum
     The aerosol .avg files must already exist. The stellar spectrum must already exist.
 
     Arguments:
+    - `RAD_DIR::String`          Path to SOCRATES directory.
     - `orig_file::String`        Path to original spectral file.
     - `star_file::String`        Path to file containing stellar spectrum in SOC format.
     - `outp_file::String`        Path to output spectral file.
@@ -323,12 +359,13 @@ module spectrum
     Returns:
     - `success::Bool`            function executed successfully
     """
-    function insert_blocks(orig_file::String, star_file::String, outp_file::String,
+    function insert_blocks(RAD_DIR::String,
+                            orig_file::String, star_file::String, outp_file::String,
                             insert_rscatter::Bool, insert_aerosol::Bool;
                             aerosol_avg_files::Dict{String,String}=Dict())::Bool
 
         # Inputs to prep_spec
-        prep_spec = abspath(ENV["RAD_DIR"],"bin","prep_spec")
+        prep_spec = abspath(RAD_DIR,"bin","prep_spec")
         @debug "Using prep_spec at: "*prep_spec
         star_inputs = [
             "6","n","T",            # ask prep_spec to tabulate the thermal source function
@@ -373,6 +410,7 @@ module spectrum
 
         # Write executable
         execpath::String = tempname() * "_agni_insert_stellar.sh"
+        execlog::String = execpath * ".log"
         @debug "Wrapping script: $execpath"
         rm(execpath, force=true)
         open(execpath, "w") do f
@@ -401,7 +439,7 @@ module spectrum
                 write(f, "a \n")       #  all gases
 
                 # If there's only one gas, add an extra 'y' confirmation
-                if (num_gases == 1) && !startswith(get_socrates_version(), "24")
+                if (num_gases == 1) && !startswith(get_socrates_version(RAD_DIR), "24")
                     write(f, "y \n")
                 end
             end
@@ -428,11 +466,27 @@ module spectrum
         # Run executable
         @debug "Running prep_spec now"
         try
-            ps = run(pipeline(`bash $execpath`, stdout=devnull))
+            ps = run(pipeline(`bash $execpath`, stdout=execlog, stderr=execlog))
 
             if !success(ps)
                 @warn "prep_spec failed with exit code $(ps.exitcode)"
                 @warn "Command: bash $execpath"
+                return false
+            end
+
+            # Check if command produced any output
+            if !isfile(execlog)
+                @warn "prep_spec failed to produce log file"
+                @warn "Command: bash $execpath"
+                return false
+            end
+
+            # Check that log does not contain errors
+            logstr = read(execlog, String)
+            if any([occursin(s, logstr) for s in ["F-", "error", "Error"]])
+                @warn "prep_spec logged a failure"
+                @warn "Command: bash $execpath"
+                @warn "Log content: $logstr"
                 return false
             end
 
@@ -443,7 +497,8 @@ module spectrum
         end
 
         # Tidy up
-        rm(execpath)
+        rm(execlog, force=true)
+        rm(execpath, force=true)
         return true
     end
 
@@ -455,6 +510,7 @@ module spectrum
     solar-weighted averaging (`-S <solar> -w`). Does not modify the spectral file.
 
     Arguments:
+    - `RAD_DIR::String`               Path to SOCRATES directory.
     - `orig_file::String`             Original spectral file
     - `species::Array{String,1}`      List of aerosol species
     - `output_dir::String`            Directory where output `.avg` files are written
@@ -465,7 +521,8 @@ module spectrum
     Returns:
     - `avg_files::Dict{String,String}` Mapping from aerosol species to generated `.avg` file paths.
     """
-    function generate_aerosol_avg_files(orig_file::String,
+    function generate_aerosol_avg_files(RAD_DIR::String,
+                                        orig_file::String,
                                         species::Array{String,1},
                                         output_dir::String,
                                         phase_moments::Int64,
@@ -492,7 +549,7 @@ module spectrum
             return avg_files
         end
 
-        scat_av_90 = abspath(ENV["RAD_DIR"], "bin", "scatter_average_90")
+        scat_av_90 = joinpath(RAD_DIR, "bin", "scatter_average_90")
 
         # check mon files exist
         for s in species
@@ -506,6 +563,7 @@ module spectrum
 
         # Write executable
         execpath::String = tempname() * "_agni_aerosol_scatter.sh"
+        execlog::String = execpath * ".log"
         @debug "Wrapping script: $execpath"
         rm(execpath, force=true)
         open(execpath, "w") do f
@@ -554,11 +612,28 @@ module spectrum
         # Run executable
         @debug "Running scatter_average_90 now"
         try
-            ps = run(pipeline(`bash $execpath`, stdout=devnull))
+            ps = run(pipeline(`bash $execpath`, stdout=execlog, stderr=execlog))
 
+            # Check return code
             if !success(ps)
                 @warn "scatter_average_90 failed with exit code $(ps.exitcode)"
                 @warn "Command: bash $execpath"
+                return avg_files
+            end
+
+            # Check if command produced any output
+            if !isfile(execlog)
+                @warn "scatter_average_90 failed to produce log file"
+                @warn "Command: bash $execpath"
+                return avg_files
+            end
+
+            # Check that log does not contain errors
+            logstr = read(execlog, String)
+            if any([occursin(s, logstr) for s in ["F-", "error", "Error"]])
+                @warn "scatter_average_90 logged a failure"
+                @warn "Command: bash $execpath"
+                @warn "Log content: $logstr"
                 return avg_files
             end
 
@@ -569,7 +644,8 @@ module spectrum
         end
 
         # Tidy up
-        rm(execpath)
+        rm(execpath, force=true)
+        rm(execlog, force=true)
         return avg_files
     end
 
