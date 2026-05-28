@@ -29,14 +29,10 @@ makedocs(
             ],
         ),
 
-        PageNode("Tutorials" => "tutorials/index.md", [
-            "Examples"  => "tutorials/index.md",
-            ]
-        ),
+        "Tutorials" => "tutorials/index.md",
 
         PageNode("Explanation" => "explanation/index.md", [
             "Model description"  => "explanation/model.md",
-            "Related codes"      => "explanation/ecosystem.md",
             "Bibliography"       => "explanation/references.md",
             ],
         ),
@@ -47,7 +43,11 @@ makedocs(
             "API reference"             => "reference/api.md",
             ],
         ),
-        "Acknowledgements" => "thanks.md",
+
+        "Community" => "thanks.md",
+
+        "Other PROTEUS modules" => "ecosystem.md",
+
     ]
 )
 
