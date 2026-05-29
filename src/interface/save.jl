@@ -302,7 +302,9 @@ module save
             var_rfm_wn =    defVar(ds, "rfm_wn",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "cm-1"))
             var_rfm_fl =    defVar(ds, "rfm_fl",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "erg/(s cm2 cm-1)"))
             var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c") ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Thermal contribution function, normalised"))
-            var_tau =       defVar(ds, "optdepth",  Float64, ("nbands","nlev_c") ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Thermal optical depth of the atmosphere, measured from TOA downwards"))
+            var_tau =       defVar(ds, "optdepth",  Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Optical depth of layer bottom edges, measured from TOA downwards"))
+            var_tau_p =     defVar(ds, "optdepth_p",Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "Pa", "long_name" => "Pressure of tau=1 per band"))
+            var_tau_r =     defVar(ds, "optdepth_r",Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "m", "long_name" => "Radius of tau=1 per band"))
             var_albr =      defVar(ds, "surface_r", Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Spectral spherical reflectance of surface material"))
 
             #     Store data
@@ -403,13 +405,24 @@ module save
                 end
             end
 
-            # SOCRATES contribution function and optical depth
-            for lc in 1:atmos.nlev_c
-                for ba in 1:atmos.nbands
+            # Contribution function and optical depth
+            for ba in 1:atmos.nbands
+                # tau at TOA
+                var_tau[ba, 1] = atmos.tau_band[1, ba]
+
+                # loop over layers
+                for lc in 1:atmos.nlev_c
+                    # cff at layer centres
                     var_cfn[ba, lc] = atmos.contfunc_band[lc, ba]
-                    var_tau[ba, lc] = atmos.tau_band[lc, ba]
+
+                    # tau at layer bottoms
+                    var_tau[ba, lc+1] = atmos.tau_band[lc+1, ba]
                 end
             end
+
+            # Optical depth of tau=tau_ref
+            var_tau_p[:] = atmos.tau_p
+            var_tau_r[:] = atmos.tau_r
 
             # Surface spectral albedo
             var_albr[:] = atmos.surf_r_arr

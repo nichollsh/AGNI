@@ -35,6 +35,43 @@ module plotting
                              :titlefontsize => 9,
                              :dpi => 240)
 
+
+
+    """
+    Plot telescope bandpasses as translucent vertical spans.
+    """
+    function _plot_bandpasses!(plt, xlims::Tuple{Float64,Float64})
+        for bands in values(OBSERVER_BANDS)
+            for band in values(bands)
+                wl_min = min(band[1], band[2]) * 1e3 # um to nm
+                wl_max = max(band[1], band[2]) * 1e3
+                if (wl_max < xlims[1]) || (wl_min > xlims[2])
+                    continue
+                end
+                vspan!(plt, [wl_min, wl_max], color=col_b,
+                        alpha=0.05, lw=0.0, label="")
+            end
+        end
+        return plt
+    end
+
+    """
+    Plot tau=ref_tau isoline using precomputed tau_p arrays.
+    """
+    function _plot_tau_isoline!(plt, atmos::atmosphere.Atmos_t,
+                                x::Array{Float64, 1}, reversed::Bool)
+
+        y_tau = fill(NaN, atmos.nbands)
+        for ba in 1:atmos.nbands
+            br = reversed ? atmos.nbands - ba + 1 : ba
+            y_tau[br] = atmos.tau_p[ba] * 1.0e-5 # bar
+        end
+        if any(isfinite, y_tau)
+            plot!(plt, x, y_tau, lw=1.2, lc=:white, ls=:dash, label="")
+        end
+        return plt
+    end
+
     """
     **Apply a signed symmetric log10 transform, returning zero for |v| < thresh.**
 
@@ -775,6 +812,9 @@ module plotting
         z /= maximum(z)
         z[:] = log10.(z[:])
 
+        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+
         # Make plot
         plt = plot(title="Normalised, log₁₀ Contrib Function",
                         size=(size_x, size_y*0.8); plt_default...)
@@ -782,13 +822,16 @@ module plotting
         # plot contribution function as 2D heatmap
         heatmap!(plt, x,y,z, c=:devon, label="")
 
+        # plot bandpasses
+        plt = _plot_bandpasses!(plt, xlims)
+
         # plot band limits
         for ba in 1:atmos.nbands
             vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
         end
 
-        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        plt = _plot_tau_isoline!(plt, atmos, x, reversed)
+
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
@@ -827,8 +870,8 @@ module plotting
 
         # Get data dimensions
         x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
-        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)    # pressure levels
-        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_c, atmos.nbands))
+        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_l)    # pressure levels
+        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_l, atmos.nbands))
 
         # Min, max tau for plotting
         tau_min::Float64 = 1e-3
@@ -846,7 +889,7 @@ module plotting
                 br = ba
             end
             x[br] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
-            for i in 1:atmos.nlev_c
+            for i in 1:atmos.nlev_l
                 z[i,br] = atmos.tau_band[i,ba]
             end
         end
@@ -859,8 +902,8 @@ module plotting
         z[:] = log10.(z[:])
 
         # y value - pressures [bar]
-        for i in 1:atmos.nlev_c
-            y[i] = atmos.p[i] * 1.0e-5
+        for i in 1:atmos.nlev_l
+            y[i] = atmos.pl[i] * 1.0e-5
         end
 
         xlims  = (minimum(x), max(wl_max, minimum(x)+1))
@@ -874,10 +917,15 @@ module plotting
         # plot tau as heatmap
         heatmap!(plt, x, y, z, c=:devon, label="", climits=(log10(tau_min), log10(tau_max)))
 
+        # plot bandpasses
+        plt = _plot_bandpasses!(plt, xlims)
+
         # plot band limits
         for ba in 1:atmos.nbands
             vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
         end
+
+        plt = _plot_tau_isoline!(plt, atmos, x, reversed)
 
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
