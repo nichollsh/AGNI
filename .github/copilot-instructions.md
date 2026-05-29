@@ -157,8 +157,7 @@ Unit tests are individual files (`test_consts.jl`, `test_phys.jl`, etc.) include
 
 ### Testing Standards
 
-AGNI is scientific simulation code, so the test suite is held to physics-grade rigor. The rules below are the contract; the deep-dive (anti-happy-path patterns, discriminating-value guards, certification markers, adversarial-review trigger, buffer-flip propagation, hypothesis seed stability, solver intermediate-state assertions) lives in `.github/agni-tests.md`. Read that file before editing any test file or any source file under `src/**`. The two files must be kept in sync; if you change one, mirror the change in the other.
-
+AGNI is scientific simulation code, so the test suite is held to physics-grade rigor. The rules below are the contract.
 
 
 ### Anti-happy-path rules (every new test)
