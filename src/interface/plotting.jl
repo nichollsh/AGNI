@@ -22,7 +22,6 @@ module plotting
 
     # Axis margins
     TMP_MARGIN::Float64 = 100.0
-    LINEWIDTH_PHOT::Float64 = 1.5
 
     # Default plotting configuration
     const la::Float64 = 0.7
@@ -70,7 +69,7 @@ module plotting
             y_tau[br] = atmos.tau_p[ba] * 1.0e-5 # bar
         end
         if any(isfinite, y_tau)
-            plot!(plt, x, y_tau, lw=LINEWIDTH_PHOT, lc=col_obs_phot,
+            plot!(plt, x, y_tau, lw=lw, lc=col_obs_phot,
                         ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
         end
         return plt
@@ -204,7 +203,7 @@ module plotting
         plot!(plt, atmos.tmp,  atmos.p*1e-5,  lc="grey",  lw=lw, ls=:dot, label=L"T(p)")
 
         # add photosphere
-        hline!(plt, [atmos.transspec_p*1e-5], lw=LINEWIDTH_PHOT,
+        hline!(plt, [atmos.transspec_p*1e-5], lw=lw,
                         lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
 
         # Plot current surface pressure and original
@@ -284,10 +283,10 @@ module plotting
         scatter!(plt, atmos.rl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Edges")
 
         # add photosphere
-        hline!(plt, [atmos.transspec_p*1e-5], lw=LINEWIDTH_PHOT,
+        hline!(plt, [atmos.transspec_p*1e-5], lw=lw,
                         lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
-        vline!(plt, [atmos.transspec_r*1e-3], lw=LINEWIDTH_PHOT,
-                        lc=col_obs_phot, ls=:dot)
+        vline!(plt, [atmos.transspec_r*1e-3], lw=lw,
+                        lc=col_obs_phot, ls=:dot, label="")
 
 
         # Plot current surface pressure and original
@@ -752,7 +751,7 @@ module plotting
         end
 
         # add photosphere
-        hline!(plt, [atmos.transspec_p*1e-5], lw=LINEWIDTH_PHOT,
+        hline!(plt, [atmos.transspec_p*1e-5], lw=lw,
                         lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
 
         xlabel!(plt, "log₁₀ Contribution function")

@@ -752,8 +752,8 @@ module AGNI
         @info "    done"
         if atmos.benchmark
             @info "Radiative transfer benchmarking statistics..."
-            @info "    total evals:   $(atmos.num_rt_eval), over $(atmos.tim_rt_eval/1e9) secs"
-            @info "    time per eval: $(atmos.tim_rt_eval/atmos.num_rt_eval/1e9*1e3) ms"
+            @info "    total evals: $(atmos.num_rt_eval) in $(atmos.tim_rt_eval/1e9) secs"
+            @info "    performance: $(atmos.tim_rt_eval/atmos.num_rt_eval/1e9*1e3) ms"
         end
 
         # RFM calculation?
@@ -785,8 +785,8 @@ module AGNI
         atmosphere.calc_observed_rho!(atmos)
         @info @sprintf("Photosphere defined at τ=%.2f and λ=%.2f μm",
                             atmos.transspec_ref_tau, atmos.transspec_ref_wl*1e6)
-        @info @sprintf("    pressure: %.2e bar, temperature: %.2f K",
-                            atmos.transspec_p, atmos.transspec_tmp)
+        @info @sprintf("    pressure: %.2f mbar, temperature: %.2f K",
+                            atmos.transspec_p*0.01, atmos.transspec_tmp)
         @info @sprintf("    planet density: %.2e kg/m^3, radius: %.2f R⊕",
                             atmos.transspec_rho, atmos.transspec_r/consts.R_earth)
 

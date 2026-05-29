@@ -86,7 +86,7 @@ module atmosphere
     const CFG_fastchem_xtol_chem::Float64   = 1e-3
     const CFG_fastchem_xtol_elem::Float64   = 1e-3
     const CFG_fastchem_wellmixed::Bool      = false
-    const CFG_transspec_ref_tau::Float64    = 1.0
+    const CFG_transspec_ref_tau::Float64    = 0.02
     const CFG_transspec_ref_wl::Float64     = 1.0e-6 # m
     const CFG_transspec_ref_p::Float64      = 2e3 # 20 mbar = 2000 Pa
     const CFG_ocean_ob_frac::Float64        = 0.6
@@ -293,7 +293,7 @@ module atmosphere
         band_n_sw::Array{Float64,2}         # net upward, sw
 
         # Calculated per-band optical depth
-        tau_band::Array{Float64,2}          # optical depth per band, measured from TOA
+        tau_band::Array{Float64,2}          # vertical (normal) optical depth per band, measured from TOA
 
         # Surface planck emission (incl. emissivity)
         surf_flux::Array{Float64, 1}
@@ -533,7 +533,7 @@ module atmosphere
     - `fastchem_xtol_chem::Float64`     solution tolerance required of fastchem (chemical)
     - `fastchem_xtol_elem::Float64`     solution tolerance required of fastchem (elemental)
     - `rfm_parfile::String`             path to HITRAN-formatted .par file provided to RFM
-    - `transspec_ref_tau::Float64`      optical depth at which to probe transmission spectrum
+    - `transspec_ref_tau::Float64`      vertical (normal) optical depth used to define the photosphere
     - `transspec_ref_wl::Float64`       wavelength used to define photosphere [m]
     - `transspec_ref_p::Float64`        pressure level used to define photosphere [bar]
     - `ocean_ob_frac::Float64`          ocean basin area, as fraction of planet surface
@@ -866,11 +866,11 @@ module atmosphere
 
         # reference observables
         atmos.transspec_ref_p = transspec_ref_p * 1.0e5 # Convert bar -> Pa
-        _check_range("Reference pressure [Pa] for transmission spectrum", atmos.transspec_ref_p; min=1e-5) || return
+        _check_range("Reference pressure [Pa] for transmission spectrum", atmos.transspec_ref_p; min=1e-5, max=1e10) || return
         atmos.transspec_ref_wl = transspec_ref_wl
         _check_range("Reference wavelength [m] for transmission spectrum", atmos.transspec_ref_wl; min=1e-10, max=1.0) || return
         atmos.transspec_ref_tau = transspec_ref_tau
-        _check_range("Reference optical depth for transmission spectrum", atmos.transspec_ref_tau; min=1e-5) || return
+        _check_range("Reference optical depth for transmission spectrum", atmos.transspec_ref_tau; min=1e-10, max=1e10) || return
 
         # derived statistics
         atmos.interior_mass  =  atmos.grav_surf * atmos.rp^2 / phys.G_grav
@@ -3085,7 +3085,7 @@ module atmosphere
     **Find pressure and radius where optical depth τ=1, for each spectral band.**
 
     Uses the optical depth profiles stored in `atmos.tau_band` and determines the
-    layer where τ is closest to `atmos.transspec_tau`. Values are stored
+    layer where τ is closest to `atmos.transspec_ref_tau`. Values are stored
     in `atmos.tau_p` [Pa] and `atmos.tau_r` [m].
 
     Arguments:

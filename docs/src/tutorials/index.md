@@ -28,9 +28,11 @@ You should see the following output:
 [ INFO  ] Solving with 'none'
 [ INFO  ]     done
 [ INFO  ] Radiative transfer benchmarking statistics...
-[ INFO  ]     total RT evals:  2
-[ INFO  ]     cumulative time: 0.437389641 secs
-[ INFO  ]     time per eval:   218.6948205 ms
+[ INFO  ]     total evals:   2, over 0.449157808 secs
+[ INFO  ]     time per eval: 224.578904 ms
+[ INFO  ] Photosphere defined at τ=0.02 and λ=1.00 μm
+[ INFO  ]     pressure: 82.00 mbar, temperature: 370.84 K
+[ INFO  ]     planet density: 4.46e+03 kg/m^3, radius: 1.07 R⊕
 [ INFO  ] Writing results
 [ INFO  ] Plotting results
 [ INFO  ] Model runtime: 18.63 seconds
@@ -200,7 +202,7 @@ From this, we get a lot of output. These include all the spectral fluxes, gas pr
 :date = "2026-May-25 07:41:21" ;
 :hostname = "your_computer_name" ;
 :username = "your_username" ;
-:AGNI_version = "1.10.3" ;
+:AGNI_version = "1.10.4" ;
 :SOCRATES_version = "2603.7" ;
 :SOCRATES_precision = "double" ;
 :name = "41a2d25b" ;

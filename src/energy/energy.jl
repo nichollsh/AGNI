@@ -423,7 +423,7 @@ module energy
         # Up-directed LW beam, looping from surface upwards
         atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4 * (1-atmos.albedo_s)
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
-            tau_lw = (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.g[i]
+            tau_lw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_lw / atmos.g[i]
             trans = exp( -tau_lw )
             atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
         end
