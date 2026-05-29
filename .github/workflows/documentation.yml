@@ -29,7 +29,7 @@ jobs:
       statuses: write
 
     runs-on: ubuntu-latest
-    name: build_docs
+    name: documentation
 
     steps:
       - uses: actions/checkout@v6
