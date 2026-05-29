@@ -22,6 +22,7 @@ module plotting
 
     # Axis margins
     TMP_MARGIN::Float64 = 100.0
+    LINEWIDTH_PHOT::Float64 = 1.5
 
     # Default plotting configuration
     const la::Float64 = 0.7
@@ -36,20 +37,22 @@ module plotting
                              :dpi => 240)
 
 
-
     """
     Plot telescope bandpasses as translucent vertical spans.
     """
     function _plot_bandpasses!(plt, xlims::Tuple{Float64,Float64})
-        for bands in values(OBSERVER_BANDS)
-            for band in values(bands)
-                wl_min = min(band[1], band[2]) * 1e3 # um to nm
+        first_band = true
+        for (telescope,bands) in OBSERVER_BANDS
+            for (instrument,band) in bands
+                wl_min = min(band[1], band[2]) * 1e3
                 wl_max = max(band[1], band[2]) * 1e3
                 if (wl_max < xlims[1]) || (wl_min > xlims[2])
                     continue
                 end
-                vspan!(plt, [wl_min, wl_max], color=col_b,
-                        alpha=0.05, lw=0.0, label="")
+                label = first_band ? telescope : ""
+                vspan!(plt, [wl_min, wl_max], color=col_obs_inst,
+                        alpha=0.05, lw=0.0, label=label)
+                first_band = false
             end
         end
         return plt
@@ -67,7 +70,8 @@ module plotting
             y_tau[br] = atmos.tau_p[ba] * 1.0e-5 # bar
         end
         if any(isfinite, y_tau)
-            plot!(plt, x, y_tau, lw=1.2, lc=:white, ls=:dash, label="")
+            plot!(plt, x, y_tau, lw=LINEWIDTH_PHOT, lc=col_obs_phot,
+                        ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
         end
         return plt
     end
@@ -199,6 +203,10 @@ module plotting
         plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=lw, label=L"T(pl)")
         plot!(plt, atmos.tmp,  atmos.p*1e-5,  lc="grey",  lw=lw, ls=:dot, label=L"T(p)")
 
+        # add photosphere
+        hline!(plt, [atmos.transspec_p*1e-5], lw=LINEWIDTH_PHOT,
+                        lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
+
         # Plot current surface pressure and original
         @_plt_pboa
         @_plt_poboa
@@ -274,6 +282,13 @@ module plotting
         # Plot cell-centres and cell-edges
         scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Centres")
         scatter!(plt, atmos.rl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Edges")
+
+        # add photosphere
+        hline!(plt, [atmos.transspec_p*1e-5], lw=LINEWIDTH_PHOT,
+                        lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
+        vline!(plt, [atmos.transspec_r*1e-3], lw=LINEWIDTH_PHOT,
+                        lc=col_obs_phot, ls=:dot)
+
 
         # Plot current surface pressure and original
         @_plt_pboa
@@ -736,6 +751,10 @@ module plotting
             plot!(plt, cff, prs, label=@sprintf("%.1f μm",wl_i))
         end
 
+        # add photosphere
+        hline!(plt, [atmos.transspec_p*1e-5], lw=LINEWIDTH_PHOT,
+                        lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
+
         xlabel!(plt, "log₁₀ Contribution function")
         xaxis!(plt, xlims=(x_min+0.05, x_max+0.1))
 
@@ -752,10 +771,7 @@ module plotting
     end
 
     """
-    **Plot normalised contribution function (per band)**
-
-    The data displayed in this plot are fine, but the x-axis ticks are labelled
-    incorrectly by the plotting library. I don't know why this is.
+    **Plot normalised contribution function, per band, versus pressure**
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`    atmosphere object
@@ -817,6 +833,7 @@ module plotting
 
         # Make plot
         plt = plot(title="Normalised, log₁₀ Contrib Function",
+                        legend=:topright,
                         size=(size_x, size_y*0.8); plt_default...)
 
         # plot contribution function as 2D heatmap
@@ -912,7 +929,8 @@ module plotting
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
-        plt = plot(title="log₁₀ τ (LW)", size=(size_x, size_y*0.8); plt_default...)
+        plt = plot(title="log₁₀ τ (LW)", legend=:topright,
+                    size=(size_x, size_y*0.8); plt_default...)
 
         # plot tau as heatmap
         heatmap!(plt, x, y, z, c=:devon, label="", climits=(log10(tau_min), log10(tau_max)))

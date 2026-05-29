@@ -786,7 +786,7 @@ module AGNI
         @info @sprintf("Photosphere defined at τ=%.2f and λ=%.2f μm",
                             atmos.transspec_ref_tau, atmos.transspec_ref_wl*1e6)
         @info @sprintf("    pressure: %.2e bar, temperature: %.2f K",
-                            atmos.transspec_p, atmos.transspec_t)
+                            atmos.transspec_p, atmos.transspec_tmp)
         @info @sprintf("    planet density: %.2e kg/m^3, radius: %.2f R⊕",
                             atmos.transspec_rho, atmos.transspec_r/consts.R_earth)
 

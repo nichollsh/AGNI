@@ -15,14 +15,16 @@ module style
     const col_o::String = "#66CD00"; export col_o # conduction
     const col_p::String = "#ecb000"; export col_p # phase change
     const col_d::String = "#8B008B"; export col_d # deepheating
-    const col_b::String = "#eeeeee"; export col_b # bandpass
+
+    const col_obs_inst::String = "#eeeeee"; export col_obs_inst # instrument
+    const col_obs_phot::String = "#ff4400"; export col_obs_phot # photosphere
 
     # Allowed plot file extensions
     const ALLOWED_EXTS::Set{String} = Set(["png", "pdf", "svg"])
     export ALLOWED_EXTS
 
     # Telescope bandpasses [micron], from PROTEUS plot.py
-    const OBSERVER_BANDS = Dict{String, Dict{String, NTuple{2, Float64}}}(
+    const OBSERVER_BANDS = Dict{String, Dict}(
         # https://jwst-docs.stsci.edu/jwst-mid-infrared-instrument/miri-instrumentation/miri-filters-and-dispersers
         "MIRI" => Dict(
             "F560W" => (5.054, 6.171),

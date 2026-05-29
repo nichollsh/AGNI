@@ -3106,11 +3106,10 @@ module atmosphere
         fill!(atmos.tau_p, 0.0)
         fill!(atmos.tau_r, 0.0)
         itau::Int64 = 1
-        log_ref = log10(atmos.transspec_ref_tau)
 
         # Loop over bands and find the layer where tau is closest to transspec_ref_tau
         for ba in 1:atmos.nbands
-            itau = findmin(abs.(log10.(atmos.tau_band[ba,:]) .- log_ref))[2]
+            itau = findmin(abs.(atmos.tau_band[:,ba] .- atmos.transspec_ref_tau))[2]
             atmos.tau_p[ba] = atmos.pl[itau]
             atmos.tau_r[ba] = atmos.rl[itau]
         end
@@ -3252,15 +3251,16 @@ module atmosphere
         # Update tau isolines (p and r at tau=ref_tau)
         calc_tau_isolines!(atmos)
 
-        # If optical depth profiles are available, use them to find the photosphere
-        if atmos.tau_band[2] > 0.0
-            idx = _iphot_from_tau(atmos, atmos.transspec_ref_wl)
-            atmos.transspec_p = atmos.p[idx]
-
-        # If not, fall back to fixed pressure level (default 20 mbar)
-        else
+        # If optical depth profiles not available, fall back to fixed pressure level
+        if all(atmos.tau_band[end,:] .< eps(Float32))
+            @warn "Optical depth not available; setting photosphere at constant pressure"
             idx = _iphot_from_prs!(atmos, atmos.transspec_ref_p)
             atmos.transspec_p = atmos.transspec_ref_p
+
+        # Otherwise, use tau profiles to find photosphere at reference wavelength
+        else
+            idx = _iphot_from_tau(atmos, atmos.transspec_ref_wl)
+            atmos.transspec_p = atmos.p[idx]
         end
 
         # get the observed height
