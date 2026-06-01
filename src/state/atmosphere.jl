@@ -3085,7 +3085,7 @@ module atmosphere
 
 
     """
-    **Find pressure and radius where optical depth τ=1, for each spectral band.**
+    **Find pressure and radius where optical depth τ=τ_ref, for each spectral band.**
 
     Uses the optical depth profiles stored in `atmos.tau_band` and determines the
     layer where τ is closest to `atmos.transspec_ref_tau`. Values are stored

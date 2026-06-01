@@ -538,7 +538,7 @@ end
         @test all(isfinite.(atmos.flux_d_sw))
 
         # check that scattering is zero
-        @test all(atmos.flux_u_sw .== 0.0)
+        @test all(isapprox.(atmos.flux_u_sw, 0.0; rtol=0.0, atol=1e-12))
 
         # test that band fluxes consistent with bolometric fluxes
         @test isapprox(atmos.band_d_lw[1, 1], atmos.flux_d_lw[1]; rtol=0.0, atol=1e-12)

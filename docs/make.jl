@@ -29,7 +29,6 @@ makedocs(
             ],
         ),
 
-        "Tutorials" => "tutorials/index.md",
         PageNode("Explanation" => "explanation/index.md", [
             "Model description"  => "explanation/model.md",
             "Bibliography"       => "explanation/references.md",

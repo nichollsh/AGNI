@@ -10,7 +10,8 @@ Run this script in the usual manner:
 ./agni.jl res/config/physics/aerosols.toml
 ```
 
-The plot below shows the enforced mixing ratio profiles of the aerosols. Water is plotted with a dotted line because its ratiative effects are disabled in this example.
+The plot below shows the enforced mixing ratio profiles of the aerosols. Water is plotted with a dotted line because its radiative effects are disabled in this example.
+
 ![](fig_aerosol_cloud.png)
 
 Aerosols modify both shortwave and longwave radiative transfer. The flux profiles below show how aerosols alter the vertical distribution of radiative heating and cooling. Importantly, the shortwave stellar radiation is largely reflected and attenuated at low pressures.
