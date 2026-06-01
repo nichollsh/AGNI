@@ -460,7 +460,7 @@ module energy
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `lw::Bool`                        longwave calculation? Else: shortwave
-    - `calc_cf::Bool=false`             also calculate contribution function?
+    - `calc_cf::Bool=false`             calculate contribution function and optical depths?
 
     Returns:
     - `Bool`                            whether the calculation succeeded

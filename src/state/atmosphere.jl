@@ -24,7 +24,7 @@ module atmosphere
     # Local modules
     import ..phys
     import ..spectrum
-    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum
+    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum, SMALLFLOAT
     import ..formulae
     import ..species
     import ..density
@@ -3135,7 +3135,7 @@ module atmosphere
             return 1
         end
         @debug "Calculating photosphere from reference pressure, p=$(p_ref*1e-5) bar"
-        return findmin(abs.(atmos.p .- p_ref))[2]
+        return findmin(abs.(atmos.pl .- p_ref))[2]
     end
 
     """
@@ -3165,7 +3165,7 @@ module atmosphere
         # Find band index for this wavelength
         iband::Int64 = findmin(abs.(atmos.bands_cen .- ref_wl))[2]
 
-        # Find pressure level where tau=1, and return index
+        # Find pressure level where tau=tau_ref, and return index
         return _iphot_from_prs!(atmos, atmos.tau_p[iband])
     end
 
@@ -3196,6 +3196,7 @@ module atmosphere
         # Params
         wl_min::Float64  = 0.2 * 1e-6 # 200 nanometer
         wl_max::Float64  = 150 * 1e-6 # 150 micron
+        p_min::Float64   = 10.0       # 10 Pa = 1e-4 bar
 
 
         # tracking
@@ -3240,27 +3241,35 @@ module atmosphere
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be updated.
+    - `setby::String`           method to use for estimating photosphere ("tau" or "prs")
 
     Returns:
-    - `idx::Int64`          index of photosphere
+    - `idx::Int64`              index of photosphere
     """
-    function estimate_photosphere!(atmos::atmosphere.Atmos_t)::Int64
+    function estimate_photosphere!(atmos::atmosphere.Atmos_t; setby::String="tau")::Int64
 
         idx::Int64 = 1
 
         # Update tau isolines (p and r at tau=ref_tau)
         calc_tau_isolines!(atmos)
 
-        # If optical depth profiles not available, fall back to fixed pressure level
-        if all(atmos.tau_band[end,:] .< eps(Float32))
-            @warn "Optical depth not available; setting photosphere at constant pressure"
+        # Set photosphere index based on pressure level
+        if setby == "prs"
             idx = _iphot_from_prs!(atmos, atmos.transspec_ref_p)
             atmos.transspec_p = atmos.transspec_ref_p
 
         # Otherwise, use tau profiles to find photosphere at reference wavelength
-        else
-            idx = _iphot_from_tau(atmos, atmos.transspec_ref_wl)
-            atmos.transspec_p = atmos.p[idx]
+        elseif setby == "tau"
+
+            # check optical depths are defined
+            if any(atmos.tau_band[2:end, :] .>= SMALLFLOAT)
+                idx = _iphot_from_tau(atmos, atmos.transspec_ref_wl)
+            else
+                @warn "Optical depth profiles are zero; cannot calculate photosphere from τ"
+                idx = 2
+            end
+
+            atmos.transspec_p = atmos.pl[idx]
         end
 
         # get the observed height
@@ -3268,9 +3277,15 @@ module atmosphere
         atmos.transspec_tmp  = atmos.tmpl[idx]
         atmos.transspec_grav = atmos.gl[idx]
 
+
         # get the observed layer properties
-        idx = clamp(idx, 1, atmos.nlev_c) # ensure valid index
-        atmos.transspec_μ = atmos.layer_μ[idx]
+        if idx > 1
+            atmos.transspec_μ = 0.5 * (atmos.layer_μ[idx] + atmos.layer_μ[idx-1])
+        elseif idx > atmos.nlev_c
+            atmos.transspec_μ = atmos.layer_μ[end]
+        else
+            atmos.transspec_μ = atmos.layer_μ[idx]
+        end
 
         # get mass of whole atmosphere
         atmos.transspec_m = atmos.p_boa * 4 * pi * atmos.rp^2 / atmos.grav_surf

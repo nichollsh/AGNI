@@ -753,7 +753,7 @@ module AGNI
         if atmos.benchmark
             @info "Radiative transfer benchmarking statistics..."
             @info "    total evals: $(atmos.num_rt_eval) in $(atmos.tim_rt_eval/1e9) secs"
-            @info "    performance: $(atmos.tim_rt_eval/atmos.num_rt_eval/1e9*1e3) ms"
+            @info "    performance: $(atmos.tim_rt_eval/atmos.num_rt_eval/1e9*1e3) ms/eval"
         end
 
         # RFM calculation?
@@ -787,8 +787,8 @@ module AGNI
                             atmos.transspec_ref_tau, atmos.transspec_ref_wl*1e6)
         @info @sprintf("    pressure: %.2f mbar, temperature: %.2f K",
                             atmos.transspec_p*0.01, atmos.transspec_tmp)
-        @info @sprintf("    planet density: %.2e kg/m^3, radius: %.2f R⊕",
-                            atmos.transspec_rho, atmos.transspec_r/consts.R_earth)
+        @info @sprintf("    planet radius: %.2f R⊕, bulk density: %.2e kg/m^3, ",
+                             atmos.transspec_r/consts.R_earth, atmos.transspec_rho)
 
 
         # Paths and objects for saving/plotting

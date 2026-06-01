@@ -38,20 +38,53 @@ module plotting
 
     """
     Plot telescope bandpasses as translucent vertical spans.
+
+    Arguments:
+    - `plt`                          plot object to modify
+    - `xlims::Tuple{Float64,Float64}` x-axis limits on plot
+    - `instruments`                   list of instruments to plot
+    - `prs`                           pressure level on figure y-axis
+    - `ylims`                         y-axis limits on plot
     """
-    function _plot_bandpasses!(plt, xlims::Tuple{Float64,Float64})
-        first_band = true
-        for (telescope,bands) in OBSERVER_BANDS
-            for (instrument,band) in bands
-                wl_min = min(band[1], band[2]) * 1e3
-                wl_max = max(band[1], band[2]) * 1e3
+    function _plot_bandpasses!(plt, xlims::Tuple{Float64,Float64};
+                                instruments=["NIRSpec","MIRI","PLATO"],
+                                prs=1e2,
+                                ylims=nothing)
+
+        # normalise instrument list
+        if instruments === nothing
+            instruments = keys(style.instrument_bands)
+        elseif isa(instruments, String)
+            instruments = [instruments]
+        else
+            instruments = collect(instruments)
+        end
+        instruments = intersect(Set(instruments), Set(keys(style.instrument_bands)))
+
+        # set y location
+        if ylims !== nothing
+            y = clamp(prs, minimum(ylims), maximum(ylims))
+        else
+            y = prs
+        end
+
+        label::String = ""
+        for (i,instrument) in enumerate(instruments)
+            bands = instrument_bands[instrument]
+            label = instrument
+            for (bandname,bandlims) in bands
+                if bandname == "_colour"
+                    continue
+                end
+                wl_min = min(bandlims[1], bandlims[2]) * 1e3 # convert um to nm
+                wl_max = max(bandlims[1], bandlims[2]) * 1e3
                 if (wl_max < xlims[1]) || (wl_min > xlims[2])
                     continue
                 end
-                label = first_band ? telescope : ""
-                vspan!(plt, [wl_min, wl_max], color=col_obs_inst,
-                        alpha=0.05, lw=0.0, label=label)
-                first_band = false
+                plot!(plt, [wl_min, wl_max], [y*(1-0.1*i), y*(1-0.1*i)],
+                        color=bands["_colour"],
+                        alpha=0.9, lw=lw, label=label)
+                label = ""
             end
         end
         return plt
@@ -612,7 +645,7 @@ module plotting
     """
     function plot_emission(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int64=size_x_default, size_y::Int64=size_y_default,
-                            wl_max::Float64=70e3)
+                            wl_max::Float64=300e3)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -781,7 +814,7 @@ module plotting
     """
     function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String;
                                     size_x::Int64=size_x_default, size_y::Int64=size_y_default,
-                                    wl_max::Float64=700e3)
+                                    wl_max::Float64=300e3)
 
         # Check that we have data
         if !atmos.is_out_lw
@@ -830,29 +863,31 @@ module plotting
         xlims  = (minimum(x), max(wl_max, minimum(x)+1))
         xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
 
+        ylims  = (y[1], y[end])
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
         # Make plot
         plt = plot(title="Normalised, log₁₀ Contrib Function",
-                        legend=:topright,
+                        legend=:right,
                         size=(size_x, size_y*0.8); plt_default...)
 
         # plot contribution function as 2D heatmap
         heatmap!(plt, x,y,z, c=:devon, label="")
-
-        # plot bandpasses
-        plt = _plot_bandpasses!(plt, xlims)
 
         # plot band limits
         for ba in 1:atmos.nbands
             vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
         end
 
+        # plot tau isoline
         plt = _plot_tau_isoline!(plt, atmos, x, reversed)
+
+        # plot bandpasses
+        plt = _plot_bandpasses!(plt, xlims; ylims=ylims)
 
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
-        ylims  = (y[1], y[end])
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
@@ -876,7 +911,7 @@ module plotting
     function plot_tau(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int64=size_x_default,
                             size_y::Int64=size_y_default,
-                            wl_max::Float64=700e3)
+                            wl_max::Float64=300e3)
 
         # Check that we have data
         if !atmos.is_out_lw && !atmos.is_out_sw
@@ -928,21 +963,23 @@ module plotting
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
-        plt = plot(title="log₁₀ τ (LW)", legend=:topright,
+        plt = plot(title="log₁₀ τ (downward from TOA)", legend=:right,
                     size=(size_x, size_y*0.8); plt_default...)
 
         # plot tau as heatmap
         heatmap!(plt, x, y, z, c=:devon, label="", climits=(log10(tau_min), log10(tau_max)))
 
-        # plot bandpasses
-        plt = _plot_bandpasses!(plt, xlims)
 
         # plot band limits
         for ba in 1:atmos.nbands
             vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
         end
 
+        # plot tau isoline
         plt = _plot_tau_isoline!(plt, atmos, x, reversed)
+
+        # plot bandpasses
+        plt = _plot_bandpasses!(plt, xlims; ylims=ylims)
 
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)

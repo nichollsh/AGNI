@@ -1,4 +1,3 @@
-
 using Test
 using AGNI
 
@@ -7,6 +6,34 @@ RES_DIR         = joinpath(ROOT_DIR,"res/")
 OUT_DIR         = joinpath(ROOT_DIR,"out/")
 TEST_DIR        = joinpath(ROOT_DIR,"test/")
 
+function _make_grey_atmos(; nlev_c::Int64=100,
+                                instellation::Float64=900.0,
+                                p_surf::Float64=1.0,
+                                p_top::Float64=1e-6,
+                                transspec_ref_tau::Float64=1.1,
+                                transspec_ref_wl::Float64=1e-6,
+                                transspec_ref_p::Float64=1e-3)
+    atmos = atmosphere.Atmos_t()
+    ok = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                            "greygas",
+                            instellation, 1.0, 0.0, 0.0,
+                            400.0,
+                            10.0, 1.0e7,
+                            nlev_c, p_surf, p_top,
+                            Dict("N2" => 1.0), "";
+                            real_gas=false,
+                            thermo_functions=false,
+                            flag_rayleigh=false,
+                            flag_cloud=false,
+                            transspec_ref_tau=transspec_ref_tau,
+                            transspec_ref_wl=transspec_ref_wl,
+                            transspec_ref_p=transspec_ref_p)
+    ok || error("Failed to setup transspec atmosphere")
+    atmosphere.allocate!(atmos, ""; check_safe_gas=false) || error("Failed to allocate transspec atmosphere")
+    setpt.isothermal!(atmos, 500.0)
+    atmosphere.calc_layer_props!(atmos)
+    return atmos
+end
 
 @testset "radtrans" begin
 
@@ -150,7 +177,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             @test all(atmos.tau_band .>= 0.0)
 
             # check shape
-            @test size(atmos.tau_band) == (atmos.nlev_c, atmos.nbands)
+            @test size(atmos.tau_band) == (atmos.nlev_l, atmos.nbands)
 
             # check that tau increases with depth, over each band
             for b in 1:atmos.nbands
@@ -493,6 +520,29 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
         end
         @test test_check
 
+
+        atmosphere.deallocate!(atmos)
+    end
+
+    # Greygas radiative transfer scheme
+    @testset "greygas" begin
+
+        atmos = _make_grey_atmos()
+
+        energy.radtrans!(atmos, true)
+        energy.radtrans!(atmos, false)
+
+        # check that fluxes are finite
+        @test all(isfinite.(atmos.flux_d_lw))
+        @test all(isfinite.(atmos.flux_u_lw))
+        @test all(isfinite.(atmos.flux_d_sw))
+
+        # check that scattering is zero
+        @test all(atmos.flux_u_sw .== 0.0)
+
+        # test that band fluxes consistent with bolometric fluxes
+        @test isapprox(atmos.band_d_lw[1, 1], atmos.flux_d_lw[1]; rtol=0.0, atol=1e-12)
+        @test isapprox(atmos.band_d_sw[1, 1], atmos.flux_d_sw[1]; rtol=0.0, atol=1e-12)
 
         atmosphere.deallocate!(atmos)
     end

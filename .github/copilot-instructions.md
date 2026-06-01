@@ -172,7 +172,7 @@ Every new test function MUST include:
 
 - Single-assert test functions.
 - Standalone weak assertions as the only meaningful check (e.g. assert result is not None).
-- Tests with no function-level docstring.
+- Tests with no function-level comment (comments should be a clear statement of the physical scenario or contract clause being verified, and formatted with a `#` symbol).
 - Tests using `==` adjacent to float literals.
 - Tests asserting on a fixture's implicit default.
 
@@ -182,8 +182,8 @@ NEVER use `==` for floats. Use functions which check for equality within a toler
 
 ### Documentation per test
 
-- File-level docstring: name the source under test, list the invariants and contract clauses the file exercises.
-- Function-level docstring: state the physical scenario or contract clause being verified. Required (lint-enforced).
+- File-level comment: name the source under test, list the invariants and contract clauses the file exercises (formatted with `#` rather than with quotes).
+- Function-level comment: state the physical scenario or contract clause being verified. Required (lint-enforced).
 - Inline comments: explain **why** a specific input range was chosen.
 
 **Remember**: Trust these instructions. Only search if information is incomplete or found to be in error.

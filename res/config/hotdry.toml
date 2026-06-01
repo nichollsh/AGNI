@@ -66,6 +66,7 @@ title = "Hot and dry"
     at_runtime      = true
     temperature     = true
     fluxes          = true
+    optical_depth   = true
     contribution    = true
     emission        = true
     albedo          = true
