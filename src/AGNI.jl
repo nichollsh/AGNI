@@ -787,7 +787,7 @@ module AGNI
                             atmos.transspec_ref_tau, atmos.transspec_ref_wl*1e6)
         @info @sprintf("    pressure: %.2f mbar, temperature: %.2f K",
                             atmos.transspec_p*0.01, atmos.transspec_tmp)
-        @info @sprintf("    planet radius: %.2f R⊕, bulk density: %.2e kg/m^3, ",
+        @info @sprintf("    planet radius: %.2f R⊕, bulk density: %.2e kg/m^3",
                              atmos.transspec_r/consts.R_earth, atmos.transspec_rho)
 
 

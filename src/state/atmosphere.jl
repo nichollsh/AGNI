@@ -88,7 +88,7 @@ module atmosphere
     const CFG_fastchem_wellmixed::Bool      = false
     const CFG_transspec_ref_tau::Float64    = 0.02
     const CFG_transspec_ref_wl::Float64     = 1.125e-6 # m
-    const CFG_transspec_ref_p::Float64      = 2e3 # 20 mbar = 2000 Pa
+    const CFG_transspec_ref_p::Float64      = 20e-3 # 20 mbar
     const CFG_ocean_ob_frac::Float64        = 0.6
     const CFG_ocean_cs_height::Float64      = 3000.0
 
@@ -866,11 +866,14 @@ module atmosphere
 
         # reference observables
         atmos.transspec_ref_p = transspec_ref_p * 1.0e5 # Convert bar -> Pa
-        _check_range("Reference pressure [Pa] for transmission spectrum", atmos.transspec_ref_p; min=1e-5, max=1e10) || return
+        _check_range("Reference pressure [Pa] for transmission spectrum",
+                        atmos.transspec_ref_p; min=1e-5, max=1e10) || return false
         atmos.transspec_ref_wl = transspec_ref_wl
-        _check_range("Reference wavelength [m] for transmission spectrum", atmos.transspec_ref_wl; min=1e-10, max=1.0) || return
+        _check_range("Reference wavelength [m] for transmission spectrum",
+                        atmos.transspec_ref_wl; min=1e-10, max=1.0) || return false
         atmos.transspec_ref_tau = transspec_ref_tau
-        _check_range("Reference optical depth for transmission spectrum", atmos.transspec_ref_tau; min=1e-10, max=1e10) || return
+        _check_range("Reference optical depth for transmission spectrum",
+                        atmos.transspec_ref_tau; min=1e-10, max=1e10) || return false
 
         # derived statistics
         atmos.interior_mass  =  atmos.grav_surf * atmos.rp^2 / phys.G_grav
@@ -3279,10 +3282,10 @@ module atmosphere
 
 
         # get the observed layer properties
-        if idx > 1
-            atmos.transspec_μ = 0.5 * (atmos.layer_μ[idx] + atmos.layer_μ[idx-1])
-        elseif idx > atmos.nlev_c
+        if idx > atmos.nlev_c
             atmos.transspec_μ = atmos.layer_μ[end]
+        elseif idx > 1
+            atmos.transspec_μ = 0.5 * (atmos.layer_μ[idx] + atmos.layer_μ[idx-1])
         else
             atmos.transspec_μ = atmos.layer_μ[idx]
         end

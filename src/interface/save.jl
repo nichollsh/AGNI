@@ -120,6 +120,16 @@ module save
             end
             ds.attrib["platform"] = plat
 
+            arch::String = "Generic"
+            if Sys.ARCH == :x86_64
+                arch = "x86_64"
+            elseif Sys.ARCH == :aarch64
+                arch = "ARM64"
+            end
+            ds.attrib["architecture"] = arch
+
+            ds.attrib["Julia_version"] = string(VERSION)
+
             # ----------------------
             # Create dimensions
             nlev_c = Int64(atmos.nlev_c)
@@ -140,36 +150,35 @@ module save
             # ----------------------
             # Scalar quantities (not compressed)
             #    Create variables
-            var_max_cff_p = defVar(ds, "max_cff_p",     Float64, (), attrib = OrderedDict("units" => "Pa"))     # Pressure level at which CFF is max [Pa]
-            var_tmp_surf =  defVar(ds, "tmp_surf",      Float64, (), attrib = OrderedDict("units" => "K"))      # Surface brightness temperature [K]
-            var_flux_int =  defVar(ds, "flux_int",      Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Internal flux [W m-2]
-            var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Solar flux at TOA
-            var_s0fact =    defVar(ds, "inst_factor",   Float64, ())                                            # Scale factor applied to instellation
-            var_albbond =   defVar(ds, "bond_albedo",   Float64, ())                                            # Bond albedo used to scale-down instellation
-            var_toah =      defVar(ds, "toa_heating",   Float64, (), attrib = OrderedDict("units" => "W m-2"))  # TOA SW BC
-            var_tmagma =    defVar(ds, "tmagma",        Float64, (), attrib = OrderedDict("units" => "K"))      # Magma temperature
-            var_tmin =      defVar(ds, "tfloor",        Float64, (), attrib = OrderedDict("units" => "K"))      # Minimum temperature
-            var_tmax =      defVar(ds, "tceiling",      Float64, (), attrib = OrderedDict("units" => "K"))      # Maximum temperature
-            var_plrad =     defVar(ds, "planet_radius", Float64, (), attrib = OrderedDict("units" => "m"))      # Value taken for planet radius
-            var_gsurf =     defVar(ds, "surf_gravity",  Float64, (), attrib = OrderedDict("units" => "m s-2"))  # Surface gravity
-            var_ftra =      defVar(ds, "transparent",   Char,    ())                                            # Configured to be transparent?
-            var_fray =      defVar(ds, "flag_rayleigh", Char,    ())                                            # Includes rayleigh scattering?
-            var_fcon =      defVar(ds, "flag_continuum",Char,    ())                                            # Includes continuum absorption?
-            var_fcld =      defVar(ds, "flag_cloud"    ,Char,    ())                                            # Includes clouds?
-            var_faer =      defVar(ds, "flag_aerosol"  ,Char,    ())                                            # Includes aerosols?
-            var_tfun =      defVar(ds, "thermo_funct"  ,Char,    ())                                            # Using temperature-dependent thermodynamic functions
-            var_rgas =      defVar(ds, "real_gas"      ,Char,    ())                                            # Using real gas EOS
-            var_ssol =      defVar(ds, "solved"        ,Char,    ())                                            # Has a solver been used?
-            var_scon =      defVar(ds, "converged"     ,Char,    ())                                            # Did the solver converge?
-            var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg"))    # Zenith angle of direct stellar radiation
-            var_sknd =      defVar(ds, "cond_skin_d"   ,Float64, (), attrib = OrderedDict("units" => "m"))      # Conductive skin thickness
-            var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1"))    # Conductive skin thermal conductivity
-            var_specfile =  defVar(ds, "specfile"      ,String,  ())     # Path to spectral file when read
-            var_starfile =  defVar(ds, "starfile"      ,String,  ())     # Path to star file when read
-            var_flux_sns =  defVar(ds, "fl_sens"       ,Float64, (), attrib = OrderedDict("units" => "W m-2"))  # Surface sensible heat flux [W m-2]
-            var_octop  =    defVar(ds, "ocean_topliq" , String,  ())                                          # Name of liquid making up top-most ocean layer
-            var_ocdepth  =  defVar(ds, "ocean_maxdepth",Float64, (), attrib = OrderedDict("units" => "m"))    # Deepest part of ocean [m]
-            var_ocarea =    defVar(ds, "ocean_areafrac",Float64, ())                                          # Ocean area-fraction
+            var_max_cff_p = defVar(ds, "max_cff_p",     Float64, (), attrib = OrderedDict("units" => "Pa", "long_name" => "Pressure level at which CFF is max"))
+            var_tmp_surf =  defVar(ds, "tmp_surf",      Float64, (), attrib = OrderedDict("units" => "K", "long_name" => "Surface brightness temperature"))
+            var_flux_int =  defVar(ds, "flux_int",      Float64, (), attrib = OrderedDict("units" => "W m-2", "long_name" => "Internal flux"))
+            var_inst =      defVar(ds, "instellation",  Float64, (), attrib = OrderedDict("units" => "W m-2", "long_name" => "Solar flux at TOA"))
+            var_s0fact =    defVar(ds, "inst_factor",   Float64, (), attrib = OrderedDict("units" => "1", "long_name" => "Geometric scale factor applied to instellation"))
+            var_albbond =   defVar(ds, "bond_albedo",   Float64, (), attrib = OrderedDict("units" => "1", "long_name" => "Bond albedo used to scale-down instellation"))
+            var_toah =      defVar(ds, "toa_heating",   Float64, (), attrib = OrderedDict("units" => "W m-2", "long_name" => "TOA SW BC"))
+            var_tmagma =    defVar(ds, "tmagma",        Float64, (), attrib = OrderedDict("units" => "K", "long_name" => "Magma temperature"))
+            var_tmin =      defVar(ds, "tfloor",        Float64, (), attrib = OrderedDict("units" => "K", "long_name" => "Minimum temperature"))
+            var_tmax =      defVar(ds, "tceiling",      Float64, (), attrib = OrderedDict("units" => "K", "long_name" => "Maximum temperature"))
+            var_plrad =     defVar(ds, "planet_radius", Float64, (), attrib = OrderedDict("units" => "m", "long_name" => "Radius of planet's interior; i.e. the surface"))
+            var_gsurf =     defVar(ds, "surf_gravity",  Float64, (), attrib = OrderedDict("units" => "m s-2", "long_name" => "Surface gravity"))
+            var_fcld =      defVar(ds, "flag_cloud"    ,Char,    (), attrib = OrderedDict("units" => "1", "long_name" => "Flag indicating presence of clouds"))
+            var_faer =      defVar(ds, "flag_aerosol"  ,Char,    (), attrib = OrderedDict("units" => "1", "long_name" => "Flag indicating presence of aerosols"))
+            var_tfun =      defVar(ds, "thermo_funct"  ,Char,    (), attrib = OrderedDict("units" => "1", "long_name" => "Flag indicating use of temperature-dependent thermodynamic functions"))
+            var_rgas =      defVar(ds, "real_gas"      ,Char,    (), attrib = OrderedDict("units" => "1", "long_name" => "Flag indicating use of real gas EOS"))
+            var_ssol =      defVar(ds, "solved"        ,Char,    (), attrib = OrderedDict("units" => "1", "long_name" => "Flag indicating solver has been used"))
+            var_scon =      defVar(ds, "converged"     ,Char,    (), attrib = OrderedDict("units" => "1", "long_name" => "Flag indicating solver convergence"))
+            var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg", "long_name" => "Zenith angle of direct stellar radiation"))
+            var_sknd =      defVar(ds, "cond_skin_d"   ,Float64, (), attrib = OrderedDict("units" => "m", "long_name" => "Surface conductive skin boundary layer, thickness"))
+            var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1", "long_name" => "Surface conductive skin boundary layer, thermal conductivity"))
+            var_specfile =  defVar(ds, "specfile"      ,String,  (), attrib = OrderedDict("units" => "1", "long_name" => "Path to spectral file when read"))
+            var_starfile =  defVar(ds, "starfile"      ,String,  (), attrib = OrderedDict("units" => "1", "long_name" => "Path to star file when read"))
+            var_flux_sns =  defVar(ds, "fl_sens"       ,Float64, (), attrib = OrderedDict("units" => "W m-2", "long_name" => "Surface sensible heat flux [W m-2]"))
+            var_octop  =    defVar(ds, "ocean_topliq" , String,  (), attrib = OrderedDict("units" => "1", "long_name" => "Name of liquid making up top-most ocean layer"))
+            var_ocdepth  =  defVar(ds, "ocean_maxdepth",Float64, (), attrib = OrderedDict("units" => "m", "long_name" => "Deepest part of ocean [m]"))
+            var_ocarea =    defVar(ds, "ocean_areafrac",Float64, (), attrib = OrderedDict("units" => "1", "long_name" => "Ocean area-fraction"))
+            var_ref_tau =   defVar(ds, "transspec_ref_tau", Float64, (), attrib = OrderedDict("units" => "1", "long_name" => "Optical depth defining the photosphere"))
+            var_ref_wl =    defVar(ds, "transspec_ref_wl", Float64, (), attrib = OrderedDict("units" => "m", "long_name" => "Wavelength defining the photosphere"))
 
             #     Store data
             var_max_cff_p[1] =  atmos.transspec_p
@@ -251,6 +260,9 @@ module save
             var_ocdepth[1] = atmos.ocean_maxdepth
             var_ocarea[1]  = atmos.ocean_areacov
 
+            var_ref_tau[1] = atmos.transspec_ref_tau
+            var_ref_wl[1]  = atmos.transspec_ref_wl
+
             # ----------------------
             # Vector quantities
             #    Create variables
@@ -303,8 +315,8 @@ module save
             var_rfm_fl =    defVar(ds, "rfm_fl",    Float64, ("rfm_npts",)       ;  nc_comp..., attrib = OrderedDict("units" => "erg/(s cm2 cm-1)"))
             var_cfn =       defVar(ds, "contfunc",  Float64, ("nbands","nlev_c") ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Thermal contribution function, normalised"))
             var_tau =       defVar(ds, "optdepth",  Float64, ("nbands","nlev_l") ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Optical depth of layer bottom edges, measured from TOA downwards"))
-            var_tau_p =     defVar(ds, "optdepth_p",Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "Pa", "long_name" => "Pressure of tau=1 per band"))
-            var_tau_r =     defVar(ds, "optdepth_r",Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "m", "long_name" => "Radius of tau=1 per band"))
+            var_tau_p =     defVar(ds, "optdepth_p",Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "Pa", "long_name" => "Pressure of tau=ref_tau per band"))
+            var_tau_r =     defVar(ds, "optdepth_r",Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "m", "long_name" => "Radius of tau=ref_tau per band"))
             var_albr =      defVar(ds, "surface_r", Float64, ("nbands",)         ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Spectral spherical reflectance of surface material"))
 
             #     Store data

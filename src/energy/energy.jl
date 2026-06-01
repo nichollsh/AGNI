@@ -441,7 +441,7 @@ module energy
         atmos.flux_n    = atmos.flux_n_lw + atmos.flux_n_sw  # net
 
         # Set band arrays (just one band for greygas)
-        for i in 1:atmos.nlev_c
+        for i in 1:atmos.nlev_l
             atmos.band_d_lw[i,1] = atmos.flux_d_lw[i]
             atmos.band_u_lw[i,1] = atmos.flux_u_lw[i]
             atmos.band_d_sw[i,1] = atmos.flux_d_sw[i]

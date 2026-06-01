@@ -30,10 +30,17 @@ makedocs(
         ),
 
         "Tutorials" => "tutorials/index.md",
-
         PageNode("Explanation" => "explanation/index.md", [
             "Model description"  => "explanation/model.md",
             "Bibliography"       => "explanation/references.md",
+            ],
+        ),
+
+        PageNode("Tutorials" => "tutorials/index.md", [
+            "Your first calculation"  => "tutorials/01_nosolve.md",
+            "Running a full model"    => "tutorials/02_rce.md",
+            "Aerosol formation"       => "tutorials/03_aerosol.md",
+            "Runaway greenhouse"      => "tutorials/04_runaway.md",
             ],
         ),
 
