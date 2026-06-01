@@ -3100,17 +3100,17 @@ module atmosphere
     """
     function calc_tau_isolines!(atmos::atmosphere.Atmos_t)::Tuple{Array{Float64,1}, Array{Float64,1}}
 
-        if !atmos.is_alloc
-            @warn "Atmosphere arrays have not been allocated"
-            return false
-        end
-
         # Reset
         fill!(atmos.tau_p, 0.0)
         fill!(atmos.tau_r, 0.0)
-        itau::Int64 = 1
+
+        if !atmos.is_alloc
+            @warn "Atmosphere arrays have not been allocated"
+            return (atmos.tau_p, atmos.tau_r)
+        end
 
         # Loop over bands and find the layer where tau is closest to transspec_ref_tau
+        itau::Int64 = 1
         for ba in 1:atmos.nbands
             itau = findmin(abs.(atmos.tau_band[:,ba] .- atmos.transspec_ref_tau))[2]
             atmos.tau_p[ba] = atmos.pl[itau]
