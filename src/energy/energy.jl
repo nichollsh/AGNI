@@ -417,7 +417,7 @@ module energy
             atmos.flux_d_sw[i+1] = atmos.flux_d_sw[i] * trans
 
             # Store LW+SW optical depth across this layer
-            atmos.tau_band[i+1] = atmos.tau_band[i] + (tau_lw + tau_sw)
+            atmos.tau_band[i+1, 1] = atmos.tau_band[i, 1] + (tau_lw + tau_sw)
         end
 
         # Up-directed LW beam, looping from surface upwards
