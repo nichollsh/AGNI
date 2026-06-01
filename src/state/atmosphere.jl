@@ -87,7 +87,7 @@ module atmosphere
     const CFG_fastchem_xtol_elem::Float64   = 1e-3
     const CFG_fastchem_wellmixed::Bool      = false
     const CFG_transspec_ref_tau::Float64    = 0.02
-    const CFG_transspec_ref_wl::Float64     = 1.0e-6 # m
+    const CFG_transspec_ref_wl::Float64     = 1.125e-6 # m
     const CFG_transspec_ref_p::Float64      = 2e3 # 20 mbar = 2000 Pa
     const CFG_ocean_ob_frac::Float64        = 0.6
     const CFG_ocean_cs_height::Float64      = 3000.0
