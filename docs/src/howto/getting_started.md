@@ -12,7 +12,7 @@ GNU/Linux and MacOS (including ARM) are supported.
 * unzip
 * cmake
 
-!!! warning
+!!! warning "Obtain Julia correctly"
     Do not install Julia using your system package manager. Install only from julialang.org as below.
 
 ## Installation
@@ -37,16 +37,16 @@ Follow the ordered steps below
 AGNI is now installed as a package of the Julia environment in the `AGNI/`
 directory. These steps will have downloaded some basic input data.
 
-!!! warning
+!!! warning "Set your environment"
     The `RAD_DIR` environment variable must be set to your SOCRATES path whenever AGNI is being used. This is so that AGNI can locate the SOCRATES libraries.
 
-!!! tip
+!!! tip "Troubleshooting guide"
     Visit the [Troubleshooting](@ref) page if you encounter any problems. This page can
     usually resolve your problem.
 
 ## Testing
 If you want to run the tests manually, simply use the script in the `test/` folder...
-```bash
+```
 julia --project test/runtests.jl
 ```
 This will print information on whether tests passed or failed.
@@ -68,4 +68,6 @@ To run AGNI with the default configuration file:
 
 Output files are written to the directory specified in the configuration file (default: `out/`).
 
-See [Tutorials](@ref) for a guided introduction to AGNI with example outputs results. Refer to the other [How-to guides](@ref) for steps on configuring the model for your own science cases.
+See [**Tutorials**](@ref Tutorials) for a guided introduction to AGNI with example outputs results.
+
+Refer to the other [How-to guides](@ref) for steps on configuring the model for your own science cases.

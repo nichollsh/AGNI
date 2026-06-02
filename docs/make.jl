@@ -2,6 +2,22 @@ using Documenter
 using DocumenterPages
 using AGNI
 
+# following https://github.com/JuliaMusic/JuliaMusic_documentation.jl/blob/master/docs/make.jl
+# combine style and defs files into single scss files for compilation
+for w in ("light",) # "dark")
+    header = read(joinpath(@__DIR__, "style.scss"), String)
+    theme = read(joinpath(@__DIR__, "$(w)defs.scss"), String)
+    write(joinpath(@__DIR__, "$(w).scss"), header*"\n"*theme)
+end
+
+# dark theme is duplicate of light theme
+cp(joinpath(@__DIR__, "light.scss"), joinpath(@__DIR__, "dark.scss"), force=true)
+
+# compile styles into scss files
+using DocumenterTools: Themes
+Themes.compile(joinpath(@__DIR__, "light.scss"), joinpath(@__DIR__, "src/assets/themes/documenter-light.css"))
+Themes.compile(joinpath(@__DIR__, "dark.scss"), joinpath(@__DIR__, "src/assets/themes/documenter-dark.css"))
+
 format = Documenter.HTML(edit_link = "main",
                          prettyurls = get(ENV, "CI", nothing) == "true",
                          assets = [
@@ -10,7 +26,7 @@ format = Documenter.HTML(edit_link = "main",
                             "assets/logo.ico",
 
                             # remote assets
-                            asset("https://fonts.googleapis.com/css?family=Space+Grotesk:400&family=JetBrains+Mono:400&family=Lato", class=:css),
+                            asset("https://fonts.googleapis.com/css?family=Inter:400&family=JetBrains+Mono:400&family=Lato", class=:css),
                         ]
 )
 
@@ -36,9 +52,9 @@ makedocs(
 
         PageNode("Tutorials" => "tutorials/index.md", [
             "Your first calculation"  => "tutorials/01_nosolve.md",
-            "Running a full model"    => "tutorials/02_rce.md",
-            "Aerosol formation"       => "tutorials/03_aerosol.md",
-            "Runaway greenhouse"      => "tutorials/04_runaway.md",
+            "Radiative-convective solution"    => "tutorials/02_rce.md",
+            "Aerosol radiative properties"       => "tutorials/03_aerosol.md",
+            "Steam runaway greenhouse"      => "tutorials/04_runaway.md",
             ],
         ),
 

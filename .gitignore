@@ -49,6 +49,9 @@ sbatch*.out
 sbatch*.log
 profile_report/
 
+dark.scss
+light.scss
+
 # Misc files
 .DS_Store
 __pycache__

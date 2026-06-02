@@ -45,7 +45,7 @@ jobs:
       - uses: julia-actions/cache@v3
 
       - name: Install Documenter
-        run: julia -e 'using Pkg; Pkg.add(["Documenter", "DocumenterPages"]); Pkg.instantiate()'
+        run: julia -e 'using Pkg; Pkg.add(["Documenter", "DocumenterPages", "DocumenterTools"]); Pkg.instantiate()'
 
       # Setup SOCRATES
       - name: Get SOCRATES

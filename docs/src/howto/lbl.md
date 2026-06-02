@@ -5,7 +5,7 @@ AGNI includes an interface to the
 radiative transfer calculations. This provides a way to validate and benchmark the
 correlated-k SOCRATES results.
 
-!!! note
+!!! note "RFM source code"
     The RFM source code is proprietary; AGNI packages it as a pre-compiled binary.
 
 ## Setup
