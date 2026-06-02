@@ -5,13 +5,18 @@ using AGNI
 format = Documenter.HTML(edit_link = "main",
                          prettyurls = get(ENV, "CI", nothing) == "true",
                          assets = [
-                             "assets/style.css",
-                             "assets/logo.ico",
+                            # local assets
+                            "assets/style.css",
+                            "assets/logo.ico",
+
+                            # remote assets
+                            asset("https://fonts.googleapis.com/css?family=Space+Grotesk:400&family=JetBrains+Mono:400&family=Lato", class=:css),
                         ]
 )
 
 makedocs(
     sitename="AGNI",
+    authors = "Harrison Nicholls",
     format=format,
     pages = [
         "Home" => "index.md",
@@ -29,17 +34,17 @@ makedocs(
             ],
         ),
 
-        PageNode("Explanation" => "explanation/index.md", [
-            "Model description"  => "explanation/model.md",
-            "Bibliography"       => "explanation/references.md",
-            ],
-        ),
-
         PageNode("Tutorials" => "tutorials/index.md", [
             "Your first calculation"  => "tutorials/01_nosolve.md",
             "Running a full model"    => "tutorials/02_rce.md",
             "Aerosol formation"       => "tutorials/03_aerosol.md",
             "Runaway greenhouse"      => "tutorials/04_runaway.md",
+            ],
+        ),
+
+        PageNode("Explanation" => "explanation/index.md", [
+            "Model description"  => "explanation/model.md",
+            "Bibliography"       => "explanation/references.md",
             ],
         ),
 
