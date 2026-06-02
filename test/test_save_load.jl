@@ -192,7 +192,7 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
             @test length(ds["tmp"][:]) == atmos.nlev_c
 
             # Validate optical depth arrays
-            optdepth = ds["optdepth"][:]
+            optdepth = ds["optdepth"][:, :]
             @test size(optdepth) == (atmos.nbands, atmos.nlev_l)
             @test all(isapprox.(optdepth[1, :], atmos.tau_band[:, 1]; rtol=0.0, atol=1e-12))
             @test all(isapprox.(ds["optdepth_p"][:], atmos.tau_p; rtol=0.0, atol=1e-12))
