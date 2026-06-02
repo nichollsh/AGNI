@@ -3,12 +3,12 @@
 version: 2
 updates:
   # Enable version updates for Julia packages
-  - package-ecosystem: "julia"
-    # Look for `Project.toml` and `Manifest.toml` files in the `root` directory
-    directory: "/"
-    # Check for updates once a week
-    schedule:
-      interval: "weekly"
+  #- package-ecosystem: "julia"
+  #  # Look for `Project.toml` and `Manifest.toml` files in the `root` directory
+  #  directory: "/"
+  #  # Check for updates once a week
+  #  schedule:
+  #    interval: "weekly"
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
