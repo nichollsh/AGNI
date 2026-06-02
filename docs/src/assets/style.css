@@ -1,3 +1,20 @@
+pre, article, nav, body {
+    color: #2d1725;
+    font-family: 'Space Grotesk', 'Lato', sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+}
+
+code {
+  font-family: 'JetBrains Mono', courier, monospace;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+a {
+	color: #3e5b85;
+}
+
 img {
 width: 75%;
 }

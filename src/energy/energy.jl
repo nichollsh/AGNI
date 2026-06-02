@@ -341,9 +341,9 @@ module energy
                         trans_now = clamp(trans_prev - delta_trans, SMALL_TRANS, 1.0)
                         trans_prev = trans_now
 
-                        # set optical depth from transmissivity
+                        # set optical depth at bottom of this layer from transmissivity
                         #   trans = exp(-tau * diffusivity_factor)
-                        atmos.tau_band[lv, ba] = -log(trans_now) / DFSVTY_FCTR
+                        atmos.tau_band[lv+1, ba] = -log(trans_now) / DFSVTY_FCTR
 
                     end
                 end
@@ -379,37 +379,52 @@ module energy
     **Solve RT using double grey-gas formulation**
 
     Simple two-stream double grey RT solver which integrates fluxes from the TOA and BOA.
-
     Uses two opacity values to represent the LW and SW components of the flux field.
-
     Loosely following this tutorial, which is based on Pierrehumbert (2010).
     https://brian-rose.github.io/ClimateLaboratoryBook/courseware/radiative-transfer/
+
+    * Optical depth across each layer, `τ = κ * (p_bot - p_top) / g`
+    * Transmissivity of each layer, `T = exp(-τ)`
+    * Emissivity of each layer, `ε = 1 - T`
+    * Where κ is the opacity, p is pressure, and g is gravity.
+
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     """
     function _radtrans_greygas!(atmos::atmosphere.Atmos_t)::Bool
 
-        # Working layer transmissivity and emissivity
-        trans::Float64 = 0.0
+        # Working layer's transmissivity and optical depth
+        trans::Float64 = 0.0  # reused for LW and SW
+        tau_lw::Float64 = 0.0
+        tau_sw::Float64 = 0.0
 
-        # Down-directed SW and LW beams, looping from TOA downwards
+        # Set TOA boundary conditions
         atmos.flux_d_sw[1] = atmos.toa_heating
         atmos.flux_d_lw[1] = 0.0
+        fill!(atmos.tau_band, 0.0)
+
+        # Down-directed SW and LW beams, looping from TOA downwards
         for i in 1:atmos.nlev_c
             # Downward LW flux at bottom of layer
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.g[i] )
+            tau_lw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_lw / atmos.g[i]
+            trans = exp( -tau_lw )
             atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
 
             # Downward SW flux at bottom of layer
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_sw / atmos.g[i] )
+            tau_sw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_sw / atmos.g[i]
+            trans = exp( -tau_sw )
             atmos.flux_d_sw[i+1] = atmos.flux_d_sw[i] * trans
+
+            # Store LW+SW optical depth across this layer
+            atmos.tau_band[i+1, 1] = atmos.tau_band[i, 1] + (tau_lw + tau_sw)
         end
 
         # Up-directed LW beam, looping from surface upwards
         atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4 * (1-atmos.albedo_s)
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
-            trans = exp( (atmos.pl[i] - atmos.pl[i+1]) * atmos.κ_grey_lw / atmos.g[i] )
+            tau_lw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_lw / atmos.g[i]
+            trans = exp( -tau_lw )
             atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
         end
 
@@ -425,6 +440,14 @@ module energy
         atmos.flux_n_sw = atmos.flux_u_sw - atmos.flux_d_sw  # net sw
         atmos.flux_n    = atmos.flux_n_lw + atmos.flux_n_sw  # net
 
+        # Set band arrays (just one band for greygas)
+        for i in 1:atmos.nlev_l
+            atmos.band_d_lw[i,1] = atmos.flux_d_lw[i]
+            atmos.band_u_lw[i,1] = atmos.flux_u_lw[i]
+            atmos.band_d_sw[i,1] = atmos.flux_d_sw[i]
+            atmos.band_u_sw[i,1] = atmos.flux_u_sw[i]
+        end
+
         return true
     end
 
@@ -437,7 +460,7 @@ module energy
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used.
     - `lw::Bool`                        longwave calculation? Else: shortwave
-    - `calc_cf::Bool=false`             also calculate contribution function?
+    - `calc_cf::Bool=false`             calculate contribution function and optical depths?
 
     Returns:
     - `Bool`                            whether the calculation succeeded

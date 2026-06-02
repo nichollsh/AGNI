@@ -132,6 +132,13 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
         # Remove file if it exists
         rm(nc_file, force=true)
 
+        # Seed optical depth arrays with a non-trivial profile
+        for ba in 1:atmos.nbands
+            atmos.tau_band[:, ba] .= range(0.0, 5.0 + 0.25 * ba, length=atmos.nlev_l)
+            atmos.tau_p[ba] = atmos.pl[2] * (1.0 + 0.05 * ba)
+            atmos.tau_r[ba] = atmos.rl[2] * (1.0 + 0.01 * ba)
+        end
+
         # Write NetCDF
         result = AGNI.save.write_ncdf(atmos, nc_file)
 
@@ -170,6 +177,9 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
             @test haskey(ds, "tmpl")
             @test haskey(ds, "gases")
             @test haskey(ds, "x_gas")
+            @test haskey(ds, "optdepth")
+            @test haskey(ds, "optdepth_p")
+            @test haskey(ds, "optdepth_r")
 
             # Validate data values match atmosphere
             @test ds["tmp_surf"][] ≈ atmos.tmp_surf
@@ -180,6 +190,16 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
             @test length(ds["p"][:]) == atmos.nlev_c
             @test length(ds["pl"][:]) == atmos.nlev_l
             @test length(ds["tmp"][:]) == atmos.nlev_c
+
+            # Validate optical depth arrays
+            optdepth = ds["optdepth"][:, :]
+            @test size(optdepth) == (atmos.nbands, atmos.nlev_l)
+            @test all(isapprox.(optdepth[1, :], atmos.tau_band[:, 1]; rtol=0.0, atol=1e-12))
+            @test all(isapprox.(ds["optdepth_p"][:], atmos.tau_p; rtol=0.0, atol=1e-12))
+            @test all(isapprox.(ds["optdepth_r"][:], atmos.tau_r; rtol=0.0, atol=1e-12))
+
+            # Discrimination guard: ensure optical depth is not flat
+            @test abs(optdepth[1, end] - optdepth[1, 1]) > 1.0
         end
     end
 

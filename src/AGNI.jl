@@ -752,9 +752,8 @@ module AGNI
         @info "    done"
         if atmos.benchmark
             @info "Radiative transfer benchmarking statistics..."
-            @info "    total RT evals:  $(atmos.num_rt_eval)"
-            @info "    cumulative time: $(atmos.tim_rt_eval/1e9) secs" # ns->s
-            @info "    time per eval:   $(atmos.tim_rt_eval/atmos.num_rt_eval/1e9*1e3) ms"
+            @info "    total evals: $(atmos.num_rt_eval) in $(atmos.tim_rt_eval/1e9) secs"
+            @info "    performance: $(atmos.tim_rt_eval/atmos.num_rt_eval/1e9*1e3) ms/eval"
         end
 
         # RFM calculation?
@@ -781,6 +780,15 @@ module AGNI
             @info @sprintf("Oceans cover %d%% area, max depth %g km",
                             atmos.ocean_areacov*100, atmos.ocean_maxdepth/1e3)
         end
+
+        # Calculate and print information about photosphere
+        atmosphere.calc_observed_rho!(atmos)
+        @info @sprintf("Photosphere defined at τ=%.2f and λ=%.2f μm",
+                            atmos.transspec_ref_tau, atmos.transspec_ref_wl*1e6)
+        @info @sprintf("    pressure: %.2f mbar, temperature: %.2f K",
+                            atmos.transspec_p*0.01, atmos.transspec_tmp)
+        @info @sprintf("    planet radius: %.2f R⊕, bulk density: %.2e kg/m^3",
+                             atmos.transspec_r/consts.R_earth, atmos.transspec_rho)
 
 
         # Paths and objects for saving/plotting
