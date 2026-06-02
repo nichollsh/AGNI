@@ -35,18 +35,13 @@ Consult the [AGNI documentation](https://www.h-nicholls.space/AGNI/) for informa
 Contact: see information on [my website homepage](https://www.h-nicholls.space/).
 
 ## Installation and usage
-See the [Getting Started](https://www.h-nicholls.space/AGNI/dev/tutorials/getting_started/) page in the documentation for information on installing and using the model.
+See the [**Getting Started**](https://www.h-nicholls.space/AGNI/dev/howto/getting_started/) page in the documentation for information on installing and using the model.
 
 ## Citation
 If you use AGNI, please cite the following papers:
 * Nicholls et al. (2025a)  - doi:[10.1093/mnras/stae2772](https://doi.org/10.1093/mnras/stae2772)
 * Nicholls et al. (2025b)  - doi:[10.21105/joss.07726](https://doi.org/10.21105/joss.07726)
 * Nicholls et al. (2026)   - doi:[10.1038/s41550-026-02815-8](https://doi.org/10.1038/s41550-026-02815-8)
-
-## Example
-Below is an animated example of AGNI solving for a temperature-pressure profile, starting from an isothermal state.
-<video autoplay loop muted width="100%" src="https://github.com/user-attachments/assets/759d635e-5de4-410c-8d0e-a0a70ae2ea30"></video>
-
 
 ## Repository structure
 * `agni.jl`         - The main AGNI executable
@@ -58,6 +53,6 @@ Below is an animated example of AGNI solving for a temperature-pressure profile,
 * `res/`            - Resources (configs, thermodynamic data, etc.)
 * `src/`            - Source code
 * `test/`           - Tests for the code (see [Testing Documentation](https://www.h-nicholls.space/AGNI/dev/howto/testing/))
-* `tutorials/`      - Notebooks and tutorials
 
 This software is available under GPLv3. Copyright (C) 2023-2026 Harrison Nicholls.
+
