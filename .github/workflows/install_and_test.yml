@@ -40,7 +40,7 @@ jobs:
           version: '1.12'
 
       - name: Cache Julia
-        uses: julia-actions/cache@v5
+        uses: julia-actions/cache@v3
 
       # Setup SOCRATES
       - name: Get SOCRATES
