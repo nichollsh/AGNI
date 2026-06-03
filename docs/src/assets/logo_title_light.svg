@@ -136,7 +136,7 @@
     <flowRoot
        xml:space="preserve"
        id="flowRoot4625"
-       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:'Inter, sans-serif';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
        transform="scale(0.26458333)"><flowRegion
          id="flowRegion4627"><rect
            id="rect4629"
@@ -146,7 +146,7 @@
            y="205.30118" /></flowRegion><flowPara
          id="flowPara4631">AGNI</flowPara></flowRoot>    <g
        aria-label="AGNI"
-       style="font-style:normal;font-weight:normal;font-size:17.05537224px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.42638433"
+       style="font-style:normal;font-weight:normal;font-size:17.05537224px;line-height:1.25;font-family:'Inter, sans-serif';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.42638433"
        id="text4635">
       <path
          d="m 45.207101,59.627042 h -4.513684 l -0.716193,2.26517 h -2.898085 l 4.147259,-12.43345 h 3.439394 l 4.147259,12.43345 H 45.906638 Z M 41.40961,57.320233 h 3.064642 l -1.523993,-4.94673 z"
@@ -168,7 +168,7 @@
     <flowRoot
        xml:space="preserve"
        id="flowRoot26"
-       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+       style="font-style:normal;font-weight:normal;font-size:40px;line-height:1.25;font-family:'Inter, sans-serif';letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
        transform="matrix(0.26458333,0,0,0.26458333,12.285122,38.731603)"><flowRegion
          id="flowRegion28"><rect
            id="rect30"

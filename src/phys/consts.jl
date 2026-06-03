@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 
 """
 **Module for defining physical and numerical constants.**
@@ -10,7 +10,7 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String     = "1.10.5"  # current agni version
+    const AGNI_VERSION::String     = "1.11.0"  # current agni version
     export AGNI_VERSION
     const SOCVER_minimum::Float64  = 2603.6    # minimum required socrates version
     export SOCVER_minimum

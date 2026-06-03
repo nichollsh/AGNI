@@ -152,7 +152,7 @@ From this, we get a lot of output. These include all the spectral fluxes, gas pr
 :date = "2026-May-25 07:41:21" ;
 :hostname = "your_computer_name" ;
 :username = "your_username" ;
-:AGNI_version = "1.10.5" ;
+:AGNI_version = "1.11.0" ;
 :SOCRATES_version = "2603.7" ;
 :SOCRATES_precision = "double" ;
 :name = "41a2d25b" ;
