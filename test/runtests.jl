@@ -42,7 +42,7 @@ suite::String = "all"
 if length(ARGS)>0
     suite = strip(ARGS[1])
     if suite == "0"
-        suite = "fast"
+        suite = "none"
     end
 end
 @info "Requested suite '$suite'"

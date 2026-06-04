@@ -1,3 +1,5 @@
+import Pkg; Pkg.add("Glob")
+
 # Build AGNI
 ROOT_DIR=abspath(dirname(PROGRAM_FILE),"..")
 println("ROOT_DIR = $ROOT_DIR")

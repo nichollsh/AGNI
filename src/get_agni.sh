@@ -10,9 +10,6 @@ else
     testsuite="$1" # requested test suite
 fi
 
-# Update from GitHub
-echo "Updating from GitHub..."
-git pull
 root=$(dirname $(realpath $0))
 root=$(realpath "$root/..")
 
