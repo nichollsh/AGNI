@@ -10,6 +10,12 @@ else
     testsuite="$1" # requested test suite
 fi
 
+# Update from GitHub (if we are in an updateable state)
+if git pull 2>/dev/null; then
+    echo "Updated from GitHub"
+else
+    echo "Not updating AGNI from GitHub. When installing AGNI through the PROTEUS installer this is expected, since it checks out a specific commit. If you want to update AGNI, you should install it manually or request an update through PROTEUS."
+fi
 root=$(dirname $(realpath $0))
 root=$(realpath "$root/..")
 
