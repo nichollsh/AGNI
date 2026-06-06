@@ -303,6 +303,7 @@ function handle_request {
 
             anyspec Oak 318
             anyspec Dayspring 48
+            anyspec Dayspring 16
 
             zenodo 17981836 $stellar sun.txt
 

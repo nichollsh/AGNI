@@ -52,8 +52,9 @@ title = "Default"                       # Name for this configuration file
     easy_start      = false                     # Initially down-scale convective/condensation fluxes, if initial guess is poor.
     grey_start      = false                     # Initially solve for RCE using double-grey rad trans.
     perturb_all     = false                     # Perturb all rows of jacobin matrix?
-    rfm_wn_min    = 100.0                     # Line-by-line RFM minimum wavenumber [cm-1] (optional).
-    rfm_wn_max    = 10000.0                   # Line-by-line RFM maximum wavenumber [cm-1] (optional).
+    rfm_wn_min      = 100.0                     # Line-by-line RFM minimum wavenumber [cm-1] (optional).
+    rfm_wn_max      = 10000.0                   # Line-by-line RFM maximum wavenumber [cm-1] (optional).
+    benchmark_rt    = true                      # Record stats for benchmarking radtrans performance?
 
 [physics]
     chemistry       = false                     # Solve for thermochemistry in atmosphere?

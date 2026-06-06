@@ -12,7 +12,7 @@ GNU/Linux and MacOS (including ARM) are supported.
 * unzip
 * cmake
 
-!!! warning
+!!! warning "Obtain Julia correctly"
     Do not install Julia using your system package manager. Install only from julialang.org as below.
 
 ## Installation
@@ -37,16 +37,16 @@ Follow the ordered steps below
 AGNI is now installed as a package of the Julia environment in the `AGNI/`
 directory. These steps will have downloaded some basic input data.
 
-!!! warning
+!!! warning "Set your environment"
     The `RAD_DIR` environment variable must be set to your SOCRATES path whenever AGNI is being used. This is so that AGNI can locate the SOCRATES libraries.
 
-!!! tip
+!!! tip "Troubleshooting guide"
     Visit the [Troubleshooting](@ref) page if you encounter any problems. This page can
     usually resolve your problem.
 
 ## Testing
 If you want to run the tests manually, simply use the script in the `test/` folder...
-```bash
+```
 julia --project test/runtests.jl
 ```
 This will print information on whether tests passed or failed.
@@ -59,44 +59,15 @@ automatically pull changes from GitHub and download any required data files.
 ./src/get_agni.sh
 ```
 
-## Your first model run
+## What next?
 
-The environment variable `RAD_DIR` must point to the SOCRATES installation
-directory. The best way to do this is to add `RAD_DIR=path/to/socrates/folder/` to your
-shell rc file (e.g. `~/.bashrc`).
-
-Then run AGNI with the default configuration file:
+To run AGNI with the default configuration file:
 ```bash
-./agni.jl
+./agni.jl res/config/default.toml
 ```
-
-You should see the following output:
-```log
-[ INFO  ] Using configuration 'Default'
-[ INFO  ] Setting-up a new atmosphere struct
-[ INFO  ] Loading thermodyamic data
-[ INFO  ] Inserting stellar spectrum and Rayleigh coefficients
-[ INFO  ] Allocating atmosphere with composition:
-[ INFO  ]       1 H2O     1.00e+00 (EOS_AQUA)
-[ INFO  ] Setting T(p): dry, sat
-[ INFO  ] Solving with 'none'
-[ INFO  ]     done
-[ INFO  ] Total RT evalulations: 2
-[ INFO  ] Writing results
-[ INFO  ] Plotting results
-[ INFO  ] Deallocating memory
-[ INFO  ] Model runtime: 16.60 seconds
-```
-
-The line following "Allocating atmosphere with composition" is a table of gases, their
-volume mixing ratios, and flags. In this case there is only one gas.
-
-Potential flags for each species are:
-* `EOS_[XX]` - using the `[XX]` equation of state (e.g. ideal gas, AQUA)
-* `NO_OPACITY` - no opacity data available, but can contribute to the thermodynamics
-* `NO_THERMO` - no thermodynamic data available, so will be treated as a diatomic ideal gas
-* `COND` - this gas is allowed to condense
 
 Output files are written to the directory specified in the configuration file (default: `out/`).
-See [Tutorials](@ref) for illustrative results, and [How-to guides](@ref) for
-next steps such as configuring the model for your own science case.
+
+See [**Tutorials**](@ref Tutorials) for a guided introduction to AGNI with example outputs results.
+
+Refer to the other [How-to guides](@ref) for steps on configuring the model for your own science cases.

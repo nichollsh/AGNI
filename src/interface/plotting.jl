@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 
 """
 **Contains functions for plotting/diagnosing the atmosphere**
@@ -13,6 +13,7 @@ module plotting
     using Statistics
     import Glob:glob
 
+    import ..consts: BIGFLOAT
     import ..atmosphere
     import ..phys
     import ..species
@@ -33,6 +34,79 @@ module plotting
                              :guidefontsize => 9,
                              :titlefontsize => 9,
                              :dpi => 240)
+
+
+    """
+    Plot telescope bandpasses as translucent vertical spans.
+
+    Arguments:
+    - `plt`                          plot object to modify
+    - `xlims::Tuple{Float64,Float64}` x-axis limits on plot
+    - `instruments`                   list of instruments to plot
+    - `prs`                           pressure level on figure y-axis
+    - `ylims`                         y-axis limits on plot
+    """
+    function _plot_bandpasses!(plt, xlims::Tuple{Float64,Float64};
+                                instruments=["NIRSpec","MIRI","PLATO"],
+                                prs=1e2,
+                                ylims=nothing)
+
+        # normalise instrument list
+        if instruments === nothing
+            instruments = keys(style.instrument_bands)
+        elseif isa(instruments, String)
+            instruments = [instruments]
+        else
+            instruments = collect(instruments)
+        end
+        instruments = intersect(Set(instruments), Set(keys(style.instrument_bands)))
+
+        # set y location
+        if ylims !== nothing
+            y = clamp(prs, minimum(ylims), maximum(ylims))
+        else
+            y = prs
+        end
+
+        label::String = ""
+        for (i,instrument) in enumerate(instruments)
+            bands = instrument_bands[instrument]
+            label = instrument
+            for (bandname,bandlims) in bands
+                if bandname == "_colour"
+                    continue
+                end
+                wl_min = min(bandlims[1], bandlims[2]) * 1e3 # convert um to nm
+                wl_max = max(bandlims[1], bandlims[2]) * 1e3
+                if (wl_max < xlims[1]) || (wl_min > xlims[2])
+                    continue
+                end
+                plot!(plt, [wl_min, wl_max], [y*(1-0.1*i), y*(1-0.1*i)],
+                        color=bands["_colour"],
+                        alpha=0.9, lw=lw, label=label)
+                label = ""
+            end
+        end
+        return plt
+    end
+
+    """
+    Plot tau=ref_tau isoline using precomputed tau_p arrays.
+    """
+    function _plot_tau_isoline!(plt, atmos::atmosphere.Atmos_t,
+                                x::Array{Float64, 1}, reversed::Bool)
+
+        y_tau = fill(NaN, atmos.nbands)
+        for ba in 1:atmos.nbands
+            br = reversed ? atmos.nbands - ba + 1 : ba
+            y_tau[br] = atmos.tau_p[ba] * 1.0e-5 # bar
+        end
+        if any(isfinite, y_tau)
+            plot!(plt, x, y_tau, lw=lw, lc=col_obs_phot,
+                        ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
+        end
+        return plt
+    end
 
     """
     **Apply a signed symmetric log10 transform, returning zero for |v| < thresh.**
@@ -161,6 +235,10 @@ module plotting
         plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=lw, label=L"T(pl)")
         plot!(plt, atmos.tmp,  atmos.p*1e-5,  lc="grey",  lw=lw, ls=:dot, label=L"T(p)")
 
+        # add photosphere
+        hline!(plt, [atmos.transspec_p*1e-5], lw=lw,
+                        lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
+
         # Plot current surface pressure and original
         @_plt_pboa
         @_plt_poboa
@@ -236,6 +314,13 @@ module plotting
         # Plot cell-centres and cell-edges
         scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Centres")
         scatter!(plt, atmos.rl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Edges")
+
+        # add photosphere
+        hline!(plt, [atmos.transspec_p*1e-5], lw=lw,
+                        lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
+        vline!(plt, [atmos.transspec_r*1e-3], lw=lw,
+                        lc=col_obs_phot, ls=:dot, label="")
+
 
         # Plot current surface pressure and original
         @_plt_pboa
@@ -456,10 +541,10 @@ module plotting
                     size=(size_x,size_y); plt_default...)
 
         # Legend dummy plots
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dot,   lw=lw, lc=col_r, label="SW")
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:dash,  lw=lw, lc=col_r, label="LW")
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=lw, lc=col_r, label="LW+SW")
-        plot!(plt, [-9e99, -8e99], [-9e99, -8e99], ls=:solid, lw=lw, lc=col_n, label="UP-DN")
+        plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:dot,   lw=lw, lc=col_r, label="SW")
+        plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:dash,  lw=lw, lc=col_r, label="LW")
+        plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:solid, lw=lw, lc=col_r, label="LW+SW")
+        plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:solid, lw=lw, lc=col_n, label="UP-DN")
 
         # Zero line
         vline!(plt, [0.0], lw=0.4, lc="black", label="")
@@ -560,7 +645,7 @@ module plotting
     """
     function plot_emission(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int64=size_x_default, size_y::Int64=size_y_default,
-                            wl_max::Float64=70e3)
+                            wl_max::Float64=300e3)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -698,6 +783,10 @@ module plotting
             plot!(plt, cff, prs, label=@sprintf("%.1f μm",wl_i))
         end
 
+        # add photosphere
+        hline!(plt, [atmos.transspec_p*1e-5], lw=lw,
+                        lc=col_obs_phot, ls=:dot, label="τ=$(atmos.transspec_ref_tau)")
+
         xlabel!(plt, "log₁₀ Contribution function")
         xaxis!(plt, xlims=(x_min+0.05, x_max+0.1))
 
@@ -714,10 +803,7 @@ module plotting
     end
 
     """
-    **Plot normalised contribution function (per band)**
-
-    The data displayed in this plot are fine, but the x-axis ticks are labelled
-    incorrectly by the plotting library. I don't know why this is.
+    **Plot normalised contribution function, per band, versus pressure**
 
     Arguments:
     - `atmos::atmosphere.Atmos_t`    atmosphere object
@@ -728,7 +814,7 @@ module plotting
     """
     function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String;
                                     size_x::Int64=size_x_default, size_y::Int64=size_y_default,
-                                    wl_max::Float64=700e3)
+                                    wl_max::Float64=300e3)
 
         # Check that we have data
         if !atmos.is_out_lw
@@ -774,8 +860,15 @@ module plotting
         z /= maximum(z)
         z[:] = log10.(z[:])
 
+        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
+        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+
+        ylims  = (y[1], y[end])
+        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
+
         # Make plot
         plt = plot(title="Normalised, log₁₀ Contrib Function",
+                        legend=:right,
                         size=(size_x, size_y*0.8); plt_default...)
 
         # plot contribution function as 2D heatmap
@@ -786,13 +879,15 @@ module plotting
             vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
         end
 
-        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        # plot tau isoline
+        plt = _plot_tau_isoline!(plt, atmos, x, reversed)
+
+        # plot bandpasses
+        plt = _plot_bandpasses!(plt, xlims; ylims=ylims)
+
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
-        ylims  = (y[1], y[end])
-        yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
         ylabel!(plt, "Pressure [bar]")
         yflip!(plt)
         yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
@@ -816,7 +911,7 @@ module plotting
     function plot_tau(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int64=size_x_default,
                             size_y::Int64=size_y_default,
-                            wl_max::Float64=700e3)
+                            wl_max::Float64=300e3)
 
         # Check that we have data
         if !atmos.is_out_lw && !atmos.is_out_sw
@@ -826,8 +921,8 @@ module plotting
 
         # Get data dimensions
         x::Array{Float64, 1} = zeros(Float64, atmos.nbands)    # band centres (reverse order)
-        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_c)    # pressure levels
-        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_c, atmos.nbands))
+        y::Array{Float64, 1} = zeros(Float64, atmos.nlev_l)    # pressure levels
+        z::Array{Float64, 2} = zeros(Float64, (atmos.nlev_l, atmos.nbands))
 
         # Min, max tau for plotting
         tau_min::Float64 = 1e-3
@@ -845,7 +940,7 @@ module plotting
                 br = ba
             end
             x[br] = 0.5 * (atmos.bands_min[ba] + atmos.bands_max[ba]) * 1.0e9
-            for i in 1:atmos.nlev_c
+            for i in 1:atmos.nlev_l
                 z[i,br] = atmos.tau_band[i,ba]
             end
         end
@@ -858,8 +953,8 @@ module plotting
         z[:] = log10.(z[:])
 
         # y value - pressures [bar]
-        for i in 1:atmos.nlev_c
-            y[i] = atmos.p[i] * 1.0e-5
+        for i in 1:atmos.nlev_l
+            y[i] = atmos.pl[i] * 1.0e-5
         end
 
         xlims  = (minimum(x), max(wl_max, minimum(x)+1))
@@ -868,15 +963,23 @@ module plotting
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
 
-        plt = plot(title="log₁₀ τ (LW)", size=(size_x, size_y*0.8); plt_default...)
+        plt = plot(title="log₁₀ τ (downward from TOA)", legend=:right,
+                    size=(size_x, size_y*0.8); plt_default...)
 
         # plot tau as heatmap
         heatmap!(plt, x, y, z, c=:devon, label="", climits=(log10(tau_min), log10(tau_max)))
+
 
         # plot band limits
         for ba in 1:atmos.nbands
             vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
         end
+
+        # plot tau isoline
+        plt = _plot_tau_isoline!(plt, atmos, x, reversed)
+
+        # plot bandpasses
+        plt = _plot_bandpasses!(plt, xlims; ylims=ylims)
 
         xlabel!(plt, "Wavelength [nm]")
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)

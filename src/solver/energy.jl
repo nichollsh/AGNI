@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 
 """
 **Core solver and helper functions for radiative-convective-chemical equilibrium.**
@@ -10,6 +10,7 @@ module solve_energy
     using Statistics: median, mean
     using LinearAlgebra
 
+    import ..consts: BIGFLOAT
     import ..atmosphere
     import ..diagnostics
     import ..energy
@@ -204,14 +205,14 @@ module solve_energy
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)              # Test for rejection residuals
         perturb::Array{Bool,1}   = falses(arr_len)      # Mask for levels which should be perturbed
-        lml::Float64             = 1.0                 # Levenberg-Marquardt lambda parameter
+        lml::Float64             = 1.0                  # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
         conv_val::Float64        = Inf                  # quantity used to evaluate convergence
         linesearch::Bool         = Bool(ls_method>0)    # ls enabled?
         ls_alpha::Float64        = 1.0                  # linesearch scale factor
-        ls_cost::Float64         = 1.0e99               # linesearch cost at ls_alpha
-        ls_cful::Float64         = 1.0e99               # linesearch cost at full step
+        ls_cost::Float64         = BIGFLOAT             # linesearch cost at ls_alpha
+        ls_cful::Float64         = BIGFLOAT             # linesearch cost at full step
         plateau_apply::Bool      = false                # Plateau declared in this iteration?
 
         #     stability
@@ -473,8 +474,8 @@ module solve_energy
 
         # Final setup
         @. x_cur = x_ini
-        fill!(r_cur, 1.0e99)            # reset residual arrays
-        fill!(r_old, 1.0e98)            # ^
+        fill!(r_cur, BIGFLOAT/10.0)     # reset residual arrays
+        fill!(r_old, BIGFLOAT/10.0)     # ^
         energy.reset_fluxes!(atmos)     # reset energy fluxes
 
         # Modulate convection and phase change?
@@ -701,8 +702,8 @@ module solve_energy
 
                 # Reset
                 ls_alpha = ls_max_scale   # Greater than 1 => extension of step
-                ls_cost  = 1.0e99   # a big number
-                ls_cful  = 1.0e99   # cost of full step
+                ls_cost  = BIGFLOAT   # a big number
+                ls_cful  = BIGFLOAT   # cost of full step
 
                 # Internal function minimised by linesearch method
                 function _ls_func(scale::Float64)::Float64
@@ -863,12 +864,6 @@ module solve_energy
                     code = CODE_SUC
                     break
                 end
-            end
-
-            # Show benchmark [nanoseconds -> ms]
-            if atmos.benchmark
-                rt_avg = atmos.tim_rt_eval / atmos.num_rt_eval / 1e9 * 1e3
-                @debug @sprintf("Average RT time: %.3f ms", rt_avg)
             end
 
             # Record that this step not ok

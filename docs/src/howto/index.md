@@ -2,10 +2,13 @@
 
 How-to guides are **task-oriented**. They provide concise directions for accomplishing a
 specific goal, assuming you already have AGNI installed and running.
-See [Getting started](@ref) if you have not yet installed the model.
+
+!!! info "Get started"
+    See the [Getting started](@ref) page if you have not yet installed AGNI.
 
 | Guide | Description |
 |:------|:------------|
+| [Getting started](@ref)     | Get started with AGNI |
 | [Obtaining input data](@ref) | Download spectral files and other data |
 | [Configuring AGNI](@ref) | Write and customise configuration files |
 | [Using FastChem](@ref) | Enable equilibrium chemistry with FastChem |

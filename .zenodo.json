@@ -22,7 +22,7 @@
         }
     ],
     "title": "AGNI: An open-source model for extreme atmospheres on rocky exoplanets",
-    "version": "1.10.2",
+    "version": "1.11.0",
     "access_right": "open",
     "related_identifiers": [
         {
@@ -50,7 +50,7 @@
         "planetary",
         "physics"
     ],
-    "license": "GPL-3.0",
+    "license": "Apache-2.0",
     "upload_type": "software",
     "language": "eng"
 }

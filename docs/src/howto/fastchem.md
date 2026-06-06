@@ -19,7 +19,11 @@ Steps 2 and 3 are therefore **compatible and complementary**: FastChem handles g
 speciation while AGNI handles condensation independently. The condensation scheme
 (`composition.condensates`) can be used alongside FastChem.
 
-## Installation
+!!! info "FastChem literature"
+    If you use AGNI with FastChem, make sure to cite the relevant papers. The most recent paper for FastChem 4 [can be found here](https://arxiv.org/abs/2605.18264).
+
+
+## Install FastChem
 
 Run the installation script from the AGNI root directory:
 ```bash
@@ -50,6 +54,6 @@ metallicities = { H = 1.0, O = 0.5, C = 0.1 }
 
 See the [Configuration reference](@ref) for all available composition parameters.
 
-!!! warning
+!!! warning "Set your environment"
     The `FC_DIR` environment variable must be set before running AGNI with chemistry
     enabled, or the model will error.

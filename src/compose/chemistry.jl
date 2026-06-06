@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 
 """
 This module handles chemistry, condensation, and evaporation.
@@ -15,14 +15,13 @@ module chemistry
     using Logging
 
     # Local files
+    import ..consts: SMALLFLOAT
     import ..phys
     import ..atmosphere
     import ..species
     import ..ocean
     import ..fastchem
 
-    # Constants
-    const SMALL_FLOAT::Float64  = 1e-20     # small number for numerical stability
 
     """
     **Normalise gas VMRs, keeping condensates unchanged**
@@ -157,7 +156,7 @@ module chemistry
                 dp = species.get_Psat(atmos.gas_dat[c], atmos.tmp_surf) - p_gas[c]
 
                 # Negligible
-                if abs(dp) < SMALL_FLOAT
+                if abs(dp) < SMALLFLOAT*10.0
                     continue
 
                 # Super-saturated at the surface...
@@ -323,12 +322,12 @@ module chemistry
             atmos.cond_accum[c] = 0.0
 
             # skip here if no evaporation
-            if atmos.evap_efficiency < SMALL_FLOAT
+            if atmos.evap_efficiency < SMALLFLOAT*10
                 continue
             end
 
             # no rain? go to next condensable
-            if sum(atmos.cond_yield[c]) < SMALL_FLOAT
+            if sum(atmos.cond_yield[c]) < SMALLFLOAT*10
                 continue
             end
 
@@ -346,7 +345,7 @@ module chemistry
                 # in a dry layer...
 
                 # skip if no rain entering from above
-                if atmos.cond_accum[c] < SMALL_FLOAT
+                if atmos.cond_accum[c] < SMALLFLOAT*10
                     continue
                 end
 

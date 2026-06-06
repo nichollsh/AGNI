@@ -21,6 +21,8 @@ For example, if you wanted to get the spectral file "Honeyside48" you would run:
 Additional spectral files can also be downloaded directly from the
 [PROTEUS community on Zenodo](https://zenodo.org/communities/proteus_framework/records?q&f=subject%3Aspectral_files&l=list&p=1&s=10&sort=newest).
 
-!!! tip
+A menu of the available spectral files is [available on the SOCRATES documentation website](https://proteus-framework.org/SOCRATES/Reference/proteus_spectral_file_reference.html).
+
+!!! tip "Get missing spectral files"
     See [Spectral file does not exist](@ref) in the troubleshooting guide if a spectral
     file you downloaded cannot be found by AGNI.

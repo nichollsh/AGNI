@@ -23,7 +23,9 @@ using Test
 @info "Begin AGNI tests"
 
 # Configure
-SLOW_TESTS = ["integration", "radtrans", "chemistry", "deep_heating", "kzz", "spectrum", "rfm"]
+LOG_LEVEL = Logging.Error
+SLOW_TESTS = ["integration", "radtrans", "chemistry",
+                "deep_heating", "kzz", "spectrum", "rfm"]
 
 # Prepare
 SRC_DIR         = joinpath(ROOT_DIR,"src/")
@@ -105,11 +107,11 @@ end
 @info "Collected: $(join(test_names, ", "))"
 @info "Running tests..."
 
-# Configure logging to show only error messages during tests
-LoggingExtras.global_logger(Logging.SimpleLogger(Logging.Error))
 
 # Run tests
 for test_file in test_files
+    # Configure logging to show only error messages during tests
+    LoggingExtras.global_logger(Logging.SimpleLogger(LOG_LEVEL))
     @info "Running '$(test_file)'"
     include(test_file)
 end

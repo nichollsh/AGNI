@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 
 """
 **Module for handling file paths and directories.**
@@ -19,6 +19,10 @@ module paths
     # FWL_DATA folder (fall back to RES_DIR if not set)
     const FWL_DATA::String = normpath(joinpath(get(ENV, "FWL_DATA", RES_DIR)))
     export FWL_DATA
+
+    # RAD_DIR (socrates root directory)
+    const RAD_DIR::String = abspath(ENV["RAD_DIR"])
+    export RAD_DIR
 
     """
     **Get path to other data dirs (can be overridden)**

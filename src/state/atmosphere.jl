@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 
 """
 **Main atmosphere module for storing model data**
@@ -17,14 +17,14 @@ module atmosphere
     import DelimitedFiles:readdlm
 
     # SOCRATES library
-    const SOCRATESjl = abspath(ENV["RAD_DIR"], "julia","src","SOCRATES.jl")
+    import ..paths
+    const SOCRATESjl = joinpath(paths.RAD_DIR, "julia","src","SOCRATES.jl")
     include(SOCRATESjl)
 
     # Local modules
     import ..phys
     import ..spectrum
-    import ..paths
-    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum
+    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum, SMALLFLOAT
     import ..formulae
     import ..species
     import ..density
@@ -50,6 +50,7 @@ module atmosphere
     const CFG_tmp_magma::Float64        = 3000.0
     const CFG_skin_d::Float64           = 0.05
     const CFG_skin_k::Float64           = 2.0
+    const CFG_benchmark_rt::Bool        = false
     const CFG_overlap_method::String    = "ee"
     const CFG_target_olr::Float64       = 250.0
     const CFG_flux_int::Float64         = 0.0
@@ -85,6 +86,9 @@ module atmosphere
     const CFG_fastchem_xtol_chem::Float64   = 1e-3
     const CFG_fastchem_xtol_elem::Float64   = 1e-3
     const CFG_fastchem_wellmixed::Bool      = false
+    const CFG_transspec_ref_tau::Float64    = 0.02
+    const CFG_transspec_ref_wl::Float64     = 1.125e-6 # m
+    const CFG_transspec_ref_p::Float64      = 20e-3 # 20 mbar
     const CFG_ocean_ob_frac::Float64        = 0.6
     const CFG_ocean_cs_height::Float64      = 3000.0
 
@@ -132,6 +136,7 @@ module atmosphere
 
         # SOCRATES objects
         SOCRATES_VERSION::String
+        SOCRATES_PRECISION::String
         dimen::SOCRATES.StrDim
         control::SOCRATES.StrCtrl
         spectrum::SOCRATES.StrSpecData
@@ -288,7 +293,7 @@ module atmosphere
         band_n_sw::Array{Float64,2}         # net upward, sw
 
         # Calculated per-band optical depth
-        tau_band::Array{Float64,2}          # optical depth per band, lw (all-sky)
+        tau_band::Array{Float64,2}          # vertical (normal) optical depth per band, measured from TOA
 
         # Surface planck emission (incl. emissivity)
         surf_flux::Array{Float64, 1}
@@ -395,7 +400,16 @@ module atmosphere
         rfm_work::String                # Path to rfm working directory
         rfm_parfile::String             # Path to rfm parfile. If empty, do not run RFM.
 
-        # Observing properties
+        # Lines of constant optical depth
+        tau_p::Array{Float64,1}         # Pressure [Pa] at tau=transspec_tau, per band
+        tau_r::Array{Float64,1}         # Radius [m] at tau=transspec_tau, per band
+
+        # Observing properties (parameters)
+        transspec_ref_tau::Float64          # Optical depth at which to probe transmission
+        transspec_ref_wl::Float64           # Wavelength at which to probe transmission [m]
+        transspec_ref_p::Float64            # Pressure level at which to probe transmission [Pa]
+
+        # Observing properties (calculated)
         transspec_p::Float64            # Pressure level probed in transmission [Pa]
         transspec_r::Float64            # planet radius probed in transmission [m]
         transspec_μ::Float64            # mmw probed in transmission [kg mol-1]
@@ -519,6 +533,11 @@ module atmosphere
     - `fastchem_xtol_chem::Float64`     solution tolerance required of fastchem (chemical)
     - `fastchem_xtol_elem::Float64`     solution tolerance required of fastchem (elemental)
     - `rfm_parfile::String`             path to HITRAN-formatted .par file provided to RFM
+    - `transspec_ref_tau::Float64`      vertical (normal) optical depth used to define the photosphere
+    - `transspec_ref_wl::Float64`       wavelength used to define photosphere [m]
+    - `transspec_ref_p::Float64`        pressure level used to define photosphere [bar]
+    - `ocean_ob_frac::Float64`          ocean basin area, as fraction of planet surface
+    - `ocean_cs_height::Float64`        continental shelf height [m]
 
     Returns:
         Nothing
@@ -557,6 +576,7 @@ module atmosphere
                     latitude::Float64 =         CFG_latitude,
                     longitude::Float64 =        CFG_longitude,
 
+                    benchmark_rt::Bool =        CFG_benchmark_rt,
                     overlap_method::String =    CFG_overlap_method,
                     target_olr::Float64 =       CFG_target_olr,
                     flux_int::Float64 =         CFG_flux_int,
@@ -596,6 +616,9 @@ module atmosphere
                     fastchem_wellmixed::Bool     = CFG_fastchem_wellmixed,
 
                     rfm_parfile::String =       UNSET_STR,
+                    transspec_ref_tau::Float64   = CFG_transspec_ref_tau,
+                    transspec_ref_wl::Float64    = CFG_transspec_ref_wl,
+                    transspec_ref_p::Float64     = CFG_transspec_ref_p,
 
                     ocean_ob_frac::Float64 =    CFG_ocean_ob_frac,
                     ocean_cs_height::Float64 =  CFG_ocean_cs_height
@@ -674,7 +697,7 @@ module atmosphere
         # -------------------------
 
         # Set parameters for benchmarking
-        atmos.benchmark   = false
+        atmos.benchmark   = benchmark_rt
         atmos.num_rt_eval = 0
         atmos.tim_rt_eval = 0.0
 
@@ -682,8 +705,11 @@ module atmosphere
         if strip(lowercase(spfile)) == "greygas"
             atmos.rt_scheme = RT_GREYGAS
             atmos.spectral_file = "greygas"
-            atmos.SOCRATES_VERSION = "0000"
             @info "Using grey-gas radiative transfer scheme"
+
+            # Dummy values for SOCRATES
+            atmos.SOCRATES_PRECISION = UNSET_STR
+            atmos.SOCRATES_VERSION = "0000"
 
             # check options
             if flag_rayleigh || flag_cloud || flag_aerosol
@@ -696,16 +722,26 @@ module atmosphere
             atmos.rt_scheme = RT_SOCRATES
             atmos.spectral_file = abspath(spfile)
 
-            @debug "Using SOCRATES at $(ENV["RAD_DIR"])"
+            @debug "Using SOCRATES at $(paths.RAD_DIR)"
+
+            # Check SOCRATES is present
+            if !isdir(paths.RAD_DIR) || !isfile(joinpath(paths.RAD_DIR,"version"))
+                @error "SOCRATES is not found in the specified directory!"
+                @error "    Got: $(paths.RAD_DIR)"
+                return false
+            end
 
             # Get SOCRATES version
-            atmos.SOCRATES_VERSION = spectrum.get_socrates_version()
+            atmos.SOCRATES_VERSION = spectrum.get_socrates_version(paths.RAD_DIR)
             @debug "SOCRATES VERSION = "*atmos.SOCRATES_VERSION
+
+            # Get SOCRATES precision
+            atmos.SOCRATES_PRECISION = spectrum.get_socrates_precision(SOCRATES)
 
             # Check SOCRATES version is valid
             if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
                 @error "SOCRATES is out of date and cannot be used!"
-                @error "    found at $(ENV["RAD_DIR"])"
+                @error "    found at $(paths.RAD_DIR)"
                 @error "    version is "*atmos.SOCRATES_VERSION
                 return false
             end
@@ -828,6 +864,17 @@ module atmosphere
         atmos.col_lon = longitude
         _check_range("Longitude", atmos.col_lon; min=0, max=360.0) || return false
 
+        # reference observables
+        atmos.transspec_ref_p = transspec_ref_p * 1.0e5 # Convert bar -> Pa
+        _check_range("Reference pressure [Pa] for transmission spectrum",
+                        atmos.transspec_ref_p; min=1e-5, max=1e10) || return false
+        atmos.transspec_ref_wl = transspec_ref_wl
+        _check_range("Reference wavelength [m] for transmission spectrum",
+                        atmos.transspec_ref_wl; min=1e-10, max=1.0) || return false
+        atmos.transspec_ref_tau = transspec_ref_tau
+        _check_range("Reference optical depth for transmission spectrum",
+                        atmos.transspec_ref_tau; min=1e-10, max=1e10) || return false
+
         # derived statistics
         atmos.interior_mass  =  atmos.grav_surf * atmos.rp^2 / phys.G_grav
         atmos.interior_rho   =  3.0 * atmos.interior_mass / ( 4.0 * pi * atmos.rp^3)
@@ -836,7 +883,7 @@ module atmosphere
         atmos.transspec_tmp  =  0.0
         atmos.transspec_grav =  0.0
         atmos.transspec_r    =  0.0
-        atmos.transspec_p    =  2e3     # 20 mbar = 2000 Pa
+        atmos.transspec_p    =  atmos.transspec_ref_p
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -1631,6 +1678,7 @@ module atmosphere
                 if atmos.control.l_aerosol
                     @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
+                        paths.RAD_DIR,
                         atmos.spectral_file,
                         [s for s in keys(atmos.aerosol_arr_l)],
                         atmos.IO_DIR,
@@ -1649,7 +1697,8 @@ module atmosphere
 
                 # Insert blocks into spectral file
                 @debug "Inserting required blocks into runtime spectral file"
-                spectrum.insert_blocks(atmos.spectral_file,
+                spectrum.insert_blocks(paths.RAD_DIR,
+                                        atmos.spectral_file,
                                         socstar, spectral_file_run,
                                         atmos.control.l_rayleigh,
                                         atmos.control.l_aerosol;
@@ -2282,8 +2331,10 @@ module atmosphere
 
         atmos.surf_flux =         zeros(Float64, atmos.nbands)
 
-        atmos.tau_band  =         zeros(Float64, (atmos.nlev_c,atmos.nbands))
+        atmos.tau_band  =         zeros(Float64, (atmos.nlev_l,atmos.nbands))
         atmos.contfunc_band =     zeros(Float64, (atmos.nlev_c,atmos.nbands))
+        atmos.tau_p =            zeros(Float64, atmos.nbands)
+        atmos.tau_r =            zeros(Float64, atmos.nbands)
 
         atmos.flux_sens =         0.0
 
@@ -2724,6 +2775,7 @@ module atmosphere
         # Set surface pressure to be very small, but still larger than TOA pressure
         atmos.p_boa       = atmos.p_toa*1.10
         atmos.transspec_p = atmos.p_toa*1.05
+        atmos.transspec_r = atmos.rp
         generate_pgrid!(atmos)
 
         # Set temperatures to be small, except the surface
@@ -3033,7 +3085,97 @@ module atmosphere
 
 
     """
-    **Estimate photosphere pressure level.**
+    **Find pressure and radius where optical depth τ=τ_ref, for each spectral band.**
+
+    Uses the optical depth profiles stored in `atmos.tau_band` and determines the
+    layer where τ is closest to `atmos.transspec_ref_tau`. Values are stored
+    in `atmos.tau_p` [Pa] and `atmos.tau_r` [m].
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+    - `tau_p::Array{Float64,1}` pressure at which τ=τ_ref for each band [Pa]
+    - `tau_r::Array{Float64,1}` radius at which τ=τ_ref for each band [m]
+    """
+    function calc_tau_isolines!(atmos::atmosphere.Atmos_t)::Tuple{Array{Float64,1}, Array{Float64,1}}
+
+        # Reset
+        fill!(atmos.tau_p, 0.0)
+        fill!(atmos.tau_r, 0.0)
+
+        if !atmos.is_alloc
+            @warn "Atmosphere arrays have not been allocated"
+            return (atmos.tau_p, atmos.tau_r)
+        end
+
+        # Loop over bands and find the layer where tau is closest to transspec_ref_tau
+        itau::Int64 = 1
+        for ba in 1:atmos.nbands
+            itau = findmin(abs.(atmos.tau_band[:,ba] .- atmos.transspec_ref_tau))[2]
+            atmos.tau_p[ba] = atmos.pl[itau]
+            atmos.tau_r[ba] = atmos.rl[itau]
+        end
+
+        return (atmos.tau_p, atmos.tau_r)
+    end
+
+    """
+    **Calculate index of photosphere simply from a reference pressure.**
+
+    This is a simple method that does not require optical depth profiles.
+
+    Arguments:
+    - `atmos::Atmos_t`           the atmosphere struct instance to be used.
+    - `p_ref::Float64`           reference pressure [Pa]
+
+    Returns:
+    - `Int64`                    index of photosphere
+    """
+    function _iphot_from_prs!(atmos::atmosphere.Atmos_t, p_ref::Float64)::Int64
+        if !atmos.is_alloc
+            @warn "Atmosphere arrays have not been allocated"
+            return 1
+        end
+        @debug "Calculating photosphere from reference pressure, p=$(p_ref*1e-5) bar"
+        return findmin(abs.(atmos.pl .- p_ref))[2]
+    end
+
+    """
+    **Calculate index of photosphere at a reference wavelength.**
+
+    Assuming that `atmos.tau_p` has already been determined using `calc_tau_isolines!`,
+    this method finds the index of the photosphere at the reference wavelength.
+
+    Arguments:
+    - `atmos::Atmos_t`              the atmosphere struct instance to be used.
+    - `ref_wl::Float64`             reference wavelength [m]
+
+    Returns:
+    - `Int64`                       index of photosphere
+    """
+    function _iphot_from_tau(atmos::atmosphere.Atmos_t, ref_wl::Float64)::Int64
+        if !atmos.is_alloc
+            @warn "Atmosphere arrays have not been allocated"
+            return 1
+        end
+
+        @debug "Calculating photosphere, τ=$(atmos.transspec_ref_tau) at λ=$(ref_wl*1e6) μm"
+
+        # Ensure valid range of wavelengths
+        ref_wl = clamp(ref_wl, minimum(atmos.bands_cen), maximum(atmos.bands_cen))
+
+        # Find band index for this wavelength
+        iband::Int64 = findmin(abs.(atmos.bands_cen .- ref_wl))[2]
+
+        # Find pressure level where tau=tau_ref, and return index
+        return _iphot_from_prs!(atmos, atmos.tau_p[iband])
+    end
+
+    """
+    **Calculate index of photosphere from contribution function.**
+
+    This is retained as a legacy method.
 
     Estimates the location of the photosphere by finding the median of the contribution
     function in each band (0.2 μm to 150 μm), and then finding the pressure level at which
@@ -3043,19 +3185,27 @@ module atmosphere
     - `atmos::Atmos_t`          the atmosphere struct instance to be used.
 
     Returns:
-    - `p_ref::Float64`          pressure level of photosphere [Pa]
+    - `iphot::Int64`          index of photosphere
     """
-    function estimate_photosphere!(atmos::atmosphere.Atmos_t)::Float64
+    function _iphot_from_cff(atmos::atmosphere.Atmos_t)::Int64
+
+        if !atmos.is_alloc
+            @warn "Atmosphere arrays have not been allocated"
+            return 1
+        end
+
+        @debug "Calculating photosphere from contribution function (legacy method)"
 
         # Params
         wl_min::Float64  = 0.2 * 1e-6 # 200 nanometer
         wl_max::Float64  = 150 * 1e-6 # 150 micron
         p_min::Float64   = 10.0       # 10 Pa = 1e-4 bar
 
+
         # tracking
         cff_max::Float64 = 0.0
         cff_try::Float64 = 0.0
-        atmos.transspec_p = p_min
+        transspec_i::Int64   = 1
 
         # get band indices
         wl_imin = findmin(abs.(atmos.bands_cen .- wl_min))[2]
@@ -3078,41 +3228,69 @@ module atmosphere
             # is this more than the existing maximum?
             if cff_try > cff_max
                 cff_max = cff_try
-                atmos.transspec_p = atmos.p[i]
+                transspec_i = i
             end
         end
 
-        return atmos.transspec_p
+        return transspec_i
     end
 
     """
-    **Calculate observed radius and bulk density.**
+    **Estimate the index of the photosphere.**
 
-    This is done at the layer probed in transmission, which is set to a fixed pressure.
+    This is the layer that is probed in transmission, and is used to calculate the
+    observed radius and bulk density. This is a wrapper function that updates the
+    `transspec_*` properties of the atmosphere struct.
 
     Arguments:
-        - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+    - `atmos::Atmos_t`          the atmosphere struct instance to be updated.
+    - `setby::String`           method to use for estimating photosphere ("tau" or "prs")
 
     Returns:
-        - `transspec_rho::Float64`  the bulk density observed in transmission
+    - `idx::Int64`              index of photosphere
     """
-    function calc_observed_rho!(atmos::atmosphere.Atmos_t)::Float64
+    function estimate_photosphere!(atmos::atmosphere.Atmos_t; setby::String="tau")::Int64
 
-        # transspec_r::Float64            # planet radius probed in transmission [m]
-        # transspec_m::Float64            # mass [kg] of atmosphere + interior
-        # transspec_rho::Float64          # bulk density [kg m-3] implied by r and m
+        idx::Int64 = 1
 
-        # Store reference pressure in atmos struct
-        # estimate_photosphere!(atmos)
+        # Update tau isolines (p and r at tau=ref_tau)
+        calc_tau_isolines!(atmos)
+
+        # Set photosphere index based on pressure level
+        if setby == "prs"
+            idx = _iphot_from_prs!(atmos, atmos.transspec_ref_p)
+            atmos.transspec_p = atmos.transspec_ref_p
+
+        # Otherwise, use tau profiles to find photosphere at reference wavelength
+        elseif setby == "tau"
+
+            # check optical depths are defined
+            if any(atmos.tau_band[2:end, :] .>= SMALLFLOAT)
+                idx = _iphot_from_tau(atmos, atmos.transspec_ref_wl)
+            else
+                @warn "Optical depth profiles are zero; cannot calculate photosphere from τ"
+                idx = 2
+            end
+
+            atmos.transspec_p = atmos.pl[idx]
+        end
 
         # get the observed height
-        idx::Int64 = findmin(abs.(atmos.p .- atmos.transspec_p))[2]
-        atmos.transspec_r    = atmos.r[idx]
-        atmos.transspec_μ    = atmos.layer_μ[idx]
-        atmos.transspec_tmp  = atmos.tmp[idx]
-        atmos.transspec_grav = atmos.g[idx]
+        atmos.transspec_r    = atmos.rl[idx]
+        atmos.transspec_tmp  = atmos.tmpl[idx]
+        atmos.transspec_grav = atmos.gl[idx]
 
-        # get mass of whole atmosphere, assuming hydrostatic
+
+        # get the observed layer properties
+        if idx > atmos.nlev_c
+            atmos.transspec_μ = atmos.layer_μ[end]
+        elseif idx > 1
+            atmos.transspec_μ = 0.5 * (atmos.layer_μ[idx] + atmos.layer_μ[idx-1])
+        else
+            atmos.transspec_μ = atmos.layer_μ[idx]
+        end
+
+        # get mass of whole atmosphere
         atmos.transspec_m = atmos.p_boa * 4 * pi * atmos.rp^2 / atmos.grav_surf
 
         # add mass of the interior component
@@ -3122,7 +3300,24 @@ module atmosphere
         # store this in the atmosphere struct
         atmos.transspec_rho = 3.0 * atmos.transspec_m / (4.0 * pi * atmos.transspec_r^3)
 
-        # also return the value
+        return idx
+    end
+
+
+    """
+    **Calculate planet's bulk density.**
+
+    This function is retained for legacy API compatibility. The main calculation of the
+    bulk density is done by `estimate_photosphere!`.
+
+    Arguments:
+    - `atmos::Atmos_t`          the atmosphere struct instance to be used.
+
+    Returns:
+    - `transspec_rho::Float64`  the bulk density observed in transmission
+    """
+    function calc_observed_rho!(atmos::atmosphere.Atmos_t)::Float64
+        estimate_photosphere!(atmos)
         return atmos.transspec_rho
     end
 

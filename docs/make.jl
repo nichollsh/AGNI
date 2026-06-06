@@ -1,17 +1,57 @@
 using Documenter
 using DocumenterPages
+using DocumenterTools: Themes
 using AGNI
 
-format = Documenter.HTML(edit_link = "main",
-                         prettyurls = get(ENV, "CI", nothing) == "true",
-                         assets = [
-                             "assets/style.css",
-                             "assets/logo.ico",
-                        ]
-)
+# dirs
+ASSETS_DIR = joinpath(@__DIR__, "src", "assets")
+
+# metadata
+header::String = ""
+footer::String = "Copyright © 2023-2026 Harrison Nicholls. AGNI source code is available under [Apache-2.0](https://apache.org/licenses/LICENSE-2.0) license. Documentation and assets are available under the [CC-BY-NC-SA-4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) license."
+description::String = "AGNI is an open-source model for simulating extreme atmospheres on rocky planets and exoplanets. It simulates 1D radiative-convective-chemical atmosphere profiles and is designed to be fast, flexible, and user-friendly. AGNI is developed by Harrison Nicholls and is a part of the PROTEUS framework."
+authors::String = "Harrison Nicholls"
+sitename::String = "AGNI"
+
+# following https://github.com/JuliaMusic/JuliaMusic_documentation.jl/blob/master/docs/make.jl
+# combine style and defs files into single scss files for compilation
+for w in ("light",) # "dark")
+    style = read(joinpath(ASSETS_DIR, "style.scss"), String)
+    theme = read(joinpath(ASSETS_DIR, "$(w)defs.scss"), String)
+    write(joinpath(ASSETS_DIR, "$(w).scss"), style*"\n"*theme)
+end
+
+# dark theme is duplicate of light theme
+cp(joinpath(ASSETS_DIR, "light.scss"), joinpath(ASSETS_DIR, "dark.scss"), force=true)
+
+# compile styles into scss files
+Themes.compile(joinpath(ASSETS_DIR, "light.scss"),
+                joinpath(ASSETS_DIR, "src/assets/themes/documenter-light.css"))
+Themes.compile(joinpath(ASSETS_DIR, "dark.scss"),
+                joinpath(ASSETS_DIR, "src/assets/themes/documenter-dark.css"))
+
+format = Documenter.HTML(   edit_link = nothing,
+                            collapselevel = 1,
+                            size_threshold=Int(1e6),
+                            description = description,
+                            footer = footer,
+                            prettyurls = get(ENV, "CI", nothing) == "true",
+                            assets = [
+                                # HTML content
+                                Documenter.HTMLWriter.RawHTMLHeadContent(header),
+
+                                # local assets
+                                "assets/style.css",
+                                "assets/logo.ico",
+
+                                # remote assets
+                                asset("https://fonts.googleapis.com/css?family=Inter:400&family=JetBrains+Mono:400&family=Lato", class=:css),
+                            ]
+    )
 
 makedocs(
-    sitename="AGNI",
+    sitename = sitename,
+    authors = authors,
     format=format,
     pages = [
         "Home" => "index.md",
@@ -30,13 +70,15 @@ makedocs(
         ),
 
         PageNode("Tutorials" => "tutorials/index.md", [
-            "Example outputs"  => "tutorials/index.md",
-            ]
+            "Your first calculation"  => "tutorials/01_nosolve.md",
+            "Radiative-convective solution"    => "tutorials/02_rce.md",
+            "Aerosol radiative properties"       => "tutorials/03_aerosol.md",
+            "Steam runaway greenhouse"      => "tutorials/04_runaway.md",
+            ],
         ),
 
         PageNode("Explanation" => "explanation/index.md", [
             "Model description"  => "explanation/model.md",
-            "Related codes"      => "explanation/ecosystem.md",
             "Bibliography"       => "explanation/references.md",
             ],
         ),
@@ -47,7 +89,11 @@ makedocs(
             "API reference"             => "reference/api.md",
             ],
         ),
-        "Acknowledgements" => "thanks.md",
+
+        "Community" => "thanks.md",
+
+        "Other PROTEUS modules" => "ecosystem.md",
+
     ]
 )
 

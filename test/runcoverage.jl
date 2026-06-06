@@ -20,6 +20,7 @@ using Glob
 
 target_good = 80.0
 target_bad  = 50.0
+color = "31c754"
 
 TEST_DIR = joinpath(ROOT_DIR, "test")
 BADGE_DIR = joinpath(ROOT_DIR, ".github", "badges")
@@ -36,7 +37,7 @@ function write_test_badge(path::String, label::String, value::Int)
         println(io, "  \"schemaVersion\": 1,")
         println(io, "  \"label\": \"$(label)\",")
         println(io, "  \"message\": \"$(value)\",")
-        println(io, "  \"color\": \"blue\"")
+        println(io, "  \"color\": \"$(color)\"")
         println(io, "}")
     end
 end

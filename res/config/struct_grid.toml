@@ -75,5 +75,6 @@ title = "Base config for structure calcs"
     albedo          = false
     mixing_ratios   = true
     animate         = true
+    optical_depth   = true            
     height          = true
     cloud           = false

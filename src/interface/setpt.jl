@@ -1,10 +1,11 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 
 """
 **Contains functions for setting-up the temperature profile analytically**
 """
 module setpt
 
+    import ..consts: SMALLFLOAT
     import ..phys
     import ..species
     import ..atmosphere
@@ -613,7 +614,7 @@ module setpt
         # Return the new temperature (Float) and whether saturated (Bool)
         function _tdew(tmp::Float64,pgas::Float64)::Tuple
             # Tiny partial pressure
-            if pgas < 1e-99
+            if pgas < SMALLFLOAT
                 return (tmp, false)
             end
 

@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 # Contains the multicol module
 
 """
@@ -242,6 +242,24 @@ module multicol
     end
 
     """
+    **Check if the output of a function is considered a success**
+
+    Arguments:
+    - `out`                 the output to check
+
+    Returns:
+    - `Bool`                whether the output is successful
+    """
+    function _is_succ(out)::Bool
+        if isa(out, Bool)
+            return out
+        elseif isa(out, AbstractFloat)
+            return isfinite(out)
+        end
+        return true
+    end
+
+    """
     **Wrapper calling a function across multiple columns in a globe**
 
     Arguments:
@@ -262,7 +280,7 @@ module multicol
             succ &= copy_atmos_fields!(globe.atmos_wrk, globe.atmos_arr[i])
 
             # Run the function for this column, using the worker
-            succ &= func(globe.atmos_wrk, args...; kwargs...)
+            succ = _is_succ(func(globe.atmos_wrk, args...; kwargs...))
 
             # Copy data from worker back to aux
             succ &= copy_atmos_fields!(globe.atmos_arr[i], globe.atmos_wrk)
@@ -287,7 +305,7 @@ module multicol
     """
     function call_agnostic!(ag::Union{atmosphere.Atmos_t,Globe_t}, func::Function, args...; kwargs...)::Bool
         if ag isa atmosphere.Atmos_t
-            return func(ag, args...; kwargs...)
+            return _is_succ(func(ag, args...; kwargs...))
         elseif ag isa Globe_t
             return call_for_globe!(ag, func, args...; kwargs...)
         else

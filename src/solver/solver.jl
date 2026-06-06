@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 
 """
 **Wrapper module around the various solver modules.**
@@ -14,6 +14,7 @@ module solver
     import ..diagnostics
     import ..setpt
     import ..energy
+    import ..consts
     import ..phys
     import ..plotting
     import ..chemistry

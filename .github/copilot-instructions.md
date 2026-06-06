@@ -157,8 +157,7 @@ Unit tests are individual files (`test_consts.jl`, `test_phys.jl`, etc.) include
 
 ### Testing Standards
 
-AGNI is scientific simulation code, so the test suite is held to physics-grade rigor. The rules below are the contract; the deep-dive (anti-happy-path patterns, discriminating-value guards, certification markers, adversarial-review trigger, buffer-flip propagation, hypothesis seed stability, solver intermediate-state assertions) lives in `.github/agni-tests.md`. Read that file before editing any test file or any source file under `src/**`. The two files must be kept in sync; if you change one, mirror the change in the other.
-
+AGNI is scientific simulation code, so the test suite is held to physics-grade rigor. The rules below are the contract.
 
 
 ### Anti-happy-path rules (every new test)
@@ -173,7 +172,7 @@ Every new test function MUST include:
 
 - Single-assert test functions.
 - Standalone weak assertions as the only meaningful check (e.g. assert result is not None).
-- Tests with no function-level docstring.
+- Tests with no function-level comment (comments should be a clear statement of the physical scenario or contract clause being verified, and formatted with a `#` symbol).
 - Tests using `==` adjacent to float literals.
 - Tests asserting on a fixture's implicit default.
 
@@ -183,8 +182,8 @@ NEVER use `==` for floats. Use functions which check for equality within a toler
 
 ### Documentation per test
 
-- File-level docstring: name the source under test, list the invariants and contract clauses the file exercises.
-- Function-level docstring: state the physical scenario or contract clause being verified. Required (lint-enforced).
+- File-level comment: name the source under test, list the invariants and contract clauses the file exercises (formatted with `#` rather than with quotes).
+- Function-level comment: state the physical scenario or contract clause being verified. Required (lint-enforced).
 - Inline comments: explain **why** a specific input range was chosen.
 
 **Remember**: Trust these instructions. Only search if information is incomplete or found to be in error.

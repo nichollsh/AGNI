@@ -1,4 +1,4 @@
-# This file is part of AGNI. License is GPL-3.0: https://www.gnu.org/licenses
+# This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 module diagnostics
 
     import ..phys
@@ -99,7 +99,7 @@ module diagnostics
     function estimate_timescale_conv!(atmos::atmosphere.Atmos_t)
 
         @inbounds for i in 1:atmos.nlev_c
-            atmos.timescale_conv[i] = atmos.λ_conv[i] / max(atmos.w_conv[i], 1e-300)
+            atmos.timescale_conv[i] = atmos.λ_conv[i] / max(atmos.w_conv[i], eps(Float32))
         end
 
         return nothing
