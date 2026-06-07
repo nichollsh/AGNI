@@ -83,7 +83,7 @@ jobs:
         if: steps.cache-socrates.outputs.cache-hit != 'true'
         run: |
           export LD_LIBRARY_PATH=""
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_DIR="$HOME/work/AGNI/AGNI/SOCRATES"
           cd $RAD_DIR
           ./configure
           ./build_code
@@ -94,7 +94,7 @@ jobs:
 
       - name: Build AGNI
         run: |
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_DIR="$HOME/work/AGNI/AGNI/SOCRATES"
           export RAD_BIN="$RAD_DIR/bin/"
           export LD_LIBRARY_PATH=""
           export FC=$(command -v gfortran)
@@ -103,8 +103,8 @@ jobs:
       # Run the tests
       - name: Run AGNI test suite
         run: |
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
-          export FC_DIR="/home/runner/work/AGNI/AGNI/fastchem"
+          export RAD_DIR="$HOME/work/AGNI/AGNI/SOCRATES"
+          export FC_DIR="$HOME/work/AGNI/AGNI/fastchem"
           export LD_LIBRARY_PATH=""
           julia --project --code-coverage test/runtests.jl
       
