@@ -17,8 +17,8 @@ on:
       - ready_for_review
   workflow_dispatch:
 
-env:
-  CODECOV_TOKEN: 1f20e5bd-6449-4538-b29d-ae16e0ba5b99
+# env:
+#   CODECOV_TOKEN: 1f20e5bd-6449-4538-b29d-ae16e0ba5b99
 
 jobs:
   install_and_test:
