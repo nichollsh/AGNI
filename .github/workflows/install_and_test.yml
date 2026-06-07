@@ -46,13 +46,13 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt update
-          sudo apt-get install libnetcdff-dev netcdf-bin gcc@15 gfortran
+          sudo apt-get install libnetcdff-dev netcdf-bin gcc gfortran
 
       - name: NetCDF macOS
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
           brew update
-          brew install netcdf netcdf-fortran gfortran gcc
+          brew install netcdf netcdf-fortran gcc@15 gfortran
           echo 'eval $(/opt/homebrew/bin/brew shellenv)' >> ~/.zprofile
           echo 'export PATH="/opt/homebrew/opt/gcc/bin:$PATH"' >> ~/.zprofile
           ls "/opt/homebrew/opt/gcc/bin"
