@@ -57,9 +57,9 @@ jobs:
           brew install netcdf netcdf-fortran gcc@${GCC_V} gfortran
           ls "/opt/homebrew/opt/gcc/bin"
           echo 'eval $(/opt/homebrew/bin/brew shellenv)' >> ~/.zprofile
-          ln -fs /opt/homebrew/bin/gfortran-${GCC_V} /usr/local/bin/gfortran
-          mkdir -p /usr/local/gfortran
-          ln -sf /opt/homebrew/Cellar/gcc@${GCC_V}/*/lib/gcc/${GCC_V} /usr/local/gfortran/lib
+          sudo ln -fs /opt/homebrew/bin/gfortran-${GCC_V} /usr/local/bin/gfortran
+          sudo mkdir -p /usr/local/gfortran
+          sudo ln -sf /opt/homebrew/Cellar/gcc@${GCC_V}/*/lib/gcc/${GCC_V} /usr/local/gfortran/lib
           echo 'export PATH="/opt/homebrew/opt/gcc/bin:$PATH"' >> ~/.zprofile
 
 
