@@ -46,7 +46,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt update
-          sudo apt-get install libnetcdff-dev netcdf-bin gfortran gcc
+          sudo apt-get install libnetcdff-dev netcdf-bin gcc@15 gfortran
 
       - name: NetCDF macOS
         if: ${{ matrix.os == 'macos-latest' }}
@@ -55,6 +55,7 @@ jobs:
           brew install netcdf netcdf-fortran gfortran gcc
           echo 'eval $(/opt/homebrew/bin/brew shellenv)' >> ~/.zprofile
           echo 'export PATH="/opt/homebrew/opt/gcc/bin:$PATH"' >> ~/.zprofile
+          ls "/opt/homebrew/opt/gcc/bin"
           echo $(which gfortran)
 
       # Setup Julia
