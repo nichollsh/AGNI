@@ -56,7 +56,7 @@ If you use AGNI, please cite the following papers:
 
 ---------
 
-Copyright © 2023-2026 Harrison Nicholls.
+Copyright © 2023-Present Harrison Nicholls.
 AGNI source code is available under the [Apache-2.0](https://apache.org/licenses/LICENSE-2.0) license.
-Documentation and assets are available under the [CC-BY-NC-SA-4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) license.
+Documentation and assets are available under the [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) license.
 

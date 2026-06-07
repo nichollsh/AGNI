@@ -8,7 +8,7 @@ ASSETS_DIR = joinpath(@__DIR__, "src", "assets")
 
 # metadata
 header::String = ""
-footer::String = "Copyright © 2023-2026 Harrison Nicholls. AGNI source code is available under [Apache-2.0](https://apache.org/licenses/LICENSE-2.0) license. Documentation and assets are available under the [CC-BY-NC-SA-4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) license."
+footer::String = "Copyright © 2023-Present Harrison Nicholls. AGNI source code is available under [Apache-2.0](https://apache.org/licenses/LICENSE-2.0) license. Documentation and assets are available under the [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) license."
 description::String = "AGNI is an open-source model for simulating extreme atmospheres on rocky planets and exoplanets. It simulates 1D radiative-convective-chemical atmosphere profiles and is designed to be fast, flexible, and user-friendly. AGNI is developed by Harrison Nicholls and is a part of the PROTEUS framework."
 authors::String = "Harrison Nicholls"
 sitename::String = "AGNI"
