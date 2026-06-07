@@ -418,6 +418,15 @@ module solve_energy
         # Plot current state
         function plot_step()
 
+            # Check if arrays are NaN or Inf
+            if !all(isfinite, x_cur)
+                @warn "Cannot make plot; solution array not finite"
+                return
+            elseif !all(isfinite, r_cur)
+                @warn "Cannot make plot; residual array not finite"
+                return
+            end
+
             # Info string
             plt_info::String = ""
             plt_info *= "[$(atmos.name)]   "
