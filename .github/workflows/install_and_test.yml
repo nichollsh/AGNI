@@ -4,43 +4,74 @@
 name: Tests
 
 on:
-  pull_request:
-    branches: [main]
   push:
-      branches: [main]
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  workflow_dispatch:
 
-env:
-  CODECOV_TOKEN: 1f20e5bd-6449-4538-b29d-ae16e0ba5b99
+# env:
+#   CODECOV_TOKEN: 1f20e5bd-6449-4538-b29d-ae16e0ba5b99
 
 jobs:
-  install:
+  install_and_test:
 
     if: github.event.pull_request.draft == false
+
     permissions:
       contents: read
       pull-requests: write
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     name: install_and_test
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        julia-version: ['1.12']
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       # Setup system
-      - name: NetCDF
+      - name: NetCDF Ubuntu
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt update
-          sudo apt-get install libnetcdff-dev netcdf-bin gfortran gcc
+          sudo apt-get install libnetcdff-dev netcdf-bin gcc gfortran
+
+      - name: NetCDF macOS
+        if: ${{ matrix.os == 'macos-latest' }}
+        env:
+          GCC_V: 15
+        run: |
+          brew update
+          brew install netcdf netcdf-fortran gcc@${GCC_V} gfortran
+          ls "/opt/homebrew/opt/gcc/bin"
+          echo 'eval $(/opt/homebrew/bin/brew shellenv)' >> ~/.zprofile
+          sudo ln -fs /opt/homebrew/bin/gfortran-${GCC_V} /usr/local/bin/gfortran
+          sudo mkdir -p /usr/local/gfortran
+          sudo ln -sf /opt/homebrew/Cellar/gcc@${GCC_V}/*/lib/gcc/${GCC_V} /usr/local/gfortran/lib
+          echo 'export PATH="/opt/homebrew/opt/gcc/bin:$PATH"' >> ~/.zprofile
+
 
       # Setup Julia
       - name: Setup Julia
         uses: julia-actions/setup-julia@v3
         with:
-          version: '1.12'
+          version: ${{ matrix.julia-version }}
 
       - name: Cache Julia
         uses: julia-actions/cache@v3
+
 
       # Setup SOCRATES
       - name: Get SOCRATES
@@ -54,13 +85,14 @@ jobs:
         id: cache-socrates
         with:
           path: SOCRATES/
-          key: socrates-${{ hashFiles('SOCRATES/version') }}
+          key: socrates[${{ hashFiles('SOCRATES/version') }}]-os[${{ runner.os }}]-julia[${{ matrix.julia-version }}]
+          restore-keys: socrates[${{ hashFiles('SOCRATES/version') }}]-os[${{ runner.os }}]-julia-[${ matrix.julia-version }}]
 
       - name: Build SOCRATES if required
         if: steps.cache-socrates.outputs.cache-hit != 'true'
         run: |
           export LD_LIBRARY_PATH=""
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_DIR="$HOME/work/AGNI/AGNI/SOCRATES"
           cd $RAD_DIR
           ./configure
           ./build_code
@@ -71,7 +103,7 @@ jobs:
 
       - name: Build AGNI
         run: |
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
+          export RAD_DIR="$HOME/work/AGNI/AGNI/SOCRATES"
           export RAD_BIN="$RAD_DIR/bin/"
           export LD_LIBRARY_PATH=""
           export FC=$(command -v gfortran)
@@ -80,12 +112,14 @@ jobs:
       # Run the tests
       - name: Run AGNI test suite
         run: |
-          export RAD_DIR="/home/runner/work/AGNI/AGNI/SOCRATES"
-          export FC_DIR="/home/runner/work/AGNI/AGNI/fastchem"
+          export RAD_DIR="$HOME/work/AGNI/AGNI/SOCRATES"
+          export FC_DIR="$HOME/work/AGNI/AGNI/fastchem"
           export LD_LIBRARY_PATH=""
           julia --project --code-coverage test/runtests.jl
-
+      
+      # Get coverage when running on linux
       - name: Get coverage
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version == '1.12' }}
         run: |
           export CODECOV_TOKEN="${{ secrets.CODECOV_TOKEN }}"
           julia --project test/runcoverage.jl
@@ -104,7 +138,7 @@ jobs:
             .github/badges/tests-*.json
 
       - name: Publish test badges to gist
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: ${{ (matrix.os == 'ubuntu-latest') && (matrix.julia-version == '1.12' ) && (github.event_name == 'push') && (github.ref == 'refs/heads/main') }}
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: |

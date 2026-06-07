@@ -13,36 +13,45 @@ module blake
     # Import modules
     using LoggingExtras
 
-    # Path to executable blob
-    const exec_path::String = abspath(dirname(@__FILE__),
-                                        "..", "..", "res", "blobs", "b2sum-amd64-linux")
+    # Load the BLAKE2b implementation
+    include("blake2b.jl")
+    import .Blake2b: compute2b
+
+    """
+    **Calculate the BLAKE2b hash for a string.**
+
+    Converts to/from bytes using UTF-8 encoding.
+
+    Arguments:
+    - `data::String`       The string to hash.
+
+    Returns:
+    - `hash::String`       The BLAKE2b hash of the string.
+    """
+    function hash_string(data::String)::String
+        return join(string.(compute2b(Vector{UInt8}(data)), base=16, pad=2), "")
+    end
+    export hash_string
 
 
     """
     **Calculate the BLAKE2b hash for a file.**
 
-    Only works on AMD64 Linux.
-
     Arguments:
     - `fpath::String`       Path to the file to hash.
-    - `quiet::Bool=false`   Suppresses warnings about missing files.
 
     Returns:
     - `String`: The BLAKE2b hash of the file.
     """
-    function hash_file(fpath::String; quiet::Bool=false)::String
-        if !Sys.islinux()
-            return "ONLY_SUPPORTED_ON_LINUX"
-        end
-        if Sys.ARCH != :x86_64
-            return "ONLY_SUPPORTED_ON_AMD64"
-        end
+    function hash_file(fpath::String)::String
+        # check file exists
         if !isfile(fpath)
-            quiet || @warn "File not found '$fpath'"
+            @warn "File not found '$fpath'"
             return "FILE_NOT_FOUND:$fpath"
         end
-        content = strip(read(`$exec_path $fpath`, String))
-        return split(content, " ")[1]
+
+        # compute the hash
+        return hash_string(read(fpath,String))
     end
     export hash_file
 
@@ -53,34 +62,27 @@ module blake
 
     Arguments
     - `fpath::String`       Path to the file to validate
-    - `quiet::Bool=false`   Suppresses warnings
 
     Returns
     - `Bool`                File is valid.
     """
-    function valid_file(fpath::String; quiet::Bool=false)::Bool
-        # Return true if unsupported
-        if !Sys.islinux() || Sys.ARCH != :x86_64
-            quiet || @debug "Skipping integrity check for '$fpath'"
-            return true
-        end
-
+    function valid_file(fpath::String)::Bool
         # Get the actual hash
         hash_obs = hash_file(fpath)
 
         # Get the expected hash
         cpath::String = fpath*".chk"
         if !isfile(cpath)
-            quiet || @warn "File not found '$cpath'"
+            @warn "File not found '$cpath'"
             return false
         end
         hash_exp = strip(read(fpath*".chk", String))
 
         # Check if equal
         if Bool(hash_exp != hash_obs)
-            quiet || @warn "File '$fpath' failed integrity check"
-            quiet || @warn "    obs = '$hash_obs'"
-            quiet || @warn "    exp = '$hash_exp'"
+            @warn "File '$fpath' failed integrity check"
+            @warn "    obs = '$hash_obs'"
+            @warn "    exp = '$hash_exp'"
             return false
         end
         return true
@@ -94,10 +96,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     import .blake
     if length(ARGS) != 1
         @error("Invalid arguments: $(ARGS)")
-    elseif !Sys.islinux()
-        @error("File hashing is only supported on Linux")
-    elseif Sys.ARCH != :x86_64
-        @error("File hashing is only supported on AMD64 architecture")
     else
         @info("Computing BLAKE2b hash...")
         hash_obs = blake.hash_file(ARGS[1])
