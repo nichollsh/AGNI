@@ -54,6 +54,8 @@ jobs:
           brew update
           brew install netcdf netcdf-fortran gfortran gcc
           echo 'eval $(/opt/homebrew/bin/brew shellenv)' >> ~/.zprofile
+          echo 'export PATH="/opt/homebrew/opt/gcc/bin:$PATH"' >> ~/.zprofile
+          echo $(which gfortran)
 
       # Setup Julia
       - name: Setup Julia
