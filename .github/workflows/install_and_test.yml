@@ -13,15 +13,21 @@ env:
   CODECOV_TOKEN: 1f20e5bd-6449-4538-b29d-ae16e0ba5b99
 
 jobs:
-  install:
+  test:
 
     if: github.event.pull_request.draft == false
+
     permissions:
       contents: read
       pull-requests: write
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     name: install_and_test
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        julia-version: ['1.12']
 
     steps:
       - name: Checkout repository
@@ -37,10 +43,11 @@ jobs:
       - name: Setup Julia
         uses: julia-actions/setup-julia@v3
         with:
-          version: '1.12'
+          version: ${{ matrix.julia-version }}
 
       - name: Cache Julia
         uses: julia-actions/cache@v3
+
 
       # Setup SOCRATES
       - name: Get SOCRATES
@@ -54,7 +61,8 @@ jobs:
         id: cache-socrates
         with:
           path: SOCRATES/
-          key: socrates-${{ hashFiles('SOCRATES/version') }}
+          key: socrates[${{ hashFiles('SOCRATES/version') }}]-os[${{ runner.os }}]-julia[${{ matrix.julia-version }}]
+          restore-keys: socrates[${{ hashFiles('SOCRATES/version') }}]-os[${{ runner.os }}]-julia-[${ matrix.julia-version }}]
 
       - name: Build SOCRATES if required
         if: steps.cache-socrates.outputs.cache-hit != 'true'
@@ -84,8 +92,10 @@ jobs:
           export FC_DIR="/home/runner/work/AGNI/AGNI/fastchem"
           export LD_LIBRARY_PATH=""
           julia --project --code-coverage test/runtests.jl
-
+      
+      # Get coverage when running on linux
       - name: Get coverage
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version == '1.12' }}
         run: |
           export CODECOV_TOKEN="${{ secrets.CODECOV_TOKEN }}"
           julia --project test/runcoverage.jl
@@ -104,7 +114,7 @@ jobs:
             .github/badges/tests-*.json
 
       - name: Publish test badges to gist
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: ${{ (matrix.os == 'ubuntu-latest') && (matrix.julia-version == '1.12' ) && (github.event_name == 'push') && (github.ref == 'refs/heads/main') }}
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: |
