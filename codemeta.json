@@ -19,5 +19,5 @@
   "keywords": "exoplanets, radiation, astronomy, atmosphere, optimization, julia, fortran, convection, chemistry, magma, planetary, physics",
   "license": "Apache-2.0",
   "title": "AGNI",
-  "version": "1.11.0"
+  "version": "1.11.1"
 }
