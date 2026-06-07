@@ -50,13 +50,18 @@ jobs:
 
       - name: NetCDF macOS
         if: ${{ matrix.os == 'macos-latest' }}
+        env:
+          GCC_V: 15
         run: |
           brew update
-          brew install netcdf netcdf-fortran gcc@15 gfortran
-          echo 'eval $(/opt/homebrew/bin/brew shellenv)' >> ~/.zprofile
-          echo 'export PATH="/opt/homebrew/opt/gcc/bin:$PATH"' >> ~/.zprofile
+          brew install netcdf netcdf-fortran gcc@${GCC_V} gfortran
           ls "/opt/homebrew/opt/gcc/bin"
-          echo $(which gfortran)
+          echo 'eval $(/opt/homebrew/bin/brew shellenv)' >> ~/.zprofile
+          ln -fs /opt/homebrew/bin/gfortran-${GCC_V} /usr/local/bin/gfortran
+          mkdir -p /usr/local/gfortran
+          ln -sf /opt/homebrew/Cellar/gcc@${GCC_V}/*/lib/gcc/${GCC_V} /usr/local/gfortran/lib
+          echo 'export PATH="/opt/homebrew/opt/gcc/bin:$PATH"' >> ~/.zprofile
+
 
       # Setup Julia
       - name: Setup Julia
