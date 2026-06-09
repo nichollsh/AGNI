@@ -6,6 +6,6 @@ the wider ecosystem of planetary science software.
 
 | Page | Description |
 |:-----|:------------|
-| [Model description](@ref) | Physics, numerics, and design decisions |
+| [Model description](@ref) overview | Physics, numerics, and design decisions |
 | [Related codes](@ref) | AGNI within the PROTEUS framework and beyond |
 | [Bibliography](@ref) | Literature cited in the source code and documentation |

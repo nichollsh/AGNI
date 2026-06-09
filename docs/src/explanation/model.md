@@ -1,124 +1,13 @@
 # Model description
 AGNI models a planetary atmosphere by treating it as a single column (1D) and splitting it up into levels of finite thickness. These levels are defined in pressure-space, and are arranged logarithmically between the surface and the top of the atmosphere. The atmosphere is assumed to be plane-parallel. Quantities such as pressure and temperature are calculated at level-centres and level-edges, while energy fluxes are calculated only at the edges, and thermodynamic properties (e.g. heat capacity) are calculated only at their centres.
 
-## Height structure
-The atmosphere is assumed to be hydrostatically supported. The density of the gas mixture is calculated using Amagat's additive volume law to combine the densities of the components. The densities of each gas component are nominally calculated using the Van der Waals equation of state (EOS). [AQUA](https://doi.org/10.1051/0004-6361/202038367) is implemented as the EOS for water. The Chabrier+[2019](https://iopscience.iop.org/article/10.3847/1538-4357/aaf99f) EOS is implemented as the EOS for hydrogen. AGNI will fallback to the ideal gas EOS for otherwise unsupported gases.
+## Physics
 
-The radius at each pressure level is obtained by integrating from the surface upwards using a fourth order Runge-Kutta method. This solves the coupled system:
-```math
-\frac{dr}{dp} = -\frac{1}{\rho a}
-```
-```math
-\frac{dg}{dr} = -\frac{G M(r)}{r^2}
-```
-```math
-a = g - r ( 2 \pi  \cos(\theta) / d )^2
-```
-where  $r$ is radial distance from planet centre, $p$ is pressure, $\rho$ is density, $g$ is local gravitational acceleration, $G$ is the gravitational constant, $M(r)$ is the mass enclosed within radius $r$, $\theta$ is latitude, and $d$ is the planet's axial rotation period (day length). This includes self-gravitational attraction, and makes AGNI applicable as an atmospheric structure model.
+You can find a detailed description of the physics underpinning AGNI, and the specific implementation within the code, by reading the pages in this section of the documentation. These are linked in the navbar on the left-hand side of the website.
 
-## Radiative transfer
-Radiative transfer (RT) refers to the transport of radiation energy through a medium subject to the characteristics of the medium. Radiation passing through an atmosphere is absorbed, emitted, scattered, and reflected. In the context of planetary atmospheres, we also have to handle their surfaces, cloud formation, and radiation from the host star.
+The physics descriptions and implementational approach are largely derived from Harrison Nicholls' [PhD Thesis](https://www.h-nicholls.space/thesis.pdf). Literature references are provided in each page's bibliography section.
 
-AGNI nominally simulates RT using a bespoke version of [SOCRATES](https://proteus-framework.org/SOCRATES/): a suite of numerical codes primarily developed by the UK Met Office. SOCRATES solves the RT equation using a two-stream solution, and is accessed here using a Julia interface. Opacity is handled using the correlated-k approximation, with either random overlap or equivalent extinction used to account for overlapping absorption in mixtures of gases.
-
-The model uses k-terms fitted to spectral absorption cross-section data from [DACE](https://dace.unige.ch/opacityDatabase/?#). The MT\_CKD model is used to estimate water continuum absorption cross-sections. Other continua are derived from the HITRAN tables. Rayleigh scattering, water cloud radiative properties, and aerosol parametrisations are also included. For aerosols, generates band-averaged optical properties files at runtime using `scatter_average_90`, then inserts these into the runtime spectral file using `prep_spec`, alongside the stellar spectrum and Rayleigh scattering terms. You can find tools for fitting k-terms and processing line absorption data in my redistribution of [SOCRATES](https://github.com/FormingWorlds/SOCRATES) on GitHub. The flowchart below outlines how these absorption data are converted into a 'spectral file'.
-
-The monochromatic scattering properties are stored in `SOCRATES/data/aerosol/*.mon` files. New `.mon` files can be generated using the `SOCRATES/sbin/Cscatter` script, which can allow the creation of new aerosol data.
-
-![](fig_spectral_flowchart.svg)
-
-Surface reflectivity can be modelled as a greybody with an albedo from 0 to 1. Alternatively, the surface can be modelled using empirical reflectance data that varies (spectrally) with wavelength. In the latter case a filepath must be provided via the config. The file can tabulate any one of: spherical reflectance ('r'), hemispherical emissivity ('e'), or single scattering albedo ('w'). These data are compiled on Zenodo [here](https://zenodo.org/communities/proteus_framework/records?q&f=subject%3Asurface_albedos&l=list&p=1&s=10&sort=newest).
-
-AGNI also includes an interface to the [Reference Forward Model](https://eodg.atm.ox.ac.uk/RFM/), which is packaged as a binary
-blob (the RFM source code is proprietary). This interface provides an extremely easy way to validate and benchmark SOCRATES.
-
-## Convection
-Convection is a turbulent process that occurs across more than one spatial dimension, so it must be parameterised within 1D models like AGNI. In fact, it is typically parameterised inside 3D global circulation models, as resolving convection is numerically expensive. AGNI uses mixing length theory (MLT) to parameterise atmospheric convection. This is in contrast to convective adjustment, which forcibly adjusts a convectively unstable region of the atmosphere to the corresponding adiabat while ensuring that enthalpy is conserved.
-
-MLT directly calculates the energy flux associated with convective heat transport, and thus is the preferred parameterisation within the model. It assumes that parcels of gas are diffused over a characteristic _mixing length_, transporting energy in the process. This requires choosing a scale for this mixing length, but in practice this has very little impact on the results from the model.
-
-When evaluating convective energy fluxes, AGNI first calculates the temperature gradient across each layer of the atmosphere. Convection occurs within each layer that has a lapse rate $dT/dP$ greater than the critical lapse rate for triggering convection. Equations 2 to 6 of Nicholls+[2025](https://academic.oup.com/mnras/article/536/3/2957/7926963) describe the calculation of the convective energy flux under the Schwarzschild criterion. AGNI can also check against the Ledoux criterion for convective stability, which accounts for vertical gradients in the gas MMW. The atmosphere is not explicitly split into convecting and non-convecting regions, thereby allowing disconnected regions of convection.
-
-### Eddy diffusion coefficient
-
-AGNI calculates the vertical eddy diffusion coefficient $K_{zz}$ (units of m² s⁻¹) to parameterise vertical mixing processes in the atmosphere. Three parametrisations are available, selectable via the `Kzz_type` configuration parameter:
-
-**Type 1: Constant value**
-```math
-K_{zz} = K_{\text{break}}
-```
-where $K_{\text{break}}$ is a user-specified constant diffusion coefficient.
-
-**Type 2: Simple MLT scaling** (default)
-```math
-K_{zz} = \lambda_{\text{conv}} \, w_{\text{conv}}
-```
-where $\lambda_{\text{conv}}$ is the mixing length and $w_{\text{conv}}$ is the convective velocity, both calculated from mixing length theory in convective regions.
-
-**Type 3: MLT convective flux scaling**
-
-Following Charnay et al. ([2015](https://iopscience.iop.org/article/10.1088/0004-637X/813/1/15)), Equation 16:
-```math
-K_{zz} = \frac{H_p}{3} \left(\frac{\lambda_{\text{conv}}}{H_p}\right)^{4/3} \left(\frac{R_{\text{gas}} F_c}{\mu \rho c_p}\right)^{1/3}
-```
-where $H_p$ is the pressure scale height, $R_{\text{gas}}$ is the gas constant, $F_c$ is the convective energy flux, $\mu$ is the mean molecular weight, $\rho$ is the density, and $c_p$ is the specific heat capacity at constant pressure.
-
-In convective regions, $K_{zz}$ is calculated directly using one of the above parametrisations. In non-convective regions (radiative zones), $K_{zz}$ is extended using a power-law scaling with pressure:
-```math
-K_{zz}(p) = K_{\text{ref}} \left(\frac{p}{p_{\text{ref}}}\right)^{\alpha}
-```
-where $K_{\text{ref}}$ and $p_{\text{ref}}$ are the reference diffusion coefficient and pressure at the convective region boundary (or at a user-specified breakpoint pressure), and $\alpha$ is the power-law index (default: $\alpha = -0.4$). This stratospheric scaling follows Tsai et al. ([2020](https://iopscience.iop.org/article/10.3847/1538-4357/ac29bc), Equation 28). Below convective regions, $K_{zz}$ is held constant at its deepest convective value.
-
-## Condensation, evaporation, and oceans
-AGNI incorporates a simple ocean model, which is tied to the atmosphere rainout and evaporation schemes. This is divided into two reservoirs for each condensable component:
-* An initial reservoir of surface condensate, provided by the user.
-* A total reservoir of surface condensate, based on the calculated chemistry and temperature profile.
-
-The condensation and chemistry calculations then operate together. At each solver step, the following actions occur:
-1. The *surface* temperature and partial pressures are checked against saturation, for each condensable
-    - Super-saturated condensables have their partial pressures decreased, and the mass is added to the ocean reservoir
-    - Sub-saturated condensables have their partial pressures increased based on the availability of surface condensate
-2. Chemistry is then performed to calculate the gas phase speciation; see [Equilibrium chemistry](@ref) below
-3. Rainout is calculated aloft, based on sub/super-saturation at *every* atmosphere level.
-
-In the first step, the model is effectively non-hydrostatic because the surface pressure (and whole pressure grid) is adjusted according to *surface* sub/super-saturation. The sum of condensation at the surface and aloft go towards modulating the surface ocean content. The ocean layer structure is calculated according to liquid density. Two parameters (ocean basin area, continental shelf height) determine the filling fraction of the basins; i.e. whether the planet is a 'desert planet', a 'continental planet', or an 'aqua planet'.
-
-During the third step, where phase change happens aloft, the mixing ratios of dry species are increased in order to satisfy the total pressure at condensing levels. This is treated as a hydrostatic process. The total accumulated amount of condensation (for each volatile) is then re-evaporated in the deeper atmosphere where possible. Rain reaching the surface contributes to the ocean.
-
-## Phase change in the atmosphere
-Gases release energy "latent heat" into their surroundings when condensing into a liquid or solid. This is included in the model through a diffusive condensation scheme, which assumes a fixed condensation timescale. Any rain which is not re-evaporated before reaching the surface is considered to contribute towards forming an ocean (secondary reservoir).
-
-The latent heating associated with the change in partial pressure of condensable gases in the atmosphere is used to calculate a latent heating rate at each level of the model (positive where condensing, negative where evaporating). The heating rates in each layer are then integrated (from the TOA downwards) to provide a latent heat transport *flux* at cell-edges, with the assumption being that condensation occurs by updrafts:
-```math
-F_{\text{latent}}(p) = \int_0^p L_v(T) \frac{dq}{dt} dp
-```
-where $L_v(T)$ is the temperature-dependent latent heat of vaporisation, $q$ is the mixing ratio of the condensable species, and the integral is performed from the top of atmosphere downwards. The integrated condensable heat flux is balanced by evaporation at deeper layers which closes the energy balance.
-
-Latent heats are temperature-dependent, using values derived from Coker ([2007](https://doi.org/10.1016/B978-0-7506-7766-0.X5000-3)) and Wagner & Pruß ([2001](https://doi.org/10.1063/1.1461829)). Heat capacities are also temperature-dependent, using values derived from the JANAF database. See the [ThermoTools repo](https://github.com/nichollsh/ThermoTools) for scripts. This method is conceptually similar to Derras-Chouk+[2025](https://arxiv.org/abs/2508.16750).
-
-AGNI assumes that no work is done during phase changes aloft, $p dV \approx 0$, so enthalpy and latent heat become equivalent.
-
-## Deep heating
-In addition to the energy transport terms, some heat production/loss may occur within a given layer of the atmosphere; e.g. from advective heat transport or ohmic dissipation. AGNI includes a parameterisation of this 'deep' heating through a Gaussian energy deposition profile in log-pressure space, centred at a user-specified centre and width:
-```math
-\frac{dF}{dP} = \frac{F_{\text{total}}}{\sqrt{2\pi} \sigma P} \exp\left(-\frac{(\ln P - \ln P_0)^2}{2\sigma^2}\right)
-```
-where $F_{\text{total}}$ is the total integrated heating rate, $P_0$ is the centre pressure of the Gaussian profile, $\sigma$ is the width in log-pressure space, and $P$ is pressure. This is a representation of energy sources/sinks from otherwise unmodelled physics. The 'deep heating' functionality was first introduced to AGNI by [Cheng An Hsieh](https://didymos65803.github.io/).
-
-## Stellar flux
-A key input to the radiation model is the shortwave downward-directed flux from the star at the top of the atmosphere. This is quantified by the bolometric instellation flux, a scale factor, an artificial additional albedo factor, and a zenith angle. All of these may be provided to the model through the configuration file. The model also requires a stellar spectrum scaled to the top of the atmosphere.
-
-## Equilibrium chemistry
-By default, AGNI assumes that the atmosphere composition is "well-mixed". This means that the mixing ratios of the species are constant with height. Condensation of a super-saturated volatile will reduce its mixing ratio such that it becomes exactly saturated.
-
-AGNI can couple to [FastChem](https://newstrangeworlds.github.io/FastChem/) — a fast numerical code for gas-phase thermochemical equilibrium. FastChem takes elemental abundances (metallicities), pressures, and temperatures as input variables and returns the mixing ratios of hundreds of gas-phase species at thermochemical equilibrium. When the configuration variable `physics.chemistry = true` FastChem will be enabled.
-
-At each step of the solver loop, AGNI derives the atmosphere's bulk elemental metallicity from the gas composition (or from user-provided metallicities), then calls FastChem to compute gas-phase equilibrium mixing ratios across the column. AGNI's own rainout and condensation scheme (`_sat_aloft!`) subsequently operates on the post-FastChem composition, handling super-saturation and cold-trapping. The two schemes are therefore **complementary**: FastChem handles gas-phase speciation while AGNI handles condensation independently.
-
-## Transparent atmospheres
-It is useful to run AGNI with a transparent atmosphere in various scenarios. For example, in the calculation of reflectance or emission spectra of 'bare rock' planets. Or alternatively to determine a planet's surface temperature in the absence of an overlying atmosphere. AGNI incorporates this functionality through the configuration variable `composition.transparent=true`. This will set the atmosphere surface pressure to be small and disable the gas opacity, continuum opacity, and other absorption processes in SOCRATES.
-
-When this is enabled, make sure to use the "transparent" solver. The section below does not apply in this case, as there is only one variable (the surface temperature) to solve for - this is done using a Golden-Section search method.
+In-code references are also provided in the [Bibliography](@ref).
 
 ## Obtaining a solution
 
@@ -144,19 +33,6 @@ Solution type (4) is useful when the target OLR is known from observational cons
 ### Construction
 The atmosphere is constructed of $N$ levels (cell-centres), corresponding to $N+1$ interfaces (cell-edges). The RT model takes cell-centre temperatures $T_i$, pressures $p_i$, geometric heights, and mixing ratios as input variables at each level $i$, as well as the surface temperature and incoming stellar flux. In return, it provides cell-edges spectral fluxes $F_i$ at all $N+1$ interfaces for LW & SW components and upward & downward streams. Convective fluxes can be estimated using the MLT scheme, condensation fluxes from the condensation scheme, and sensible heat from a simple turbulent kinetic energy (TKE) approximation.
 
-### Sensible heat flux
-
-Surface-atmosphere turbulent heat exchange is parameterised using a bulk aerodynamic formula with Monin-Obukhov similarity theory (see Nicholson & Benn [2006](https://doi.org/10.3189/172756506781828584), Equation 9; and Pierrehumbert [2010](https://geosci.uchicago.edu/~rtp1/PrinciplesPlanetaryClimate/index.html)):
-```math
-F_{\text{sens}} = \rho c_p C_d u (T_{\text{surf}} - T_{\text{atm}})
-```
-where $\rho$ is air density, $c_p$ is specific heat capacity, $u$ is wind speed, $T_{\text{surf}}$ is surface temperature, $T_{\text{atm}}$ is the temperature of the lowest atmospheric layer, and $C_d$ is the drag coefficient:
-```math
-C_d = \left(\frac{\kappa}{\ln(h/z_0)}\right)^2
-```
-where $\kappa$ is the von Kármán constant (0.4), $h$ is the height of the lowest atmospheric layer, and $z_0$ is the surface roughness length.
-
-The total upward-directed energy flux $F_{i}$ describes the total upward-directed energy transport (units of $\text{W m}^{-2}$) from cell $i$ into cell $i-1$ above (or into space for $i=1$). For energy to be conserved throughout the column, it must be true that $F_i = F_t \text{ } \forall \text{ } i$ where $F_t$ is the total amount of energy being transported out of the planet. In global radiative equilibrium, $F_t = 0$.
 
 ### Definition of residuals
 We can use this construction to solve for the temperature profile of the atmosphere as an $N+1$-dimensional optimisation problem. This directly solves for $T(p)$ at radiative-convective equilibrium without having to invoke heating rate calculations, thereby avoiding slow convergence in regions of the atmosphere with long radiative timescales. The residuals vector (length $N+1$)
@@ -238,9 +114,13 @@ The update may also be scaled by a linesearch
 ```
 on $\alpha$. This is applied if the full step $\bm{d}$ would increase the cost by an unacceptable amount. If the model is close to convergence then a golden-section search method is used to determine the optimal $\alpha$, otherwise a backtracking method is used.  This means that the model is (mostly) able to avoid oscillating around a solution. All three of these scalings to $\bm{d}$ preserve its direction.
 
-
 ## Other features
 AGNI can calculate emission spectra, provided with T(p) and the volume mixing ratios of the gases. This is performed using the same RT as the RCE calculations, so is limited in resolution by the choice of correlated-k bands. Similarly, the longwave contribution function can also be calculated.
+
+## Transparent atmospheres
+It is useful to run AGNI with a transparent atmosphere in various scenarios. For example, in the calculation of reflectance or emission spectra of 'bare rock' planets. Or alternatively to determine a planet's surface temperature in the absence of an overlying atmosphere. AGNI incorporates this functionality through the configuration variable `composition.transparent=true`. This will set the atmosphere surface pressure to be small and disable the gas opacity, continuum opacity, and other absorption processes in SOCRATES.
+
+When this is enabled, make sure to use the "transparent" solver. The section below does not apply in this case, as there is only one variable (the surface temperature) to solve for - this is done using a Golden-Section search method.
 
 ## Julia and Fortran
 AGNI is primarily written in Julia, while SOCRATES itself is written in Fortran. Julia was chosen because it allows the SOCRATES binaries to be included in the precompiled code, which significantly improves performance.

@@ -33,7 +33,7 @@ Literature cited in the AGNI source code and documentation. Grouped thematically
 ```
 
 
-## Radiative transfer
+## Radiative transfer modelling and theory
 
 - **Edwards & Slingo (1996)**
   Studies with a flexible new radiation code. I: Choosing a configuration for a large-scale model.
@@ -339,3 +339,9 @@ Literature cited in the AGNI source code and documentation. Grouped thematically
   Julia: A fresh approach to numerical computing.
   *SIAM Review*, 59(1), 65–98.
   [doi:10.1137/141000671](https://doi.org/10.1137/141000671)
+
+## Compiled bibliography
+
+```@bibliography
+*
+```

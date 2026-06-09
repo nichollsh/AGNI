@@ -1,4 +1,5 @@
 using Documenter
+using DocumenterCitations
 using DocumenterPages
 using DocumenterTools: Themes
 using AGNI
@@ -26,9 +27,9 @@ cp(joinpath(ASSETS_DIR, "light.scss"), joinpath(ASSETS_DIR, "dark.scss"), force=
 
 # compile styles into scss files
 Themes.compile(joinpath(ASSETS_DIR, "light.scss"),
-                joinpath(ASSETS_DIR, "src/assets/themes/documenter-light.css"))
+                joinpath(ASSETS_DIR, "themes/documenter-light.css"))
 Themes.compile(joinpath(ASSETS_DIR, "dark.scss"),
-                joinpath(ASSETS_DIR, "src/assets/themes/documenter-dark.css"))
+                joinpath(ASSETS_DIR, "themes/documenter-dark.css"))
 
 format = Documenter.HTML(   edit_link = nothing,
                             collapselevel = 1,
@@ -48,6 +49,11 @@ format = Documenter.HTML(   edit_link = nothing,
                                 asset("https://fonts.googleapis.com/css?family=Inter:400&family=JetBrains+Mono:400&family=Lato", class=:css),
                             ]
     )
+
+bib = CitationBibliography(
+    joinpath(ASSETS_DIR, "refs.bib"),
+    style=:numeric  # :authoryear
+)
 
 makedocs(
     sitename = sitename,
@@ -78,7 +84,13 @@ makedocs(
         ),
 
         PageNode("Explanation" => "explanation/index.md", [
-            "Model description"  => "explanation/model.md",
+            "Model description" => "explanation/model.md",
+            "Convection" => "explanation/model_convection.md",
+            "Radiation" => "explanation/model_radiation.md",
+            "Height and gravity" => "explanation/model_height.md",
+            "Thermodynamics" => "explanation/model_thermodynamics.md",
+            "Sensible heating" => "explanation/model_sensible.md",
+            "Advective terms" => "explanation/model_advection.md",
             "Bibliography"       => "explanation/references.md",
             ],
         ),
@@ -94,7 +106,8 @@ makedocs(
 
         "Other PROTEUS modules" => "ecosystem.md",
 
-    ]
+    ],
+    plugins=[bib],
 )
 
 deploydocs(
