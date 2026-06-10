@@ -8,7 +8,7 @@ AGNI is a standalone piece of software designed to model planetary atmospheres. 
 </center>
 ```
 
-PROTEUS (/ˈproʊtiəs, PROH-tee-əs) is a modular Python framework that simulates the coupled evolution of the atmospheres and interiors of rocky planets and exoplanets. PROTEUS achieves this by connecting various codes together, which are referred to as 'modules'.  In this manner, AGNI is applied as the primary atmosphere-climate module within PROTEUS, allowing a solution for planetary evolution with realistic atmosphere modelling. It is primarily developed by the [FormingWorlds Lab](https://www.formingworlds.space/) (University of Groningen), and the [Planetary Chemistry](https://www.shorttle.com/people/) group (University of Cambridge.)
+PROTEUS (/ˈproʊtiəs, PROH-tee-əs) is a modular Python framework that simulates the coupled evolution of the atmospheres and interiors of rocky planets and exoplanets. PROTEUS achieves this by connecting various codes together, which are referred to as 'modules'.  In this manner, AGNI is applied as the primary atmosphere-climate module within PROTEUS, allowing a solution for planetary evolution with realistic atmosphere modelling. It is primarily developed by the [FormingWorlds Lab](https://www.formingworlds.space/) (University of Groningen), and the [Planetary Chemistry](https://www.shorttle.com/people/) group (University of Cambridge).
 
 ```@raw html
 <center>

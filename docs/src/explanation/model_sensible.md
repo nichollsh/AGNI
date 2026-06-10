@@ -12,8 +12,6 @@ C_d = \left(\frac{\kappa}{\ln(h/z_0)}\right)^2
 ```
 where $\kappa$ is the von Kármán constant (0.4), $h$ is the height of the lowest atmospheric layer, and $z_0$ is the surface roughness length [hogstrom_karman_1988](@citep).
 
-The total upward-directed energy flux $F_{i}$ describes the total upward-directed energy transport (units of $\text{W m}^{-2}$) from cell $i$ into cell $i-1$ above (or into space for $i=1$). For energy to be conserved throughout the column, it must be true that $F_i = F_t \text{ } \forall \text{ } i$ where $F_t$ is the total amount of energy being transported out of the planet. In global radiative equilibrium, $F_t = 0$.
-
 ## Bibliography for this page
 
 ```@bibliography
