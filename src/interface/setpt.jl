@@ -95,7 +95,7 @@ module setpt
     """
     function request!(atmos::atmosphere.Atmos_t, request::Array)::Bool
 
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -194,7 +194,7 @@ module setpt
     function fromarrays!(atmos::atmosphere.Atmos_t, pl::Array, tmpl::Array;
                             extrap::Bool=false)::Bool
 
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -257,7 +257,7 @@ module setpt
     """
     function fromcsv!(atmos::atmosphere.Atmos_t, fpath::String)::Bool
 
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -340,7 +340,7 @@ module setpt
     """
     function fromncdf!(atmos::atmosphere.Atmos_t, fpath::String)::Bool
 
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -421,7 +421,7 @@ module setpt
     - `Bool`                success status.
     """
     function isothermal!(atmos::atmosphere.Atmos_t, set_tmp)
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -449,7 +449,7 @@ module setpt
     - `Bool`                success status.
     """
     function add!(atmos::atmosphere.Atmos_t, delta)::Bool
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -477,7 +477,7 @@ module setpt
     """
     function dry_adiabat!(atmos::atmosphere.Atmos_t)::Bool
         # Validate input
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -555,7 +555,7 @@ module setpt
     """
     function loglinear!(atmos::atmosphere.Atmos_t, top_tmp)::Bool
 
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -599,7 +599,7 @@ module setpt
     """
     function saturation!(atmos::atmosphere.Atmos_t, gas::String; dTdew::Float64=0.05)
 
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end
@@ -670,7 +670,7 @@ module setpt
     """
     function analytic!(atmos::atmosphere.Atmos_t)::Bool
 
-        if !(atmos.is_alloc || atmos.is_param)
+        if !atmos.is_alloc || !atmos.is_param
             @warn "setpt: Atmosphere is not setup or allocated"
             return false
         end

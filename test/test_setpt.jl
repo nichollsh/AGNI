@@ -304,8 +304,17 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         # _verb_arg helper out-of-range returns UNSET sentinel string
         @test AGNI.setpt._verb_arg(Any["iso"], 3) == AGNI.atmosphere.UNSET_STR
 
-        # Methods should return false when atmosphere is not setup/allocated
+        # Methods should return false when atmosphere is not allocated
         atmos_unalloc = AGNI.atmosphere.Atmos_t()
+        AGNI.atmosphere.setup!(atmos_unalloc, ROOT_DIR, OUT_DIR,
+                          spfile,
+                          toa_heating, 1.0, 0.0, theta,
+                          tmp_surf,
+                          gravity, radius,
+                          nlev_centre, p_surf, p_top,
+                          mf_dict, ""
+                  )
+
         @test AGNI.setpt.request!(atmos_unalloc, Any["iso", 300.0]) == false
         @test AGNI.setpt.isothermal!(atmos_unalloc, 300.0) == false
         @test AGNI.setpt.add!(atmos_unalloc, 10.0) == false
