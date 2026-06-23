@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Setup system
       - name: NetCDF Ubuntu
@@ -75,7 +75,7 @@ jobs:
 
       # Setup SOCRATES
       - name: Get SOCRATES
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: 'FormingWorlds/SOCRATES'
           path: 'SOCRATES'

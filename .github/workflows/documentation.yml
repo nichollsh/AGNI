@@ -32,7 +32,7 @@ jobs:
     name: documentation
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: NetCDF
         run: |
@@ -49,7 +49,7 @@ jobs:
 
       # Setup SOCRATES
       - name: Get SOCRATES
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: 'FormingWorlds/SOCRATES'
           path: 'SOCRATES'
