@@ -81,7 +81,7 @@ jobs:
           path: 'SOCRATES'
 
       - name: Restore SOCRATES from cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: cache-socrates
         with:
           path: SOCRATES/

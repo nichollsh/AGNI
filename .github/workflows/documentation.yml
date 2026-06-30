@@ -54,7 +54,7 @@ jobs:
           repository: 'FormingWorlds/SOCRATES'
           path: 'SOCRATES'
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         id: cache-socrates
         with:
           path: |
