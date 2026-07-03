@@ -10,7 +10,7 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String     = "1.11.3"  # current agni version
+    const AGNI_VERSION::String     = "1.11.4"  # current agni version
     export AGNI_VERSION
     const SOCVER_minimum::Float64  = 2603.6    # minimum required socrates version
     export SOCVER_minimum
@@ -96,7 +96,8 @@ module consts
 
     # List of elements included in the model
     const elems_standard::Array{String,1} = ["H","D","C","N","O","S","P",
-                                                "He","Ar","F","Cl","Br",
+                                                "He","Ne","Ar","Kr","Xe",
+                                                "F","Cl","Br",
                                                 "Ti", "V", "Fe", "Si","Al", "Cr",
                                                 "Mg","Ca","Na","Li","K"]
     export elems_standard
@@ -104,7 +105,9 @@ module consts
     # Standard species
     const vols_standard::Array{String,1} = [
         # volatile atoms
-        "H", "O", "C", "N", "S", "P", "He",
+        "H", "O", "C", "N", "S", "P", 
+        # Noble gases
+        "He", "Ne", "Ar", "Kr", "Xe",
         # basic
         "CH4", "CO2", "CO", "H2", "H2O", "O2", "OH", "O3",
         # carbon
