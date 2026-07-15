@@ -7,16 +7,46 @@
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 $maincolor: #1c2b4b;   // main color of the org theme
-$secondcolor: #3b6193; // secondary color that serves as accents
+$secondcolor: #1B6FA8; // link/action color — see reference/visual_language.md
                          // it is used as-is for links in light theme
-$mainwhite: #ffffff;      // color representing white
-$mainblack: #212121;   // color representing black
+$mainwhite: #F2F5F7;      // off-white background color — see reference/visual_language.md
+$mainblack: #10151B;   // text color — see reference/visual_language.md
 $darkbg: #212121;      // dark theme main page background
 
 // These commands set up the fonts for the main text and code blocks.
-// the fonts must be included into the assets of the `makdocs` command, with e.g.
-$family-sans-serif: 'Inter', sans-serif;
-$family-monospace: 'JetBrains Mono', monospace;
+// The font files themselves are bundled locally under assets/fonts/ (variable TTFs,
+// SIL OFL-1.1 licensed) rather than pulled from Google Fonts at page-load time.
+$family-sans-serif: 'Instrument Sans', sans-serif; // prose, documentation, interface text
+$family-monospace: 'Spline Sans Mono', monospace;  // code, axis labels, eyebrows, captions, versions, timestamps
+// Headings, titles, and the wordmark use a distinct display font (Sora). Bulma/Documenter
+// have no dedicated heading-font variable, so this is applied via explicit selectors below.
+$family-heading: 'Sora', sans-serif;
+
+// Local, self-hosted variable-font faces (paths are relative to the compiled CSS file
+// at assets/themes/documenter-{light,dark}.css). Weight/width ranges below were read
+// directly from each font's `fvar` axis table.
+@font-face {
+  font-family: 'Sora';
+  src: url("../fonts/Sora-Variable.ttf") format("truetype-variations");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url("../fonts/InstrumentSans-Variable.ttf") format("truetype-variations");
+  font-weight: 400 700;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Spline Sans Mono';
+  src: url("../fonts/SplineSansMono-Variable.ttf") format("truetype-variations");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
@@ -102,4 +132,22 @@ $input-focus-border-color: $mainwhite;
       color: $mainwhite; // placeholder text color ("Search here...")
     }
   }
+}
+
+// Titles, headings, and the wordmark use $family-heading (Sora); everything else
+// inherits $family-sans-serif (Instrument Sans) from the base theme import above.
+h1, h2, h3, h4, h5, h6,
+.title, .subtitle,
+#documenter .docs-package-name {
+  font-family: $family-heading;
+}
+
+// Axis labels, eyebrows, captions, version strings, and timestamps use
+// $family-monospace (Spline Sans Mono), matching code text. ".eyebrow" and
+// ".caption" are utility classes for authors to apply in raw-HTML blocks;
+// the version selector is targeted directly since it ships with the theme.
+#documenter .docs-version-selector,
+figcaption, time,
+.eyebrow, .caption {
+  font-family: $family-monospace;
 }
