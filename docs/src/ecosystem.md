@@ -4,7 +4,7 @@ AGNI is a standalone piece of software designed to model planetary atmospheres. 
 
 ```@raw html
 <center>
-<object type="image/png" width="45%" data="https://cdn.jsdelivr.net/gh/FormingWorlds/PROTEUS@main/docs/assets/PROTEUS_white.png"></object>
+<object type="image/png" width="45%" data="https://cdn.jsdelivr.net/gh/FormingWorlds/proteus-visual-language@main/logo/lockup/proteus-lockup-light-transparent.png"></object>
 </center>
 ```
 

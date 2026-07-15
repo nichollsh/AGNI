@@ -11,6 +11,7 @@ I would like to thank the following people for their input and assistance during
 * [Namrah Habib](https://www.physics.ox.ac.uk/our-people/habibn)
 * [Leoni Janssen](https://www.universiteitleiden.nl/en/staffmembers/leoni-janssen)
 * [Karen Stuitje](https://github.com/stuitje)
+* [James Manners](https://exoclimatology.com/team-profiles/james-manners/)
 * [Ruizhi Zhan](https://ruizhizhan.github.io/)
 * [Boding Ouyang](https://github.com/OYBDOOO)
 * [Soumil Kelkar](https://research.rug.nl/en/persons/soumil-kelkar/)
@@ -18,3 +19,4 @@ I would like to thank the following people for their input and assistance during
 * [Stuart Daines](https://scholar.google.com/citations?user=EZqVB7wAAAAJ)
 
 Please contact [Harrison Nicholls](https://www.h-nicholls.space/) for any queries relating to AGNI.
+

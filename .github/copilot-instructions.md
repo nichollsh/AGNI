@@ -151,6 +151,18 @@ Documentation can include information about SOCRATES, FastChem, and RFM dependen
 
 Documentation should be clear, concise, and accessible to the target audience of planetary scientists and climate modellers. It can use jargon but should explain any technical terms that are necessary.
 
+Documentation must be written in British English throughout (e.g. "colour", "modelling", "optimisation", "behaviour"), not American English. This applies to all prose in `docs/src/**`, docstrings, and this rule file.
+
+### Keep the docs pipeline and visual language pages in sync
+
+`docs/src/reference/docs_pipeline.md` is the canonical description of the documentation build pipeline (`docs/make.jl`, SCSS→CSS theme compilation, deployment). `docs/src/reference/visual_language.md` is the canonical reference for the palette, fonts, logo usage, and badge-embedding convention. Any change to one of the following **must** update the matching page in the same commit/PR:
+- `docs/make.jl` page structure, plugins, or `deploydocs` config → `docs_pipeline.md`
+- `docs/make.jl` asset list or `docs/src/assets/*.scss` (palette, font-family variables, heading/code/metadata selectors) → `visual_language.md`
+- Logo, favicon, or font assets under `docs/src/assets/` (fonts are bundled locally as TTF files under `docs/src/assets/fonts/`, not loaded remotely) → `visual_language.md`
+- The badge-embedding convention (e.g. how `<img>` tags are sized/styled in raw HTML blocks) → `visual_language.md`
+
+Conversely, before making any of the above changes, read the matching page first so the change is consistent with the documented conventions (e.g. which font family is used for headings vs. body vs. code/metadata text).
+
 ## Test suite
 
 Unit tests are individual files (`test_consts.jl`, `test_phys.jl`, etc.) included by `runtests.jl`. Slow tests, such as those requiring SOCRATES data, are skipped with the `fast` argument. Add new unit test files by `include()`ing them in `runtests.jl`.

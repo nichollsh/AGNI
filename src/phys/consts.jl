@@ -10,7 +10,7 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String     = "1.11.4"  # current agni version
+    const AGNI_VERSION::String     = "1.11.5"  # current agni version
     export AGNI_VERSION
     const SOCVER_minimum::Float64  = 2603.6    # minimum required socrates version
     export SOCVER_minimum
@@ -141,6 +141,7 @@ module consts
         "CaO", "AlO", "Na2", "NaO", "NaOH", "KOH",
         "HAlO2"
     ]
+
     const gases_standard::Array{String, 1} = vcat(vols_standard, vaps_standard)
     export vols_standard
     export vaps_standard

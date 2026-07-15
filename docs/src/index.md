@@ -26,7 +26,11 @@ Contact: see information on [my website homepage](https://www.h-nicholls.space/)
 
 GitHub: [https://github.com/nichollsh/AGNI](https://github.com/nichollsh/AGNI)
 
+See the [Testing suite](@ref) page for an overview of AGNI's testing and validation approach. The [Licensing](@ref) page for licensing terms covering the code,
+documentation, and assets.
+
 If you use AGNI, please cite the following papers:
 * Nicholls et al. (2025a)  - doi:[10.1093/mnras/stae2772](https://doi.org/10.1093/mnras/stae2772)
 * Nicholls et al. (2025b)  - doi:[10.21105/joss.07726](https://doi.org/10.21105/joss.07726)
 * Nicholls et al. (2026)   - doi:[10.1038/s41550-026-02815-8](https://doi.org/10.1038/s41550-026-02815-8)
+

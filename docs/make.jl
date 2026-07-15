@@ -44,9 +44,9 @@ format = Documenter.HTML(   edit_link = nothing,
                                 # local assets
                                 "assets/style.css",
                                 "assets/logo.ico",
-
-                                # remote assets
-                                asset("https://fonts.googleapis.com/css?family=Inter:400&family=JetBrains+Mono:400&family=Lato", class=:css),
+                                # Sora, Instrument Sans, and Spline Sans Mono are bundled locally as
+                                # @font-face rules in assets/style.scss (see assets/fonts/), so no
+                                # remote font assets are loaded here.
                             ]
     )
 
@@ -91,6 +91,8 @@ makedocs(
             "Thermodynamics" => "explanation/model_thermodynamics.md",
             "Sensible heating" => "explanation/model_sensible.md",
             "Advective terms" => "explanation/model_advection.md",
+            "Testing suite" => "explanation/testing.md",
+            "Licensing" => "explanation/licensing.md",
             "Bibliography"       => "explanation/references.md",
             ],
         ),
@@ -98,6 +100,8 @@ makedocs(
         PageNode("Reference" => "reference/index.md", [
             "Configuration reference"   => "reference/configuration.md",
             "Solver and output flags"   => "reference/solver_flags.md",
+            "Documentation build pipeline" => "reference/docs_pipeline.md",
+            "Visual language"           => "reference/visual_language.md",
             "API reference"             => "reference/api.md",
             ],
         ),
