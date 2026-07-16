@@ -354,7 +354,7 @@ function handle_request {
 
         "thermodynamics")
             echo $help_thermo
-            get_zip 18602435 $thermo gases.zip
+            get_zip 21390786 $thermo gases.zip
             ;;
 
         "parfiles")

@@ -10,7 +10,7 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String     = "1.11.6"  # current agni version
+    const AGNI_VERSION::String     = "1.12.0"  # current agni version
     export AGNI_VERSION
     const SOCVER_minimum::Float64  = 2603.6    # minimum required socrates version
     export SOCVER_minimum
@@ -105,7 +105,7 @@ module consts
     # Standard species
     const vols_standard::Array{String,1} = [
         # volatile atoms
-        "H", "O", "C", "N", "S", "P", 
+        "H", "O", "C", "N", "S", "P",
         # Noble gases
         "He", "Ne", "Ar", "Kr", "Xe",
         # basic

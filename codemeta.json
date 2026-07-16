@@ -14,10 +14,10 @@
   "codeRepository": "https://github.com/nichollsh/AGNI",
   "datePublished": "2024-12-29",
   "dateCreated": "2024-09-13",
-  "dateModified": "2026-02-10",
+  "dateModified": "2026-07-16",
   "description": "An open-source model for extreme atmospheres on rocky exoplanets.",
   "keywords": "exoplanets, radiation, astronomy, atmosphere, optimization, julia, fortran, convection, chemistry, magma, planetary, physics",
   "license": "Apache-2.0",
   "title": "AGNI",
-  "version": "1.11.4"
+  "version": "1.12.0"
 }
