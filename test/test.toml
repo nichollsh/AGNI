@@ -1,5 +1,5 @@
 # AGNI configuration file
-title = "Unit tests configuration"
+title = "AGNI configuration file for test suite"
 
 [planet]
     tmp_surf        = 1000.0
