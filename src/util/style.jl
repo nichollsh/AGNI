@@ -8,15 +8,20 @@ module style
     import ..formulae: count_atoms
 
     # Colors for plotting
+    # Black/yellow/green/blue/red roles follow the brand palette documented in
+    # docs/src/reference/visual_language.md (docs/src/assets/style.scss)
     const col_r::String = "#c0c0c0"; export col_r # radiation
-    const col_n::String = "#000000"; export col_n # net
-    const col_c::String = "#6495ed"; export col_c # convection
-    const col_t::String = "#ff4400"; export col_t # temperature
-    const col_o::String = "#66CD00"; export col_o # conduction
-    const col_p::String = "#ecb000"; export col_p # phase change
+    const col_n::String = "#10151B"; export col_n # net
+    const col_c::String = "#1B6FA8"; export col_c # convection
+    const col_t::String = "#C2362B"; export col_t # temperature
+    const col_o::String = "#57A05C"; export col_o # conduction
+    const col_p::String = "#C8860F"; export col_p # phase change
     const col_d::String = "#8B008B"; export col_d # deepheating
 
-    const col_obs_phot::String = "#ff4400"; export col_obs_phot # photosphere
+    const col_obs_phot::String = "#C2362B"; export col_obs_phot # photosphere
+
+    const col_black::String = "#10151B"; export col_black # generic black/text
+    const col_bg::String    = "#F2F5F7"; export col_bg    # plot background
 
     # Allowed plot file extensions
     const ALLOWED_EXTS::Set{String} = Set(["png", "pdf", "svg"])
