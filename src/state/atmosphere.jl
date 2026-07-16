@@ -1088,10 +1088,6 @@ module atmosphere
                                                 header=false, skipstart=2)
             mf_body = transpose(mf_body)
 
-            # Get pressure array from file
-            arr_p::Array{Float64,1} = mf_body[1,:]
-            arr_x::Array{Float64,1} = zero(arr_p)
-
             # set composition by interpolating with pressure array
             # the pressure array must be the first column in the file
             for li in 2:lastindex(heads)
@@ -1114,8 +1110,11 @@ module atmosphere
                     atmos.gas_num += 1
                 end
 
-                # Get VMR values from file
-                arr_x[:] .= mf_body[li,:]
+                # Get pressure and VMR arrays from file, fresh for each gas so that
+                # the pressure-domain extension below does not leak into the next
+                # gas column's (differently-sized) arrays
+                arr_p::Array{Float64,1} = mf_body[1,:]
+                arr_x::Array{Float64,1} = mf_body[li,:]
 
                 # Extend loaded profile to lower pressures (prevents domain error)
                 if arr_p[1] > atmos.p_toa

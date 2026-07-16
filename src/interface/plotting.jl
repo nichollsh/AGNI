@@ -33,6 +33,8 @@ module plotting
                              :grid       => true,
                              :guidefontsize => 9,
                              :titlefontsize => 9,
+                             :background_color => col_bg,
+                             :foreground_color => col_black,
                              :dpi => 240)
 
 
@@ -149,10 +151,10 @@ module plotting
 
     # Reusable plotting snippets
     macro _plt_pboa()
-        return esc(:(hline!(plt, [atmos.p_boa/1e5 ], label="", color="black",  ls=:solid)))
+        return esc(:(hline!(plt, [atmos.p_boa/1e5 ], label="", color=col_black,  ls=:solid)))
     end
     macro _plt_poboa()
-        return esc(:(hline!(plt, [atmos.p_oboa/1e5], label="", color="black", ls=:dot)))
+        return esc(:(hline!(plt, [atmos.p_oboa/1e5], label="", color=col_black, ls=:dot)))
     end
 
     """
@@ -225,14 +227,14 @@ module plotting
         # Plot tmp_magma
         if incl_magma
             scatter!(plt, [atmos.tmp_magma], [atmos.p_boa/1e5],
-                        color="cornflowerblue", label=L"T_m")
+                        color=col_c, label=L"T_m")
         end
 
         # Plot tmp_surf
-        scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color="brown3", label=L"T_s")
+        scatter!(plt, [atmos.tmp_surf], [atmos.p_boa/1e5], color=col_t, label=L"T_s")
 
         # Plot profile
-        plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc="black", lw=lw, label=L"T(pl)")
+        plot!(plt, atmos.tmpl, atmos.pl*1e-5, lc=col_black, lw=lw, label=L"T(pl)")
         plot!(plt, atmos.tmp,  atmos.p*1e-5,  lc="grey",  lw=lw, ls=:dot, label=L"T(p)")
 
         # add photosphere
@@ -269,9 +271,9 @@ module plotting
             x_rad[i] = atmos.flux_cdry[i] <= 0.0 ? x[i] : NaN
         end
 
-        plot!(plt2, [xmin, xmin], [1.0, 1.0], lc="darkgreen", lw=lw, ls=:solid, label=L"K_{zz}")
-        plot!(plt2, x_con, atmos.pl*1e-5, lc="darkgreen", label="Con.", ls=:solid)
-        plot!(plt2, x_rad, atmos.pl*1e-5, lc="darkgreen", label="Rad.", ls=:dot)
+        plot!(plt2, [xmin, xmin], [1.0, 1.0], lc=col_o, lw=lw, ls=:solid, label=L"K_{zz}")
+        plot!(plt2, x_con, atmos.pl*1e-5, lc=col_o, label="Con.", ls=:solid)
+        plot!(plt2, x_rad, atmos.pl*1e-5, lc=col_o, label="Rad.", ls=:dot)
 
         xlabel!(plt2, "log₁₀ Kzz [cm²/s]")
         ylims!(plt2, _get_ylims(atmos))
@@ -309,11 +311,13 @@ module plotting
                         size=(size_x,size_y); plt_default...)
 
         # Plot surface
-        scatter!(plt, [atmos.rp*1e-3], [atmos.pl[end]*1e-5], color="brown3", label=L"P_s")
+        scatter!(plt, [atmos.rp*1e-3], [atmos.pl[end]*1e-5], color=col_t, label=L"P_s")
 
         # Plot cell-centres and cell-edges
-        scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Centres")
-        scatter!(plt, atmos.rl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2, shape=:diamond, label="Edges")
+        scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, 
+                    shape=:diamond, label="Centres", color=col_n)
+        scatter!(plt, atmos.rl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2,
+                    shape=:diamond, label="Edges", color=col_c)
 
         # add photosphere
         hline!(plt, [atmos.transspec_p*1e-5], lw=lw,
@@ -368,7 +372,7 @@ module plotting
         # Temperature profile for reference
         tmp_nrm = (atmos.tmp .- minimum(atmos.tmp))./(maximum(atmos.tmp)-minimum(atmos.tmp))
         @. tmp_nrm = xlims[1] + (xlims[2]-xlims[1])*tmp_nrm
-        plot!(plt, tmp_nrm, y, lc="black",
+        plot!(plt, tmp_nrm, y, lc=col_black,
                         linealpha=0.3, lw=lw, label=L"\hat{T}(p)")
 
         # Plot cloud profiles
@@ -547,11 +551,11 @@ module plotting
         plot!(plt, [BIGFLOAT], [BIGFLOAT], ls=:solid, lw=lw, lc=col_n, label="UP-DN")
 
         # Zero line
-        vline!(plt, [0.0], lw=0.4, lc="black", label="")
+        vline!(plt, [0.0], lw=0.4, lc=col_black, label="")
 
         # Indicate the target intrinsic (or interior) heat flux
         if incl_eff
-            plot!(plt, [_symlog(atmos.flux_int)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc="black", label="INT")
+            plot!(plt, [_symlog(atmos.flux_int)], [arr_P[1], arr_P[end]], ls=:dashdot, lw=0.4, lc=col_black, label="INT")
         end
 
         # LW component
@@ -615,8 +619,8 @@ module plotting
         @_plt_poboa
 
         # Labels
-        annotate!(plt, xlims[1]/2.0, ylims[1]*1.4, text("Downward", :black, :center, 9))
-        annotate!(plt, xlims[2]/2.0, ylims[1]*1.4, text("Upward"  , :black, :center, 9))
+        annotate!(plt, xlims[1]/2.0, ylims[1]*1.4, text("Downward", col_black, :center, 9))
+        annotate!(plt, xlims[2]/2.0, ylims[1]*1.4, text("Upward"  , col_black, :center, 9))
 
         # Finalise + save
         xlabel!(plt, "log Unsigned Flux [W m⁻²]")
@@ -682,12 +686,12 @@ module plotting
         # Make plot
         plt = plot(size=(size_x, size_y); plt_default...)
 
-        plot!(plt, xe, yp, label=L"Planck @ $T_s$",  color="green")
-        plot!(plt, xe, ye, label="Surface LW+SW",    color="green", ls=:dash)
+        plot!(plt, xe, yp, label=L"Planck @ $T_s$",  color=col_o)
+        plot!(plt, xe, ye, label="Surface LW+SW",    color=col_o, ls=:dash)
 
-        plot!(plt, xe, ys, lw=0.9, label="Planetary SW",    color="blue")
-        plot!(plt, xe, yl, lw=0.9, label="Planetary LW",    color="red" )
-        plot!(plt, xe, yt, lw=0.5, label="Planetary LW+SW", color="black")
+        plot!(plt, xe, ys, lw=0.9, label="Planetary SW",    color=col_c)
+        plot!(plt, xe, yl, lw=0.9, label="Planetary LW",    color=col_t )
+        plot!(plt, xe, yt, lw=0.5, label="Planetary LW+SW", color=col_black)
 
         wl_max = max(wl_max, minimum(xe)+1)
         xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), wl_max))
@@ -755,17 +759,17 @@ module plotting
             cff[i] = log10(max(maximum(atmos.contfunc_band[i,wl_imin:wl_imax]), cf_min))
         end
         x_max = max(x_max, maximum(cff))
-        plot!(plt, cff, prs, c=:black, label="Maximum", ls=:solid)
+        plot!(plt, cff, prs, c=col_black, label="Maximum", ls=:solid)
 
         for i in 1:atmos.nlev_c
             cff[i] = log10(max(mean(atmos.contfunc_band[i,wl_imin:wl_imax]), cf_min))
         end
-        plot!(plt, cff, prs, c=:black, label="Mean", ls=:dash)
+        plot!(plt, cff, prs, c=col_black, label="Mean", ls=:dash)
 
         for i in 1:atmos.nlev_c
             cff[i] = log10(max(median(atmos.contfunc_band[i,wl_imin:wl_imax]), cf_min))
         end
-        plot!(plt, cff, prs, c=:black, label="Median", ls=:dot)
+        plot!(plt, cff, prs, c=col_black, label="Median", ls=:dot)
 
         # plot per-band contributions [um] as their own lines
         for wl_tgt in Float64[1.0, 5.0, 10.0, 15.0]
@@ -876,7 +880,7 @@ module plotting
 
         # plot band limits
         for ba in 1:atmos.nbands
-            vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
+            vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=col_black, label="")
         end
 
         # plot tau isoline
@@ -972,7 +976,7 @@ module plotting
 
         # plot band limits
         for ba in 1:atmos.nbands
-            vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=:black, label="")
+            vline!(plt, [atmos.bands_max[ba]*1e9], lw=0.4, lc=col_black, label="")
         end
 
         # plot tau isoline
@@ -1019,7 +1023,7 @@ module plotting
         ylims  = (-5.0, 100.0)
         plt = plot(ylims=ylims, size=(size_x, size_y); plt_default...)
 
-        plot!(plt, atmos.bands_cen*1e9, y, color="black", label="")
+        plot!(plt, atmos.bands_cen*1e9, y, color=col_black, label="")
 
         xlims  = (200.0, 1500.0)
         xticks = range( xlims[1], xlims[2], step=100.0)
@@ -1073,7 +1077,7 @@ module plotting
         # show perturbed levels
         if l > 0
             scatter!(plt, collect(1:l)[perturb], ones(Float64, l)[perturb]*(l+1),
-                        color=:gold,markershape=:utriangle, markersize=4,
+                        color=col_p,markershape=:utriangle, markersize=4,
                         markerstrokewidth=0.0,
                         label="")
         end
@@ -1138,7 +1142,7 @@ module plotting
                         legend=false; plt_default...)
 
         # Zero line
-        vline!(plt2, [0.0], lw=0.4, lc="black", label="")
+        vline!(plt2, [0.0], lw=0.4, lc=col_black, label="")
 
         # Plot profiles
         cmap = cgrad(:batlow, globe.ncol, categorical=true, rev=true)
@@ -1177,8 +1181,8 @@ module plotting
         xaxis!(plt2, xlims=hlim, xlabel="log Unsigned Heating [K day⁻¹]")
         ylabel!(plt1, "Pressure [bar]")
 
-        annotate!(plt2, hlim[1]/2.0, ylims[1]*1.4, text("Cooling", :black, :center, 9))
-        annotate!(plt2, hlim[2]/2.0, ylims[1]*1.4, text("Heating", :black, :center, 9))
+        annotate!(plt2, hlim[1]/2.0, ylims[1]*1.4, text("Cooling", col_black, :center, 9))
+        annotate!(plt2, hlim[2]/2.0, ylims[1]*1.4, text("Heating", col_black, :center, 9))
 
         # combine into multi-panel plot
         plt = plot(plt1, plt2, layout=(1,2), size=(size_x, size_y),

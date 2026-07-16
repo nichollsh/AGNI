@@ -39,6 +39,27 @@ end
     @test atmos.is_converged
     @test all(atmos.tmp .≈ atmos.tmp_surf)
     @test all(atmos.tmpl .≈ atmos.tmp_surf)
-    
+
     atmosphere.deallocate!(atmos)
+
+    # sol_type=2: conductive skin-flux boundary condition. Solver should find a Tsurf
+    # such that the radiative flux balances the conductive flux through the magma skin
+    # layer (energy-balance invariant), rather than just returning without erroring.
+    atmos2 = _make_prescribed_atmos()
+    @test solver.solve_prescribed!(atmos2; sol_type=2, atm_type=1)
+    @test atmos2.is_solved
+    @test atmos2.is_converged
+    F_skin = energy.skin_flux(atmos2)
+    @test isapprox(atmos2.flux_tot[1], F_skin; rtol=1e-2, atol=0.5)
+    atmosphere.deallocate!(atmos2)
+
+    # sol_type=3: prescribed total internal flux boundary condition. Solver should find
+    # a Tsurf such that the total outgoing flux matches the requested internal flux.
+    atmos3 = _make_prescribed_atmos()
+    atmos3.flux_int = 1200.0
+    @test solver.solve_prescribed!(atmos3; sol_type=3, atm_type=1)
+    @test atmos3.is_solved
+    @test atmos3.is_converged
+    @test isapprox(atmos3.flux_tot[1], atmos3.flux_int; rtol=1e-2, atol=0.5)
+    atmosphere.deallocate!(atmos3)
 end

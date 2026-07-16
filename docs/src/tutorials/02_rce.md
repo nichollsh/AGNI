@@ -16,7 +16,7 @@ The output now contains more details. Below, I have inserted inline comments to 
 
 ```log
 # Initial setup and memory allocation.
-[ INFO  ] Using configuration 'Unit tests configuration'
+[ INFO  ] Using configuration 'AGNI configuration file for test suite'
 [ INFO  ] Setting-up a new atmosphere struct
 
 # Load thermo data from pre-computed tables, which are stored in the res/ folder.

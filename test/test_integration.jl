@@ -22,6 +22,9 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
         @test haskey(cfg["planet"], "tmp_surf")
         @test haskey(cfg, "execution")
 
+        # set to use spectral surface albedo
+        cfg["planet"]["surface_material"] = "res/surface_albedos/lunarmarebasalt.dat"
+
         # check return code is fine
         succ = AGNI.main(cfg_path=CONFIG_PATH)
         @test succ
