@@ -604,8 +604,14 @@ module setpt
             return false
         end
 
-        # gas is present?
+        # gas is not present?
         if !(gas in atmos.gas_names)
+            # maybe the user provided the gas name in lowercase?
+            if uppercase(gas) in atmos.gas_names
+                @warn "saturation!() expects gas names to match letter-case; got '$gas'"
+            end
+
+            # don't return an error status
             return true
         end
 

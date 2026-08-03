@@ -418,17 +418,24 @@ module species
     """
     **Check if pressure-temperature coordinate is within the vapour regime.**
 
-    Returns true if p > p_sat and t < t_crit.
+    Returns true if p < p_sat and t < t_crit.
+    Also returns true if no phase-change data are available for this gas.
+
+    This function performs the saturation check in log10 pressure, and applies small
+    numerical tolerance on the inequality so that exactly-saturated cases are
+    considered to be vapours.
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
     - `t::Float64`              temperature [K]
-    - `p::Float64`              temperature [K]
+    - `p::Float64`              partial pressure [Pa]
+    - `phs_εlogp::Float64`      tolerance for log10(pressure) inequality comparison
 
     Returns:
     - `vapour::Bool`           is within vapour regime?
     """
-    function is_vapour(gas::Gas_t, t::Float64, p::Float64)::Bool
+    function is_vapour(gas::Gas_t, t::Float64, p::Float64;
+                        phs_εlogp::Float64=1e-5)::Bool
 
         # Handle stub cases
         if gas.stub || gas.no_sat
@@ -440,8 +447,9 @@ module species
             return true
         end
 
-        # Saturated by pressure? (with offset to account for transition)
-        return Bool(p > 10.0 ^ gas.sat_I(t+0.2))
+        # Is vapour when p < p_sat (see docstring)
+        # Comparison is made in log10-space with a small tolerance
+        return log10(p) - phs_εlogp < gas.sat_I(t)
     end
     export is_vapour
 
