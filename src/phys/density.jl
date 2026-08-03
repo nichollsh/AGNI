@@ -103,7 +103,7 @@ module density
         #     next, check if we are within a non-vapour regime (see docstring)
         #     this uses a small negative tolerance to ensure that exactly-saturated cases
         #     are treated as condensates, enabling special treatment if phs_method=2,3.
-        if !eval_ideal && !is_vapour(gas, tmp, prs; phs_εlogp=-1e-2)
+        if !eval_ideal && !is_vapour(gas, tmp, prs; phs_εlogp=-phs_dlogp)
             if phs_method == 1
                 # don't need to do anything
             elseif phs_method == 2
