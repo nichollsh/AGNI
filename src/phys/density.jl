@@ -114,10 +114,7 @@ module density
                 # this decreases the pressure such that we fall within the vapour region
                 # @debug "Applying clamp at phase boundary (old logP=$eval_log10prs)"
                 eval_log10prs = min(eval_log10prs, gas.sat_I(tmp) - phs_dlogp)
-                # @debug "    new logP=$eval_log10prs => vapour=$(is_vapour(gas, tmp, 10.0^eval_log10prs))"
             end
-        else
-            @debug "Is vapour: T=$tmp, P=$prs, logP=$eval_log10prs"
         end
 
         # evaluate EOS
