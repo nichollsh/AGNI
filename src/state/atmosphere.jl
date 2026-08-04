@@ -3136,7 +3136,7 @@ module atmosphere
             @warn "Atmosphere arrays have not been allocated"
             return 1
         end
-        @debug "Calculating photosphere from reference pressure, p=$(p_ref*1e-5) bar"
+        @debug "Calculating photosphere using p=$(p_ref*1e-5) bar"
         return findmin(abs.(atmos.pl .- p_ref))[2]
     end
 
@@ -3159,7 +3159,7 @@ module atmosphere
             return 1
         end
 
-        @debug "Calculating photosphere, τ=$(atmos.transspec_ref_tau) at λ=$(ref_wl*1e6) μm"
+        @debug "Calculating photosphere using τ=$(atmos.transspec_ref_tau) at λ=$(ref_wl*1e6) μm"
 
         # Ensure valid range of wavelengths
         ref_wl = clamp(ref_wl, minimum(atmos.bands_cen), maximum(atmos.bands_cen))
@@ -3193,7 +3193,7 @@ module atmosphere
             return 1
         end
 
-        @debug "Calculating photosphere from contribution function (legacy method)"
+        @debug "Calculating photosphere using contribution function (legacy method)"
 
         # Params
         wl_min::Float64  = 0.2 * 1e-6 # 200 nanometer

@@ -90,7 +90,7 @@ module density
     - `rho::Float64`        mass density [kg m-3]
     """
     function calc_rho_gas(tmp::Float64, prs::Float64, gas::Gas_t;
-                            phs_method::Int64=3,
+                            phs_method::Int64=2,
                             phs_dlogp::Float64=0.2)::Float64
 
         # log10 pressure for evaluating EOS (Pa)
@@ -114,14 +114,17 @@ module density
                 # this decreases the pressure such that we fall within the vapour region
                 # @debug "Applying clamp at phase boundary (old logP=$eval_log10prs)"
                 eval_log10prs = min(eval_log10prs, gas.sat_I(tmp) - phs_dlogp)
+                # @debug "    new logP=$eval_log10prs => vapour=$(is_vapour(gas, tmp, 10.0^eval_log10prs))"
             end
+        else
+            @debug "Is vapour: T=$tmp, P=$prs, logP=$eval_log10prs"
         end
 
         # evaluate EOS
         if eval_ideal
             # analytical form of ideal gas equation of state
             # this doesn't care about phase boundaries
-            # @debug "Evaluating ideal gas: T=$tmp, new logP=$eval_log10prs"
+            # @debug "Evaluating ideal gas: T=$tmp, P=$prs"
             return _rho_ideal(tmp, prs, gas.mmw)
         else
             # otherwise, will use tabulated real-gas EOS to evaluate the density
