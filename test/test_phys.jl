@@ -152,6 +152,28 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
         @test test_pass
     end
 
+    # -------------
+    # Test AQUA equation of state (phs_method=4)
+    # This method uses a scaled density relative to some shifted-pressure evaluation
+    # -------------
+    @testset "AQUA_EOS_PHSMETHOD4" begin
+        aqua_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
+        t_test = [200.0,  300.0, 500.0,   1273.0,  3200.0] # Tested values of temperature [K]
+        p_test = [1e0,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
+        v_expt = [926.1211619878637, 0.007236844386485598, 0.4359407345619636, 17.048794763091344, 66.91125151662774]
+        v_obs  = zero(p_test)
+        test_pass = true
+        for i in 1:5
+            v_obs[i] = density.calc_rho_gas(t_test[i], p_test[i], aqua_H2O; phs_method=4)
+            test_pass &= isapprox(v_expt[i], v_obs[i]; rtol=1e-3)
+        end
+
+        if !test_pass
+            @error "Expected values = $(v_expt) kg m-3\n Modelled values = $(v_obs) kg m-3"
+        end
+        @test test_pass
+    end
+
 
     # -------------
     # Test VdW equation of state
