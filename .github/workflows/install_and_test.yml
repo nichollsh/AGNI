@@ -44,9 +44,42 @@ jobs:
       # Setup system
       - name: NetCDF Ubuntu
         if: ${{ matrix.os == 'ubuntu-latest' }}
+        timeout-minutes: 18
         run: |
-          sudo apt update
-          sudo apt-get install libnetcdff-dev netcdf-bin gcc gfortran
+          set -euo pipefail
+          # apt-get can stall against a flaky mirror on GH-hosted runners; an
+          # unbounded call once ate the whole 6h job ceiling. Bound each call
+          # and repair any dpkg state a killed attempt left mid-unpack. A new
+          # command added to this step must go through retry() too, or have
+          # its own bound; timeout-minutes above is only a backstop.
+          retry() {
+            local desc="$1" secs="$2"; shift 2
+            local n=1 rc
+            while true; do
+              if [ "$n" -gt 1 ] && ! sudo timeout --kill-after=10 60 dpkg --configure -a >/tmp/dpkg-repair.log 2>&1; then
+                echo "dpkg --configure -a repair before retry $n exited non-zero:" >&2
+                cat /tmp/dpkg-repair.log >&2
+              fi
+              if sudo timeout --kill-after=10 "$secs" "$@"; then
+                rc=0
+              else
+                rc=$?
+              fi
+              if [ "$rc" -eq 0 ]; then
+                echo "$desc succeeded on attempt $n"
+                return 0
+              fi
+              if [ "$n" -ge 2 ]; then
+                echo "$desc failed after 2 attempts (exit $rc)" >&2
+                return "$rc"
+              fi
+              echo "$desc attempt $n failed or timed out (exit $rc); retrying in 45s" >&2
+              sleep 45
+              n=$((n + 1))
+            done
+          }
+          retry "apt update" 120 apt-get update -qq
+          retry "apt-get install" 150 apt-get install -y libnetcdff-dev netcdf-bin gcc gfortran
 
       - name: NetCDF macOS
         if: ${{ matrix.os == 'macos-latest' }}
