@@ -92,7 +92,7 @@ output_dir = "/"
     rm(tmpdir; force=true, recursive=true)
 end
 
-@testset "test_config_parser" begin
+@testset "agni_config_parser" begin
 
     # check the config has expected values
     cfg = _base_cfg()
@@ -190,7 +190,7 @@ end
 end
 
 # Greygas RT rejects scattering flags while accepting boundary opacity inputs.
-@testset "greygas_config" begin
+@testset "agni_greygas_config" begin
     mkpath(AGNI_CORE_OUT_DIR)
     κ_lw = 1.0e-4
     κ_sw = 0.0

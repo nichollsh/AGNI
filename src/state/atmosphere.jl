@@ -1224,12 +1224,17 @@ module atmosphere
         end
 
         # store condensates
+        forced_dry = Set{String}()
         for c in condensates
             if atmos.gas_dat[c].stub || atmos.gas_dat[c].no_sat || (c in COND_DISALLOWED)
-                @warn "$c disallowed from being condensable; treated as dry"
+                push!(forced_dry, c)
             else
                 push!(atmos.condensates, c)
             end
+        end
+        if length(forced_dry) > 0
+            @debug "Some species are not allowed to condense and will be treated as dry:"
+            @debug "    "*join(forced_dry,", ")
         end
 
         # Validate condensate names

@@ -39,7 +39,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         gravity, radius,
                         nlev, p_surf, p_top,
                         mf_dict, "",
-                        real_gas=false
+                        real_gas=false,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -80,7 +81,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         gravity, radius,
                         nlev, p_surf, p_top,
                         mf_dict, "",
-                        real_gas=false
+                        real_gas=false,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -122,7 +124,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -169,7 +172,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -218,7 +222,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -274,7 +279,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -364,7 +370,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -401,7 +408,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
         setpt.dry_adiabat!(atmos)
@@ -482,6 +490,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         condensates=["H2O"],
                         real_gas=false,
                         thermo_functions=true,
+                        check_integrity=false,
                         evap_efficiency=0.5  # partial evaporation
                 )
         atmosphere.allocate!(atmos,"")
@@ -523,7 +532,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         gravity, radius,
                         nlev, p_surf, p_top,
                         mf_dict, "",
-                        real_gas=false
+                        real_gas=false,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -563,7 +573,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -610,7 +621,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         condensates=["H2O"],
                         real_gas=false,
                         thermo_functions=true,
-                        coldtrap=true
+                        coldtrap=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos1,"")
         setpt.dry_adiabat!(atmos1)
@@ -675,7 +687,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                             nlev, p_surf, p_top,
                             mf_dict, "",
                             real_gas=false,
-                            thermo_functions=true
+                            thermo_functions=true,
+                        check_integrity=false,
                     )
             atmosphere.allocate!(atmos,"")
             setpt.isothermal!(atmos, tmp_surf)
@@ -716,7 +729,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                             nlev, p_surf, p_top,
                             mf_dict, "",
                             real_gas=false,
-                            thermo_functions=true
+                            thermo_functions=true,
+                        check_integrity=false,
                     )
             atmosphere.allocate!(atmos,"")
             setpt.isothermal!(atmos, tmp_surf)
@@ -761,7 +775,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                             nlev, p_surf, p_top,
                             mf_dict, "",
                             real_gas=false,
-                            thermo_functions=true
+                            thermo_functions=true,
+                        check_integrity=false,
                     )
             atmosphere.allocate!(atmos,"")
             setpt.isothermal!(atmos, tmp_surf)
@@ -812,7 +827,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                             mf_dict, "",
                             real_gas=false,
                             thermo_functions=true,
-                            fastchem_wellmixed=true
+                            fastchem_wellmixed=true,
+                        check_integrity=false,
                     )
             atmosphere.allocate!(atmos,"")
 
@@ -853,7 +869,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                             nlev, p_surf, p_top,
                             mf_dict, "",
                             real_gas=false,
-                            thermo_functions=true
+                            thermo_functions=true,
+                        check_integrity=false,
                     )
             atmosphere.allocate!(atmos,"")
             setpt.isothermal!(atmos, 1300.0)
@@ -908,7 +925,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                             real_gas=false,
                             thermo_functions=true,
                             metallicities=metal_dict,
-                            use_all_gases=true
+                            use_all_gases=true,
+                        check_integrity=false,
                     )
             atmosphere.allocate!(atmos,"")
 
@@ -949,7 +967,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                             mf_dict, "",
                             real_gas=false,
                             thermo_functions=true,
-                            fastchem_floor=200.0
+                            fastchem_floor=200.0,
+                        check_integrity=false,
                     )
             atmosphere.allocate!(atmos,"")
 
@@ -992,7 +1011,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -1043,7 +1063,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         mf_dict, "",
                         condensates=["H2O"],
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 
@@ -1101,7 +1122,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
                         condensates=["HCN"],
                         aerosol_species=aerosol_dict,
                         real_gas=false,
-                        thermo_functions=true
+                        thermo_functions=true,
+                        check_integrity=false,
                 )
         atmosphere.allocate!(atmos,"")
 

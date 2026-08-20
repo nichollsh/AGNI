@@ -32,7 +32,8 @@ OUT_DIR  = joinpath(ROOT_DIR,"out/")
                     nlev, p_surf, p_top,
                     mf_dict, "",
                     rfm_parfile=parfile,
-                    real_gas=false
+                    real_gas=false,
+                    check_integrity=false,
             )
     atmosphere.allocate!(atmos, "")
     setpt.isothermal!(atmos, tmp_surf)
