@@ -78,6 +78,12 @@ module density
     offset is used to define a shifted log10 pressure at which the EOS evaluator switches
     to the vapour region, and is used in `phs_method` 3 and 4.
 
+    The vapour/condensed branch test is evaluated at `prs` (the same pressure at which the
+    EOS itself is evaluated), not at any partial pressure. Under Amagat's law (see
+    `calc_rho_mix`) that is the total pressure, since the phase-boundary contamination in
+    the EOS table is a property of the point the table is queried at, which is the total
+    pressure for each component.
+
     Options for `phs_method` flag:
     - `1`, naively evaluate the density at the requested T-P.
     - `2`, switch to ideal gas when `is_vapour() == false`.
@@ -87,13 +93,14 @@ module density
     - `4`, [default] scale the density by distance from phase boundary, continuously
             transitioning to ideal gas as the pressure decreases. Done by evaluating the
             density at the shifted pressure, and scaling by the distance from the switch
-            when `is_vapour() == false`.
+            when `is_vapour() == false`. If the shifted (anchor) pressure falls outside the
+            tabulated EOS domain, the ideal gas law is used instead of extrapolating the
+            table, since Z≈1 to well under a percent accuracy in that low-density limit.
 
     Arguments:
     - `tmp::Float64`        temperature [K]
     - `prs::Float64`        pressure [Pa]
     - `gas::Gas_t`          the gas struct to be used
-    - `vmr::Float64`        volume mixing ratio of the gas, when part of mixture
     - `phs_method::Int64`   method for handling P-T conditions near non-vapour regions
     - `phs_dlogp::Float64`  log10 pressure offset relative to saturation pressure
 
@@ -101,7 +108,6 @@ module density
     - `rho::Float64`        mass density [kg m-3]
     """
     function calc_rho_gas(tmp::Float64, prs::Float64, gas::Gas_t;
-                            vmr::Float64=1.0,
                             phs_method::Int64=PHS_METHOD_DEFAULT,
                             phs_dlogp::Float64=PHS_DLOGP_DEFAULT)::Float64
 
@@ -124,9 +130,11 @@ module density
             # this requires careful handling of phase boundaries
 
             # is vapour?
-            # this checks if the pressure is within phs_dlogp of the saturation pressure
-            # on the condensed side, so sub-saturated pressures are still considered vapour
-            if is_vapour(gas, tmp, prs*vmr; phs_εlogp=-phs_dlogp)
+            # this checks if prs is within phs_dlogp of the saturation pressure on the
+            # condensed side, so sub-saturated pressures are still considered vapour.
+            # Uses prs (the evaluation pressure), not a partial pressure, since the table
+            # contamination is a property of the point the EOS is queried at.
+            if is_vapour(gas, tmp, prs; phs_εlogp=-phs_dlogp)
                 # yes, so just evaluate the EOS
                 return 10.0 ^ gas.eos_I(tmp, log10prs)
 
@@ -154,16 +162,21 @@ module density
                     return 10.0 ^ gas.eos_I(tmp, log10prs_e)
 
                 elseif phs_method == 4
-                    # calculate switch boundary (in log10 space)
+                    # calculate switch boundary (anchor) in log10 space
                     log10prs_e = gas.sat_I(tmp) - phs_dlogp
 
-                    # evaluate and scale then density from the shifted pressure point
+                    # if the anchor falls outside the tabulated EOS domain, evaluating
+                    # eos_I there would extrapolate flat and return a condensed-phase
+                    # density; the ideal gas law is accurate to well under a percent in
+                    # this low-density limit, so use that instead of extrapolating the
+                    # real-gas table
+                    if log10prs_e < gas.log10prs_min
+                        return _rho_ideal(tmp, prs, gas.mmw)
+                    end
+
+                    # evaluate and scale the density from the shifted pressure point
                     # this keeps behaviour continuous in pressure and temperature
                     rho_s = gas.eos_I(tmp, log10prs_e) + log10prs - log10prs_e
-
-                    # clamp to min/max valid pressures
-                    log10prs_e = min(log10prs, log10prs_e)
-                    log10prs_e = clamp(log10prs_e, gas.log10prs_min, gas.log10prs_max)
 
                     # ensure that this doesn't exceed the condensed phase's density
                     return 10.0 ^ min(rho_s,  gas.eos_I(tmp, log10prs))
@@ -203,7 +216,7 @@ module density
         # single gas case
         # (the total pressure is identical to the partial pressure)
         if ngas == 1
-            return calc_rho_gas(tmp, prs, gas[1], phs_method=phs_method)
+            return calc_rho_gas(tmp, prs, gas[1], phs_method=phs_method, phs_dlogp=phs_dlogp)
         end
 
         # calculate the density (and mass-mixing ratio) of each gas
@@ -211,7 +224,6 @@ module density
         mmr::Array{Float64, 1} = zeros(Float64, ngas)
         for i in 1:ngas
             rho[i] = calc_rho_gas(tmp, prs, gas[i],
-                                    vmr=vmr[i],
                                     phs_method=phs_method,
                                     phs_dlogp=phs_dlogp)
             mmr[i] = vmr[i] * gas[i].mmw / mmw # convert VMR to MMR

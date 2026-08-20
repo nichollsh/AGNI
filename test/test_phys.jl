@@ -115,7 +115,7 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
         aqua_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
         t_test = [100.0,  200.0, 500.0,   1273.0,  4000.0] # Tested values of temperature [K]
         p_test = [1e1,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
-        v_expt = [0.00021667064761346432, 0.010833532380673217, 0.4359407345619636, 17.048794763091344, 51.30098543815275]
+        v_expt = [0.00021667064761346432, 0.010833532380673217, 0.43521435354778626, 17.02216182825162, 51.22864662875654]
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
@@ -138,7 +138,7 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
         aqua_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
         t_test = [200.0,  300.0, 500.0,   1273.0,  3200.0] # Tested values of temperature [K]
         p_test = [1e0,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
-        v_expt = [926.1211619878637, 0.007236844386485598, 0.4359407345619636, 17.048794763091344, 66.91125151662774]
+        v_expt = [926.1211619878637, 0.007227415287350509, 0.43521435354778626, 17.02216182825162, 66.82013418840567]
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
@@ -154,13 +154,17 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
 
     # -------------
     # Test AQUA equation of state (phs_method=4)
-    # This method uses a scaled density relative to some shifted-pressure evaluation
+    # This method uses a scaled density relative to some shifted-pressure evaluation.
     # -------------
     @testset "AQUA_EOS_PHSMETHOD4" begin
         aqua_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
         t_test = [200.0,  300.0, 500.0,   1273.0,  3200.0] # Tested values of temperature [K]
         p_test = [1e0,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
-        v_expt = [926.1211619878637, 0.007236844386485598, 0.4359407345619636, 17.048794763091344, 66.91125151662774]
+
+        # index 1 (200 K, 1 Pa) is below the table floor once shifted by phs_dlogp, so
+        # the correct value is the analytic ideal-gas density, not a table lookup
+        v_expt = [density._rho_ideal(200.0, 1e0, aqua_H2O.mmw),
+                    0.007227415287350509, 0.43521435354778626, 17.02216182825162, 66.82013418840567]
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
@@ -172,6 +176,11 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
             @error "Expected values = $(v_expt) kg m-3\n Modelled values = $(v_obs) kg m-3"
         end
         @test test_pass
+
+        # test that a broken fallback returns the ice density of ~926 kg/m3
+        # at this point instead of the ~1e-5 ideal-gas value
+        wrong_condensed_fallback = 926.1211619878637
+        @test !isapprox(v_obs[1], wrong_condensed_fallback; rtol=1e-3)
     end
 
 
@@ -182,7 +191,7 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
         vdw_CO2::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "CO2", true, true)
         t_test = [200.0,  300.0, 500.0,   1273.0,  3200.0] # Tested values of temperature [K]
         p_test = [1e0,    1e3,   1e5,     1e7,     1e8]    # Tested values of pressure [Pa]
-        v_expt = [2.6465333190669653e-5, 0.017667317673669407, 1.0615149059884963, 41.25391321499029, 147.675055617719]
+        v_expt = [2.6465333190669653e-5, 0.017644297244863345, 1.0597595155879878, 41.19090754552491, 147.5212980424141]
         v_obs  = zero(p_test)
         test_pass = true
         for i in 1:5
@@ -193,6 +202,111 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
             @error "Expected values = $(v_expt) kg m-3\n Modelled values = $(v_obs) kg m-3"
         end
         @test test_pass
+    end
+
+
+    # -------------
+    # Test that calc_rho_gas's vapour/condensed branch test uses the evaluation
+    # pressure (total pressure, under Amagat's law) rather than a species' partial
+    # pressure.
+    # -------------
+    @testset "calc_rho_gas_branch_test_uses_total_not_partial_pressure" begin
+        aqua_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
+        tmp::Float64 = 540.0
+        vmr_h2o::Float64 = 0.3
+        phs_dlogp::Float64 = 0.3
+
+        # column equals exactly at H2O's own saturation pressure (total pressure),
+        # but H2O's partial pressure (vmr_h2o * prs) is only 30% of that
+        prs_total::Float64 = 10.0 ^ aqua_H2O.sat_I(tmp)
+
+        # branch test evaluated at the total (evaluation) pressure: correctly
+        # identifies this point as needing phase-boundary handling
+        @test species.is_vapour(aqua_H2O, tmp, prs_total; phs_εlogp=-phs_dlogp) == false
+
+        # branch test evaluated at the partial pressure: misclassifies this point as
+        # vapour, since the partial pressure is sub-saturated relative to phs_dlogp
+        @test species.is_vapour(aqua_H2O, tmp, prs_total*vmr_h2o; phs_εlogp=-phs_dlogp) == true
+
+        # calc_rho_gas (fixed) must use the total-pressure branch test, and so must
+        # NOT reduce to the naive evaluation at this point
+        rho_fixed::Float64 = density.calc_rho_gas(tmp, prs_total, aqua_H2O;
+                                                    phs_method=4, phs_dlogp=phs_dlogp)
+        naive_eval::Float64 = 10.0 ^ aqua_H2O.eos_I(tmp, log10(prs_total))
+        @test isfinite(rho_fixed) && rho_fixed > 0.0
+        @test isapprox(rho_fixed, 23.095477724934334; rtol=1e-3)
+
+        # naive evaluation at p=psat inflates the density by roughly an order of
+        # magnitude relative phase-boundary-aware evaluation
+        @test naive_eval > 5.0 * rho_fixed
+    end
+
+
+    # -------------
+    # Test that calc_rho_mix's ngas==1 fast path forwards phs_dlogp through to
+    # calc_rho_gas, rather than always using PHS_DLOGP_DEFAULT regardless of the
+    # caller's choice.
+    # -------------
+    @testset "calc_rho_mix_single_gas_forwards_phs_dlogp" begin
+        aqua_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
+        tmp::Float64 = 270.0
+        prs::Float64 = 1e5
+
+        # calc_rho_mix with a single gas must delegate exactly to calc_rho_gas with
+        # the same (non-default) phs_dlogp value
+        rho_mix_dlogp01 = density.calc_rho_mix([aqua_H2O], [1.0], tmp, prs, aqua_H2O.mmw;
+                                                    phs_method=4, phs_dlogp=0.1)
+        rho_gas_dlogp01 = density.calc_rho_gas(tmp, prs, aqua_H2O; phs_method=4, phs_dlogp=0.1)
+        @test isapprox(rho_mix_dlogp01, rho_gas_dlogp01; rtol=1e-10)
+
+        # if phs_dlogp were silently ignored, the two values below would match instead
+        rho_gas_default_dlogp = density.calc_rho_gas(tmp, prs, aqua_H2O;
+                                                        phs_method=4, phs_dlogp=density.PHS_DLOGP_DEFAULT)
+        @test !isapprox(rho_mix_dlogp01, rho_gas_default_dlogp; rtol=1e-6)
+    end
+
+
+    # -------------
+    # Test calc_rho_mix against the H2O+H2 scenario to verify Amagat's law directly for
+    # every phs_method, and checks the low-pressure limit where all
+    # methods must agree and approach the ideal-gas mixture density.
+    # -------------
+    @testset "calc_rho_mix_amagat_law_holds_across_phs_methods" begin
+        aqua_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
+        cms19_H2::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2",  true, true)
+        tmp::Float64 = 270.0
+        prs::Float64 = 1e5
+        vmr::Array{Float64,1} = [0.7, 0.3]
+        mmw::Float64 = vmr[1]*aqua_H2O.mmw + vmr[2]*cms19_H2.mmw
+        mmr_h2o::Float64 = vmr[1]*aqua_H2O.mmw/mmw
+        mmr_h2::Float64  = vmr[2]*cms19_H2.mmw/mmw
+
+        for m in 1:4
+            rho_mix = density.calc_rho_mix([aqua_H2O, cms19_H2], vmr, tmp, prs, mmw;
+                                                phs_method=m, phs_dlogp=0.3)
+            rho_h2o = density.calc_rho_gas(tmp, prs, aqua_H2O; phs_method=m, phs_dlogp=0.3)
+            rho_h2  = density.calc_rho_gas(tmp, prs, cms19_H2; phs_method=m, phs_dlogp=0.3)
+
+            # Amagat's law: 1/rho_mix = sum(mmr_i / rho_i); check this independently
+            # of the internals of calc_rho_mix, using each component's own density
+            rho_amagat = 1.0 / (mmr_h2o/rho_h2o + mmr_h2/rho_h2)
+            @test isfinite(rho_mix) && rho_mix > 0.0
+            @test isapprox(rho_mix, rho_amagat; rtol=1e-9)
+        end
+
+        # end member case at 1 Pa, where both components are far below their saturation
+        # pressures at 270 K. All phs_method agree and the result must be close to the
+        # ideal-gas mixture in this regime.
+        prs_lo::Float64 = 1.0
+        rho_mix_lo = [density.calc_rho_mix([aqua_H2O, cms19_H2], vmr, tmp, prs_lo, mmw;
+                                                phs_method=m, phs_dlogp=0.3) for m in 1:4]
+        for m in 2:4
+            @test isapprox(rho_mix_lo[m], rho_mix_lo[1]; rtol=1e-9)
+        end
+        rho_ideal_h2o = density._rho_ideal(tmp, prs_lo, aqua_H2O.mmw)
+        rho_ideal_h2  = density._rho_ideal(tmp, prs_lo, cms19_H2.mmw)
+        rho_ideal_mix = 1.0 / (mmr_h2o/rho_ideal_h2o + mmr_h2/rho_ideal_h2)
+        @test isapprox(rho_mix_lo[1], rho_ideal_mix; rtol=0.02)
     end
 
 
@@ -291,6 +405,72 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
 
 
     # -------------
+    # Test the H2O demixing-temperature fit (_Tdemix_H2O).
+    # This is a pure analytic formula from Appendix A of the cited paper.
+    # -------------
+    @testset "Tdemix_H2O_fit_is_symmetric_about_peak_composition" begin
+        d::Float64 = 0.4498  # peak molar fraction (Table A1 coefficient)
+        for p in [1e7, 1e8, 5e8, 1e9]  # Pa, spanning ~0.1-10 kbar
+            t_peak::Float64  = species._Tdemix_H2O(p, d)
+            t_left::Float64  = species._Tdemix_H2O(p, d - 0.05)
+            t_right::Float64 = species._Tdemix_H2O(p, d + 0.05)
+
+            # exact symmetry of the Lorentzian term about x=d
+            @test isapprox(t_left, t_right; rtol=1e-12)
+
+            # the fit's Lorentzian term peaks at x=d for these (physically positive)
+            # coefficients, so the demixing temperature there exceeds nearby values
+            @test t_peak > t_left
+        end
+
+        # away from the peak the demixing temperature is substantially lower than peak
+        t_peak_1e8::Float64 = species._Tdemix_H2O(1e8, d)
+        t_far_1e8::Float64  = species._Tdemix_H2O(1e8, 0.05)
+        @test !isapprox(t_peak_1e8, t_far_1e8; rtol=0.1)
+        @test t_far_1e8 < t_peak_1e8
+
+        # edge case: x at the boundaries of its physical domain (pure H2 / pure H2O)
+        @test isfinite(species._Tdemix_H2O(1e8, 0.0))
+        @test isfinite(species._Tdemix_H2O(1e8, 1.0))
+    end
+
+
+    # -------------
+    # Test that the demixing temperature increases with pressure at fixed
+    # composition, consistent with immiscibility being enhanced at higher pressure.
+    # -------------
+    @testset "Tdemix_H2O_fit_increases_with_pressure_at_fixed_composition" begin
+        d::Float64 = 0.4498
+        p_test::Array{Float64,1} = [1e7, 1e8, 5e8, 1e9]  # Pa
+        t_test::Array{Float64,1} = [species._Tdemix_H2O(p, d) for p in p_test]
+        @test all(isfinite.(t_test))
+        # strictly increasing (not just non-decreasing) across this pressure range
+        @test all(diff(t_test) .> 0.0)
+    end
+
+
+    # -------------
+    # Test get_Tdemix, the gas-aware wrapper that dispatches to a species-specific
+    # demixing fit (only implemented for H2O; other species have no known fit).
+    # -------------
+    @testset "get_Tdemix_dispatches_by_species" begin
+        gas_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, false)
+        gas_CO2::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "CO2", true, false)
+        prs::Float64 = 1e8
+        x::Float64   = 0.4
+
+        # H2O uses the fitted demixing curve directly
+        @test isapprox(species.get_Tdemix(gas_H2O, prs, x), species._Tdemix_H2O(prs, x); rtol=1e-12)
+
+        # species without a demixing return a value far below any physical
+        # temperature, so that "atmos.tmp < get_Tdemix(...)" never triggers
+        tdemix_co2::Float64 = species.get_Tdemix(gas_CO2, prs, x)
+        @test isapprox(tdemix_co2, -1.0 * AGNI.consts.BIGFLOAT; rtol=1e-12)
+        @test tdemix_co2 < -1.0e5
+    end
+
+
+    # -------------
     # Test is_vapour
     # Ideal gas is always in the vapour phase (no real-gas condensation)
     # -------------
@@ -299,6 +479,31 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
         # ideal / no-sat stub is always vapour
         @test species.is_vapour(gas_Ne, 300.0, 1e5)
         @test species.is_vapour(gas_Ne, 100.0, 1e8)
+    end
+
+
+    # -------------
+    # Test is_vapour()'s phs_εlogp offset against real AQUA saturation curve.
+    # With phs_εlogp=-phs_dlogp, the switch away from "vapour" occurs phs_dlogp
+    # below the true saturation pressure (not at psat itself).
+    # -------------
+    @testset "is_vapour_switch_boundary_is_offset_below_saturation_curve" begin
+        gas_H2O::species.Gas_t = species.load_gas("$RES_DIR/thermodynamics/", "H2O", true, true)
+        T_boil::Float64 = 373.15
+        phs_dlogp::Float64 = 0.3
+        psat::Float64 = 10.0 ^ gas_H2O.sat_I(T_boil)
+
+        # default (near-zero) tolerance: switch essentially at psat itself
+        @test species.is_vapour(gas_H2O, T_boil, psat*0.999)
+        @test !species.is_vapour(gas_H2O, T_boil, psat*1.001)
+
+        # with phs_dlogp=0.3, the switch is shifted to 0.3 dex below psat: still
+        # vapour comfortably inside that band, no longer vapour once inside it
+        @test species.is_vapour(gas_H2O, T_boil, psat*10.0^(-0.35); phs_εlogp=-phs_dlogp)
+        @test !species.is_vapour(gas_H2O, T_boil, psat*10.0^(-0.25); phs_εlogp=-phs_dlogp)
+
+        # pressures above psat are never classified as vapour, regardless of offset
+        @test !species.is_vapour(gas_H2O, T_boil, psat*1.5; phs_εlogp=-phs_dlogp)
     end
 
 
@@ -407,6 +612,126 @@ const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
             gas = species.load_gas("$RES_DIR/thermodynamics/", "Xz2", true, false)
             @test gas.fail == true
         end
+    end
+
+
+    # -------------
+    # Test load_gas's handling of malformed thermodynamic data files.
+    # Each scenario writes a minimal synthetic NetCDF file to a scratch directory.
+    # -------------
+    @testset "load_gas_rejects_malformed_data_files" begin
+        scratch_dir::String = mktempdir()
+
+        # -- corrupted file: the companion .chk hash does not match the file --
+        @testset "corrupt_checksum" begin
+            formula = "H2O"
+            fpath = joinpath(scratch_dir, "$formula.nc")
+            write(fpath, "this is not a real netcdf file")
+            write(fpath * ".chk", "0"^64)  # deliberately wrong hash
+
+            species.ENABLE_CHECKSUM = true
+            local gas::species.Gas_t
+            with_logger(MinLevelLogger(current_logger(), Test.Logging.Error+1)) do
+                gas = species.load_gas(scratch_dir, formula, true, false; check_integrity=true)
+            end
+            @test gas.fail == true
+            @test gas.eos == species.EOS_IDEAL
+
+            rm(fpath); rm(fpath * ".chk")
+        end
+
+        # -- missing creation date --
+        @testset "missing_creation_date" begin
+            formula = "H2O"
+            fpath = joinpath(scratch_dir, "$formula.nc")
+            NCDataset(fpath, "c") do ds
+                defVar(ds, "mmw", 0.018, ())
+            end
+
+            local gas::species.Gas_t
+            with_logger(MinLevelLogger(current_logger(), Test.Logging.Error+1)) do
+                gas = species.load_gas(scratch_dir, formula, true, false; check_integrity=false)
+            end
+            @test gas.fail == true
+            @test gas.eos == species.EOS_IDEAL
+
+            rm(fpath)
+        end
+
+        # -- outdated creation date --
+        @testset "outdated_creation_date" begin
+            formula = "H2O"
+            fpath = joinpath(scratch_dir, "$formula.nc")
+            created_fixture::Int64 = 20200101  # predates MIN_DATA_VERSION
+            NCDataset(fpath, "c") do ds
+                defVar(ds, "created", created_fixture, ())
+                defVar(ds, "mmw", 0.018, ())
+            end
+
+            # sanity check on the fixture itself: it must actually be outdated
+            @test created_fixture < species.MIN_DATA_VERSION
+
+            local gas::species.Gas_t
+            with_logger(MinLevelLogger(current_logger(), Test.Logging.Error+1)) do
+                gas = species.load_gas(scratch_dir, formula, true, false; check_integrity=false)
+            end
+            @test gas.fail == true
+            @test gas.eos == species.EOS_IDEAL
+
+            rm(fpath)
+        end
+
+        # -- EOS pressure axis not strictly ascending --
+        @testset "eos_pressure_axis_not_ascending" begin
+            formula = "CO2"
+            fpath = joinpath(scratch_dir, "$formula.nc")
+            NCDataset(fpath, "c") do ds
+                defVar(ds, "created", species.MIN_DATA_VERSION, ())
+                defVar(ds, "mmw", 0.044, ())
+                defVar(ds, "JANAF", "CO2", ())
+                defDim(ds, "vdw_T", 2)
+                defDim(ds, "vdw_P", 3)
+                defVar(ds, "vdw_T", [100.0, 200.0], ("vdw_T",))
+                defVar(ds, "vdw_P", [10.0, 5.0, 20.0], ("vdw_P",))  # not ascending
+                defVar(ds, "vdw_rho", zeros(2,3), ("vdw_T","vdw_P"))
+            end
+
+            local gas::species.Gas_t
+            with_logger(MinLevelLogger(current_logger(), Test.Logging.Error+1)) do
+                gas = species.load_gas(scratch_dir, formula, true, true; check_integrity=false)
+            end
+            @test gas.fail == true
+            @test isapprox(gas.mmw, 0.044; rtol=1e-12)
+
+            rm(fpath)
+        end
+
+        # -- EOS temperature axis not strictly ascending --
+        @testset "eos_temperature_axis_not_ascending" begin
+            formula = "CO2"
+            fpath = joinpath(scratch_dir, "$formula.nc")
+            NCDataset(fpath, "c") do ds
+                defVar(ds, "created", species.MIN_DATA_VERSION, ())
+                defVar(ds, "mmw", 0.044, ())
+                defVar(ds, "JANAF", "CO2", ())
+                defDim(ds, "vdw_T", 2)
+                defDim(ds, "vdw_P", 3)
+                defVar(ds, "vdw_T", [200.0, 100.0], ("vdw_T",))  # not ascending
+                defVar(ds, "vdw_P", [10.0, 15.0, 20.0], ("vdw_P",))
+                defVar(ds, "vdw_rho", zeros(2,3), ("vdw_T","vdw_P"))
+            end
+
+            local gas::species.Gas_t
+            with_logger(MinLevelLogger(current_logger(), Test.Logging.Error+1)) do
+                gas = species.load_gas(scratch_dir, formula, true, true; check_integrity=false)
+            end
+            @test gas.fail == true
+            @test isapprox(gas.mmw, 0.044; rtol=1e-12)
+
+            rm(fpath)
+        end
+
+        rm(scratch_dir; recursive=true, force=true)
     end
 
 end

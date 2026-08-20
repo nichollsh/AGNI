@@ -82,9 +82,8 @@ The source tree is split hierarchically by responsibility:
 - `src/state/` for model state structs and layer/diagnostic utilities
 - `src/compose/` for chemistry/ocean composition logic
 - `src/energy/` for RT, fluxes, spectrum, and optional RFM handling
-- `src/interface/` for I/O, plotting, config-path helpers, and T(p) setup verbs
+- `src/interface/` for I/O, plotting, config-path helpers, T(p) setup verbs, and shared helpers (style, checksums)
 - `src/solver/` for solver front-end plus method-specific implementations
-- `src/util/` for shared helpers (style, checksums)
 
 ### Central data structure
 `atmosphere.Atmos_t` (defined in `src/state/atmosphere.jl`) is a mutable struct that holds all model state: pressure/temperature grids, flux arrays, gas mixing ratios, solver flags, file paths, and physics options. Nearly every function takes an `atmos::Atmos_t` as its first argument and mutates it.
@@ -107,8 +106,8 @@ The source tree is split hierarchically by responsibility:
 | `compose/chemistry.jl`, `compose/fastchem.jl`, `compose/ocean.jl` | Thermochemical equilibrium (FastChem), rainout/condensation, surface oceans |
 | `energy/energy.jl`, `energy/spectrum.jl`, `energy/rfm.jl` | SOCRATES/RFM RT interfaces, fluxes/heating, spectrum utilities |
 | `interface/setpt.jl`, `interface/save.jl`, `interface/load.jl`, `interface/plotting.jl`, `interface/paths.jl` | T(p) setup verbs, I/O, plotting, and path safety helpers |
+| `interface/blake.jl`, `interface/style.jl` | Shared utility helpers (hash checks, style/label/color helpers) |
 | `solver/solver.jl` + `solver/*.jl` | Solver front-end and method-specific implementations (energy, transparent, globe, etc.) |
-| `util/blake.jl`, `util/style.jl` | Shared utility helpers (hash checks, style/label/color helpers) |
 
 ### External dependencies
 - **SOCRATES** (Fortran RT code, loaded at runtime via `include(ENV["RAD_DIR"]/julia/src/SOCRATES.jl)`). The `atmosphere` module hard-includes this path on load.

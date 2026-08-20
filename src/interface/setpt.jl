@@ -463,11 +463,22 @@ module setpt
         return true
     end
 
+    # Fixed-point iteration limits for the self-consistent lapse rate in dry_adiabat!
+    const DRY_ADIABAT_MAXITER::Int64 = 30
+    const DRY_ADIABAT_RTOL::Float64  = 1.0e-4
+
     """
     **Set T(p) to dry adiabat.**
 
     Integrates upward from the surface temperature using the dry adiabatic lapse rate.
     Uses real gas properties (cp, density) at each level based on current composition.
+
+    Both density and heat capacity vanish as pressure approaches zero, so the lapse rate
+    `1/(rho*cp)` diverges in that limit. Evaluating it from the (stale) temperature of the
+    level below, as a single explicit step, can therefore overshoot severely at low
+    pressure and drive the profile to the temperature floor. To avoid this, cp and rho are
+    instead evaluated self-consistently at each level's own (iteratively-updated)
+    temperature, which bounds the local truncation error of the step.
 
     Arguments:
     - `atmos::Atmos_t`      atmosphere struct instance to modify.
@@ -490,26 +501,36 @@ module setpt
 
         # Lapse rate dT/dp
         grad::Float64 = 0.0
+        tmp_new::Float64 = 0.0
 
         # Calculate values
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
 
-            # Set cp and rho based on temperature of the level below this one
+            # Initial guess: temperature of the level below this one
             atmos.tmp[i] = atmos.tmp_surf
             if i < atmos.nlev_c
                 atmos.tmp[i] = atmos.tmp[i+1]
             end
-            atmosphere.calc_single_cpkc!(atmos, i)
-            atmosphere.calc_single_density!(atmos, i)
 
-            # Evaluate lapse rate dT/dp
-            grad = 1 / (atmos.layer_ρ[i] * atmos.layer_cp[i])
+            # Iterate cp and rho to self-consistency with this level's own temperature,
+            # rather than evaluating them once at the (possibly very different) guess
+            for _ in 1:DRY_ADIABAT_MAXITER
+                atmosphere.calc_single_cpkc!(atmos, i)
+                atmosphere.calc_single_density!(atmos, i)
 
-            # Cell-edge to cell-centre
-            atmos.tmp[i] = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
-            atmos.tmp[i] = max(atmos.tmp[i], atmos.tmp_floor)
+                # Evaluate lapse rate dT/dp at this level's own current temperature
+                grad = 1 / (atmos.layer_ρ[i] * atmos.layer_cp[i])
 
-            # Cell-centre to cell-edge
+                # Cell-edge to cell-centre
+                tmp_new = atmos.tmpl[i+1] + grad * (atmos.p[i]-atmos.pl[i+1])
+                tmp_new = max(tmp_new, atmos.tmp_floor)
+
+                converged = isapprox(tmp_new, atmos.tmp[i]; rtol=DRY_ADIABAT_RTOL)
+                atmos.tmp[i] = tmp_new
+                converged && break
+            end
+
+            # Cell-centre to cell-edge (using the converged lapse rate)
             atmos.tmpl[i] = atmos.tmp[i] + grad * (atmos.pl[i]-atmos.p[i])
             atmos.tmpl[i] = max(atmos.tmpl[i], atmos.tmp_floor)
         end

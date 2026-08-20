@@ -15,11 +15,11 @@ module AGNI
     import TOML:parsefile
 
     # Include local jl files (submodule load-ordering matters here)
-    include("util/blake.jl"); import .blake; export blake
+    include("interface/blake.jl"); import .blake; export blake
     include("interface/paths.jl"); import .paths; export paths
     include("phys/consts.jl"); import .consts; export consts
     include("phys/formulae.jl"); import .formulae; export formulae
-    include("util/style.jl"); import .style; export style
+    include("interface/style.jl"); import .style; export style
     include("phys/species.jl"); import .species; export species
     include("phys/density.jl"); import .density; export density
     include("phys/phys.jl"); import .phys; export phys
