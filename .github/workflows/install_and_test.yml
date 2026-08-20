@@ -53,7 +53,7 @@ jobs:
         env:
           GCC_V: 15
         run: |
-          sudo chown -R "$USER":admin bin
+          sudo chown -R "$USER":admin /opt/homebrew/
           find /opt/homebrew/Cellar -user root | xargs sudo chown -R $USER
           brew update
           brew install netcdf netcdf-fortran gcc@${GCC_V} gfortran
