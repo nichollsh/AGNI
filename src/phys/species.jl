@@ -25,15 +25,19 @@ module species
     # Minimum data file version [YYYYMMDD, as integer]
     const MIN_DATA_VERSION::Int64 = 20260201
 
+    # Pressure limits for EOS evaluation (should be consistent with NetCDF data files)
+    const EOS_LOGPMIN::Float64 = 0.0   # log10 Pa
+    const EOS_LOGPMAX::Float64 = 11.0  # log10 Pa
+
     # Enumerate potential equations of state
     @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3 EOS_CMS19=4
     export EOS, EOS_IDEAL, EOS_VDW, EOS_AQUA, EOS_CMS19
-
 
     # Enable/disable flags
     ENABLE_CHECKSUM::Bool = true  # can still be disabled when function is called
     ENABLE_AQUA::Bool     = true
     ENABLE_CMS19::Bool    = true
+
 
     # Structure containing data for a single gas
     mutable struct Gas_t
@@ -54,7 +58,8 @@ module species
 
         # Maximum valid range for T,P
         tmp_max::Float64
-        prs_max::Float64
+        log10prs_max::Float64
+        log10prs_min::Float64
 
         # Constituent atoms (dictionary of numbers)
         atoms::Dict{String, Int64}
@@ -70,7 +75,7 @@ module species
         no_sat::Bool                # No saturation data
         sat_T::Array{Float64,1}     # Reference temperatures [K]
         sat_P::Array{Float64,1}     # Corresponding saturation pressures [log10 Pa]
-        sat_I::Extrapolation        # Psat(T), 1D linear interpolator-extrapolator
+        sat_I::Extrapolation        # log10 Psat(T), 1D linear interpolator-extrapolator
 
         # Latent heat (enthalpy) of phase change
         lat_T::Array{Float64,1}     # Reference temperatures [K]
@@ -99,7 +104,7 @@ module species
         eos_ρ::Array{Float64,2}     # log density [kg m-3]
 
         # EOS interpolator with constant-value extrapolation
-        eos_I::Extrapolation        # 2D linear interpolator-extrapolator
+        eos_I::Extrapolation        # log10 rho(T,P),2D linear interpolator-extrapolator
 
         Gas_t() = new()
     end # end gas struct
@@ -181,7 +186,8 @@ module species
         # set EOS to ideal gas
         gas.eos = EOS_IDEAL
         gas.tmp_max = BIGFLOAT
-        gas.prs_max = BIGFLOAT
+        gas.log10prs_max = BIGLOGFLOAT
+        gas.log10prs_min = SMALLLOGFLOAT
         eos_name = "ideal gas"
 
         # Check if we have data from file
@@ -325,11 +331,19 @@ module species
                     end
 
                     # record valid T,P range
-                    gas.tmp_max = maximum(gas.eos_T)
-                    gas.prs_max = 10.0 ^ maximum(gas.eos_P)
+                    gas.tmp_max      = maximum(gas.eos_T)
+                    gas.log10prs_max = min(maximum(gas.eos_P), EOS_LOGPMAX)
+                    gas.log10prs_min = max(minimum(gas.eos_P), EOS_LOGPMIN)
 
-                    # convert density to SI units
-                    @. gas.eos_ρ = 10.0 ^ gas.eos_ρ
+                    # ensure min/max are compatible
+                    if gas.log10prs_min >= gas.log10prs_max
+                        @warn("Could not parse $formula EOS data from file")
+                        @warn("    The valid pressure domain is too small")
+                        @warn("    log10(Pmin/Pa) = $(gas.log10prs_min)")
+                        @warn("    log10(Pmax/Pa) = $(gas.log10prs_max)")
+                        gas.fail = true
+                        return gas
+                    end
 
                     # interpolate to 2D grid
                     gas.eos_I = extrapolate(interpolate(
@@ -449,6 +463,8 @@ module species
 
         # Is vapour when p < p_sat (see docstring)
         # Comparison is made in log10-space with a small tolerance
+        # A `phs_εlogp>0` means that super-saturated pressures are considered to be vapour
+        # A `phs_εlogp<0` means that sub-saturated pressures are considered to be vapour
         return log10(p) - phs_εlogp < gas.sat_I(t)
     end
     export is_vapour

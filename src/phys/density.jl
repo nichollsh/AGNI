@@ -13,7 +13,7 @@ module density
     import ..species: Gas_t, is_vapour, EOS_IDEAL, EOS
 
     # Constants for handling phase boundaries in density calculations
-    const PHS_METHOD_DEFAULT::Int64 = 3
+    const PHS_METHOD_DEFAULT::Int64 = 4
     const PHS_DLOGP_DEFAULT::Float64 = 0.3
 
     # Table of liquid-phase density for ocean calculation [kg/m^3]
@@ -74,7 +74,9 @@ module density
     The flag `phs_method` is an integer specifying how to handle EOS evaluations with phase
     boundaries, which is tricky for non-ideal equations of state. A check is made against
     phase boundaries with a small tolerance, set within the call to `is_vapour()`. Note that
-    the tolerance `phs_εlogp` in `is_vapour()` differs from the offset `phs_dlogp` on psat.
+    the tolerance `phs_εlogp` in `is_vapour()` can differ from the offset `phs_dlogp`. This
+    offset is used to define a shifted log10 pressure at which the EOS evaluator switches
+    to the vapour region, and is used in `phs_method` 3 and 4.
 
     Options for `phs_method` flag:
     - `1`, naively evaluate the density at the requested T-P.
@@ -84,8 +86,8 @@ module density
             density is evaluated in the vapour region.
     - `4`, [default] scale the density by distance from phase boundary, continuously
             transitioning to ideal gas as the pressure decreases. Done by evaluating the
-            density at psat, and then scaling by `10^(log10(prs) - log10(prs_sat))` when
-            `is_vapour() == false`.
+            density at the shifted pressure, and scaling by the distance from the switch
+            when `is_vapour() == false`.
 
     Arguments:
     - `tmp::Float64`        temperature [K]
@@ -104,7 +106,8 @@ module density
                             phs_dlogp::Float64=PHS_DLOGP_DEFAULT)::Float64
 
         # log10 pressure for evaluating EOS (Pa)
-        eval_log10prs::Float64 = log10(prs)
+        log10prs::Float64 = log10(prs)
+        log10prs_e::Float64 = log10prs  # default to no shift
 
         # determine which EOS and approach to use...
 
@@ -121,15 +124,17 @@ module density
             # this requires careful handling of phase boundaries
 
             # is vapour?
+            # this checks if the pressure is within phs_dlogp of the saturation pressure
+            # on the condensed side, so sub-saturated pressures are still considered vapour
             if is_vapour(gas, tmp, prs*vmr; phs_εlogp=-phs_dlogp)
                 # yes, so just evaluate the EOS
-                return gas.eos_I(tmp, eval_log10prs)
+                return 10.0 ^ gas.eos_I(tmp, log10prs)
 
             else
                 # no, so we need to handle the phase boundary carefully
                 if phs_method == 1
                     # just evaluate the EOS naively
-                    return gas.eos_I(tmp, eval_log10prs)
+                    return 10.0 ^ gas.eos_I(tmp, log10prs)
 
                 elseif phs_method == 2
                     # switch to ideal gas if we are in the condensed region
@@ -138,17 +143,30 @@ module density
                 elseif phs_method == 3
                     # use shifted log10pressure (same temperature) for evaluating density
                     # this decreases the pressure such that we fall within the vapour region
-                    eval_log10prs = min(eval_log10prs, gas.sat_I(tmp) - phs_dlogp)
-                    return gas.eos_I(tmp, eval_log10prs)
+                    # calculate switch boundary (in log10 space)
+                    log10prs_e = gas.sat_I(tmp) - phs_dlogp
+
+                    # clamp to min/max valid pressures
+                    log10prs_e = min(log10prs, log10prs_e)
+                    log10prs_e = clamp(log10prs_e, gas.log10prs_min, gas.log10prs_max)
+
+                    # return density [Pa] evaluated at the shifted pressure point
+                    return 10.0 ^ gas.eos_I(tmp, log10prs_e)
 
                 elseif phs_method == 4
-                    # evaluate the density at the shifted pressure, and then scale by the
-                    # distance from the switch boundary (in log10 space)
-                    eval_log10prs = gas.sat_I(tmp) - phs_dlogp
+                    # calculate switch boundary (in log10 space)
+                    log10prs_e = gas.sat_I(tmp) - phs_dlogp
 
-                    # evaluate and scale density from the shifted pressure
+                    # evaluate and scale then density from the shifted pressure point
                     # this keeps behaviour continuous in pressure and temperature
-                    return gas.eos_I(tmp, eval_log10prs) * 10^(log10(prs) - eval_log10prs)
+                    rho_s = gas.eos_I(tmp, log10prs_e) + log10prs - log10prs_e
+
+                    # clamp to min/max valid pressures
+                    log10prs_e = min(log10prs, log10prs_e)
+                    log10prs_e = clamp(log10prs_e, gas.log10prs_min, gas.log10prs_max)
+
+                    # ensure that this doesn't exceed the condensed phase's density
+                    return 10.0 ^ min(rho_s,  gas.eos_I(tmp, log10prs))
                 else
                     error("Invalid phs_method=$phs_method specified for calc_rho_gas()")
                 end

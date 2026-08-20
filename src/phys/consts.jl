@@ -24,6 +24,8 @@ module consts
     # A small positive floating point number
     const SMALLFLOAT::Float64   = floatmin(Float32)*2.0
     export SMALLFLOAT
+    const SMALLLOGFLOAT::Float64 = log(SMALLFLOAT)
+    export SMALLLOGFLOAT
 
     # Sources:
     # - Pierrehumbert (2010)

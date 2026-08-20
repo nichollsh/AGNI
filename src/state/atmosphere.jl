@@ -1258,8 +1258,8 @@ module atmosphere
 
         # Check T,P range vs EOS limits
         for g in atmos.gas_names
-            if atmos.p_boa > atmos.gas_dat[g].prs_max
-                @warn "Surface pressure exceeds the valid range ($g EOS; ≥$(atmos.gas_dat[g].prs_max) Pa)"
+            if atmos.p_boa > 10^atmos.gas_dat[g].log10prs_max
+                @warn "Surface pressure exceeds the valid range ($g EOS; ≥$(10^atmos.gas_dat[g].log10prs_max) Pa)"
             end
             if maximum(atmos.tmp) > atmos.gas_dat[g].tmp_max
                 @warn "Temperature profile exceeds the valid range ($g EOS; ≥$(atmos.gas_dat[g].tmp_max) K)"
