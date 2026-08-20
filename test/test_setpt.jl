@@ -90,14 +90,30 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         # Check surface temperature is preserved
         @test atmos.tmpl[end] ≈ atmos.tmp_surf
 
-        # Check temperatures are positive and decreasing with altitude
+        # Check temperatures are positive and at least at the floor everywhere
         @test all(atmos.tmp .> 0.0)
         @test all(atmos.tmpl .> 0.0)
+        @test all(atmos.tmp .>= atmos.tmp_floor)
 
-        # Temperature should generally decrease with altitude (lower pressure)
-        # Check that temperatures are monotonic (allowing for small violations)
-        decreasing_count = sum(atmos.tmp[1:end-1] .< atmos.tmp[2:end])
-        @test decreasing_count > atmos.nlev_c * 0.8  # At least 80% decreasing
+        # Real cp and rho both vanish as p->0, so the true dry adiabat cools toward
+        # (and, over a wide enough pressure range, clamps at) tmp_floor near the top
+        # of the column; it must never increase with altitude nor oscillate, so the
+        # profile (ordered TOA to surface) must be exactly non-decreasing throughout,
+        # not just "mostly decreasing"
+        @test issorted(atmos.tmp)
+        @test issorted(atmos.tmpl)
+
+        # discrimination guard: a solver that overshoots into an unstable oscillation
+        # (e.g. a single explicit step using a stale neighbouring temperature to
+        # evaluate cp/rho, rather than the level's own self-consistent temperature)
+        # produces jumps back down to the floor from a level above it that already
+        # exceeded it; issorted() above would already catch that, but pin the extra
+        # invariant that only the levels nearest the floor are actually clamped there
+        n_floored = count(isapprox.(atmos.tmp, atmos.tmp_floor; atol=1e-8))
+        @test n_floored < atmos.nlev_c  # not every level can be floored
+        if n_floored > 0
+            @test all(isapprox.(atmos.tmp[1:n_floored], atmos.tmp_floor; atol=1e-8))
+        end
     end
 
     @testset "stratosphere!" begin

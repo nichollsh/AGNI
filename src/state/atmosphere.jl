@@ -1224,12 +1224,17 @@ module atmosphere
         end
 
         # store condensates
+        forced_dry = Set{String}()
         for c in condensates
             if atmos.gas_dat[c].stub || atmos.gas_dat[c].no_sat || (c in COND_DISALLOWED)
-                @warn "$c disallowed from being condensable; treated as dry"
+                push!(forced_dry, c)
             else
                 push!(atmos.condensates, c)
             end
+        end
+        if length(forced_dry) > 0
+            @debug "Some species are not allowed to condense and will be treated as dry:"
+            @debug "    "*join(forced_dry,", ")
         end
 
         # Validate condensate names
@@ -1258,8 +1263,8 @@ module atmosphere
 
         # Check T,P range vs EOS limits
         for g in atmos.gas_names
-            if atmos.p_boa > atmos.gas_dat[g].prs_max
-                @warn "Surface pressure exceeds the valid range ($g EOS; ≥$(atmos.gas_dat[g].prs_max) Pa)"
+            if atmos.p_boa > 10^atmos.gas_dat[g].log10prs_max
+                @warn "Surface pressure exceeds the valid range ($g EOS; ≥$(10^atmos.gas_dat[g].log10prs_max) Pa)"
             end
             if maximum(atmos.tmp) > atmos.gas_dat[g].tmp_max
                 @warn "Temperature profile exceeds the valid range ($g EOS; ≥$(atmos.gas_dat[g].tmp_max) K)"
@@ -3136,7 +3141,7 @@ module atmosphere
             @warn "Atmosphere arrays have not been allocated"
             return 1
         end
-        @debug "Calculating photosphere from reference pressure, p=$(p_ref*1e-5) bar"
+        @debug "Calculating photosphere using p=$(p_ref*1e-5) bar"
         return findmin(abs.(atmos.pl .- p_ref))[2]
     end
 
@@ -3159,7 +3164,7 @@ module atmosphere
             return 1
         end
 
-        @debug "Calculating photosphere, τ=$(atmos.transspec_ref_tau) at λ=$(ref_wl*1e6) μm"
+        @debug "Calculating photosphere using τ=$(atmos.transspec_ref_tau) at λ=$(ref_wl*1e6) μm"
 
         # Ensure valid range of wavelengths
         ref_wl = clamp(ref_wl, minimum(atmos.bands_cen), maximum(atmos.bands_cen))
@@ -3193,7 +3198,7 @@ module atmosphere
             return 1
         end
 
-        @debug "Calculating photosphere from contribution function (legacy method)"
+        @debug "Calculating photosphere using contribution function (legacy method)"
 
         # Params
         wl_min::Float64  = 0.2 * 1e-6 # 200 nanometer

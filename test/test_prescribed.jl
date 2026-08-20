@@ -19,6 +19,7 @@ function _make_prescribed_atmos(; instellation::Float64=1200.0,
                             Dict("N2" => 1.0), "";
                             real_gas=false,
                             thermo_functions=false,
+                            check_integrity=false,
                             flag_rayleigh=false,
                             flag_cloud=false)
     ok || error("Failed to setup prescribed-solver atmosphere")

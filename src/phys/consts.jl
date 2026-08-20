@@ -10,7 +10,7 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String     = "1.12.0"  # current agni version
+    const AGNI_VERSION::String     = "1.12.1"  # current agni version
     export AGNI_VERSION
     const SOCVER_minimum::Float64  = 2603.6    # minimum required socrates version
     export SOCVER_minimum
@@ -24,6 +24,8 @@ module consts
     # A small positive floating point number
     const SMALLFLOAT::Float64   = floatmin(Float32)*2.0
     export SMALLFLOAT
+    const SMALLLOGFLOAT::Float64 = log(SMALLFLOAT)
+    export SMALLLOGFLOAT
 
     # Sources:
     # - Pierrehumbert (2010)
