@@ -53,6 +53,8 @@ jobs:
         env:
           GCC_V: 15
         run: |
+          sudo chown -R "$USER":admin bin
+          find /opt/homebrew/Cellar -user root | xargs sudo chown -R $USER
           brew update
           brew install netcdf netcdf-fortran gcc@${GCC_V} gfortran
           ls "/opt/homebrew/opt/gcc/bin"
@@ -116,7 +118,7 @@ jobs:
           export FC_DIR="$HOME/work/AGNI/AGNI/fastchem"
           export LD_LIBRARY_PATH=""
           julia --project --code-coverage test/runtests.jl
-      
+
       # Get coverage when running on linux
       - name: Get coverage
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version == '1.12' }}
