@@ -407,7 +407,7 @@ module spectrum
         end
 
         # Check file sizes
-        total_size = filesize(orig_file) + filesize(star_file)
+        total_size::Int64 = filesize(orig_file) + filesize(star_file)
         @debug "Total size of SOCRATES input files: $(total_size / 1e6) MB"
 
         # Copy original file to output file
