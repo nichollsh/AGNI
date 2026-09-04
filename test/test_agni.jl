@@ -267,7 +267,7 @@ end
 
 # These cases use Test.collect_test_logs to inspect *which* validation branch fired,
 # rather than only checking the boolean return value.
-@testset "agni_run_from_config_extra_branches" begin
+@testset "agni_from_config_extra" begin
     # gravity computed from `mass` alone (single-key success path), distinct from the
     # already-tested "mass AND gravity both given" overspecified-error branch above
     cfg = _base_cfg()
@@ -459,7 +459,7 @@ function _minimal_greygas_cfg(; out_dir::String=mktempdir())
     )
 end
 
-@testset "agni_run_from_config_greygas_branches" begin
+@testset "agni_from_config_grey" begin
     # Invalid solver name
     cfg = _minimal_greygas_cfg()
     cfg["execution"]["solver"] = "notarealsolver"
