@@ -21,6 +21,25 @@ const _P_SURF    = 100.0  # bar -> p_boa = 1e7 Pa
 const _P_TOP     = 1e-6   # bar -> p_toa = 0.1 Pa
 const _THETA     = 60.0
 
+# Cheap fixture used by the tests below that only require atmosphere.setup!()
+function _setup_only(; condensates::Array{String,1}=String[], gravity::Float64=_GRAVITY)
+    atmos = atmosphere.Atmos_t()
+    ok = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                            "greygas",
+                            1000.0, 1.0, 0.0, _THETA,
+                            _TMP_SURF,
+                            gravity, _RADIUS,
+                            _NLEV, _P_SURF, _P_TOP,
+                            Dict("H2O" => 1.0), "";
+                            real_gas=false,
+                            thermo_functions=false,
+                            flag_rayleigh=false,
+                            flag_cloud=false,
+                            condensates=condensates)
+    ok || error("Failed to setup test atmosphere")
+    return atmos
+end
+
 function _setup_with_vmr_file(mf_path::String)
     atmos = atmosphere.Atmos_t()
     ok = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
@@ -198,5 +217,237 @@ end
         end
         @test !alloc_ok
         @test !atmos.is_alloc
+    end
+
+    # -----------------------------------------------------------------
+    # _check_range: pure boundary-check helper, no Atmos_t required at all.
+    # -----------------------------------------------------------------
+    @testset "check_range" begin
+        # value within [min,max]: success, no logging
+        @test atmosphere._check_range("x", 15.0; min=10.0, max=20.0)
+
+        # below min only
+        @test atmosphere._check_range("x", 15.0; min=10.0) == true
+        logs, ok = with_logger(MinLevelLogger(current_logger(), Logging.Error+1)) do
+            Test.collect_test_logs() do
+                atmosphere._check_range("too_small", 5.0; min=10.0)
+            end
+        end
+        @test ok == false
+
+        # above max only
+        logs, ok = Test.collect_test_logs() do
+            atmosphere._check_range("too_large", 25.0; max=20.0)
+        end
+        @test ok == false
+        @test any(occursin("too_large", l.message) for l in logs if l.level == Logging.Error)
+
+        # both min and max given, value out of range on the low side: must report the
+        # combined "$name is out of range" form, not the single-bound "too small" form
+        logs, ok = Test.collect_test_logs() do
+            atmosphere._check_range("both_bounds", 5.0; min=10.0, max=20.0)
+        end
+        @test ok == false
+        errs = [l.message for l in logs if l.level == Logging.Error]
+        @test any(occursin("out of range", m) for m in errs)
+        @test !any(occursin("too small", m) for m in errs)
+    end
+
+    # -----------------------------------------------------------------
+    # generate_pgrid!: only needs p_boa/p_toa/nlev_c/nlev_l set on the struct, so
+    # this is tested without calling setup!() or allocate!() at all.
+    # -----------------------------------------------------------------
+    @testset "generate_pgrid_low_pressure_ratio" begin
+        atmos = atmosphere.Atmos_t()
+        atmos.p_toa = 1.0
+        atmos.p_boa = 1.0  # ratio = 1.0, below PRESSURE_RATIO_MIN (1.0001)
+        atmos.nlev_c = 10
+        atmos.nlev_l = 11
+        logs, _ = Test.collect_test_logs() do
+            atmosphere.generate_pgrid!(atmos)
+        end
+
+        # test that the low-pressure-ratio warning was logged
+        warns = [l.message for l in logs if l.level == Logging.Warn]
+        @test any(occursin("pressure ratio", m) for m in warns)
+
+        # discrimination guard: p_boa must be corrected to exceed the original
+        @test atmos.p_boa > 1.0
+        @test isapprox(atmos.p_boa, atmosphere.PRESSURE_RATIO_MIN * atmos.p_toa; rtol=1e-12)
+        @test length(atmos.p) == 10
+        @test length(atmos.pl) == 11
+        @test issorted(atmos.pl; rev=false)  # increasing index -> increasing pressure
+    end
+
+    # -----------------------------------------------------------------
+    # set_deep_heating!: argument-validation branches only (the physics of the
+    # heating profile itself is covered by test_deep_heating.jl, which is excluded
+    # from the fast tier). Only needs setup!() (reads atmos.p_toa/p_boa).
+    # -----------------------------------------------------------------
+    @testset "set_deep_heating_validation" begin
+        atmos = _setup_only()
+
+        logs, ok = Test.collect_test_logs() do
+            atmosphere.set_deep_heating!(atmos, 1e5, 1.0, 0.1, 0.0, "mass", "clamp", "badmode")
+        end
+        @test ok == false
+        @test any(occursin("Invalid deep heating power mode", l.message)
+                        for l in logs if l.level == Logging.Error)
+
+        logs, ok = Test.collect_test_logs() do
+            atmosphere.set_deep_heating!(atmos, 1e5, 1.0, 0.1, 0.0, "badnorm", "clamp", "rel")
+        end
+        @test ok == false
+        @test any(occursin("Invalid deep heating normalisation", l.message)
+                        for l in logs if l.level == Logging.Error)
+
+        logs, ok = Test.collect_test_logs() do
+            atmosphere.set_deep_heating!(atmos, 1e5, 1.0, 0.1, 0.0, "mass", "baddomain", "rel")
+        end
+        @test ok == false
+        @test any(occursin("Invalid deep heating domain treatment", l.message)
+                        for l in logs if l.level == Logging.Error)
+
+        # power_mode="off" is a valid no-op success path, distinct from the failure
+        # modes above and from the verbose success case below
+        @test atmosphere.set_deep_heating!(atmos, 1e5, 1.0, 0.1, 0.0, "mass", "clamp", "off")
+        @test atmos.deepheat_power_mode == "off"
+
+        # verbose success path logs a description of the configured profile
+        logs, ok = Test.collect_test_logs() do
+            atmosphere.set_deep_heating!(atmos, 1e5, 1.0, 0.1, 0.0, "mass", "clamp", "rel";
+                                            verbose=true)
+        end
+        @test ok == true
+        infos = [l.message for l in logs if l.level == Logging.Info]
+        @test any(occursin("power_mode=rel", m) for m in infos)
+        @test any(occursin("norm_method=mass", m) for m in infos)
+    end
+
+    # -----------------------------------------------------------------
+    # calc_layer_props! and calc_profile_radius!
+    # -----------------------------------------------------------------
+    @testset "calc_layer_props_without_allocate" begin
+        atmos = _setup_only()
+
+        # baseline: a physically-reasonable surface gravity produces a fully-bound
+        # atmosphere with positive density/scale-height everywhere
+        @test atmosphere.calc_layer_props!(atmos)
+        @test all(atmos.layer_isbound)
+        @test all(atmos.layer_ρ .> 0.0)
+        @test all(atmos.layer_Hp .> 0.0)
+
+        # radius decreases from surface (i=nlev_c) to TOA (i=1)
+        @test issorted(atmos.r; rev=true)
+
+        # gravity below the internal HYDROGRAV_ming floor (1e-4 m/s^2), so the function
+        # must report failure and flag the affected layers
+        atmos_lowg = _setup_only(; gravity=1e-7)
+        ok = with_logger(MinLevelLogger(current_logger(), Logging.Error+1)) do
+            atmosphere.calc_layer_props!(atmos_lowg)
+        end
+        @test ok == false
+        @test any(.!atmos_lowg.layer_isbound)
+
+        # discrimination guard: this must not be trivially "all layers unbound"
+        @test all(atmos_lowg.g .<= atmosphere.HYDROGRAV_ming)
+    end
+
+    # -----------------------------------------------------------------
+    # set_cloud!: only needs condensates/gas_sat from setup!(), no allocate!().
+    # -----------------------------------------------------------------
+    @testset "set_cloud" begin
+        atmos = _setup_only(; condensates=["H2O"])
+
+        # from_yield=true (default), but no condensation has occurred yet (uniform
+        # hot initial profile from setup!()), so there is nothing to form clouds from
+        @test atmosphere.set_cloud!(atmos) == false
+        @test all(atmos.cloud_arr_l .== 0.0)
+
+        # from_yield=false uses the saturation mask (gas_sat) instead of from yield
+        fill!(atmos.gas_sat["H2O"], false)
+        atmos.gas_sat["H2O"][5]  = true
+        atmos.gas_sat["H2O"][10] = true
+        any_cloud = atmosphere.set_cloud!(atmos; from_yield=false)
+        @test any_cloud == true
+        @test isapprox(atmos.cloud_arr_l[5],  atmos.cloud_val_l; rtol=1e-10)
+        @test isapprox(atmos.cloud_arr_l[10], atmos.cloud_val_l; rtol=1e-10)
+
+        # discrimination guard: an un-saturated layer is set above the numerical floor
+        @test atmos.cloud_arr_l[1] > 0.0
+        @test atmos.cloud_arr_l[1] < atmos.cloud_val_l
+
+        # negative cloud particle size
+        atmos.cloud_val_r = -1.0
+        logs, _ = Test.collect_test_logs() do
+            atmosphere.set_cloud!(atmos; from_yield=false)
+        end
+        @test any(occursin("Negative cloud particle size", l.message)
+                        for l in logs if l.level == Logging.Warn)
+    end
+
+    # -----------------------------------------------------------------
+    # set_aerosol! and set_aerosols!
+    # -----------------------------------------------------------------
+    @testset "set_aerosol_and_aerosols" begin
+        atmos = _setup_only(; condensates=["H2O"])
+        atmos.aerosol_arr_l["testaer"] = zeros(Float64, atmos.nlev_c)
+        atmos.aerosol_arr_r["testaer"] = zeros(Float64, atmos.nlev_c)
+
+        # 1D-array mmr profile branch
+        mmr_profile = fill(0.5, atmos.nlev_c)
+        @test atmosphere.set_aerosol!(atmos, "testaer", mmr_profile)
+        @test all(isapprox.(atmos.aerosol_arr_l["testaer"], 0.5; rtol=1e-10))
+
+        # populate layer_σ, needed by calc_cond_mmr
+        atmosphere.calc_layer_props!(atmos)
+
+        # populate with a small nonzero condensation yield
+        atmos.cond_yield["H2O"][5] = 0.5
+        atmos.aerosol_names = ["testaer", "orphanaer"]
+        atmos.aerosol_setby["testaer"] = "H2O"
+
+        # "orphanaer" deliberately has no aerosol_setby entry and no array allocated
+        any_aerosol = atmosphere.set_aerosols!(atmos)
+        @test any_aerosol == true
+        expect5 = atmosphere.calc_cond_mmr(atmos, "H2O", 5)
+        @test expect5 > 0.0  # sanity: the discrimination below is non-trivial
+        @test isapprox(atmos.aerosol_arr_l["testaer"][5], expect5; rtol=1e-10)
+        @test !haskey(atmos.aerosol_arr_l, "orphanaer")
+    end
+
+    # -----------------------------------------------------------------
+    # _iphot_from_prs! to test pressure index search
+    # -----------------------------------------------------------------
+    @testset "iphot_from_prs_guard_and_search" begin
+        atmos = _setup_only()
+
+        # not allocated
+        @test !atmos.is_alloc
+        logs, idx = Test.collect_test_logs() do
+            atmosphere._iphot_from_prs!(atmos, 1e3)
+        end
+        @test idx == 1
+        @test any(occursin("not been allocated", l.message)
+                        for l in logs if l.level == Logging.Warn)
+
+        # is_alloc hand-set true, then check we get the correct layer
+        atmos.is_alloc = true
+        idx2 = atmosphere._iphot_from_prs!(atmos, atmos.pl[7])
+        @test idx2 == 7
+
+        # discrimination guard: a reference pressure roughly half-way down the grid
+        idx3 = atmosphere._iphot_from_prs!(atmos, sqrt(atmos.pl[1]*atmos.pl[end]))
+        @test 1 < idx3 < atmos.nlev_l
+    end
+
+    # -----------------------------------------------------------------
+    # list_available_aerosols
+    # -----------------------------------------------------------------
+    @testset "list_available_aerosols_disabled" begin
+        atmos = _setup_only()
+        @test !atmos.control.l_aerosol
+        names = atmosphere.list_available_aerosols(atmos)
+        @test names == String[]
     end
 end

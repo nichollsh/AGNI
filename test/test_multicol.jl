@@ -265,4 +265,67 @@ end
         multicol.deconstruct!(globe)
     end
 
+    # _is_succ is a pure classifier, no Atmos_t/Globe_t required at all.
+    @testset "is_succ" begin
+        @test multicol._is_succ(true) == true
+        @test multicol._is_succ(false) == false
+        @test multicol._is_succ(1.0) == true       # finite Float
+        @test multicol._is_succ(NaN) == false      # non-finite Float
+        # fallback branch: any type other than Bool/AbstractFloat is treated as
+        # success (e.g. a function returning `nothing`, or a plain value)
+        @test multicol._is_succ("ok") == true
+        @test multicol._is_succ(nothing) == true
+    end
+
+    # construct!'s four early-return guards all fire before deepcopy/allocation work
+    @testset "construct_guards" begin
+
+        # allocate atmosphere cheaply
+        atmos = atmosphere.Atmos_t()
+        ok0 = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                                "greygas",
+                                900.0, 1.0, 0.0, 0.0,
+                                400.0,
+                                10.0, 1.0e7,
+                                30, 1.0, 1e-6,
+                                Dict("N2" => 1.0), "";
+                                real_gas=false,
+                                thermo_functions=false,
+                                flag_rayleigh=false,
+                                flag_cloud=false)
+        ok0 || error("Failed to setup test atmosphere")
+        @test !atmos.is_alloc
+
+        globe = multicol.Globe_t()
+        logs, ok = Test.collect_test_logs() do
+            multicol.construct!(globe, atmos, [0.0], [0.0], [0.0], [1.0e5], [4.0])
+        end
+        @test ok == false
+        @test !globe.is_constructed
+        @test any(occursin("not allocated", l.message) for l in logs if l.level == Logging.Warn)
+
+        atmos.is_alloc = true  # white-box: only to get past the guard above
+
+        logs, ok = Test.collect_test_logs() do
+            multicol.construct!(globe, atmos, [0.0, 45.0], [0.0], [0.0, 0.0], [1.0e5, 1.0e5], [4.0, 4.0])
+        end
+        @test ok == false
+        @test any(occursin("must match num of columns", l.message) for l in logs if l.level == Logging.Warn)
+
+        logs, ok = Test.collect_test_logs() do
+            multicol.construct!(globe, atmos, [400.0], [0.0], [0.0], [1.0e5], [4.0])
+        end
+        @test ok == false
+        @test any(occursin("Invalid longitude", l.message) for l in logs if l.level == Logging.Warn)
+
+        logs, ok = Test.collect_test_logs() do
+            multicol.construct!(globe, atmos, [0.0], [100.0], [0.0], [1.0e5], [4.0])
+        end
+        @test ok == false
+        @test any(occursin("Invalid latitude", l.message) for l in logs if l.level == Logging.Warn)
+
+        # discrimination guard: none of these failure paths must set is_constructed=true
+        @test !globe.is_constructed
+    end
+
 end

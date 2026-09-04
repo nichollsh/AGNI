@@ -63,4 +63,32 @@ end
     @test atmos3.is_converged
     @test isapprox(atmos3.flux_tot[1], atmos3.flux_int; rtol=1e-2, atol=0.5)
     atmosphere.deallocate!(atmos3)
+
+    # atm_type=2: dry-adiabat initial profile prescription
+    atmos4 = _make_prescribed_atmos()
+    atmos4.tmp_surf = 700.0
+    @test solver.solve_prescribed!(atmos4; sol_type=1, atm_type=2)
+    @test atmos4.is_solved
+    @test atmos4.is_converged
+    @test issorted(atmos4.tmp)
+    atmosphere.deallocate!(atmos4)
+
+    # atm_type=3: dry-adiabat with an isothermal stratosphere capped at skin temperature.
+    atmos5 = _make_prescribed_atmos()
+    atmos5.tmp_surf = 700.0
+    @test solver.solve_prescribed!(atmos5; sol_type=1, atm_type=3)
+    @test atmos5.is_solved
+    @test atmos5.is_converged
+    strat_tmp = AGNI.phys.calc_Tskin(atmos5.instellation, atmos5.albedo_b)
+    @test any(isapprox.(atmos5.tmp, strat_tmp; rtol=1e-2))
+    atmosphere.deallocate!(atmos5)
+
+    # sol_type=4: target-OLR golden-section search. 
+    atmos6 = _make_prescribed_atmos()
+    atmos6.target_olr = 300.0
+    @test solver.solve_prescribed!(atmos6; sol_type=4, atm_type=1)
+    @test atmos6.is_solved
+    @test atmos6.is_converged
+    @test isapprox(atmos6.flux_u_lw[1], atmos6.target_olr; rtol=1e-2, atol=0.5)
+    atmosphere.deallocate!(atmos6)
 end

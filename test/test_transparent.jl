@@ -41,6 +41,15 @@ end
     @test atmos.is_solved
     @test !atmos.is_converged
 
+    # try with type=2 (conductive skin-flux boundary condition): solver should find
+    # a Tsurf such that the radiative flux balances the conductive flux 
+    atmosphere.make_transparent!(atmos)
+    @test solver.solve_transparent!(atmos; sol_type=2, max_steps=150)
+    @test atmos.is_solved
+    @test atmos.is_converged
+    F_skin = energy.skin_flux(atmos)
+    @test isapprox(atmos.flux_tot[1], F_skin; rtol=1e-2, atol=0.5)
+
     # try with type=3 and check converges
     atmosphere.make_transparent!(atmos)
     atmos.flux_int = 1200.0

@@ -182,6 +182,30 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         bad_pl = [1e2, 1e4, 1e3, 1e5]
         bad_t = [150.0, 200.0, 250.0, 300.0]
         @test AGNI.setpt.fromarrays!(atmos, bad_pl, bad_t) == false
+
+        # Input grid narrower than the model grid at the high-pressure end must trigger
+        # extrapolation-padding branch
+        narrow_pl = [1e2, 1e3, 1e4, 5e4]
+        narrow_t  = [150.0, 200.0, 250.0, 280.0]
+
+        # fromarrays! mutates its pl/tmpl arguments in place (push!/pushfirst! extend
+        # them), so backup the original values before the call
+        orig_pl, orig_t = copy(narrow_pl), copy(narrow_t)
+
+        # test that extrapolation actually extended the arrays to the psurf
+        @test atmos.pl[end] > orig_pl[end]
+        @test AGNI.setpt.fromarrays!(atmos, narrow_pl, narrow_t; extrap=true)
+        @test all(atmos.tmp .> 0.0)
+        @test all(atmos.tmpl .> 0.0)
+
+        # discrimination guard: without the padding point, Linear() extrapolation
+        # beyond the file's domain would continue the trend
+        slope = (orig_t[end] - orig_t[end-1]) /
+                    (log10(orig_pl[end]) - log10(orig_pl[end-1]))
+        expect_wrong = orig_t[end] + slope * (log10(atmos.pl[end]) - log10(orig_pl[end]))
+        @test !isapprox(expect_wrong, orig_t[end]; atol=1.0)  # sanity: guard is non-trivial
+        @test !isapprox(atmos.tmpl[end], expect_wrong; atol=1.0)
+        @test isapprox(atmos.tmpl[end], orig_t[end]; atol=1.0)
     end
 
     @testset "fromcsv!" begin
@@ -232,10 +256,54 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         finally
             rm(bad_csv, force=true)
         end
+
+        # Negative temperature (distinct from the negative-pressure case above)
+        bad_t_csv = tempname() * ".csv"
+        open(bad_t_csv, "w") do io
+            println(io, "1e2, 150.0")
+            println(io, "1e3, -50.0")
+            println(io, "1e4, 250.0")
+        end
+        try
+            @test AGNI.setpt.fromcsv!(atmos, bad_t_csv) == false
+        finally
+            rm(bad_t_csv, force=true)
+        end
     end
 
     @testset "fromncdf!" begin
         @test AGNI.setpt.fromncdf!(atmos, "/nonexistent/file.nc") == false
+
+        # Round-trip smoke test for the file-found success path
+        AGNI.setpt.dry_adiabat!(atmos)
+        nc_tmpdir = mktempdir()
+        nc_path = joinpath(nc_tmpdir, "roundtrip.nc")
+        @test AGNI.save.write_ncdf(atmos, nc_path) # test writing file
+
+        # make new atmosphere
+        atmos2 = AGNI.atmosphere.Atmos_t()
+        AGNI.atmosphere.setup!(atmos2, ROOT_DIR, OUT_DIR,
+                              spfile,
+                              toa_heating, 1.0, 0.0, theta,
+                              tmp_surf,
+                              gravity, radius,
+                              nlev_centre, p_surf, p_top,
+                              mf_dict, ""
+                      )
+        AGNI.atmosphere.allocate!(atmos2, "")
+        @test AGNI.setpt.fromncdf!(atmos2, nc_path) # read from the file
+
+        # check that the round-tripped profile matches the original
+        @test all(isapprox.(atmos2.tmp,  atmos.tmp;  rtol=rtol))
+        @test all(isapprox.(atmos2.tmpl, atmos.tmpl; rtol=rtol))
+        @test isapprox(atmos2.tmp_surf, atmos.tmp_surf; rtol=rtol)
+
+        # the round-tripped profile is a non-trivial dry adiabat
+        @test !isapprox(atmos2.tmp[1], atmos2.tmp[end]; rtol=1e-2)
+
+        # tidy up
+        AGNI.atmosphere.deallocate!(atmos2)
+        rm(nc_tmpdir; force=true, recursive=true)
     end
 
     @testset "request!" begin
@@ -275,6 +343,14 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         result = AGNI.setpt.request!(atmos, Any["sat", "H2O"])
         @test result == true
 
+        # Test surfsat request: restores composition then ensures the surface is not
+        # super-saturated (calls chemistry.restore_composition!/_sat_surf!).
+        @test isempty(atmos.condensates)
+        result = AGNI.setpt.request!(atmos, Any["surfsat"])
+        @test result == false
+        @test all(atmos.tmp .> 0.0)
+        atmosphere.deallocate!(atmos)
+
         # Test missing argument path for a verb
         @test AGNI.setpt.request!(atmos, Any["iso"]) == false
 
@@ -302,6 +378,13 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         AGNI.setpt.isothermal!(atmos, 300.0)
         AGNI.setpt.saturation!(atmos, "H2O"; dTdew=0.1)
         @test all(atmos.tmp .> 0.0)
+
+        # Case-mismatched gas name (lowercase "h2o" vs stored "H2O") should warn
+        AGNI.setpt.isothermal!(atmos, 310.0)
+        before_case = copy(atmos.tmp)
+        result_case = AGNI.setpt.saturation!(atmos, "h2o")
+        @test result_case == true
+        @test all(isapprox.(atmos.tmp, before_case; rtol=0.0, atol=1e-10))
     end
 
     @testset "analytic!" begin
