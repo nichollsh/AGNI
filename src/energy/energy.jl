@@ -515,9 +515,11 @@ module energy
     """
     **Calculate turbulent kinetic energy (TKE) exchange coefficient**.
 
-    Based on Monin–Obukhov similarity theory, from roughness length scale.
+    Based on Monin-Obukhov similarity theory, from roughness length scale.
     See eq 9 in Nicholson & Benn (2006). Added small epsilon-factor to avoid function
     blowing-up around regime where height ≈ roughness.
+
+    A reasonable length scale can be found here: https://arxiv.org/pdf/2608.21549
 
     Arguments:
     - `height::Float64`     Height above surface [m]

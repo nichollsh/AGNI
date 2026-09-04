@@ -34,7 +34,7 @@ module atmosphere
     const CFG_albedo_s::Float64         = 0.0
     const CFG_tmp_floor::Float64        = 2.0
     const CFG_tmp_ceiling::Float64      = 2e4
-    const CFG_surf_roughness::Float64   = 0.001
+    const CFG_surf_roughness::Float64   = 0.01  # [m], see https://arxiv.org/pdf/2608.21549
     const CFG_surf_windspeed::Float64   = 2.0
     const CFG_col_lat::Float64          = 0.0
     const CFG_col_lon::Float64          = 0.0
@@ -671,6 +671,9 @@ module atmosphere
             mkdir(atmos.OUT_DIR)
         end
         @debug "Using OUT_DIR='$(atmos.OUT_DIR)'"
+        if paths.get_avail_space(atmos.OUT_DIR) < 100_000_000
+            @warn "Insufficient disk space available in output directory"
+        end
 
         # Directory used for fast I/O
         if IO_DIR == UNSET_STR
@@ -688,6 +691,9 @@ module atmosphere
             end
         end
         @debug "Using IO_DIR='$(atmos.IO_DIR)'"
+        if paths.get_avail_space(atmos.IO_DIR) < 100_000_000
+            @warn "Insufficient disk space available in I/O directory"
+        end
 
         # Directory used for writing animation frames
         atmos.FRAMES_DIR  =  joinpath(atmos.IO_DIR, "frames")

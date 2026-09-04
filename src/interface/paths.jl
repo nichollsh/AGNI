@@ -64,13 +64,13 @@ module paths
     export get_dir
 
     """
-    **Check if directory is 'safe' for removal**
+    **Check if directory is 'safe' for removal and can be written to.**
 
     Arguments:
     - path::String                  the path to check
 
     Returns:
-    - Bool                          true if the path is safe for removal
+    - Bool                          true if the path is safe
     """
     function is_safe_dir(path::String)::Bool
         # Do not allow empty paths
@@ -97,8 +97,28 @@ module paths
         # Is AGNI resources directory
         (path == paths.RES_DIR) && return false
 
+        # Have permissions to write to this path, if it exists
+        (isdir(path) && !iswritable(path)) && return false
+
         return true
     end
     export is_safe_dir
 
+    """
+    **Get available disk space on file system mounted at a path**
+
+    Arguments:
+    - `path::String` the path to check
+
+    Returns:
+    - `Int64` available disk space in bytes
+    """
+    function get_avail_space(path::String)::Int64
+        # Check if path exists - if not, default to the root directory of the file system
+        if !ispath(path)
+            path = "/"
+        end
+        return Int64(diskstat(path).available)
+    end
+    export get_avail_space
 end
