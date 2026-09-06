@@ -35,7 +35,11 @@ module solve_energy
     end
 
     # Solver constants and parameters
-    cost_exponent::Real   = 4
+    #
+    # KNOWN PERFORMANCE ISSUE: none of the parameters below are declared `const`.
+    # In Julia, a global can change type at any point, so every function that reads one
+    # falls back to dynamically-dispatched access instead of an inlined constant.
+    cost_exponent::Float64= 4
     #    chemistry
     compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
     compose_ls::Bool      = false    # Do chem/comp for every linesearch step
@@ -202,7 +206,7 @@ module solve_energy
     **Calculate the Jacobian and residuals at `x` using a finite-difference scheme.**
 
     Internally allocates its own scratch arrays rather than requiring the caller's
-    preallocated buffers. 
+    preallocated buffers.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used/modified.
@@ -454,14 +458,23 @@ module solve_energy
             atmos.rt_scheme = atmosphere.RT_GREYGAS
         end
 
-        #     solver
+        #     jacobian matrix
         b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))   # Approximate jacobian (i)
+        b_fac::Array{Float64,2}  = zeros(Float64, (arr_len, arr_len))   # Scratch copy of b, factorised in-place (b itself must survive for plotting)
+        btb::Array{Float64,2}    = zeros(Float64, (arr_len, arr_len))   # Scratch for b'*b (methods 2-4)
+        btr::Array{Float64,1}    = zeros(Float64, arr_len)              # Scratch for b'*r_cur (methods 2-4), and solver RHS/solution
+
+        #    solution vectors
         x_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Current best solution (i)
         x_old::Array{Float64,1}  = zeros(Float64, arr_len)              # Previous best solution (i-1)
         x_dif::Array{Float64,1}  = zeros(Float64, arr_len)              # Change in x (i-1 to i)
+
+        #    residual vectors
         r_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i)
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)              # Test for rejection residuals
+
+        #    other solver variables
         perturb::Array{Bool,1}   = falses(arr_len)      # Mask for levels which should be perturbed
         lml::Float64             = 1.0                  # Levenberg-Marquardt lambda parameter
         c_cur::Float64           = Inf                  # current cost (i)
@@ -473,7 +486,7 @@ module solve_energy
         ls_cful::Float64         = BIGFLOAT             # linesearch cost at full step
         plateau_apply::Bool      = false                # Plateau declared in this iteration?
 
-        #     stability
+        #     stability parameters
         easy_start               = Bool(easy_start)     # make copy of variable - don't modify parameter
         easy_sf::Float64         = 0.0                  # Convective & phase change flux scale factor
         fc_wm_default::Bool      = atmos.fastchem_wellmixed # should we aim for well-mixed composition?
@@ -709,9 +722,9 @@ module solve_energy
                 #    the layer is near convergence.
                 fill!(perturb, true)
                 for i in 3:arr_len-4
-                    perturb[i] = (sum(abs.(r_cur[i-2:i+2])) > perturb_crit) ||
-                                    any(atmos.mask_l[i-2:i+2]) ||
-                                    any(atmos.mask_c[i-2:i+2])
+                    perturb[i] = (sum(abs, @view r_cur[i-2:i+2]) > perturb_crit) ||
+                                    any(@view atmos.mask_l[i-2:i+2]) ||
+                                    any(@view atmos.mask_c[i-2:i+2])
                 end
             end
 
@@ -750,21 +763,32 @@ module solve_energy
             end
 
             # Model step
+            #    Each branch below solves its system in-place
             @. x_old = x_cur
             if (method == 1)
                 # Newton-Raphson step
                 # @debug "        NR step"
-                x_dif = -b\r_cur
+                # x_dif = -b\r_cur
+                copyto!(b_fac, b)       # copy Jacobian to scratch array for factorisation
+                copyto!(btr, r_cur)     # copy residuals to scratch array for factorisation
+                ldiv!(lu!(b_fac), btr)  # LU factorise and solve in-place
+                @. x_dif = -btr         # store the solution
                 # stepflags *= "Nr-"
 
             elseif method == 2
                 # Gauss-Newton step
                 # @debug "        GN step"
-                x_dif = -(b'*b) \ (b'*r_cur)
+                # x_dif = -(b'*b) \ (b'*r_cur)
+                mul!(btb, b', b)        # calculate b'*b
+                mul!(btr, b', r_cur)    # calculate b'*r_cur
+                ldiv!(lu!(btb), btr)    # LU factorise and solve in-place
+                @. x_dif = -btr         # store the solution
                 # stepflags *= "Gn-"
 
             elseif method == 3
                 # Levenberg-Marquardt step
+                # This is essentially a Gauss-Newton step with a damping parameter (lambda)
+                # applied to the diagonal of the Jacobian.
                 # @debug "        LM step"
                 #    Calculate damping parameter ("delayed gratification")
                 if r_cur_2nm < r_old_2nm
@@ -776,18 +800,27 @@ module solve_energy
                 end
 
                 #    Update our estimate of the solution
-                x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
+                # x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
+                mul!(btb, b', b)        # calculate b'*b
+                @. btb += lml * dtd     # add damping to diagonal of jacobian matrix
+                mul!(btr, b', r_cur)    # calculate b'*r_cur
+                ldiv!(lu!(btb), btr)    # LU factorise and solve in-place
+                @. x_dif = -btr         # store the solution
                 # stepflags *= "Lm-"
 
             elseif method == 4
                 # Newton-Raphson with jacobi preconditioning
-                x_dif = - (b' * b) \ (b' * r_cur)
+                # x_dif = - (b' * b) \ (b' * r_cur)
+                mul!(btb, b', b)
+                mul!(btr, b', r_cur)
+                ldiv!(lu!(btb), btr)
+                @. x_dif = -btr
 
             end
 
             # Max step size
-            #    limit by user requirement, without changing direction of dx vector
-            x_dif *= min(1.0, dx_max / maximum(abs.(x_dif[:])))
+            #    limited by user requirement, without changing direction of dx vector
+            x_dif *= min(1.0, dx_max / maximum(abs, x_dif))
 
             # Extrapolate step if on plateau.
             #    This acts to give the solver a 'nudge' in (hopefully) the right direction.
@@ -800,6 +833,8 @@ module solve_energy
             end
 
             # Linesearch
+            # This scales the update to the solution vector to ensure that the
+            # cost function is optimally minimised. There are various methods for this.
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
             if linesearch && !plateau_apply
                 @debug "        linesearch"
@@ -910,8 +945,9 @@ module solve_energy
             end
 
             # Model statistics
-            r_med   =   median(abs.(r_cur))
-            iworst  =   argmax(abs.(r_cur))
+            r_cur_abs =  abs.(r_cur)  # computed once, reused for both r_med and iworst below
+            r_med   =   median(r_cur_abs)
+            iworst  =   argmax(r_cur_abs)
             r_max   =   r_cur[iworst]
             x_med   =   median(x_cur)
             x_max   =   x_cur[argmax(abs.(x_cur))]
