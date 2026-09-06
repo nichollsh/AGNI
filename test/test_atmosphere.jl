@@ -3,6 +3,10 @@
 #   - atmosphere.setup!() composition loading when mf_source==1 (VMR set from a CSV file),
 #     including the pressure-domain extension guards and malformed-column handling.
 #   - atmosphere.allocate!() rejecting a missing SOCRATES spectral file.
+#   - atmosphere.allocate!() surface reflectance/emissivity loading: the greybody
+#     path (Kirchhoff's law, albedo_s clamping) and the spectral-file path (r/e/w
+#     header conventions, interpolation onto the model's spectral bands, and the
+#     missing-file/bad-header/malformed-column error/gap paths).
 
 using Test
 using AGNI
@@ -54,6 +58,30 @@ function _setup_with_vmr_file(mf_path::String)
                             flag_rayleigh=false,
                             flag_cloud=false)
     return atmos, ok
+end
+
+# Cheap fixture for surface-reflectance/albedo tests: greygas RT gives
+# nbands=1, bands_cen=[1e-6] m = 1000 nm (atmosphere.jl:1613-1617), and the
+# surface-properties block (atmosphere.jl:2216-2315) runs unconditionally for
+# both RT schemes, so allocate!(atmos, ""; check_safe_gas=false) reaches it
+# without needing a real SOCRATES spectral file.
+function _setup_with_surface(surface_material::String, albedo_s::Float64=0.0)
+    atmos = atmosphere.Atmos_t()
+    ok = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                            "greygas",
+                            1000.0, 1.0, 0.0, _THETA,
+                            _TMP_SURF,
+                            _GRAVITY, _RADIUS,
+                            _NLEV, _P_SURF, _P_TOP,
+                            Dict("H2O" => 1.0), "";
+                            real_gas=false,
+                            thermo_functions=false,
+                            flag_rayleigh=false,
+                            flag_cloud=false,
+                            surface_material=surface_material,
+                            albedo_s=albedo_s)
+    ok || error("Failed to setup test atmosphere")
+    return atmos
 end
 
 @testset "atmosphere" begin
@@ -217,6 +245,225 @@ end
         end
         @test !alloc_ok
         @test !atmos.is_alloc
+    end
+
+    # -----------------------------------------------------------------
+    # Surface reflectance/emissivity, greybody path (atmosphere.jl:2220-2224).
+    # Kirchhoff's law sets emissivity = 1 - albedo spectrally; albedo_s is
+    # clamped to [0,1] by setup!() (atmosphere.jl:795) before allocate!() ever
+    # sees it.
+    # -----------------------------------------------------------------
+    @testset "surface_reflectance_greybody" begin
+        # mid-range albedo: check the Kirchhoff relation e = 1-r holds exactly,
+        # not just that the arrays get populated with something
+        atmos = _setup_with_surface("greybody", 0.3)
+        @test atmosphere.allocate!(atmos, ""; check_safe_gas=false)
+        @test length(atmos.surf_r_arr) == atmos.nbands == 1
+        @test isapprox(atmos.surf_r_arr[1], 0.3; atol=1e-12)
+        @test isapprox(atmos.surf_e_arr[1], 0.7; atol=1e-12)
+        # discrimination guard: emissivity must not simply mirror albedo
+        @test !isapprox(atmos.surf_e_arr[1], atmos.surf_r_arr[1]; atol=1e-3)
+        atmosphere.deallocate!(atmos)
+
+        # boundary: albedo_s above 1 must be clamped to 1, giving a perfectly
+        # reflecting / non-emitting surface
+        atmos_hi = _setup_with_surface("greybody", 1.5)
+        @test isapprox(atmos_hi.albedo_s, 1.0; atol=1e-12)
+        @test atmosphere.allocate!(atmos_hi, ""; check_safe_gas=false)
+        @test isapprox(atmos_hi.surf_r_arr[1], 1.0; atol=1e-12)
+        @test isapprox(atmos_hi.surf_e_arr[1], 0.0; atol=1e-12)
+        atmosphere.deallocate!(atmos_hi)
+
+        # boundary: albedo_s below 0 must be clamped to 0
+        atmos_lo = _setup_with_surface("greybody", -0.5)
+        @test isapprox(atmos_lo.albedo_s, 0.0; atol=1e-12)
+        @test atmosphere.allocate!(atmos_lo, ""; check_safe_gas=false)
+        @test isapprox(atmos_lo.surf_r_arr[1], 0.0; atol=1e-12)
+        @test isapprox(atmos_lo.surf_e_arr[1], 1.0; atol=1e-12)
+        atmosphere.deallocate!(atmos_lo)
+    end
+
+    # -----------------------------------------------------------------
+    # Surface reflectance, spectral file, header token "r" (spherical
+    # reflectance, AKA Bond albedo; atmosphere.jl:2281-2286). Values are
+    # interpolated linearly in wavelength [m]; the greygas band centre is
+    # bands_cen=1e-6 m = 1000 nm (atmosphere.jl:1617).
+    # -----------------------------------------------------------------
+    @testset "surface_reflectance_spectral_r" begin
+        tmpdir = mktempdir()
+
+        # Two points straddling the 1000 nm band centre, so the interpolated
+        # value is a genuine linear interpolation, not one input value verbatim.
+        r_path = joinpath(tmpdir, "surf_r.dat")
+        write(r_path, """
+        r
+        500.0 0.2
+        2000.0 0.8
+        """)
+
+        atmos = _setup_with_surface(r_path)
+        @test atmosphere.allocate!(atmos, ""; check_safe_gas=false)
+
+        # reference calculation: linear interpolation in wavelength [nm],
+        # independent of the implementation under test
+        expect_r = 0.2 + (0.8 - 0.2) * (1000.0 - 500.0) / (2000.0 - 500.0)
+        @test isapprox(atmos.surf_r_arr[1], expect_r; atol=1e-6)
+        @test isapprox(atmos.surf_e_arr[1], 1.0 - expect_r; atol=1e-6)
+
+        # discrimination guard: nearest-endpoint (wrong interpolation basis)
+        # would give a substantially different value than true linear interp
+        @test abs(expect_r - 0.2) > 1e-2
+        @test abs(expect_r - 0.8) > 1e-2
+
+        # the scalar albedo_s is overwritten with the median of the spectral
+        # array (atmosphere.jl:2314); with nbands==1 that's just the one value
+        @test isapprox(atmos.albedo_s, expect_r; atol=1e-6)
+        atmosphere.deallocate!(atmos)
+
+        # edge case: single-row file. Both ends of the wavelength domain are
+        # extrapolated with a constant copy of that one value (atmosphere.jl:
+        # 2261-2267), so the interpolated result must equal it exactly.
+        r1_path = joinpath(tmpdir, "surf_r_single.dat")
+        write(r1_path, """
+        r
+        1000.0 0.42
+        """)
+        atmos1 = _setup_with_surface(r1_path)
+        @test atmosphere.allocate!(atmos1, ""; check_safe_gas=false)
+        @test isapprox(atmos1.surf_r_arr[1], 0.42; atol=1e-10)
+        @test isapprox(atmos1.surf_e_arr[1], 0.58; atol=1e-10)
+        atmosphere.deallocate!(atmos1)
+    end
+
+    # -----------------------------------------------------------------
+    # Surface reflectance, spectral file, header token "e" (hemispherical
+    # emissivity; atmosphere.jl:2288-2293). Values chosen asymmetrically so
+    # that swapping the r/e roles (a plausible implementation bug) is
+    # detectable rather than accidentally passing.
+    # -----------------------------------------------------------------
+    @testset "surface_reflectance_spectral_e" begin
+        tmpdir = mktempdir()
+        e_path = joinpath(tmpdir, "surf_e.dat")
+        write(e_path, """
+        e
+        500.0 0.2
+        2000.0 0.5
+        """)
+
+        atmos = _setup_with_surface(e_path)
+        @test atmosphere.allocate!(atmos, ""; check_safe_gas=false)
+
+        expect_e = 0.2 + (0.5 - 0.2) * (1000.0 - 500.0) / (2000.0 - 500.0)
+        @test isapprox(atmos.surf_e_arr[1], expect_e; atol=1e-6)
+        @test isapprox(atmos.surf_r_arr[1], 1.0 - expect_e; atol=1e-6)
+
+        # discrimination guard: if "e" were mistakenly treated as "r" (roles
+        # swapped), surf_r_arr would equal expect_e instead of 1-expect_e;
+        # these differ substantially here by construction
+        @test abs((1.0 - expect_e) - expect_e) > 0.1
+
+        atmosphere.deallocate!(atmos)
+    end
+
+    # -----------------------------------------------------------------
+    # Surface reflectance, spectral file, header token "w" (single-scattering
+    # albedo; atmosphere.jl:2296-2303, Hapke2012 diffusive-reflectance form).
+    # The expected r/e values are recomputed here from the same published
+    # formula, independently of the source under test, as the discriminating
+    # reference calculation (per repo testing standards: a wrong-formula
+    # implementation cannot pass this by construction).
+    # -----------------------------------------------------------------
+    @testset "surface_reflectance_spectral_w" begin
+        tmpdir = mktempdir()
+        w_path = joinpath(tmpdir, "surf_w.dat")
+        # constant single-scattering albedo: interpolation is trivial here, so
+        # the only thing under test is the w -> (r,e) conversion formula
+        write(w_path, """
+        w
+        500.0 0.5
+        2000.0 0.5
+        """)
+
+        atmos = _setup_with_surface(w_path)
+        @test atmosphere.allocate!(atmos, ""; check_safe_gas=false)
+
+        w = 0.5
+        γ = sqrt(1 - w)
+        r0 = (1 - γ) / (1 + γ)
+        expect_r = r0 * (1 - γ/(3+3γ))
+        expect_e = 1.0 - expect_r
+
+        @test isapprox(atmos.surf_r_arr[1], expect_r; atol=1e-10)
+        @test isapprox(atmos.surf_e_arr[1], expect_e; atol=1e-10)
+
+        # discrimination guard: naively treating w as if it were r directly
+        # gives a substantially different value from the correct result
+        @test abs(expect_r - w) > 0.2
+
+        atmosphere.deallocate!(atmos)
+    end
+
+    # -----------------------------------------------------------------
+    # Surface reflectance: missing spectral-albedo file must fail gracefully
+    # (return false), not throw (atmosphere.jl:2248-2252).
+    # -----------------------------------------------------------------
+    @testset "surface_reflectance_missing_file" begin
+        tmpdir = mktempdir()
+        missing_path = joinpath(tmpdir, "does_not_exist.dat")
+        @test !isfile(missing_path)
+
+        atmos = _setup_with_surface(missing_path)
+        logs, alloc_ok = Test.collect_test_logs() do
+            atmosphere.allocate!(atmos, ""; check_safe_gas=false)
+        end
+        @test !alloc_ok
+        @test !atmos.is_alloc
+        @test any(occursin("Could not find surface albedo file", l.message)
+                        for l in logs if l.level == Logging.Error)
+    end
+
+    # -----------------------------------------------------------------
+    # Surface reflectance: header token other than r/e/w must fail gracefully
+    # (return false), not throw (atmosphere.jl:2305-2311).
+    # -----------------------------------------------------------------
+    @testset "surface_reflectance_bad_header" begin
+        tmpdir = mktempdir()
+        bad_path = joinpath(tmpdir, "surf_bad_header.dat")
+        write(bad_path, """
+        q
+        500.0 0.2
+        2000.0 0.8
+        """)
+
+        atmos = _setup_with_surface(bad_path)
+        logs, alloc_ok = Test.collect_test_logs() do
+            atmosphere.allocate!(atmos, ""; check_safe_gas=false)
+        end
+        @test !alloc_ok
+        @test !atmos.is_alloc
+        @test any(occursin("Unexpected format for surface data", l.message)
+                        for l in logs if l.level == Logging.Error)
+    end
+
+    # -----------------------------------------------------------------
+    # Gap (documented, not fixed here): a surface-data file with only one
+    # column (no "value" column) is not validated before use - readdlm
+    # succeeds, but atmosphere.jl:2259 (_srf_data[:,2]) then throws
+    # BoundsError instead of returning false gracefully like the two cases
+    # above. This pins the *current* behaviour so a future change is
+    # deliberate rather than a silent regression.
+    # -----------------------------------------------------------------
+    @testset "surface_reflectance_malformed_single_column" begin
+        tmpdir = mktempdir()
+        onecol_path = joinpath(tmpdir, "surf_onecol.dat")
+        write(onecol_path, """
+        r
+        500.0
+        2000.0
+        """)
+
+        atmos = _setup_with_surface(onecol_path)
+        @test_throws BoundsError atmosphere.allocate!(atmos, ""; check_safe_gas=false)
     end
 
     # -----------------------------------------------------------------
