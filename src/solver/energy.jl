@@ -61,17 +61,16 @@ module solve_energy
     easy_ini::Float64  = 3e-4       # Initial value for easy_sf
 
     """
-    **Calculate the (remaining) temperatures from a solver solution-array guess.**
+    **Update the atmosphere cell-center temperatures from a solver solution-array guess.**
 
-    Lifted out of `solve_energy!` so that it (and `_fev!`/`_calc_jac_res!`, which
-    depend on it) can be called and unit tested independently of the solver loop.
+    This is a helper function which takes a solution array `x` and updates the
+    atmosphere's cell-center temperatures. It also updates other quantities being solved
+    for, such as the surface brightness temperature, as appropriate.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be modified.
-    - `x::Array{Float64,1}`             solution-array guess (cell-centre temperatures,
-                                         plus a trailing surface/skin temperature when
-                                         `sol_type >= 2`).
-    - `sol_type::Int64`                 solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
+    - `x::Array{Float64,1}`             solution-array guess
+    - `sol_type::Int64`                 solution type (1, 2, 3, 4)
     """
     function _set_tmps!(atmos::atmosphere.Atmos_t, x::Array{Float64,1}, sol_type::Int64)
         # Read new guess
@@ -91,36 +90,36 @@ module solve_energy
     end # end _set_tmps!
 
     """
-    **Objective function: evaluate fluxes and residuals at a temperature guess.**
+    **Forward model. Evaluates fluxes, residuals, and the objective function.**
 
-    Lifted out of `solve_energy!` so that it can be called and unit tested
-    independently of the solver loop. `step_ok` and `code` are passed as `Ref`s
-    so that this function can report back flux-evaluation failure and a NaN/Inf
-    residual failure to the caller, exactly as the original nested closure did
-    by mutating the enclosing scope's `step_ok`/`code` variables.
+    This is the 'forward model' that the solver is iteratively calling. It takes a
+    solution-array guess `x`, updates the atmosphere's properties, to calculate energy
+    fluxes. These provide residuals which are used to evaluate the objective function.
+    This is used to construct a Jacobian matrix for the solver, and to evaluate
+    convergence of the solution.
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used/modified.
     - `x::Array{Float64,1}`             solution-array guess.
     - `resid::Array{Float64,1}`         residual array to be filled in-place.
-    - `sol_type::Int64`                 solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
+    - `sol_type::Int64`                 solution type (1, 2, 3, 4)
     - `oceans::Bool`                    check surface saturation (ocean formation)
     - `chem::Bool`                      include eqm thermochemistry when solving for RCE?
     - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios)
-    - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
+    - `latent::Bool`                    include latent heat release / absorption
     - `convect::Bool`                   include convection
     - `sens_heat::Bool`                 include sensible heating at the surface
-    - `conduct::Bool`                   include conductive heat transport within the atmosphere
+    - `conduct::Bool`                   include conductive transport within the atmosphere
     - `deep::Bool`                      include deep heat production (e.g. from dynamics)
     - `easy_sf::Float64`                convective & phase change flux scale factor
-    - `step_ok::Ref{Bool}`              accumulates (via `&=`) whether the flux calculation succeeded
-    - `code::Ref{STATUSCODE}`           set to `CODE_NAN` if the residual array is non-finite
+    - `step_ok::Ref{Bool}`              whether the flux calculation succeeded
+    - `code::Ref{STATUSCODE}`           set to `CODE_NAN` if residual array is non-finite
 
     Optional arguments:
-    - `compose::Bool`                   recalculate composition (chemistry/condensation) this call?
+    - `compose::Bool`                   recalculate composition in this call?
 
     Returns:
-    - `Bool`                            false if the residual array contains NaN/Inf, true otherwise
+    - `Bool`                            success? false if the residual array is not finite
     """
     function _fev!(atmos::atmosphere.Atmos_t, x::Array{Float64,1}, resid::Array{Float64,1},
                     sol_type::Int64,
@@ -202,12 +201,8 @@ module solve_energy
     """
     **Calculate the Jacobian and residuals at `x` using a finite-difference scheme.**
 
-    Lifted out of `solve_energy!` so that it can be called and unit tested
-    independently of the solver loop. Internally allocates its own scratch
-    arrays (sized from `length(x)`) rather than requiring the caller's
-    preallocated buffers, since this function is called at most twice per
-    solver step - the extra allocation is negligible next to the cost of the
-    flux evaluations it performs, and it substantially simplifies the signature.
+    Internally allocates its own scratch arrays rather than requiring the caller's
+    preallocated buffers. 
 
     Arguments:
     - `atmos::Atmos_t`                  the atmosphere struct instance to be used/modified.
