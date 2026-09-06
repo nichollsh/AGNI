@@ -331,6 +331,43 @@ module solve_energy
     end # end _calc_jac_res!
 
     """
+    **Classify a solver STATUSCODE into a final log message and required actions.**
+
+    Arguments:
+    - `code::STATUSCODE`      the solver's final status code.
+    - `step::Int64`           number of steps taken (only used in the success message).
+
+    Returns:
+    - `is_converged::Bool`    true only for CODE_SUC.
+    - `level::Symbol`         level the message should be logged at.
+    - `message::String`       human-readable description of the outcome.
+    - `should_plot::Bool`     whether solve_energy! should call plot_step() for this code.
+    """
+    function _classify_status(code::STATUSCODE, step::Int64)::Tuple{Bool,Symbol,String,Bool}
+        if code == CODE_SUC
+            return (true, :info, "    success in $step steps", false)
+        elseif code == CODE_ITE
+            return (false, :warn, "    failure (maximum iterations)", true)
+        elseif code == CODE_SIN
+            return (false, :warn, "    failure (singular jacobian)", true)
+        elseif code == CODE_TIM
+            return (false, :warn, "    failure (maximum time)", false)
+        elseif code == CODE_NAN
+            return (false, :warn, "    failure (NaN values)", true)
+        elseif code == CODE_CFG
+            return (false, :warn, "    failure (configuration)", false)
+        elseif code == CODE_OBJ
+            return (false, :warn, "    failure (objective function)", true)
+        elseif code == CODE_STP
+            return (false, :warn, "    failure (other; last step not ok)", true)
+        elseif code == CODE_HYD
+            return (false, :warn, "    failure (hydrostatic integration)", true)
+        else
+            return (false, :warn, "    failure (other)", true)
+        end
+    end # end _classify_status
+
+    """
     **Solve for radiative-convective-chemical equilibrium by energy conservation.**
 
     Solves the non-linear system of equations defined by the flux field
@@ -1025,35 +1062,16 @@ module solve_energy
         # Extract solution
         # ----------------------------------------------------------
         atmos.is_solved = true
-        atmos.is_converged = false
-        if code[] == CODE_SUC
-            @info "    success in $step steps"
-            atmos.is_converged = true
-            rm(path_plt, force=true)
-        elseif code[] == CODE_ITE
-            @warn "    failure (maximum iterations)"
-            plot_step()
-        elseif code[] == CODE_SIN
-            @warn "    failure (singular jacobian)"
-            plot_step()
-        elseif code[] == CODE_TIM
-            @warn "    failure (maximum time)"
-        elseif code[] == CODE_NAN
-            @warn "    failure (NaN values)"
-            plot_step()
-        elseif code[] == CODE_CFG
-            @warn "    failure (configuration)"
-        elseif code[] == CODE_OBJ
-            @warn "    failure (objective function)"
-            plot_step()
-        elseif code[] == CODE_STP
-            @warn "    failure (other; last step not ok)"
-            plot_step()
-        elseif code[] == CODE_HYD
-            @warn "    failure (hydrostatic integration)"
-            plot_step()
+        is_converged, level, message, should_plot = _classify_status(code[], step)
+        atmos.is_converged = is_converged
+        if level == :info
+            @info message
         else
-            @warn "    failure (other)"
+            @warn message
+        end
+        if is_converged
+            rm(path_plt, force=true)
+        elseif should_plot
             plot_step()
         end
 
