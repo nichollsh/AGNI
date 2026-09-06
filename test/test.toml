@@ -69,7 +69,7 @@ title = "AGNI configuration file for test suite"
     demixing        = false
 
 [plots]
-    at_runtime      = false
+    at_runtime      = true
     temperature     = true
     fluxes          = true
     contribution    = true
@@ -77,6 +77,6 @@ title = "AGNI configuration file for test suite"
     emission        = true
     albedo          = false
     mixing_ratios   = false
-    animate         = false
+    animate         = true
     height          = false
     cloud           = false

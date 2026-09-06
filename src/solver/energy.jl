@@ -61,6 +61,277 @@ module solve_energy
     easy_ini::Float64  = 3e-4       # Initial value for easy_sf
 
     """
+    **Calculate the (remaining) temperatures from a solver solution-array guess.**
+
+    Lifted out of `solve_energy!` so that it (and `_fev!`/`_calc_jac_res!`, which
+    depend on it) can be called and unit tested independently of the solver loop.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be modified.
+    - `x::Array{Float64,1}`             solution-array guess (cell-centre temperatures,
+                                         plus a trailing surface/skin temperature when
+                                         `sol_type >= 2`).
+    - `sol_type::Int64`                 solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
+    """
+    function _set_tmps!(atmos::atmosphere.Atmos_t, x::Array{Float64,1}, sol_type::Int64)
+        # Read new guess
+        clamp!(x, atmos.tmp_floor+1.0, atmos.tmp_ceiling-1.0)
+        for i in 1:atmos.nlev_c
+            atmos.tmp[i] = x[i]
+        end
+
+        # Interpolate temperature to cell-edge values
+        atmosphere.set_tmpl_from_tmp!(atmos)
+
+        if (sol_type >= 2)  # states 2,3,4
+            atmos.tmp_surf = x[end]  # Surface brightness temperature
+        end
+
+        return nothing
+    end # end _set_tmps!
+
+    """
+    **Objective function: evaluate fluxes and residuals at a temperature guess.**
+
+    Lifted out of `solve_energy!` so that it can be called and unit tested
+    independently of the solver loop. `step_ok` and `code` are passed as `Ref`s
+    so that this function can report back flux-evaluation failure and a NaN/Inf
+    residual failure to the caller, exactly as the original nested closure did
+    by mutating the enclosing scope's `step_ok`/`code` variables.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used/modified.
+    - `x::Array{Float64,1}`             solution-array guess.
+    - `resid::Array{Float64,1}`         residual array to be filled in-place.
+    - `sol_type::Int64`                 solution type, 1: tmp_surf | 2: skin | 3: flux_int | 4: tgt_olr
+    - `oceans::Bool`                    check surface saturation (ocean formation)
+    - `chem::Bool`                      include eqm thermochemistry when solving for RCE?
+    - `rainout::Bool`                   allow rainout (phase change impacts mixing ratios)
+    - `latent::Bool`                    include latent heat exchange (condensation/evaporation)
+    - `convect::Bool`                   include convection
+    - `sens_heat::Bool`                 include sensible heating at the surface
+    - `conduct::Bool`                   include conductive heat transport within the atmosphere
+    - `deep::Bool`                      include deep heat production (e.g. from dynamics)
+    - `easy_sf::Float64`                convective & phase change flux scale factor
+    - `step_ok::Ref{Bool}`              accumulates (via `&=`) whether the flux calculation succeeded
+    - `code::Ref{STATUSCODE}`           set to `CODE_NAN` if the residual array is non-finite
+
+    Optional arguments:
+    - `compose::Bool`                   recalculate composition (chemistry/condensation) this call?
+
+    Returns:
+    - `Bool`                            false if the residual array contains NaN/Inf, true otherwise
+    """
+    function _fev!(atmos::atmosphere.Atmos_t, x::Array{Float64,1}, resid::Array{Float64,1},
+                    sol_type::Int64,
+                    oceans::Bool, chem::Bool, rainout::Bool,
+                    latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool, deep::Bool,
+                    easy_sf::Float64,
+                    step_ok::Ref{Bool}, code::Ref{STATUSCODE};
+                    compose::Bool=false)::Bool
+
+        # Reset masks
+        fill!(atmos.mask_c, false)
+        fill!(atmos.mask_l, false)
+
+        # Set new temperatures
+        _set_tmps!(atmos, x, sol_type)
+
+        # New layer properties
+        atmosphere.calc_layer_props!(atmos)
+
+        # Do chemistry?
+        compose_here = compose && (oceans || chem || rainout)
+        if compose_here
+            chemistry.calc_composition!(atmos, oceans, chem, rainout)
+        end
+
+        # Set cloud profiles from condensation of H2O
+        atmosphere.set_cloud!(atmos; from_yield=true, mmr_sf=easy_sf)
+
+        # Set aerosol profiles at levels where condensation occurs
+        atmosphere.set_aerosols!(atmos; mmr_sf=easy_sf)
+
+        # Calculate fluxes
+        step_ok[] &= energy.calc_fluxes!(atmos, radiative=true,
+                            latent_heat=latent, convective=convect, sens_heat=sens_heat,
+                            conductive=conduct, deep=deep,
+                            convect_sf=easy_sf, latent_sf=easy_sf)
+
+        # Calculate residuals subject to the solution type
+        if (sol_type == 1)
+            # Zero loss with constant tmp_surf
+            @. resid = atmos.flux_dif
+
+        elseif (sol_type == 2)
+            # Zero loss
+            resid[1:end-1] .= atmos.flux_dif[1:end]
+            # Conductive boundary layer
+            resid[end] = atmos.flux_tot[end] - energy.skin_flux(atmos)
+
+        elseif (sol_type == 3)
+
+            # Energy balance for each layer:
+            # At equilibrium, heating deposited in a layer equals net flux divergence.
+            # flux_dif = flux_tot[i+1] - flux_tot[i] (positive = cooling)
+            resid[1:end-1] .= atmos.flux_dif[1:end]
+
+            # TOA boundary: total upward flux = internal + deep heating from below
+            # flux_deep[end] is the total heating flux entering from below the domain
+            resid[end] = atmos.flux_tot[end] - atmos.flux_int
+        elseif (sol_type == 4)
+            # Same energy balance as sol_type=3
+            resid[1:end-1] .= atmos.flux_dif[1:end]
+            # OLR is equal to target_olr
+            resid[end] = atmos.target_olr - atmos.flux_u_lw[1]
+
+        end
+
+        # Check that residuals are real numbers
+        if !all(isfinite, resid)
+            @warn "Residual array contains NaNs and/or Infs"
+            @warn "resid: $resid"
+            @warn "flux_n: $(atmos.flux_n)"
+            code[] = CODE_NAN
+            return false
+        end
+
+        return true
+    end  # end _fev!
+
+    """
+    **Calculate the Jacobian and residuals at `x` using a finite-difference scheme.**
+
+    Lifted out of `solve_energy!` so that it can be called and unit tested
+    independently of the solver loop. Internally allocates its own scratch
+    arrays (sized from `length(x)`) rather than requiring the caller's
+    preallocated buffers, since this function is called at most twice per
+    solver step - the extra allocation is negligible next to the cost of the
+    flux evaluations it performs, and it substantially simplifies the signature.
+
+    Arguments:
+    - `atmos::Atmos_t`                  the atmosphere struct instance to be used/modified.
+    - `x::Array{Float64,1}`             solution-array guess at which to evaluate the Jacobian.
+    - `jacob::Array{Float64,2}`         Jacobian matrix to be filled in-place.
+    - `resid::Array{Float64,1}`         residual array to be filled in-place (at `x`).
+    - `central::Bool`                   use a central (vs forward) finite-difference scheme?
+    - `order::Int64`                    finite-difference order (2 or 4).
+    - `which::Array{Bool,1}`            mask of which columns of the Jacobian to update.
+    - `sol_type, oceans, chem, rainout, latent, convect, sens_heat, conduct, deep, easy_sf`:
+                                         passed straight through to `_fev!` (see its docstring).
+    - `tmp_pad::Float64`                padding around hard limits on temperature floor & ceiling
+    - `step_ok::Ref{Bool}`              passed straight through to `_fev!`
+    - `code::Ref{STATUSCODE}`           passed straight through to `_fev!`
+
+    Returns:
+    - `Bool`                            false if any underlying `_fev!` call failed, true otherwise
+    """
+    function _calc_jac_res!(atmos::atmosphere.Atmos_t,
+                                x::Array{Float64, 1}, jacob::Array{Float64, 2},
+                                resid::Array{Float64 ,1}, central::Bool, order::Int64,
+                                which::Array{Bool,1},
+                                sol_type::Int64,
+                                oceans::Bool, chem::Bool, rainout::Bool,
+                                latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool,
+                                deep::Bool, easy_sf::Float64, tmp_pad::Float64,
+                                step_ok::Ref{Bool}, code::Ref{STATUSCODE})::Bool
+
+        arr_len::Int64 = length(x)
+
+        #     finite difference scratch arrays (see docstring for why these are
+        #     allocated here rather than threaded through as arguments)
+        x_s::Array{Float64,1}    = zeros(Float64, arr_len)  # Perturbed row, for jacobian
+        rf1::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference  (+1 dx)
+        rb1::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (-1 dx)
+        rf2::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference  (+2 dx)
+        rb2::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (-2 dx)
+        fd_s::Float64            = 0.0                      # Row perturbation amount
+
+        ok::Bool = true
+
+        # Evalulate residuals at x
+        ok = ok && _fev!(atmos, x, resid, sol_type, oceans, chem, rainout,
+                            latent, convect, sens_heat, conduct, deep, easy_sf,
+                            step_ok, code, compose=compose_jac)
+
+        # For each level...
+        for i in 1:arr_len
+
+            # Should this column be updated?
+            if !which[i]
+                continue
+            end
+
+            # Reset temperature at all levels
+            @. x_s = x
+
+            # Reset residuals
+            fill!(rf1, 0.0)
+            fill!(rb1, 0.0)
+            fill!(rf2, 0.0)
+            fill!(rb2, 0.0)
+
+            # Calculate perturbation at this level
+            #    - must be less than tmp_pad/2
+            fd_s = min(x[i] * fd_rel + fd_abs, tmp_pad/2)
+
+            # Forward part (1 step)
+            x_s[i] = x[i] + fd_s
+            ok = ok && _fev!(atmos, x_s, rf1, sol_type, oceans, chem, rainout,
+                                latent, convect, sens_heat, conduct, deep, easy_sf,
+                                step_ok, code)
+
+            # Forward part (2 step)
+            if order == 4
+                x_s[i] = x[i] + 2.0*fd_s
+                ok = ok && _fev!(atmos, x_s, rf2, sol_type, oceans, chem, rainout,
+                                    latent, convect, sens_heat, conduct, deep, easy_sf,
+                                    step_ok, code)
+            end
+
+            # Backward part
+            if central
+                # (1 step)
+                x_s[i] = x[i] - fd_s
+                ok = ok && _fev!(atmos, x_s, rb1, sol_type, oceans, chem, rainout,
+                                    latent, convect, sens_heat, conduct, deep, easy_sf,
+                                    step_ok, code)
+
+                # (2 step)
+                if order == 4
+                    x_s[i] = x[i] - 2.0*fd_s
+                    ok = ok && _fev!(atmos, x_s, rb2, sol_type, oceans, chem, rainout,
+                                        latent, convect, sens_heat, conduct, deep, easy_sf,
+                                        step_ok, code)
+                end
+            end
+
+            # Set jacobian
+            # https://www.dam.brown.edu/people/alcyew/handouts/numdiff.pdf
+            # https://en.wikipedia.org/wiki/Finite_difference_coefficient
+            if central
+                if order == 4
+                    # 4th order central difference
+                    @. jacob[:,i] = (-rf2 + 8.0*rf1 - 8.0*rb1 + rb2)/(12.0*fd_s)
+                else
+                    # 2nd order central difference
+                    @. jacob[:,i] = (rf1 - rb1)/(2.0*fd_s)
+                end
+            else
+                if order == 4
+                    # 4th order forward difference
+                    @. jacob[:,i] = (-rf2 + 4.0*rf1 - 3.0*resid)/(2.0*fd_s)
+                else
+                    # 2nd order forward difference
+                    @. jacob[:,i] = (rf1 - resid)/fd_s
+                end
+            end # end central/forward
+        end # end levels
+
+        return ok
+    end # end _calc_jac_res!
+
+    """
     **Solve for radiative-convective-chemical equilibrium by energy conservation.**
 
     Solves the non-linear system of equations defined by the flux field
@@ -188,14 +459,6 @@ module solve_energy
             atmos.rt_scheme = atmosphere.RT_GREYGAS
         end
 
-        #     finite difference
-        rf1::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference  (+1 dx)
-        rb1::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (-1 dx)
-        rf2::Array{Float64,1}    = zeros(Float64, arr_len)  # Forward difference  (+2 dx)
-        rb2::Array{Float64,1}    = zeros(Float64, arr_len)  # Backward difference (-2 dx)
-        x_s::Array{Float64,1}    = zeros(Float64, arr_len)  # Perturbed row, for jacobian
-        fd_s::Float64            = 0.0                      # Row perturbation amount
-
         #     solver
         b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))   # Approximate jacobian (i)
         x_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Current best solution (i)
@@ -222,10 +485,10 @@ module solve_energy
 
         #     tracking
         step::Int64 =             0       # Step number
-        code::STATUSCODE =      CODE_99 # Status code
+        code::Ref{STATUSCODE} = Ref(CODE_99) # Status code
         runtime::Float64  =     0.0     # Model runtime [s]
         compose_retcode::Int64 =  0       # Composition calculation return code
-        step_ok::Bool =         true    # Current step was fine
+        step_ok::Ref{Bool} =    Ref(true)  # Current step was fine
         grey_step::Bool = grey_start    # double-grey RT enabled in this step
         easy_step::Bool =       false   # easy_start sf increased in this step
         plateau_i::Int64 =        0       # Number of iterations for which step was small
@@ -240,175 +503,6 @@ module solve_energy
         dx_stat::Float64 =      9.0     # Maximum change in solution array
         r_cur_2nm::Float64 =    0.01    # Two-norm of residuals
         r_old_2nm::Float64 =    0.02    # Previous ^
-
-        # Calculate the (remaining) temperatures from known temperatures
-        function _set_tmps!(_x::Array{Float64,1})
-            # Read new guess
-            clamp!(_x, atmos.tmp_floor+1.0, atmos.tmp_ceiling-1.0)
-            for i in 1:atmos.nlev_c
-                atmos.tmp[i] = _x[i]
-            end
-
-            # Interpolate temperature to cell-edge values
-            atmosphere.set_tmpl_from_tmp!(atmos)
-
-            if (sol_type >= 2)  # states 2,3,4
-                atmos.tmp_surf = _x[end]  # Surface brightness temperature
-            end
-
-            return nothing
-        end # end set_tmps
-
-        # Objective function
-        function _fev!(x::Array{Float64,1},resid::Array{Float64,1}; compose::Bool=false)::Bool
-
-            # Reset masks
-            fill!(atmos.mask_c, false)
-            fill!(atmos.mask_l, false)
-
-            # Set new temperatures
-            _set_tmps!(x)
-
-            # New layer properties
-            atmosphere.calc_layer_props!(atmos)
-
-            # Do chemistry?
-            compose_here = compose && (oceans || chem || rainout)
-            if compose_here
-                chemistry.calc_composition!(atmos, oceans, chem, rainout)
-            end
-
-            # Set cloud profiles from condensation of H2O
-            atmosphere.set_cloud!(atmos; from_yield=true, mmr_sf=easy_sf)
-
-            # Set aerosol profiles at levels where condensation occurs
-            atmosphere.set_aerosols!(atmos; mmr_sf=easy_sf)
-
-            # Calculate fluxes
-            step_ok &= energy.calc_fluxes!(atmos, radiative=true,
-                                latent_heat=latent, convective=convect, sens_heat=sens_heat,
-                                conductive=conduct, deep=deep,
-                                convect_sf=easy_sf, latent_sf=easy_sf)
-
-            # Calculate residuals subject to the solution type
-            if (sol_type == 1)
-                # Zero loss with constant tmp_surf
-                @. resid = atmos.flux_dif
-
-            elseif (sol_type == 2)
-                # Zero loss
-                resid[1:end-1] .= atmos.flux_dif[1:end]
-                # Conductive boundary layer
-                resid[end] = atmos.flux_tot[end] - energy.skin_flux(atmos)
-
-            elseif (sol_type == 3)
-
-                # Energy balance for each layer:
-                # At equilibrium, heating deposited in a layer equals net flux divergence.
-                # flux_dif = flux_tot[i+1] - flux_tot[i] (positive = cooling)
-                resid[1:end-1] .= atmos.flux_dif[1:end]
-
-                # TOA boundary: total upward flux = internal + deep heating from below
-                # flux_deep[end] is the total heating flux entering from below the domain
-                resid[end] = atmos.flux_tot[end] - atmos.flux_int
-            elseif (sol_type == 4)
-                # Same energy balance as sol_type=3
-                resid[1:end-1] .= atmos.flux_dif[1:end]
-                # OLR is equal to target_olr
-                resid[end] = atmos.target_olr - atmos.flux_u_lw[1]
-
-            end
-
-            # Check that residuals are real numbers
-            if !all(isfinite, resid)
-                @warn "Residual array contains NaNs and/or Infs"
-                @warn "resid: $resid"
-                @warn "flux_n: $(atmos.flux_n)"
-                code = CODE_NAN
-                return false
-            end
-
-            return true
-        end  # end fev
-
-        # Calculate the jacobian and residuals at x using a 2nd order central-difference
-        function _calc_jac_res!(x::Array{Float64, 1}, jacob::Array{Float64, 2},
-                                    resid::Array{Float64 ,1}, central::Bool, order::Int64,
-                                    which::Array{Bool,1})::Bool
-
-            ok::Bool = true
-
-            # Evalulate residuals at x
-            ok = ok && _fev!(x, resid, compose=compose_jac)
-
-            # For each level...
-            for i in 1:arr_len
-
-                # Should this column be updated?
-                if !which[i]
-                    continue
-                end
-
-                # Reset temperature at all levels
-                @. x_s = x
-
-                # Reset residuals
-                fill!(rf1, 0.0)
-                fill!(rb1, 0.0)
-                fill!(rf2, 0.0)
-                fill!(rb2, 0.0)
-
-                # Calculate perturbation at this level
-                #    - must be less than tmp_pad/2
-                fd_s = min(x[i] * fd_rel + fd_abs, tmp_pad/2)
-
-                # Forward part (1 step)
-                x_s[i] = x[i] + fd_s
-                ok = ok && _fev!(x_s, rf1)
-
-                # Forward part (2 step)
-                if order == 4
-                    x_s[i] = x[i] + 2.0*fd_s
-                    ok = ok && _fev!(x_s, rf2)
-                end
-
-                # Backward part
-                if central
-                    # (1 step)
-                    x_s[i] = x[i] - fd_s
-                    ok = ok && _fev!(x_s, rb1)
-
-                    # (2 step)
-                    if order == 4
-                        x_s[i] = x[i] - 2.0*fd_s
-                        ok = ok && _fev!(x_s, rb2)
-                    end
-                end
-
-                # Set jacobian
-                # https://www.dam.brown.edu/people/alcyew/handouts/numdiff.pdf
-                # https://en.wikipedia.org/wiki/Finite_difference_coefficient
-                if central
-                    if order == 4
-                        # 4th order central difference
-                        @. jacob[:,i] = (-rf2 + 8.0*rf1 - 8.0*rb1 + rb2)/(12.0*fd_s)
-                    else
-                        # 2nd order central difference
-                        @. jacob[:,i] = (rf1 - rb1)/(2.0*fd_s)
-                    end
-                else
-                    if order == 4
-                        # 4th order forward difference
-                        @. jacob[:,i] = (-rf2 + 4.0*rf1 - 3.0*resid)/(2.0*fd_s)
-                    else
-                        # 2nd order forward difference
-                        @. jacob[:,i] = (rf1 - resid)/fd_s
-                    end
-                end # end central/forward
-            end # end levels
-
-            return ok
-        end # end jr_cd
 
         # Cost function to minimise
         function _cost(_r::Array)::Float64
@@ -518,12 +612,12 @@ module solve_energy
             #     X          = e(x)trapolating along plateau region
             info_str  = ""
             stepflags = ""
-            step_ok   = true
+            step_ok[] = true
 
             # Check time
             runtime = time()-wct_start
             if runtime > max_runtime
-                code = CODE_TIM
+                code[] = CODE_TIM
                 break
             end
 
@@ -531,17 +625,17 @@ module solve_energy
             @debug "        iterate"
             step += 1
             if step > max_steps
-                code = CODE_ITE
+                code[] = CODE_ITE
                 break
             end
             info_str *= @sprintf("    %4d  ", step)
 
             # Check status of guess
             if !all(isfinite, x_cur)
-                code = CODE_NAN
+                code[] = CODE_NAN
                 break
             end
-            _set_tmps!(x_cur)
+            _set_tmps!(atmos, x_cur, sol_type)
 
             # Run chemistry and condensation schemes
             if chem || rainout || oceans
@@ -551,7 +645,7 @@ module solve_energy
                     stepflags *= "Cs-"  # success
                 else
                     stepflags *= "Cf-"  # failure
-                    step_ok = false
+                    step_ok[] = false
                 end
             end
 
@@ -631,15 +725,21 @@ module solve_energy
             if fdc || (step == 1)
                 # use central difference if:
                 #    requested, at the start, or insufficient cost decrease
-                if !_calc_jac_res!(x_cur, b, r_cur, true, fdo, perturb)
-                    code = CODE_OBJ
+                if !_calc_jac_res!(atmos, x_cur, b, r_cur, true, fdo, perturb,
+                                    sol_type, oceans, chem, rainout,
+                                    latent, convect, sens_heat, conduct, deep,
+                                    easy_sf, tmp_pad, step_ok, code)
+                    code[] = CODE_OBJ
                     break
                 end
                 stepflags *= "C$fdo-"
             else
                 # otherwise, use forward difference
-                if !_calc_jac_res!(x_cur, b, r_cur, false, fdo, perturb)
-                    code = CODE_OBJ
+                if !_calc_jac_res!(atmos, x_cur, b, r_cur, false, fdo, perturb,
+                                    sol_type, oceans, chem, rainout,
+                                    latent, convect, sens_heat, conduct, deep,
+                                    easy_sf, tmp_pad, step_ok, code)
+                    code[] = CODE_OBJ
                     break
                 end
                 stepflags *= "F$fdo-"
@@ -649,8 +749,8 @@ module solve_energy
             #    Diagonal elements are usually negative
             #    Off-diagonals are usually positive
             if abs(det(b)) < floatmin()*10.0
-                code = CODE_SIN
-                step_ok = false
+                code[] = CODE_SIN
+                step_ok[] = false
                 break
             end
 
@@ -717,7 +817,9 @@ module solve_energy
                 # Internal function minimised by linesearch method
                 function _ls_func(scale::Float64)::Float64
                     @. x_cur = x_old + scale * x_dif
-                    _fev!(x_cur,r_tst, compose=compose_ls)
+                    _fev!(atmos, x_cur, r_tst, sol_type, oceans, chem, rainout,
+                            latent, convect, sens_heat, conduct, deep, easy_sf,
+                            step_ok, code, compose=compose_ls)
                     return _cost(r_tst)
                 end
 
@@ -766,7 +868,7 @@ module solve_energy
                         end
                     else
                         @warn "Invalid linesearch algorithm $ls_method"
-                        code = CODE_CFG
+                        code[] = CODE_CFG
                         break
                     end
 
@@ -789,12 +891,14 @@ module solve_energy
             clamp!(x_cur, atmos.tmp_floor+tmp_pad, atmos.tmp_ceiling-tmp_pad)
 
             # Evaluate fluxes
-            _fev!(x_cur, r_cur, compose=true)
+            _fev!(atmos, x_cur, r_cur, sol_type, oceans, chem, rainout,
+                    latent, convect, sens_heat, conduct, deep, easy_sf,
+                    step_ok, code, compose=true)
 
             # Recalculate layer properties
             if ! atmosphere.calc_layer_props!(atmos)
-                code = CODE_HYD
-                step_ok = false
+                code[] = CODE_HYD
+                step_ok[] = false
                 stepflags *= "Ub-"
             end
 
@@ -831,7 +935,7 @@ module solve_energy
             else
                 @warn "Invalid choice for convergence type"
                 @warn "    Got $conv_type. Must be 1, 2, or 3"
-                code = CODE_CFG
+                code[] = CODE_CFG
                 break
             end
 
@@ -845,7 +949,7 @@ module solve_energy
                                  r_med, c_cur, atmos.flux_u_lw[1],
                                  x_max, dx_stat, stepflags[1:end-1])
             if (modprint>0) && (mod(step, modprint)==0)
-                if step_ok
+                if step_ok[]
                     @info info_str
                 else
                     @warn info_str
@@ -857,27 +961,27 @@ module solve_energy
             # Check if surface temperature has collapsed to floor
             if atmos.tmp_surf < atmos.tmp_floor + tmp_pad+1
                 @warn "Surface temperature collapsed! Resetting to initial guess..."
-                step_ok = false
+                step_ok[] = false
                 @. x_cur = x_ini
             end
 
             # Converged?
             @debug "        check convergence"
-            if (conv_val < conv_atol + conv_rtol * c_max) && step_ok
+            if (conv_val < conv_atol + conv_rtol * c_max) && step_ok[]
                 # still using grey RT?
                 if grey_step
                     # switch to preferred RT scheme
                     grey_step = false
                 elseif !easy_start
                     # done!
-                    code = CODE_SUC
+                    code[] = CODE_SUC
                     break
                 end
             end
 
             # Record that this step not ok
-            if (code == 0) && !step_ok
-                code = CODE_STP
+            if (code[] == CODE_99) && !step_ok[]
+                code[] = CODE_STP
             end
 
         end # end solver loop
@@ -891,30 +995,30 @@ module solve_energy
         # ----------------------------------------------------------
         atmos.is_solved = true
         atmos.is_converged = false
-        if code == CODE_SUC
+        if code[] == CODE_SUC
             @info "    success in $step steps"
             atmos.is_converged = true
             rm(path_plt, force=true)
-        elseif code == CODE_ITE
+        elseif code[] == CODE_ITE
             @warn "    failure (maximum iterations)"
             plot_step()
-        elseif code == CODE_SIN
+        elseif code[] == CODE_SIN
             @warn "    failure (singular jacobian)"
             plot_step()
-        elseif code == CODE_TIM
+        elseif code[] == CODE_TIM
             @warn "    failure (maximum time)"
-        elseif code == CODE_NAN
+        elseif code[] == CODE_NAN
             @warn "    failure (NaN values)"
             plot_step()
-        elseif code == CODE_CFG
+        elseif code[] == CODE_CFG
             @warn "    failure (configuration)"
-        elseif code == CODE_OBJ
+        elseif code[] == CODE_OBJ
             @warn "    failure (objective function)"
             plot_step()
-        elseif code == CODE_STP
+        elseif code[] == CODE_STP
             @warn "    failure (other; last step not ok)"
             plot_step()
-        elseif code == CODE_HYD
+        elseif code[] == CODE_HYD
             @warn "    failure (hydrostatic integration)"
             plot_step()
         else
@@ -923,13 +1027,13 @@ module solve_energy
         end
 
         # timeout
-        if (code in [CODE_ITE, CODE_TIM]) && easy_start
+        if (code[] in [CODE_ITE, CODE_TIM]) && easy_start
             @warn "Solver timed-out before easy_start stage had finished."
             @warn "    Try `easy_start=false`, increasing max_runtime, or increasing max_steps."
         end
 
         # perform one last evaluation to set `atmos` given the final `x_cur`
-        _set_tmps!(x_cur)
+        _set_tmps!(atmos, x_cur, sol_type)
 
         # calc LW contribution function
         energy.radtrans!(atmos, true, calc_cf=true)
