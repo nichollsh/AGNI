@@ -349,7 +349,6 @@ OUT_DIR = joinpath(ROOT_DIR,"out/")
         result = AGNI.setpt.request!(atmos, Any["surfsat"])
         @test result == false
         @test all(atmos.tmp .> 0.0)
-        atmosphere.deallocate!(atmos)
 
         # Test missing argument path for a verb
         @test AGNI.setpt.request!(atmos, Any["iso"]) == false
