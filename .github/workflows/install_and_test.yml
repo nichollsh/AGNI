@@ -56,13 +56,25 @@ jobs:
           sudo chown -R "$USER":admin /opt/homebrew/
           find /opt/homebrew/Cellar -user root | xargs sudo chown -R $USER
           brew update
-          brew install netcdf netcdf-fortran gcc@${GCC_V} gfortran
-          ls "/opt/homebrew/opt/gcc/bin"
-          echo 'eval $(/opt/homebrew/bin/brew shellenv)' >> ~/.zprofile
-          sudo ln -fs /opt/homebrew/bin/gfortran-${GCC_V} /usr/local/bin/gfortran
+          brew install netcdf netcdf-fortran gcc@${GCC_V}
+          GCC_PREFIX="$(brew --prefix gcc@${GCC_V})"
+          ls "${GCC_PREFIX}/bin"
+
+          # Pin gfortran to gcc@${GCC_V} for every later step in this job via
+          # $GITHUB_PATH/$GITHUB_ENV. The previous approach wrote PATH changes
+          # to ~/.zprofile, but GitHub Actions runs `run:` steps as a non-login
+          # shell, which never sources ~/.zprofile - so that pin silently had
+          # no effect, and the job actually built with whichever GCC version
+          # Homebrew's unversioned `gcc` formula currently provides (also no
+          # longer installed here as a side effect of the removed `gfortran`
+          # formula, since it depended on it).
+          mkdir -p "$HOME/gcc-pin/bin"
+          ln -sf "${GCC_PREFIX}/bin/gfortran-${GCC_V}" "$HOME/gcc-pin/bin/gfortran"
+          echo "$HOME/gcc-pin/bin" >> "$GITHUB_PATH"
+          echo "FC=$HOME/gcc-pin/bin/gfortran" >> "$GITHUB_ENV"
+
           sudo mkdir -p /usr/local/gfortran
-          sudo ln -sf /opt/homebrew/Cellar/gcc@${GCC_V}/*/lib/gcc/${GCC_V} /usr/local/gfortran/lib
-          echo 'export PATH="/opt/homebrew/opt/gcc/bin:$PATH"' >> ~/.zprofile
+          sudo ln -sf "${GCC_PREFIX}"/lib/gcc/${GCC_V} /usr/local/gfortran/lib
 
 
       # Setup Julia
