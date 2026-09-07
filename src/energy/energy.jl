@@ -22,15 +22,15 @@ module energy
     import ..species
 
     # Constants
-    SMALL_TRANS::Float64            = 1e-10     # minimum transmissivity
-    DFSVTY_FCTR::Float64            = 2.0       # diffusivity factor
-    SKIP_SW_THRESH::Float64         = 1e-9      # skip SW calculation if TOA heating is below this threshold [W m-2]
-    FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
-    CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [bar]
-    CONVECT_REAL_GAS::Bool          = false     # use real gas EOS in convection scheme, if RG EOS enabled
-    MIN_SKIN_D::Float64             = 1e-6      # minimum skin depth for conductive flux calculation [m]
-    MAX_SKIN_D::Float64             = 1e6       # maximum skin depth for conductive flux calculation [m]
-    ROUGHNESS_EPS::Float64          = 1e-3      # avoid blow-up of exchange coefficient when height ≈ roughness
+    const SMALL_TRANS::Float64            = 1e-10     # minimum transmissivity
+    const DFSVTY_FCTR::Float64            = 2.0       # diffusivity factor
+    const SKIP_SW_THRESH::Float64         = 1e-9      # skip SW calculation if TOA heating is below this threshold [W m-2]
+    const FILL_FINITE_FLUX::Float64       = 1.0       # filling value for NaN fluxes [W m-2]
+    const CONVECT_MIN_PRESSURE::Float64   = 1e-9      # lowest pressure at which convection is allowed [bar]
+    const CONVECT_REAL_GAS::Bool          = false     # use real gas EOS in convection scheme, if RG EOS enabled
+    const MIN_SKIN_D::Float64             = 1e-6      # minimum skin depth for conductive flux calculation [m]
+    const MAX_SKIN_D::Float64             = 1e6       # maximum skin depth for conductive flux calculation [m]
+    const ROUGHNESS_EPS::Float64          = 1e-3      # avoid blow-up of exchange coefficient when height ≈ roughness
 
     """
     **Set non-finite values in an array equal to a given fill value**.

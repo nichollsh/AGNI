@@ -1092,10 +1092,7 @@ module solve_energy
         _set_tmps!(atmos, x_cur, sol_type)
 
         # calc LW contribution function
-        energy.radtrans!(atmos, true, calc_cf=true)
-
-        # calc heating rate profile
-        energy.calc_hrates!(atmos)
+        energy.radtrans!(atmos, true, calc_cf=true, calc_hr=true)
 
         # calc diagnostic quantities
         diagnostics.estimate_Ra!(atmos)
