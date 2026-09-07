@@ -587,7 +587,7 @@ end
         # radius decreases from surface (i=nlev_c) to TOA (i=1)
         @test issorted(atmos.r; rev=true)
 
-        # gravity below the internal HYDROGRAV_ming floor (1e-4 m/s^2), so the function
+        # gravity below the internal ming floor (1e-4 m/s^2), so the function
         # must report failure and flag the affected layers
         atmos_lowg = _setup_only(; gravity=1e-7)
         ok = with_logger(MinLevelLogger(current_logger(), Logging.Error+1)) do
@@ -597,7 +597,7 @@ end
         @test any(.!atmos_lowg.layer_isbound)
 
         # discrimination guard: this must not be trivially "all layers unbound"
-        @test all(atmos_lowg.g .<= atmosphere.HYDROGRAV_ming)
+        @test all(atmos_lowg.g .<= atmos.hydrograv_ming)
     end
 
     # -----------------------------------------------------------------

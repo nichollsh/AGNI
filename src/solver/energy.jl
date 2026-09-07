@@ -34,35 +34,6 @@ module solve_energy
         CODE_99  = 99 # default code (failure)
     end
 
-    # Solver constants and parameters
-    #
-    # KNOWN PERFORMANCE ISSUE: none of the parameters below are declared `const`.
-    # In Julia, a global can change type at any point, so every function that reads one
-    # falls back to dynamically-dispatched access instead of an inlined constant.
-    cost_exponent::Float64= 4
-    #    chemistry
-    compose_jac::Bool     = false   # Do chem/condensation for every jacobian call
-    compose_ls::Bool      = false    # Do chem/comp for every linesearch step
-    #    jacobian
-    perturb_trig::Float64 = 0.1     # Require full Jacobian update when cost*peturb_trig satisfies convergence
-    perturb_crit::Float64 = 0.1     # Require Jacobian update at level i when r_i>perturb_crit
-    perturb_mod::Int64 =      5       # Do full jacobian at least this frequently
-    fd_rel::Float64=        1e-4    # finite difference: relative width (dx/x) of the difference (rtol)
-    fd_abs::Float64=        1e-5    # finite difference: absolute width (dx) of the difference (atol)
-    #    plateau parameters
-    plateau_n::Int64    =    4       # Plateau declared when plateau_i > plateau_n
-    plateau_s::Float64 =    10.0     # Scale factor applied to x_dif when plateau_i > plateau_n
-    plateau_r::Float64 =    0.98    # Cost ratio for determining whether to increment plateau_i
-    #    linesearch
-    ls_tau::Float64    =    0.5     # backtracking downscale size
-    ls_increase::Float64 =  0.7     # threshold for change in the cost function, between steps, for triggering/converging linesearch (large values => do LS more often)
-    ls_max_steps::Int64   =  12      # maximum steps undertaken by linesearch routine
-    ls_min_scale::Float64 = 1.0e-5  # minimum step scale allowed by linesearch
-    ls_max_scale::Float64 = 0.99    # maximum step scale allowed by linesearch
-    #    easy start
-    easy_incr::Float64 = 2.0        # Factor by which to increase easy_sf at each step
-    easy_trig::Float64 = 0.1        # Increase sf when cost*easy_trig satisfies convergence
-    easy_ini::Float64  = 3e-4       # Initial value for easy_sf
 
     """
     **Update the atmosphere cell-center temperatures from a solver solution-array guess.**
@@ -221,6 +192,9 @@ module solve_energy
     - `tmp_pad::Float64`                padding around hard limits on temperature floor & ceiling
     - `step_ok::Ref{Bool}`              passed straight through to `_fev!`
     - `code::Ref{STATUSCODE}`           passed straight through to `_fev!`
+    - `fd_rel::Float64`                 finite difference: relative width (dx/x) of the difference (rtol)
+    - `fd_abs::Float64`                 finite difference: absolute width (dx) of the difference (atol)
+    - `compose_jac::Bool`               recalculate composition when evaluating residuals at `x`?
 
     Returns:
     - `Bool`                            false if any underlying `_fev!` call failed, true otherwise
@@ -233,7 +207,8 @@ module solve_energy
                                 oceans::Bool, chem::Bool, rainout::Bool,
                                 latent::Bool, convect::Bool, sens_heat::Bool, conduct::Bool,
                                 deep::Bool, easy_sf::Float64, tmp_pad::Float64,
-                                step_ok::Ref{Bool}, code::Ref{STATUSCODE})::Bool
+                                step_ok::Ref{Bool}, code::Ref{STATUSCODE},
+                                fd_rel::Float64, fd_abs::Float64, compose_jac::Bool)::Bool
 
         arr_len::Int64 = length(x)
 
@@ -404,11 +379,29 @@ module solve_energy
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
     - `modplot::Int64`                  iteration frequency at which to make plots
-    - `save_frames::Bool`               save plotting frames
+    - `save_frames::Bool`               save plotting frames?
     - `modprint::Int64`                 iteration frequency at which to print info
-    - `plot_jacobian::Bool`             [deprecated]
     - `conv_atol::Float64`              convergence: absolute tolerance on per-level flux deviation [W m-2]
     - `conv_rtol::Float64`              convergence: relative tolerance on per-level flux deviation [dimensionless]
+    - `cost_exponent::Float64`          convergence: p-norm order defining the cost function minimised by the solver
+    - `compose_jac::Bool`               finite difference: recalculate chemistry/condensation on every Jacobian evaluation?
+    - `compose_ls::Bool`                finite difference: recalculate chemistry/condensation on every linesearch step?
+    - `perturb_trig::Float64`           finite difference: require full Jacobian update when cost*perturb_trig satisfies convergence
+    - `perturb_crit::Float64`           finite difference: require Jacobian update at level i when residual_i > perturb_crit
+    - `perturb_mod::Int64`              finite difference: always do a full Jacobian update at least this frequently [steps]
+    - `fd_rel::Float64`                 finite difference: relative width (dx/x) of the perturbation (rtol)
+    - `fd_abs::Float64`                 finite difference: absolute width (dx) of the perturbation (atol)
+    - `plateau_n::Int64`                plateau: number of consecutive iterations with small changes in the cost function before a plateau is declared
+    - `plateau_s::Float64`              plateau: scale factor applied to x_dif when plateau_i > plateau_n
+    - `plateau_r::Float64`              plateau: cost ratio for determining whether to increment plateau_i
+    - `ls_tau::Float64`                 linesearch: backtracking downscale size
+    - `ls_increase::Float64`            linesearch: threshold for change in the cost function, between steps, for triggering/converging linesearch (large values => do LS more often)
+    - `ls_max_steps::Int64`             linesearch: maximum steps undertaken by linesearch routine
+    - `ls_min_scale::Float64`           linesearch: minimum step scale allowed by linesearch
+    - `ls_max_scale::Float64`           linesearch: maximum step scale allowed by linesearch
+    - `easy_incr::Float64`              easystart: factor by which to increase easy_sf at each step
+    - `easy_trig::Float64`              easystart: increase easy_sf when cost*easy_trig satisfies convergence
+    - `easy_ini::Float64`               easystart: initial value for easy_sf
 
     Returns:
     - `Bool`                            whether the solver converged successfully
@@ -428,8 +421,20 @@ module solve_energy
                             ls_method::Int64=1, conv_type::Int64=1,
                             detect_plateau::Bool=true, perturb_all::Bool=true,
                             modplot::Int64=1, save_frames::Bool=true,
-                            modprint::Int64=1, plot_jacobian::Bool=true,
+                            modprint::Int64=1,
                             conv_atol::Float64=1.0e-1, conv_rtol::Float64=1.0e-3,
+                            cost_exponent::Float64=4.0,
+                            compose_jac::Bool=false, compose_ls::Bool=false,
+                            perturb_trig::Float64=0.1, perturb_crit::Float64=0.1,
+                            perturb_mod::Int64=5,
+                            fd_rel::Float64=1e-4, fd_abs::Float64=1e-5,
+                            plateau_n::Int64=4, plateau_s::Float64=10.0,
+                            plateau_r::Float64=0.98,
+                            ls_tau::Float64=0.5, ls_increase::Float64=0.7,
+                            ls_max_steps::Int64=12,
+                            ls_min_scale::Float64=1.0e-5, ls_max_scale::Float64=0.99,
+                            easy_incr::Float64=2.0, easy_trig::Float64=0.1,
+                            easy_ini::Float64=3e-4,
                             )::Bool
 
         # --------------------
@@ -773,7 +778,8 @@ module solve_energy
                 if !_calc_jac_res!(atmos, x_cur, b, r_cur, true, fdo, perturb,
                                     sol_type, oceans, chem, rainout,
                                     latent, convect, sens_heat, conduct, deep,
-                                    easy_sf, tmp_pad, step_ok, code)
+                                    easy_sf, tmp_pad, step_ok, code,
+                                    fd_rel, fd_abs, compose_jac)
                     code[] = CODE_OBJ
                     break
                 end
@@ -783,7 +789,8 @@ module solve_energy
                 if !_calc_jac_res!(atmos, x_cur, b, r_cur, false, fdo, perturb,
                                     sol_type, oceans, chem, rainout,
                                     latent, convect, sens_heat, conduct, deep,
-                                    easy_sf, tmp_pad, step_ok, code)
+                                    easy_sf, tmp_pad, step_ok, code,
+                                    fd_rel, fd_abs, compose_jac)
                     code[] = CODE_OBJ
                     break
                 end
@@ -1084,10 +1091,10 @@ module solve_energy
         # perform one last evaluation to set `atmos` given the final `x_cur`
         _set_tmps!(atmos, x_cur, sol_type)
 
-        # calc LW contribution function
+        # calc fluxes
         energy.radtrans!(atmos, true, calc_cf=true)
 
-        # calc heating rate profile
+        # calculate heating rates
         energy.calc_hrates!(atmos)
 
         # calc diagnostic quantities
