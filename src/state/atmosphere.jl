@@ -2607,8 +2607,8 @@ module atmosphere
                                 p1::Float64, 
                                 rho::Float64, 
                                 n::Int64;
-                                constg::Bool = HYDROGRAV_constg,
-                                selfg::Bool  = HYDROGRAV_selfg
+                                constg::Bool = CFG_hydrograv_constg,
+                                selfg::Bool  = CFG_hydrograv_selfg
                                 )::Tuple{Float64,Float64,Float64}
 
         # Work variables
