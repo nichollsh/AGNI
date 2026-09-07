@@ -172,7 +172,7 @@ end
         which[1] = false
         ok = SE._calc_jac_res!(atmos, x, jacob, resid, true, 2, which,
                                 1, true, false, true, true, true, true, true, true,
-                                1.0, 5.0, step_ok, code)
+                                1.0, 5.0, step_ok, code, 1e-4, 1e-5, false)
         @test ok
         @test all(jacob[:, 1] .== 0.0)
         @test any(jacob[:, 2] .!= 0.0)
@@ -187,7 +187,7 @@ end
         resid4c = zeros(Float64, arr_len4c)
         ok4c = SE._calc_jac_res!(atmos4c, x4c, jacob4c, resid4c, true, 4, fill(true, arr_len4c),
                                 1, true, false, true, true, true, true, true, true,
-                                1.0, 5.0, step_ok, code)
+                                1.0, 5.0, step_ok, code, 1e-4, 1e-5, false)
         @test ok4c
         @test any(jacob4c .!= 0.0)
         atmosphere.deallocate!(atmos4c)
@@ -201,7 +201,7 @@ end
             residf = zeros(Float64, arr_lenf)
             okf = SE._calc_jac_res!(atmosf, xf, jacobf, residf, false, order, fill(true, arr_lenf),
                                     1, true, false, true, true, true, true, true, true,
-                                    1.0, 5.0, step_ok, code)
+                                    1.0, 5.0, step_ok, code, 1e-4, 1e-5, false)
             @test okf
             @test any(jacobf .!= 0.0)
             atmosphere.deallocate!(atmosf)

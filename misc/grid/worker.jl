@@ -78,8 +78,11 @@ const mlt_asymptotic::Bool   = true
 atmosphere.HYDROGRAV_selfg  = true
 atmosphere.HYDROGRAV_constg = false
 
-solver.solve_energy.ls_increase = 1.02
-solver.solve_energy.easy_incr  = 1/solver.solve_energy.easy_ini
+# solver tuning overrides, passed as kwargs to solve_energy! below (formerly
+# mutated module globals in solver.solve_energy)
+const easy_ini::Float64    = 3e-4       # default from solve_energy!
+const ls_increase::Float64 = 1.02
+const easy_incr::Float64   = 1/easy_ini
 
 # energy.CONVECT_MIN_PRESSURE = 1e-3 * 1e5    # 1 mbar -> Pa
 
@@ -788,6 +791,9 @@ for (i,p) in enumerate(grid_flat)
                                             modplot=modplot,
                                             save_frames=false,
                                             perturb_all=cfg["execution"]["perturb_all"],
+                                            ls_increase=ls_increase,
+                                            easy_ini=easy_ini,
+                                            easy_incr=easy_incr,
                                             )
     # Report radius
     @info @sprintf("    found r_phot = %.3f R_earth",atmos.transspec_r/R_earth)
