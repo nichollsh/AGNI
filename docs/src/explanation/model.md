@@ -32,6 +32,7 @@ For a detailed description of each process, see the corresponding pages in this 
 - [Sensible heat flux](@ref) - turbulent surface exchange
 - [Height structure](@ref) - hydrostatic integration, self-gravity
 - [Advective heating](@ref) - deep heat deposition profile
+- [Multicolumn and global mode](@ref) - pseudo-global climate via coupled 1D columns
 
 ## Obtaining a solution
 

@@ -29,6 +29,17 @@ General properties of the planet.
 | `wind_speed      ` | Effective wind speed for sensible heat transport [m s-1]. |
 | `star_Teff       ` | Stellar photospheric temperature [K] used if `input_star=="blackbody"`. |
 
+### `[planet.globe]`
+Optional subsection which enables [multicolumn/global mode](@ref "Multicolumn and global mode"). Incompatible with `[physics.deep_heating]`.
+
+| Parameter          | Description   |
+| -----------------: | :------------ |
+| `lons           `  | List of longitudes for each column [degrees, 0-360]. |
+| `lats           `  | List of latitudes for each column [degrees, -90 to 90]. |
+| `redist_flux    `  | List of prescribed heat-redistribution fluxes for each column [W m$^{-2}$]. |
+| `redist_Pmid    `  | List of central pressures for each column's redistribution profile [bar]. |
+| `redist_Pwid    `  | List of widths (in log-pressure space) for each column's redistribution profile. |
+
 
 ## `[files]`
 Input/output files and other paths.
@@ -84,6 +95,7 @@ Parameters that tell the model what to do.
 | `perturb_all`     | Perturb all rows of Jacobian matrix at each solver iteration? True=stable, False=fast. |
 | `rfm_wn_min`      | RFM radiative transfer minimum wavenumber [cm$^{-1}$], (optional). |
 | `rfm_wn_max`      | RFM radiative transfer maximum wavenumber [cm$^{-1}$], (optional). |
+| `globe_iters   `  | Maximum number of outer iterations for the multicolumn/global solver (see [Multicolumn and global mode](@ref)). Used when `[planet.globe]` is set. |
 
 ## `[physics]`
 Parameters that describe how the model should treat the physics.

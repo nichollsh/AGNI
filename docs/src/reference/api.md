@@ -24,6 +24,12 @@ Functions from `solver.jl`.
 Modules = [AGNI.solver]
 ```
 
+## Multicolumn module
+Functions from `multicol.jl`.
+```@autodocs
+Modules = [AGNI.multicol]
+```
+
 ## Plotting functions and utilities
 Functions from `plotting.jl`.
 ```@autodocs

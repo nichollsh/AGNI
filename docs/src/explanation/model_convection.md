@@ -21,7 +21,17 @@ The **Schwarzschild criterion** for convective instability is then
 
 In this case, the atmosphere becomes unstable when its lapse rate exceeds that of an adiabatically rising parcel [gabriel_schwarz_2014, anders_schwarz_2022](@citep). This criterion applies in the absence of composition gradients.
 
-The more general **Ledoux criterion** reduces the tendency to convect due to MMW gradients [gabriel_schwarz_2014](@citep). AGNI supports checking against either criterion (configurable via `physics.convection`).
+The more general **Ledoux criterion** reduces the tendency to convect due to MMW gradients [gabriel_schwarz_2014](@citep). In the ideal-gas limit it can be written
+```math
+\nabla_\text{ld} = \nabla_\text{ad} + \frac{d \ln \mu}{d \ln p}
+```
+AGNI supports checking against either criterion, selected via the `physics.convection_crit` configuration option ('s' for Schwarzschild, 'l' for Ledoux). The Ledoux criterion is not self-consistently supported when a real-gas equation of state is in use (see below) since the $d\ln\mu/d\ln p$ correction term neglects the non-ideal contributions to the mixture's thermodynamics. The dry adiabatic lapse rate above assumes an ideal gas compressibility. For a general equation of state, the thermodynamic identity $dT/dp|_\text{ad} = 1/(\rho \, c_{pm})$ still adopts
+```math
+\nabla_\text{ad} = \frac{p}{T \, \rho \, c_{pm}}
+```
+where $\rho$ is evaluated from the real-gas equation of state (see [Gas densities](@ref)) rather than the ideal-gas law.
+
+Below a minimum pressure (`CONVECT_MIN_PRESSURE`, $10^{-9}$ bar by default), the convective stability check is skipped entirely and the column is assumed radiative; this avoids evaluating the criterion in the numerically ill-conditioned uppermost layers of the model, where pressures and densities become vanishingly small.
 
 ## Mixing-length theory
 
@@ -37,11 +47,16 @@ w = \lambda \sqrt{\frac{g}{H} \, (\nabla_T - \nabla_\text{ad})}
 ```
 is the characteristic convective velocity. The convective flux is positive (upward) wherever $\nabla_T > \nabla_\text{ad}$.
 
-The mixing length follows a near-surface formulation:
+Two mixing-length parametrisations are available, selected via the `mlt_asymptotic` option:
+
+* **Asymptotic** (default): a near-surface formulation
 ```math
-\lambda = \frac{k_v z}{1 + k_v z / H}
+\lambda = \frac{k_v z}{1 + k_v z / (\alpha_\text{MLT} H)}
 ```
-where $k_v \approx 1/\sqrt{2\pi}$ is the von Kármán constant and $z$ is the height above the surface [blackadar_mlt_1962, hogstrom_karman_1988](@citep). This ensures $\lambda \to 0$ as $z \to 0$, respecting the Law of the Wall for the near-surface turbulent boundary layer, and $\lambda \to H$ aloft. In practice the resulting temperature structure and convective flux are not sensitive to the specific choice of $\lambda$ parametrisation.
+where $k_v \approx 1/\sqrt{2\pi}$ is the von Kármán constant and $z$ is the height above the surface [blackadar_mlt_1962, hogstrom_karman_1988](@citep). This ensures $\lambda \to 0$ as $z \to 0$, respecting the Law of the Wall for the near-surface turbulent boundary layer, and $\lambda \to \alpha_\text{MLT} H$ aloft.
+* **Fixed**: $\lambda = \alpha_\text{MLT} H$ everywhere, independent of height above the surface.
+
+$\alpha_\text{MLT}$ is a dimensionless mixing-length efficiency parameter, analogous to that used in stellar structure models [joyce_mlt_2023](@citep); it is currently fixed at $\alpha_\text{MLT}=1$. In practice the resulting temperature structure and convective flux are not sensitive to the specific choice of $\lambda$ parametrisation.
 
 ## Eddy diffusion coefficient $K_{zz}$
 
@@ -72,6 +87,8 @@ In non-convective (radiative) regions, $K_{zz}$ is extended using a power-law sc
 K_{zz}(p) = K_{\text{ref}} \left(\frac{p}{p_{\text{ref}}}\right)^{\alpha}
 ```
 where $K_{\text{ref}}$ and $p_{\text{ref}}$ are the reference diffusion coefficient and pressure at the convective region boundary, and $\alpha$ is the power-law index (default: $\alpha = -0.4$), following [lee_dynamically_2024](@citep). Below convective regions, $K_{zz}$ is held constant at its deepest convective value.
+
+If the atmosphere contains multiple detached convective layers (e.g. separated by an intervening radiative zone), the power-law extension is anchored by the shallowest region with constant extension to the deepest one. Any radiative gaps between separate convective regions are filled with the minimum $K_{zz}$ value found within the convective regions, floored at a configurable minimum `Kzz_floor`. If the column is entirely radiative, $K_{zz}$ is instead set to a single user-specified reference value `Kzz_kbreak` at the reference pressure `Kzz_pbreak`.
 
 ## Bibliography for this page
 
