@@ -91,6 +91,12 @@ module atmosphere
     const CFG_transspec_ref_p::Float64      = 20e-3 # 20 mbar
     const CFG_ocean_ob_frac::Float64        = 0.6
     const CFG_ocean_cs_height::Float64      = 3000.0
+    const CFG_hydrograv_steps::Int64        = 2000    
+    const CFG_hydrograv_maxdr::Float64      = 1e8     
+    const CFG_hydrograv_mindr::Float64      = 1e-5    
+    const CFG_hydrograv_ming::Float64       = 1e-4    
+    const CFG_hydrograv_constg::Bool        = false   
+    const CFG_hydrograv_selfg::Bool         = true    
 
     # Variable limits and defaults
     const NLEV_minimum::Int64           = 15        # minimum allowed number of levels
@@ -251,6 +257,14 @@ module atmosphere
         ocean_areacov::Float64              # OUTPUT: fraction of planet surface covered by oceans
         ocean_topliq::String                # OUTPUT: name of top-most ocean component
 
+        # Hydrostatic integration parameters
+        hydrograv_steps::Int64              # number of steps to use when calculating heights and gravity
+        hydrograv_maxdr::Float64            # maximum step size to use when calculating heights [m]
+        hydrograv_mindr::Float64            # minimum step size to use when calculating heights [m]
+        hydrograv_ming::Float64             # minimum allowed gravity [m/s^2]
+        hydrograv_constg::Bool              # constant gravity with height?
+        hydrograv_selfg::Bool               # include self-gravity of the atmosphere?
+
         # Gases (only those in SOCRATES spectralfile)
         gas_soc_num::Int64                  # number of gases
         gas_soc_names::Array{String,1}      # names of each gas (as a list)
@@ -311,7 +325,6 @@ module atmosphere
         surf_windspeed::Float64             # Surface wind speed [m s-1]
         surf_roughness::Float64             # Surface roughness scale [m]
         flux_sens::Float64                  # Turbulent flux [W m-2]
-
 
         # Convection
         mlt_asymptotic::Bool                # INPUT: Mixing length scales asymptotically, but ~0 near ground
@@ -538,6 +551,12 @@ module atmosphere
     - `transspec_ref_p::Float64`        pressure level used to define photosphere [bar]
     - `ocean_ob_frac::Float64`          ocean basin area, as fraction of planet surface
     - `ocean_cs_height::Float64`        continental shelf height [m]
+    - `hydrograv_steps::Int64`          number of steps to use when calculating heights and gravity
+    - `hydrograv_maxdr::Float64`        maximum step size to use when calculating heights [m]
+    - `hydrograv_mindr::Float64`        minimum step size to use when calculating heights [m]
+    - `hydrograv_ming::Float64`         minimum allowed gravity [m/s^2]
+    - `hydrograv_constg::Bool`          constant gravity with height?
+    - `hydrograv_selfg::Bool`           include self-gravity of the atmosphere?
 
     Returns:
         Nothing
@@ -621,7 +640,14 @@ module atmosphere
                     transspec_ref_p::Float64     = CFG_transspec_ref_p,
 
                     ocean_ob_frac::Float64 =    CFG_ocean_ob_frac,
-                    ocean_cs_height::Float64 =  CFG_ocean_cs_height
+                    ocean_cs_height::Float64 =  CFG_ocean_cs_height,
+
+                    hydrograv_steps::Int64 =       CFG_hydrograv_steps,
+                    hydrograv_maxdr::Float64 =     CFG_hydrograv_maxdr,
+                    hydrograv_mindr::Float64 =     CFG_hydrograv_mindr,
+                    hydrograv_ming::Float64 =      CFG_hydrograv_ming,
+                    hydrograv_constg::Bool =       CFG_hydrograv_constg,
+                    hydrograv_selfg::Bool =        CFG_hydrograv_selfg
                     )::Bool
 
         # Say hello
@@ -831,7 +857,6 @@ module atmosphere
 
         if atmos.real_gas && (atmos.mlt_criterion == 'l')
             @warn "Ledoux criterion not self-consistently supported for real gases"
-            @warn "    (Will use Ledoux criterion anyway)"
         end
         if !(atmos.mlt_criterion in ['s','l'])
             @error "Invalid choice for mlt_criterion: '$(atmos.mlt_criterion)'"
@@ -857,6 +882,18 @@ module atmosphere
             return false
         end
         atmos.p_oboa = atmos.p_boa
+
+        # hydrostatic integration parameters
+        atmos.hydrograv_steps = hydrograv_steps
+        _check_range("Hydrostatic integration steps", atmos.hydrograv_steps; min=2, max=1e5) || return false
+        atmos.hydrograv_maxdr = hydrograv_maxdr
+        _check_range("Hydrostatic integration max step size", atmos.hydrograv_maxdr; min=1e-9, max=1e9) || return false
+        atmos.hydrograv_mindr = hydrograv_mindr
+        _check_range("Hydrostatic integration min step size", atmos.hydrograv_mindr; min=1e-9, max=1e9) || return false
+        atmos.hydrograv_ming = hydrograv_ming
+        _check_range("Hydrostatic integration min gravity", atmos.hydrograv_ming; min=0.0) || return false
+        atmos.hydrograv_constg = hydrograv_constg
+        atmos.hydrograv_selfg = hydrograv_selfg
 
         # interior radius
         atmos.rp = radius
@@ -2381,14 +2418,6 @@ module atmosphere
         return true
     end  # end of allocate
 
-     # Hydrostatic+gravity+mass calculation (constants and limits)
-    HYDROGRAV_steps::Int64   = 2000      # total number of steps in height integration
-    HYDROGRAV_maxdr::Float64 = 1e8       # maximum dz across each layer [m]
-    HYDROGRAV_mindr::Float64 = 1e-5      # minimum dz across each layer [m]
-    HYDROGRAV_ming::Float64  = 1e-4      # minimum allowed gravity [m/s^2]
-    HYDROGRAV_constg::Bool   = false     # constant gravity with height?
-    HYDROGRAV_selfg::Bool    = true      # include self-gravity of the atmosphere?
-
     """
     **Calculate properties within each layer of the atmosphere (e.g. density, mmw).**
 
@@ -2442,7 +2471,7 @@ module atmosphere
     Returns:
     - `bound::Bool`             atmosphere is strongly bound by gravity
     """
-    function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
+    function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool  
 
         # Calculate net surface acceleration [m s-2]
         a_surf::Float64 = atmos.grav_surf -
@@ -2462,14 +2491,14 @@ module atmosphere
         fill!(atmos.layer_isbound, true)
 
         # Check config...
-        if HYDROGRAV_constg && HYDROGRAV_selfg
+        if atmos.hydrograv_constg && atmos.hydrograv_selfg
             @warn "Incompatible gravity parameters have been set:"
-            @warn "    constant with height (HYDROGRAV_constg=$HYDROGRAV_constg)"
-            @warn "    atmos self-attraction (HYDROGRAV_selfg=$HYDROGRAV_selfg)"
+            @warn "    constant with height (constg=$constg)"
+            @warn "    atmos self-attraction (selfg=$selfg)"
         end
 
         # Temporary values
-        nsub::Int64 = round(Int64, HYDROGRAV_steps/atmos.nlev_c, RoundUp)
+        nsub::Int64 = round(Int64, atmos.hydrograv_steps/atmos.nlev_c, RoundUp)
 
         # Integrate from surface upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
@@ -2480,21 +2509,23 @@ module atmosphere
                 integ_hydrograv(atmos.rl[i+1],
                                     atmos.gl[i+1], atmos.al[i+1],
                                     atmos.ml[i+1], atmos.pl[i+1],
-                                    atmos.p[i], atmos.layer_ρ[i], nsub)
+                                    atmos.p[i], atmos.layer_ρ[i], nsub;
+                                    constg = atmos.hydrograv_constg, 
+                                    selfg = atmos.hydrograv_selfg)
 
             #   apply radius limiter
-            atmos.r[i] = max(atmos.r[i], atmos.rl[i+1] + HYDROGRAV_mindr)
-            if atmos.r[i] > atmos.rl[i+1] + HYDROGRAV_maxdr/2
-                atmos.r[i] = atmos.rl[i+1] + HYDROGRAV_maxdr/2
+            atmos.r[i] = max(atmos.r[i], atmos.rl[i+1] + atmos.hydrograv_mindr)
+            if atmos.r[i] > atmos.rl[i+1] + atmos.hydrograv_maxdr/2
+                atmos.r[i] = atmos.rl[i+1] + atmos.hydrograv_maxdr/2
                 atmos.layer_isbound[i] = false
             end
 
             #   apply gravity limiter
-            if HYDROGRAV_constg
+            if atmos.hydrograv_constg
                 atmos.g[i]  = atmos.grav_surf
             end
-            if atmos.g[i] < HYDROGRAV_ming
-                atmos.g[i] = HYDROGRAV_ming
+            if atmos.g[i] < atmos.hydrograv_ming
+                atmos.g[i] = atmos.hydrograv_ming
                 atmos.layer_isbound[i] = false
             end
 
@@ -2508,21 +2539,23 @@ module atmosphere
                 integ_hydrograv(atmos.r[i],
                                     atmos.g[i], atmos.a[i],
                                     atmos.m[i], atmos.p[i],
-                                    atmos.pl[i], atmos.layer_ρ[i], nsub)
+                                    atmos.pl[i], atmos.layer_ρ[i], nsub;
+                                    constg = atmos.hydrograv_constg, 
+                                    selfg = atmos.hydrograv_selfg)
 
             #   apply radius limiter
-            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + HYDROGRAV_mindr)
-            if atmos.rl[i] > atmos.r[i] + HYDROGRAV_maxdr/2
-                atmos.rl[i] = atmos.r[i] + HYDROGRAV_maxdr/2
+            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + atmos.hydrograv_mindr)
+            if atmos.rl[i] > atmos.r[i] + atmos.hydrograv_maxdr/2
+                atmos.rl[i] = atmos.r[i] + atmos.hydrograv_maxdr/2
                 atmos.layer_isbound[i] = false
             end
 
             #   apply gravity limiter
-            if HYDROGRAV_constg
+            if atmos.hydrograv_constg
                 atmos.gl[i] = atmos.grav_surf
             end
-            if atmos.gl[i] < HYDROGRAV_ming
-                atmos.gl[i] = HYDROGRAV_ming
+            if atmos.gl[i] < atmos.hydrograv_ming
+                atmos.gl[i] = atmos.hydrograv_ming
                 atmos.layer_isbound[i] = false
             end
 
@@ -2559,13 +2592,24 @@ module atmosphere
     - `rho::Float64`    density throughout interval, constant [kg m-3]
     - `n::Int64`        number of steps for integration (n >= 2)
 
+    Optional keyword arguments:
+    - `constg::Bool`    constant gravity with height?
+    - `selfg::Bool`     include self-gravity of the atmosphere?
+
     Returns:
     - `rj::Float64`     radius   at end of interval [m]
     - `gj::Float64`     gravity  at end of interval [kg]
     - `mj::Float64`     mass enc at end of interval [kg]
     """
-    function integ_hydrograv(r0::Float64, g0::Float64, a0::Float64, m0::Float64, p0::Float64,
-                                    p1::Float64, rho::Float64, n::Int64)::Tuple{Float64,Float64,Float64}
+    function integ_hydrograv(r0::Float64, 
+                                g0::Float64, a0::Float64, 
+                                m0::Float64, p0::Float64,
+                                p1::Float64, 
+                                rho::Float64, 
+                                n::Int64;
+                                constg::Bool = HYDROGRAV_constg,
+                                selfg::Bool  = HYDROGRAV_selfg
+                                )::Tuple{Float64,Float64,Float64}
 
         # Work variables
         pj::Float64 = p0    # rolling pressure (decreasing)
@@ -2579,11 +2623,11 @@ module atmosphere
 
         # Get gravitational acceleration at r
         function _grav(r)
-            if HYDROGRAV_constg
+            if constg
                 # gravity is constant
                 return g0
             else
-                if HYDROGRAV_selfg
+                if selfg
                     # gravity changes with mass and radius
                     # approximate mass as constant for this part of the integration
                     return phys.grav_accel(mj, r)
