@@ -1091,8 +1091,11 @@ module solve_energy
         # perform one last evaluation to set `atmos` given the final `x_cur`
         _set_tmps!(atmos, x_cur, sol_type)
 
-        # calc LW contribution function
-        energy.radtrans!(atmos, true, calc_cf=true, calc_hr=true)
+        # calc fluxes
+        energy.radtrans!(atmos, true, calc_cf=true)
+
+        # calculate heating rates
+        energy.calc_hrates!(atmos)
 
         # calc diagnostic quantities
         diagnostics.estimate_Ra!(atmos)
