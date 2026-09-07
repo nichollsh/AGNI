@@ -84,7 +84,7 @@ const easy_ini::Float64    = 3e-4       # default from solve_energy!
 const ls_increase::Float64 = 1.02
 const easy_incr::Float64   = 1/easy_ini
 
-# energy.CONVECT_MIN_PRESSURE = 1e-3 * 1e5    # 1 mbar -> Pa
+# energy.convect.CONVECT_MIN_PRESSURE = 1e-3 * 1e5    # 1 mbar -> Pa
 
 
 # =============================================================================
