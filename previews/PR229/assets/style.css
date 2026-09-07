@@ -1,0 +1,49 @@
+pre, article, nav, body {
+    font-family: 'Inter', 'Lato', sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+    text-align: justify;
+}
+
+code {
+  font-family: 'JetBrains Mono', courier, monospace;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+img {
+width: 75%;
+}
+
+.left {
+    float: left;
+    padding: 2px;
+}
+
+.center {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.display-light-only {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 32%;
+}
+
+.display-dark-only {
+    display: none;
+    margin-left: auto;
+    margin-right: auto;
+    width: 32%;
+}
+
+.theme--documenter-dark .display-light-only {
+    display: none;
+}
+
+.theme--documenter-dark .display-dark-only {
+    display: block;
+}
