@@ -18,6 +18,7 @@ module plotting
     import ..phys
     import ..species
     import ..multicol
+    import ..paths: get_avail_space
     using ..style
 
     # Axis margins
@@ -157,6 +158,32 @@ module plotting
         return esc(:(hline!(plt, [atmos.p_oboa/1e5], label="", color=col_black, ls=:dot)))
     end
 
+    # Save a figure safely
+    function _savefig_safe(plt, fname::String)
+
+        # No filename provided
+        if isempty(fname)
+            @debug "No filename provided, not saving figure"
+            return
+        end
+
+        # Check if the directory exists
+        if !isdir(dirname(fname))
+            @warn "Directory does not exist: $(dirname(fname))"
+            return
+        end
+
+        # Check there's space to save the file (500 KB)
+        if get_avail_space(dirname(fname)) < 500_000
+            @warn "Insufficient disk space to save figure: $(fname)"
+            return
+        end
+
+        # Looks good to save
+        @debug "Saving figure to: $(fname)"
+        savefig(plt, fname)
+    end
+
     """
     **Plot the temperature-pressure and Kzz profile.**
 
@@ -285,9 +312,7 @@ module plotting
         # ensures that axes spines are same size
         plot!(plt2, legend=:outertopright, tick_direction=:out)
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -314,7 +339,7 @@ module plotting
         scatter!(plt, [atmos.rp*1e-3], [atmos.pl[end]*1e-5], color=col_t, label=L"P_s")
 
         # Plot cell-centres and cell-edges
-        scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2, 
+        scatter!(plt, atmos.r*1e-3,  atmos.p*1e-5,  msa=0.0, msw=0, ms=1.2,
                     shape=:diamond, label="Centres", color=col_n)
         scatter!(plt, atmos.rl*1e-3, atmos.pl*1e-5, msa=0.0, msw=0, ms=1.2,
                     shape=:diamond, label="Edges", color=col_c)
@@ -339,9 +364,7 @@ module plotting
             title!(plt, title)
         end
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -401,9 +424,7 @@ module plotting
             title!(plt, title)
         end
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -501,9 +522,7 @@ module plotting
         yflip!(plt)
         yaxis!(plt, yscale=:log10)
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -631,9 +650,7 @@ module plotting
             title!(plt, title)
         end
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -705,9 +722,7 @@ module plotting
         yaxis!(plt, yscale=:log10, ylims=ylims, yticks=yticks)
         xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -800,9 +815,7 @@ module plotting
         yflip!(plt)
         yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -896,9 +909,7 @@ module plotting
         yflip!(plt)
         yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -991,9 +1002,7 @@ module plotting
         yflip!(plt)
         yaxis!(plt, yscale=:log10, yticks=yticks, ylims=ylims, minorgrid=true)
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -1032,9 +1041,7 @@ module plotting
         xlabel!(plt, "Wavelength [nm]")
         ylabel!(plt, "Spectral albedo [%]")
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -1085,10 +1092,7 @@ module plotting
         yaxis!(plt, ylabel="Level index (perturbed)")
         xaxis!(plt, xlabel="Level index (residual)")
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
-
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -1106,9 +1110,7 @@ module plotting
                         plot_title=info,
                         layout=(3,2), size=(size_x, size_y); plt_default...)
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 
@@ -1194,9 +1196,7 @@ module plotting
         @_plt_pboa
         @_plt_poboa
 
-        if !isempty(fname)
-            savefig(plt, fname)
-        end
+        _savefig_safe(plt, fname)
         return plt
     end
 

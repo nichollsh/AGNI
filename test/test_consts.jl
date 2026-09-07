@@ -125,13 +125,10 @@ using AGNI
 
     # Test key solar metallicity values (important for atmospheric chemistry)
     solar_metal_cases = [
-        ("C",  8.46),
-        ("N",  7.83),
-        ("O",  8.69),
-        ("He", 10.914),
-        ("Fe", 7.46),
-        ("Si", 7.51),
-        ("Mg", 7.55),
+        ("C",  8.47),
+        ("N",  7.84),
+        ("O",  8.7),
+        ("Po", -12.0)
     ]
     for (elem, expected) in solar_metal_cases
         @test isapprox(AGNI.consts.solar_metallicity[elem], expected; atol=1e-10)

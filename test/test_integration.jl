@@ -35,6 +35,23 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
         @test isfile(joinpath(OUT_DIR, "plot_contfunc2.png"))
         @test isfile(joinpath(OUT_DIR, "plot_tau.png"))
 
+        # with [plots] at_runtime=true and animate=true, solve_energy!'s
+        # in-loop plot_step() (plot_pt/plot_fluxes/plot_vmr/plot_radius/
+        # plot_cloud/jacobian/combined) must have run at least once per
+        # solver step, saving one frame per step plus a combined animation -
+        # this is real solver-loop plotting coverage, not just the final
+        # post-solve plots checked above
+        frames_dir = joinpath(cfg["files"]["io_dir"], "frames")
+        @test isdir(frames_dir)
+        frame_files = filter(f -> endswith(f, ".png"), readdir(frames_dir))
+        @test length(frame_files) > 1
+        @test isfile(joinpath(frames_dir, "0001.png"))
+        @test isfile(joinpath(OUT_DIR, "animation.mp4"))
+
+        # on a successful solve, the transient solver.png (the source frames
+        # are copied from) is cleaned up rather than left behind
+        @test !isfile(joinpath(OUT_DIR, "solver.png"))
+
         # -------------
         # Compare result from NetCDF
         # -------------

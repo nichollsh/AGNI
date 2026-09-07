@@ -91,6 +91,7 @@ makedocs(
             "Thermodynamics" => "explanation/model_thermodynamics.md",
             "Sensible heating" => "explanation/model_sensible.md",
             "Advective terms" => "explanation/model_advection.md",
+            "Multicolumn mode" => "explanation/model_globe.md",
             "Testing suite" => "explanation/testing.md",
             "Licensing" => "explanation/licensing.md",
             "Bibliography"       => "explanation/references.md",

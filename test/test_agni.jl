@@ -89,6 +89,82 @@ title = "unit-test"
 output_dir = "/"
 """)
     @test_throws ErrorException AGNI.open_config(cfg_unsafe)
+
+    # missing output_dir key entirely (distinct from the present-but-empty-string
+    # case exercised implicitly by requiring the key for cfg_ok/cfg_unsafe above)
+    cfg_no_key = joinpath(tmpdir, "cfg_no_key.toml")
+    write(cfg_no_key, """
+title = "unit-test"
+
+[plots]
+[planet]
+[execution]
+[physics]
+
+[files]
+""")
+    @test_throws ErrorException AGNI.open_config(cfg_no_key)
+
+    # make_logger: file logger must route all four log levels (existing tests above
+    # only exercise INFO and WARN)
+    logpath_all = joinpath(tmpdir, "agni_alllevels.log")
+    logger_all = AGNI.make_logger(logpath_all; to_term=false)
+    with_logger(logger_all) do
+        @debug "dbg line"
+        @info "info line"
+        @warn "warn line"
+        @error "err line"
+    end
+    logtxt_all = read(logpath_all, String)
+    @test occursin("DEBUG", logtxt_all) && occursin("dbg line", logtxt_all)
+    @test occursin("ERROR", logtxt_all) && occursin("err line", logtxt_all)
+
+    # make_logger: terminal logger routes ERROR to stderr and other levels to
+    # stdout. Levels are logged in this order (ERROR last) deliberately.
+    out_path = joinpath(tmpdir, "term_stdout.txt")
+    err_path = joinpath(tmpdir, "term_stderr.txt")
+    open(out_path, "w") do out_io
+        open(err_path, "w") do err_io
+            redirect_stdout(out_io) do
+                redirect_stderr(err_io) do
+                    # constructed *inside* the redirect scope: make_logger captures
+                    # the current stdout/stderr streams by value at call time
+                    term_logger = AGNI.make_logger(""; to_term=true)
+                    with_logger(term_logger) do
+                        @debug "term debug"
+                        @info "term info"
+                        @warn "term warn"
+                        @error "term error"
+                    end
+                end
+            end
+        end
+    end
+    out_txt = read(out_path, String)
+    err_txt = read(err_path, String)
+    @test occursin("term debug", out_txt)
+    @test occursin("term info", out_txt)
+    @test occursin("term warn", out_txt)
+    @test occursin("term error", err_txt)
+
+    # discrimination guard: ERROR must not also appear on stdout, and the levels
+    # logged before it must not appear on stderr
+    @test !occursin("term error", out_txt)
+    @test !occursin("term debug", err_txt)
+    @test !occursin("term info", err_txt)
+    @test !occursin("term warn", err_txt)
+
+    # make_logger: to_term=false & empty outpath falls back to a NullLogger, with a
+    # diagnostic warning printed directly to stderr (not via the logging system)
+    null_err_path = joinpath(tmpdir, "null_logger_stderr.txt")
+    null_logger = open(null_err_path, "w") do io
+        redirect_stderr(io) do
+            AGNI.make_logger(""; to_term=false)
+        end
+    end
+    @test null_logger isa Logging.NullLogger
+    @test occursin("NullLogger", read(null_err_path, String))
+
     rm(tmpdir; force=true, recursive=true)
 end
 
@@ -189,6 +265,93 @@ end
     end
 end
 
+# These cases use Test.collect_test_logs to inspect *which* validation branch fired,
+# rather than only checking the boolean return value.
+@testset "agni_from_config_extra" begin
+    # gravity computed from `mass` alone (single-key success path), distinct from the
+    # already-tested "mass AND gravity both given" overspecified-error branch above
+    cfg = _base_cfg()
+    delete!(cfg["planet"], "gravity")
+    cfg["planet"]["mass"] = 5.972e24  # kg, Earth-like
+    delete!(cfg["planet"], "albedo_s")
+    logs, ok = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg)
+    end
+    @test ok == false
+    errs = [l.message for l in logs if l.level == Logging.Error]
+    @test any(occursin("albedo_s", m) for m in errs)
+
+    # discrimination guard: if the mass-only branch were broken (e.g. treating the
+    # default `gravity=0.0` as "provided"), the function would never reach albedo_s branch
+    @test !any(occursin("provide `planet.mass` OR `planet.gravity`", m) for m in errs)
+
+    # metallicities-driven composition + chemistry=true uses the dummy-VMR-dict path
+    cfg = _base_cfg()
+    delete!(cfg["composition"], "vmr_dict")
+    cfg["composition"]["metallicities"] = Dict("C" => 1.0)
+    cfg["physics"]["chemistry"] = true
+    cfg["plots"]["extension"] = "invalidext"
+    logs, ok = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg)
+    end
+    @test ok == false
+    errs = [l.message for l in logs if l.level == Logging.Error]
+    @test any(occursin("Plot extension", m) for m in errs)
+
+    # discrimination guard: metallicities-without-chemistry must NOT be the failure reason
+    @test !any(occursin("must enable FastChem", m) for m in errs)
+
+    # neither `p_surf` nor `p_dict` provided (non-transparent)
+    cfg = _base_cfg()
+    delete!(cfg["composition"], "p_surf")
+    @test !haskey(cfg["composition"], "p_dict")
+    logs, ok = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg)
+    end
+    @test ok == false
+    errs = [l.message for l in logs if l.level == Logging.Error]
+    @test any(occursin("Must provide either", m) for m in errs)
+
+    # RFM requested with only one of the two required wavenumber bounds
+    cfg = _base_cfg()
+    cfg["files"]["rfm_parfile"] = "dummy.par"
+    cfg["execution"]["rfm_wn_min"] = 500.0
+    logs, ok = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg)
+    end
+    @test ok == false
+    errs = [l.message for l in logs if l.level == Logging.Error]
+    @test any(occursin("RFM calculation enabled", m) for m in errs)
+
+    # RFM requested with both wavenumber bounds present
+    cfg = _base_cfg()
+    cfg["files"]["rfm_parfile"] = "dummy.par"
+    cfg["execution"]["rfm_wn_min"] = 500.0
+    cfg["execution"]["rfm_wn_max"] = 1500.0
+    cfg["plots"]["extension"] = "invalidext"
+    logs, ok = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg)
+    end
+    @test ok == false
+    errs = [l.message for l in logs if l.level == Logging.Error]
+    @test any(occursin("Plot extension", m) for m in errs)
+    @test !any(occursin("RFM calculation enabled", m) for m in errs)
+
+    # grey opacities (`grey_lw`/`grey_sw`) success-assignment path
+    cfg = _base_cfg()
+    cfg["execution"]["grey_start"] = true
+    cfg["physics"]["grey_lw"] = 1.0e-4
+    cfg["physics"]["grey_sw"] = 0.0
+    cfg["plots"]["extension"] = "invalidext"
+    logs, ok = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg)
+    end
+    @test ok == false
+    errs = [l.message for l in logs if l.level == Logging.Error]
+    @test any(occursin("Plot extension", m) for m in errs)
+    @test !any(occursin("Grey-gas calculation enabled", m) for m in errs)
+end
+
 # Greygas RT rejects scattering flags while accepting boundary opacity inputs.
 @testset "agni_greygas_config" begin
     mkpath(AGNI_CORE_OUT_DIR)
@@ -236,5 +399,121 @@ end
     end
     @test !bad
     @test atmos_bad.rt_scheme == atmosphere.RT_GREYGAS
+end
+
+# Minimal from-scratch greygas configuration dict, used to reach the parts of
+# run_from_config that lie *after* atmosphere allocation
+function _minimal_greygas_cfg(; out_dir::String=mktempdir())
+    return Dict(
+        "title" => "minimal greygas smoke config",
+        "files" => Dict(
+            "output_dir" => out_dir,
+            "input_sf"   => "greygas",
+            "input_star" => "",
+        ),
+        "planet" => Dict(
+            "radius"          => 1.0e7,
+            "surface_material"=> "greybody",
+            "albedo_s"        => 0.2,
+            "instellation"    => 1200.0,
+            "s0_fact"         => 1.0,
+            "albedo_b"        => 0.0,
+            "zenith_angle"    => 0.0,
+            "tmp_surf"        => 350.0,
+            "gravity"         => 10.0,
+        ),
+        "composition" => Dict(
+            "p_surf"      => 10.0,
+            "p_top"       => 1.0e-6,
+            "vmr_dict"    => Dict("H2O" => 1.0),
+            "condensates" => String[],
+        ),
+        "execution" => Dict(
+            "num_levels"     => 30,
+            "solver"         => "newton",
+            "solution_type"  => 1,
+            "converge_atol"  => 1.0,
+            "converge_rtol"  => 1.0e-2,
+            "grey_start"     => false,
+            "initial_state"  => Any["iso", "300"],
+        ),
+        "physics" => Dict(
+            "continua"        => true,
+            "rayleigh"        => false,
+            "cloud"           => false,
+            "rainout"         => false,
+            "oceans"          => false,
+            "overlap_method"  => "ee",
+            "thermo_funct"    => false,
+            "convection_crit" => "l",
+            "convection"      => true,
+            "conduction"      => false,
+            "sensible_heat"   => false,
+            "latent_heat"     => false,
+            "chemistry"       => false,
+            "real_gas"        => false,
+            "grey_lw"         => 1.0e-4,
+            "grey_sw"         => 0.0,
+        ),
+        "plots" => Dict(),
+    )
+end
+
+@testset "agni_from_config_grey" begin
+    # Invalid solver name
+    cfg = _minimal_greygas_cfg()
+    cfg["execution"]["solver"] = "notarealsolver"
+    logs, ok = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg)
+    end
+    @test ok == false
+    warns = [l.message for l in logs if l.level == Logging.Warn]
+    @test any(occursin("Invalid solver", m) for m in warns)
+
+    # Multi-column ("globe") simulation requested but `lons`/`lats` omitted
+    cfg2 = _minimal_greygas_cfg()
+    cfg2["planet"]["globe"] = Dict{String,Any}()
+    logs2, ok2 = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg2)
+    end
+    @test ok2 == false
+    errs2 = [l.message for l in logs2 if l.level == Logging.Error]
+    @test any(occursin("globe.lons", m) for m in errs2)
+end
+
+@testset "agni_main" begin
+    # nonexistent config path raises before any file I/O
+    @test_throws ErrorException AGNI.main(cfg_path="/nonexistent/path/to/config.toml")
+
+    # a config that parses successfully via open_config, but is missing required key
+    tmpdir = mktempdir()
+    out_dir = joinpath(tmpdir, "main_out")
+    cfg_path = joinpath(tmpdir, "cfg_incomplete.toml")
+    write(cfg_path, """
+title = "incomplete config"
+
+[plots]
+[planet]
+[execution]
+    clean_output = false
+    verbosity = 0
+[physics]
+
+[files]
+output_dir = "$out_dir"
+""")
+    # main() calls setup_logging(), which mutates the process-global logger
+    old_global_logger = global_logger()
+    logs, ok = try
+        Test.collect_test_logs() do
+            AGNI.main(cfg_path=cfg_path)
+        end
+    finally
+        global_logger(old_global_logger)
+    end
+    @test ok == false
+    errs = [l.message for l in logs if l.level == Logging.Error]
+    @test any(occursin("missing required key", m) for m in errs)
+    rm(tmpdir; force=true, recursive=true)
 end
 

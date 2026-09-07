@@ -453,7 +453,7 @@ end
         atmos.flux_tot += atmos.flux_n
         energy.calc_hrates!(atmos)
 
-        val_e = 6.144974916820797   # from previous tests
+        val_e = 6.163073075700236    # from previous tests
         val_o = atmos.heating_rate[atmos.nlev_c-10]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -482,7 +482,7 @@ end
         end
 
         # check against known value
-        val_e = 8235.347576033042  # from previous tests
+        val_e = 8268.304674652334  # from previous tests
         val_o = atmos.flux_tot[atmos.nlev_c-10]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check

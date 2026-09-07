@@ -43,4 +43,29 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
         @test normpath(paths.RES_DIR) == normpath(joinpath(ROOT_DIR, "res"))
         @test normpath(paths.FWL_DATA) == normpath(joinpath(get(ENV, "FWL_DATA", paths.RES_DIR)))
     end
+
+    @testset "get_avail_space" begin
+        # Existing directory: must report a real, physically-plausible disk
+        # quantity, cross-checked against an independent diskstat() call
+        tmp_existing = mktempdir()
+        avail = paths.get_avail_space(tmp_existing)
+        @test avail isa Int64
+        stat_direct = diskstat(tmp_existing)
+        @test avail == Int64(stat_direct.available)
+
+        # Available space cannot exceed total space, and cannot be negative.
+        @test 0 <= avail <= stat_direct.total
+        rm(tmp_existing; force=true, recursive=true)
+
+        # Nonexistent path: get_avail_space() must fall back to querying "/"
+        nonexistent = joinpath(tmp_existing, "does_not_exist", "deeper")
+        @test !ispath(nonexistent)
+        @test_throws Base.IOError diskstat(nonexistent)
+        @test paths.get_avail_space(nonexistent) == paths.get_avail_space("/")
+        @test paths.get_avail_space(nonexistent) > 0
+
+        # Edge case: empty string path also triggers the same fallback
+        @test !ispath("")
+        @test paths.get_avail_space("") == paths.get_avail_space("/")
+    end
 end

@@ -6,6 +6,7 @@
 module save
 
     import ..atmosphere
+    import ..paths: get_avail_space
 
     using DataStructures
     using NCDatasets
@@ -23,15 +24,22 @@ module save
     - `atmos::Atmos_t`      Atmosphere object
     - `fname::String`       Filename to write to
     """
-    function write_profile(atmos::atmosphere.Atmos_t, fname::String)
+    function write_profile(atmos::atmosphere.Atmos_t, fname::String)::Bool
 
         arr_P, arr_T, arr_R = atmosphere.get_interleaved_ptr(atmos)
 
         # Remove old file if exists
         rm(fname, force=true)
 
-        @debug "Writing T(p) csv to $fname"
+        # Check there's space to write the file
+        est_size::Int64 = 100 + 3 * 16 * (atmos.nlev_l + atmos.nlev_c)
+        if get_avail_space(dirname(fname)) < est_size
+            @warn "Insufficient disk space to write profile CSV file"
+            return false
+        end
 
+        # Write the file
+        @debug "Writing T(p) csv to $fname"
         open(fname, "w") do f
             write(f, "# pressure  , temperature, radius \n")
             write(f, "# [Pa]      , [K]        , [m]  \n")
@@ -39,7 +47,7 @@ module save
                 @printf(f, "%1.5e , %1.5e , %1.5e \n", arr_P[i], arr_T[i], arr_R[i])
             end
         end
-        return nothing
+        return true
     end
 
 
@@ -50,10 +58,17 @@ module save
     - `atmos::Atmos_t`      Atmosphere object
     - `fname::String`       Filename to write to
     """
-    function write_fluxes(atmos::atmosphere.Atmos_t, fname::String)
+    function write_fluxes(atmos::atmosphere.Atmos_t, fname::String)::Bool
 
         # Remove old file if exists
         rm(fname, force=true)
+
+        # Check there's space to write the file
+        est_size::Int64 = 100 + 13 * 16 * (atmos.nlev_l)
+        if get_avail_space(dirname(fname)) < est_size
+            @warn "Insufficient disk space to write fluxes CSV file"
+            return false
+        end
 
         @debug "Writing fluxes CSV to $fname"
 
@@ -70,30 +85,40 @@ module save
                           )
             end
         end
-        return nothing
+        return true
     end
 
     """
-    Write verbose atmosphere data to a NetCDF file
+    **Write verbose atmosphere data to a NetCDF file**
 
-    Arguments
+    Note that the content of the NetCDF file is designed to be compatible with what JANUS
+    writes. As a result, they can both be integrated into PROTEUS without incompatibility.
+
+    Check that there's sufficient space to write the file first.
+
+    Arguments:
     - `atmos::Atmos_t`      Atmosphere object
     - `fname::String`       Filename to write to
-    """
-    function write_ncdf(atmos::atmosphere.Atmos_t, fname::String)
 
-        # Create dataset handle
+    Returns:
+    - `succ::Bool`          true if the file was written successfully, false otherwise
+    """
+    function write_ncdf(atmos::atmosphere.Atmos_t, fname::String)::Bool
+
+        # Normalise file path
         fname = abspath(fname)
         rm(fname, force=true)
 
-        @debug "Writing NetCDF to $fname"
+        # Check there's space to write the file (typically 1 MB per NetCDF file)
+        if get_avail_space(dirname(fname)) < 1_000_000
+            @warn "Insufficient disk space to write NetCDF file"
+            return false
+        end
 
+        # Write file
         # See the tutorial at:
         # https://github.com/Alexander-Barth/NCDatasets.jl#create-a-netcdf-file
-
-        # Note that the content of the NetCDF file is designed to be compatible
-        # with what JANUS writes. As a result, they can both be integrated
-        # into PROTEUS without compatibility issues.
+        @debug "Writing NetCDF to $fname"
 
         # Absorb output from these calls, because they spam the Debug logger
         with_logger(MinLevelLogger(current_logger(), Logging.Error)) do
@@ -450,7 +475,7 @@ module save
 
         end # suppress output
 
-        return nothing
+        return true
     end # end write_ncdf
 
 end

@@ -15,13 +15,16 @@ module spectrum
     import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
     import DelimitedFiles:readdlm
 
-    import ..paths: RAD_DIR
+    import ..paths: RAD_DIR, get_avail_space
     import ..consts: SMALLFLOAT, BIGFLOAT
     import ..phys
     include(joinpath(RAD_DIR, "julia", "gen", "input_head_pcf.jl"))
 
     # Constants
     const PRECISION_DEFAULT::String = "double"
+    const THERMAL_MIN::Float64 = 25.0
+    const THERMAL_MAX::Float64 = 6000.0
+    const THERMAL_STP::Float64 = 25.0
 
     """
     **Get the version of SOCRATES being used.**
@@ -364,14 +367,33 @@ module spectrum
                             insert_rscatter::Bool, insert_aerosol::Bool;
                             aerosol_avg_files::Dict{String,String}=Dict())::Bool
 
+        # Validate thermal source function parameters
+        if any([THERMAL_MIN < 0.0, THERMAL_MAX < 0.0, THERMAL_STP <= 0.0])
+            @warn "THERMAL_MIN, THERMAL_MAX, and THERMAL_STP must be positive"
+            return false
+        end
+        if (THERMAL_MAX - THERMAL_MIN) < THERMAL_STP
+            @warn "THERMAL_MAX - THERMAL_MIN must be greater than THERMAL_STP"
+            return false
+        end
+        thermal_num = Int64(floor((THERMAL_MAX - THERMAL_MIN) / THERMAL_STP)) + 1
+        @debug "Source function tabulated from $(THERMAL_MIN) K to $(THERMAL_MAX) K"
+        @debug "    Using steps of $(THERMAL_STP) K, with N=$(thermal_num) points"
+
         # Inputs to prep_spec
         prep_spec = abspath(RAD_DIR,"bin","prep_spec")
         @debug "Using prep_spec at: "*prep_spec
         star_inputs = [
-            "6","n","T",            # ask prep_spec to tabulate the thermal source function
-            "100 4000","1200",      # tmp_min, tmp_max, num_points
-            "2","n",star_file,      # ask prep_spec to insert this stellar spectrum
-            "y"                     # exit prep_spec
+            # ask prep_spec to tabulate the thermal source function
+            "6","n","T",
+            @sprintf("%.0f %.0f", THERMAL_MIN, THERMAL_MAX), # temperature min and max
+            @sprintf("%.0f", thermal_num), # number of temperature points
+
+            # ask prep_spec to insert a stellar spectrum from the provided file
+            "2","n",star_file,
+
+            # exit prep_spec
+            "y"
             ]
 
         # Check files exist
@@ -384,7 +406,15 @@ module spectrum
             return false
         end
 
+        # Check file sizes
+        total_size::Int64 = filesize(orig_file) + filesize(star_file)
+        @debug "Total size of SOCRATES input files: $(total_size / 1e6) MB"
+
         # Copy original file to output file
+        if get_avail_space(dirname(outp_file)) < total_size
+            @warn "Not enough disk space to copy spectral file"
+            return false
+        end
         cp(orig_file,      outp_file;      force=true)
         cp(orig_file*"_k", outp_file*"_k"; force=true)
 

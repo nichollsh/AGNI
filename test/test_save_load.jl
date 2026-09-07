@@ -62,8 +62,10 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
         # Write profile
         result = AGNI.save.write_profile(atmos, csv_file)
 
-        # Check that function returns nothing
-        @test result === nothing
+        # write_profile()::Bool signals success/failure (false on insufficient
+        # disk space, save.jl:36-39); this call has ample space, so it must
+        # report success rather than the documented failure sentinel
+        @test result === true
 
         # Check that file was created
         @test isfile(csv_file)
@@ -99,8 +101,10 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
         # Write fluxes
         result = AGNI.save.write_fluxes(atmos, csv_file)
 
-        # Check that function returns nothing
-        @test result === nothing
+        # write_fluxes()::Bool signals success/failure (false on insufficient
+        # disk space, save.jl:67-71); this call has ample space, so it must
+        # report success rather than the documented failure sentinel
+        @test result === true
 
         # Check that file was created
         @test isfile(csv_file)
@@ -142,8 +146,11 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
         # Write NetCDF
         result = AGNI.save.write_ncdf(atmos, nc_file)
 
-        # Check that function returns nothing
-        @test result === nothing
+        # write_ncdf()::Bool signals success/failure per its docstring (false
+        # on insufficient disk space, save.jl:112-116); this call has ample
+        # space, so it must report success rather than the documented
+        # failure sentinel
+        @test result === true
 
         # Check that file was created
         @test isfile(nc_file)
