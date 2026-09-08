@@ -91,12 +91,12 @@ module atmosphere
     const CFG_transspec_ref_p::Float64      = 20e-3 # 20 mbar
     const CFG_ocean_ob_frac::Float64        = 0.6
     const CFG_ocean_cs_height::Float64      = 3000.0
-    const CFG_hydrograv_steps::Int64        = 2000    
-    const CFG_hydrograv_maxdr::Float64      = 1e8     
-    const CFG_hydrograv_mindr::Float64      = 1e-5    
-    const CFG_hydrograv_ming::Float64       = 1e-4    
-    const CFG_hydrograv_constg::Bool        = false   
-    const CFG_hydrograv_selfg::Bool         = true    
+    const CFG_hydrograv_steps::Int64        = 2000
+    const CFG_hydrograv_maxdr::Float64      = 1e8
+    const CFG_hydrograv_mindr::Float64      = 1e-5
+    const CFG_hydrograv_ming::Float64       = 1e-4
+    const CFG_hydrograv_constg::Bool        = false
+    const CFG_hydrograv_selfg::Bool         = true
 
     # Variable limits and defaults
     const NLEV_minimum::Int64           = 15        # minimum allowed number of levels
@@ -477,6 +477,46 @@ module atmosphere
     end
 
     """
+    Check that the installed SOCRATES version is acceptably recent.
+
+    SOCRATES versions take the form of `YYMM.VV` where `YY` is the year,
+    `MM` is the month, and `VV` is the minor version number.
+
+    Arguments:
+    - `atmos::Atmos_t`  the atmosphere struct instance to be used.
+
+    Returns:
+    - `accept::Bool`    whether the SOCRATES version is compatible.
+    """
+    function _check_socrates_version(atmos::atmosphere.Atmos_t)::Bool
+
+        # Split into major/minor parts
+        SOCRATES_req_split::Vector{String} = split(SOCVER_minimum, ".")
+        SOCRATES_use_split::Vector{String} = split(atmos.SOCRATES_VERSION, ".")
+
+        # Check syntax
+        if length(SOCRATES_req_split) != 2 || length(SOCRATES_use_split) != 2
+            @error "SOCRATES version string is malformed"
+            @error "    Got: $(atmos.SOCRATES_VERSION)"
+            return false
+        end
+
+        # Check major part
+        if parse(Int64, SOCRATES_use_split[1]) < parse(Int64, SOCRATES_req_split[1])
+            return false
+        end
+
+        # If major part is equal, check minor part
+        if (parse(Int64, SOCRATES_use_split[1]) == parse(Int64, SOCRATES_req_split[1])) &&
+           (parse(Int64, SOCRATES_use_split[2]) < parse(Int64, SOCRATES_req_split[2]))
+            return false
+        end
+
+        # Otherwise, the version is acceptable
+        return true
+    end
+
+    """
     **Set parameters of the atmosphere.**
 
     This is used to set up the struct immediately after creation. It must be
@@ -771,10 +811,10 @@ module atmosphere
             atmos.SOCRATES_PRECISION = spectrum.get_socrates_precision(SOCRATES)
 
             # Check SOCRATES version is valid
-            if parse(Float64, atmos.SOCRATES_VERSION) < SOCVER_minimum
+            if !_check_socrates_version(atmos)
                 @error "SOCRATES is out of date and cannot be used!"
-                @error "    found at $(paths.RAD_DIR)"
-                @error "    version is "*atmos.SOCRATES_VERSION
+                @error "    found at: $(paths.RAD_DIR)"
+                @error "    version:  "*atmos.SOCRATES_VERSION
                 return false
             end
         end
@@ -2471,7 +2511,7 @@ module atmosphere
     Returns:
     - `bound::Bool`             atmosphere is strongly bound by gravity
     """
-    function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool  
+    function calc_profile_radius!(atmos::atmosphere.Atmos_t)::Bool
 
         # Calculate net surface acceleration [m s-2]
         a_surf::Float64 = atmos.grav_surf -
@@ -2510,7 +2550,7 @@ module atmosphere
                                     atmos.gl[i+1], atmos.al[i+1],
                                     atmos.ml[i+1], atmos.pl[i+1],
                                     atmos.p[i], atmos.layer_ρ[i], nsub;
-                                    constg = atmos.hydrograv_constg, 
+                                    constg = atmos.hydrograv_constg,
                                     selfg = atmos.hydrograv_selfg)
 
             #   apply radius limiter
@@ -2540,7 +2580,7 @@ module atmosphere
                                     atmos.g[i], atmos.a[i],
                                     atmos.m[i], atmos.p[i],
                                     atmos.pl[i], atmos.layer_ρ[i], nsub;
-                                    constg = atmos.hydrograv_constg, 
+                                    constg = atmos.hydrograv_constg,
                                     selfg = atmos.hydrograv_selfg)
 
             #   apply radius limiter
@@ -2601,11 +2641,11 @@ module atmosphere
     - `gj::Float64`     gravity  at end of interval [kg]
     - `mj::Float64`     mass enc at end of interval [kg]
     """
-    function integ_hydrograv(r0::Float64, 
-                                g0::Float64, a0::Float64, 
+    function integ_hydrograv(r0::Float64,
+                                g0::Float64, a0::Float64,
                                 m0::Float64, p0::Float64,
-                                p1::Float64, 
-                                rho::Float64, 
+                                p1::Float64,
+                                rho::Float64,
                                 n::Int64;
                                 constg::Bool = CFG_hydrograv_constg,
                                 selfg::Bool  = CFG_hydrograv_selfg

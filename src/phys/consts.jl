@@ -10,9 +10,9 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String     = "1.12.3"  # current agni version
+    const AGNI_VERSION::String    = "1.12.4"  # current agni version
     export AGNI_VERSION
-    const SOCVER_minimum::Float64  = 2603.6    # minimum required socrates version
+    const SOCVER_minimum::String  = "2603.9"    # minimum required socrates version
     export SOCVER_minimum
 
     # A large floating point number
@@ -28,9 +28,9 @@ module consts
     export SMALLLOGFLOAT
 
     # Sources:
-    # - Pierrehumbert (2010)
-    # - NIST
-    # - Sources outlined in Thermo files (https://github.com/nichollsh/Thermo)
+    # - Pierrehumbert (2010) textbook "Principles of Planetary Climate"
+    # - NIST CODATA (https://physics.nist.gov/cuu/Constants/index.html)
+    # - Sources outlined in Thermo files (https://github.com/nichollsh/ThermoTools)
 
     # Universal gas constant, J K-1 mol-1
     const R_gas::Float64 = 8.314462618 # NIST CODATA
