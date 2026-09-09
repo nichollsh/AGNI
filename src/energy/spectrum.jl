@@ -24,7 +24,7 @@ module spectrum
     const PRECISION_DEFAULT::String = "double"
     const THERMAL_MIN::Float64 = 25.0
     const THERMAL_MAX::Float64 = 6000.0
-    const THERMAL_STP::Float64 = 25.0
+    const THERMAL_STP::Float64 = 2.5
 
     """
     **Get the version of SOCRATES being used.**
