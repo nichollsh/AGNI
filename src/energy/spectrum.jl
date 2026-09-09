@@ -23,8 +23,8 @@ module spectrum
     # Constants
     const PRECISION_DEFAULT::String = "double"
     const THERMAL_MIN::Float64 = 25.0
-    const THERMAL_MAX::Float64 = 6000.0
-    const THERMAL_STP::Float64 = 2.5
+    const THERMAL_MAX::Float64 = 6000.0     # K
+    const THERMAL_STP::Float64 = 5.0        # this substantially impacts the `prep_spec` runtime
 
     """
     **Get the version of SOCRATES being used.**
