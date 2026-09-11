@@ -1,12 +1,6 @@
 # This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
 # Core file containing functions for running the model
 
-# Not for direct execution
-if (abspath(PROGRAM_FILE) == @__FILE__)
-    thisfile = @__FILE__
-    error("The file '$thisfile' is not for direct execution")
-end
-
 module AGNI
 
     # Include system libraries
@@ -857,7 +851,7 @@ module AGNI
     Returns:
     - `return_success::Bool`        flag for model success
     """
-    function main(;cfg_path::String=consts.UNSET_STR)::Bool
+    function main(; cfg_path::String=consts.UNSET_STR)::Bool
 
         # Record start time
         tbegin = time()
@@ -932,5 +926,6 @@ module AGNI
 
         return return_success
     end
+    export main
 
 end

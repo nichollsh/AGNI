@@ -32,7 +32,7 @@ AGNI's primary purpose is to simulate the atmospheric temperature-, height-, and
 
 Consult the [AGNI documentation](https://www.h-nicholls.space/AGNI/) for information about the model, including usage, functionality, and how to contribute.
 
-Contact: see information on [my website homepage](https://www.h-nicholls.space/).
+Contact information is available via [my website homepage](https://www.h-nicholls.space/).
 
 ## Installation and usage
 See the [**Getting Started**](https://www.h-nicholls.space/AGNI/dev/howto/getting_started/) page in the documentation for information on installing and using the model.

@@ -18,8 +18,10 @@ GNU/Linux and MacOS (including ARM) are supported.
 ## Installation
 
 Follow the ordered steps below
+
 1. Install Julia's package manager
     - `curl -fsSL https://install.julialang.org | sh`
+    - Using Julia version 1.13 is recommended
 
 2. Download AGNI
     - `git clone https://github.com/nichollsh/AGNI.git && cd AGNI`
@@ -59,7 +61,9 @@ automatically pull changes from GitHub and download any required data files.
 ./src/get_agni.sh
 ```
 
-## What next?
+## Running AGNI
+
+### Via the command line
 
 To run AGNI with the default configuration file:
 ```bash
@@ -67,6 +71,22 @@ To run AGNI with the default configuration file:
 ```
 
 Output files are written to the directory specified in the configuration file (default: `out/`).
+
+### Via the Julia REPL shell
+
+*Alternatively*, you can call AGNI as a module through the Julia shell. First, start the REPL:
+
+```bash
+julia --project
+```
+and then run AGNI:
+```julia
+using AGNI
+AGNI.main(cfg_path="res/config/default.toml")
+```
+
+## What's next?
+
 
 See [**Tutorials**](@ref Tutorials) for a guided introduction to AGNI with example outputs results.
 
