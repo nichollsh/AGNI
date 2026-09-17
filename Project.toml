@@ -3,6 +3,9 @@ uuid = "ede838c1-9ec3-4ebe-8ae8-da4091b3f21c"
 version = "1.12.5"
 authors = ["Harrison Nicholls <agni@h-nicholls.space>"]
 
+[compat]
+julia = ">=1.12"
+
 [deps]
 Coverage = "a2441757-f6aa-5fb2-8edb-039e3f45d037"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
