@@ -68,7 +68,40 @@ ratios (`vmr_dict` or `vmr_file`), or by metallicities (`metallicities`).
 | `metallicities`   | Dictionary of elemental **mass** abundance ratios relative to hydrogen. Must also set `p_surf`. |
 | `condensates   `  | List of volatiles which are allowed to condense. Can be used together with thermochemical equilibrium (`physics.chemistry = true`). |
 | `transparent   `  | Make the atmosphere transparent (see below). Replaces all of the above parameters in this table. |
-| `aerosols      `  | Dictionary of aerosols, and their mass mixing ratios [kg/kg] or associated condensate species. |
+| `aerosols      `  | Tables describing each aerosol species (see below). Optional. |
+
+### `[composition.aerosols.<name>]`
+Each aerosol is configured in its own table, where `<name>` is a label for that aerosol. The radiative effects of aerosols are only included when `physics.aerosol = true`. See [Aerosols and clouds](@ref) for a description of the physics.
+
+| Parameter         | Description   |
+| ----------------: | :------------ |
+| `method        `  | How optical properties are obtained: `"mon"` (pre-computed SOCRATES data) or `"mie"` (Mie theory from refractive indices). Required. |
+| `mmr           `  | Constant mass mixing ratio [kg/kg]. Provide exactly one of `mmr` or `species`. |
+| `species       `  | Condensable gas whose condensate yield sets the mass mixing ratio. Must be listed in `condensates`. |
+| `nk_file       `  | Name of the refractive index material, e.g. `"SiO2_amorph"`. Required for `method="mie"`. |
+| `r_eff         `  | Effective radius of the log-normal size distribution [m]. Required for `method="mie"`. |
+| `sigma_g       `  | Geometric standard deviation of the log-normal size distribution (≥ 1). Required for `method="mie"`. |
+
+For `method="mon"`, the name of the table must match one of the aerosols supplied with SOCRATES (e.g. `soot`, `sulph`, `nitrate`, `dustdiv1`), which have data in `res/scattering/`. For `method="mie"`, any name can be used, and the material density is taken from the source code. For example:
+```toml
+[composition.aerosols.soot]
+    method  = "mon"
+    mmr     = 1e-4
+
+[composition.aerosols.sio2]
+    method  = "mie"
+    species = "SiO2"
+    nk_file = "SiO2_amorph"
+    r_eff   = 1.0e-6
+    sigma_g = 1.65
+```
+
+!!! note "Change of format"
+    Earlier versions of AGNI configured aerosols with an inline dictionary, such as
+    `aerosols = { "soot"=1e-4, "biogenic"="HCN" }`. This format is no longer accepted in
+    configuration files. Each entry should be replaced by a table with `method = "mon"`
+    and either `mmr` (for a number) or `species` (for a gas name), as above.
+
 
 
 
@@ -105,8 +138,8 @@ Parameters that describe how the model should treat the physics.
 | `chemistry     `  | Include 1D equilibrium chemistry in the atmosphere (true/false). |
 | `continua      `  | Include collisional/continuum absorption in radiative transfer (true/false). |
 | `rayleigh      `  | Include Rayleigh scattering in radiative transfer (true/false). |
-| `aerosol       `  | Include aerosols in radiative transfer  (true/false). |
-| `cloud         `  | Include water clouds in radiative transfer (true/false). |
+| `aerosol       `  | Include aerosols in radiative transfer (true/false). Aerosols are configured in `[composition.aerosols.<name>]`. |
+| `cloud         `  | Include water clouds in radiative transfer (true/false). Requires a spectral file containing droplet data. |
 | `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see [Configuring AGNI](@ref)). |
 | `grey_lw`         | Grey opacity [m2/kg] of longwave (thermal) radiation. Used when `input_sf="greygas"`. |
 | `grey_sw`         | Grey opacity [m2/kg] of shortwave (stellar) radiation. Used when `input_sf="greygas"`. |
@@ -151,3 +184,4 @@ Configure plotting routines; all of these should be `true` or `false`.
 | `height         ` | Plot radius-pressure profile? |
 | `animate        ` | Make an animation of the solver obtaining its solution? |
 | `cloud          ` | Plot water cloud mass fraction and area fraction profiles? |
+| `aerosol_optics ` | Plot band-averaged aerosol optical properties (extinction, single scattering albedo, asymmetry)? |

@@ -87,6 +87,7 @@ makedocs(
             "Model description" => "explanation/model.md",
             "Convection" => "explanation/model_convection.md",
             "Radiation" => "explanation/model_radiation.md",
+            "Aerosols and clouds" => "explanation/model_aerosols.md",
             "Height and gravity" => "explanation/model_height.md",
             "Thermodynamics" => "explanation/model_thermodynamics.md",
             "Sensible heating" => "explanation/model_sensible.md",

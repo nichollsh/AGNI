@@ -12,6 +12,12 @@ Functions from `energy.jl`.
 Modules = [AGNI.energy]
 ```
 
+## Aerosol optical properties
+Functions from `mie.jl` and `aerosol_optics.jl`.
+```@autodocs
+Modules = [AGNI.mie, AGNI.aerosol_optics]
+```
+
 ## Chemistry and phase-change calculations
 Functions from `chemistry.jl`.
 ```@autodocs
