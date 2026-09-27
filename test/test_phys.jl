@@ -8,7 +8,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 const lookup_mmw = AGNI.formulae._lookup_mmw
 const lookup_count_atoms = AGNI.formulae._lookup_count_atoms
 const lookup_colour = AGNI.style._lookup_colour
-const lookup_liquid_rho = AGNI.density._lookup_liquid_rho
+const lookup_rho = AGNI.density._lookup_rho
 
 @testset "phys" begin
     # atom counting

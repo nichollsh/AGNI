@@ -10,7 +10,6 @@ using AGNI
 #   - extinction paradox: Q_ext → 2 for large, non-absorbing spheres
 #   - log-normal quadrature reproduces analytic moments (mean volume, effective radius)
 #   - mass coefficients scale as 1/ρ, and σ_g = 1 recovers the monodisperse result
-#   - invalid inputs raise errors (non-positive x, λ, r_eff, ρ; σ_g < 1; k < 0)
 
 const mie = AGNI.mie
 
@@ -48,8 +47,6 @@ const mie = AGNI.mie
         # far more than the tolerance, so the pins above are sensitive to k.
         Qe_noabs, _, _ = mie.mie_sphere(10.0, complex(1.5, 0.0))
         @test abs(Qe_noabs - 2.459790528444) > 1e-2
-        # A negative k (the opposite sign convention) is rejected
-        @test_throws ErrorException mie.mie_sphere(10.0, complex(1.5, -0.1))
     end
 
     # -------------
@@ -107,22 +104,6 @@ const mie = AGNI.mie
         @test g > 0.7
         # Discrimination guard: the geometric cross-section alone would give Q_ext = 1
         @test abs(Qe - 1.0) > 0.5
-    end
-
-    # -------------
-    # Invalid inputs raise errors rather than returning garbage
-    # -------------
-    @testset "invalid_inputs_raise_errors" begin
-        @test_throws ErrorException mie.mie_sphere(0.0, complex(1.5, 0.0))
-        @test_throws ErrorException mie.mie_sphere(-1.0, complex(1.5, 0.0))
-        @test_throws ErrorException mie.mie_sphere(Inf, complex(1.5, 0.0))
-        @test_throws ErrorException mie.mie_sphere(1.0, complex(0.0, 0.1))
-        @test_throws ErrorException mie.lognormal_nodes(0.0, 1.5)
-        @test_throws ErrorException mie.lognormal_nodes(1e-6, 0.99)
-        @test_throws ErrorException mie.polydisperse(0.0, complex(1.5, 0.0), 1e-6, 1.5)
-        @test_throws ErrorException mie.mass_coefficients([1e-6], [complex(1.5, 0.0)], 1e-6, 1.5, 0.0)
-        @test_throws ErrorException mie.mass_coefficients([1e-6, 2e-6], [complex(1.5, 0.0)], 1e-6, 1.5, 1e3)
-        @test_throws ErrorException mie.gauss_hermite(0)
     end
 
     # -------------

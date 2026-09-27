@@ -526,7 +526,6 @@ end
     parse = atmosphere.parse_aerosol_entry
     quiet(f) = with_logger(f, MinLevelLogger(current_logger(), Test.Logging.Error+1))
     conds = ["H2O", "SiO2"]
-    have_nk = !isempty(AGNI.aerosol_optics.list_materials())
 
     # Valid "mon" entries, including legacy flat values
     e = parse("soot", Dict("method"=>"mon", "mmr"=>1e-4), conds)
@@ -557,23 +556,19 @@ end
                                             "r_eff"=>1e-6, "sigma_g"=>1.5), conds))              # unknown material
     end
 
-    if have_nk
-        base = Dict{String,Any}("method"=>"mie", "species"=>"SiO2", "nk_file"=>"SiO2_amorph",
-                                "r_eff"=>1e-6, "sigma_g"=>1.65)
-        e = parse("sio2", base, conds)
-        @test e["method"] == "mie"
-        @test isapprox(e["r_eff"], 1e-6; rtol=1e-12)
-        @test isa(e["sigma_g"], Float64)
-        # σ_g = 1 (monodisperse) is the lower edge of the valid range
-        @test !isnothing(parse("sio2", merge(base, Dict("sigma_g"=>1)), conds))
-        quiet() do
-            @test isnothing(parse("sio2", merge(base, Dict("sigma_g"=>0.9)), conds))
-            @test isnothing(parse("sio2", merge(base, Dict("r_eff"=>-1e-6)), conds))
-            @test isnothing(parse("sio2", merge(base, Dict("r_eff"=>Inf)), conds))
-            @test isnothing(parse("sio2", merge(base, Dict("extra"=>1)), conds))
-        end
-    else
-        @test_skip "refractive index data not available"
+    base = Dict{String,Any}("method"=>"mie", "species"=>"SiO2", "nk_file"=>"SiO2_amorph",
+                            "r_eff"=>1e-6, "sigma_g"=>1.65)
+    e = parse("sio2", base, conds)
+    @test e["method"] == "mie"
+    @test isapprox(e["r_eff"], 1e-6; rtol=1e-12)
+    @test isa(e["sigma_g"], Float64)
+    # σ_g = 1 (monodisperse) is the lower edge of the valid range
+    @test !isnothing(parse("sio2", merge(base, Dict("sigma_g"=>1)), conds))
+    quiet() do
+        @test isnothing(parse("sio2", merge(base, Dict("sigma_g"=>0.9)), conds))
+        @test isnothing(parse("sio2", merge(base, Dict("r_eff"=>-1e-6)), conds))
+        @test isnothing(parse("sio2", merge(base, Dict("r_eff"=>Inf)), conds))
+        @test isnothing(parse("sio2", merge(base, Dict("extra"=>1)), conds))
     end
 
     # Legacy inline dict in a config file is rejected with a migration message
@@ -587,27 +582,25 @@ end
     @test any(occursin("no longer supported", m) for m in errs)
 
     # setup! stores methods and Mie parameters, and sets particle sizes accordingly
-    if have_nk
-        atmos = atmosphere.Atmos_t()
-        ok = quiet() do
-            atmosphere.setup!(atmos, AGNI_CORE_ROOT, AGNI_CORE_OUT_DIR, AGNI_CORE_SF,
-                              1000.0, 1.0, 0.0, 0.0, 1500.0, 10.0, 1.0e7, 20, 10.0, 1e-5,
-                              Dict("H2O" => 1.0), "";
-                              flag_aerosol=true, real_gas=false, thermo_functions=false,
-                              aerosol_species=Dict("soot"=>1e-4,
-                                                   "SiO2"=>Dict("method"=>"mie", "mmr"=>1e-5,
-                                                                "nk_file"=>"SiO2_amorph",
-                                                                "r_eff"=>2e-6, "sigma_g"=>1.5)))
-        end
-        @test ok
-        @test atmos.aerosol_method["soot"] == "mon"
-        @test atmos.aerosol_method["sio2"] == "mie"          # names are lower-cased
-        @test !haskey(atmos.aerosol_optics, "soot")
-        @test atmos.aerosol_optics["sio2"]["nk_file"] == "SiO2_amorph"
-        @test all(isapprox.(atmos.aerosol_arr_r["sio2"], 2e-6; rtol=1e-12))
-        @test all(isapprox.(atmos.aerosol_arr_r["soot"], atmos.aerosol_val_r; rtol=1e-12))
-        @test all(isapprox.(atmos.aerosol_arr_l["sio2"], 1e-5; rtol=1e-12))
-        # Discrimination guard: the Mie size is not the default aerosol size
-        @test abs(atmos.aerosol_optics["sio2"]["r_eff"] - atmos.aerosol_val_r) > 1e-7
+    atmos = atmosphere.Atmos_t()
+    ok = quiet() do
+        atmosphere.setup!(atmos, AGNI_CORE_ROOT, AGNI_CORE_OUT_DIR, AGNI_CORE_SF,
+                            1000.0, 1.0, 0.0, 0.0, 1500.0, 10.0, 1.0e7, 20, 10.0, 1e-5,
+                            Dict("H2O" => 1.0), "";
+                            flag_aerosol=true, real_gas=false, thermo_functions=false,
+                            aerosol_species=Dict("soot"=>1e-4,
+                                                "SiO2"=>Dict("method"=>"mie", "mmr"=>1e-5,
+                                                            "nk_file"=>"SiO2_amorph",
+                                                            "r_eff"=>2e-6, "sigma_g"=>1.5)))
     end
+    @test ok
+    @test atmos.aerosol_method["soot"] == "mon"
+    @test atmos.aerosol_method["sio2"] == "mie"          # names are lower-cased
+    @test !haskey(atmos.aerosol_optics, "soot")
+    @test atmos.aerosol_optics["sio2"]["nk_file"] == "SiO2_amorph"
+    @test all(isapprox.(atmos.aerosol_arr_r["sio2"], 2e-6; rtol=1e-12))
+    @test all(isapprox.(atmos.aerosol_arr_r["soot"], atmos.aerosol_val_r; rtol=1e-12))
+    @test all(isapprox.(atmos.aerosol_arr_l["sio2"], 1e-5; rtol=1e-12))
+    # Discrimination guard: the Mie size is not the default aerosol size
+    @test abs(atmos.aerosol_optics["sio2"]["r_eff"] - atmos.aerosol_val_r) > 1e-7
 end

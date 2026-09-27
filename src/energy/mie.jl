@@ -1,14 +1,14 @@
 # This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
+
 """
 **Contains module for Mie scattering calculations**
 
 Scattering and absorption by homogeneous spheres, following the BHMIE algorithm of
-Bohren & Huffman (1983), with the series truncation criterion of Wiscombe (1980). The
-logarithmic derivative is evaluated by downward recurrence, which is stable for absorbing
-particles with large size parameters.
-
+Bohren & Huffman (1983), with the series truncation criterion of Wiscombe (1980).
 Polydisperse properties are integrated over a log-normal size distribution using
 Gauss-Hermite quadrature in ln(r).
+
+https://www.astro.princeton.edu/~draine/code/bhmie.f
 
 References:
 - Bohren, C. F. & Huffman, D. R. (1983), Absorption and Scattering of Light by Small
@@ -32,9 +32,6 @@ module mie
 
     # Quadrature nodes with normalised weights below this value are skipped
     const W_QUAD_MIN::Float64 = 1.0e-30
-
-    # Warn once when size parameter is clamped
-    const _warned_xmax = Ref(false)
 
     """
     **Mie efficiencies of a homogeneous sphere in the Rayleigh limit.**
@@ -75,27 +72,13 @@ module mie
     """
     function mie_sphere(x::Float64, m::ComplexF64)::Tuple{Float64,Float64,Float64}
 
-        # Validate
-        if !(x > 0.0) || !isfinite(x)
-            error("Mie size parameter must be positive and finite (got x=$x)")
-        end
-        if !(real(m) > 0.0) || (imag(m) < 0.0) || !isfinite(m)
-            error("Refractive index must have n>0 and k>=0 (got m=$m)")
-        end
-
         # Small particle limit
         if x < X_RAYLEIGH
             return mie_rayleigh(x, m)
         end
 
         # Large particle limit
-        if x > X_MAX
-            if !_warned_xmax[]
-                @warn "Mie size parameter $x exceeds $X_MAX and will be clamped"
-                _warned_xmax[] = true
-            end
-            x = X_MAX
-        end
+        x = min(x, X_MAX)
 
         y = m * x
         nstop = floor(Int, x + 4.05 * cbrt(x) + 2.0)
@@ -114,8 +97,8 @@ module mie
         chi1 = cos(x)
         xi1  = complex(psi1, -chi1)
 
-        qsca = 0.0
-        qext = 0.0
+        qsca = 0.0   # efficiency factor for scattering
+        qext = 0.0   # efficiency factor for extinction
         gsum = 0.0
         an1  = zero(ComplexF64)
         bn1  = zero(ComplexF64)
@@ -150,7 +133,7 @@ module mie
         # g = (4/(x² Qsca)) Σ[...] = 2 Σ[...] / (unnormalised Qsca sum)
         g    = 2.0 * gsum / qsca
         qsca = 2.0 / x^2 * qsca
-        qext = 2.0 / x^2 * qext
+        qext = 2.0 / x^2 * qext  
 
         return (qext, qsca, g)
     end
@@ -169,9 +152,7 @@ module mie
     - `w::Vector{Float64}`      normalised weights (sum to unity)
     """
     function gauss_hermite(n::Int)::Tuple{Vector{Float64},Vector{Float64}}
-        if n < 1
-            error("Number of quadrature nodes must be positive (got $n)")
-        end
+        n = max(n, 1)
         if n == 1
             return ([0.0], [1.0])
         end
@@ -195,7 +176,6 @@ module mie
     - `r_g::Float64`        geometric mean radius [m]
     """
     function geometric_radius(r_eff::Float64, σ_g::Float64)::Float64
-        _check_distribution(r_eff, σ_g)
         return r_eff * exp(-2.5 * log(σ_g)^2)
     end
 
@@ -212,16 +192,6 @@ module mie
     function lognormal_mean_volume(r_eff::Float64, σ_g::Float64)::Float64
         r_g = geometric_radius(r_eff, σ_g)
         return 4.0/3.0 * π * r_g^3 * exp(4.5 * log(σ_g)^2)
-    end
-
-    function _check_distribution(r_eff::Float64, σ_g::Float64)
-        if !(r_eff > 0.0) || !isfinite(r_eff)
-            error("Effective radius must be positive and finite (got $r_eff)")
-        end
-        if !(σ_g >= 1.0) || !isfinite(σ_g)
-            error("Geometric standard deviation must be ≥ 1 (got $σ_g)")
-        end
-        return nothing
     end
 
     """
@@ -243,14 +213,21 @@ module mie
     """
     function lognormal_nodes(r_eff::Float64, σ_g::Float64;
                                 n::Int=N_QUAD_DEFAULT)::Tuple{Vector{Float64},Vector{Float64}}
-        _check_distribution(r_eff, σ_g)
+
+        # Convert σ_g to the standard deviation of ln(r), s = ln(σ_g)
         s = log(σ_g)
         if s < 1e-8
             return ([r_eff], [1.0])
         end
+
+        # Calculate nodes and weights
         t, w = gauss_hermite(n)
+
+        # Skip nodes with negligible weight
         mask = w .> W_QUAD_MIN
         t = t[mask]
+
+        # Renormalise weights and convert to radii using r = r_g exp(sqrt(2) s t)
         w = w[mask] ./ sum(w[mask])
         r = geometric_radius(r_eff, σ_g) .* exp.(sqrt(2.0) * s .* t)
         return (r, w)
@@ -258,6 +235,8 @@ module mie
 
     """
     **Optical properties averaged over a log-normal size distribution.**
+
+    Calculated for each wavelength and refractive index, using Gauss-Hermite quadrature.
 
     Arguments:
     - `λ::Float64`          wavelength [m]
@@ -276,18 +255,16 @@ module mie
     """
     function polydisperse(λ::Float64, m::ComplexF64, r_eff::Float64, σ_g::Float64;
                             n::Int=N_QUAD_DEFAULT)::NTuple{4,Float64}
-        if !(λ > 0.0) || !isfinite(λ)
-            error("Wavelength must be positive and finite (got $λ)")
-        end
-        r, w = lognormal_nodes(r_eff, σ_g; n=n)
+        λ = max(λ, 1e-12)
+        r, w = lognormal_nodes(r_eff, σ_g; n=n) # nodes and weights
         return _polydisperse(λ, m, r, w)
     end
 
     function _polydisperse(λ::Float64, m::ComplexF64,
                             r::Vector{Float64}, w::Vector{Float64})::NTuple{4,Float64}
-        σ_ext = 0.0
-        σ_sca = 0.0
-        gsca  = 0.0
+        σ_ext = 0.0 # mean extinction cross-section per particle
+        σ_sca = 0.0 # mean scattering cross-section per particle
+        gsca  = 0.0 # mean scattering cross-section weighted by asymmetry parameter
         V     = 0.0
         for i in eachindex(r)
             area = π * r[i]^2
@@ -326,12 +303,7 @@ module mie
                                 r_eff::Float64, σ_g::Float64, ρ::Float64;
                                 n::Int=N_QUAD_DEFAULT
                                 )::Tuple{Vector{Float64},Vector{Float64},Vector{Float64}}
-        if length(λ) != length(m)
-            error("Wavelength and refractive index arrays must have equal length")
-        end
-        if !(ρ > 0.0) || !isfinite(ρ)
-            error("Particle density must be positive and finite (got $ρ)")
-        end
+
         r, w = lognormal_nodes(r_eff, σ_g; n=n)
 
         nλ = length(λ)
@@ -339,9 +311,6 @@ module mie
         k_sca = zeros(Float64, nλ)
         g     = zeros(Float64, nλ)
         for i in 1:nλ
-            if !(λ[i] > 0.0) || !isfinite(λ[i])
-                error("Wavelength must be positive and finite (got $(λ[i]))")
-            end
             σe, σs, gi, V = _polydisperse(λ[i], m[i], r, w)
             k_abs[i] = max(σe - σs, 0.0) / (ρ * V)
             k_sca[i] = σs / (ρ * V)

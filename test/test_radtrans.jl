@@ -559,61 +559,57 @@ end
     #   - in the optically thin limit the flux perturbation is linear in MMR
     # -------------
     @testset "mie_aerosol_changes_fluxes_monotonically" begin
-        if isempty(AGNI.aerosol_optics.list_materials())
-            @test_skip "refractive index data not available"
-        else
-            spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
-            aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>0.0, "nk_file"=>"SiO2_amorph",
-                                        "r_eff"=>1e-6, "sigma_g"=>1.65))
-            atmos = atmosphere.Atmos_t()
-            @test atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, spfile,
-                                    1000.0, 1.0, 0.0, 45.0, 1500.0, gravity, radius,
-                                    40, 10.0, 1e-5, Dict("H2O"=>0.5, "CO2"=>0.5), "";
-                                    flag_aerosol=true, aerosol_species=aer,
-                                    flag_rayleigh=false, flag_gcontinuum=false,
-                                    real_gas=false, thermo_functions=false)
-            @test atmosphere.allocate!(atmos, "$RES_DIR/stellar_spectra/sun.txt")
-            @test atmos.aerosol_names == ["sio2"]
-            @test atmos.aerosol_custom_types[atmosphere.AEROSOL_CUSTOM_TYPE0 + 1] == "sio2"
-            @test size(atmos.aerosol_band_props["sio2"]) == (atmos.nbands, 3)
-            setpt.dry_adiabat!(atmos)
-            atmosphere.calc_layer_props!(atmos)
+        spfile = "$RE[S_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>0.0, "nk_file"=>"SiO2_amorph",
+                                    "r_eff"=>1e-6, "sigma_g"=>1.65))
+        atmos = atmosphere.Atmos_t()
+        @test atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, spfile,
+                                1000.0, 1.0, 0.0, 45.0, 1500.0, gravity, radius,
+                                40, 10.0, 1e-5, Dict("H2O"=>0.5, "CO2"=>0.5), "";
+                                flag_aerosol=true, aerosol_species=aer,
+                                flag_rayleigh=false, flag_gcontinuum=false,
+                                real_gas=false, thermo_functions=false)
+        @test atmosphere.allocate!(atmos, "$RES_DIR/stellar_spectra/sun.txt")
+        @test atmos.aerosol_names == ["sio2"]
+        @test atmos.aerosol_custom_types[atmosphere.AEROSOL_CUSTOM_TYPE0 + 1] == "sio2"
+        @test size(atmos.aerosol_band_props["sio2"]) == (atmos.nbands, 3)
+        setpt.dry_adiabat!(atmos)
+        atmosphere.calc_layer_props!(atmos)
 
-            function fluxes(mmr)
-                fill!(atmos.aerosol_arr_l["sio2"], mmr)
-                energy.radtrans!(atmos, true)
-                energy.radtrans!(atmos, false)
-                return (atmos.flux_u_lw[1], atmos.flux_u_sw[1], atmos.flux_d_sw[end])
-            end
-
-            # reference without aerosol: disable the aerosol flag entirely
-            atmos.control.l_aerosol = false
-            olr_clear, swu_clear, _ = fluxes(0.0)
-            atmos.control.l_aerosol = true
-
-            olr_0, swu_0, _ = fluxes(0.0)
-            @test isapprox(olr_0, olr_clear; rtol=1e-10)
-            @test isapprox(swu_0, swu_clear; rtol=1e-10, atol=1e-10)
-
-            mmrs = [1e-8, 1e-7, 1e-6, 1e-5]
-            res  = [fluxes(m) for m in mmrs]
-            olr  = [r[1] for r in res]
-            swu  = [r[2] for r in res]
-            sws  = [r[3] for r in res]
-            @test all(isfinite, olr) && all(isfinite, swu) && all(isfinite, sws)
-            @test all(olr .> 0.0) && all(swu .>= 0.0) && all(sws .>= 0.0)
-            @test all(diff(vcat(olr_0, olr)) .< 0.0)     # OLR decreases
-            @test all(diff(vcat(swu_0, swu)) .> 0.0)     # reflection increases
-            # Discrimination guard: the thickest cloud changes OLR by more than 1%
-            @test (olr_0 - olr[end]) / olr_0 > 0.01
-
-            # optically thin limit: doubling a tiny MMR doubles the perturbation
-            olr_a, _, _ = fluxes(1e-11)
-            olr_b, _, _ = fluxes(2e-11)
-            @test isapprox((olr_0 - olr_b) / (olr_0 - olr_a), 2.0; rtol=0.02)
-
-            atmosphere.deallocate!(atmos)
+        function fluxes(mmr)
+            fill!(atmos.aerosol_arr_l["sio2"], mmr)
+            energy.radtrans!(atmos, true)
+            energy.radtrans!(atmos, false)
+            return (atmos.flux_u_lw[1], atmos.flux_u_sw[1], atmos.flux_d_sw[end])
         end
+
+        # reference without aerosol: disable the aerosol flag entirely
+        atmos.control.l_aerosol = false
+        olr_clear, swu_clear, _ = fluxes(0.0)
+        atmos.control.l_aerosol = true
+
+        olr_0, swu_0, _ = fluxes(0.0)
+        @test isapprox(olr_0, olr_clear; rtol=1e-10)
+        @test isapprox(swu_0, swu_clear; rtol=1e-10, atol=1e-10)
+
+        mmrs = [1e-8, 1e-7, 1e-6, 1e-5]
+        res  = [fluxes(m) for m in mmrs]
+        olr  = [r[1] for r in res]
+        swu  = [r[2] for r in res]
+        sws  = [r[3] for r in res]
+        @test all(isfinite, olr) && all(isfinite, swu) && all(isfinite, sws)
+        @test all(olr .> 0.0) && all(swu .>= 0.0) && all(sws .>= 0.0)
+        @test all(diff(vcat(olr_0, olr)) .< 0.0)     # OLR decreases
+        @test all(diff(vcat(swu_0, swu)) .> 0.0)     # reflection increases
+        # Discrimination guard: the thickest cloud changes OLR by more than 1%
+        @test (olr_0 - olr[end]) / olr_0 > 0.01
+
+        # optically thin limit: doubling a tiny MMR doubles the perturbation
+        olr_a, _, _ = fluxes(1e-11)
+        olr_b, _, _ = fluxes(2e-11)
+        @test isapprox((olr_0 - olr_b) / (olr_0 - olr_a), 2.0; rtol=0.02)
+
+        atmosphere.deallocate!(atmos)
     end
 
     # -------------

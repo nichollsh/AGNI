@@ -377,13 +377,7 @@ function handle_request {
 
         "refractive")
             echo $help_refractive
-            # TODO: set to the Zenodo record containing the files in res/refractive/
-            rec="ZENODO_RECORD_TBD"
-            if [[ "$rec" == "ZENODO_RECORD_TBD" ]]; then
-                echo "WARNING: Zenodo record for refractive index data is not yet set. Skipping."
-            else
-                zenodo_all $rec $refractive
-            fi
+            zenodo_all 23000222 $refractive
             ;;
 
         *)

@@ -539,60 +539,58 @@ Some more content
     # limited by size-distribution quadrature and 6-digit output (observed ≈ 1e-3).
     # -------------
     @testset "mie_agrees_with_socrates_cscatter" begin
+
         setenv_file = joinpath(RAD_DIR, "set_rad_env")
         refract = joinpath(RAD_DIR, "data", "aerosol", "refract_soot")
-        if !isfile(setenv_file) || !isfile(refract)
-            @test_skip "SOCRATES set_rad_env or refract_soot not available"
-        else
-            tmpdir = mktempdir()
-            rows = Vector{Float64}[]
-            on = false
-            for l in readlines(refract)
-                startswith(l, "*BEGIN_DATA") && (on = true; continue)
-                startswith(l, "*END") && break
-                on && push!(rows, parse.(Float64, split(l)))
-            end
-            sel = [r for r in rows if 0.25e-6 <= r[1] <= 30e-6]
-            open(joinpath(tmpdir, "wl"), "w") do f
-                write(f, "Wavelengths\n*BEGIN_DATA\n")
-                foreach(r -> write(f, @sprintf("  %.6e\n", r[1])), sel)
-                write(f, "*END\n")
-            end
-            cmd = "cd $tmpdir && source $setenv_file >/dev/null 2>&1 && " *
-                  "$(joinpath(RAD_DIR, "sbin", "Cscatter")) -w wl -r $refract -l -t 1 -C 4 " *
-                  "-g 1.0 0.5e-6 1.65 -n 1.0e8 -M -o soot.mon >/dev/null 2>&1"
-            run(`bash -c $cmd`; wait=true)
-            mon = joinpath(tmpdir, "soot.mon")
-            @test isfile(mon)
 
-            L = readlines(mon)
-            φ = parse(Float64, split(L[findfirst(l->contains(l, "Volume fraction"), L)], "=")[2])
-            reff_soc = parse(Float64, split(split(L[findfirst(l->contains(l, "Effective radius"), L)], "=")[2])[1])
-            i0 = findfirst(l->contains(l, "Wavelength (m)"), L)
-            dat = [parse.(Float64, split(l)) for l in L[i0+1:end] if length(split(l)) == 4]
-            @test length(dat) == length(sel)
-
-            # SOCRATES reports r_eff = r_g exp(2.5 ln²σ_g), matching AGNI's conversion. The
-            # tolerance reflects SOCRATES' own size quadrature, which recovers the input
-            # number density to only ~1e-4.
-            r_eff = 0.5e-6 * exp(2.5 * log(1.65)^2)
-            @test isapprox(reff_soc, r_eff; rtol=1e-4)
-            @test isapprox(AGNI.mie.geometric_radius(r_eff, 1.65), 0.5e-6; rtol=1e-12)
-
-            λ = [r[1] for r in sel]
-            m = [complex(r[2], r[3]) for r in sel]
-            ka, ks, g = AGNI.mie.mass_coefficients(λ, m, r_eff, 1.65, 1.0)
-            for i in eachindex(λ)
-                @test isapprox(ka[i], dat[i][2] / φ; rtol=5e-3)
-                @test isapprox(ks[i], dat[i][3] / φ; rtol=5e-3)
-                @test isapprox(g[i],  dat[i][4];     atol=2e-3)
-            end
-            # Discrimination guard: using r_g in place of r_eff changes k_sca by >> 0.5%
-            _, ks_wrong, _ = AGNI.mie.mass_coefficients(λ[1:1], m[1:1], 0.5e-6, 1.65, 1.0)
-            @test abs(ks_wrong[1] / (dat[1][3] / φ) - 1) > 0.05
-
-            rm(tmpdir; force=true, recursive=true)
+        tmpdir = mktempdir()
+        rows = Vector{Float64}[]
+        on = false
+        for l in readlines(refract)
+            startswith(l, "*BEGIN_DATA") && (on = true; continue)
+            startswith(l, "*END") && break
+            on && push!(rows, parse.(Float64, split(l)))
         end
+        sel = [r for r in rows if 0.25e-6 <= r[1] <= 30e-6]
+        open(joinpath(tmpdir, "wl"), "w") do f
+            write(f, "Wavelengths\n*BEGIN_DATA\n")
+            foreach(r -> write(f, @sprintf("  %.6e\n", r[1])), sel)
+            write(f, "*END\n")
+        end
+        cmd = "cd $tmpdir && source $setenv_file >/dev/null 2>&1 && " *
+                "$(joinpath(RAD_DIR, "sbin", "Cscatter")) -w wl -r $refract -l -t 1 -C 4 " *
+                "-g 1.0 0.5e-6 1.65 -n 1.0e8 -M -o soot.mon >/dev/null 2>&1"
+        run(`bash -c $cmd`; wait=true)
+        mon = joinpath(tmpdir, "soot.mon")
+        @test isfile(mon)
+
+        L = readlines(mon)
+        φ = parse(Float64, split(L[findfirst(l->contains(l, "Volume fraction"), L)], "=")[2])
+        reff_soc = parse(Float64, split(split(L[findfirst(l->contains(l, "Effective radius"), L)], "=")[2])[1])
+        i0 = findfirst(l->contains(l, "Wavelength (m)"), L)
+        dat = [parse.(Float64, split(l)) for l in L[i0+1:end] if length(split(l)) == 4]
+        @test length(dat) == length(sel)
+
+        # SOCRATES reports r_eff = r_g exp(2.5 ln²σ_g), matching AGNI's conversion. The
+        # tolerance reflects SOCRATES' own size quadrature, which recovers the input
+        # number density to only ~1e-4.
+        r_eff = 0.5e-6 * exp(2.5 * log(1.65)^2)
+        @test isapprox(reff_soc, r_eff; rtol=1e-4)
+        @test isapprox(AGNI.mie.geometric_radius(r_eff, 1.65), 0.5e-6; rtol=1e-12)
+
+        λ = [r[1] for r in sel]
+        m = [complex(r[2], r[3]) for r in sel]
+        ka, ks, g = AGNI.mie.mass_coefficients(λ, m, r_eff, 1.65, 1.0)
+        for i in eachindex(λ)
+            @test isapprox(ka[i], dat[i][2] / φ; rtol=5e-3)
+            @test isapprox(ks[i], dat[i][3] / φ; rtol=5e-3)
+            @test isapprox(g[i],  dat[i][4];     atol=2e-3)
+        end
+        # Discrimination guard: using r_g in place of r_eff changes k_sca by >> 0.5%
+        _, ks_wrong, _ = AGNI.mie.mass_coefficients(λ[1:1], m[1:1], 0.5e-6, 1.65, 1.0)
+        @test abs(ks_wrong[1] / (dat[1][3] / φ) - 1) > 0.05
+
+        rm(tmpdir; force=true, recursive=true)
     end
 
     # -------------

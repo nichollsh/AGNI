@@ -1,4 +1,5 @@
 # This file is part of AGNI. License is Apache-2.0: https://apache.org/licenses/LICENSE-2.0
+
 """
 **Contains module for calculating aerosol optical properties at runtime**
 
@@ -7,15 +8,14 @@ index (n, k) of the particle material using Mie theory (see the `mie` module), f
 log-normal size distribution. The resultant spectral mass absorption coefficient, mass
 scattering coefficient, and asymmetry parameter are averaged over each band of a SOCRATES
 spectral file, weighted by the stellar spectrum ('thin' averaging).
-
-Refractive index data are taken from the compilation distributed with POSEIDON:
-Mullens, Lewis & MacDonald (2024), ApJ 977, 105. https://doi.org/10.3847/1538-4357/ad8575
 """
 module aerosol_optics
 
     import ..paths
     import ..density
     import ..mie
+
+    using LoggingExtras
 
     # Minimum number of log-spaced wavelength points per band
     const NLAM_BAND_MIN::Int = 16
@@ -53,27 +53,28 @@ module aerosol_optics
     **Read refractive index data from a text file.**
 
     Accepts files with three numeric columns (wavelength [micron], n, k), or more columns in
-    which case the last three are used. Lines which are not entirely numeric are treated as
-    headers. Comments begin with '#'. Old-style carriage return line endings are supported.
-    Rows with unphysical values (λ ≤ 0, n ≤ 0, or k < 0) are skipped with a warning. Data are
-    sorted by wavelength, and duplicated wavelengths are averaged.
+    which case the last three are used. Data are sorted by wavelength, and duplicated
+    wavelengths are averaged.
 
     Arguments:
-    - `path::String`            path to file
+    - `path::String`            path to txt file
 
-    Returns:
+    Returns on success:
     - `λ::Vector{Float64}`      wavelength [m]
     - `n::Vector{Float64}`      real part of the refractive index
     - `k::Vector{Float64}`      imaginary part of the refractive index (≥ 0)
+
+    Returns on failure:
+    - `false`                   failure to read file
     """
-    function read_nk(path::String)::NTuple{3,Vector{Float64}}
+    function read_nk(path::String)::Union{NTuple{3,Vector{Float64}},Bool}
         if !isfile(path)
-            error("Refractive index file not found: '$path'")
+            @warn("Refractive index file not found: '$path'")
+            return false
         end
 
         text = replace(read(path, String), "\r\n"=>"\n", "\r"=>"\n")
         rows = Tuple{Float64,Float64,Float64}[]
-        n_bad = 0
         for line in split(text, '\n')
             line = strip(split(line, '#')[1])
             isempty(line) && continue
@@ -82,17 +83,17 @@ module aerosol_optics
                 row = (vals[end-2], vals[end-1], vals[end])
                 if all(isfinite, row) && (row[1] > 0.0) && (row[2] > 0.0) && (row[3] >= 0.0)
                     push!(rows, row)
-                else
-                    n_bad += 1
                 end
             end
         end
 
-        if n_bad > 0
-            @warn "Skipped $n_bad invalid rows (λ≤0, n≤0, or k<0) in '$(basename(path))'"
+        if length(rows) < 2
+            @warn("Refractive index file '$path' contains fewer than two valid data rows")
+            return false
         end
         if length(rows) < 2
-            error("Refractive index file '$path' contains fewer than two valid data rows")
+            @warn("Refractive index file '$path' contains fewer than two wavelengths")
+            return false
         end
 
         # Sort by wavelength
@@ -108,14 +109,15 @@ module aerosol_optics
             while (j < length(rows)) && (rows[j+1][1] == rows[i][1])
                 j += 1
             end
-            push!(λ, rows[i][1] * 1e-6)
+            push!(λ, rows[i][1] * 1e-6) # convert from microns to metres
             push!(n, sum(r[2] for r in rows[i:j]) / (j-i+1))
             push!(k, sum(r[3] for r in rows[i:j]) / (j-i+1))
             i = j + 1
         end
 
         if length(λ) < 2
-            error("Refractive index file '$path' contains fewer than two distinct wavelengths")
+            @warn("Refractive index file '$path' contains fewer than two wavelengths")
+            return false
         end
 
         return (λ, n, k)
@@ -156,7 +158,7 @@ module aerosol_optics
     end
 
     """
-    **Wavelength grid within a single band.**
+    **Wavelength grid within a single correlated-k band.**
 
     Union of log-spaced points spanning the band and (a subset of) the tabulated refractive
     index wavelengths inside the band.
@@ -170,12 +172,20 @@ module aerosol_optics
     - `λ::Vector{Float64}`      sorted wavelength grid including the band edges [m]
     """
     function band_grid(λ_lo::Float64, λ_hi::Float64, λ_tab::Vector{Float64})::Vector{Float64}
+
+        # Log-spaced grid spanning the band, with NLAM_BAND_MIN points
         grid = collect(exp.(range(log(λ_lo), log(λ_hi), length=NLAM_BAND_MIN+1)))
+
+        # get wavelengths within the band (not including the edges)
         inside = λ_tab[(λ_tab .> λ_lo) .& (λ_tab .< λ_hi)]
+
+        # if there are too many points, downsample to NLAM_BAND_NK
         if length(inside) > NLAM_BAND_NK
             idx = round.(Int, range(1, length(inside), length=NLAM_BAND_NK))
             inside = inside[unique(idx)]
         end
+
+        # return the total set of points
         return unique(sort(vcat(grid, inside)))
     end
 
@@ -201,9 +211,14 @@ module aerosol_optics
         edges[1]   = λ[1]
         edges[end] = λ[end]
         for j in 2:N
+            # The edge between λ[j-1] and λ[j] is the midpoint in log-space
             edges[j] = 0.5 * (λ[j-1] + λ[j])
         end
+
+        # Integrate the stellar spectrum over each cell to get the weights
         C = [star_integral(star, e) for e in edges]
+
+        # Return weights and widths
         return (max.(diff(C), 0.0), diff(edges))
     end
 
@@ -250,35 +265,44 @@ module aerosol_optics
     **Prepare a stellar spectrum for use as a weighting function.**
 
     Sorts the spectrum, converts wavelengths to metres, and tabulates its cumulative
-    integral using power-law segments (see `_segment_integral`).
+    integral using power-law segments within each band (see `_segment_integral`).
 
     Arguments:
     - `star_wl::Vector{Float64}`    wavelengths [nm]
     - `star_fl::Vector{Float64}`    spectral flux (any units, per unit wavelength)
 
-    Returns:
+    Returns on success:
     - `λ::Vector{Float64}`          sorted, unique wavelengths [m]
     - `f::Vector{Float64}`          non-negative flux at each wavelength
     - `C::Vector{Float64}`          cumulative integral of flux at each wavelength
+
+    Returns on failure:
+    - `false`                       failure to prepare the stellar spectrum
     """
     function star_cumulative(star_wl::Vector{Float64},
-                                star_fl::Vector{Float64})::NTuple{3,Vector{Float64}}
-        if (length(star_wl) < 2) || (length(star_wl) != length(star_fl))
-            error("Invalid stellar spectrum passed for aerosol band averaging")
-        end
+                                star_fl::Vector{Float64})::Union{Bool,NTuple{3,Vector{Float64}}}
+
+        # Sort the spectrum by wavelength and remove duplicates
         perm = sortperm(star_wl)
+
+        # Convert to metres, and remove non-positive fluxes and duplicate wavelengths
         λ = star_wl[perm] .* 1e-9
         f = max.(star_fl[perm], 0.0)
         keep = vcat(true, diff(λ) .> 0.0)
         λ = λ[keep]
         f = f[keep]
-        if (length(λ) < 2) || !(λ[1] > 0.0)
-            error("Invalid stellar spectrum passed for aerosol band averaging")
-        end
+
+        # Set cumulative integral to zero at first wavelength
         C = zeros(Float64, length(λ))
+
+        # Loop over each segment of the spectrum,
+        # integrating from the previous wavelength to the current one.
+        # This provides weights for the band-averaging of aerosol optical properties.
         for i in 2:length(λ)
             C[i] = C[i-1] + _segment_integral(λ[i-1], f[i-1], λ[i], f[i], λ[i])
         end
+
+        # Return the sorted wavelengths, fluxes, and cumulative integral
         return (λ, f, C)
     end
 
@@ -287,7 +311,8 @@ module aerosol_optics
 
     Performs 'thin' averaging as in SOCRATES `scatter_average`, weighted by the stellar
     spectrum:
-        k̄ = ∫ k w dλ / ∫ w dλ,     ḡ = ∫ g k_sca w dλ / ∫ k_sca w dλ.
+        k̄ = ∫ k w dλ / ∫ w dλ
+        ḡ = ∫ g k_sca w dλ / ∫ k_sca w dλ.
     Where the stellar spectrum has no flux within a band, uniform weighting is used.
 
     Arguments:
@@ -306,30 +331,35 @@ module aerosol_optics
     function band_average(bands::Matrix{Float64}, star::NTuple{3,Vector{Float64}},
                             λ_tab::Vector{Float64},
                             props::Function)::NTuple{4,Vector{Float64}}
-        nb = size(bands, 1)
-        if size(bands, 2) != 2
-            error("Band edges must have shape (nbands, 2)")
-        end
 
+        # Number of bands (`bands` has shape (nb, 2))
+        nb = size(bands, 1)
+
+        # Set values in bands to zero
         k_abs = zeros(Float64, nb)
         k_sca = zeros(Float64, nb)
         g     = zeros(Float64, nb)
         f_ext = zeros(Float64, nb)
 
+        # Loop through bands
         for b in 1:nb
-            λ_lo, λ_hi = minmax(bands[b,1], bands[b,2])
-            if !(λ_lo > 0.0) || !(λ_hi > λ_lo)
-                error("Invalid band edges for band $b: $(bands[b,:])")
-            end
 
+            # Get band edges
+            λ_lo, λ_hi = minmax(bands[b,1], bands[b,2])
+
+            # Get wavelength grid *within* this band
             λ = band_grid(λ_lo, λ_hi, λ_tab)
+
+            # Determine the weights and widths of each cell in the band,
+            # using the stellar spectrum, so that the properties are weighted by where
+            # the stellar spectrum has increased flux.
             w, dλ = cell_weights(λ, star)
             if !(sum(w) > 0.0)
-                @debug "No stellar flux in band $b; using uniform weighting"
                 w = dλ
             end
-            w = w ./ sum(w)
+            w = w ./ sum(w) # normalize weights to sum to 1
 
+            # Compute the optical properties for this band
             ka, ks, gg, ext = props(λ)
 
             k_abs[b] = sum(w .* ka)
@@ -352,19 +382,33 @@ module aerosol_optics
     - `star_wl::Vector{Float64}`    stellar spectrum wavelengths [nm]
     - `star_fl::Vector{Float64}`    stellar spectral flux (any units, per unit wavelength)
 
-    Returns:
+    Returns on success:
     - `k_abs::Vector{Float64}`      band-mean mass absorption coefficient [m2 kg-1]
     - `k_sca::Vector{Float64}`      band-mean mass scattering coefficient [m2 kg-1]
     - `g::Vector{Float64}`          band-mean asymmetry parameter
     - `f_ext::Vector{Float64}`      fraction of weight in each band which was extrapolated
+
+    Returns on failure:
+    - `false`                       failure to read refractive index file
     """
     function compute_mie_optics(material::String, r_eff::Float64, σ_g::Float64,
                                 bands::Matrix{Float64},
                                 star_wl::Vector{Float64},
-                                star_fl::Vector{Float64})::NTuple{4,Vector{Float64}}
+                                star_fl::Vector{Float64})::Union{NTuple{4,Vector{Float64}},Bool}
 
+        # Get the density of this material
         ρ = density.condensate_rho(material)
-        λ_tab, n_tab, k_tab = read_nk(nk_path(material))
+
+        # Read the refractive index data for this material
+        read_nk_return = read_nk(nk_path(material))
+        if read_nk_return === false
+            @warn("Failed to read refractive index for material '$material'")
+            return false
+        else
+            λ_tab, n_tab, k_tab = read_nk_return
+        end
+
+        # Prepare a stellar spectrum for use as a weighting function
         star = star_cumulative(star_wl, star_fl)
 
         function props(λ::Vector{Float64})
