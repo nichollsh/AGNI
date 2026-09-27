@@ -363,7 +363,7 @@ module atmosphere
         cloud_val_l::Float64                #  |-> Default scalar values to above arrays
         cloud_val_f::Float64                # /
 
-        # Parametrised aerosols (SOCRATES's classic aerosol functionality)
+        # Parametrised aerosols
         aerosol_arr_l::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles [kg/kg]
         aerosol_arr_r::Dict{String, Array{Float64,1}}  # Aerosol particle size profiles [m]
         aerosol_val_r::Float64                         # Default particle size for aerosol species, if not specified in array
@@ -518,14 +518,15 @@ module atmosphere
         elseif isa(value, AbstractString)
             value = Dict{String,Any}("method"=>"mon", "species"=>value)
         elseif !isa(value, AbstractDict)
-            @error "Aerosol '$name' configuration must be a table, got $(typeof(value))"
+            @warn "Aerosol '$name' configuration must be a table, got $(typeof(value))"
+            @warn "    See AGNI documentation pages."
             return nothing
         end
         entry = Dict{String,Any}(string(k)=>v for (k,v) in value)
 
-        # Method
+        # Method for determining optical properties
         if !haskey(entry, "method")
-            @error "Aerosol '$name' must specify a method (\"mon\" or \"mie\")"
+            @warn "Aerosol '$name' must specify method as either \"mon\" or \"mie\""
             return nothing
         end
         method = entry["method"]
@@ -534,19 +535,14 @@ module atmosphere
         elseif method == "mie"
             allowed = AEROSOL_KEYS_MIE
         else
-            @error "Aerosol '$name' has invalid method '$method'; use \"mon\" or \"mie\""
+            @warn "Aerosol '$name' has invalid method '$method'; use \"mon\" or \"mie\""
             return nothing
-        end
-        for k in keys(entry)
-            if !(k in allowed)
-                @error "Aerosol '$name' has unexpected key '$k' for method '$method'"
-                return nothing
-            end
         end
 
         # Mixing ratio source
         if haskey(entry, "mmr") == haskey(entry, "species")
-            @error "Aerosol '$name' must specify exactly one of 'mmr' or 'species'"
+            @warn "The abundance of aerosol '$name' is set incorrectly."
+            @warn "      Specify exactly either 'mmr' or 'species' in its table."
             return nothing
         end
         if haskey(entry, "mmr")
@@ -568,15 +564,17 @@ module atmosphere
 
         # Mie parameters
         if method == "mie"
+            # Check that all required keys are present
             for k in ("nk_file", "r_eff", "sigma_g")
                 if !haskey(entry, k)
                     @error "Aerosol '$name' with method \"mie\" must specify '$k'"
                     return nothing
                 end
             end
-            if !isa(entry["nk_file"], AbstractString) ||
-                    !(entry["nk_file"] in aerosol_optics.list_materials())
-                @error "Aerosol '$name' has unknown refractive index material " *
+
+            # Check that nk_file is valid and we have density data
+            if !(entry["nk_file"] in aerosol_optics.list_materials())
+                @error "Aerosol '$name' has invalid refractive index or density: " *
                         "'$(entry["nk_file"])'"
                 @error "    Available: $(join(aerosol_optics.list_materials(), ", "))"
                 @error "    Try using: \$ ./src/get_data.sh refractive"
@@ -1159,9 +1157,9 @@ module atmosphere
         _check_range("Cloud condensation efficiency", atmos.cloud_alpha; min=0, max=1) || return false
 
         # Aerosol parameters
-        atmos.aerosol_phase_num = 1    # [INPUT] number of phase-function moments
-        atmos.aerosol_relhumid  = 0.0  # [INPUT] relative humidity used by moist aerosol schemes
-        atmos.aerosol_val_r = aerosol_r   # [INPUT] default particle size for aerosol species
+        atmos.aerosol_phase_num = 1             # [INPUT] number of phase-function moments
+        atmos.aerosol_relhumid  = 0.0           # [INPUT] relative humidity used by moist aerosol schemes
+        atmos.aerosol_val_r = aerosol_r         # [INPUT] default particle size for aerosol species
         atmos.aerosol_arr_l = Dict{String, Array{Float64,1}}() # list of MMR profiles
         atmos.aerosol_arr_r = Dict{String, Array{Float64,1}}() # list of particle size profiles
         atmos.aerosol_setby = Dict{String, String}() # dictionary of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
@@ -1495,6 +1493,8 @@ module atmosphere
 
         # Fastchem directory
         atmos.flag_fastchem = false
+        @debug ""
+        @debug "Configuring Fastchem"
         if fastchem_work == UNSET_STR
             # default
             atmos.fastchem_work = joinpath(atmos.IO_DIR, "fastchem")  # default path
@@ -1853,6 +1853,7 @@ module atmosphere
             # Setup spectral file
             socstar::String = joinpath([atmos.IO_DIR, "socstar.dat"])
             if !isempty(stellar_spectrum)
+                @debug ""
                 @debug "Inserting blocks into spectral file"
 
                 # Remove if already exists

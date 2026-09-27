@@ -315,6 +315,8 @@ module save
             var_rl =        defVar(ds, "rl",        Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_thick =     defVar(ds, "dz",        Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m"))
             var_grav =      defVar(ds, "gravity",   Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m s-2", "long_name" => "Gravity at cell centres"))
+            var_massenc =   defVar(ds, "mass_enc",  Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg", "long_name" => "Mass of material enclosed within each layer"))
+            var_masslay =   defVar(ds, "mass_layer",Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg m-2", "long_name" => "Mass of material in each layer, per unit area"))
             var_accel =     defVar(ds, "net_accel", Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "m s-2", "long_name" => "Net acceleration at cell centres, positive downwards"))
             var_rho =       defVar(ds, "density",   Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "kg m-3", "long_name" => "Density of the dry phase at cell centres"))
             var_cp =        defVar(ds, "cp",        Float64, ("nlev_c",)         ;  nc_comp..., attrib = OrderedDict("units" => "J K-1 kg-1"))
@@ -378,6 +380,8 @@ module save
             var_cp[:]  =    atmos.layer_cp
             var_rho[:]  =   atmos.layer_ρ
             var_grav[:]  =  atmos.g
+            var_massenc[:]= atmos.m
+            var_masslay[:]= atmos.layer_σ
             var_accel[:] =  atmos.a
             var_thick[:]  = atmos.layer_thick
 

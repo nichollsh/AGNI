@@ -505,12 +505,7 @@ module AGNI
         if haskey(cfg["composition"], "aerosols")
             aer_cfg = cfg["composition"]["aerosols"]
             if !isa(aer_cfg, AbstractDict) || !all(v->isa(v, AbstractDict), values(aer_cfg))
-                @error "Config: composition.aerosols must contain one table per aerosol"
-                @error "    The inline format 'aerosols = { name = value }' is no longer supported"
-                @error "    Example:"
-                @error "        [composition.aerosols.soot]"
-                @error "            method  = \"mon\""
-                @error "            mmr     = 1e-4"
+                @error "Config: composition.aerosols must contain one table per aerosol. See AGNI documentation."
                 return false
             end
             for (k, v) in aer_cfg

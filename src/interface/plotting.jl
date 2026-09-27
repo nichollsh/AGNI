@@ -452,23 +452,31 @@ module plotting
         x = vcat([[atmos.bands_min[b], atmos.bands_max[b]] for b in 1:atmos.nbands]...) .* 1e6
         xlims = (minimum(x), min(maximum(x), 1e3))
 
+        # plot for each aerosol property in a separate subplot
         p1 = plot(xscale=:log10, yscale=:log10, xlims=xlims, legend=:bottomleft; plt_default...)
         p2 = plot(xscale=:log10, xlims=xlims, ylims=(0.0, 1.0), legend=false; plt_default...)
         p3 = plot(xscale=:log10, xlims=xlims, ylims=(-0.2, 1.0), legend=false; plt_default...)
 
+        # get data from SOCRATES struct
         A = atmos.spectrum.Aerosol
+
+        # loop over aerosols
         for (i, name) in enumerate(atmos.aerosol_names)
+            # extinction coefficient, single scattering albedo, asymmetry parameter
             kext = [A.abs[1,i,b] + A.scat[1,i,b] for b in 1:atmos.nbands]
             ssa  = [kext[b] > 0 ? A.scat[1,i,b]/kext[b] : 0.0 for b in 1:atmos.nbands]
             asym = [A.phf_fnc[1,1,i,b] for b in 1:atmos.nbands]
+
+            # make the plots!
             plot!(p1, x, repeat(max.(kext, 1e-30), inner=2), lw=lw, linealpha=la, label=name)
             plot!(p2, x, repeat(ssa, inner=2), lw=lw, linealpha=la)
             plot!(p3, x, repeat(asym, inner=2), lw=lw, linealpha=la)
         end
 
-        ylabel!(p1, "k_ext [m² kg⁻¹]")
-        ylabel!(p2, "ω")
-        ylabel!(p3, "g")
+        # decorate the plots
+        ylabel!(p1, "Extinction [m² kg⁻¹]")
+        ylabel!(p2, "Single Scattering Albedo")
+        ylabel!(p3, "Asymmetry Parameter")
         xlabel!(p3, "Wavelength [μm]")
 
         plt = plot(p1, p2, p3, layout=(3,1), size=(size_x, size_y); plt_default...)
@@ -1082,7 +1090,7 @@ module plotting
 
         plot!(plt, atmos.bands_cen*1e9, y, color=col_black, label="")
 
-        xlims  = (200.0, 1500.0)
+        xlims  = (200.0, 3000.0)
         xticks = range( xlims[1], xlims[2], step=100.0)
         xaxis!(plt, xlims=xlims, xticks=xticks, minorgrid=true)
 

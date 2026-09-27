@@ -49,6 +49,9 @@ module density
         ("NaCl",                2165.0),  # halite
         ("C",                   2260.0),  # graphite
 
+        # https://webmineral.com/data/Corundum.shtml
+        ("Al2O3", 4050.0), # Corundum
+
         # Bond & Bergstrom (2006), Aerosol Sci. Technol. 40, 27
         ("Soot",                1800.0),
 
