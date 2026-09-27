@@ -429,6 +429,54 @@ module plotting
     end
 
     """
+    **Plot band-averaged aerosol optical properties.**
+
+    Shows the mass extinction coefficient, single scattering albedo, and asymmetry
+    parameter of each aerosol, as stored in the spectral file.
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`               width of the plot in pixels
+    - `size_y::Int64`               height of the plot in pixels
+    """
+    function plot_aerosol_optics(atmos::atmosphere.Atmos_t, fname::String;
+                                    size_x::Int64=size_x_default, size_y::Int64=700)
+
+        if !atmos.is_alloc || !atmos.control.l_aerosol || isempty(atmos.aerosol_names)
+            @debug "No aerosol optical properties to plot"
+            return nothing
+        end
+
+        # Band edges [μm], repeated to make step plots
+        x = vcat([[atmos.bands_min[b], atmos.bands_max[b]] for b in 1:atmos.nbands]...) .* 1e6
+        xlims = (minimum(x), min(maximum(x), 1e3))
+
+        p1 = plot(xscale=:log10, yscale=:log10, xlims=xlims, legend=:bottomleft; plt_default...)
+        p2 = plot(xscale=:log10, xlims=xlims, ylims=(0.0, 1.0), legend=false; plt_default...)
+        p3 = plot(xscale=:log10, xlims=xlims, ylims=(-0.2, 1.0), legend=false; plt_default...)
+
+        A = atmos.spectrum.Aerosol
+        for (i, name) in enumerate(atmos.aerosol_names)
+            kext = [A.abs[1,i,b] + A.scat[1,i,b] for b in 1:atmos.nbands]
+            ssa  = [kext[b] > 0 ? A.scat[1,i,b]/kext[b] : 0.0 for b in 1:atmos.nbands]
+            asym = [A.phf_fnc[1,1,i,b] for b in 1:atmos.nbands]
+            plot!(p1, x, repeat(max.(kext, 1e-30), inner=2), lw=lw, linealpha=la, label=name)
+            plot!(p2, x, repeat(ssa, inner=2), lw=lw, linealpha=la)
+            plot!(p3, x, repeat(asym, inner=2), lw=lw, linealpha=la)
+        end
+
+        ylabel!(p1, "k_ext [m² kg⁻¹]")
+        ylabel!(p2, "ω")
+        ylabel!(p3, "g")
+        xlabel!(p3, "Wavelength [μm]")
+
+        plt = plot(p1, p2, p3, layout=(3,1), size=(size_x, size_y); plt_default...)
+        _savefig_safe(plt, fname)
+        return plt
+    end
+
+    """
     **Plot the gas phase volume mixing ratios at each cell-centre location.**
 
     Arguments:

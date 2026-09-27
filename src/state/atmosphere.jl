@@ -28,6 +28,7 @@ module atmosphere
     import ..formulae
     import ..species
     import ..density
+    import ..aerosol_optics
 
     # Configuration defaults
     const CFG_surface_material::String  = "greybody"
@@ -108,6 +109,8 @@ module atmosphere
     const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
     const COND_DISALLOWED::Array        = ["H2","He"]
     const CLOUD_MMR_FLOOR::Float64      = 1e-40     # Minimum cloud MMR if clouds present
+    const AEROSOL_CUSTOM_TYPE0::Int     = 100       # Type numbers of runtime-calculated aerosols start after this
+    const DROP_TYPE_WATER::Int          = 5         # Droplet type number used for water clouds in spectral files
     const T_INI_MAX::Float64            = 1500.0    # Maximum initial temperature [K]
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
@@ -368,6 +371,10 @@ module atmosphere
         aerosol_names::Array{String,1}                 # Map SOCRATES index (int) to name (string)
         aerosol_relhumid::Float64                      # Mean relative humidity used by moist aerosol schemes [0,1]
         aerosol_phase_num::Int64                       # Number of phase-function moments retained when averaging
+        aerosol_method::Dict{String, String}           # How optical properties are obtained for each aerosol ("mon" or "mie")
+        aerosol_optics::Dict{String, Dict{String,Any}} # Mie parameters for aerosols with method "mie" (nk_file, r_eff, sigma_g)
+        aerosol_custom_types::Dict{Int, String}        # Map type number to name, for aerosols with runtime-calculated properties
+        aerosol_band_props::Dict{String, Matrix{Float64}} # Band-averaged k_abs [m2 kg-1], k_sca [m2 kg-1], g for "mie" aerosols
 
         # Deep atmospheric heating
         deepheat_norm_method::String    # Normalisation method for deep heating (pressure or mass)
@@ -474,6 +481,122 @@ module atmosphere
             return true
         end
         return false
+    end
+
+    # Keys permitted for each aerosol optical-properties method
+    const AEROSOL_KEYS_MON::Vector{String} = ["method", "mmr", "species"]
+    const AEROSOL_KEYS_MIE::Vector{String} = ["method", "mmr", "species",
+                                                "nk_file", "r_eff", "sigma_g"]
+
+    """
+    **Parse and validate the configuration of a single aerosol species.**
+
+    Each aerosol is described by a dictionary containing a `method` key, which is either
+    `"mon"` (pre-computed SOCRATES monochromatic scattering data) or `"mie"` (properties
+    calculated at runtime from refractive indices using Mie theory). Exactly one of `mmr`
+    (a constant mass mixing ratio) or `species` (a condensate which sets the mixing ratio)
+    must be provided. Aerosols with method `"mie"` also require `nk_file`, `r_eff`, and
+    `sigma_g`.
+
+    For backwards compatibility, a number (interpreted as `mmr`) or a string (interpreted as
+    `species`) may be passed in place of the dictionary, implying method `"mon"`.
+
+    Arguments:
+    - `name::String`                        name of the aerosol
+    - `value`                               the configuration for this aerosol
+    - `condensates::Vector{String}`         list of condensable species
+
+    Returns:
+    - `entry::Union{Dict,Nothing}`          normalised configuration, or nothing if invalid
+    """
+    function parse_aerosol_entry(name::String, value,
+                                    condensates::Vector{String})::Union{Dict{String,Any},Nothing}
+
+        # Legacy flat values
+        if isa(value, Real)
+            value = Dict{String,Any}("method"=>"mon", "mmr"=>value)
+        elseif isa(value, AbstractString)
+            value = Dict{String,Any}("method"=>"mon", "species"=>value)
+        elseif !isa(value, AbstractDict)
+            @error "Aerosol '$name' configuration must be a table, got $(typeof(value))"
+            return nothing
+        end
+        entry = Dict{String,Any}(string(k)=>v for (k,v) in value)
+
+        # Method
+        if !haskey(entry, "method")
+            @error "Aerosol '$name' must specify a method (\"mon\" or \"mie\")"
+            return nothing
+        end
+        method = entry["method"]
+        if method == "mon"
+            allowed = AEROSOL_KEYS_MON
+        elseif method == "mie"
+            allowed = AEROSOL_KEYS_MIE
+        else
+            @error "Aerosol '$name' has invalid method '$method'; use \"mon\" or \"mie\""
+            return nothing
+        end
+        for k in keys(entry)
+            if !(k in allowed)
+                @error "Aerosol '$name' has unexpected key '$k' for method '$method'"
+                return nothing
+            end
+        end
+
+        # Mixing ratio source
+        if haskey(entry, "mmr") == haskey(entry, "species")
+            @error "Aerosol '$name' must specify exactly one of 'mmr' or 'species'"
+            return nothing
+        end
+        if haskey(entry, "mmr")
+            if !isa(entry["mmr"], Real)
+                @error "Aerosol '$name' mmr must be a number"
+                return nothing
+            end
+            entry["mmr"] = Float64(entry["mmr"])
+            _check_range("Aerosol '$name' mass mixing ratio", entry["mmr"];
+                            min=0.0, max=1.0) || return nothing
+        else
+            if !isa(entry["species"], AbstractString) || !(entry["species"] in condensates)
+                @error "Aerosol '$name' is tied to '$(entry["species"])', " *
+                        "but this is not in the list of condensates"
+                return nothing
+            end
+            entry["species"] = String(entry["species"])
+        end
+
+        # Mie parameters
+        if method == "mie"
+            for k in ("nk_file", "r_eff", "sigma_g")
+                if !haskey(entry, k)
+                    @error "Aerosol '$name' with method \"mie\" must specify '$k'"
+                    return nothing
+                end
+            end
+            if !isa(entry["nk_file"], AbstractString) ||
+                    !(entry["nk_file"] in aerosol_optics.list_materials())
+                @error "Aerosol '$name' has unknown refractive index material " *
+                        "'$(entry["nk_file"])'"
+                @error "    Available: $(join(aerosol_optics.list_materials(), ", "))"
+                @error "    Try using: \$ ./src/get_data.sh refractive"
+                return nothing
+            end
+            entry["nk_file"] = String(entry["nk_file"])
+            for k in ("r_eff", "sigma_g")
+                if !isa(entry[k], Real) || !isfinite(entry[k])
+                    @error "Aerosol '$name' $k must be a finite number"
+                    return nothing
+                end
+                entry[k] = Float64(entry[k])
+            end
+            _check_range("Aerosol '$name' effective radius", entry["r_eff"];
+                            min=1e-10, max=1e-2) || return nothing
+            _check_range("Aerosol '$name' geometric standard deviation", entry["sigma_g"];
+                            min=1.0, max=5.0) || return nothing
+        end
+
+        return entry
     end
 
     """
@@ -1043,12 +1166,28 @@ module atmosphere
         atmos.aerosol_arr_r = Dict{String, Array{Float64,1}}() # list of particle size profiles
         atmos.aerosol_setby = Dict{String, String}() # dictionary of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
         atmos.aerosol_names = String[] # list of species names, in same order as spectral file
+        atmos.aerosol_method = Dict{String, String}()
+        atmos.aerosol_optics = Dict{String, Dict{String,Any}}()
+        atmos.aerosol_custom_types = Dict{Int, String}()
+        atmos.aerosol_band_props = Dict{String, Matrix{Float64}}()
         for (k, v) in aerosol_species
             k = lowercase(k)
             if haskey(atmos.aerosol_arr_l, k)
                 @error "Duplicated aerosol: $k"
                 return false
             end
+
+            # parse and validate entry
+            entry = parse_aerosol_entry(k, v, condensates)
+            isnothing(entry) && return false
+            atmos.aerosol_method[k] = entry["method"]
+            if entry["method"] == "mie"
+                atmos.aerosol_optics[k] = Dict{String,Any}(
+                                            "nk_file" => entry["nk_file"],
+                                            "r_eff"   => entry["r_eff"],
+                                            "sigma_g" => entry["sigma_g"])
+            end
+            v = haskey(entry, "species") ? entry["species"] : entry["mmr"]
 
             # set to zero for now (true values will be set elsewhere)
             atmos.aerosol_arr_l[k] = zeros(Float64, atmos.nlev_c)
@@ -1760,14 +1899,20 @@ module atmosphere
                 # Write stellar spectrum to disk in format required by SOCRATES
                 spectrum.write_to_socrates_format(wl, fl, socstar) || return false
 
+                # Aerosols using pre-computed (mon) and runtime-calculated (mie) properties
+                aerosol_mon = sort([s for s in keys(atmos.aerosol_arr_l)
+                                        if atmos.aerosol_method[s] == "mon"])
+                aerosol_mie = sort([s for s in keys(atmos.aerosol_arr_l)
+                                        if atmos.aerosol_method[s] == "mie"])
+
                 # Generate aerosol .avg data files
                 aerosol_avg_files_rt::Dict = Dict{String,String}()
-                if atmos.control.l_aerosol
+                if atmos.control.l_aerosol && !isempty(aerosol_mon)
                     @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
                         paths.RAD_DIR,
                         atmos.spectral_file,
-                        [s for s in keys(atmos.aerosol_arr_l)],
+                        aerosol_mon,
                         atmos.IO_DIR,
                         atmos.aerosol_phase_num,
                         socstar,
@@ -1775,7 +1920,7 @@ module atmosphere
                     )
 
                     # check that all files were generated successfully
-                    if length(aerosol_avg_files_rt) != length(atmos.aerosol_arr_l)
+                    if length(aerosol_avg_files_rt) != length(aerosol_mon)
                         @error "Failed to generate required aerosol .avg files"
                         list_available_aerosols(atmos)
                         return false
@@ -1788,12 +1933,43 @@ module atmosphere
                                         atmos.spectral_file,
                                         socstar, spectral_file_run,
                                         atmos.control.l_rayleigh,
-                                        atmos.control.l_aerosol;
+                                        atmos.control.l_aerosol && !isempty(aerosol_mon);
                                         aerosol_avg_files=aerosol_avg_files_rt) || return false
+
+                # Calculate properties of mie aerosols, and append them to the spectral file
+                if atmos.control.l_aerosol && !isempty(aerosol_mie)
+                    @info "Calculating aerosol optical properties with Mie theory"
+                    bands = spectrum.read_band_edges(spectral_file_run)
+                    mie_types = Int[]
+                    mie_abs = Vector{Float64}[]
+                    mie_sca = Vector{Float64}[]
+                    mie_asy = Vector{Float64}[]
+                    for (i, s) in enumerate(aerosol_mie)
+                        opt = atmos.aerosol_optics[s]
+                        @debug "    $s: $(opt["nk_file"]), r_eff=$(opt["r_eff"]) m, σ_g=$(opt["sigma_g"])"
+                        k_abs, k_sca, asy, _ = aerosol_optics.compute_mie_optics(
+                                                    opt["nk_file"], opt["r_eff"], opt["sigma_g"],
+                                                    bands, wl, fl)
+                        type_id = AEROSOL_CUSTOM_TYPE0 + i
+                        atmos.aerosol_custom_types[type_id] = s
+                        atmos.aerosol_band_props[s] = hcat(k_abs, k_sca, asy)
+                        push!(mie_types, type_id)
+                        push!(mie_abs, k_abs)
+                        push!(mie_sca, k_sca)
+                        push!(mie_asy, asy)
+                    end
+                    spectrum.append_custom_aerosols!(spectral_file_run, aerosol_mie, mie_types,
+                                                        mie_abs, mie_sca, mie_asy) || return false
+                end
 
             else
                 # Stellar spectrum was not provided, which is taken to mean that
                 #       the spectral file includes it already.
+                if atmos.control.l_aerosol && any(values(atmos.aerosol_method) .== "mie")
+                    @error "Aerosols with method \"mie\" require a stellar spectrum, " *
+                            "so that their properties can be inserted into the spectral file"
+                    return false
+                end
                 @info "Using pre-existing spectral file without modifications"
                 atmos.star_file = "_ALREADY_IN_SPECTRAL_FILE"
                 spectral_file_run  = atmos.spectral_file
@@ -1962,7 +2138,7 @@ module atmosphere
             ############################################
             # Check Options
             ############################################
-``
+
             if atmos.control.l_rayleigh
                 if !Bool(atmos.spectrum.Basic.l_present[3])
                     @error "The spectral file contains no rayleigh scattering data"
@@ -1973,6 +2149,24 @@ module atmosphere
             if atmos.control.l_aerosol
                 if !Bool(atmos.spectrum.Basic.l_present[11])
                     @error "The spectral file contains no aerosol data"
+                    return false
+                end
+            end
+
+            if atmos.control.l_cloud
+                if !Bool(atmos.spectrum.Basic.l_present[10])
+                    @error "The spectral file contains no droplet (block 10) data"
+                    @error "    Disable clouds, or use a spectral file which contains droplet data"
+                    return false
+                end
+                i_st_water = DROP_TYPE_WATER
+                if !Bool(atmos.spectrum.Drop.l_drop_type[i_st_water])
+                    @error "The spectral file contains no data for droplet type $i_st_water"
+                    return false
+                end
+                if atmos.spectrum.Drop.i_drop_parm[i_st_water] != SOCRATES.rad_pcf.ip_drop_pade_2
+                    @error "Droplet type $i_st_water in the spectral file does not use the " *
+                            "expected Pade parametrisation ($(SOCRATES.rad_pcf.ip_drop_pade_2))"
                     return false
                 end
             end
@@ -2153,7 +2347,7 @@ module atmosphere
                 for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
                     # get name of this aerosol
                     type_id = Int64(atmos.spectrum.Aerosol.type_aerosol[i])
-                    name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
+                    name = aerosol_type_name(atmos, type_id)
 
                     # store name from index (for updating aerosol profiles in the future)
                     atmos.aerosol_names[i] = name
@@ -2204,8 +2398,8 @@ module atmosphere
                 atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous
 
                 # Microphysical optical parametrization IDs from spectrum metadata (water and ice).
-                atmos.control.i_st_water  = 5
-                atmos.control.i_cnv_water = 5
+                atmos.control.i_st_water  = DROP_TYPE_WATER
+                atmos.control.i_cnv_water = DROP_TYPE_WATER
                 atmos.control.i_st_ice    = 11
                 atmos.control.i_cnv_ice   = 11
             else
@@ -2957,6 +3151,30 @@ module atmosphere
 
 
     """
+    **Get the name of an aerosol from its type number in the spectral file.**
+
+    Type numbers defined by SOCRATES map to their standard suffix. Larger type numbers are
+    used for aerosols whose properties were calculated at runtime.
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance
+    - `type_id::Int`                aerosol type number
+
+    Returns:
+    - `name::String`                name of the aerosol
+    """
+    function aerosol_type_name(atmos::atmosphere.Atmos_t, type_id::Int)::String
+        if haskey(atmos.aerosol_custom_types, type_id)
+            return atmos.aerosol_custom_types[type_id]
+        elseif 1 <= type_id <= length(SOCRATES.input_head_pcf.aerosol_suffix)
+            return SOCRATES.input_head_pcf.aerosol_suffix[type_id]
+        else
+            @warn "Unrecognised aerosol type number $type_id in spectral file"
+            return "type$(type_id)"
+        end
+    end
+
+    """
     **List available aerosol species.**
 
     Arguments:
@@ -2973,8 +3191,12 @@ module atmosphere
             @info "Available aerosol species:"
             for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
                 type_id = Int64(atmos.spectrum.Aerosol.type_aerosol[i])
-                name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
-                title = SOCRATES.input_head_pcf.aerosol_title[type_id]
+                name = aerosol_type_name(atmos, type_id)
+                if haskey(atmos.aerosol_custom_types, type_id)
+                    title = "Mie: " * atmos.aerosol_optics[name]["nk_file"]
+                else
+                    title = SOCRATES.input_head_pcf.aerosol_title[type_id]
+                end
                 @info @sprintf("    %10s - %s", name, strip(title))
                 push!(aerosol_names, name)
             end
@@ -2982,13 +3204,16 @@ module atmosphere
                 @info "    [none]"
             end
 
-            @info "Supported but unavailable species:"
+            @info "Supported but unavailable species (method \"mon\"):"
             for (i,name) in enumerate(SOCRATES.input_head_pcf.aerosol_suffix)
                 if !(name in aerosol_names)
                     title = SOCRATES.input_head_pcf.aerosol_title[i]
                     @info @sprintf("    %10s - %s", name, strip(title))
                 end
             end
+
+            @info "Materials available for method \"mie\":"
+            @info "    " * join(aerosol_optics.list_materials(), ", ")
         else
             @info "Aerosol treatment is disabled; no aerosol species available"
         end
@@ -3132,7 +3357,11 @@ module atmosphere
         clamp!(atmos.aerosol_arr_l[species], 0.0, 1.0)
 
         # Set constant size
-        fill!(atmos.aerosol_arr_r[species], atmos.aerosol_val_r)
+        if haskey(atmos.aerosol_optics, species)
+            fill!(atmos.aerosol_arr_r[species], atmos.aerosol_optics[species]["r_eff"])
+        else
+            fill!(atmos.aerosol_arr_r[species], atmos.aerosol_val_r)
+        end
 
         return any(atmos.aerosol_arr_l[species] .> 0.0) # Return whether aerosol is present
     end

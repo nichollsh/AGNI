@@ -89,6 +89,18 @@ module save
     end
 
     """
+    Write a string into column `i` of a NetCDF character variable, padded with spaces and
+    truncated to `nchars`.
+    """
+    function _fill_chars!(var, i::Int, str::AbstractString, nchars::Int)
+        c = collect(rpad(first(str, nchars), nchars))
+        for j in 1:nchars
+            var[j, i] = c[j]
+        end
+        return nothing
+    end
+
+    """
     **Write verbose atmosphere data to a NetCDF file**
 
     Note that the content of the NetCDF file is designed to be compatible with what JANUS
@@ -168,6 +180,7 @@ module save
             defDim(ds, "ngases",    ngases)        # Gases
             defDim(ds, "naeros",    naeros)        # Aerosols
             defDim(ds, "nchars",    nchars)        # Length of string containing gas names
+            defDim(ds, "nchars_long", 2*nchars)    # Length of longer strings
             defDim(ds, "nbands",    atmos.nbands)  # Number of spectral bands
             defDim(ds, "nchannels", atmos.dimen.nd_channel)  # Number of spectral channels
             defDim(ds, "rfm_npts",  atmos.rfm_npts)  # Number of RFM spectral points
@@ -314,6 +327,13 @@ module save
             var_aerosols =  defVar(ds, "aerosols",  Char,    ("nchars", "naeros");  nc_comp..., ) # Transposed cf JANUS because of how Julia stores arrays
             var_aer_l =     defVar(ds, "aer_mmr",   Float64, ("naeros", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "kg kg-1", "long_name" => "Aerosol mass mixing ratio relative to dry air")) # ^^
             var_aer_r =     defVar(ds, "aer_size",  Float64, ("naeros", "nlev_c");  nc_comp..., attrib = OrderedDict("units" => "m", "long_name" => "Aerosol particle size")) # ^^
+            var_aer_m =     defVar(ds, "aer_method",Char,    ("nchars", "naeros");  nc_comp..., attrib = OrderedDict("long_name" => "Method for aerosol optical properties (mon or mie)"))
+            var_aer_mat =   defVar(ds, "aer_material",Char,  ("nchars_long", "naeros");  nc_comp..., attrib = OrderedDict("long_name" => "Refractive index material for mie aerosols"))
+            var_aer_reff =  defVar(ds, "aer_reff",  Float64, ("naeros",)         ;  nc_comp..., attrib = OrderedDict("units" => "m", "long_name" => "Effective radius of log-normal size distribution, for mie aerosols"))
+            var_aer_sig =   defVar(ds, "aer_sigmag",Float64, ("naeros",)         ;  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Geometric standard deviation of log-normal size distribution, for mie aerosols"))
+            var_aer_kabs =  defVar(ds, "aer_kabs",  Float64, ("naeros", "nbands");  nc_comp..., attrib = OrderedDict("units" => "m2 kg-1", "long_name" => "Band-averaged aerosol mass absorption coefficient"))
+            var_aer_ksca =  defVar(ds, "aer_ksca",  Float64, ("naeros", "nbands");  nc_comp..., attrib = OrderedDict("units" => "m2 kg-1", "long_name" => "Band-averaged aerosol mass scattering coefficient"))
+            var_aer_asym =  defVar(ds, "aer_asym",  Float64, ("naeros", "nbands");  nc_comp..., attrib = OrderedDict("units" => "1", "long_name" => "Band-averaged aerosol asymmetry parameter"))
             var_fdl =       defVar(ds, "fl_D_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2", "long_name" => "Bolometric downward LW radiative flux, positive upwards"))
             var_ful =       defVar(ds, "fl_U_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2", "long_name" => "Bolometric upward LW radiative flux, positive upwards"))
             var_fnl =       defVar(ds, "fl_N_LW",   Float64, ("nlev_l",)         ;  nc_comp..., attrib = OrderedDict("units" => "W m-2", "long_name" => "Bolometric net LW radiative flux, positive upwards"))
@@ -387,6 +407,13 @@ module save
                 var_aerosols[:, 1] = fill(' ', nchars)
                 var_aer_l[1, :] = collect(0.0 for i in 1:nlev_c)
                 var_aer_r[1, :] = collect(0.0 for i in 1:nlev_c)
+                var_aer_m[:, 1] = fill(' ', nchars)
+                var_aer_mat[:, 1] = fill(' ', 2*nchars)
+                var_aer_reff[1] = 0.0
+                var_aer_sig[1] = 0.0
+                var_aer_kabs[1, :] .= 0.0
+                var_aer_ksca[1, :] .= 0.0
+                var_aer_asym[1, :] .= 0.0
             else
                 for (i_aer, k_aer) in enumerate(sort(collect(keys(atmos.aerosol_arr_l))))
                     # Fill aerosol names
@@ -401,6 +428,33 @@ module save
                     for i_lvl in 1:nlev_c
                         var_aer_l[i_aer, i_lvl] = atmos.aerosol_arr_l[k_aer][i_lvl]
                         var_aer_r[i_aer, i_lvl] = atmos.aerosol_arr_r[k_aer][i_lvl]
+                    end
+
+                    # Optical properties method and Mie parameters
+                    _fill_chars!(var_aer_m, i_aer, get(atmos.aerosol_method, k_aer, ""), nchars)
+                    if haskey(atmos.aerosol_optics, k_aer)
+                        opt = atmos.aerosol_optics[k_aer]
+                        _fill_chars!(var_aer_mat, i_aer, opt["nk_file"], 2*nchars)
+                        var_aer_reff[i_aer] = opt["r_eff"]
+                        var_aer_sig[i_aer]  = opt["sigma_g"]
+                    else
+                        _fill_chars!(var_aer_mat, i_aer, "", 2*nchars)
+                        var_aer_reff[i_aer] = 0.0
+                        var_aer_sig[i_aer]  = 0.0
+                    end
+
+                    # Band-averaged optical properties, as stored in the spectral file
+                    i_spec = findfirst(==(k_aer), atmos.aerosol_names)
+                    if atmos.is_alloc && atmos.control.l_aerosol && !isnothing(i_spec)
+                        for b in 1:atmos.nbands
+                            var_aer_kabs[i_aer, b] = atmos.spectrum.Aerosol.abs[1, i_spec, b]
+                            var_aer_ksca[i_aer, b] = atmos.spectrum.Aerosol.scat[1, i_spec, b]
+                            var_aer_asym[i_aer, b] = atmos.spectrum.Aerosol.phf_fnc[1, 1, i_spec, b]
+                        end
+                    else
+                        var_aer_kabs[i_aer, :] .= 0.0
+                        var_aer_ksca[i_aer, :] .= 0.0
+                        var_aer_asym[i_aer, :] .= 0.0
                     end
                 end
             end
