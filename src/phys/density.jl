@@ -30,6 +30,67 @@ module density
         ("SO2", 1461.1 ),  # boiling
     ])
 
+    # Table of bulk densities of aerosol and cloud particle materials [kg/m^3]
+    #     Keys match the names of refractive index files in res/refractive/.
+    #     Room-temperature values. For crystalline minerals, the density calculated from the
+    #     unit cell is used, from the Handbook of Mineralogy (Anthony et al., Mineralogical
+    #     Society of America; https://www.handbookofmineralogy.org/), abbreviated HoM.
+    #     Materials without a sourced density for the phase of their optical data are not
+    #     included (e.g. porous amorphous Al2O3, sol-gel amorphous Mg2SiO4).
+    const _lookup_condensate_rho::Dict{String, Float64} = Dict([
+        ("SiO2",                2660.0),  # alpha quartz, HoM
+        ("SiO2_amorph",         2201.0),  # fused silica, Corning HPFS 7980 datasheet
+        ("SiO",                 2140.0),  # amorphous; 2.13-2.15 g/cm3 (PubChem CID 66241, Goodfellow)
+        ("FeO",                 5970.0),  # wustite, HoM
+        ("Fe",                  7874.0),  # alpha iron, HoM
+        ("Fe2O3",               5255.0),  # hematite, HoM
+        ("FeS",                 4850.0),  # troilite, HoM
+        ("Fe2SiO4_KH",          4400.0),  # fayalite, HoM
+        ("MgO",                 3580.0),  # periclase, HoM
+        ("MgSiO3",              3189.0),  # enstatite, HoM
+        ("MgSiO3_amorph_glass", 2710.0),  # glass, Jena Database of Optical Constants for Cosmic Dust
+        ("Mg2SiO4_crystalline", 3271.0),  # forsterite, HoM
+        ("CaTiO3_KH",           4020.0),  # perovskite (synthetic), HoM
+        ("TiO2_anatase",        3890.0),  # anatase, HoM
+        ("TiO2_rutile",         4250.0),  # rutile, HoM
+        ("Na2S",                1856.0),  # PubChem CID 14804 (Merck Index)
+        ("KCl",                 1987.0),  # sylvite, HoM
+        ("NaCl",                2165.0),  # halite, HoM
+        ("C",                   2260.0),  # graphite, HoM
+        ("Soot",                1800.0),  # Bond & Bergstrom (2006), Aerosol Sci. Technol. 40, 27
+        ("Tholin",              1350.0),  # 1.3-1.4 g/cm3, Imanaka et al. (2012) via Horst & Tolbert (2013); uncertain
+    ])
+
+    """
+    **Evaluate the bulk density of an aerosol or cloud particle material.**
+
+    Unlike `liquid_rho`, this raises an error for unknown materials, since a placeholder
+    density would silently produce incorrect optical properties.
+
+    Arguments:
+    - `name::String`    Name of material (matching a refractive index file)
+
+    Returns:
+    - `rho::Float64`    Bulk density of the material [kg m-3]
+    """
+    function condensate_rho(name::String)::Float64
+        if name in keys(_lookup_condensate_rho)
+            return _lookup_condensate_rho[name]
+        else
+            error("Density of aerosol material '$name' is not known")
+        end
+    end
+
+    """
+    **List the aerosol and cloud particle materials with known densities.**
+
+    Returns:
+    - `names::Vector{String}`   Names of materials
+    """
+    function list_condensate_rho()::Vector{String}
+        return sort(collect(keys(_lookup_condensate_rho)))
+    end
+
     """
     **Evaluate the density of a liquid phase.**
 
