@@ -7,6 +7,7 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
     @testset "get_dir" begin
         @test paths.get_dir("thermodynamics") == joinpath(paths.RES_DIR, "thermodynamics")
         @test paths.get_dir("scattering") == joinpath(paths.RES_DIR, "scattering")
+        @test paths.get_dir("refractive") == joinpath(paths.RES_DIR, "refractive")
         @test paths.get_dir("config") == joinpath(paths.RES_DIR, "config")
         @test paths.get_dir("stellar_spectra") == joinpath(paths.RES_DIR, "stellar_spectra")
         @test paths.get_dir("spectral_files") == joinpath(paths.RES_DIR, "spectral_files")

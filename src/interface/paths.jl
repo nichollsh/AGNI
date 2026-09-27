@@ -41,6 +41,9 @@ module paths
         elseif name == "scattering"
             return joinpath(RES_DIR, "scattering")
 
+        elseif name == "refractive"
+            return joinpath(RES_DIR, "refractive")
+
         elseif name == "config"
             return joinpath(RES_DIR, "config")
 

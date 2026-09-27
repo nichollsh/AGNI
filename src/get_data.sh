@@ -44,6 +44,7 @@ surface=$res/surface_albedos
 thermo=$res/thermodynamics
 parfiles=$res/parfiles
 scattering=$res/scattering
+refractive=$res/refractive
 
 # Make basic data folders
 mkdir -p $res
@@ -53,6 +54,7 @@ mkdir -p $surface
 mkdir -p $thermo
 mkdir -p $parfiles
 mkdir -p $scattering
+mkdir -p $refractive
 
 # Help strings
 help_dryrun="Test the get_data script"
@@ -66,6 +68,7 @@ help_surf_extended="Get an extended collection of surface reflectance data"
 help_parfiles="Get a collection of gas linelist par files"
 help_thermo="Get lookup data for thermodynamics (heat capacities, etc.)"
 help_scattering="Get lookup data and parameter files for aerosol and cloud scattering"
+help_refractive="Get refractive indices of aerosol and cloud materials, for Mie calculations"
 help="\
 Download and unpack data used to run the model.
 
@@ -91,6 +94,8 @@ Where [TARGET] can be any of the following:
         $help_parfiles
     scattering
         $help_scattering
+    refractive
+        $help_refractive
     thermodynamics
         $help_thermo\
 "
@@ -309,6 +314,7 @@ function handle_request {
 
             handle_request "thermodynamics"
             handle_request "scattering"
+            handle_request "refractive"
 
             zenodo 15806626 $parfiles h2o-co2_4000-5000.par
             ;;
@@ -367,6 +373,17 @@ function handle_request {
         "scattering")
             echo $help_scattering
             zenodo_all 19294180 $scattering
+            ;;
+
+        "refractive")
+            echo $help_refractive
+            # TODO: set to the Zenodo record containing the files in res/refractive/
+            rec="ZENODO_RECORD_TBD"
+            if [[ "$rec" == "ZENODO_RECORD_TBD" ]]; then
+                echo "WARNING: Zenodo record for refractive index data is not yet set. Skipping."
+            else
+                zenodo_all $rec $refractive
+            fi
             ;;
 
         *)
