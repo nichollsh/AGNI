@@ -9,6 +9,7 @@ Invariants exercised:
 const _SPECTRUM_TESTS_DOC = nothing
 using Test
 using AGNI
+using Printf
 
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
 RES_DIR = joinpath(ROOT_DIR,"res/")
@@ -388,6 +389,258 @@ Some more content
         @test any(contains.(out_lines, "List of indexing numbers of aerosols"))
 
         # remove this folder
+        rm(tmpdir; force=true, recursive=true)
+    end
+
+
+    # -------------
+    # Block-0 aerosol rows are read by SOCRATES with the Fortran format (i5, 7x, i5, 7x, a),
+    # so the index must occupy columns 1-5 and the type number columns 13-17. Type numbers
+    # above 99 (used for runtime-calculated aerosols) must fit this layout.
+    # -------------
+    @testset "aerosol_row_matches_fortran_layout" begin
+        for (idx, typ) in ((1, 4), (3, 101), (12, 32), (99999, 99999))
+            row = AGNI.spectrum.format_aerosol_row(idx, typ, "name")
+            @test parse(Int, row[1:5]) == idx
+            @test parse(Int, row[13:17]) == typ
+            @test strip(row[18:end]) == "name"
+        end
+        # Discrimination guard: the previous layout ("   %2d          %2d") put 3-digit
+        # type numbers outside columns 13-17
+        old = "    1          101       name "
+        @test tryparse(Int, strip(old[13:17])) != 101
+        # Error contract: out-of-range numbers
+        @test_throws ErrorException AGNI.spectrum.format_aerosol_row(0, 101, "x")
+        @test_throws ErrorException AGNI.spectrum.format_aerosol_row(1, 100000, "x")
+    end
+
+    # -------------
+    # Band edges parsed from block 1 of a real spectral file are positive, contiguous, and
+    # increasing; the first band starts at 0.2857 μm in Dayspring/48.
+    # -------------
+    @testset "band_edges_parsed_from_block_1" begin
+        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        bands = AGNI.spectrum.read_band_edges(spfile)
+        @test size(bands) == (48, 2)
+        @test all(bands .> 0.0)
+        @test all(bands[:,2] .> bands[:,1])
+        @test all(isapprox.(bands[2:end,1], bands[1:end-1,2]; rtol=1e-8))
+        @test isapprox(bands[1,1], 2.857143673e-7; rtol=1e-8)
+        # Error contract: missing file, and a file without block 1
+        @test_throws ErrorException AGNI.spectrum.read_band_edges(tempname())
+        write(temp_sf, "*BLOCK: TYPE =    0\n*END\n")
+        @test_throws ErrorException AGNI.spectrum.read_band_edges(temp_sf)
+        rm(temp_sf, force=true)
+    end
+
+    # -------------
+    # Runtime-calculated aerosols appended to a spectral file are read back by SOCRATES with
+    # the written values, in the dry-aerosol parametrisation, alongside any aerosols already
+    # present. Invalid properties are rejected without modifying the file.
+    # -------------
+    @testset "custom_aerosols_round_trip_through_socrates" begin
+        SOC = AGNI.atmosphere.SOCRATES
+        tmpdir = mktempdir()
+        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        work = joinpath(tmpdir, "work.sf")
+        cp(spfile, work; force=true)
+        cp(spfile*"_k", work*"_k"; force=true)
+        nb = 48
+
+        # Values chosen to vary across bands, so that a band offset would be detected
+        ka = [[10.0*b for b in 1:nb], fill(5.0, nb)]
+        ks = [[1000.0 + b for b in 1:nb], fill(0.0, nb)]     # purely absorbing second aerosol
+        g  = [[0.5 + 0.004*b for b in 1:nb], fill(-0.2, nb)]
+
+        # Guard paths: mismatched lengths, unphysical values, NaN, wrong band count
+        orig = read(work, String)
+        @test !AGNI.spectrum.append_custom_aerosols!(work, ["a"], [101, 102], ka[1:1], ks[1:1], g[1:1])
+        @test !AGNI.spectrum.append_custom_aerosols!(work, ["a"], [101], [-ka[1]], ks[1:1], g[1:1])
+        @test !AGNI.spectrum.append_custom_aerosols!(work, ["a"], [101], ka[1:1], ks[1:1], [fill(1.5, nb)])
+        @test !AGNI.spectrum.append_custom_aerosols!(work, ["a"], [101], [fill(NaN, nb)], ks[1:1], g[1:1])
+        @test !AGNI.spectrum.append_custom_aerosols!(work, ["a"], [101], [ones(nb-1)], [ones(nb-1)], [zeros(nb-1)])
+        @test read(work, String) == orig
+        @test AGNI.spectrum.append_custom_aerosols!(work, String[], Int[], Vector{Float64}[],
+                                                    Vector{Float64}[], Vector{Float64}[])
+
+        # Append two aerosols to a file with no aerosols
+        @test AGNI.spectrum.append_custom_aerosols!(work, ["sio2", "feo"], [101, 102], ka, ks, g)
+
+        sp = SOC.StrSpecData()
+        kw = Dict{Symbol,Any}(:spectrum=>sp, :spectral_file=>work)
+        if startswith(AGNI.spectrum.get_socrates_version(RAD_DIR), "24")
+            kw[:l_all_gasses] = true
+        else
+            kw[:l_all_gases] = true
+        end
+        SOC.set_spectrum(; kw...)
+        A = sp.Aerosol
+        @test A.n_aerosol == 2
+        @test Int.(A.type_aerosol[1:2]) == [101, 102]
+        @test all(Int.(A.i_aerosol_parm[1:2]) .== SOC.rad_pcf.ip_aerosol_param_dry)
+        @test Bool(sp.Basic.l_present[11])
+        for i in 1:2, b in 1:nb
+            @test isapprox(A.abs[1, i, b],        ka[i][b]; rtol=1e-8)
+            @test isapprox(A.scat[1, i, b],       ks[i][b]; rtol=1e-8, atol=1e-12)
+            @test isapprox(A.phf_fnc[1, 1, i, b], g[i][b];  rtol=1e-8)
+        end
+        # Discrimination guard: a one-band offset would be detected
+        @test abs(A.abs[1, 1, 10] - ka[1][11]) > 1.0
+
+        rm(tmpdir; force=true, recursive=true)
+    end
+
+    # -------------
+    # Runtime-calculated aerosols are appended after aerosols inserted by prep_spec, taking
+    # the next indices in the block-0 list, and both are read back by SOCRATES.
+    # -------------
+    @testset "custom_aerosols_follow_prep_spec_aerosols" begin
+        SOC = AGNI.atmosphere.SOCRATES
+        tmpdir = mktempdir()
+        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        star_file = joinpath(tmpdir, "star.dat")
+        wl = collect(range(100.0, 1000.0, length=1000))
+        @test AGNI.spectrum.write_to_socrates_format(wl, ones(1000) .* 1e10, star_file, 500)
+        avg = AGNI.spectrum.generate_aerosol_avg_files(RAD_DIR, spfile, ["soot"], tmpdir, 1,
+                                                        star_file, joinpath(RES_DIR, "scattering"))
+        outp = joinpath(tmpdir, "runtime.sf")
+        @test AGNI.spectrum.insert_blocks(RAD_DIR, spfile, star_file, outp, false, true;
+                                            aerosol_avg_files=avg)
+        nb = 48
+        @test AGNI.spectrum.append_custom_aerosols!(outp, ["sio2"], [101],
+                                                    [fill(2.0, nb)], [fill(3.0, nb)], [fill(0.1, nb)])
+        lines = readlines(outp)
+        @test any(l -> startswith(l, "Total number of aerosols =     2"), lines)
+
+        sp = SOC.StrSpecData()
+        kw = Dict{Symbol,Any}(:spectrum=>sp, :spectral_file=>outp)
+        if startswith(AGNI.spectrum.get_socrates_version(RAD_DIR), "24")
+            kw[:l_all_gasses] = true
+        else
+            kw[:l_all_gases] = true
+        end
+        SOC.set_spectrum(; kw...)
+        A = sp.Aerosol
+        @test A.n_aerosol == 2
+        @test Int.(A.type_aerosol[1:2]) == [4, 101]    # soot, then custom
+        @test isapprox(A.abs[1, 2, 7], 2.0; rtol=1e-8)
+        @test A.abs[1, 1, 7] > 0.0                     # soot data from prep_spec intact
+        @test abs(A.abs[1, 1, 7] - 2.0) > 1e-3
+
+        rm(tmpdir; force=true, recursive=true)
+    end
+
+
+    # -------------
+    # Independent check of AGNI's Mie code against SOCRATES' own Mie implementation
+    # (Cscatter -M), for soot with a log-normal distribution (r_g = 0.5 μm, σ_g = 1.65).
+    # Wavelengths are taken from the SOCRATES refractive index table so that interpolation
+    # does not enter. Compared quantity is ⟨σ⟩/⟨V⟩ (independent of density). Agreement is
+    # limited by size-distribution quadrature and 6-digit output (observed ≈ 1e-3).
+    # -------------
+    @testset "mie_agrees_with_socrates_cscatter" begin
+
+        setenv_file = joinpath(RAD_DIR, "set_rad_env")
+        refract = joinpath(RAD_DIR, "data", "aerosol", "refract_soot")
+
+        tmpdir = mktempdir()
+        rows = Vector{Float64}[]
+        on = false
+        for l in readlines(refract)
+            startswith(l, "*BEGIN_DATA") && (on = true; continue)
+            startswith(l, "*END") && break
+            on && push!(rows, parse.(Float64, split(l)))
+        end
+        sel = [r for r in rows if 0.25e-6 <= r[1] <= 30e-6]
+        open(joinpath(tmpdir, "wl"), "w") do f
+            write(f, "Wavelengths\n*BEGIN_DATA\n")
+            foreach(r -> write(f, @sprintf("  %.6e\n", r[1])), sel)
+            write(f, "*END\n")
+        end
+        cmd = "cd $tmpdir && source $setenv_file >/dev/null 2>&1 && " *
+                "$(joinpath(RAD_DIR, "sbin", "Cscatter")) -w wl -r $refract -l -t 1 -C 4 " *
+                "-g 1.0 0.5e-6 1.65 -n 1.0e8 -M -o soot.mon >/dev/null 2>&1"
+        run(`bash -c $cmd`; wait=true)
+        mon = joinpath(tmpdir, "soot.mon")
+        @test isfile(mon)
+
+        L = readlines(mon)
+        φ = parse(Float64, split(L[findfirst(l->contains(l, "Volume fraction"), L)], "=")[2])
+        reff_soc = parse(Float64, split(split(L[findfirst(l->contains(l, "Effective radius"), L)], "=")[2])[1])
+        i0 = findfirst(l->contains(l, "Wavelength (m)"), L)
+        dat = [parse.(Float64, split(l)) for l in L[i0+1:end] if length(split(l)) == 4]
+        @test length(dat) == length(sel)
+
+        # SOCRATES reports r_eff = r_g exp(2.5 ln²σ_g), matching AGNI's conversion. The
+        # tolerance reflects SOCRATES' own size quadrature, which recovers the input
+        # number density to only ~1e-4.
+        r_eff = 0.5e-6 * exp(2.5 * log(1.65)^2)
+        @test isapprox(reff_soc, r_eff; rtol=1e-4)
+        @test isapprox(AGNI.mie.geometric_radius(r_eff, 1.65), 0.5e-6; rtol=1e-12)
+
+        λ = [r[1] for r in sel]
+        m = [complex(r[2], r[3]) for r in sel]
+        ka, ks, g = AGNI.mie.mass_coefficients(λ, m, r_eff, 1.65, 1.0)
+        for i in eachindex(λ)
+            @test isapprox(ka[i], dat[i][2] / φ; rtol=5e-3)
+            @test isapprox(ks[i], dat[i][3] / φ; rtol=5e-3)
+            @test isapprox(g[i],  dat[i][4];     atol=2e-3)
+        end
+        # Discrimination guard: using r_g in place of r_eff changes k_sca by >> 0.5%
+        _, ks_wrong, _ = AGNI.mie.mass_coefficients(λ[1:1], m[1:1], 0.5e-6, 1.65, 1.0)
+        @test abs(ks_wrong[1] / (dat[1][3] / φ) - 1) > 0.05
+
+        rm(tmpdir; force=true, recursive=true)
+    end
+
+    # -------------
+    # Independent check of AGNI's stellar-weighted 'thin' band averaging against SOCRATES'
+    # scatter_average_90, applied to the same monochromatic soot data (soot.mon). Bands
+    # beyond 40 μm are excluded: soot.mon has no data between 40 μm and 10 mm, so results
+    # there depend only on how the gap is interpolated. Agreement elsewhere is limited by
+    # the sparse .mon sampling (62 points) and the down-binned stellar spectrum. This checks
+    # units, normalisation, and band mapping; in these narrow bands the choice of weighting
+    # changes results by less than the tolerance, so the weighting itself is tested with
+    # synthetic data in test_aerosol_optics.jl.
+    # -------------
+    @testset "band_average_agrees_with_socrates_scatter_average" begin
+        tmpdir = mktempdir()
+        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        monfile = joinpath(RES_DIR, "scattering", "soot.mon")
+        wl, fl = AGNI.spectrum.load_from_file(joinpath(RES_DIR, "stellar_spectra", "sun.txt"))
+        star_file = joinpath(tmpdir, "star.dat")
+        @test AGNI.spectrum.write_to_socrates_format(wl, fl, star_file)
+        avg = AGNI.spectrum.generate_aerosol_avg_files(RAD_DIR, spfile, ["soot"], tmpdir, 1,
+                                                        star_file, joinpath(RES_DIR, "scattering"))
+        @test isfile(avg["soot"])
+
+        function readblock(path)
+            L = readlines(path)
+            φ = parse(Float64, split(split(L[findfirst(l->contains(l, "Volume fraction"), L)], "=")[2])[1])
+            i0 = findfirst(l->contains(l, "Absorption"), L)
+            d = [parse.(Float64, split(l)) for l in L[i0+1:end]
+                    if length(split(l)) == 4 && !isnothing(tryparse(Float64, split(l)[1]))]
+            return φ, permutedims(hcat(d...))
+        end
+        φm, mon = readblock(monfile)
+        φa, soc = readblock(avg["soot"])
+
+        λm = mon[:,1]
+        lin(y, x) = x <= λm[1] ? y[1] : x >= λm[end] ? y[end] :
+                    (i = searchsortedlast(λm, x); y[i] + (x - λm[i]) / (λm[i+1] - λm[i]) * (y[i+1] - y[i]))
+        props(λ) = ([lin(mon[:,2] ./ φm, x) for x in λ], [lin(mon[:,3] ./ φm, x) for x in λ],
+                    [lin(mon[:,4], x) for x in λ], fill(false, length(λ)))
+        bands = AGNI.spectrum.read_band_edges(spfile)
+        star = AGNI.aerosol_optics.star_cumulative(wl, fl)
+        ka, ks, g, _ = AGNI.aerosol_optics.band_average(bands, star, λm, props)
+
+        covered = findall(bands[:,2] .<= 40e-6)
+        @test length(covered) >= 40
+        for b in covered
+            @test isapprox(ka[b], soc[b,2] / φa; rtol=0.05)
+            @test isapprox(ks[b], soc[b,3] / φa; rtol=0.05)
+            @test isapprox(g[b],  soc[b,4];      atol=0.01)
+        end
         rm(tmpdir; force=true, recursive=true)
     end
 

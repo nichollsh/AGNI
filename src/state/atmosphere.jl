@@ -24,10 +24,11 @@ module atmosphere
     # Local modules
     import ..phys
     import ..spectrum
-    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum, SMALLFLOAT
+    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum, SMALLFLOAT, R_earth
     import ..formulae
     import ..species
     import ..density
+    import ..aerosol_optics
 
     # Configuration defaults
     const CFG_surface_material::String  = "greybody"
@@ -91,12 +92,14 @@ module atmosphere
     const CFG_transspec_ref_p::Float64      = 20e-3 # 20 mbar
     const CFG_ocean_ob_frac::Float64        = 0.6
     const CFG_ocean_cs_height::Float64      = 3000.0
-    const CFG_hydrograv_steps::Int64        = 2000
-    const CFG_hydrograv_maxdr::Float64      = 1e8
+    const CFG_hydrograv_steps::Int64        = 2048
+    const CFG_hydrograv_hilldr::Float64     = 1e-3 * R_earth
+    const CFG_hydrograv_maxdr::Float64      = R_earth
     const CFG_hydrograv_mindr::Float64      = 1e-5
     const CFG_hydrograv_ming::Float64       = 1e-4
     const CFG_hydrograv_constg::Bool        = false
     const CFG_hydrograv_selfg::Bool         = true
+    const CFG_hill_radius::Float64          = R_earth * 100.0
 
     # Variable limits and defaults
     const NLEV_minimum::Int64           = 15        # minimum allowed number of levels
@@ -108,6 +111,8 @@ module atmosphere
     const SKIN_K_MIN::Float64           = 1e-6      # [W K-1 m-1]
     const COND_DISALLOWED::Array        = ["H2","He"]
     const CLOUD_MMR_FLOOR::Float64      = 1e-40     # Minimum cloud MMR if clouds present
+    const AEROSOL_CUSTOM_TYPE0::Int     = 100       # Type numbers of runtime-calculated aerosols start after this
+    const DROP_TYPE_WATER::Int          = 5         # Droplet type number used for water clouds in spectral files
     const T_INI_MAX::Float64            = 1500.0    # Maximum initial temperature [K]
     const PRESSURE_RATIO_MIN::Float64   = 1.0001    # minimum p_boa/p_toa ratio
     const PRESSURE_FACT_BOT::Float64    = 0.6       # Pressure factor at bottom layer
@@ -259,11 +264,15 @@ module atmosphere
 
         # Hydrostatic integration parameters
         hydrograv_steps::Int64              # number of steps to use when calculating heights and gravity
-        hydrograv_maxdr::Float64            # maximum step size to use when calculating heights [m]
-        hydrograv_mindr::Float64            # minimum step size to use when calculating heights [m]
+        hydrograv_hilldr::Float64           # maximum dz when calculating heights beyond the hill radius [m]
+        hydrograv_maxdr::Float64            # maximum dz when calculating heights [m]
+        hydrograv_mindr::Float64            # minimum dz when calculating heights [m]
         hydrograv_ming::Float64             # minimum allowed gravity [m/s^2]
         hydrograv_constg::Bool              # constant gravity with height?
         hydrograv_selfg::Bool               # include self-gravity of the atmosphere?
+
+        # Hill radius
+        hill_radius::Float64                # Hill radius [m] provided by PROTEUS or from stellar mass
 
         # Gases (only those in SOCRATES spectralfile)
         gas_soc_num::Int64                  # number of gases
@@ -360,7 +369,7 @@ module atmosphere
         cloud_val_l::Float64                #  |-> Default scalar values to above arrays
         cloud_val_f::Float64                # /
 
-        # Parametrised aerosols (SOCRATES's classic aerosol functionality)
+        # Parametrised aerosols
         aerosol_arr_l::Dict{String, Array{Float64,1}}  # Aerosol mass mixing ratio profiles [kg/kg]
         aerosol_arr_r::Dict{String, Array{Float64,1}}  # Aerosol particle size profiles [m]
         aerosol_val_r::Float64                         # Default particle size for aerosol species, if not specified in array
@@ -368,6 +377,10 @@ module atmosphere
         aerosol_names::Array{String,1}                 # Map SOCRATES index (int) to name (string)
         aerosol_relhumid::Float64                      # Mean relative humidity used by moist aerosol schemes [0,1]
         aerosol_phase_num::Int64                       # Number of phase-function moments retained when averaging
+        aerosol_method::Dict{String, String}           # How optical properties are obtained for each aerosol ("mon" or "mie")
+        aerosol_optics::Dict{String, Dict{String,Any}} # Mie parameters for aerosols with method "mie" (nk_file, r_eff, sigma_g)
+        aerosol_custom_types::Dict{Int, String}        # Map type number to name, for aerosols with runtime-calculated properties
+        aerosol_band_props::Dict{String, Matrix{Float64}} # Band-averaged k_abs [m2 kg-1], k_sca [m2 kg-1], g for "mie" aerosols
 
         # Deep atmospheric heating
         deepheat_norm_method::String    # Normalisation method for deep heating (pressure or mass)
@@ -474,6 +487,102 @@ module atmosphere
             return true
         end
         return false
+    end
+
+    """
+    **Parse and validate the configuration of a single aerosol species.**
+
+    Each aerosol is described by a dictionary containing a `method` key, which is either
+    `"mon"` (pre-computed SOCRATES monochromatic scattering data) or `"mie"` (properties
+    calculated at runtime from refractive indices using Mie theory).
+
+    Arguments:
+    - `name::String`                        name of the aerosol
+    - `value`                               the configuration for this aerosol
+    - `condensates::Vector{String}`         list of condensable species
+
+    Returns:
+    - `entry::Union{Dict,Nothing}`          normalised configuration, or nothing if invalid
+    """
+    function parse_aerosol_entry(name::String, value,
+                                    condensates::Vector{String})::Union{Dict{String,Any},Nothing}
+
+        # Legacy flat values
+        if !isa(value, AbstractDict)
+            @warn "Aerosol '$name' configuration must be a table, got $(typeof(value))"
+            @warn "    See AGNI documentation pages."
+            return nothing
+        end
+        entry = Dict{String,Any}(string(k)=>v for (k,v) in value)
+
+        # Method for determining optical properties
+        if !haskey(entry, "method")
+            @warn "Aerosol '$name' must specify method as either \"mon\" or \"mie\""
+            return nothing
+        end
+
+        # Mie parameters
+        if entry["method"] == "mie"
+            # Check that all required keys are present
+            for k in ("nk_file", "r_eff", "sigma_g")
+                if !haskey(entry, k)
+                    @error "Aerosol '$name' with method \"mie\" must specify '$k'"
+                    return nothing
+                end
+            end
+
+            # Check that nk_file is valid and we have density data
+            if !(entry["nk_file"] in aerosol_optics.list_materials())
+                @error "Aerosol '$name' has invalid refractive index or density: " *
+                        "'$(entry["nk_file"])'"
+                @error "    Available: $(join(aerosol_optics.list_materials(), ", "))"
+                @error "    Try using: \$ ./src/get_data.sh refractive"
+                return nothing
+            end
+            entry["nk_file"] = String(entry["nk_file"])
+            for k in ("r_eff", "sigma_g")
+                if !isa(entry[k], Real) || !isfinite(entry[k])
+                    @error "Aerosol '$name' $k must be a finite number"
+                    return nothing
+                end
+                entry[k] = Float64(entry[k])
+            end
+            _check_range("Aerosol '$name' mean effective radius", entry["r_eff"];
+                            min=1e-10, max=1.0) || return nothing
+            _check_range("Aerosol '$name' radius distribution std-dev", entry["sigma_g"];
+                            min=1.0, max=100.0) || return nothing
+        elseif entry["method"] == "mon"
+            # Don't need to do anything
+        else
+            @warn "Aerosol '$name' has invalid method '$(entry["method"])'; use \"mon\" or \"mie\""
+            return nothing
+        end
+
+
+        # Mixing ratio source
+        if haskey(entry, "mmr") == haskey(entry, "species")
+            @warn "The abundance of aerosol '$name' is set incorrectly."
+            @warn "      Specify exactly either 'mmr' or 'species' in its table."
+            return nothing
+        end
+        if haskey(entry, "mmr")
+            if !isa(entry["mmr"], Real)
+                @error "Aerosol '$name' mmr must be a number"
+                return nothing
+            end
+            entry["mmr"] = Float64(entry["mmr"])
+            _check_range("Aerosol '$name' mass mixing ratio", entry["mmr"];
+                            min=0.0, max=1.0) || return nothing
+        else
+            if !isa(entry["species"], AbstractString) || !(entry["species"] in condensates)
+                @error "Aerosol '$name' is tied to '$(entry["species"])', " *
+                        "but this is not in the list of condensates"
+                return nothing
+            end
+            entry["species"] = String(entry["species"])
+        end
+
+        return entry
     end
 
     """
@@ -593,10 +702,12 @@ module atmosphere
     - `ocean_cs_height::Float64`        continental shelf height [m]
     - `hydrograv_steps::Int64`          number of steps to use when calculating heights and gravity
     - `hydrograv_maxdr::Float64`        maximum step size to use when calculating heights [m]
+    - `hydrograv_hilldr::Float64`       maximum step size to use beyond the Hill radius [m]
     - `hydrograv_mindr::Float64`        minimum step size to use when calculating heights [m]
     - `hydrograv_ming::Float64`         minimum allowed gravity [m/s^2]
     - `hydrograv_constg::Bool`          constant gravity with height?
     - `hydrograv_selfg::Bool`           include self-gravity of the atmosphere?
+    - `hill_radius::Float64`            Hill radius of the planet [m]; layers beyond this are unbound
 
     Returns:
         Nothing
@@ -684,14 +795,16 @@ module atmosphere
 
                     hydrograv_steps::Int64 =       CFG_hydrograv_steps,
                     hydrograv_maxdr::Float64 =     CFG_hydrograv_maxdr,
+                    hydrograv_hilldr::Float64 =    CFG_hydrograv_hilldr,
                     hydrograv_mindr::Float64 =     CFG_hydrograv_mindr,
                     hydrograv_ming::Float64 =      CFG_hydrograv_ming,
                     hydrograv_constg::Bool =       CFG_hydrograv_constg,
-                    hydrograv_selfg::Bool =        CFG_hydrograv_selfg
+                    hydrograv_selfg::Bool =        CFG_hydrograv_selfg,
+                    hill_radius::Float64 =         CFG_hill_radius
                     )::Bool
 
         # Say hello
-        @info  "Setting-up a new atmosphere struct"
+        @info  "Setting up a new atmosphere struct"
         atmos.AGNI_VERSION = AGNI_VERSION
         @debug "AGNI VERSION = "*AGNI_VERSION
 
@@ -928,12 +1041,18 @@ module atmosphere
         _check_range("Hydrostatic integration steps", atmos.hydrograv_steps; min=2, max=1e5) || return false
         atmos.hydrograv_maxdr = hydrograv_maxdr
         _check_range("Hydrostatic integration max step size", atmos.hydrograv_maxdr; min=1e-9, max=1e9) || return false
+        atmos.hydrograv_hilldr = hydrograv_hilldr
+        _check_range("Hydrostatic integration max step size beyond Hill radius", atmos.hydrograv_hilldr; min=1e-9, max=1e9) || return false
         atmos.hydrograv_mindr = hydrograv_mindr
         _check_range("Hydrostatic integration min step size", atmos.hydrograv_mindr; min=1e-9, max=1e9) || return false
         atmos.hydrograv_ming = hydrograv_ming
         _check_range("Hydrostatic integration min gravity", atmos.hydrograv_ming; min=0.0) || return false
         atmos.hydrograv_constg = hydrograv_constg
         atmos.hydrograv_selfg = hydrograv_selfg
+
+        # hill radius is reasonable
+        atmos.hill_radius = hill_radius
+        _check_range("Hill radius", atmos.hill_radius; min=1.0) || return false
 
         # interior radius
         atmos.rp = radius
@@ -1036,19 +1155,35 @@ module atmosphere
         _check_range("Cloud condensation efficiency", atmos.cloud_alpha; min=0, max=1) || return false
 
         # Aerosol parameters
-        atmos.aerosol_phase_num = 1    # [INPUT] number of phase-function moments
-        atmos.aerosol_relhumid  = 0.0  # [INPUT] relative humidity used by moist aerosol schemes
-        atmos.aerosol_val_r = aerosol_r   # [INPUT] default particle size for aerosol species
+        atmos.aerosol_phase_num = 1             # [INPUT] number of phase-function moments
+        atmos.aerosol_relhumid  = 0.0           # [INPUT] relative humidity used by moist aerosol schemes
+        atmos.aerosol_val_r = aerosol_r         # [INPUT] default particle size for aerosol species
         atmos.aerosol_arr_l = Dict{String, Array{Float64,1}}() # list of MMR profiles
         atmos.aerosol_arr_r = Dict{String, Array{Float64,1}}() # list of particle size profiles
         atmos.aerosol_setby = Dict{String, String}() # dictionary of how each aerosol is set (e.g. "value", "S8", "H2O", etc.)
         atmos.aerosol_names = String[] # list of species names, in same order as spectral file
+        atmos.aerosol_method = Dict{String, String}()
+        atmos.aerosol_optics = Dict{String, Dict{String,Any}}()
+        atmos.aerosol_custom_types = Dict{Int, String}()
+        atmos.aerosol_band_props = Dict{String, Matrix{Float64}}()
         for (k, v) in aerosol_species
             k = lowercase(k)
             if haskey(atmos.aerosol_arr_l, k)
                 @error "Duplicated aerosol: $k"
                 return false
             end
+
+            # parse and validate entry
+            entry = parse_aerosol_entry(k, v, condensates)
+            isnothing(entry) && return false
+            atmos.aerosol_method[k] = entry["method"]
+            if entry["method"] == "mie"
+                atmos.aerosol_optics[k] = Dict{String,Any}(
+                                            "nk_file" => entry["nk_file"],
+                                            "r_eff"   => entry["r_eff"],
+                                            "sigma_g" => entry["sigma_g"])
+            end
+            v = haskey(entry, "species") ? entry["species"] : entry["mmr"]
 
             # set to zero for now (true values will be set elsewhere)
             atmos.aerosol_arr_l[k] = zeros(Float64, atmos.nlev_c)
@@ -1069,6 +1204,7 @@ module atmosphere
                 # interpret as MMR value
                 v = Float64(v)
                 _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
+                @debug "Aerosol '$k' to be set by value $v"
                 set_aerosol!(atmos, k, v)
                 atmos.aerosol_setby[k] = "value"
             end
@@ -1356,6 +1492,8 @@ module atmosphere
 
         # Fastchem directory
         atmos.flag_fastchem = false
+        @debug ""
+        @debug "Configuring Fastchem"
         if fastchem_work == UNSET_STR
             # default
             atmos.fastchem_work = joinpath(atmos.IO_DIR, "fastchem")  # default path
@@ -1714,6 +1852,7 @@ module atmosphere
             # Setup spectral file
             socstar::String = joinpath([atmos.IO_DIR, "socstar.dat"])
             if !isempty(stellar_spectrum)
+                @debug ""
                 @debug "Inserting blocks into spectral file"
 
                 # Remove if already exists
@@ -1760,14 +1899,20 @@ module atmosphere
                 # Write stellar spectrum to disk in format required by SOCRATES
                 spectrum.write_to_socrates_format(wl, fl, socstar) || return false
 
+                # Aerosols using pre-computed (mon) and runtime-calculated (mie) properties
+                aerosol_mon = sort([s for s in keys(atmos.aerosol_arr_l)
+                                        if atmos.aerosol_method[s] == "mon"])
+                aerosol_mie = sort([s for s in keys(atmos.aerosol_arr_l)
+                                        if atmos.aerosol_method[s] == "mie"])
+
                 # Generate aerosol .avg data files
                 aerosol_avg_files_rt::Dict = Dict{String,String}()
-                if atmos.control.l_aerosol
+                if atmos.control.l_aerosol && !isempty(aerosol_mon)
                     @debug "Generating aerosol .avg files with scatter_average_90"
                     aerosol_avg_files_rt = spectrum.generate_aerosol_avg_files(
                         paths.RAD_DIR,
                         atmos.spectral_file,
-                        [s for s in keys(atmos.aerosol_arr_l)],
+                        aerosol_mon,
                         atmos.IO_DIR,
                         atmos.aerosol_phase_num,
                         socstar,
@@ -1775,7 +1920,7 @@ module atmosphere
                     )
 
                     # check that all files were generated successfully
-                    if length(aerosol_avg_files_rt) != length(atmos.aerosol_arr_l)
+                    if length(aerosol_avg_files_rt) != length(aerosol_mon)
                         @error "Failed to generate required aerosol .avg files"
                         list_available_aerosols(atmos)
                         return false
@@ -1788,12 +1933,48 @@ module atmosphere
                                         atmos.spectral_file,
                                         socstar, spectral_file_run,
                                         atmos.control.l_rayleigh,
-                                        atmos.control.l_aerosol;
+                                        atmos.control.l_aerosol && !isempty(aerosol_mon);
                                         aerosol_avg_files=aerosol_avg_files_rt) || return false
+
+                # Calculate properties of mie aerosols, and append them to the spectral file
+                if atmos.control.l_aerosol && !isempty(aerosol_mie)
+                    @info "Calculating aerosol optical properties with Mie theory"
+                    bands = spectrum.read_band_edges(spectral_file_run)
+                    mie_types = Int[]
+                    mie_abs = Vector{Float64}[]
+                    mie_sca = Vector{Float64}[]
+                    mie_asy = Vector{Float64}[]
+                    for (i, s) in enumerate(aerosol_mie)
+                        opt = atmos.aerosol_optics[s]
+                        @debug "    $s: $(opt["nk_file"]), r_eff=$(opt["r_eff"]) m, σ_g=$(opt["sigma_g"])"
+                        mie_out = aerosol_optics.compute_mie_optics(
+                                                    opt["nk_file"], opt["r_eff"], opt["sigma_g"],
+                                                    bands, wl, fl)
+                        if mie_out === false
+                            @error "Failed to calculate optical properties of aerosol '$s'"
+                            return false
+                        end
+                        k_abs, k_sca, asy, _ = mie_out
+                        type_id = AEROSOL_CUSTOM_TYPE0 + i
+                        atmos.aerosol_custom_types[type_id] = s
+                        atmos.aerosol_band_props[s] = hcat(k_abs, k_sca, asy)
+                        push!(mie_types, type_id)
+                        push!(mie_abs, k_abs)
+                        push!(mie_sca, k_sca)
+                        push!(mie_asy, asy)
+                    end
+                    spectrum.append_custom_aerosols!(spectral_file_run, aerosol_mie, mie_types,
+                                                        mie_abs, mie_sca, mie_asy) || return false
+                end
 
             else
                 # Stellar spectrum was not provided, which is taken to mean that
                 #       the spectral file includes it already.
+                if atmos.control.l_aerosol && any(values(atmos.aerosol_method) .== "mie")
+                    @error "Aerosols with method \"mie\" require a stellar spectrum, " *
+                            "so that their properties can be inserted into the spectral file"
+                    return false
+                end
                 @info "Using pre-existing spectral file without modifications"
                 atmos.star_file = "_ALREADY_IN_SPECTRAL_FILE"
                 spectral_file_run  = atmos.spectral_file
@@ -1962,7 +2143,7 @@ module atmosphere
             ############################################
             # Check Options
             ############################################
-``
+
             if atmos.control.l_rayleigh
                 if !Bool(atmos.spectrum.Basic.l_present[3])
                     @error "The spectral file contains no rayleigh scattering data"
@@ -1973,6 +2154,24 @@ module atmosphere
             if atmos.control.l_aerosol
                 if !Bool(atmos.spectrum.Basic.l_present[11])
                     @error "The spectral file contains no aerosol data"
+                    return false
+                end
+            end
+
+            if atmos.control.l_cloud
+                if !Bool(atmos.spectrum.Basic.l_present[10])
+                    @error "The spectral file contains no droplet (block 10) data"
+                    @error "    Disable clouds, or use a spectral file which contains droplet data"
+                    return false
+                end
+                i_st_water = DROP_TYPE_WATER
+                if !Bool(atmos.spectrum.Drop.l_drop_type[i_st_water])
+                    @error "The spectral file contains no data for droplet type $i_st_water"
+                    return false
+                end
+                if atmos.spectrum.Drop.i_drop_parm[i_st_water] != SOCRATES.rad_pcf.ip_drop_pade_2
+                    @error "Droplet type $i_st_water in the spectral file does not use the " *
+                            "expected Pade parametrisation ($(SOCRATES.rad_pcf.ip_drop_pade_2))"
                     return false
                 end
             end
@@ -2153,7 +2352,7 @@ module atmosphere
                 for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
                     # get name of this aerosol
                     type_id = Int64(atmos.spectrum.Aerosol.type_aerosol[i])
-                    name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
+                    name = aerosol_type_name(atmos, type_id)
 
                     # store name from index (for updating aerosol profiles in the future)
                     atmos.aerosol_names[i] = name
@@ -2204,8 +2403,8 @@ module atmosphere
                 atmos.control.i_inhom     = SOCRATES.rad_pcf.ip_homogeneous
 
                 # Microphysical optical parametrization IDs from spectrum metadata (water and ice).
-                atmos.control.i_st_water  = 5
-                atmos.control.i_cnv_water = 5
+                atmos.control.i_st_water  = DROP_TYPE_WATER
+                atmos.control.i_cnv_water = DROP_TYPE_WATER
                 atmos.control.i_st_ice    = 11
                 atmos.control.i_cnv_ice   = 11
             else
@@ -2539,9 +2738,20 @@ module atmosphere
 
         # Temporary values
         nsub::Int64 = round(Int64, atmos.hydrograv_steps/atmos.nlev_c, RoundUp)
+        maxdr::Float64 = atmos.hydrograv_maxdr / 2 # we do 2 integrations per layer
+        isbound::Bool = true
+        m_atm::Float64 = 0.0    # mass of atmosphere below the current layer [kg]
+        a_σ::Float64 = 0.0      # net acceleration used to calculate layer mass [m s-2]
 
         # Integrate from surface upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
+
+            # Set maximum dr for this layer
+            if atmos.rl[i+1] > atmos.hill_radius
+                maxdr = atmos.hydrograv_hilldr / 2
+                isbound = false
+                atmos.layer_isbound[i] = false
+            end
 
             # ------------
             # Integrate from lower edge to centre
@@ -2553,20 +2763,26 @@ module atmosphere
                                     constg = atmos.hydrograv_constg,
                                     selfg = atmos.hydrograv_selfg)
 
+            #   check for divergence: when the scale height greatly exceeds the radius
+            isbound &= isfinite(atmos.r[i]) && (atmos.r[i] > atmos.rl[i+1]) && isfinite(atmos.g[i])
+
             #   apply radius limiter
-            atmos.r[i] = max(atmos.r[i], atmos.rl[i+1] + atmos.hydrograv_mindr)
-            if atmos.r[i] > atmos.rl[i+1] + atmos.hydrograv_maxdr/2
-                atmos.r[i] = atmos.rl[i+1] + atmos.hydrograv_maxdr/2
+            if !isbound || (atmos.r[i] > atmos.rl[i+1] + maxdr)
+                atmos.r[i] = atmos.rl[i+1] + maxdr
                 atmos.layer_isbound[i] = false
             end
+            atmos.r[i] = max(atmos.r[i], atmos.rl[i+1] + atmos.hydrograv_mindr)
 
             #   apply gravity limiter
             if atmos.hydrograv_constg
                 atmos.g[i]  = atmos.grav_surf
             end
-            if atmos.g[i] < atmos.hydrograv_ming
+            if !isbound || (atmos.g[i] < atmos.hydrograv_ming)
                 atmos.g[i] = atmos.hydrograv_ming
                 atmos.layer_isbound[i] = false
+            end
+            if !isfinite(atmos.m[i])
+                atmos.m[i] = atmos.ml[i+1]
             end
 
             # calculate net acceleration at layer centre
@@ -2583,20 +2799,26 @@ module atmosphere
                                     constg = atmos.hydrograv_constg,
                                     selfg = atmos.hydrograv_selfg)
 
+            #   check for divergence, as above
+            isbound &= isfinite(atmos.rl[i]) && (atmos.rl[i] > atmos.r[i]) && isfinite(atmos.gl[i])
+
             #   apply radius limiter
-            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + atmos.hydrograv_mindr)
-            if atmos.rl[i] > atmos.r[i] + atmos.hydrograv_maxdr/2
-                atmos.rl[i] = atmos.r[i] + atmos.hydrograv_maxdr/2
+            if !isbound || (atmos.rl[i] > atmos.r[i] + maxdr)
+                atmos.rl[i] = atmos.r[i] + maxdr
                 atmos.layer_isbound[i] = false
             end
+            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + atmos.hydrograv_mindr)
 
             #   apply gravity limiter
             if atmos.hydrograv_constg
                 atmos.gl[i] = atmos.grav_surf
             end
-            if atmos.gl[i] < atmos.hydrograv_ming
+            if !isbound || (atmos.gl[i] < atmos.hydrograv_ming)
                 atmos.gl[i] = atmos.hydrograv_ming
                 atmos.layer_isbound[i] = false
+            end
+            if !isfinite(atmos.ml[i])
+                atmos.ml[i] = atmos.m[i]
             end
 
             #  calculate net acceleration at layer upper edge
@@ -2606,11 +2828,40 @@ module atmosphere
             # Store: Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
-            # Mass of layer, per unit area at layer-centre [kg m-2]
-            atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
+            # Mass of layer, per unit area [kg m-2], from hydrostatic balance dp = -ρ a dr.
+            if atmos.layer_isbound[i]
+                a_σ = atmos.a[i]
+            else
+                # Gravity in unbound layers has been set to the floor value - handle this.
+                if atmos.hydrograv_constg
+                    # acceleration equal to surface
+                    a_σ = atmos.grav_surf
+                elseif atmos.hydrograv_selfg
+                    # acceleration equal to enclosed mass
+                    a_σ = phys.grav_accel(atmos.interior_mass + m_atm, atmos.r[i])
+                else
+                    # acceleration equal to enclosed non-atmospheric mass
+                    a_σ = phys.grav_accel(atmos.interior_mass, atmos.r[i])
+                end
+                a_σ -= phys.cent_accel(atmos.axial_period, atmos.r[i], atmos.col_lat)
+            end
+
+            # Calculate layer mass per unit area using acceleration
+            if isfinite(a_σ) && (a_σ > atmos.hydrograv_ming)
+                atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i]) / a_σ
+            else
+                # no meaningful acceleration, so use the mass within the layer
+                atmos.layer_σ[i] = atmos.layer_ρ[i] * atmos.layer_thick[i]
+            end
+
+            # Accumulate atmosphere mass
+            m_atm += atmos.layer_σ[i] * 4 * pi * atmos.r[i]^2
+
+            # Check if layer is bound
+            isbound &= atmos.layer_isbound[i]
         end
 
-        return all(atmos.layer_isbound)
+        return isbound
     end
 
     """
@@ -2690,13 +2941,14 @@ module atmosphere
         end
 
         # Parameters
-        dp::Float64  = (p1-p0)/max(2,n) # this will be negative
+        nstep::Int64 = max(2,n)
+        dp::Float64  = (p1-p0)/nstep # this will be negative
         dp2::Float64 = dp/2
         k1::Float64  = 0.0; k2::Float64 = 0.0
         k3::Float64  = 0.0; k4::Float64 = 0.0
 
-        # Loop over sub-levels between p0 and p1
-        for _ in range(p0, stop=p1, step=dp)
+        # Loop over sub-levels between p0 and p1 (exactly nstep steps, ending at p1)
+        for _ in 1:nstep
 
             # Integrate radius ...
             k1 = _drdp(pj,       rj)
@@ -2957,6 +3209,30 @@ module atmosphere
 
 
     """
+    **Get the name of an aerosol from its type number in the spectral file.**
+
+    Type numbers defined by SOCRATES map to their standard suffix. Larger type numbers are
+    used for aerosols whose properties were calculated at runtime.
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   the atmosphere struct instance
+    - `type_id::Int`                aerosol type number
+
+    Returns:
+    - `name::String`                name of the aerosol
+    """
+    function aerosol_type_name(atmos::atmosphere.Atmos_t, type_id::Int)::String
+        if haskey(atmos.aerosol_custom_types, type_id)
+            return atmos.aerosol_custom_types[type_id]
+        elseif 1 <= type_id <= length(SOCRATES.input_head_pcf.aerosol_suffix)
+            return SOCRATES.input_head_pcf.aerosol_suffix[type_id]
+        else
+            @warn "Unrecognised aerosol type number $type_id in spectral file"
+            return "type$(type_id)"
+        end
+    end
+
+    """
     **List available aerosol species.**
 
     Arguments:
@@ -2973,8 +3249,12 @@ module atmosphere
             @info "Available aerosol species:"
             for i = 1:atmos.spectrum.Aerosol.n_aerosol_mr
                 type_id = Int64(atmos.spectrum.Aerosol.type_aerosol[i])
-                name = SOCRATES.input_head_pcf.aerosol_suffix[type_id]
-                title = SOCRATES.input_head_pcf.aerosol_title[type_id]
+                name = aerosol_type_name(atmos, type_id)
+                if haskey(atmos.aerosol_custom_types, type_id)
+                    title = "Mie: " * atmos.aerosol_optics[name]["nk_file"]
+                else
+                    title = SOCRATES.input_head_pcf.aerosol_title[type_id]
+                end
                 @info @sprintf("    %10s - %s", name, strip(title))
                 push!(aerosol_names, name)
             end
@@ -2982,13 +3262,16 @@ module atmosphere
                 @info "    [none]"
             end
 
-            @info "Supported but unavailable species:"
+            @info "Supported but unavailable species (method \"mon\"):"
             for (i,name) in enumerate(SOCRATES.input_head_pcf.aerosol_suffix)
                 if !(name in aerosol_names)
                     title = SOCRATES.input_head_pcf.aerosol_title[i]
                     @info @sprintf("    %10s - %s", name, strip(title))
                 end
             end
+
+            @info "Materials available for method \"mie\":"
+            @info "    " * join(aerosol_optics.list_materials(), ", ")
         else
             @info "Aerosol treatment is disabled; no aerosol species available"
         end
@@ -3132,7 +3415,11 @@ module atmosphere
         clamp!(atmos.aerosol_arr_l[species], 0.0, 1.0)
 
         # Set constant size
-        fill!(atmos.aerosol_arr_r[species], atmos.aerosol_val_r)
+        if haskey(atmos.aerosol_optics, species)
+            fill!(atmos.aerosol_arr_r[species], atmos.aerosol_optics[species]["r_eff"])
+        else
+            fill!(atmos.aerosol_arr_r[species], atmos.aerosol_val_r)
+        end
 
         return any(atmos.aerosol_arr_l[species] .> 0.0) # Return whether aerosol is present
     end

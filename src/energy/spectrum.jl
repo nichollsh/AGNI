@@ -115,6 +115,170 @@ module spectrum
     end
 
     """
+    **Format a row of the aerosol list in block 0 of a SOCRATES spectral file.**
+
+    SOCRATES reads these rows with the Fortran format `(i5, 7x, i5, 7x, a)`.
+
+    Arguments:
+    - `index::Int`      Index of the aerosol within the spectral file
+    - `type::Int`       Aerosol type number
+    - `title`           Aerosol name
+
+    Returns:
+    - `row::String`     Formatted row
+    """
+    function format_aerosol_row(index::Int, type::Int, title::AbstractString)::String
+        if !(0 < index < 100000) || !(0 < type < 100000)
+            error("Aerosol index ($index) and type ($type) must be in the range 1-99999")
+        end
+        return @sprintf("%5d%7s%5d%7s%s ", index, "", type, "", title)
+    end
+
+    """
+    **Read the band edges from a SOCRATES spectral file.**
+
+    Parses block 1 of the spectral file directly, so that it can be used before the file is
+    loaded into SOCRATES.
+
+    Arguments:
+    - `spec_file::String`   Path to spectral file
+
+    Returns:
+    - `bands::Matrix{Float64}`  Band edges [m], with size (nbands, 2)
+    """
+    function read_band_edges(spec_file::String)::Matrix{Float64}
+        if !isfile(spec_file)
+            error("Spectral file not found: '$spec_file'")
+        end
+        lines = readlines(spec_file)
+        i0 = findfirst(l->startswith(l, "*BLOCK: TYPE =    1"), lines)
+        isnothing(i0) && error("Could not find block 1 in spectral file '$spec_file'")
+
+        rows = Vector{Float64}[]
+        for l in lines[i0+1:end]
+            startswith(l, "*END") && break
+            vals = tryparse.(Float64, split(l))
+            if (length(vals) == 3) && !any(isnothing, vals)
+                push!(rows, [vals[2], vals[3]])
+            end
+        end
+        isempty(rows) && error("Could not parse band edges from '$spec_file'")
+        return permutedims(hcat(rows...))
+    end
+
+    """
+    **Append aerosols with runtime-calculated optical properties to a spectral file.**
+
+    Adds each aerosol to the list in block 0, and appends a block of type 11 (dry aerosol,
+    one phase function moment) with the provided band-averaged properties. This must be
+    applied after any modifications made using `prep_spec`, since `prep_spec` does not
+    recognise aerosol type numbers outside of those defined by SOCRATES.
+
+    Arguments:
+    - `work_file::String`           Path to spectral file to modify in-place
+    - `names::Vector{String}`       Aerosol names
+    - `types::Vector{Int}`          Aerosol type numbers
+    - `k_abs::Vector{Vector{Float64}}`  Mass absorption coefficients per band [m2 kg-1]
+    - `k_sca::Vector{Vector{Float64}}`  Mass scattering coefficients per band [m2 kg-1]
+    - `g::Vector{Vector{Float64}}`      Asymmetry parameters per band
+
+    Returns:
+    - `success::Bool`               function executed successfully
+    """
+    function append_custom_aerosols!(work_file::String, names::Vector{String},
+                                        types::Vector{Int},
+                                        k_abs::Vector{Vector{Float64}},
+                                        k_sca::Vector{Vector{Float64}},
+                                        g::Vector{Vector{Float64}})::Bool
+        if !isfile(work_file)
+            @warn "Spectral file not found: '$work_file'"
+            return false
+        end
+        nadd = length(names)
+        if any(length.([types, k_abs, k_sca, g]) .!= nadd)
+            @warn "Inconsistent number of aerosols passed to append_custom_aerosols!"
+            return false
+        end
+        if nadd == 0
+            return true
+        end
+
+        lines = readlines(work_file)
+
+        # Number of bands
+        i_nb = findfirst(l->startswith(l, "Number of spectral bands"), lines)
+        if isnothing(i_nb)
+            @warn "Could not find number of bands in spectral file"
+            return false
+        end
+        nband = parse(Int, strip(split(lines[i_nb], "=")[2]))
+
+        # Validate properties
+        for i in 1:nadd
+            if any(length.([k_abs[i], k_sca[i], g[i]]) .!= nband)
+                @warn "Aerosol '$(names[i])' properties do not match number of bands ($nband)"
+                return false
+            end
+            if !all(isfinite, k_abs[i]) || !all(isfinite, k_sca[i]) || !all(isfinite, g[i])
+                @warn "Aerosol '$(names[i])' has non-finite optical properties"
+                return false
+            end
+            if any(k_abs[i] .< 0.0) || any(k_sca[i] .< 0.0) || any(abs.(g[i]) .> 1.0)
+                @warn "Aerosol '$(names[i])' has unphysical optical properties"
+                return false
+            end
+        end
+
+        # Existing aerosol count
+        i_na = findfirst(l->startswith(l, "Total number of aerosols"), lines)
+        if isnothing(i_na)
+            # Create header, before the first *END
+            i_end = findfirst(l->startswith(l, "*END"), lines)
+            if isnothing(i_end)
+                @warn "Could not find first '*END' when adding aerosol header"
+                return false
+            end
+            insert!(lines, i_end, "List of indexing numbers of aerosols.")
+            insert!(lines, i_end+1, "Index       Aerosol(type number and name)")
+            insert!(lines, 4, "Total number of aerosols =    0")
+            i_na = 4
+        end
+        n_old = parse(Int, strip(split(lines[i_na], "=")[2]))
+
+        # Aerosol list in block 0
+        i_hd = findfirst(l->startswith(l, "Index       Aerosol"), lines)
+        if isnothing(i_hd)
+            @warn "Could not find aerosol list in spectral file"
+            return false
+        end
+        for i in 1:nadd
+            insert!(lines, i_hd + n_old + i, format_aerosol_row(n_old+i, types[i], names[i]))
+        end
+        lines[i_na] = @sprintf("Total number of aerosols = %5d", n_old + nadd)
+
+        # Append block 11 for each aerosol
+        for i in 1:nadd
+            push!(lines, "*BLOCK: TYPE =   11: SUBTYPE =    0: VERSION =    2")
+            push!(lines, "Scattering parameters for dry aerosols.")
+            push!(lines, @sprintf("Index of species = %5d  %s", n_old+i, names[i]))
+            push!(lines, "Number of terms in phase function =     1")
+            push!(lines, "Band        Absorption          Scattering          Phase fnc")
+            push!(lines, "            (m2.kg-1)           (m2.kg-1)")
+            for b in 1:nband
+                push!(lines, @sprintf("%5d     %16.9E    %16.9E    %16.9E",
+                                        b, k_abs[i][b], k_sca[i][b], g[i][b]))
+            end
+            push!(lines, "*END")
+        end
+
+        open(work_file, "w") do f
+            write(f, join(lines, "\n"))
+            write(f, "\n")
+        end
+        return true
+    end
+
+    """
     **Insert aerosol header information into a SOCRATES spectral file.**
 
     Arguments:
@@ -147,9 +311,7 @@ module spectrum
             if s in species
                 num_aer += 1
                 push!(block0_lines,
-                        @sprintf("   %2d          %2d       %s ",
-                        num_aer, i, strip(input_head_pcf.aerosol_title[i]))
-                    )
+                        format_aerosol_row(num_aer, i, strip(input_head_pcf.aerosol_title[i])))
             end
         end
 
@@ -491,6 +653,12 @@ module spectrum
             write(f, "-1 \n")
             write(f, "EOF\n")
             write(f, " ")
+        end
+
+        # Check file exists
+        if !isfile(execpath)
+            @warn "Failed to write executable script: '$execpath'"
+            return false
         end
 
         # Run executable

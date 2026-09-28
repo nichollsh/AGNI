@@ -1,6 +1,7 @@
 using Test
 using AGNI
 using Logging
+using LoggingExtras
 
 const SE = AGNI.solver.solve_energy
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
@@ -9,7 +10,9 @@ OUT_DIR  = joinpath(ROOT_DIR, "out/")
 # Cheap, fully-allocated greygas atmosphere for directly unit testing _fev!/
 # _calc_jac_res! (now standalone functions), without needing a real SOCRATES
 # solve.
-function _cheap_atmos(; nlev_centre::Int=16)
+function _cheap_atmos(; nlev_centre::Int=16,
+                        tmp_floor::Float64=atmosphere.CFG_tmp_floor,
+                        hill_radius::Float64=atmosphere.CFG_hill_radius)
     atmos = atmosphere.Atmos_t()
     ok = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
                             "greygas",
@@ -21,7 +24,9 @@ function _cheap_atmos(; nlev_centre::Int=16)
                             real_gas=false,
                             thermo_functions=false,
                             flag_rayleigh=false,
-                            flag_cloud=false)
+                            flag_cloud=false,
+                            tmp_floor=tmp_floor,
+                            hill_radius=hill_radius)
     ok || error("Failed to setup test atmosphere")
     atmosphere.allocate!(atmos, ""; check_safe_gas=false) ||
         error("Failed to allocate test atmosphere")
@@ -276,5 +281,58 @@ end
         @test_throws UndefVarError SE.solve_energy!(atmos_lm; sol_type=1, method=3,
                                                         max_steps=1, modplot=0, save_frames=false)
         atmosphere.deallocate!(atmos_lm)
+    end
+
+    # Convergence is only accepted on steps which were not rejected, except for when
+    # they are flagged as unbound
+    @testset "convergence_requires_accepted_step" begin
+        conv = (conv_atol=1e30, conv_rtol=0.0, max_steps=3, modplot=0, save_frames=false)
+
+        # baseline: an accepted step converges immediately
+        atmos_ok = _cheap_atmos()
+        converged = with_logger(MinLevelLogger(current_logger(), Logging.Error+1)) do
+            SE.solve_energy!(atmos_ok; sol_type=1, conv...)
+        end
+        @test converged
+        @test atmos_ok.is_converged
+        atmosphere.deallocate!(atmos_ok)
+
+        # every step is rejected by the surface-temperature collapse check (the fixed
+        #    500 K surface is within tmp_pad+1 of the floor), so the solver must not report
+        #    convergence, despite the criterion being satisfied. It instead runs out of steps.
+        atmos_rej = _cheap_atmos(; tmp_floor=495.0)
+        logs, converged = Test.collect_test_logs() do
+            SE.solve_energy!(atmos_rej; sol_type=1, conv...)
+        end
+        @test !converged
+        @test !atmos_rej.is_converged
+        @test any(occursin("maximum iterations", l.message) for l in logs if l.level == Logging.Warn)
+        atmosphere.deallocate!(atmos_rej)
+
+        # layers above a Hill radius placed within the atmosphere are unbound on every step,
+        #    but the solver can still converge, and warns that it has done so
+        base = _cheap_atmos()
+        atmosphere.calc_layer_props!(base)
+        r_hill = 0.5 * (base.rl[end] + base.rl[1])
+        atmosphere.deallocate!(base)
+        atmos_unb = _cheap_atmos(; hill_radius=r_hill)
+        logs, converged = Test.collect_test_logs() do
+            SE.solve_energy!(atmos_unb; sol_type=1, conv...)
+        end
+        @test converged
+        @test any(.!atmos_unb.layer_isbound)
+        @test any(occursin("not bound by gravity", l.message) for l in logs if l.level == Logging.Warn)
+        atmosphere.deallocate!(atmos_unb)
+
+        # unbound layers must not make a step acceptable when it was also rejected for
+        #    another reason (here, the surface-temperature collapse on every step)
+        atmos_both = _cheap_atmos(; tmp_floor=495.0, hill_radius=r_hill)
+        logs, converged = Test.collect_test_logs() do
+            SE.solve_energy!(atmos_both; sol_type=1, conv...)
+        end
+        @test !converged
+        @test any(occursin("maximum iterations", l.message) for l in logs if l.level == Logging.Warn)
+        @test !any(occursin("not bound by gravity", l.message) for l in logs if l.level == Logging.Warn)
+        atmosphere.deallocate!(atmos_both)
     end
 end

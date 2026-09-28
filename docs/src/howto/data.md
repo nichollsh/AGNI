@@ -26,3 +26,13 @@ A menu of the available spectral files is [available on the SOCRATES documentati
 !!! tip "Get missing spectral files"
     See [Spectral file does not exist](@ref) in the troubleshooting guide if a spectral
     file you downloaded cannot be found by AGNI.
+
+## Aerosol refractive indices
+
+Aerosols with `method = "mie"` require refractive index data for the particle material.
+These can be obtained by running:
+```bash
+./src/get_data.sh refractive
+```
+which places the files in `res/refractive/`. See [Aerosols and clouds](@ref) for their
+provenance, and for the list of supported materials.

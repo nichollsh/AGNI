@@ -31,7 +31,7 @@ where $w_g$ are the $k$-term quadrature weights. SOCRATES implements the two-str
 
 The $k$-terms are pre-tabulated from gas line-absorption opacities sourced primarily from the [DACE](https://dace.unige.ch/opacityDatabase/) database [grimm_database_2021](@citep), which draws from the ExoMol and HITEMP molecular line databases [tennyson_exomol_2018, rothman_hitemp_2010](@citep). These are cross-sections integrated over the linelists with a line truncation width of 25 cm$^{-1}$.
 
-Water continuum absorption cross-sections are computed using the MTCKD model [mlawer_mtckd_2012, mlawer_mtckd_2023](@citep). Other continua, including CIA between H₂–H₂ and H₂–He, are taken from the HITRAN collision-induced absorption section [karman_hitran_2019](@citep). Rayleigh scattering and water cloud radiative properties are also included.
+Water continuum absorption cross-sections are computed using the MTCKD model [mlawer_mtckd_2012, mlawer_mtckd_2023](@citep). Other continua, including CIA between H₂–H₂ and H₂–He, are taken from the HITRAN collision-induced absorption section [karman_hitran_2019](@citep). Rayleigh scattering, water clouds, and aerosols are also included; see [Aerosols and clouds](@ref).
 
 The flowchart below outlines how these absorption data are converted into a spectral file used at runtime.
 

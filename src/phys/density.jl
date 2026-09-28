@@ -9,26 +9,43 @@ ideal gas calculations for liquid and gas densities.
 """
 module density
 
-    import ..consts: BIGFLOAT, R_gas
+    import ..consts: BIGFLOAT, R_gas, _lookup_rho
     import ..species: Gas_t, is_vapour, EOS_IDEAL, EOS
 
     # Constants for handling phase boundaries in density calculations
     const PHS_METHOD_DEFAULT::Int64 = 4
     const PHS_DLOGP_DEFAULT::Float64 = 0.3
 
-    # Table of liquid-phase density for ocean calculation [kg/m^3]
-    #     All taken from this website:
-    #     https://encyclopedia.airliquide.com/water#properties
-    const _lookup_liquid_rho::Dict{String, Float64} = Dict([
-        ("H2O", 958.37 ),  # boiling
-        ("CO2", 1178.4 ),  # triple
-        ("H2" , 70.516 ),  # boiling
-        ("CH4", 422.36 ),  # boiling
-        ("CO" , 793.2  ),  # boiling
-        ("N2" , 806.11 ),  # boiling
-        ("NH3", 681.97 ),  # boiling
-        ("SO2", 1461.1 ),  # boiling
-    ])
+    """
+    **Evaluate the bulk density of an aerosol or cloud particle material.**
+
+    Unlike `liquid_rho`, this raises an error for unknown materials, since a placeholder
+    density would silently produce incorrect optical properties.
+
+    Arguments:
+    - `name::String`    Name of material (matching a refractive index file)
+
+    Returns:
+    - `rho::Float64`    Bulk density of the material [kg m-3]
+    """
+    function condensate_rho(name::String)::Float64
+        if name in keys(_lookup_rho)
+            return _lookup_rho[name]
+        else
+            @error("Density of material '$name' is not known")
+            return 1.0
+        end
+    end
+
+    """
+    **List the aerosol and cloud particle materials with known densities.**
+
+    Returns:
+    - `names::Vector{String}`   Names of materials
+    """
+    function list_condensate_rho()::Vector{String}
+        return sort(collect(keys(_lookup_rho)))
+    end
 
     """
     **Evaluate the density of a liquid phase.**
@@ -42,8 +59,8 @@ module density
     - `rho::Float64`    Density of liquid phase [kg m-3]
     """
     function liquid_rho(name::String)::Float64
-        if name in keys(_lookup_liquid_rho)
-            return _lookup_liquid_rho[name]
+        if name in keys(_lookup_rho)
+            return _lookup_rho[name]
         else
             return BIGFLOAT
         end

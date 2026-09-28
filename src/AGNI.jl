@@ -18,6 +18,8 @@ module AGNI
     include("phys/density.jl"); import .density; export density
     include("phys/phys.jl"); import .phys; export phys
     include("phys/guillot.jl"); import .guillot; export guillot
+    include("energy/mie.jl"); import .mie; export mie
+    include("energy/aerosol_optics.jl"); import .aerosol_optics; export aerosol_optics
     include("energy/spectrum.jl"); import .spectrum; export spectrum
     include("state/atmosphere.jl"); import .atmosphere; export atmosphere
     include("state/diagnostics.jl"); import .diagnostics; export diagnostics
@@ -433,6 +435,7 @@ module AGNI
         plt_emt::Bool          = get(cfg["plots"], "emission", false) && !just_greygas
         plt_alb::Bool          = get(cfg["plots"], "albedo", false) && !just_greygas
         plt_cld::Bool          = get(cfg["plots"], "cloud", false) && !transparent && !just_greygas
+        plt_aop::Bool          = get(cfg["plots"], "aerosol_optics", false) && !transparent && !just_greygas
         plt_cff::Bool          = get(cfg["plots"], "contribution", false) && !transparent && !just_greygas
         plt_tau::Bool          = get(cfg["plots"], "optical_depth", false) && !transparent && !just_greygas
         if !( plt_EXT in plotting.ALLOWED_EXTS )
@@ -497,10 +500,15 @@ module AGNI
         # Optional IO folder
         io_dir::String = get(cfg["files"], "io_dir", atmosphere.UNSET_STR)
 
-        # Optional aerosol parametrization controls
-        aerosol_species::Dict = Dict()
+        # Optional aerosols: each is a table [composition.aerosols.<name>]
+        aerosol_species::Dict = Dict{String,Any}()
         if haskey(cfg["composition"], "aerosols")
-            for (k, v) in cfg["composition"]["aerosols"]
+            aer_cfg = cfg["composition"]["aerosols"]
+            if !isa(aer_cfg, AbstractDict) || !all(v->isa(v, AbstractDict), values(aer_cfg))
+                @error "Config: composition.aerosols must contain one table per aerosol. See AGNI documentation."
+                return false
+            end
+            for (k, v) in aer_cfg
                 aerosol_species[string(k)] = v
             end
         end
@@ -679,6 +687,13 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
+            # Set cloud and aerosol profiles from condensation yields
+            multicol.call_agnostic!( is_multicol ? globe : atmos,
+                                    atmosphere.set_cloud!; from_yield=true)
+            multicol.call_agnostic!( is_multicol ? globe : atmos,
+                                    atmosphere.set_aerosols!)
+
+            # Calculate fluxes and heating rates
             multicol.call_agnostic!( is_multicol ? globe : atmos,
                                     energy.calc_fluxes!,
                                     radiative=true, latent_heat=incl_latent,
@@ -814,6 +829,7 @@ module AGNI
 
         for (a,s) in zip(arr_cols, arr_sfxs)
             plt_cld && plotting.plot_cloud(a,       joinpath(a.OUT_DIR,"plot_cloud$s.$plt_EXT"))
+            plt_aop && plotting.plot_aerosol_optics(a, joinpath(a.OUT_DIR,"plot_aerosol_optics$s.$plt_EXT"))
             plt_vmr && plotting.plot_vmr(a,         joinpath(a.OUT_DIR,"plot_vmrs$s.$plt_EXT"), size_x=600)
             plt_cff && plotting.plot_contfunc1(a,   joinpath(a.OUT_DIR,"plot_contfunc1$s.$plt_EXT"))
             plt_cff && plotting.plot_contfunc2(a,   joinpath(a.OUT_DIR,"plot_contfunc2$s.$plt_EXT"))

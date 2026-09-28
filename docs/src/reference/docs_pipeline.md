@@ -19,7 +19,9 @@ Before `makedocs` runs, `make.jl` compiles the custom theme from SCSS to CSS usi
 `DocumenterTools.Themes.compile`. The file `docs/src/assets/style.scss` (palette, fonts, sidebar styling) is concatenated with `docs/src/assets/lightdefs.scss` (Documenter theme variable overrides) into `light.scss`. Then, `light.scss` is copied to `dark.scss`. AGNI currently uses one visual theme for both light and dark mode, rather than a separate dark palette.
 
 
-`makedocs` then renders the page tree defined in `make.jl`, pulling in local assets
+`makedocs` then renders the page tree defined in `make.jl`. The Explanation section has one
+page per area of model physics (e.g. convection, radiation, aerosols and clouds). Each of
+these pages ends with a page-local `@bibliography` block. The page tree pulls in local assets
 (`assets/style.css`, `assets/logo.ico`). All three site fonts are bundled as local
 variable TTF files under `docs/src/assets/fonts/` and loaded via `@font-face` rules in
 `style.scss` — there are no remote font requests. Docstrings are pulled automatically

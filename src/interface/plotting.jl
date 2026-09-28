@@ -29,6 +29,10 @@ module plotting
     const lw::Float64 = 1.9
     const size_x_default::Int64 = 500
     const size_y_default::Int64 = 400
+
+    # Default wavelength range for spectral plots [nm]
+    const wlmin_default::Float64 = 100.0     # 100 nm
+    const wlmax_default::Float64 = 300.0e3   # 300 μm
     const plt_default = Dict(:fontfamily => "sans-serif",
                              :framestyle => :box,
                              :grid       => true,
@@ -133,6 +137,39 @@ module plotting
     """
     function _intstr(v::Int64)::String
         return @sprintf("%d",v)
+    end
+
+    """
+    Get x-axis limits and logarithmic ticks for a plot against wavelength.
+
+    The limits are the requested range, clipped to the range of the data. If this leaves
+    an empty range, the full range of the data is used instead.
+
+    Arguments:
+    - `x::Array{Float64,1}`     wavelengths of the plotted data (any units)
+    - `wlmin::Float64`          minimum wavelength to plot (same units as `x`)
+    - `wlmax::Float64`          maximum wavelength to plot (same units as `x`)
+
+    Returns:
+    - `xlims::Tuple`            axis limits
+    - `xticks::Array`           tick locations, at integer powers of ten (or the limits, if
+                                the range spans less than a decade)
+    """
+    function _get_wl_lims(x::Array{Float64,1}, wlmin::Float64, wlmax::Float64)::Tuple
+        xmin = max(minimum(x), 1.0e-10)
+        xmax = max(maximum(x), xmin * 1.01)
+        lo = max(wlmin, xmin)
+        hi = min(wlmax, xmax)
+        if !(hi > lo)
+            @warn "Requested wavelength range ($wlmin, $wlmax) does not overlap the data; plotting full range"
+            lo, hi = xmin, xmax
+        end
+        xticks = 10.0 .^ collect(ceil(Int, log10(lo)):floor(Int, log10(hi)))
+        if isempty(xticks)
+            # range spans less than a decade
+            xticks = [lo, hi]
+        end
+        return (lo, hi), xticks
     end
 
     """
@@ -350,6 +387,14 @@ module plotting
         vline!(plt, [atmos.transspec_r*1e-3], lw=lw,
                         lc=col_obs_phot, ls=:dot, label="")
 
+        # mark where the atmosphere becomes unbound (lower edge of the lowest unbound layer)
+        i_unb = findlast(.!atmos.layer_isbound)
+        if !isnothing(i_unb)
+            hline!(plt, [atmos.pl[i_unb+1]*1e-5], lw=lw,
+                            lc=col_d, ls=:solid, label="Unbound")
+            vline!(plt, [atmos.rl[i_unb+1]*1e-3], lw=lw,
+                            lc=col_d, ls=:solid, label="")
+        end
 
         # Plot current surface pressure and original
         @_plt_pboa
@@ -424,6 +469,65 @@ module plotting
             title!(plt, title)
         end
 
+        _savefig_safe(plt, fname)
+        return plt
+    end
+
+    """
+    **Plot band-averaged aerosol optical properties.**
+
+    Shows the mass extinction coefficient, single scattering albedo, and asymmetry
+    parameter of each aerosol, as stored in the spectral file.
+
+    Arguments:
+    - `atmos::atmosphere.Atmos_t`   atmosphere object
+    - `fname::String`               filename to save the plot (if empty, does not save)
+    - `size_x::Int64`               width of the plot in pixels
+    - `size_y::Int64`               height of the plot in pixels
+    - `wlmin::Float64`              minimum wavelength to plot [nm]
+    - `wlmax::Float64`              maximum wavelength to plot [nm]
+    """
+    function plot_aerosol_optics(atmos::atmosphere.Atmos_t, fname::String;
+                                    size_x::Int64=size_x_default, size_y::Int64=700,
+                                    wlmin::Float64=wlmin_default, wlmax::Float64=wlmax_default)
+
+        if !atmos.is_alloc || !atmos.control.l_aerosol || isempty(atmos.aerosol_names)
+            @debug "No aerosol optical properties to plot"
+            return nothing
+        end
+
+        # Band edges [μm], repeated to make step plots
+        x = vcat([[atmos.bands_min[b], atmos.bands_max[b]] for b in 1:atmos.nbands]...) .* 1e6
+        xlims, _ = _get_wl_lims(x, wlmin * 1e-3, wlmax * 1e-3) # nm -> μm
+
+        # plot for each aerosol property in a separate subplot
+        p1 = plot(xscale=:log10, yscale=:log10, xlims=xlims, legend=:bottomleft; plt_default...)
+        p2 = plot(xscale=:log10, xlims=xlims, ylims=(0.0, 1.0), legend=false; plt_default...)
+        p3 = plot(xscale=:log10, xlims=xlims, ylims=(-0.2, 1.0), legend=false; plt_default...)
+
+        # get data from SOCRATES struct
+        A = atmos.spectrum.Aerosol
+
+        # loop over aerosols
+        for (i, name) in enumerate(atmos.aerosol_names)
+            # extinction coefficient, single scattering albedo, asymmetry parameter
+            kext = [A.abs[1,i,b] + A.scat[1,i,b] for b in 1:atmos.nbands]
+            ssa  = [kext[b] > 0 ? A.scat[1,i,b]/kext[b] : 0.0 for b in 1:atmos.nbands]
+            asym = [A.phf_fnc[1,1,i,b] for b in 1:atmos.nbands]
+
+            # make the plots!
+            plot!(p1, x, repeat(max.(kext, 1e-30), inner=2), lw=lw, linealpha=la, label=name)
+            plot!(p2, x, repeat(ssa, inner=2), lw=lw, linealpha=la)
+            plot!(p3, x, repeat(asym, inner=2), lw=lw, linealpha=la)
+        end
+
+        # decorate the plots
+        ylabel!(p1, "Extinction [m² kg⁻¹]")
+        ylabel!(p2, "Single Scattering Albedo")
+        ylabel!(p3, "Asymmetry Parameter")
+        xlabel!(p3, "Wavelength [μm]")
+
+        plt = plot(p1, p2, p3, layout=(3,1), size=(size_x, size_y); plt_default...)
         _savefig_safe(plt, fname)
         return plt
     end
@@ -662,11 +766,12 @@ module plotting
     - `fname::String`                filename to save the plot (if empty, does not save)
     - `size_x::Int64`                width of the plot in pixels
     - `size_y::Int64`                height of the plot in pixels
-    - `wl_max::Float64`              maximum wavelength to plot [nm]
+    - `wlmin::Float64`               minimum wavelength to plot [nm]
+    - `wlmax::Float64`               maximum wavelength to plot [nm]
     """
     function plot_emission(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int64=size_x_default, size_y::Int64=size_y_default,
-                            wl_max::Float64=300e3)
+                            wlmin::Float64=wlmin_default, wlmax::Float64=wlmax_default)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -710,9 +815,7 @@ module plotting
         plot!(plt, xe, yl, lw=0.9, label="Planetary LW",    color=col_t )
         plot!(plt, xe, yt, lw=0.5, label="Planetary LW+SW", color=col_black)
 
-        wl_max = max(wl_max, minimum(xe)+1)
-        xlims  = ( max(1.0e-10,minimum(xe)), min(maximum(xe), wl_max))
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        xlims, xticks = _get_wl_lims(xe, wlmin, wlmax)
 
         ylims  = (max(1.0e-10,minimum(yt)) / 2, max(maximum(yt),maximum(yp)) * 2)
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
@@ -827,11 +930,12 @@ module plotting
     - `fname::String`                filename to save the plot (if empty, does not save)
     - `size_x::Int64`                width of the plot in pixels
     - `size_y::Int64`                height of the plot in pixels
-    - `wl_max::Float64`              maximum wavelength to plot [nm]
+    - `wlmin::Float64`               minimum wavelength to plot [nm]
+    - `wlmax::Float64`               maximum wavelength to plot [nm]
     """
     function plot_contfunc2(atmos::atmosphere.Atmos_t, fname::String;
                                     size_x::Int64=size_x_default, size_y::Int64=size_y_default,
-                                    wl_max::Float64=300e3)
+                                    wlmin::Float64=wlmin_default, wlmax::Float64=wlmax_default)
 
         # Check that we have data
         if !atmos.is_out_lw
@@ -877,8 +981,7 @@ module plotting
         z /= maximum(z)
         z[:] = log10.(z[:])
 
-        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        xlims, xticks = _get_wl_lims(x, wlmin, wlmax)
 
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
@@ -921,12 +1024,13 @@ module plotting
     - `fname::String`                filename to save the plot (if empty, does not save)
     - `size_x::Int64`                width of each plot panel in pixels
     - `size_y::Int64`                height of each plot panel in pixels
-    - `wl_max::Float64`              maximum wavelength to plot [nm]
+    - `wlmin::Float64`               minimum wavelength to plot [nm]
+    - `wlmax::Float64`               maximum wavelength to plot [nm]
     """
     function plot_tau(atmos::atmosphere.Atmos_t, fname::String;
                             size_x::Int64=size_x_default,
                             size_y::Int64=size_y_default,
-                            wl_max::Float64=300e3)
+                            wlmin::Float64=wlmin_default, wlmax::Float64=wlmax_default)
 
         # Check that we have data
         if !atmos.is_out_lw && !atmos.is_out_sw
@@ -972,8 +1076,7 @@ module plotting
             y[i] = atmos.pl[i] * 1.0e-5
         end
 
-        xlims  = (minimum(x), max(wl_max, minimum(x)+1))
-        xticks = 10.0 .^ round.(Int,range( log10(xlims[1]), stop=log10(xlims[2]), step=1))
+        xlims, xticks = _get_wl_lims(x, wlmin, wlmax)
 
         ylims  = (y[1], y[end])
         yticks = 10.0 .^ round.(Int,range( log10(ylims[1]), stop=log10(ylims[2]), step=1))
@@ -1014,9 +1117,12 @@ module plotting
     - `fname::String`               filename to save the plot (if empty, does not save)
     - `size_x::Int64`              width of the plot in pixels
     - `size_y::Int64`              height of the plot in pixels
+    - `wlmin::Float64`             minimum wavelength to plot [nm]
+    - `wlmax::Float64`             maximum wavelength to plot [nm]
     """
     function plot_albedo(atmos::atmosphere.Atmos_t, fname::String;
-                            size_x::Int64=size_x_default, size_y::Int64=size_y_default)
+                            size_x::Int64=size_x_default, size_y::Int64=size_y_default,
+                            wlmin::Float64=wlmin_default, wlmax::Float64=wlmax_default)
 
         # Check that we have data
         if !(atmos.is_out_lw && atmos.is_out_sw)
@@ -1026,17 +1132,24 @@ module plotting
 
         # spectral albedo [percentage]
         y::Array{Float64, 1} = zeros(Float64, atmos.nbands)
-        @. y = 100.0 * atmos.band_u_sw[1, :]/atmos.band_d_sw[1, :]
+        for b in 1:atmos.nbands
+            # albedo is undefined in bands without incoming stellar flux
+            if atmos.band_d_sw[1, b] > 0.0
+                y[b] = 100.0 * atmos.band_u_sw[1, b] / atmos.band_d_sw[1, b]
+            else
+                y[b] = NaN
+            end
+        end
 
         # Make plot
         ylims  = (-5.0, 100.0)
         plt = plot(ylims=ylims, size=(size_x, size_y); plt_default...)
 
-        plot!(plt, atmos.bands_cen*1e9, y, color=col_black, label="")
+        x = atmos.bands_cen * 1e9 # convert to nm
+        plot!(plt, x, y, color=col_black, label="")
 
-        xlims  = (200.0, 1500.0)
-        xticks = range( xlims[1], xlims[2], step=100.0)
-        xaxis!(plt, xlims=xlims, xticks=xticks, minorgrid=true)
+        xlims, xticks = _get_wl_lims(x, wlmin, wlmax)
+        xaxis!(plt, xscale=:log10, xlims=xlims, xticks=xticks, minorgrid=true)
 
         xlabel!(plt, "Wavelength [nm]")
         ylabel!(plt, "Spectral albedo [%]")

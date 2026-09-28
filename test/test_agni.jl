@@ -517,3 +517,91 @@ output_dir = "$out_dir"
     rm(tmpdir; force=true, recursive=true)
 end
 
+
+# Aerosol configuration: each aerosol is a table with a `method` ("mon" or "mie"), exactly one
+# of `mmr` or `species`, and (for "mie") the refractive index material and size distribution.
+# Flat values (a number or a gas name in place of the table) are rejected, both by the
+# config parser and by `setup!`. Keys which are not used by the chosen method are ignored.
+@testset "agni_aerosol_config" begin
+    parse = atmosphere.parse_aerosol_entry
+    quiet(f) = with_logger(f, MinLevelLogger(current_logger(), Test.Logging.Error+1))
+    conds = ["H2O", "SiO2"]
+
+    # Valid "mon" entries
+    e = parse("soot", Dict("method"=>"mon", "mmr"=>1e-4), conds)
+    @test e["method"] == "mon"
+    @test isapprox(e["mmr"], 1e-4; rtol=1e-12)
+    e = parse("soot", Dict("method"=>"mon", "mmr"=>0), conds)   # integer MMR at the boundary
+    @test isa(e["mmr"], Float64)
+    @test isapprox(e["mmr"], 0.0; atol=1e-15)
+    e = parse("biogenic", Dict("method"=>"mon", "species"=>"H2O"), conds)
+    @test e["species"] == "H2O"
+    # keys which are not used by the method are ignored
+    e = parse("soot", Dict("method"=>"mon", "mmr"=>1e-4, "r_eff"=>1e-6), conds)
+    @test e["method"] == "mon"
+
+    # Invalid entries return nothing
+    quiet() do
+        @test isnothing(parse("soot", Dict("mmr"=>1e-4), conds))                                  # no method
+        @test isnothing(parse("soot", Dict("method"=>"file", "mmr"=>1e-4), conds))                # bad method
+        @test isnothing(parse("soot", Dict("method"=>"mon", "mmr"=>1e-4, "species"=>"H2O"), conds)) # both
+        @test isnothing(parse("soot", Dict("method"=>"mon"), conds))                              # neither
+        @test isnothing(parse("soot", Dict("method"=>"mon", "mmr"=>1.5), conds))                  # mmr > 1
+        @test isnothing(parse("soot", Dict("method"=>"mon", "mmr"=>-1e-9), conds))                # mmr < 0
+        @test isnothing(parse("soot", Dict("method"=>"mon", "species"=>"CH4"), conds))            # not condensable
+        @test isnothing(parse("soot", [1.0], conds))                                              # wrong type
+        @test isnothing(parse("soot", 2e-3, conds))                                               # flat number
+        @test isnothing(parse("biogenic", "H2O", conds))                                          # flat gas name
+        @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5,
+                                            "nk_file"=>"SiO2_amorph", "sigma_g"=>1.5), conds))   # no r_eff
+        @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5, "nk_file"=>"Unobtainium",
+                                            "r_eff"=>1e-6, "sigma_g"=>1.5), conds))              # unknown material
+    end
+
+    base = Dict{String,Any}("method"=>"mie", "species"=>"SiO2", "nk_file"=>"SiO2_amorph",
+                            "r_eff"=>1e-6, "sigma_g"=>1.65)
+    e = parse("sio2", base, conds)
+    @test e["method"] == "mie"
+    @test isapprox(e["r_eff"], 1e-6; rtol=1e-12)
+    @test isa(e["sigma_g"], Float64)
+    # σ_g = 1 (monodisperse) is the lower edge of the valid range
+    @test !isnothing(parse("sio2", merge(base, Dict("sigma_g"=>1)), conds))
+    quiet() do
+        @test isnothing(parse("sio2", merge(base, Dict("sigma_g"=>0.9)), conds))
+        @test isnothing(parse("sio2", merge(base, Dict("r_eff"=>-1e-6)), conds))
+        @test isnothing(parse("sio2", merge(base, Dict("r_eff"=>Inf)), conds))
+    end
+
+    # Legacy inline dict in a config file is rejected
+    cfg = _base_cfg()
+    cfg["composition"]["aerosols"] = Dict("soot"=>1e-4)
+    logs, ok = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg)
+    end
+    @test ok == false
+    errs = [l.message for l in logs if l.level == Logging.Error]
+    @test any(occursin("one table per aerosol", m) for m in errs)
+
+    # setup! stores methods and Mie parameters, and sets particle sizes accordingly
+    atmos = atmosphere.Atmos_t()
+    ok = quiet() do
+        atmosphere.setup!(atmos, AGNI_CORE_ROOT, AGNI_CORE_OUT_DIR, AGNI_CORE_SF,
+                            1000.0, 1.0, 0.0, 0.0, 1500.0, 10.0, 1.0e7, 20, 10.0, 1e-5,
+                            Dict("H2O" => 1.0), "";
+                            flag_aerosol=true, real_gas=false, thermo_functions=false,
+                            aerosol_species=Dict("soot"=>Dict("method"=>"mon", "mmr"=>1e-4),
+                                                "SiO2"=>Dict("method"=>"mie", "mmr"=>1e-5,
+                                                            "nk_file"=>"SiO2_amorph",
+                                                            "r_eff"=>2e-6, "sigma_g"=>1.5)))
+    end
+    @test ok
+    @test atmos.aerosol_method["soot"] == "mon"
+    @test atmos.aerosol_method["sio2"] == "mie"          # names are lower-cased
+    @test !haskey(atmos.aerosol_optics, "soot")
+    @test atmos.aerosol_optics["sio2"]["nk_file"] == "SiO2_amorph"
+    @test all(isapprox.(atmos.aerosol_arr_r["sio2"], 2e-6; rtol=1e-12))
+    @test all(isapprox.(atmos.aerosol_arr_r["soot"], atmos.aerosol_val_r; rtol=1e-12))
+    @test all(isapprox.(atmos.aerosol_arr_l["sio2"], 1e-5; rtol=1e-12))
+    # Discrimination guard: the Mie size is not the default aerosol size
+    @test abs(atmos.aerosol_optics["sio2"]["r_eff"] - atmos.aerosol_val_r) > 1e-7
+end

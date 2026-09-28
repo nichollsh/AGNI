@@ -1,5 +1,7 @@
 using Test
 using AGNI
+using Logging
+using LoggingExtras
 
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)),"../"))
 RES_DIR         = joinpath(ROOT_DIR,"res/")
@@ -153,8 +155,8 @@ end
             # check all layers are bound
             @test all(atmos.layer_isbound)
 
-            # check known value
-            val_e = 1.0487713813847492e7 / AGNI.consts.R_earth
+            # check known value (converged: independent of hydrograv_steps to ~1e-8)
+            val_e = 1.6345635358947102
             val_o = atmos.r[1] / AGNI.consts.R_earth # height of topmost layer-centre
 
             test_check = isapprox(val_e, val_o; rtol=rtol)
@@ -218,7 +220,9 @@ end
             @test all(atmos.flux_u_sw .>= 0.0)
 
             # check known value
-            val_e = 29.699515011666094  # known from previous tests
+            # known from previous tests; updated for σ = Δp/a
+            #    (was 29.699515011666094)
+            val_e = 30.246728893950902
             val_o = atmos.flux_u_sw[end] # bottom level
             test_check = isapprox(val_e, val_o; rtol=1e-3)
             if !test_check
@@ -404,7 +408,7 @@ end
         @test isapprox(val_e, val_o; rtol=rtol)
 
         # check known value
-        val_e = 37.18288051811991
+        val_e = 37.12571350789956
         val_o = atmos.flux_u_sw[20]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -453,7 +457,8 @@ end
         atmos.flux_tot += atmos.flux_n
         energy.calc_hrates!(atmos)
 
-        val_e = 6.144639564022429    # from previous tests
+        # from previous tests
+        val_e = 6.3658225891529066
         val_o = atmos.heating_rate[atmos.nlev_c-10]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -482,7 +487,7 @@ end
         end
 
         # check against known value
-        val_e = 8234.876160580243  # from previous tests
+        val_e = 8602.40387091133
         val_o = atmos.flux_tot[atmos.nlev_c-10]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -545,5 +550,141 @@ end
         @test isapprox(atmos.band_d_sw[1, 1], atmos.flux_d_sw[1]; rtol=0.0, atol=1e-12)
 
         atmosphere.deallocate!(atmos)
+    end
+
+    # -------------
+    # Radiative effect of an aerosol whose optical properties are calculated at runtime with
+    # Mie theory (SiO2 glass, r_eff = 1 μm). A dry adiabat is used so that a cloud aloft
+    # emits at lower temperatures than the surface. Contract:
+    #   - zero MMR reproduces the aerosol-free fluxes
+    #   - fluxes remain finite and non-negative for all MMRs
+    #   - reflected SW increases and OLR decreases monotonically with MMR (bright, cold cloud)
+    #   - in the optically thin limit the flux perturbation is linear in MMR
+    # -------------
+    @testset "mie_aerosol_changes_fluxes_monotonically" begin
+        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>0.0, "nk_file"=>"SiO2_amorph",
+                                    "r_eff"=>1e-6, "sigma_g"=>1.65))
+        atmos = atmosphere.Atmos_t()
+        @test atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, spfile,
+                                1000.0, 1.0, 0.0, 45.0, 1500.0, gravity, radius,
+                                40, 10.0, 1e-5, Dict("H2O"=>0.5, "CO2"=>0.5), "";
+                                flag_aerosol=true, aerosol_species=aer,
+                                flag_rayleigh=false, flag_gcontinuum=false,
+                                real_gas=false, thermo_functions=false)
+        @test atmosphere.allocate!(atmos, "$RES_DIR/stellar_spectra/sun.txt")
+        @test atmos.aerosol_names == ["sio2"]
+        @test atmos.aerosol_custom_types[atmosphere.AEROSOL_CUSTOM_TYPE0 + 1] == "sio2"
+        @test size(atmos.aerosol_band_props["sio2"]) == (atmos.nbands, 3)
+        setpt.dry_adiabat!(atmos)
+        atmosphere.calc_layer_props!(atmos)
+
+        function fluxes(mmr)
+            fill!(atmos.aerosol_arr_l["sio2"], mmr)
+            energy.radtrans!(atmos, true)
+            energy.radtrans!(atmos, false)
+            return (atmos.flux_u_lw[1], atmos.flux_u_sw[1], atmos.flux_d_sw[end])
+        end
+
+        # reference without aerosol: disable the aerosol flag entirely
+        atmos.control.l_aerosol = false
+        olr_clear, swu_clear, _ = fluxes(0.0)
+        atmos.control.l_aerosol = true
+
+        olr_0, swu_0, _ = fluxes(0.0)
+        @test isapprox(olr_0, olr_clear; rtol=1e-10)
+        @test isapprox(swu_0, swu_clear; rtol=1e-10, atol=1e-10)
+
+        mmrs = [1e-8, 1e-7, 1e-6, 1e-5]
+        res  = [fluxes(m) for m in mmrs]
+        olr  = [r[1] for r in res]
+        swu  = [r[2] for r in res]
+        sws  = [r[3] for r in res]
+        @test all(isfinite, olr) && all(isfinite, swu) && all(isfinite, sws)
+        @test all(olr .> 0.0) && all(swu .>= 0.0) && all(sws .>= 0.0)
+        @test all(diff(vcat(olr_0, olr)) .< 0.0)     # OLR decreases
+        @test all(diff(vcat(swu_0, swu)) .> 0.0)     # reflection increases
+
+        # Discrimination guard: the thickest cloud changes OLR by more than 1%
+        @test (olr_0 - olr[end]) / olr_0 > 0.01
+
+        # optically thin limit: doubling a tiny MMR doubles the perturbation
+        olr_a, _, _ = fluxes(1e-11)
+        olr_b, _, _ = fluxes(2e-11)
+        @test isapprox((olr_0 - olr_b) / (olr_0 - olr_a), 2.0; rtol=0.02)
+
+        atmosphere.deallocate!(atmos)
+    end
+
+    # -------------
+    # A failure to calculate Mie optical properties (here, a material with a density but no
+    # refractive index file) must make allocate! return false, rather than throw. Config
+    # validation would normally catch this, so the material is changed after setup!.
+    # -------------
+    @testset "mie_failure_returns_false_from_allocate" begin
+        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>1e-6, "nk_file"=>"SiO2_amorph",
+                                    "r_eff"=>1e-6, "sigma_g"=>1.65))
+        atmos = atmosphere.Atmos_t()
+        @test atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, spfile,
+                                1000.0, 1.0, 0.0, 45.0, 1500.0, gravity, radius,
+                                20, 10.0, 1e-5, Dict("H2O"=>0.5, "CO2"=>0.5), "";
+                                flag_aerosol=true, aerosol_species=aer,
+                                flag_rayleigh=false, real_gas=false, thermo_functions=false)
+        @test !isfile(AGNI.aerosol_optics.nk_path("H2"))       # no refractive index data
+        @test AGNI.density.condensate_rho("H2") > 0.0           # but a known density
+        atmos.aerosol_optics["sio2"]["nk_file"] = "H2"
+        ok = true
+        logs, ok = Test.collect_test_logs() do
+            atmosphere.allocate!(atmos, "$RES_DIR/stellar_spectra/sun.txt")
+        end
+        @test ok == false
+        @test any(occursin("optical properties of aerosol 'sio2'", l.message)
+                    for l in logs if l.level == Logging.Error)
+    end
+
+    # -------------
+    # Water clouds require droplet data (block 10) in the spectral file, with the Pade
+    # parametrisation for droplet type 5. A spectral file with block 10 removed must be
+    # rejected at allocation, while the unmodified file is accepted (positive control).
+    # -------------
+    @testset "cloud_requires_droplet_block" begin
+        tmpdir = mktempdir()
+        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+
+        # copy of the spectral file with block 10 stripped
+        stripped = joinpath(tmpdir, "noblock10.sf")
+        lines = readlines(spfile)
+        keep = trues(length(lines))
+        inblk = false
+        for (i, l) in enumerate(lines)
+            if startswith(l, "*BLOCK: TYPE =   10")
+                inblk = true
+            end
+            if inblk
+                keep[i] = false
+                startswith(l, "*END") && (inblk = false)
+            end
+        end
+        @test count(.!keep) > 0
+        open(stripped, "w") do f
+            write(f, join(lines[keep], "\n") * "\n")
+        end
+        cp(spfile*"_k", stripped*"_k"; force=true)
+
+        for (sf, expect) in ((stripped, false), (spfile, true))
+            atmos = atmosphere.Atmos_t()
+            @test atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, sf,
+                                    1000.0, 1.0, 0.0, 45.0, 300.0, gravity, radius,
+                                    20, 1.0, 1e-5, Dict("H2O"=>0.1, "CO2"=>0.9), "";
+                                    flag_cloud=true, flag_rayleigh=false,
+                                    real_gas=false, thermo_functions=false)
+            ok = with_logger(MinLevelLogger(current_logger(), Logging.Error+1)) do
+                atmosphere.allocate!(atmos, "$RES_DIR/stellar_spectra/sun.txt")
+            end
+            @test ok == expect
+            expect && atmosphere.deallocate!(atmos)
+        end
+        rm(tmpdir; force=true, recursive=true)
     end
 end

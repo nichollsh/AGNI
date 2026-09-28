@@ -32,6 +32,7 @@ res/surface_albedos/*
 res/thermodynamics/*.nc
 res/thermodynamics/*.nc.chk
 res/scattering/*
+res/refractive/*
 !res/*/_readme.txt
 index.html
 
@@ -40,6 +41,7 @@ scratch
 scratch/
 test/out/
 out/*
+/out*/
 runtime.sf
 runtime.sf_k
 socstar.dat

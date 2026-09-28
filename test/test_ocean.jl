@@ -3,7 +3,7 @@ using AGNI
 
 # Ocean module: pure geometric functions for distributing condensed liquids
 # across ocean basins and continental shelves.
-# Liquid densities used below come from consts._lookup_liquid_rho:
+# Liquid densities used below come from consts._lookup_rho:
 #   H2O = 958.37 kg/m^3
 #   CO2 = 1178.4 kg/m^3  (denser → sinks to bottom)
 

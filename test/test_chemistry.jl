@@ -1109,7 +1109,8 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
             ("N2"  , 0.5)
         ])
 
-        aerosol_dict = Dict("soot" => 1e-4, "biogenic" => "HCN")
+        aerosol_dict = Dict("soot"     => Dict("method"=>"mon", "mmr"=>1e-4),
+                            "biogenic" => Dict("method"=>"mon", "species"=>"HCN"))
 
         atmos = atmosphere.Atmos_t()
         atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,

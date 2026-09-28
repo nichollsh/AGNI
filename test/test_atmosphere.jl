@@ -26,7 +26,9 @@ const _P_TOP     = 1e-6   # bar -> p_toa = 0.1 Pa
 const _THETA     = 60.0
 
 # Cheap fixture used by the tests below that only require atmosphere.setup!()
-function _setup_only(; condensates::Array{String,1}=String[], gravity::Float64=_GRAVITY)
+function _setup_only(; condensates::Array{String,1}=String[], gravity::Float64=_GRAVITY,
+                        hill_radius::Float64=atmosphere.CFG_hill_radius,
+                        selfg::Bool=atmosphere.CFG_hydrograv_selfg)
     atmos = atmosphere.Atmos_t()
     ok = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
                             "greygas",
@@ -39,7 +41,9 @@ function _setup_only(; condensates::Array{String,1}=String[], gravity::Float64=_
                             thermo_functions=false,
                             flag_rayleigh=false,
                             flag_cloud=false,
-                            condensates=condensates)
+                            condensates=condensates,
+                            hill_radius=hill_radius,
+                            hydrograv_selfg=selfg)
     ok || error("Failed to setup test atmosphere")
     return atmos
 end
@@ -588,8 +592,11 @@ end
         @test issorted(atmos.r; rev=true)
 
         # gravity below the internal ming floor (1e-4 m/s^2), so the function
-        # must report failure and flag the affected layers
-        atmos_lowg = _setup_only(; gravity=1e-7)
+        # must report failure and flag the affected layers. Self-gravity is disabled:
+        # otherwise the 100 bar atmosphere (~1e12 times the interior mass at this surface
+        # gravity) would dominate the gravity field, and the result would depend on the
+        # number of integration steps.
+        atmos_lowg = _setup_only(; gravity=1e-7, selfg=false)
         ok = with_logger(MinLevelLogger(current_logger(), Logging.Error+1)) do
             atmosphere.calc_layer_props!(atmos_lowg)
         end
@@ -598,6 +605,111 @@ end
 
         # discrimination guard: this must not be trivially "all layers unbound"
         @test all(atmos_lowg.g .<= atmos.hydrograv_ming)
+
+        # the integration diverges here (scale height >> radius); the result must still
+        # be finite, with radius increasing monotonically with height
+        @test all(isfinite, atmos_lowg.r) && all(isfinite, atmos_lowg.rl)
+        @test all(isfinite, atmos_lowg.layer_σ) && all(atmos_lowg.layer_σ .> 0.0)
+        @test issorted(atmos_lowg.rl; rev=true)
+    end
+
+    # -----------------------------------------------------------------
+    # Layer masses per unit area follow hydrostatic balance, σ = Δp / a. The column total
+    # must be close to Δp_total / g_surf (slightly larger, since gravity decreases with
+    # height), all layers must have positive mass, and σ must be insensitive to the number
+    # of hydrostatic integration steps.
+    # -----------------------------------------------------------------
+    @testset "layer_mass_follows_hydrostatic_balance" begin
+        function _masses(steps)
+            atmos = atmosphere.Atmos_t()
+            atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, "greygas", 1000.0, 1.0, 0.0, _THETA,
+                                _TMP_SURF, _GRAVITY, _RADIUS, _NLEV, _P_SURF, _P_TOP,
+                                Dict("H2O" => 1.0), ""; real_gas=false, thermo_functions=false,
+                                hydrograv_steps=steps)
+            @test atmosphere.calc_layer_props!(atmos)
+            return atmos
+        end
+        a1 = _masses(atmosphere.CFG_hydrograv_steps)  # default
+        a2 = _masses(16000)
+
+        # all layers have positive mass, including the lowest-pressure layers where
+        # differencing the enclosed mass previously lost all precision
+        @test all(a1.layer_σ .> 0.0)
+        @test all(a2.layer_σ .> 0.0)
+
+        # column mass: within 2% of Δp/g_surf, and not below it
+        col_ref = (a1.pl[end] - a1.pl[1]) / a1.grav_surf
+        @test 1.0 <= sum(a1.layer_σ) / col_ref < 1.02
+
+        # Discrimination guard: differencing the enclosed mass changed σ by ~4% between
+        # these step counts. With σ = Δp/a the remaining difference (<1%) comes only from
+        # the convergence of the radius, and hence of a, in the lowest-pressure layers.
+        @test all(isapprox.(a1.layer_σ, a2.layer_σ; rtol=1e-2))
+    end
+
+    # -----------------------------------------------------------------
+    # Hill radius: layers whose lower edge lies beyond the Hill radius are unbound.
+    # Their gravity is set to the floor value and their thickness is capped at
+    # hydrograv_hilldr, while layers below the Hill radius are unchanged.
+    # -----------------------------------------------------------------
+    @testset "hill_radius_marks_outer_layers_unbound" begin
+        quiet(f) = with_logger(f, MinLevelLogger(current_logger(), Logging.Error+1))
+
+        # baseline with the default (distant) Hill radius is fully bound
+        base = _setup_only()
+        @test atmosphere.calc_layer_props!(base)
+        @test all(base.layer_isbound)
+
+        # place the Hill radius half-way through the baseline atmosphere
+        r_hill = 0.5 * (base.rl[end] + base.rl[1])
+        atmos = _setup_only(; hill_radius=r_hill)
+        ok = quiet() do
+            atmosphere.calc_layer_props!(atmos)
+        end
+        @test ok == false
+
+        # layer i spans rl[i+1] (lower edge) to rl[i] (upper edge). The layer which straddles
+        # the Hill radius is bound, and every layer above it (lower edge beyond) is unbound.
+        i_str = findlast(base.rl[1:end-1] .> r_hill)      # straddling layer
+        below = i_str:atmos.nlev_c
+        above = 1:(i_str-1)
+        @test length(above) > 2                           # enough layers to test
+        @test all(atmos.layer_isbound[below])
+        @test !any(atmos.layer_isbound[above])
+
+        # layers below the Hill radius match the baseline exactly
+        @test all(isapprox.(atmos.r[below], base.r[below]; rtol=1e-12))
+
+        # layers beyond have floor gravity and the capped thickness
+        @test all(isapprox.(atmos.g[above], atmos.hydrograv_ming; rtol=1e-12))
+        @test all(isapprox.(atmos.layer_thick[above[1:end-1]], atmos.hydrograv_hilldr; rtol=1e-8))
+
+        # Discrimination guard: without the Hill radius these layers are much thicker
+        @test minimum(base.layer_thick[above]) > 2 * atmos.hydrograv_hilldr
+
+        # Layer masses beyond the Hill radius come from the physical gravity, not the floor
+        #    value, so remain close to the bound reference (the capped layers sit at slightly
+        #    smaller radius, so have slightly larger gravity and slightly smaller mass)
+        @test all(isapprox.(atmos.layer_σ[above], base.layer_σ[above]; rtol=0.1))
+        @test isapprox(sum(atmos.layer_σ), sum(base.layer_σ); rtol=1e-3)
+
+        # Edge case: Hill radius below the surface makes every layer unbound
+        atmos_in = _setup_only(; hill_radius=0.5 * _RADIUS)
+        ok = quiet() do
+            atmosphere.calc_layer_props!(atmos_in)
+        end
+        @test ok == false
+        @test !any(atmos_in.layer_isbound)
+
+        # Error contract: a non-positive Hill radius is rejected by setup!
+        bad = atmosphere.Atmos_t()
+        ok = quiet() do
+            atmosphere.setup!(bad, ROOT_DIR, OUT_DIR, "greygas", 1000.0, 1.0, 0.0, _THETA,
+                                _TMP_SURF, _GRAVITY, _RADIUS, _NLEV, _P_SURF, _P_TOP,
+                                Dict("H2O" => 1.0), ""; real_gas=false, thermo_functions=false,
+                                hill_radius=0.0)
+        end
+        @test ok == false
     end
 
     # -----------------------------------------------------------------
