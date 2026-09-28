@@ -425,9 +425,7 @@ module aerosol_optics
 
         if maximum(f_ext) > EXTRAP_WARN
             nb_ext = count(f_ext .> EXTRAP_WARN)
-            @warn "Refractive index of '$material' extrapolated in $nb_ext bands " *
-                    "(tabulated $(round(λ_tab[1]*1e6, sigdigits=3))-" *
-                    "$(round(λ_tab[end]*1e6, sigdigits=3)) μm)"
+            @debug "Refract index of '$material' extrapolated in $nb_ext bands"
         end
 
         return (k_abs, k_sca, g, f_ext)

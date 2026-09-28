@@ -335,8 +335,6 @@ module solve_energy
             return (false, :warn, "    failure (objective function)", true)
         elseif code == CODE_STP
             return (false, :warn, "    failure (other; last step not ok)", true)
-        elseif code == CODE_HYD
-            return (false, :warn, "    failure (hydrostatic integration)", true)
         else
             return (false, :warn, "    failure (other)", true)
         end
@@ -972,7 +970,6 @@ module solve_energy
             # Recalculate layer properties
             if ! atmosphere.calc_layer_props!(atmos)
                 code[] = CODE_HYD
-                step_ok[] = false
                 stepflags *= "Ub-"
             end
 
@@ -1024,7 +1021,7 @@ module solve_energy
                                  r_med, c_cur, atmos.flux_u_lw[1],
                                  x_max, dx_stat, stepflags[1:end-1])
             if (modprint>0) && (mod(step, modprint)==0)
-                if step_ok[]
+                if step_ok[] && all(atmos.layer_isbound)
                     @info info_str
                 else
                     @warn info_str
@@ -1042,20 +1039,24 @@ module solve_energy
 
             # Converged?
             @debug "        check convergence"
-            if (conv_val < conv_atol + conv_rtol * c_max)
+            #    Steps rejected for any reason other than unbound layers cannot converge
+            if (conv_val < conv_atol + conv_rtol * c_max) && step_ok[]
                 # still using grey RT?
                 if grey_step
                     # switch to preferred RT scheme
                     grey_step = false
                 elseif !easy_start
                     # done!
+                    if any(.!atmos.layer_isbound)
+                        @warn "Converged, but some layers are not bound by gravity"
+                    end
                     code[] = CODE_SUC
                     break
                 end
             end
 
             # Record that this step not ok
-            if (code[] == CODE_99)
+            if (code[] == CODE_99) && !step_ok[]
                 code[] = CODE_STP
             end
 

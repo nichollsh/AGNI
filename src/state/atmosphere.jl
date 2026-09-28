@@ -1947,9 +1947,14 @@ module atmosphere
                     for (i, s) in enumerate(aerosol_mie)
                         opt = atmos.aerosol_optics[s]
                         @debug "    $s: $(opt["nk_file"]), r_eff=$(opt["r_eff"]) m, σ_g=$(opt["sigma_g"])"
-                        k_abs, k_sca, asy, _ = aerosol_optics.compute_mie_optics(
+                        mie_out = aerosol_optics.compute_mie_optics(
                                                     opt["nk_file"], opt["r_eff"], opt["sigma_g"],
                                                     bands, wl, fl)
+                        if mie_out === false
+                            @error "Failed to calculate optical properties of aerosol '$s'"
+                            return false
+                        end
+                        k_abs, k_sca, asy, _ = mie_out
                         type_id = AEROSOL_CUSTOM_TYPE0 + i
                         atmos.aerosol_custom_types[type_id] = s
                         atmos.aerosol_band_props[s] = hcat(k_abs, k_sca, asy)
@@ -2735,6 +2740,8 @@ module atmosphere
         nsub::Int64 = round(Int64, atmos.hydrograv_steps/atmos.nlev_c, RoundUp)
         maxdr::Float64 = atmos.hydrograv_maxdr / 2 # we do 2 integrations per layer
         isbound::Bool = true
+        m_atm::Float64 = 0.0    # mass of atmosphere below the current layer [kg]
+        a_σ::Float64 = 0.0      # net acceleration used to calculate layer mass [m s-2]
 
         # Integrate from surface upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
@@ -2822,10 +2829,33 @@ module atmosphere
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
             # Mass of layer, per unit area [kg m-2], from hydrostatic balance dp = -ρ a dr.
-            #    Using the net acceleration at the layer centre avoids the cancellation
-            #    error of differencing the total enclosed mass (dominated by the interior).
-            atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i]) /
-                                    max(atmos.a[i], atmos.hydrograv_ming)
+            if atmos.layer_isbound[i]
+                a_σ = atmos.a[i]
+            else
+                # Gravity in unbound layers has been set to the floor value - handle this.
+                if atmos.hydrograv_constg
+                    # acceleration equal to surface
+                    a_σ = atmos.grav_surf
+                elseif atmos.hydrograv_selfg
+                    # acceleration equal to enclosed mass
+                    a_σ = phys.grav_accel(atmos.interior_mass + m_atm, atmos.r[i])
+                else
+                    # acceleration equal to enclosed non-atmospheric mass
+                    a_σ = phys.grav_accel(atmos.interior_mass, atmos.r[i])
+                end
+                a_σ -= phys.cent_accel(atmos.axial_period, atmos.r[i], atmos.col_lat)
+            end
+
+            # Calculate layer mass per unit area using acceleration
+            if isfinite(a_σ) && (a_σ > atmos.hydrograv_ming)
+                atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i]) / a_σ
+            else
+                # no meaningful acceleration, so use the mass within the layer
+                atmos.layer_σ[i] = atmos.layer_ρ[i] * atmos.layer_thick[i]
+            end
+
+            # Accumulate atmosphere mass
+            m_atm += atmos.layer_σ[i] * 4 * pi * atmos.r[i]^2
 
             # Check if layer is bound
             isbound &= atmos.layer_isbound[i]

@@ -617,6 +617,33 @@ end
     end
 
     # -------------
+    # A failure to calculate Mie optical properties (here, a material with a density but no
+    # refractive index file) must make allocate! return false, rather than throw. Config
+    # validation would normally catch this, so the material is changed after setup!.
+    # -------------
+    @testset "mie_failure_returns_false_from_allocate" begin
+        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>1e-6, "nk_file"=>"SiO2_amorph",
+                                    "r_eff"=>1e-6, "sigma_g"=>1.65))
+        atmos = atmosphere.Atmos_t()
+        @test atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, spfile,
+                                1000.0, 1.0, 0.0, 45.0, 1500.0, gravity, radius,
+                                20, 10.0, 1e-5, Dict("H2O"=>0.5, "CO2"=>0.5), "";
+                                flag_aerosol=true, aerosol_species=aer,
+                                flag_rayleigh=false, real_gas=false, thermo_functions=false)
+        @test !isfile(AGNI.aerosol_optics.nk_path("H2"))       # no refractive index data
+        @test AGNI.density.condensate_rho("H2") > 0.0           # but a known density
+        atmos.aerosol_optics["sio2"]["nk_file"] = "H2"
+        ok = true
+        logs, ok = Test.collect_test_logs() do
+            atmosphere.allocate!(atmos, "$RES_DIR/stellar_spectra/sun.txt")
+        end
+        @test ok == false
+        @test any(occursin("optical properties of aerosol 'sio2'", l.message)
+                    for l in logs if l.level == Logging.Error)
+    end
+
+    # -------------
     # Water clouds require droplet data (block 10) in the spectral file, with the Pade
     # parametrisation for droplet type 5. A spectral file with block 10 removed must be
     # rejected at allocation, while the unmodified file is accepted (positive control).

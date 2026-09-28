@@ -687,6 +687,12 @@ end
         # Discrimination guard: without the Hill radius these layers are much thicker
         @test minimum(base.layer_thick[above]) > 2 * atmos.hydrograv_hilldr
 
+        # Layer masses beyond the Hill radius come from the physical gravity, not the floor
+        #    value, so remain close to the bound reference (the capped layers sit at slightly
+        #    smaller radius, so have slightly larger gravity and slightly smaller mass)
+        @test all(isapprox.(atmos.layer_σ[above], base.layer_σ[above]; rtol=0.1))
+        @test isapprox(sum(atmos.layer_σ), sum(base.layer_σ); rtol=1e-3)
+
         # Edge case: Hill radius below the surface makes every layer unbound
         atmos_in = _setup_only(; hill_radius=0.5 * _RADIUS)
         ok = quiet() do
