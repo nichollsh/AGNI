@@ -391,9 +391,9 @@ module plotting
         i_unb = findlast(.!atmos.layer_isbound)
         if !isnothing(i_unb)
             hline!(plt, [atmos.pl[i_unb+1]*1e-5], lw=lw,
-                            lc=col_d, ls=:dashdot, label="Unbound")
+                            lc=col_d, ls=:solid, label="Unbound")
             vline!(plt, [atmos.rl[i_unb+1]*1e-3], lw=lw,
-                            lc=col_d, ls=:dashdot, label="")
+                            lc=col_d, ls=:solid, label="")
         end
 
         # Plot current surface pressure and original

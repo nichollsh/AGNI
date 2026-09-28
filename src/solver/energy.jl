@@ -1042,7 +1042,7 @@ module solve_energy
 
             # Converged?
             @debug "        check convergence"
-            if (conv_val < conv_atol + conv_rtol * c_max) && step_ok[]
+            if (conv_val < conv_atol + conv_rtol * c_max)
                 # still using grey RT?
                 if grey_step
                     # switch to preferred RT scheme
@@ -1055,7 +1055,7 @@ module solve_energy
             end
 
             # Record that this step not ok
-            if (code[] == CODE_99) && !step_ok[]
+            if (code[] == CODE_99)
                 code[] = CODE_STP
             end
 
