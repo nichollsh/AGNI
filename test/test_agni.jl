@@ -520,24 +520,25 @@ end
 
 # Aerosol configuration: each aerosol is a table with a `method` ("mon" or "mie"), exactly one
 # of `mmr` or `species`, and (for "mie") the refractive index material and size distribution.
-# The legacy inline dict is rejected by the config parser, but flat values are still accepted
-# by `setup!` for API callers such as PROTEUS.
+# Flat values (a number or a gas name in place of the table) are rejected, both by the
+# config parser and by `setup!`. Keys which are not used by the chosen method are ignored.
 @testset "agni_aerosol_config" begin
     parse = atmosphere.parse_aerosol_entry
     quiet(f) = with_logger(f, MinLevelLogger(current_logger(), Test.Logging.Error+1))
     conds = ["H2O", "SiO2"]
 
-    # Valid "mon" entries, including legacy flat values
+    # Valid "mon" entries
     e = parse("soot", Dict("method"=>"mon", "mmr"=>1e-4), conds)
     @test e["method"] == "mon"
     @test isapprox(e["mmr"], 1e-4; rtol=1e-12)
-    e = parse("soot", 2e-3, conds)
-    @test e["method"] == "mon"
-    @test isapprox(e["mmr"], 2e-3; rtol=1e-12)
-    e = parse("soot", 0, conds)                       # integer MMR at the boundary
+    e = parse("soot", Dict("method"=>"mon", "mmr"=>0), conds)   # integer MMR at the boundary
+    @test isa(e["mmr"], Float64)
     @test isapprox(e["mmr"], 0.0; atol=1e-15)
-    e = parse("biogenic", "H2O", conds)
+    e = parse("biogenic", Dict("method"=>"mon", "species"=>"H2O"), conds)
     @test e["species"] == "H2O"
+    # keys which are not used by the method are ignored
+    e = parse("soot", Dict("method"=>"mon", "mmr"=>1e-4, "r_eff"=>1e-6), conds)
+    @test e["method"] == "mon"
 
     # Invalid entries return nothing
     quiet() do
@@ -548,8 +549,9 @@ end
         @test isnothing(parse("soot", Dict("method"=>"mon", "mmr"=>1.5), conds))                  # mmr > 1
         @test isnothing(parse("soot", Dict("method"=>"mon", "mmr"=>-1e-9), conds))                # mmr < 0
         @test isnothing(parse("soot", Dict("method"=>"mon", "species"=>"CH4"), conds))            # not condensable
-        @test isnothing(parse("soot", Dict("method"=>"mon", "mmr"=>1e-4, "r_eff"=>1e-6), conds))  # mie key on mon
         @test isnothing(parse("soot", [1.0], conds))                                              # wrong type
+        @test isnothing(parse("soot", 2e-3, conds))                                               # flat number
+        @test isnothing(parse("biogenic", "H2O", conds))                                          # flat gas name
         @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5,
                                             "nk_file"=>"SiO2_amorph", "sigma_g"=>1.5), conds))   # no r_eff
         @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5, "nk_file"=>"Unobtainium",
@@ -568,10 +570,9 @@ end
         @test isnothing(parse("sio2", merge(base, Dict("sigma_g"=>0.9)), conds))
         @test isnothing(parse("sio2", merge(base, Dict("r_eff"=>-1e-6)), conds))
         @test isnothing(parse("sio2", merge(base, Dict("r_eff"=>Inf)), conds))
-        @test isnothing(parse("sio2", merge(base, Dict("extra"=>1)), conds))
     end
 
-    # Legacy inline dict in a config file is rejected with a migration message
+    # Legacy inline dict in a config file is rejected
     cfg = _base_cfg()
     cfg["composition"]["aerosols"] = Dict("soot"=>1e-4)
     logs, ok = Test.collect_test_logs() do
@@ -579,7 +580,7 @@ end
     end
     @test ok == false
     errs = [l.message for l in logs if l.level == Logging.Error]
-    @test any(occursin("no longer supported", m) for m in errs)
+    @test any(occursin("one table per aerosol", m) for m in errs)
 
     # setup! stores methods and Mie parameters, and sets particle sizes accordingly
     atmos = atmosphere.Atmos_t()
@@ -588,7 +589,7 @@ end
                             1000.0, 1.0, 0.0, 0.0, 1500.0, 10.0, 1.0e7, 20, 10.0, 1e-5,
                             Dict("H2O" => 1.0), "";
                             flag_aerosol=true, real_gas=false, thermo_functions=false,
-                            aerosol_species=Dict("soot"=>1e-4,
+                            aerosol_species=Dict("soot"=>Dict("method"=>"mon", "mmr"=>1e-4),
                                                 "SiO2"=>Dict("method"=>"mie", "mmr"=>1e-5,
                                                             "nk_file"=>"SiO2_amorph",
                                                             "r_eff"=>2e-6, "sigma_g"=>1.5)))

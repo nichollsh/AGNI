@@ -24,7 +24,7 @@ module atmosphere
     # Local modules
     import ..phys
     import ..spectrum
-    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum, SMALLFLOAT
+    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum, SMALLFLOAT, R_earth
     import ..formulae
     import ..species
     import ..density
@@ -92,12 +92,14 @@ module atmosphere
     const CFG_transspec_ref_p::Float64      = 20e-3 # 20 mbar
     const CFG_ocean_ob_frac::Float64        = 0.6
     const CFG_ocean_cs_height::Float64      = 3000.0
-    const CFG_hydrograv_steps::Int64        = 2000
-    const CFG_hydrograv_maxdr::Float64      = 1e8
+    const CFG_hydrograv_steps::Int64        = 2048
+    const CFG_hydrograv_hilldr::Float64     = 1e-3 * R_earth
+    const CFG_hydrograv_maxdr::Float64      = R_earth
     const CFG_hydrograv_mindr::Float64      = 1e-5
     const CFG_hydrograv_ming::Float64       = 1e-4
     const CFG_hydrograv_constg::Bool        = false
     const CFG_hydrograv_selfg::Bool         = true
+    const CFG_hill_radius::Float64          = R_earth * 100.0
 
     # Variable limits and defaults
     const NLEV_minimum::Int64           = 15        # minimum allowed number of levels
@@ -262,11 +264,15 @@ module atmosphere
 
         # Hydrostatic integration parameters
         hydrograv_steps::Int64              # number of steps to use when calculating heights and gravity
-        hydrograv_maxdr::Float64            # maximum step size to use when calculating heights [m]
-        hydrograv_mindr::Float64            # minimum step size to use when calculating heights [m]
+        hydrograv_hilldr::Float64           # maximum dz when calculating heights beyond the hill radius [m]
+        hydrograv_maxdr::Float64            # maximum dz when calculating heights [m]
+        hydrograv_mindr::Float64            # minimum dz when calculating heights [m]
         hydrograv_ming::Float64             # minimum allowed gravity [m/s^2]
         hydrograv_constg::Bool              # constant gravity with height?
         hydrograv_selfg::Bool               # include self-gravity of the atmosphere?
+
+        # Hill radius
+        hill_radius::Float64                # Hill radius [m] provided by PROTEUS or from stellar mass
 
         # Gases (only those in SOCRATES spectralfile)
         gas_soc_num::Int64                  # number of gases
@@ -483,23 +489,12 @@ module atmosphere
         return false
     end
 
-    # Keys permitted for each aerosol optical-properties method
-    const AEROSOL_KEYS_MON::Vector{String} = ["method", "mmr", "species"]
-    const AEROSOL_KEYS_MIE::Vector{String} = ["method", "mmr", "species",
-                                                "nk_file", "r_eff", "sigma_g"]
-
     """
     **Parse and validate the configuration of a single aerosol species.**
 
     Each aerosol is described by a dictionary containing a `method` key, which is either
     `"mon"` (pre-computed SOCRATES monochromatic scattering data) or `"mie"` (properties
-    calculated at runtime from refractive indices using Mie theory). Exactly one of `mmr`
-    (a constant mass mixing ratio) or `species` (a condensate which sets the mixing ratio)
-    must be provided. Aerosols with method `"mie"` also require `nk_file`, `r_eff`, and
-    `sigma_g`.
-
-    For backwards compatibility, a number (interpreted as `mmr`) or a string (interpreted as
-    `species`) may be passed in place of the dictionary, implying method `"mon"`.
+    calculated at runtime from refractive indices using Mie theory).
 
     Arguments:
     - `name::String`                        name of the aerosol
@@ -513,11 +508,7 @@ module atmosphere
                                     condensates::Vector{String})::Union{Dict{String,Any},Nothing}
 
         # Legacy flat values
-        if isa(value, Real)
-            value = Dict{String,Any}("method"=>"mon", "mmr"=>value)
-        elseif isa(value, AbstractString)
-            value = Dict{String,Any}("method"=>"mon", "species"=>value)
-        elseif !isa(value, AbstractDict)
+        if !isa(value, AbstractDict)
             @warn "Aerosol '$name' configuration must be a table, got $(typeof(value))"
             @warn "    See AGNI documentation pages."
             return nothing
@@ -529,41 +520,9 @@ module atmosphere
             @warn "Aerosol '$name' must specify method as either \"mon\" or \"mie\""
             return nothing
         end
-        method = entry["method"]
-        if method == "mon"
-            allowed = AEROSOL_KEYS_MON
-        elseif method == "mie"
-            allowed = AEROSOL_KEYS_MIE
-        else
-            @warn "Aerosol '$name' has invalid method '$method'; use \"mon\" or \"mie\""
-            return nothing
-        end
-
-        # Mixing ratio source
-        if haskey(entry, "mmr") == haskey(entry, "species")
-            @warn "The abundance of aerosol '$name' is set incorrectly."
-            @warn "      Specify exactly either 'mmr' or 'species' in its table."
-            return nothing
-        end
-        if haskey(entry, "mmr")
-            if !isa(entry["mmr"], Real)
-                @error "Aerosol '$name' mmr must be a number"
-                return nothing
-            end
-            entry["mmr"] = Float64(entry["mmr"])
-            _check_range("Aerosol '$name' mass mixing ratio", entry["mmr"];
-                            min=0.0, max=1.0) || return nothing
-        else
-            if !isa(entry["species"], AbstractString) || !(entry["species"] in condensates)
-                @error "Aerosol '$name' is tied to '$(entry["species"])', " *
-                        "but this is not in the list of condensates"
-                return nothing
-            end
-            entry["species"] = String(entry["species"])
-        end
 
         # Mie parameters
-        if method == "mie"
+        if entry["method"] == "mie"
             # Check that all required keys are present
             for k in ("nk_file", "r_eff", "sigma_g")
                 if !haskey(entry, k)
@@ -588,10 +547,39 @@ module atmosphere
                 end
                 entry[k] = Float64(entry[k])
             end
-            _check_range("Aerosol '$name' effective radius", entry["r_eff"];
-                            min=1e-10, max=1e-2) || return nothing
-            _check_range("Aerosol '$name' geometric standard deviation", entry["sigma_g"];
-                            min=1.0, max=5.0) || return nothing
+            _check_range("Aerosol '$name' mean effective radius", entry["r_eff"];
+                            min=1e-10, max=1.0) || return nothing
+            _check_range("Aerosol '$name' radius distribution std-dev", entry["sigma_g"];
+                            min=1.0, max=100.0) || return nothing
+        elseif entry["method"] == "mon"
+            # Don't need to do anything
+        else
+            @warn "Aerosol '$name' has invalid method '$(entry["method"])'; use \"mon\" or \"mie\""
+            return nothing
+        end
+
+
+        # Mixing ratio source
+        if haskey(entry, "mmr") == haskey(entry, "species")
+            @warn "The abundance of aerosol '$name' is set incorrectly."
+            @warn "      Specify exactly either 'mmr' or 'species' in its table."
+            return nothing
+        end
+        if haskey(entry, "mmr")
+            if !isa(entry["mmr"], Real)
+                @error "Aerosol '$name' mmr must be a number"
+                return nothing
+            end
+            entry["mmr"] = Float64(entry["mmr"])
+            _check_range("Aerosol '$name' mass mixing ratio", entry["mmr"];
+                            min=0.0, max=1.0) || return nothing
+        else
+            if !isa(entry["species"], AbstractString) || !(entry["species"] in condensates)
+                @error "Aerosol '$name' is tied to '$(entry["species"])', " *
+                        "but this is not in the list of condensates"
+                return nothing
+            end
+            entry["species"] = String(entry["species"])
         end
 
         return entry
@@ -714,10 +702,12 @@ module atmosphere
     - `ocean_cs_height::Float64`        continental shelf height [m]
     - `hydrograv_steps::Int64`          number of steps to use when calculating heights and gravity
     - `hydrograv_maxdr::Float64`        maximum step size to use when calculating heights [m]
+    - `hydrograv_hilldr::Float64`       maximum step size to use beyond the Hill radius [m]
     - `hydrograv_mindr::Float64`        minimum step size to use when calculating heights [m]
     - `hydrograv_ming::Float64`         minimum allowed gravity [m/s^2]
     - `hydrograv_constg::Bool`          constant gravity with height?
     - `hydrograv_selfg::Bool`           include self-gravity of the atmosphere?
+    - `hill_radius::Float64`            Hill radius of the planet [m]; layers beyond this are unbound
 
     Returns:
         Nothing
@@ -805,14 +795,16 @@ module atmosphere
 
                     hydrograv_steps::Int64 =       CFG_hydrograv_steps,
                     hydrograv_maxdr::Float64 =     CFG_hydrograv_maxdr,
+                    hydrograv_hilldr::Float64 =    CFG_hydrograv_hilldr,
                     hydrograv_mindr::Float64 =     CFG_hydrograv_mindr,
                     hydrograv_ming::Float64 =      CFG_hydrograv_ming,
                     hydrograv_constg::Bool =       CFG_hydrograv_constg,
-                    hydrograv_selfg::Bool =        CFG_hydrograv_selfg
+                    hydrograv_selfg::Bool =        CFG_hydrograv_selfg,
+                    hill_radius::Float64 =         CFG_hill_radius
                     )::Bool
 
         # Say hello
-        @info  "Setting-up a new atmosphere struct"
+        @info  "Setting up a new atmosphere struct"
         atmos.AGNI_VERSION = AGNI_VERSION
         @debug "AGNI VERSION = "*AGNI_VERSION
 
@@ -1049,12 +1041,18 @@ module atmosphere
         _check_range("Hydrostatic integration steps", atmos.hydrograv_steps; min=2, max=1e5) || return false
         atmos.hydrograv_maxdr = hydrograv_maxdr
         _check_range("Hydrostatic integration max step size", atmos.hydrograv_maxdr; min=1e-9, max=1e9) || return false
+        atmos.hydrograv_hilldr = hydrograv_hilldr
+        _check_range("Hydrostatic integration max step size beyond Hill radius", atmos.hydrograv_hilldr; min=1e-9, max=1e9) || return false
         atmos.hydrograv_mindr = hydrograv_mindr
         _check_range("Hydrostatic integration min step size", atmos.hydrograv_mindr; min=1e-9, max=1e9) || return false
         atmos.hydrograv_ming = hydrograv_ming
         _check_range("Hydrostatic integration min gravity", atmos.hydrograv_ming; min=0.0) || return false
         atmos.hydrograv_constg = hydrograv_constg
         atmos.hydrograv_selfg = hydrograv_selfg
+
+        # hill radius is reasonable
+        atmos.hill_radius = hill_radius
+        _check_range("Hill radius", atmos.hill_radius; min=1.0) || return false
 
         # interior radius
         atmos.rp = radius
@@ -1206,6 +1204,7 @@ module atmosphere
                 # interpret as MMR value
                 v = Float64(v)
                 _check_range("Aerosol mass mixing ratio override for type $k", v; min=0.0) || return false
+                @debug "Aerosol '$k' to be set by value $v"
                 set_aerosol!(atmos, k, v)
                 atmos.aerosol_setby[k] = "value"
             end
@@ -2734,9 +2733,18 @@ module atmosphere
 
         # Temporary values
         nsub::Int64 = round(Int64, atmos.hydrograv_steps/atmos.nlev_c, RoundUp)
+        maxdr::Float64 = atmos.hydrograv_maxdr / 2 # we do 2 integrations per layer
+        isbound::Bool = true
 
         # Integrate from surface upwards
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
+
+            # Set maximum dr for this layer
+            if atmos.rl[i+1] > atmos.hill_radius
+                maxdr = atmos.hydrograv_hilldr / 2
+                isbound = false
+                atmos.layer_isbound[i] = false
+            end
 
             # ------------
             # Integrate from lower edge to centre
@@ -2748,20 +2756,26 @@ module atmosphere
                                     constg = atmos.hydrograv_constg,
                                     selfg = atmos.hydrograv_selfg)
 
+            #   check for divergence: when the scale height greatly exceeds the radius
+            isbound &= isfinite(atmos.r[i]) && (atmos.r[i] > atmos.rl[i+1]) && isfinite(atmos.g[i])
+
             #   apply radius limiter
-            atmos.r[i] = max(atmos.r[i], atmos.rl[i+1] + atmos.hydrograv_mindr)
-            if atmos.r[i] > atmos.rl[i+1] + atmos.hydrograv_maxdr/2
-                atmos.r[i] = atmos.rl[i+1] + atmos.hydrograv_maxdr/2
+            if !isbound || (atmos.r[i] > atmos.rl[i+1] + maxdr)
+                atmos.r[i] = atmos.rl[i+1] + maxdr
                 atmos.layer_isbound[i] = false
             end
+            atmos.r[i] = max(atmos.r[i], atmos.rl[i+1] + atmos.hydrograv_mindr)
 
             #   apply gravity limiter
             if atmos.hydrograv_constg
                 atmos.g[i]  = atmos.grav_surf
             end
-            if atmos.g[i] < atmos.hydrograv_ming
+            if !isbound || (atmos.g[i] < atmos.hydrograv_ming)
                 atmos.g[i] = atmos.hydrograv_ming
                 atmos.layer_isbound[i] = false
+            end
+            if !isfinite(atmos.m[i])
+                atmos.m[i] = atmos.ml[i+1]
             end
 
             # calculate net acceleration at layer centre
@@ -2778,20 +2792,26 @@ module atmosphere
                                     constg = atmos.hydrograv_constg,
                                     selfg = atmos.hydrograv_selfg)
 
+            #   check for divergence, as above
+            isbound &= isfinite(atmos.rl[i]) && (atmos.rl[i] > atmos.r[i]) && isfinite(atmos.gl[i])
+
             #   apply radius limiter
-            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + atmos.hydrograv_mindr)
-            if atmos.rl[i] > atmos.r[i] + atmos.hydrograv_maxdr/2
-                atmos.rl[i] = atmos.r[i] + atmos.hydrograv_maxdr/2
+            if !isbound || (atmos.rl[i] > atmos.r[i] + maxdr)
+                atmos.rl[i] = atmos.r[i] + maxdr
                 atmos.layer_isbound[i] = false
             end
+            atmos.rl[i] = max(atmos.rl[i], atmos.r[i] + atmos.hydrograv_mindr)
 
             #   apply gravity limiter
             if atmos.hydrograv_constg
                 atmos.gl[i] = atmos.grav_surf
             end
-            if atmos.gl[i] < atmos.hydrograv_ming
+            if !isbound || (atmos.gl[i] < atmos.hydrograv_ming)
                 atmos.gl[i] = atmos.hydrograv_ming
                 atmos.layer_isbound[i] = false
+            end
+            if !isfinite(atmos.ml[i])
+                atmos.ml[i] = atmos.m[i]
             end
 
             #  calculate net acceleration at layer upper edge
@@ -2801,11 +2821,17 @@ module atmosphere
             # Store: Layer geometrical thickness [m]
             atmos.layer_thick[i] = atmos.rl[i] - atmos.rl[i+1]
 
-            # Mass of layer, per unit area at layer-centre [kg m-2]
-            atmos.layer_σ[i] = (atmos.ml[i] - atmos.ml[i+1])/(4 * pi * atmos.r[i]^2)
+            # Mass of layer, per unit area [kg m-2], from hydrostatic balance dp = -ρ a dr.
+            #    Using the net acceleration at the layer centre avoids the cancellation
+            #    error of differencing the total enclosed mass (dominated by the interior).
+            atmos.layer_σ[i] = (atmos.pl[i+1] - atmos.pl[i]) /
+                                    max(atmos.a[i], atmos.hydrograv_ming)
+
+            # Check if layer is bound
+            isbound &= atmos.layer_isbound[i]
         end
 
-        return all(atmos.layer_isbound)
+        return isbound
     end
 
     """
@@ -2885,13 +2911,14 @@ module atmosphere
         end
 
         # Parameters
-        dp::Float64  = (p1-p0)/max(2,n) # this will be negative
+        nstep::Int64 = max(2,n)
+        dp::Float64  = (p1-p0)/nstep # this will be negative
         dp2::Float64 = dp/2
         k1::Float64  = 0.0; k2::Float64 = 0.0
         k3::Float64  = 0.0; k4::Float64 = 0.0
 
-        # Loop over sub-levels between p0 and p1
-        for _ in range(p0, stop=p1, step=dp)
+        # Loop over sub-levels between p0 and p1 (exactly nstep steps, ending at p1)
+        for _ in 1:nstep
 
             # Integrate radius ...
             k1 = _drdp(pj,       rj)

@@ -9,55 +9,12 @@ ideal gas calculations for liquid and gas densities.
 """
 module density
 
-    import ..consts: BIGFLOAT, R_gas
+    import ..consts: BIGFLOAT, R_gas, _lookup_rho
     import ..species: Gas_t, is_vapour, EOS_IDEAL, EOS
 
     # Constants for handling phase boundaries in density calculations
     const PHS_METHOD_DEFAULT::Int64 = 4
     const PHS_DLOGP_DEFAULT::Float64 = 0.3
-
-    # Table of condensed-phase density for ocean and aerosol calculations [kg/m^3]
-    const _lookup_rho::Dict{String, Float64} = Dict([
-        # https://encyclopedia.airliquide.com/water#properties
-        ("H2O", 958.37 ),  # boiling
-        ("CO2", 1178.4 ),  # triple
-        ("H2" , 70.516 ),  # boiling
-        ("CH4", 422.36 ),  # boiling
-        ("CO" , 793.2  ),  # boiling
-        ("N2" , 806.11 ),  # boiling
-        ("NH3", 681.97 ),  # boiling
-        ("SO2", 1461.1 ),  # boiling
-
-        # Handbook of Mineralogy (Anthony et al., https://www.handbookofmineralogy.org/)
-        ("SiO2",                2660.0),  # alpha quartz
-        ("SiO2_amorph",         2201.0),  # fused silica
-        ("SiO",                 2140.0),  # amorphous
-        ("FeO",                 5970.0),  # wustite
-        ("Fe",                  7874.0),  # alpha iron
-        ("Fe2O3",               5255.0),  # hematite
-        ("FeS",                 4850.0),  # troilite
-        ("Fe2SiO4_KH",          4400.0),  # fayalite
-        ("MgO",                 3580.0),  # periclase
-        ("MgSiO3",              3189.0),  # enstatite
-        ("MgSiO3_amorph_glass", 2710.0),  # glass
-        ("Mg2SiO4_crystalline", 3271.0),  # forsterite
-        ("CaTiO3_KH",           4020.0),  # perovskite (synthetic)
-        ("TiO2_anatase",        3890.0),  # anatase
-        ("TiO2_rutile",         4250.0),  # rutile
-        ("Na2S",                1856.0),  # PubChem CID 14804 (Merck Index)
-        ("KCl",                 1987.0),  # sylvite
-        ("NaCl",                2165.0),  # halite
-        ("C",                   2260.0),  # graphite
-
-        # https://webmineral.com/data/Corundum.shtml
-        ("Al2O3", 4050.0), # Corundum
-
-        # Bond & Bergstrom (2006), Aerosol Sci. Technol. 40, 27
-        ("Soot",                1800.0),
-
-        # Imanaka et al. (2012) via Horst & Tolbert (2013)
-        ("Tholin",              1350.0),  # 1.3-1.4 g/cm3
-    ])
 
     """
     **Evaluate the bulk density of an aerosol or cloud particle material.**

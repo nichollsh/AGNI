@@ -687,6 +687,13 @@ module AGNI
 
         # No solve - just calc fluxes at the end
         if sol == "none"
+            # Set cloud and aerosol profiles from condensation yields
+            multicol.call_agnostic!( is_multicol ? globe : atmos,
+                                    atmosphere.set_cloud!; from_yield=true)
+            multicol.call_agnostic!( is_multicol ? globe : atmos,
+                                    atmosphere.set_aerosols!)
+
+            # Calculate fluxes and heating rates
             multicol.call_agnostic!( is_multicol ? globe : atmos,
                                     energy.calc_fluxes!,
                                     radiative=true, latent_heat=incl_latent,

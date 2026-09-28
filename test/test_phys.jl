@@ -8,7 +8,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
 const lookup_mmw = AGNI.formulae._lookup_mmw
 const lookup_count_atoms = AGNI.formulae._lookup_count_atoms
 const lookup_colour = AGNI.style._lookup_colour
-const lookup_rho = AGNI.density._lookup_rho
+const lookup_rho = AGNI.consts._lookup_rho
 
 @testset "phys" begin
     # atom counting
@@ -48,7 +48,7 @@ const lookup_rho = AGNI.density._lookup_rho
     @test isapprox(g, 9.81; atol=1.0)
 
     # liquid density table and fallback
-    @test AGNI.density.liquid_rho("H2O") == lookup_liquid_rho["H2O"]
+    @test AGNI.density.liquid_rho("H2O") == lookup_rho["H2O"]
     @test AGNI.density.liquid_rho("UNKNOWN") == AGNI.consts.BIGFLOAT
 
     # thermal diffusivity
@@ -72,6 +72,34 @@ const lookup_rho = AGNI.density._lookup_rho
     # -------------
     # Test heat capacity lookup tables
     # -------------
+    # Species whose data file gives a placeholder critical point below the saturation curve
+    # (e.g. FeO, with T_crit = 0.5 K) take the top of the curve as their critical point, so
+    # that they can condense. Species with a real critical point are unchanged.
+    @testset "critical_point_fallback_to_saturation_curve" begin
+        thermo = "$RES_DIR/thermodynamics/"
+        FeO = species.load_gas(thermo, "FeO", false, false)
+        @test isapprox(FeO.T_crit, maximum(FeO.sat_T); rtol=1e-12)
+        @test FeO.T_crit > 2000.0
+
+        # FeO is now subcritical at 2000 K, with a finite saturation pressure far below the
+        #    placeholder value used for supercritical gases
+        psat = species.get_Psat(FeO, 2000.0)
+        @test isfinite(psat) && (psat > 0.0)
+        @test psat < 1e3
+        # Discrimination guard: without the fallback, T_crit=0.5 K gives the BIGFLOAT sentinel
+        @test psat < AGNI.consts.BIGFLOAT / 1e10
+
+        # Real critical points from the data files are preserved (H2O: 647.1 K)
+        H2O = species.load_gas(thermo, "H2O", false, false)
+        @test isapprox(H2O.T_crit, 647.1; atol=0.1)
+        @test species.get_Psat(H2O, 700.0) >= AGNI.consts.BIGFLOAT  # supercritical
+
+        # Edge case: species without saturation data are not modified
+        SiO = species.load_gas(thermo, "SiO", false, false)
+        @test SiO.no_sat
+        @test species.get_Psat(SiO, 1000.0) >= AGNI.consts.BIGFLOAT
+    end
+
     @testset "cp" begin
         t_test  = [10.0,  500.0, 1000.0, 2000.0, 3000.0]     # Tested values of temperature
         v_expt  = [4.975, 35.22, 41.27 , 51.20 , 55.74 ]     # Expected values of cp [J mol-1 K-1]

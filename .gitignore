@@ -41,6 +41,7 @@ scratch
 scratch/
 test/out/
 out/*
+/out*/
 runtime.sf
 runtime.sf_k
 socstar.dat

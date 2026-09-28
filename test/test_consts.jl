@@ -142,11 +142,11 @@ using AGNI
     # -------------
     # Liquid densities for ocean module
     # -------------
-    @test isapprox(AGNI.density._lookup_rho["H2O"], 958.37; rtol=1e-5)
-    @test AGNI.density._lookup_rho["CO2"] > AGNI.density._lookup_rho["H2O"]
+    @test isapprox(AGNI.consts._lookup_rho["H2O"], 958.37; rtol=1e-5)
+    @test AGNI.consts._lookup_rho["CO2"] > AGNI.consts._lookup_rho["H2O"]
 
     # All liquid densities should be positive
-    for (species, rho) in AGNI.density._lookup_rho
+    for (species, rho) in AGNI.consts._lookup_rho
         @test rho > 0.0  # All liquid densities should be positive
     end
 

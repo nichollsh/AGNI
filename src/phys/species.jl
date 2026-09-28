@@ -355,6 +355,13 @@ module species
             end # /NetCDF
             end # /MinLevelLogger
 
+            # Some data files have a saturation curve but no known critical point.
+            # Take the critical point to be the highest T of the saturation curve.
+            if !gas.no_sat && (gas.T_crit <= minimum(gas.sat_T))
+                gas.T_crit = maximum(gas.sat_T)
+                @debug "    $formula: updated T_crit=$(gas.T_crit) K from saturation curve"
+            end
+
             # Setup 1D interpolators for Cp, Lv, and Psat
             gas.cap_I = extrapolate(interpolate((gas.cap_T,), gas.cap_C, Gridded(Linear())), Flat())
             gas.lat_I = extrapolate(interpolate((gas.lat_T,), gas.lat_H, Gridded(Linear())), Flat())

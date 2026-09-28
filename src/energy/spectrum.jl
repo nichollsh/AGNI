@@ -655,6 +655,12 @@ module spectrum
             write(f, " ")
         end
 
+        # Check file exists
+        if !isfile(execpath)
+            @warn "Failed to write executable script: '$execpath'"
+            return false
+        end
+
         # Run executable
         @debug "Running prep_spec now"
         try

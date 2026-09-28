@@ -155,8 +155,8 @@ end
             # check all layers are bound
             @test all(atmos.layer_isbound)
 
-            # check known value
-            val_e = 1.0487713813847492e7 / AGNI.consts.R_earth
+            # check known value (converged: independent of hydrograv_steps to ~1e-8)
+            val_e = 1.6345635358947102
             val_o = atmos.r[1] / AGNI.consts.R_earth # height of topmost layer-centre
 
             test_check = isapprox(val_e, val_o; rtol=rtol)
@@ -220,7 +220,9 @@ end
             @test all(atmos.flux_u_sw .>= 0.0)
 
             # check known value
-            val_e = 29.699515011666094  # known from previous tests
+            # known from previous tests; updated for σ = Δp/a
+            #    (was 29.699515011666094)
+            val_e = 30.246728893950902
             val_o = atmos.flux_u_sw[end] # bottom level
             test_check = isapprox(val_e, val_o; rtol=1e-3)
             if !test_check
@@ -406,7 +408,7 @@ end
         @test isapprox(val_e, val_o; rtol=rtol)
 
         # check known value
-        val_e = 37.18288051811991
+        val_e = 37.12571350789956
         val_o = atmos.flux_u_sw[20]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -455,7 +457,8 @@ end
         atmos.flux_tot += atmos.flux_n
         energy.calc_hrates!(atmos)
 
-        val_e = 6.144639564022429    # from previous tests
+        # from previous tests
+        val_e = 6.3658225891529066
         val_o = atmos.heating_rate[atmos.nlev_c-10]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -484,7 +487,7 @@ end
         end
 
         # check against known value
-        val_e = 8234.876160580243  # from previous tests
+        val_e = 8602.40387091133
         val_o = atmos.flux_tot[atmos.nlev_c-10]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -559,7 +562,7 @@ end
     #   - in the optically thin limit the flux perturbation is linear in MMR
     # -------------
     @testset "mie_aerosol_changes_fluxes_monotonically" begin
-        spfile = "$RE[S_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
         aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>0.0, "nk_file"=>"SiO2_amorph",
                                     "r_eff"=>1e-6, "sigma_g"=>1.65))
         atmos = atmosphere.Atmos_t()
@@ -601,6 +604,7 @@ end
         @test all(olr .> 0.0) && all(swu .>= 0.0) && all(sws .>= 0.0)
         @test all(diff(vcat(olr_0, olr)) .< 0.0)     # OLR decreases
         @test all(diff(vcat(swu_0, swu)) .> 0.0)     # reflection increases
+
         # Discrimination guard: the thickest cloud changes OLR by more than 1%
         @test (olr_0 - olr[end]) / olr_0 > 0.01
 

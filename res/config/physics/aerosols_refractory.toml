@@ -23,14 +23,14 @@ title = "Refractory aerosols"            # Name for this configuration file
 [files]
     input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"    # Path to SOCRATES spectral file. Set to "greygas" for grey RT.
     input_star      = "res/stellar_spectra/sun.txt"                     # Path to stellar spectrum. Set to "blackbody" to use `planet.star_Teff`.
-    output_dir      = "out/"                                            # Path to output directory.
-    io_dir          = "out/"                                            # Path for fast file operations (optional).
+    output_dir      = "out_aer/"                                            # Path to output directory.
+    io_dir          = "out_aer/"                                            # Path for fast file operations (optional).
 
 [composition]
     p_surf          = 100.0                     # Total surface pressure [bar].
-    p_top           = 1e-5                      # Total top-of-atmosphere pressure [bar].
-    vmr_dict        = { H2O=0.50, CO2=0.25, HCN=0.15, Al2O3=0.10 }      # Volatile volume mixing ratios (=mole fractions).
-    condensates     = ["HCN", "Al2O3"]                        # List of volatiles which are allowed to condense.
+    p_top           = 1e-6                      # Total top-of-atmosphere pressure [bar].
+    vmr_dict        = { H2O=0.50, CO2=0.25, HCN=0.15, FeO=0.10 }      # Volatile volume mixing ratios (=mole fractions).
+    condensates     = ["HCN", "FeO"]                        # List of volatiles which are allowed to condense.
 
     [composition.aerosols.SiO2]                 # Aerosol named 'sio2'
         method      = "mie"                     # Calculate optical properties with Mie theory
@@ -43,10 +43,10 @@ title = "Refractory aerosols"            # Name for this configuration file
         method      = "mon"
         species     = "HCN"                     # Mass mixing ratio set by condensation of this species
 
-    [composition.aerosols.Al2O3]
+    [composition.aerosols.FeO]
         method      = "mie"
-        species     = "Al2O3"
-        nk_file     = "Al2O3"
+        species     = "FeO"
+        nk_file     = "FeO"
         r_eff       = 0.5e-6
         sigma_g     = 1.65
 
@@ -84,8 +84,8 @@ title = "Refractory aerosols"            # Name for this configuration file
     thermo_funct    = true                      # Use temperature-dependent thermodynamic properties?
     sensible_heat   = false                     # Include sensible heat transport at the surface?
     conduction      = true                      # Include thermal conductive heat transport?
-    oceans          = false                     # Model ocean formation - check saturation at surface
-    rainout         = false                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
+    oceans          = true                     # Model ocean formation - check saturation at surface
+    rainout         = true                     # Model rainout - phase change impacts gas mixing ratios, not just energy fluxes
     coldtrap        = true                      # Enable cold-trapping effect on abundances aloft
     evap_efficiency = 0.05                      # Efficiency of re-evaporation of raindrops in dry regions
     demixing        = false                     # Include immiscible demixing of atmospheric constituents?
