@@ -24,7 +24,7 @@ module atmosphere
     # Local modules
     import ..phys
     import ..spectrum
-    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum, SMALLFLOAT, R_earth
+    import ..consts: UNSET_STR, AGNI_VERSION, SOCVER_minimum, SMALLFLOAT, R_earth, BIGFLOAT
     import ..formulae
     import ..species
     import ..density
@@ -3123,6 +3123,12 @@ module atmosphere
         atmos.transspec_p = atmos.p_toa*1.05
         atmos.transspec_r = atmos.rp
         generate_pgrid!(atmos)
+
+        # Set hill radius to infinity
+        atmos.hill_radius = BIGFLOAT
+
+        # The column has been collapsed to near-zero thickness 
+        atmos.hydrograv_constg = true
 
         # Set temperatures to be small, except the surface
         fill!(atmos.tmp[1:end-1],  atmos.tmp_floor)

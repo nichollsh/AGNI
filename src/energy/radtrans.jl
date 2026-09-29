@@ -389,13 +389,20 @@ module radtrans
 
         # Down-directed SW and LW beams, looping from TOA downwards
         for i in 1:atmos.nlev_c
+            # A transparent atmosphere has no opacity by construction
+            if atmos.transparent
+                tau_lw = 0.0
+                tau_sw = 0.0
+            else
+                tau_lw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_lw / atmos.g[i]
+                tau_sw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_sw / atmos.g[i]
+            end
+
             # Downward LW flux at bottom of layer
-            tau_lw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_lw / atmos.g[i]
             trans = exp( -tau_lw )
             atmos.flux_d_lw[i+1] = atmos.flux_d_lw[i] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
 
             # Downward SW flux at bottom of layer
-            tau_sw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_sw / atmos.g[i]
             trans = exp( -tau_sw )
             atmos.flux_d_sw[i+1] = atmos.flux_d_sw[i] * trans
 
@@ -406,7 +413,11 @@ module radtrans
         # Up-directed LW beam, looping from surface upwards
         atmos.flux_u_lw[end] = phys.σSB * atmos.tmp_surf^4 * (1-atmos.albedo_s)
         for i in range(start=atmos.nlev_c, stop=1, step=-1)
-            tau_lw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_lw / atmos.g[i]
+            if atmos.transparent
+                tau_lw = 0.0
+            else
+                tau_lw = (atmos.pl[i+1] - atmos.pl[i]) * atmos.κ_grey_lw / atmos.g[i]
+            end
             trans = exp( -tau_lw )
             atmos.flux_u_lw[i] = atmos.flux_u_lw[i+1] * trans + (phys.σSB * atmos.tmp[i]^4) * (1 - trans)
         end
