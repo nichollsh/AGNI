@@ -499,6 +499,7 @@ module AGNI
 
         # Optional IO folder
         io_dir::String = get(cfg["files"], "io_dir", atmosphere.UNSET_STR)
+        res_dir::String = get(cfg["files"], "res_dir", atmosphere.UNSET_STR)
 
         # Optional aerosols: each is a table [composition.aerosols.<name>]
         aerosol_species::Dict = Dict{String,Any}()
@@ -541,6 +542,7 @@ module AGNI
                                 mf_dict, mf_path;
 
                                 IO_DIR=io_dir,
+                                res_dir=res_dir,
                                 condensates=condensates,
                                 coldtrap=coldtrap,
                                 evap_efficiency=evap_efficiency,

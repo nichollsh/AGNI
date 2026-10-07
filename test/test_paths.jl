@@ -1,19 +1,49 @@
+# Tests for src/interface/paths.jl. A res folder resolves to AGNI_DIR_<name>, else to the
+# res root: AGNI_DIR_res, else the configured res, else the res/ of AGNI. Blank variables
+# count as unset; "out" stays in the AGNI root; unsafe directories are refused.
 using Test
 using AGNI
 
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
 
 @testset "paths" begin
+    unset = [("AGNI_DIR_" * n) => nothing for n in ("res", paths.RES_NAMES...)]
+
+    # With no override, every res folder is the res/ of AGNI
     @testset "get_dir" begin
-        @test paths.get_dir("thermodynamics") == joinpath(paths.RES_DIR, "thermodynamics")
-        @test paths.get_dir("scattering") == joinpath(paths.RES_DIR, "scattering")
-        @test paths.get_dir("refractive") == joinpath(paths.RES_DIR, "refractive")
-        @test paths.get_dir("config") == joinpath(paths.RES_DIR, "config")
-        @test paths.get_dir("stellar_spectra") == joinpath(paths.RES_DIR, "stellar_spectra")
-        @test paths.get_dir("spectral_files") == joinpath(paths.RES_DIR, "spectral_files")
-        @test paths.get_dir("blobs") == joinpath(paths.RES_DIR, "blobs")
+        withenv(unset...) do
+            for name in ("thermodynamics", "scattering", "refractive", "config",
+                         "stellar_spectra", "spectral_files", "blobs")
+                @test paths.get_dir(name) == joinpath(paths.RES_DIR, name)
+            end
+        end
         @test paths.get_dir("out") == joinpath(paths.ROOT_DIR, "out")
         @test isnothing(paths.get_dir("does_not_exist"))
+    end
+
+    # Precedence AGNI_DIR_<name> > AGNI_DIR_res > configured res > res/; blanks count as
+    # unset and a trailing separator is dropped
+    @testset "get_dir_overrides" begin
+        mktempdir() do tmp
+            env, cfg, own = joinpath.(tmp, ("env", "cfg", "own"))
+            nk, res = "AGNI_DIR_refractive", "AGNI_DIR_res"
+            # (variables, configured res, expected res root, refractive folder if it moved)
+            for (vars, cfg_res, root, moved) in (
+                    ([], cfg, cfg, nothing),
+                    ([res => env], nothing, env, nothing),
+                    ([res => env], cfg, env, nothing),
+                    ([nk => own * "/"], cfg, cfg, own),
+                    ([nk => own, res => env], nothing, env, own),
+                    ([res => " ", nk => ""], cfg, cfg, nothing))
+                withenv(unset..., vars...) do
+                    for name in paths.RES_NAMES
+                        want = (name == "refractive" && !isnothing(moved)) ? moved :
+                               joinpath(root, name)
+                        @test paths.get_dir(name; res=cfg_res) == want
+                    end
+                end
+            end
+        end
     end
 
     @testset "is_safe_dir" begin

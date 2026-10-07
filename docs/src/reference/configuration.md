@@ -51,6 +51,7 @@ Input/output files and other paths.
 | `output_dir     `  | Path to the output directory. |
 | `io_dir         `  | Path for fast I/O operations (optional, defaults to `output_dir`). |
 | `rfm_parfile    `  | Path to .par linelist file, for running line-by-line calculations with the RFM (optional). |
+| `res_dir        `  | Folder used in place of `res/` for the thermodynamic, scattering, refractive index and RFM data (optional); see [Obtaining input data](@ref). |
 
 
 ## `[composition]`

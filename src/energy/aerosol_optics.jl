@@ -31,22 +31,27 @@ module aerosol_optics
 
     Arguments:
     - `material::String`    material name (e.g. "SiO2_amorph")
+    - `nk_dir::String`      refractive index directory
 
     Returns:
     - `path::String`        path to file
     """
-    function nk_path(material::String)::String
-        return joinpath(paths.get_dir("refractive"), material*".txt")
+    function nk_path(material::String, nk_dir::String=paths.get_dir("refractive"))::String
+        return joinpath(nk_dir, material*".txt")
     end
 
     """
     **List materials which have both a refractive index file and a known density.**
 
+    Arguments:
+    - `nk_dir::String`              refractive index directory
+
     Returns:
     - `materials::Vector{String}`   sorted list of supported materials
     """
-    function list_materials()::Vector{String}
-        return sort([m for m in density.list_condensate_rho() if isfile(nk_path(m))])
+    function list_materials(nk_dir::String=paths.get_dir("refractive"))::Vector{String}
+        return sort([m for m in density.list_condensate_rho()
+                        if isfile(nk_path(m, nk_dir))])
     end
 
     """
@@ -381,6 +386,7 @@ module aerosol_optics
     - `bands::Matrix{Float64}`      band edges [m], size (nbands, 2)
     - `star_wl::Vector{Float64}`    stellar spectrum wavelengths [nm]
     - `star_fl::Vector{Float64}`    stellar spectral flux (any units, per unit wavelength)
+    - `nk_dir::String`              refractive index directory
 
     Returns on success:
     - `k_abs::Vector{Float64}`      band-mean mass absorption coefficient [m2 kg-1]
@@ -394,13 +400,15 @@ module aerosol_optics
     function compute_mie_optics(material::String, r_eff::Float64, σ_g::Float64,
                                 bands::Matrix{Float64},
                                 star_wl::Vector{Float64},
-                                star_fl::Vector{Float64})::Union{NTuple{4,Vector{Float64}},Bool}
+                                star_fl::Vector{Float64};
+                                nk_dir::String=paths.get_dir("refractive")
+                                )::Union{NTuple{4,Vector{Float64}},Bool}
 
         # Get the density of this material
         ρ = density.condensate_rho(material)
 
         # Read the refractive index data for this material
-        read_nk_return = read_nk(nk_path(material))
+        read_nk_return = read_nk(nk_path(material, nk_dir))
         if read_nk_return === false
             @warn("Failed to read refractive index for material '$material'")
             return false
