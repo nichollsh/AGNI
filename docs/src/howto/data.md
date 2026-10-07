@@ -39,10 +39,13 @@ provenance, and for the list of supported materials.
 
 ## Data in another folder
 
-The `thermodynamics`, `scattering`, `refractive` and `blobs` folders in `res/` can be read
-from elsewhere. For each of them, AGNI uses the first of: the environment variable `AGNI_DIR_<name>` (for example `AGNI_DIR_refractive`),
-the folder `<name>` inside `AGNI_DIR_res`, the folder `<name>` inside `res_dir` from the
-`[files]` section of the configuration, and finally `res/<name>`. Blank variables are
-ignored, and relative paths are taken from the working directory. Each folder moved this way
-is reported once in the log when the atmosphere is set up. `get_data.sh` always writes to
-`res/`, and the file paths in `[files]` (such as `input_sf`) are used as written.
+AGNI reads the `thermodynamics`, `scattering`, `refractive` and `blobs` folders of `res/`
+through `paths.get_dir`, and each can be read from elsewhere. For each of them, AGNI uses
+the first of: the environment variable `AGNI_DIR_<name>` (for example
+`AGNI_DIR_refractive`), the folder `<name>` inside `AGNI_DIR_res`, the folder `<name>`
+inside `res_dir` from the `[files]` section of the configuration, and finally `res/<name>`.
+`get_dir` also accepts `config`, `stellar_spectra` and `spectral_files` for external
+callers. Blank variables are ignored, and relative paths are taken from the working
+directory. Each folder placed this way is reported once in the log when the atmosphere is
+set up. `get_data.sh` always writes to `res/`, and the file paths in `[files]` (such as
+`input_sf`) are used as written.

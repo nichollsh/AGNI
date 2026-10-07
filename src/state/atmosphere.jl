@@ -856,12 +856,9 @@ module atmosphere
         for (name, field) in (("thermodynamics", :THERMO_DIR),
                               ("scattering", :SCATTERING_DIR),
                               ("refractive", :REFRACTIVE_DIR), ("blobs", :BLOBS_DIR))
-            dir = paths.get_dir(name; res=res)
+            dir, via = paths.resolve_dir(name; res=res)
             setfield!(atmos, field, dir)
-            dir == joinpath(paths.RES_DIR, name) && continue
-            via = "[files] res_dir"
-            isnothing(paths.env_dir("AGNI_DIR_res")) || (via = "AGNI_DIR_res")
-            isnothing(paths.env_dir("AGNI_DIR_$name")) || (via = "AGNI_DIR_$name")
+            isnothing(via) && continue
             @info "Using $name data from $dir (set by $via)"
             isdir(dir) || @warn "The $name data directory does not exist: $dir"
         end

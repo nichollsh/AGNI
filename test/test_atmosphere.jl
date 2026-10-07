@@ -95,10 +95,14 @@ end
     # logs no override when nothing is set
     @testset "setup_logs_data_dir_overrides" begin
         mktempdir() do tmp
-            none = ("AGNI_DIR_res", "AGNI_DIR_refractive", "AGNI_DIR_blobs") .=> nothing
+            none = [("AGNI_DIR_" * n) => nothing for n in ("res", paths.RES_NAMES...)]
             unset = atmosphere.UNSET_STR
+            default_scattering = joinpath(paths.RES_DIR, "scattering")
             cases = ((["AGNI_DIR_refractive" => tmp], unset,
                         (:info, r"refractive data from .* \(set by AGNI_DIR_refractive\)")),
+                     # an override equal to the default path is still reported
+                     (["AGNI_DIR_scattering" => default_scattering], unset,
+                        (:info, r"scattering data from .* \(set by AGNI_DIR_scattering\)")),
                      (["AGNI_DIR_blobs" => "$tmp/x"], unset,
                         (:warn, "The blobs data directory does not exist: $tmp/x")),
                      ([], tmp, (:info, r"blobs data from .* \(set by \[files\] res_dir\)")))

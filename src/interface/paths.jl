@@ -46,11 +46,30 @@ module paths
     end
 
     """
-    **Get path to other data dirs (can be overridden)**
+    **Resolve a folder of `res/` and the setting that placed it.**
 
-    A folder in `res/` is `AGNI_DIR_<name>` when that is set; otherwise it sits in the res
-    root, which is `AGNI_DIR_res` when set, else `res` (the config `[files] res_dir`), else
-    the `res/` folder of AGNI. Blank variables count as unset.
+    The folder is `AGNI_DIR_<name>` when that is set; otherwise it sits in `AGNI_DIR_res`
+    when set, else in `res` (the config `[files] res_dir`), else in the `res/` of AGNI.
+
+    Arguments:
+    - `name::String` one of `RES_NAMES`
+    - `res::Union{String,Nothing}` res root from the configuration, or `nothing`
+
+    Returns:
+    - `Tuple` the folder, and the setting that placed it (`nothing` for the default)
+    """
+    function resolve_dir(name::String; res::Union{String,Nothing}=nothing)
+        var = "AGNI_DIR_$name"
+        dir = env_dir(var)
+        isnothing(dir) || return (dir, var)
+        root = env_dir("AGNI_DIR_res")
+        isnothing(root) || return (joinpath(root, name), "AGNI_DIR_res")
+        isnothing(res) || return (joinpath(res, name), "[files] res_dir")
+        return (joinpath(RES_DIR, name), nothing)
+    end
+
+    """
+    **Get path to other data dirs (can be overridden, see `resolve_dir`)**
 
     Arguments:
     - `name::String` name of the directory to get
@@ -62,13 +81,9 @@ module paths
     function get_dir(name::String;
                         res::Union{String,Nothing}=nothing)::Union{String, Nothing}
         name == "out" && return joinpath(ROOT_DIR, "out")
-        if !(name in RES_NAMES)
-            @warn "Unknown directory name: $name"
-            return nothing
-        end
-        dir = env_dir("AGNI_DIR_$name")
-        isnothing(dir) || return dir
-        return joinpath(something(env_dir("AGNI_DIR_res"), res, RES_DIR), name)
+        name in RES_NAMES && return first(resolve_dir(name; res=res))
+        @warn "Unknown directory name: $name"
+        return nothing
     end
     export get_dir
 
