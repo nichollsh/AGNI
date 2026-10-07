@@ -29,27 +29,11 @@ module paths
     export RAD_DIR
 
     """
-    **Directory named by an environment variable, or `nothing` when it is unset or blank.**
-
-    Arguments:
-    - `var::String` name of the environment variable
-
-    Returns:
-    - `Union{String,Nothing}` the value made absolute (relative to the working
-      directory, `~` not expanded) without a trailing separator, or `nothing`.
-    """
-    function env_dir(var::String)::Union{String, Nothing}
-        dir = strip(get(ENV, var, ""))
-        isempty(dir) && return nothing
-        dir = abspath(dir)
-        return (length(dir) > 1 && endswith(dir, "/")) ? dir[1:end-1] : dir
-    end
-
-    """
     **Resolve a folder of `res/` and the setting that placed it.**
 
     The folder is `AGNI_DIR_<name>` when that is set; otherwise it sits in `AGNI_DIR_res`
     when set, else in `res` (the config `[files] res_dir`), else in the `res/` of AGNI.
+    Blank variables count as unset; values are made absolute (`~` is not expanded).
 
     Arguments:
     - `name::String` one of `RES_NAMES`
@@ -59,6 +43,13 @@ module paths
     - `Tuple` the folder, and the setting that placed it (`nothing` for the default)
     """
     function resolve_dir(name::String; res::Union{String,Nothing}=nothing)
+        # A set, non-blank variable as an absolute path without a trailing separator
+        function env_dir(v::String)::Union{String, Nothing}
+            dir = strip(get(ENV, v, ""))
+            isempty(dir) && return nothing
+            dir = abspath(dir)
+            return (length(dir) > 1 && endswith(dir, "/")) ? dir[1:end-1] : dir
+        end
         var = "AGNI_DIR_$name"
         dir = env_dir(var)
         isnothing(dir) || return (dir, var)
