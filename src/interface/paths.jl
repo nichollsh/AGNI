@@ -30,8 +30,8 @@ module paths
     """
     **Refractive index directory from `AGNI_REFRACTIVE_DIR`, or `nothing` when unset or blank.**
 
-    The value is a directory path; it is made absolute and normalised, without a trailing
-    separator.
+    The value is a directory path, absolute or relative to the working directory (`~` is not
+    expanded); it is returned absolute and normalised, without a trailing separator.
     """
     function refractive_override()::Union{String, Nothing}
         dir = strip(get(ENV, "AGNI_REFRACTIVE_DIR", ""))

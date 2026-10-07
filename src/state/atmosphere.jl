@@ -536,7 +536,7 @@ module atmosphere
                 @error "Aerosol '$name' has invalid refractive index or density: " *
                         "'$(entry["nk_file"])'"
                 @error "    Available: $(join(aerosol_optics.list_materials(), ", "))"
-                nk_file = aerosol_optics.nk_path(String(entry["nk_file"]))
+                nk_file = aerosol_optics.nk_path(string(entry["nk_file"]))
                 if isfile(nk_file)
                     @error "    $nk_file exists; the material has no density in density.jl"
                 elseif isnothing(paths.refractive_override())

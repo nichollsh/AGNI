@@ -556,6 +556,8 @@ end
                                             "nk_file"=>"SiO2_amorph", "sigma_g"=>1.5), conds))   # no r_eff
         @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5, "nk_file"=>"Unobtainium",
                                             "r_eff"=>1e-6, "sigma_g"=>1.5), conds))              # unknown material
+        @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5, "nk_file"=>5,
+                                            "r_eff"=>1e-6, "sigma_g"=>1.5), conds))              # not a name
     end
 
     # An unknown material names the searched directory, with a hint that fits the override

@@ -31,6 +31,9 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
                 @test n ≈ [1.5, 1.3]
                 @test k ≈ [0.01, 0.07]
             end
+            withenv("AGNI_REFRACTIVE_DIR" => "~") do
+                @test paths.refractive_override() == joinpath(pwd(), "~")
+            end
             withenv("AGNI_REFRACTIVE_DIR" => joinpath(tmp, "sub", "..") * "/") do
                 @test paths.refractive_override() == normpath(abspath(tmp))
             end
