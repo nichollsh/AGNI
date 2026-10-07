@@ -89,6 +89,17 @@ function _setup_with_surface(surface_material::String, albedo_s::Float64=0.0)
 end
 
 @testset "atmosphere" begin
+    # Each moved data directory is logged once at setup!, and a missing one also warns
+    @testset "setup_logs_data_dir_overrides" begin
+        mktempdir() do tmp
+            absent = joinpath(tmp, "absent")
+            withenv("AGNI_DIR_refractive" => tmp, "AGNI_DIR_blobs" => absent) do
+                info = "Using refractive data from $tmp (set by AGNI_DIR_refractive)"
+                warning = "The blobs data directory does not exist: $absent"
+                @test_logs (:info, info) (:warn, warning) match_mode=:any _setup_only()
+            end
+        end
+    end
 
     # -----------------------------------------------------------------
     # mf_source == 1 : composition read from a VMR CSV file

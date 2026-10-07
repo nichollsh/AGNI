@@ -141,6 +141,8 @@ module atmosphere
         OUT_DIR::String         # path to output folder
         THERMO_DIR::String      # path to thermo data
         SCATTERING_DIR::String  # path to scattering data
+        REFRACTIVE_DIR::String  # path to refractive index data
+        BLOBS_DIR::String       # path to binary blobs (RFM)
         FC_DIR::String          # path to fastchem install folder
         FRAMES_DIR::String      # path to frames of animation
         IO_DIR::String          # path to temporary directory, for fast I/O
@@ -504,8 +506,9 @@ module atmosphere
     Returns:
     - `entry::Union{Dict,Nothing}`          normalised configuration, or nothing if invalid
     """
-    function parse_aerosol_entry(name::String, value,
-                                    condensates::Vector{String})::Union{Dict{String,Any},Nothing}
+    function parse_aerosol_entry(name::String, value, condensates::Vector{String};
+                                    nk_dir::String=paths.get_dir("refractive")
+                                    )::Union{Dict{String,Any},Nothing}
 
         # Legacy flat values
         if !isa(value, AbstractDict)
@@ -532,17 +535,18 @@ module atmosphere
             end
 
             # Check that nk_file is valid and we have density data
-            if !(entry["nk_file"] in aerosol_optics.list_materials())
+            if !(entry["nk_file"] in aerosol_optics.list_materials(nk_dir))
                 @error "Aerosol '$name' has invalid refractive index or density: " *
                         "'$(entry["nk_file"])'"
-                @error "    Available: $(join(aerosol_optics.list_materials(), ", "))"
-                nk_file = aerosol_optics.nk_path(string(entry["nk_file"]))
+                @error "    Available: $(join(aerosol_optics.list_materials(nk_dir), ", "))"
+                nk_file = aerosol_optics.nk_path(string(entry["nk_file"]), nk_dir)
                 if isfile(nk_file)
                     @error "    $nk_file exists; the material has no density in density.jl"
-                elseif isnothing(paths.refractive_override())
-                    @error "    Missing $nk_file; try using: \$ ./src/get_data.sh refractive"
+                elseif nk_dir == joinpath(paths.RES_DIR, "refractive")
+                    @error "    Missing $nk_file; try: \$ ./src/get_data.sh refractive"
                 else
-                    @error "    Missing $nk_file; put it there or unset AGNI_REFRACTIVE_DIR"
+                    @error "    Missing $nk_file; put it there, or unset " *
+                            "AGNI_DIR_refractive, AGNI_DIR_res or [files] res_dir"
                 end
                 return nothing
             end
@@ -730,6 +734,7 @@ module atmosphere
 
                     name::String =              UNSET_STR,
                     IO_DIR::String   =          UNSET_STR,
+                    res_dir::String  =          UNSET_STR,
                     condensates =               String[],
                     metallicities::Dict =       Dict{String,Float64}(),
                     surface_material::String =  CFG_surface_material,
@@ -842,9 +847,20 @@ module atmosphere
             return false
         end
 
-        # Locate data directories
-        atmos.THERMO_DIR = paths.get_dir("thermodynamics")
-        atmos.SCATTERING_DIR = paths.get_dir("scattering")
+        # Locate data directories, logging each one an override moved out of res/
+        res = (res_dir == UNSET_STR || isempty(strip(res_dir))) ? nothing : abspath(res_dir)
+        for (name, field) in (("thermodynamics", :THERMO_DIR),
+                              ("scattering", :SCATTERING_DIR),
+                              ("refractive", :REFRACTIVE_DIR), ("blobs", :BLOBS_DIR))
+            dir = paths.get_dir(name; res=res)
+            setfield!(atmos, field, dir)
+            dir == joinpath(paths.RES_DIR, name) && continue
+            via = "[files] res_dir"
+            isnothing(paths.env_dir("AGNI_DIR_res")) || (via = "AGNI_DIR_res")
+            isnothing(paths.env_dir("AGNI_DIR_$name")) || (via = "AGNI_DIR_$name")
+            @info "Using $name data from $dir (set by $via)"
+            isdir(dir) || @warn "The $name data directory does not exist: $dir"
+        end
 
         # Make output directory if does not exist
         atmos.OUT_DIR = abspath(OUT_DIR)
@@ -1181,7 +1197,7 @@ module atmosphere
             end
 
             # parse and validate entry
-            entry = parse_aerosol_entry(k, v, condensates)
+            entry = parse_aerosol_entry(k, v, condensates; nk_dir=atmos.REFRACTIVE_DIR)
             isnothing(entry) && return false
             atmos.aerosol_method[k] = entry["method"]
             if entry["method"] == "mie"
@@ -1956,7 +1972,8 @@ module atmosphere
                         @debug "    $s: $(opt["nk_file"]), r_eff=$(opt["r_eff"]) m, σ_g=$(opt["sigma_g"])"
                         mie_out = aerosol_optics.compute_mie_optics(
                                                     opt["nk_file"], opt["r_eff"], opt["sigma_g"],
-                                                    bands, wl, fl)
+                                                    bands, wl, fl;
+                                                    nk_dir=atmos.REFRACTIVE_DIR)
                         if mie_out === false
                             @error "Failed to calculate optical properties of aerosol '$s'"
                             return false
@@ -3284,7 +3301,7 @@ module atmosphere
             end
 
             @info "Materials available for method \"mie\":"
-            @info "    " * join(aerosol_optics.list_materials(), ", ")
+            @info "    " * join(aerosol_optics.list_materials(atmos.REFRACTIVE_DIR), ", ")
         else
             @info "Aerosol treatment is disabled; no aerosol species available"
         end

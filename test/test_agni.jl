@@ -556,24 +556,28 @@ end
                                             "nk_file"=>"SiO2_amorph", "sigma_g"=>1.5), conds))   # no r_eff
         @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5, "nk_file"=>"Unobtainium",
                                             "r_eff"=>1e-6, "sigma_g"=>1.5), conds))              # unknown material
+        # an nk_file that is not a name
         @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5, "nk_file"=>5,
-                                            "r_eff"=>1e-6, "sigma_g"=>1.5), conds))              # not a name
+                                            "r_eff"=>1e-6, "sigma_g"=>1.5), conds))
     end
 
-    # An unknown material names the searched directory, with a hint that fits the override
+    # An unknown material names the file it looked for, with a hint that fits the
+    # directory: the bundled res/ suggests get_data.sh, an override names the variables
     unknown = Dict{String,Any}("method"=>"mie", "mmr"=>1e-5, "nk_file"=>"Unobtainium",
                                "r_eff"=>1e-6, "sigma_g"=>1.5)
+    check(dir) = parse("x", unknown, conds; nk_dir=dir)
     mktempdir() do tmp
-        nk = joinpath(normpath(abspath(tmp)), "Unobtainium.txt")
-        withenv("AGNI_REFRACTIVE_DIR" => tmp) do
-            @test_logs (:error, "    Missing $nk; put it there or unset AGNI_REFRACTIVE_DIR") match_mode=:any parse("x", unknown, conds)
-            write(nk, "1.0 1.5 0.01\n2.0 1.4 0.02\n")
-            @test_logs (:error, "    $nk exists; the material has no density in density.jl") match_mode=:any parse("x", unknown, conds)
-        end
+        nk = joinpath(tmp, "Unobtainium.txt")
+        override = "    Missing $nk; put it there, or unset AGNI_DIR_refractive, " *
+                   "AGNI_DIR_res or [files] res_dir"
+        @test_logs (:error, override) match_mode=:any check(tmp)
+        write(nk, "1.0 1.5 0.01\n2.0 1.4 0.02\n")
+        no_density = "    $nk exists; the material has no density in density.jl"
+        @test_logs (:error, no_density) match_mode=:any check(tmp)
     end
-    withenv("AGNI_REFRACTIVE_DIR" => nothing) do
-        @test_logs (:error, r"Missing .*Unobtainium.txt; try using: \$ ./src/get_data.sh refractive") match_mode=:any parse("x", unknown, conds)
-    end
+    default = joinpath(paths.RES_DIR, "refractive")
+    hint = r"Missing .*Unobtainium.txt; try: \$ ./src/get_data.sh refractive"
+    @test_logs (:error, hint) match_mode=:any check(default)
 
     base = Dict{String,Any}("method"=>"mie", "species"=>"SiO2", "nk_file"=>"SiO2_amorph",
                             "r_eff"=>1e-6, "sigma_g"=>1.65)

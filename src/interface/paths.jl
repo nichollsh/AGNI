@@ -20,75 +20,55 @@ module paths
     const FWL_DATA::String = normpath(joinpath(get(ENV, "FWL_DATA", RES_DIR)))
     export FWL_DATA
 
-    # AGNI_REFRACTIVE_DIR values already warned about: each bad value warns once, whatever the logger
-    const REFRACTIVE_WARNED = Set{String}()
+    # Folders in res/ that get_dir resolves and AGNI_DIR_<name> can override
+    const RES_NAMES = ("thermodynamics", "scattering", "refractive", "config",
+                        "stellar_spectra", "spectral_files", "blobs")
 
     # RAD_DIR (socrates root directory)
     const RAD_DIR::String = abspath(ENV["RAD_DIR"])
     export RAD_DIR
 
     """
-    **Refractive index directory from `AGNI_REFRACTIVE_DIR`, or `nothing` when unset or blank.**
+    **Directory named by an environment variable, or `nothing` when it is unset or blank.**
 
-    The value is a directory path, absolute or relative to the working directory (`~` is not
-    expanded); it is returned absolute and normalised, without a trailing separator.
+    Arguments:
+    - `var::String` name of the environment variable
+
+    Returns:
+    - `Union{String,Nothing}` the value made absolute (relative to the working
+      directory, `~` not expanded) without a trailing separator, or `nothing`.
     """
-    function refractive_override()::Union{String, Nothing}
-        dir = strip(get(ENV, "AGNI_REFRACTIVE_DIR", ""))
+    function env_dir(var::String)::Union{String, Nothing}
+        dir = strip(get(ENV, var, ""))
         isempty(dir) && return nothing
         dir = abspath(dir)
         return (length(dir) > 1 && endswith(dir, "/")) ? dir[1:end-1] : dir
     end
-    export refractive_override
 
     """
     **Get path to other data dirs (can be overridden)**
 
+    A folder in `res/` is `AGNI_DIR_<name>` when that is set; otherwise it sits in the res
+    root, which is `AGNI_DIR_res` when set, else `res` (the config `[files] res_dir`), else
+    the `res/` folder of AGNI. Blank variables count as unset.
+
     Arguments:
     - `name::String` name of the directory to get
-
-    The refractive index directory is `refractive_override()` when that is set, and
-    `res/refractive` otherwise.
+    - `res::Union{String,Nothing}` res root from the configuration, or `nothing`
 
     Returns:
     - `String` path to the requested directory, or `nothing` if the name is unknown.
     """
-    function get_dir(name::String)::Union{String, Nothing}
-
-        if name == "thermodynamics"
-            return joinpath(RES_DIR, "thermodynamics")
-
-        elseif name == "scattering"
-            return joinpath(RES_DIR, "scattering")
-
-        elseif name == "refractive"
-            dir = refractive_override()
-            isnothing(dir) && return joinpath(RES_DIR, "refractive")
-            if !isdir(dir) && !(dir in REFRACTIVE_WARNED)
-                @warn "AGNI_REFRACTIVE_DIR is not a directory: $dir"
-                push!(REFRACTIVE_WARNED, dir)
-            end
-            return dir
-
-        elseif name == "config"
-            return joinpath(RES_DIR, "config")
-
-        elseif name == "stellar_spectra"
-            return joinpath(RES_DIR, "stellar_spectra")
-
-        elseif name == "spectral_files"
-            return joinpath(RES_DIR, "spectral_files")
-
-        elseif name == "blobs"
-            return joinpath(RES_DIR, "blobs")
-
-        elseif name == "out"
-            return joinpath(ROOT_DIR, "out")
-
-        else
+    function get_dir(name::String;
+                        res::Union{String,Nothing}=nothing)::Union{String, Nothing}
+        name == "out" && return joinpath(ROOT_DIR, "out")
+        if !(name in RES_NAMES)
             @warn "Unknown directory name: $name"
             return nothing
         end
+        dir = env_dir("AGNI_DIR_$name")
+        isnothing(dir) || return dir
+        return joinpath(something(env_dir("AGNI_DIR_res"), res, RES_DIR), name)
     end
     export get_dir
 
