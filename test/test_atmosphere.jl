@@ -27,6 +27,7 @@ const _THETA     = 60.0
 
 # Cheap fixture used by the tests below that only require atmosphere.setup!()
 function _setup_only(; condensates::Array{String,1}=String[], gravity::Float64=_GRAVITY,
+                        res_dir::String=atmosphere.UNSET_STR,
                         hill_radius::Float64=atmosphere.CFG_hill_radius,
                         selfg::Bool=atmosphere.CFG_hydrograv_selfg)
     atmos = atmosphere.Atmos_t()
@@ -43,7 +44,8 @@ function _setup_only(; condensates::Array{String,1}=String[], gravity::Float64=_
                             flag_cloud=false,
                             condensates=condensates,
                             hill_radius=hill_radius,
-                            hydrograv_selfg=selfg)
+                            hydrograv_selfg=selfg,
+                            res_dir=res_dir)
     ok || error("Failed to setup test atmosphere")
     return atmos
 end
@@ -89,6 +91,30 @@ function _setup_with_surface(surface_material::String, albedo_s::Float64=0.0)
 end
 
 @testset "atmosphere" begin
+    # setup! logs each moved data directory with its source, warns about a missing one, and
+    # logs no override when nothing is set
+    @testset "setup_logs_data_dir_overrides" begin
+        mktempdir() do tmp
+            none = [("AGNI_DIR_" * n) => nothing for n in ("res", paths.RES_NAMES...)]
+            unset = atmosphere.UNSET_STR
+            default_scattering = joinpath(paths.RES_DIR, "scattering")
+            cases = ((["AGNI_DIR_refractive" => tmp], unset,
+                        (:info, r"refractive data from .* \(set by AGNI_DIR_refractive\)")),
+                     # an override equal to the default path is still reported
+                     (["AGNI_DIR_scattering" => default_scattering], unset,
+                        (:info, r"scattering data from .* \(set by AGNI_DIR_scattering\)")),
+                     (["AGNI_DIR_blobs" => "$tmp/x"], unset,
+                        (:warn, "The blobs data directory does not exist: $tmp/x")),
+                     ([], tmp, (:info, r"blobs data from .* \(set by \[files\] res_dir\)")))
+            for (vars, res_dir, log) in cases
+                withenv(none..., vars...) do
+                    @test_logs log match_mode=:any _setup_only(res_dir=res_dir)
+                end
+            end
+            logs, _ = withenv(() -> Test.collect_test_logs(_setup_only), none...)
+            @test !any(log -> occursin("data from", string(log.message)), logs)
+        end
+    end
 
     # -----------------------------------------------------------------
     # mf_source == 1 : composition read from a VMR CSV file

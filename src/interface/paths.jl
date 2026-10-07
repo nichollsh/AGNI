@@ -20,49 +20,61 @@ module paths
     const FWL_DATA::String = normpath(joinpath(get(ENV, "FWL_DATA", RES_DIR)))
     export FWL_DATA
 
+    # Folders in res/ that get_dir resolves and AGNI_DIR_<name> can override
+    const RES_NAMES = ("thermodynamics", "scattering", "refractive", "config",
+                        "stellar_spectra", "spectral_files", "blobs")
+
     # RAD_DIR (socrates root directory)
     const RAD_DIR::String = abspath(ENV["RAD_DIR"])
     export RAD_DIR
 
     """
-    **Get path to other data dirs (can be overridden)**
+    **Resolve a folder of `res/` and the setting that placed it.**
+
+    The folder is `AGNI_DIR_<name>` when that is set; otherwise it sits in `AGNI_DIR_res`
+    when set, else in `res` (the config `[files] res_dir`), else in the `res/` of AGNI.
+    Blank variables count as unset; values are made absolute (`~` is not expanded).
+
+    Arguments:
+    - `name::String` one of `RES_NAMES`
+    - `res::Union{String,Nothing}` res root from the configuration, or `nothing`
+
+    Returns:
+    - `Tuple` the folder, and the setting that placed it (`nothing` for the default)
+    """
+    function resolve_dir(name::String; res::Union{String,Nothing}=nothing)
+        # A set, non-blank variable as an absolute path without a trailing separator
+        function env_dir(v::String)::Union{String, Nothing}
+            dir = strip(get(ENV, v, ""))
+            isempty(dir) && return nothing
+            dir = abspath(dir)
+            return (length(dir) > 1 && endswith(dir, "/")) ? dir[1:end-1] : dir
+        end
+        var = "AGNI_DIR_$name"
+        dir = env_dir(var)
+        isnothing(dir) || return (dir, var)
+        root = env_dir("AGNI_DIR_res")
+        isnothing(root) || return (joinpath(root, name), "AGNI_DIR_res")
+        isnothing(res) || return (joinpath(res, name), "[files] res_dir")
+        return (joinpath(RES_DIR, name), nothing)
+    end
+
+    """
+    **Get path to other data dirs (can be overridden, see `resolve_dir`)**
 
     Arguments:
     - `name::String` name of the directory to get
+    - `res::Union{String,Nothing}` res root from the configuration, or `nothing`
 
     Returns:
     - `String` path to the requested directory, or `nothing` if the name is unknown.
     """
-    function get_dir(name::String)::Union{String, Nothing}
-
-        if name == "thermodynamics"
-            return joinpath(RES_DIR, "thermodynamics")
-
-        elseif name == "scattering"
-            return joinpath(RES_DIR, "scattering")
-
-        elseif name == "refractive"
-            return joinpath(RES_DIR, "refractive")
-
-        elseif name == "config"
-            return joinpath(RES_DIR, "config")
-
-        elseif name == "stellar_spectra"
-            return joinpath(RES_DIR, "stellar_spectra")
-
-        elseif name == "spectral_files"
-            return joinpath(RES_DIR, "spectral_files")
-
-        elseif name == "blobs"
-            return joinpath(RES_DIR, "blobs")
-
-        elseif name == "out"
-            return joinpath(ROOT_DIR, "out")
-
-        else
-            @warn "Unknown directory name: $name"
-            return nothing
-        end
+    function get_dir(name::String;
+                        res::Union{String,Nothing}=nothing)::Union{String, Nothing}
+        name == "out" && return joinpath(ROOT_DIR, "out")
+        name in RES_NAMES && return first(resolve_dir(name; res=res))
+        @warn "Unknown directory name: $name"
+        return nothing
     end
     export get_dir
 

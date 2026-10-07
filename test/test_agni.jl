@@ -556,6 +556,23 @@ end
                                             "nk_file"=>"SiO2_amorph", "sigma_g"=>1.5), conds))   # no r_eff
         @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5, "nk_file"=>"Unobtainium",
                                             "r_eff"=>1e-6, "sigma_g"=>1.5), conds))              # unknown material
+        # an nk_file that is not a name
+        @test isnothing(parse("sio2", Dict("method"=>"mie", "mmr"=>1e-5, "nk_file"=>5,
+                                            "r_eff"=>1e-6, "sigma_g"=>1.5), conds))
+    end
+
+    # An unknown material gets a hint for its directory: get_data.sh for res/, the
+    # variables for an override, the density when the file exists
+    unknown = Dict{String,Any}("method"=>"mie", "mmr"=>1e-5, "nk_file"=>"Unobtainium",
+                               "r_eff"=>1e-6, "sigma_g"=>1.5)
+    mktempdir() do tmp
+        for (dir, present, hint) in ((joinpath(paths.RES_DIR, "refractive"), false,
+                                        r"Unobtainium.txt; try: \$ ./src/get_data.sh"),
+                                     (tmp, false, r"unset AGNI_DIR_refractive"),
+                                     (tmp, true, r"exists; the material has no density"))
+            present && write(joinpath(tmp, "Unobtainium.txt"), "1.0 1.5 0.01\n")
+            @test_logs (:error, hint) match_mode=:any parse("x", unknown, conds; nk_dir=dir)
+        end
     end
 
     base = Dict{String,Any}("method"=>"mie", "species"=>"SiO2", "nk_file"=>"SiO2_amorph",
