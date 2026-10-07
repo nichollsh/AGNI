@@ -39,8 +39,8 @@ provenance, and for the list of supported materials.
 
 ## Data in another folder
 
-The data folders in `res/` can be read from elsewhere. For each folder, AGNI uses the
-first of: the environment variable `AGNI_DIR_<name>` (for example `AGNI_DIR_refractive`),
+The `thermodynamics`, `scattering`, `refractive` and `blobs` folders in `res/` can be read
+from elsewhere. For each of them, AGNI uses the first of: the environment variable `AGNI_DIR_<name>` (for example `AGNI_DIR_refractive`),
 the folder `<name>` inside `AGNI_DIR_res`, the folder `<name>` inside `res_dir` from the
 `[files]` section of the configuration, and finally `res/<name>`. Blank variables are
 ignored, and relative paths are taken from the working directory. Each folder moved this way

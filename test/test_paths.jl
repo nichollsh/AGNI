@@ -12,7 +12,8 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
     # With no override, every res folder is the res/ of AGNI
     @testset "get_dir" begin
         withenv(unset...) do
-            for name in paths.RES_NAMES
+            for name in ("thermodynamics", "scattering", "refractive", "config",
+                         "stellar_spectra", "spectral_files", "blobs")
                 @test paths.get_dir(name) == joinpath(paths.RES_DIR, name)
             end
         end

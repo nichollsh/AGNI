@@ -502,6 +502,8 @@ module atmosphere
     - `name::String`                        name of the aerosol
     - `value`                               the configuration for this aerosol
     - `condensates::Vector{String}`         list of condensable species
+    - `nk_dir::String`                      refractive index directory (setup! passes
+                                            the atmosphere's; the default ignores res_dir)
 
     Returns:
     - `entry::Union{Dict,Nothing}`          normalised configuration, or nothing if invalid
@@ -664,6 +666,7 @@ module atmosphere
     Optional arguments:
     - `name::String`                    name of the atmosphere (generates name if not provided).
     - `IO_DIR::String`                  directory used for fast file operations.
+    - `res_dir::String`                 folder used in place of `res/` (`[files] res_dir`).
     - `condensates`                     list of condensates (gas names).
     - `metallicities::Dict`             dictionary of elemental metallicities (mass ratio rel to hydrogen)
     - `surface_material::String`        surface material (default is "greybody", but can point to file instead).
@@ -848,7 +851,8 @@ module atmosphere
         end
 
         # Locate data directories, logging each one an override moved out of res/
-        res = (res_dir == UNSET_STR || isempty(strip(res_dir))) ? nothing : abspath(res_dir)
+        res = (res_dir == UNSET_STR || isempty(strip(res_dir))) ? nothing :
+              abspath(strip(res_dir))
         for (name, field) in (("thermodynamics", :THERMO_DIR),
                               ("scattering", :SCATTERING_DIR),
                               ("refractive", :REFRACTIVE_DIR), ("blobs", :BLOBS_DIR))

@@ -27,6 +27,7 @@ const _THETA     = 60.0
 
 # Cheap fixture used by the tests below that only require atmosphere.setup!()
 function _setup_only(; condensates::Array{String,1}=String[], gravity::Float64=_GRAVITY,
+                        res_dir::String=atmosphere.UNSET_STR,
                         hill_radius::Float64=atmosphere.CFG_hill_radius,
                         selfg::Bool=atmosphere.CFG_hydrograv_selfg)
     atmos = atmosphere.Atmos_t()
@@ -43,7 +44,8 @@ function _setup_only(; condensates::Array{String,1}=String[], gravity::Float64=_
                             flag_cloud=false,
                             condensates=condensates,
                             hill_radius=hill_radius,
-                            hydrograv_selfg=selfg)
+                            hydrograv_selfg=selfg,
+                            res_dir=res_dir)
     ok || error("Failed to setup test atmosphere")
     return atmos
 end
@@ -97,6 +99,13 @@ end
                 info = "Using refractive data from $tmp (set by AGNI_DIR_refractive)"
                 warning = "The blobs data directory does not exist: $absent"
                 @test_logs (:info, info) (:warn, warning) match_mode=:any _setup_only()
+            end
+            # with no variable the config key is named; with nothing set, nothing is logged
+            withenv("AGNI_DIR_refractive" => nothing, "AGNI_DIR_res" => nothing) do
+                info = "Using scattering data from $tmp/scattering (set by [files] res_dir)"
+                @test_logs (:info, info) match_mode=:any _setup_only(res_dir=tmp)
+                logs, _ = Test.collect_test_logs(_setup_only; min_level=Logging.Info)
+                @test !any(log -> occursin("data from", string(log.message)), logs)
             end
         end
     end

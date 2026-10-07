@@ -386,6 +386,7 @@ module aerosol_optics
     - `bands::Matrix{Float64}`      band edges [m], size (nbands, 2)
     - `star_wl::Vector{Float64}`    stellar spectrum wavelengths [nm]
     - `star_fl::Vector{Float64}`    stellar spectral flux (any units, per unit wavelength)
+    - `nk_dir::String`              refractive index directory
 
     Returns on success:
     - `k_abs::Vector{Float64}`      band-mean mass absorption coefficient [m2 kg-1]
