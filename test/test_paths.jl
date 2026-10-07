@@ -24,10 +24,15 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
             material = first(AGNI.density.list_condensate_rho())
             write(joinpath(tmp, material * ".txt"), "# test\n1.0 1.5 0.01\n2.0 1.3 0.07\n")
             withenv("AGNI_REFRACTIVE_DIR" => tmp) do
-                @test paths.get_dir("refractive") == tmp
+                @test paths.get_dir("refractive") == abspath(tmp)
                 @test AGNI.aerosol_optics.list_materials() == [material]
                 λ, n, k = AGNI.aerosol_optics.read_nk(AGNI.aerosol_optics.nk_path(material))
-                @test n ≈ [1.5, 1.3] && k ≈ [0.01, 0.07]
+                @test λ ≈ [1.0e-6, 2.0e-6]
+                @test n ≈ [1.5, 1.3]
+                @test k ≈ [0.01, 0.07]
+            end
+            withenv("AGNI_REFRACTIVE_DIR" => "~") do
+                @test paths.get_dir("refractive") == homedir()
             end
             for blank in ("", "  ")
                 withenv("AGNI_REFRACTIVE_DIR" => blank) do
@@ -39,11 +44,14 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
                     @test paths.get_dir("refractive") == abspath(".")
                 end
             end
-            for absent in (joinpath(tmp, "absent"), joinpath(tmp, "absent2"))
+            # absent warns, absent2 warns, absent again stays silent
+            for (absent, warns) in ((joinpath(tmp, "absent"), true),
+                                    (joinpath(tmp, "absent2"), true), (joinpath(tmp, "absent"), false))
                 withenv("AGNI_REFRACTIVE_DIR" => absent) do
-                    @test_logs (:warn, r"not a directory") paths.get_dir("refractive")
-                    @test_logs AGNI.aerosol_optics.list_materials()
-                    @test AGNI.aerosol_optics.list_materials() == String[]
+                    if warns
+                        @test_logs (:warn, r"not a directory") paths.get_dir("refractive")
+                    end
+                    @test (@test_logs AGNI.aerosol_optics.list_materials()) == String[]
                 end
             end
         end

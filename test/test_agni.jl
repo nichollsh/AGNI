@@ -558,6 +558,18 @@ end
                                             "r_eff"=>1e-6, "sigma_g"=>1.5), conds))              # unknown material
     end
 
+    # An unknown material names the searched directory, with a hint that fits the override
+    unknown = Dict{String,Any}("method"=>"mie", "mmr"=>1e-5, "nk_file"=>"Unobtainium",
+                               "r_eff"=>1e-6, "sigma_g"=>1.5)
+    mktempdir() do tmp
+        withenv("AGNI_REFRACTIVE_DIR" => tmp) do
+            @test_logs (:error, "    Searched: $(abspath(tmp))") (:error, r"unset AGNI_REFRACTIVE_DIR") match_mode=:any parse("x", unknown, conds)
+        end
+    end
+    withenv("AGNI_REFRACTIVE_DIR" => nothing) do
+        @test_logs (:error, r"get_data.sh refractive") match_mode=:any parse("x", unknown, conds)
+    end
+
     base = Dict{String,Any}("method"=>"mie", "species"=>"SiO2", "nk_file"=>"SiO2_amorph",
                             "r_eff"=>1e-6, "sigma_g"=>1.65)
     e = parse("sio2", base, conds)

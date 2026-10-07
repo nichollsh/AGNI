@@ -20,8 +20,8 @@ module paths
     const FWL_DATA::String = normpath(joinpath(get(ENV, "FWL_DATA", RES_DIR)))
     export FWL_DATA
 
-    # Last AGNI_REFRACTIVE_DIR value warned about: each bad value warns once, whatever the logger
-    const REFRACTIVE_WARNED = Ref("")
+    # AGNI_REFRACTIVE_DIR values already warned about: each bad value warns once, whatever the logger
+    const REFRACTIVE_WARNED = Set{String}()
 
     # RAD_DIR (socrates root directory)
     const RAD_DIR::String = abspath(ENV["RAD_DIR"])
@@ -51,9 +51,9 @@ module paths
             dir = strip(get(ENV, "AGNI_REFRACTIVE_DIR", ""))
             isempty(dir) && return joinpath(RES_DIR, "refractive")
             dir = abspath(expanduser(dir))
-            if !isdir(dir) && dir != REFRACTIVE_WARNED[]
+            if !isdir(dir) && !(dir in REFRACTIVE_WARNED)
                 @warn "AGNI_REFRACTIVE_DIR is not a directory: $dir"
-                REFRACTIVE_WARNED[] = dir
+                push!(REFRACTIVE_WARNED, dir)
             end
             return dir
 
