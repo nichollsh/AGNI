@@ -36,3 +36,5 @@ These can be obtained by running:
 ```
 which places the files in `res/refractive/`. See [Aerosols and clouds](@ref) for their
 provenance, and for the list of supported materials.
+To read them from another directory instead, such as the copy that PROTEUS downloads, set
+the environment variable `AGNI_REFRACTIVE_DIR` to that directory.

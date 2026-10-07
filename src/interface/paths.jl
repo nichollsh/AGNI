@@ -30,6 +30,10 @@ module paths
     Arguments:
     - `name::String` name of the directory to get
 
+    The refractive index directory is `AGNI_REFRACTIVE_DIR` when that environment
+    variable is set and non-empty (PROTEUS points it at its downloaded copy), and
+    `res/refractive` otherwise.
+
     Returns:
     - `String` path to the requested directory, or `nothing` if the name is unknown.
     """
@@ -42,7 +46,10 @@ module paths
             return joinpath(RES_DIR, "scattering")
 
         elseif name == "refractive"
-            return joinpath(RES_DIR, "refractive")
+            dir = get(ENV, "AGNI_REFRACTIVE_DIR", "")
+            isempty(dir) && return joinpath(RES_DIR, "refractive")
+            isdir(dir) || @warn "AGNI_REFRACTIVE_DIR is not a directory: $dir" maxlog=1
+            return dir
 
         elseif name == "config"
             return joinpath(RES_DIR, "config")
