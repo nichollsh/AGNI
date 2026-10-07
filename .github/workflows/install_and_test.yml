@@ -133,7 +133,7 @@ jobs:
 
       # Get coverage when running on linux
       - name: Get coverage
-        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version == '1.12' }}
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version == '1.13' }}
         run: |
           export CODECOV_TOKEN="${{ secrets.CODECOV_TOKEN }}"
           julia --project test/runcoverage.jl
@@ -152,7 +152,7 @@ jobs:
             .github/badges/tests-*.json
 
       - name: Publish test badges to gist
-        if: ${{ (matrix.os == 'ubuntu-latest') && (matrix.julia-version == '1.12' ) && (github.event_name == 'push') && (github.ref == 'refs/heads/main') }}
+        if: ${{ (matrix.os == 'ubuntu-latest') && (matrix.julia-version == '1.13' ) && (github.event_name == 'push') && (github.ref == 'refs/heads/main') }}
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: |

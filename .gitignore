@@ -8,6 +8,9 @@ SOCRATES*
 # FastChem folder
 fastchem
 FastChem
+LavAtmos
+LAVATMOS
+lavatmos
 
 # Package
 deps/*.log
