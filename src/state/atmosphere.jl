@@ -536,12 +536,13 @@ module atmosphere
                 @error "Aerosol '$name' has invalid refractive index or density: " *
                         "'$(entry["nk_file"])'"
                 @error "    Available: $(join(aerosol_optics.list_materials(), ", "))"
-                nk_dir = paths.get_dir("refractive")
-                @error "    Searched: $nk_dir"
-                if nk_dir == joinpath(paths.RES_DIR, "refractive")
-                    @error "    Try using: \$ ./src/get_data.sh refractive"
+                nk_file = aerosol_optics.nk_path(String(entry["nk_file"]))
+                if isfile(nk_file)
+                    @error "    $nk_file exists; the material has no density in density.jl"
+                elseif isnothing(paths.refractive_override())
+                    @error "    Missing $nk_file; try using: \$ ./src/get_data.sh refractive"
                 else
-                    @error "    Put the file in that directory, or unset AGNI_REFRACTIVE_DIR"
+                    @error "    Missing $nk_file; put it there or unset AGNI_REFRACTIVE_DIR"
                 end
                 return nothing
             end

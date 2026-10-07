@@ -31,17 +31,18 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
                 @test n ≈ [1.5, 1.3]
                 @test k ≈ [0.01, 0.07]
             end
-            withenv("AGNI_REFRACTIVE_DIR" => "~") do
-                @test paths.get_dir("refractive") == homedir()
+            withenv("AGNI_REFRACTIVE_DIR" => joinpath(tmp, "sub", "..") * "/") do
+                @test paths.refractive_override() == normpath(abspath(tmp))
             end
             for blank in ("", "  ")
                 withenv("AGNI_REFRACTIVE_DIR" => blank) do
+                    @test isnothing(paths.refractive_override())
                     @test paths.get_dir("refractive") == joinpath(paths.RES_DIR, "refractive")
                 end
             end
             cd(tmp) do
                 withenv("AGNI_REFRACTIVE_DIR" => ".") do
-                    @test paths.get_dir("refractive") == abspath(".")
+                    @test paths.get_dir("refractive") == pwd()
                 end
             end
             # absent warns, absent2 warns, absent again stays silent

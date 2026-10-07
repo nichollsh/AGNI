@@ -28,13 +28,27 @@ module paths
     export RAD_DIR
 
     """
+    **Refractive index directory from `AGNI_REFRACTIVE_DIR`, or `nothing` when unset or blank.**
+
+    The value is a directory path; it is made absolute and normalised, without a trailing
+    separator.
+    """
+    function refractive_override()::Union{String, Nothing}
+        dir = strip(get(ENV, "AGNI_REFRACTIVE_DIR", ""))
+        isempty(dir) && return nothing
+        dir = abspath(dir)
+        return (length(dir) > 1 && endswith(dir, "/")) ? dir[1:end-1] : dir
+    end
+    export refractive_override
+
+    """
     **Get path to other data dirs (can be overridden)**
 
     Arguments:
     - `name::String` name of the directory to get
 
-    The refractive index directory is `AGNI_REFRACTIVE_DIR` (made absolute) when that
-    environment variable is set and not blank, and `res/refractive` otherwise.
+    The refractive index directory is `refractive_override()` when that is set, and
+    `res/refractive` otherwise.
 
     Returns:
     - `String` path to the requested directory, or `nothing` if the name is unknown.
@@ -48,9 +62,8 @@ module paths
             return joinpath(RES_DIR, "scattering")
 
         elseif name == "refractive"
-            dir = strip(get(ENV, "AGNI_REFRACTIVE_DIR", ""))
-            isempty(dir) && return joinpath(RES_DIR, "refractive")
-            dir = abspath(expanduser(dir))
+            dir = refractive_override()
+            isnothing(dir) && return joinpath(RES_DIR, "refractive")
             if !isdir(dir) && !(dir in REFRACTIVE_WARNED)
                 @warn "AGNI_REFRACTIVE_DIR is not a directory: $dir"
                 push!(REFRACTIVE_WARNED, dir)
