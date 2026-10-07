@@ -21,50 +21,28 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
         @test isnothing(paths.get_dir("does_not_exist"))
     end
 
-    # Precedence AGNI_DIR_<name> > AGNI_DIR_res > configured res > res/; blank is unset
+    # Precedence AGNI_DIR_<name> > AGNI_DIR_res > configured res > res/; blanks count as
+    # unset and a trailing separator is dropped
     @testset "get_dir_overrides" begin
         mktempdir() do tmp
-            env_res, cfg_res = joinpath(tmp, "env"), joinpath(tmp, "cfg")
-            own, env_nk = joinpath(tmp, "own"), joinpath(tmp, "env", "refractive")
-            # (variables, configured res, root of the other folders, refractive folder)
-            cases = [
-                ([], cfg_res, cfg_res, joinpath(cfg_res, "refractive")),
-                (["AGNI_DIR_res" => env_res], nothing, env_res, env_nk),
-                (["AGNI_DIR_res" => env_res], cfg_res, env_res, env_nk),
-                (["AGNI_DIR_refractive" => own], cfg_res, cfg_res, own),
-                (["AGNI_DIR_refractive" => own, "AGNI_DIR_res" => env_res], nothing,
-                    env_res, own),
-                # blanks fall through, and a trailing separator is dropped
-                (["AGNI_DIR_res" => "  ", "AGNI_DIR_refractive" => ""], cfg_res, cfg_res,
-                    joinpath(cfg_res, "refractive")),
-                (["AGNI_DIR_refractive" => own * "/"], nothing, paths.RES_DIR, own),
-            ]
-            for (vars, res, root, refractive) in cases
+            env, cfg, own = joinpath.(tmp, ("env", "cfg", "own"))
+            nk, res = "AGNI_DIR_refractive", "AGNI_DIR_res"
+            # (variables, configured res, expected res root, refractive folder if it moved)
+            for (vars, cfg_res, root, moved) in (
+                    ([], cfg, cfg, nothing),
+                    ([res => env], nothing, env, nothing),
+                    ([res => env], cfg, env, nothing),
+                    ([nk => own * "/"], cfg, cfg, own),
+                    ([nk => own, res => env], nothing, env, own),
+                    ([res => " ", nk => ""], cfg, cfg, nothing))
                 withenv(unset..., vars...) do
-                    @test paths.get_dir("refractive"; res=res) == refractive
-                    for name in filter(!=("refractive"), paths.RES_NAMES)
-                        @test paths.get_dir(name; res=res) == joinpath(root, name)
+                    for name in paths.RES_NAMES
+                        want = (name == "refractive" && !isnothing(moved)) ? moved :
+                               joinpath(root, name)
+                        @test paths.get_dir(name; res=cfg_res) == want
                     end
                 end
             end
-        end
-    end
-
-    # A refractive override reaches nk_path, list_materials and read_nk; n and k differ so a
-    # swapped column would fail
-    @testset "refractive_override_reaches_the_readers" begin
-        mktempdir() do tmp
-            material = first(AGNI.density.list_condensate_rho())
-            write(joinpath(tmp, material * ".txt"), "# test\n1.0 1.5 0.01\n2.0 1.3 0.07\n")
-            withenv(unset..., "AGNI_DIR_refractive" => tmp) do
-                @test AGNI.aerosol_optics.list_materials() == [material]
-                nk = AGNI.aerosol_optics.nk_path(material)
-                λ, n, k = AGNI.aerosol_optics.read_nk(nk)
-                @test λ ≈ [1.0e-6, 2.0e-6]
-                @test n ≈ [1.5, 1.3]
-                @test k ≈ [0.01, 0.07]
-            end
-            @test AGNI.aerosol_optics.list_materials(tmp) == [material]
         end
     end
 

@@ -91,22 +91,24 @@ function _setup_with_surface(surface_material::String, albedo_s::Float64=0.0)
 end
 
 @testset "atmosphere" begin
-    # Each moved data directory is logged once at setup!, and a missing one also warns
+    # setup! logs each moved data directory with its source, warns about a missing one, and
+    # logs no override when nothing is set
     @testset "setup_logs_data_dir_overrides" begin
         mktempdir() do tmp
-            absent = joinpath(tmp, "absent")
-            withenv("AGNI_DIR_refractive" => tmp, "AGNI_DIR_blobs" => absent) do
-                info = "Using refractive data from $tmp (set by AGNI_DIR_refractive)"
-                warning = "The blobs data directory does not exist: $absent"
-                @test_logs (:info, info) (:warn, warning) match_mode=:any _setup_only()
+            none = ("AGNI_DIR_res", "AGNI_DIR_refractive", "AGNI_DIR_blobs") .=> nothing
+            unset = atmosphere.UNSET_STR
+            cases = ((["AGNI_DIR_refractive" => tmp], unset,
+                        (:info, r"refractive data from .* \(set by AGNI_DIR_refractive\)")),
+                     (["AGNI_DIR_blobs" => "$tmp/x"], unset,
+                        (:warn, "The blobs data directory does not exist: $tmp/x")),
+                     ([], tmp, (:info, r"blobs data from .* \(set by \[files\] res_dir\)")))
+            for (vars, res_dir, log) in cases
+                withenv(none..., vars...) do
+                    @test_logs log match_mode=:any _setup_only(res_dir=res_dir)
+                end
             end
-            # with no variable the config key is named; with nothing set, nothing is logged
-            withenv("AGNI_DIR_refractive" => nothing, "AGNI_DIR_res" => nothing) do
-                info = "Using scattering data from $tmp/scattering (set by [files] res_dir)"
-                @test_logs (:info, info) match_mode=:any _setup_only(res_dir=tmp)
-                logs, _ = Test.collect_test_logs(_setup_only; min_level=Logging.Info)
-                @test !any(log -> occursin("data from", string(log.message)), logs)
-            end
+            logs, _ = withenv(() -> Test.collect_test_logs(_setup_only), none...)
+            @test !any(log -> occursin("data from", string(log.message)), logs)
         end
     end
 
