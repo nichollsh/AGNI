@@ -20,6 +20,9 @@ module paths
     const FWL_DATA::String = normpath(joinpath(get(ENV, "FWL_DATA", RES_DIR)))
     export FWL_DATA
 
+    # Last AGNI_REFRACTIVE_DIR value warned about: each bad value warns once, whatever the logger
+    const REFRACTIVE_WARNED = Ref("")
+
     # RAD_DIR (socrates root directory)
     const RAD_DIR::String = abspath(ENV["RAD_DIR"])
     export RAD_DIR
@@ -30,9 +33,8 @@ module paths
     Arguments:
     - `name::String` name of the directory to get
 
-    The refractive index directory is `AGNI_REFRACTIVE_DIR` when that environment
-    variable is set and non-empty (PROTEUS points it at its downloaded copy), and
-    `res/refractive` otherwise.
+    The refractive index directory is `AGNI_REFRACTIVE_DIR` (made absolute) when that
+    environment variable is set and not blank, and `res/refractive` otherwise.
 
     Returns:
     - `String` path to the requested directory, or `nothing` if the name is unknown.
@@ -46,9 +48,13 @@ module paths
             return joinpath(RES_DIR, "scattering")
 
         elseif name == "refractive"
-            dir = get(ENV, "AGNI_REFRACTIVE_DIR", "")
+            dir = strip(get(ENV, "AGNI_REFRACTIVE_DIR", ""))
             isempty(dir) && return joinpath(RES_DIR, "refractive")
-            isdir(dir) || @warn "AGNI_REFRACTIVE_DIR is not a directory: $dir" maxlog=1
+            dir = abspath(expanduser(dir))
+            if !isdir(dir) && dir != REFRACTIVE_WARNED[]
+                @warn "AGNI_REFRACTIVE_DIR is not a directory: $dir"
+                REFRACTIVE_WARNED[] = dir
+            end
             return dir
 
         elseif name == "config"

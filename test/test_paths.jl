@@ -18,25 +18,35 @@ ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
         @test isnothing(paths.get_dir("does_not_exist"))
     end
 
+    # AGNI_REFRACTIVE_DIR replaces res/refractive for nk_path, list_materials and read_nk
     @testset "refractive_dir_override" begin
-        default = joinpath(paths.RES_DIR, "refractive")
-        tmp = mktempdir()
-        material = first(AGNI.density.list_condensate_rho())
-        write(joinpath(tmp, material * ".txt"), "# test\n1.0 1.5 0.01\n2.0 1.4 0.02\n")
-        withenv("AGNI_REFRACTIVE_DIR" => tmp) do
-            @test paths.get_dir("refractive") == tmp
-            @test AGNI.aerosol_optics.nk_path(material) == joinpath(tmp, material * ".txt")
-            @test AGNI.aerosol_optics.list_materials() == [material]
+        mktempdir() do tmp
+            material = first(AGNI.density.list_condensate_rho())
+            write(joinpath(tmp, material * ".txt"), "# test\n1.0 1.5 0.01\n2.0 1.3 0.07\n")
+            withenv("AGNI_REFRACTIVE_DIR" => tmp) do
+                @test paths.get_dir("refractive") == tmp
+                @test AGNI.aerosol_optics.list_materials() == [material]
+                λ, n, k = AGNI.aerosol_optics.read_nk(AGNI.aerosol_optics.nk_path(material))
+                @test n ≈ [1.5, 1.3] && k ≈ [0.01, 0.07]
+            end
+            for blank in ("", "  ")
+                withenv("AGNI_REFRACTIVE_DIR" => blank) do
+                    @test paths.get_dir("refractive") == joinpath(paths.RES_DIR, "refractive")
+                end
+            end
+            cd(tmp) do
+                withenv("AGNI_REFRACTIVE_DIR" => ".") do
+                    @test paths.get_dir("refractive") == abspath(".")
+                end
+            end
+            for absent in (joinpath(tmp, "absent"), joinpath(tmp, "absent2"))
+                withenv("AGNI_REFRACTIVE_DIR" => absent) do
+                    @test_logs (:warn, r"not a directory") paths.get_dir("refractive")
+                    @test_logs AGNI.aerosol_optics.list_materials()
+                    @test AGNI.aerosol_optics.list_materials() == String[]
+                end
+            end
         end
-        withenv("AGNI_REFRACTIVE_DIR" => "") do
-            @test paths.get_dir("refractive") == default
-        end
-        missing_dir = joinpath(tmp, "absent")
-        withenv("AGNI_REFRACTIVE_DIR" => missing_dir) do
-            @test_logs (:warn, r"not a directory") paths.get_dir("refractive")
-            @test AGNI.aerosol_optics.list_materials() == String[]
-        end
-        rm(tmp; force=true, recursive=true)
     end
 
     @testset "is_safe_dir" begin
