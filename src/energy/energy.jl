@@ -76,7 +76,12 @@ module energy
     """
     **Calculate conductive heat fluxes using Fourier's law**
 
-    Updates array of `atmos.flux_cdct` at each layer of the atmosphere.
+    Updates array of `atmos.flux_cdct` at each layer of the atmosphere, positive upwards.
+
+    Within the bulk atmosphere, conductive flux is calculated as:
+    `F_i = (T_i - T_{i-1}) / ((r_{i-1} - rl_i)/k_{i-1} + (rl_i - r_i)/k_i)`
+
+    The flux to space (TOA) is zero, and from the surface uses the bottom half-cell.
 
     Arguments:
     - `atmos::Atmos_t`          the atmosphere struct instance to be used
@@ -87,8 +92,9 @@ module energy
 
         # bulk layers
         @inbounds for i in 2:atmos.nlev_l-1
-            atmos.flux_cdct[i] = atmos.layer_kc[i] * (atmos.tmp[i]-atmos.tmp[i-1]) /
-                                                        atmos.layer_thick[i]
+            atmos.flux_cdct[i] = (atmos.tmp[i]-atmos.tmp[i-1]) /
+                                    ( (atmos.r[i-1] - atmos.rl[i]) / atmos.layer_kc[i-1] +
+                                      (atmos.rl[i]  - atmos.r[i])  / atmos.layer_kc[i]   )
         end
 
         # bottom layer (from surface)

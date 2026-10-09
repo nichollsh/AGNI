@@ -16,7 +16,7 @@ AGNI accounts for the following energy transport processes:
 | Convection | $F^\text{cvt}$ | Mixing-length theory parameterisation |
 | Latent heat | $F^\text{lat}$ | Condensation and evaporation of volatiles |
 | Sensible heat | $F^\text{sns}$ | Turbulent surface–atmosphere exchange |
-| Thermal conduction | $F^\text{cdt}$ | Molecular thermal conduction (negligible except in ionosphere) |
+| Thermal conduction | $F^\text{cdt}$ | Molecular thermal conduction (negligible except in the thermosphere) |
 | Deep heating | $F^\text{deep}$ | Advective or interior heat deposition (optional) |
 
 The total net upward-directed energy flux at each cell edge $l$ is the sum of all contributions:
@@ -126,6 +126,9 @@ AGNI can calculate emission spectra from a given $T(p)$ profile and gas volume m
 
 ### Transparent atmospheres
 For bare-rock planets, or to determine a planet's surface temperature in the absence of an atmosphere, AGNI supports a transparent atmosphere mode (`composition.transparent = true`). This sets the atmospheric pressure to a small value and disables all gas opacity and absorption in SOCRATES. Use the dedicated transparent solver in this case.
+
+### Exobase diagnostic
+AGNI estimates where the exobase, the level at which the collisional mean free path equals the pressure scale height, might exist within the modelled atmosphere. It calculates this based on the $n$ is the number density, $\bar{m}$ the mean particle mass, and $\sigma = \sum_j x_j \pi \sigma_j^2$ the mole-fraction-weighted hard-sphere cross-section from the Lennard-Jones collision diameters. If none of the layers reach this criterion, the exobase variables are set equal to the TOA values.
 
 ## Julia and Fortran
 
