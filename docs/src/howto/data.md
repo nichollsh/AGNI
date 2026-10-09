@@ -58,7 +58,8 @@ Zenodo fails, the script takes the same files from the mirror of that record. A 
 without a mirror fails with an error, so the `basic`, `thermodynamics` and `parfiles`
 targets still need Zenodo. Downloads that return an HTML page, and zip archives that fail
 `unzip -t`, are rejected rather than saved. A target that takes a whole record from Zenodo
-checks each file against the MD5 checksum that the record lists, and keeps a file already in
-place when its new download fails. The environment variables `ZENODO_URL` and
+checks each file against the MD5 checksum that the record lists; a failed Zenodo download
+does not replace a file already in place, and a file name outside letters, digits and `._+-`
+sends the record to the mirror. The environment variables `ZENODO_URL` and
 `DATAVERSE_URL` set the two servers (by default `https://zenodo.org` and
 `https://dataverse.nl`).
