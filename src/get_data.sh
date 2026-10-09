@@ -213,19 +213,53 @@ function unzip_wrap {
     return 0
 }
 
-# Get whole Zenodo record as Zip, and extract the files
+# MD5 checksum of a file
+function md5_of {
+    # $1 = file path
+    if [ -x "$(command -v md5sum)" ]; then
+        md5sum < "$1" | cut -d' ' -f1
+    else
+        md5 -q "$1"
+    fi
+}
+
+# Get every file of a Zenodo record, checking each against its MD5 from the record API
+function zenodo_files {
+    # $1 = Zenodo identifier for Record
+    # $2 = target folder (on disk)
+
+    record=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- "$ZENODO_URL/api/records/$1") || return 1
+    entries=$(echo "$record" | grep -o '"key": "[^"]*", "size": [0-9]*, "checksum": "md5:[0-9a-f]*"')
+    count=$(echo "$record" | grep -o "/api/records/$1/files/[^\"]*/content\"" | wc -l)
+    if [ -z "$entries" ] || [ "$(echo "$entries" | wc -l)" -ne "$count" ]; then
+        echo "ERROR: Failed to read the file list of Zenodo record $1"
+        return 1
+    fi
+    while read -r entry <&3; do
+        name=$(echo "$entry" | sed 's/^"key": "\([^"]*\)".*/\1/')
+        sum=$(echo "$entry" | sed 's/.*"md5:\([0-9a-f]*\)"$/\1/')
+        [ "$name" = "_readme.txt" ] && continue
+        fetch "$ZENODO_URL/records/$1/files/$name" "$2/$name" && [ "$(md5_of "$2/$name")" = "$sum" ] && continue
+        echo "Trying again to download $name"
+        sleep 1
+        fetch "$ZENODO_URL/records/$1/files/$name" "$2/$name" && [ "$(md5_of "$2/$name")" = "$sum" ] && continue
+        echo "ERROR: $name from Zenodo record $1 is missing or has the wrong checksum"
+        rm -f "$2/$name"
+        return 1
+    done 3<<< "$entries"
+    return 0
+}
+
+# Get every file of a Zenodo record, or the whole DataverseNL mirror as Zip and extract it
 function zenodo_all {
     # $1 = Zenodo identifier for Record
-    # $2 = target folder (on disk) to extract files into
+    # $2 = target folder (on disk) to put the files into
 
     tgt="$2/$1.zip"
     mkdir -p $2
     if [ -z "$use_mirror" ]; then
-        echo "    zenodo/$1 > $tgt"
-        fetch "$ZENODO_URL/api/records/$1/files-archive" $tgt && unzip_wrap $tgt $2 && return 0
-        echo "Trying again to download the file"
-        sleep 1
-        fetch "$ZENODO_URL/api/records/$1/files-archive" $tgt && unzip_wrap $tgt $2 && return 0
+        echo "    zenodo/$1 > $2"
+        zenodo_files $1 $2 && return 0
         echo "WARNING: Failed to download $1 from Zenodo"
     fi
 
