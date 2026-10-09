@@ -134,7 +134,7 @@ function mirror_doi {
         15880455) echo 10.34894/8ARDN5 ;;
         19294180) echo 10.34894/6Z8Y0Q ;;
         23000222) echo 10.34894/PZFHP2 ;;
-        *) echo "ERROR: Zenodo record $1 is not available and has no DataverseNL mirror" >&2; return 1 ;;
+        *) echo "ERROR: Failed to get $1 from Zenodo, and it has no DataverseNL mirror" >&2; return 1 ;;
     esac
 }
 
@@ -163,6 +163,7 @@ function zenodo {
 
     tgt="$2/$3"
     mkdir -p $2
+    from_mirror=""
     if [ -z "$use_mirror" ]; then
         echo "    zenodo/$1 > $tgt"
         fetch "$ZENODO_URL/records/$1/files/$3" $tgt && return 0
@@ -173,6 +174,7 @@ function zenodo {
     fi
 
     doi=$(mirror_doi $1) || exit 1
+    from_mirror=1
     echo "    dataverse/$doi > $tgt"
     id=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- "$DATAVERSE_URL/api/datasets/:persistentId/dirindex?persistentId=doi:$doi" | sed -n "s|.*datafile/\([0-9]*\)\">${3//./\\.}</a>.*|\1|p")
     [ -n "$id" ] && fetch "$DATAVERSE_URL/api/access/datafile/$id" $tgt && return 0
@@ -240,7 +242,8 @@ function get_zip {
 
     zenodo $1 $2 $3
     unzip_wrap "$2/$3" $2 && return 0
-    use_mirror=1 zenodo $1 $2 $3
+    [ -z "$from_mirror" ] && mirror_doi $1 > /dev/null 2>&1 || exit 1
+    (use_mirror=1; zenodo $1 $2 $3) || exit 1
     unzip_wrap "$2/$3" $2 || exit 1
 }
 
