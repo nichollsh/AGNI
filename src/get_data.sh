@@ -235,7 +235,7 @@ function zenodo_files {
     while read -r sum name <&3; do
         [ "$name" = "_readme.txt" ] && continue
         case $name in
-            .*|*.part|*[!A-Za-z0-9._+-]*) echo "ERROR: Zenodo record $1 lists a file name this script does not take: $name"; return 1 ;;
+            ""|.*|*.[Pp][Aa][Rr][Tt]|*[!A-Za-z0-9._+-]*) echo "ERROR: Zenodo record $1 lists a file name this script does not take: $name"; return 1 ;;
         esac
         for try in 1 2; do
             # Download beside the target, so a failed download leaves a file already in place
