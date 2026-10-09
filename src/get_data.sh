@@ -226,13 +226,13 @@ function zenodo_files {
 
     local record entries count sum name try LC_ALL=C
     record=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- "$ZENODO_URL/api/records/$1") || return 1
-    entries=$(echo "$record" | grep -o '"key": "[^"]*", "size": [0-9]*, "checksum": "md5:[0-9a-f]\{32\}"' | sed 's/^"key": "\(.*\)", "size": [0-9]*, "checksum": "md5:\(.*\)"$/\2 \1/')
+    entries=$(echo "$record" | grep -o '"key": "[^"]*", "size": [0-9]*, "checksum": "md5:[0-9a-f]\{32\}"' | sed 's/^"key": "\(.*\)", "size": [0-9]*, "checksum": "md5:\(.*\)"$/\2:\1/')
     count=$(echo "$record" | grep -o "/api/records/$1/files/[^\"]*/content\"" | wc -l)
     if [ -z "$entries" ] || [ "$(echo "$entries" | wc -l)" -ne "$count" ]; then
         echo "ERROR: Failed to read the file list of Zenodo record $1"
         return 1
     fi
-    while read -r sum name <&3; do
+    while IFS=: read -r sum name <&3; do
         [ "$name" = "_readme.txt" ] && continue
         case $name in
             ""|.*|*.[Pp][Aa][Rr][Tt]|*[!A-Za-z0-9._+-]*) echo "ERROR: Zenodo record $1 lists a file name this script does not take: $name"; return 1 ;;
