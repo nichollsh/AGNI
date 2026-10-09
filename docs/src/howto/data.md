@@ -55,8 +55,8 @@ set up. `get_data.sh` always writes to `res/`, and the file paths in `[files]` (
 Most of the Zenodo records used by `get_data.sh` are mirrored on
 [DataverseNL](https://dataverse.nl). When Zenodo cannot be reached, or a download from
 Zenodo fails, the script takes the same files from the mirror of that record. A record
-without a mirror fails with an error, so the `basic`, `thermodynamics`, `parfiles` and
-`surfaces_extended` targets still need Zenodo. Downloads that return an HTML page, and zip
+without a mirror fails with an error, so the `basic`, `thermodynamics` and `parfiles`
+targets still need Zenodo. Downloads that return an HTML page, and zip
 archives that fail `unzip -t`, are rejected rather than saved. The environment
 variables `ZENODO_URL` and `DATAVERSE_URL` set the two servers (by default
 `https://zenodo.org` and `https://dataverse.nl`).

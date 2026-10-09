@@ -134,6 +134,8 @@ function mirror_doi {
         15880455) echo 10.34894/8ARDN5 ;;
         19294180) echo 10.34894/6Z8Y0Q ;;
         23000222) echo 10.34894/PZFHP2 ;;
+        15881238) echo 10.34894/QR4XR2 ;;
+        15881496) echo 10.34894/FLOPVW ;;
         *) echo "ERROR: Failed to get $1 from Zenodo, and it has no DataverseNL mirror" >&2; return 1 ;;
     esac
 }
