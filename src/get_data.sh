@@ -169,7 +169,7 @@ function zenodo {
         echo "Trying again to download the file"
         sleep 1
         fetch "$ZENODO_URL/records/$1/files/$3" $tgt && return 0
-        echo "WARNING: Failed to download $1 from Zenodo, trying the DataverseNL mirror"
+        echo "WARNING: Failed to download $1 from Zenodo"
     fi
 
     doi=$(mirror_doi $1) || exit 1
@@ -199,7 +199,11 @@ function unzip_wrap {
         fi
     done
 
-    unzip -oq $1 -d $2 ${exclude:+-x $exclude}
+    if ! unzip -oq $1 -d $2 ${exclude:+-x $exclude}; then
+        echo "ERROR: Failed to extract $1"
+        rm -f $1
+        return 1
+    fi
     rm $1
 
     return 0
@@ -218,7 +222,7 @@ function zenodo_all {
         echo "Trying again to download the file"
         sleep 1
         fetch "$ZENODO_URL/api/records/$1/files-archive" $tgt && unzip_wrap $tgt $2 && return 0
-        echo "WARNING: Failed to download $1 from Zenodo, trying the DataverseNL mirror"
+        echo "WARNING: Failed to download $1 from Zenodo"
     fi
 
     doi=$(mirror_doi $1) || exit 1
@@ -235,6 +239,8 @@ function get_zip {
     # $3 = name of zip file in the Zenodo record
 
     zenodo $1 $2 $3
+    unzip_wrap "$2/$3" $2 && return 0
+    use_mirror=1 zenodo $1 $2 $3
     unzip_wrap "$2/$3" $2 || exit 1
 }
 
