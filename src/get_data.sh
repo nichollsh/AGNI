@@ -31,8 +31,9 @@ ZENODO_URL=${ZENODO_URL:-https://zenodo.org}
 DATAVERSE_URL=${DATAVERSE_URL:-https://dataverse.nl}
 
 # Check internet connectivity
+use_mirror=""
 function reachable {
-    header=$(wget --user-agent "'$ua'" --spider -S "$1" 2>&1 | grep "HTTP")
+    header=$(wget --user-agent "'$ua'" --timeout=30 --tries=2 --spider -S "$1" 2>&1 | grep "HTTP")
     [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* || $header == *"response 2"* || $header == *"response 3"* ]]
 }
 if ! reachable "$ZENODO_URL"; then
@@ -133,10 +134,7 @@ function mirror_doi {
         15880455) echo 10.34894/8ARDN5 ;;
         19294180) echo 10.34894/6Z8Y0Q ;;
         23000222) echo 10.34894/PZFHP2 ;;
-        *)
-            echo "ERROR: Failed to download $1. It has no DataverseNL mirror." >&2
-            return 1
-            ;;
+        *) echo "ERROR: Zenodo record $1 is not available and has no DataverseNL mirror" >&2; return 1 ;;
     esac
 }
 
@@ -144,7 +142,7 @@ function mirror_doi {
 function fetch {
     # $1 = url
     # $2 = target file path
-    hdr=$(wget --user-agent "'$ua'" -S -qO "$2" "$1" 2>&1)
+    hdr=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -S -qO "$2" "$1" 2>&1)
     if [ $? -ne 0 ] || [[ ! -f "$2" ]]; then
         rm -f "$2"
         return 1
@@ -171,18 +169,15 @@ function zenodo {
         echo "Trying again to download the file"
         sleep 1
         fetch "$ZENODO_URL/records/$1/files/$3" $tgt && return 0
-        echo "ERROR: Failed to download $1 from Zenodo"
+        echo "WARNING: Failed to download $1 from Zenodo, trying the DataverseNL mirror"
     fi
 
     doi=$(mirror_doi $1) || exit 1
     echo "    dataverse/$doi > $tgt"
-    index="$DATAVERSE_URL/api/datasets/:persistentId/dirindex?persistentId=doi:$doi"
-    id=$(wget --user-agent "'$ua'" -qO- "$index" | sed -n "s|.*datafile/\([0-9]*\)\">${3//./\\.}</a>.*|\1|p")
-    if [ -z "$id" ] || ! fetch "$DATAVERSE_URL/api/access/datafile/$id" $tgt; then
-        echo "ERROR: Failed to download $3 from DataverseNL doi:$doi"
-        exit 1
-    fi
-    return 0
+    id=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- "$DATAVERSE_URL/api/datasets/:persistentId/dirindex?persistentId=doi:$doi" | sed -n "s|.*datafile/\([0-9]*\)\">${3//./\\.}</a>.*|\1|p")
+    [ -n "$id" ] && fetch "$DATAVERSE_URL/api/access/datafile/$id" $tgt && return 0
+    echo "ERROR: Failed to download $3 from DataverseNL doi:$doi"
+    exit 1
 }
 
 # Wrapper around unzip command, which first tests the archive
@@ -223,17 +218,14 @@ function zenodo_all {
         echo "Trying again to download the file"
         sleep 1
         fetch "$ZENODO_URL/api/records/$1/files-archive" $tgt && unzip_wrap $tgt $2 && return 0
-        echo "ERROR: Failed to download $1 from Zenodo"
+        echo "WARNING: Failed to download $1 from Zenodo, trying the DataverseNL mirror"
     fi
 
     doi=$(mirror_doi $1) || exit 1
     echo "    dataverse/$doi > $tgt"
-    url="$DATAVERSE_URL/api/access/dataset/:persistentId/?persistentId=doi:$doi"
-    if ! (fetch "$url" $tgt && unzip_wrap $tgt $2); then
-        echo "ERROR: Failed to download $1 from DataverseNL doi:$doi"
-        exit 1
-    fi
-    return 0
+    fetch "$DATAVERSE_URL/api/access/dataset/:persistentId/?persistentId=doi:$doi" $tgt && unzip_wrap $tgt $2 && return 0
+    echo "ERROR: Failed to download $1 from DataverseNL doi:$doi"
+    exit 1
 }
 
 # Get a zip file from within a Zenodo record, and extract it
