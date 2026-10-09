@@ -2,6 +2,9 @@
 # Download and unpack required and/or optional data
 # All files can be found at https://zenodo.org/communities/proteus_framework
 
+# When Zenodo fails, a record with a DataverseNL mirror is read from the mirror.
+# Servers: ZENODO_URL (default https://zenodo.org), DATAVERSE_URL (https://dataverse.nl)
+
 # Exit script if any of the commands fail
 # set -e
 
@@ -24,14 +27,21 @@ os=$(uname -s)
 arch=$(uname -m)
 ua="AGNI/1.0 ($os $arch)"
 
+ZENODO_URL=${ZENODO_URL:-https://zenodo.org}
+DATAVERSE_URL=${DATAVERSE_URL:-https://dataverse.nl}
+
 # Check internet connectivity
-header=$(wget --user-agent "'$ua'" --spider -S "https://zenodo.org" 2>&1 | grep "HTTP")
-# echo $header
-if ! [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* || $header == *"response 2"* || $header == *"response 3"* ]]; then
-    # Return error if we don't get a positive HTTP response from Zenodo
-    echo "ERROR: Failed to establish a connection to Zenodo"
-    echo "Response: $header"
-    exit 1
+function reachable {
+    header=$(wget --user-agent "'$ua'" --spider -S "$1" 2>&1 | grep "HTTP")
+    [[ $header == *"HTTP/1.1 2"* || $header == *"HTTP/1.1 3"* || $header == *"response 2"* || $header == *"response 3"* ]]
+}
+if ! reachable "$ZENODO_URL"; then
+    echo "WARNING: Failed to establish a connection to Zenodo, using the DataverseNL mirror"
+    use_mirror=1
+    if ! reachable "$DATAVERSE_URL"; then
+        echo "ERROR: Failed to establish a connection to Zenodo and DataverseNL"
+        exit 1
+    fi
 fi
 
 # Root and resources folders
@@ -100,63 +110,101 @@ Where [TARGET] can be any of the following:
         $help_thermo\
 "
 
+# DataverseNL mirror of a Zenodo record; add a pair here when a mirror is published
+function mirror_doi {
+    # $1 = Zenodo identifier for Record
+    case $1 in
+        15799743) echo 10.34894/DX7CDY ;;
+        15696415) echo 10.34894/MFHZIN ;;
+        15799754) echo 10.34894/V9KQKY ;;
+        15799776) echo 10.34894/NATTTQ ;;
+        15799318) echo 10.34894/VRDDRJ ;;
+        15721749) echo 10.34894/ES4SKG ;;
+        15799474) echo 10.34894/9FGULL ;;
+        15799495) echo 10.34894/JXMS4R ;;
+        15799607) echo 10.34894/WDE4CC ;;
+        15799652) echo 10.34894/UBSSB2 ;;
+        15799731) echo 10.34894/1KKSYT ;;
+        15696457) echo 10.34894/2WO9EC ;;
+        15743843) echo 10.34894/K3UKBX ;;
+        15806343) echo 10.34894/LZUB3T ;;
+        17981836) echo 10.34894/37SUKC ;;
+        15721440) echo 10.34894/BC1DEH ;;
+        15880455) echo 10.34894/8ARDN5 ;;
+        19294180) echo 10.34894/6Z8Y0Q ;;
+        23000222) echo 10.34894/PZFHP2 ;;
+        *)
+            echo "ERROR: Failed to download $1. It has no DataverseNL mirror." >&2
+            return 1
+            ;;
+    esac
+}
+
+# Download a URL to a file, refusing an HTML page (an error or bot-check page, not data)
+function fetch {
+    # $1 = url
+    # $2 = target file path
+    hdr=$(wget --user-agent "'$ua'" -S -qO "$2" "$1" 2>&1)
+    if [ $? -ne 0 ] || [[ ! -f "$2" ]]; then
+        rm -f "$2"
+        return 1
+    fi
+    if echo "$hdr" | grep -i "^ *content-type:" | tail -1 | grep -qi "text/html"; then
+        echo "ERROR: $1 returned an HTML page, not data"
+        rm -f "$2"
+        return 1
+    fi
+    return 0
+}
+
 # Generic single file from Zenodo record
 function zenodo {
     # $1 = Zenodo identifier for Record
     # $2 = target folder (on disk)
     # $3 = target filename (on disk and in Record)
 
-    # target file path
     tgt="$2/$3"
-
-    # target url
-    url="https://zenodo.org/records/$1/files/$3"
-
-    # get data
-    echo "    zenodo/$1 > $tgt"
     mkdir -p $2
-    wget --user-agent "'$ua'" -qO $tgt $url
-
-    # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
-    elif [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1. File not found on disk."
-    else
-        return 0
+    if [ -z "$use_mirror" ]; then
+        echo "    zenodo/$1 > $tgt"
+        fetch "$ZENODO_URL/records/$1/files/$3" $tgt && return 0
+        echo "Trying again to download the file"
+        sleep 1
+        fetch "$ZENODO_URL/records/$1/files/$3" $tgt && return 0
+        echo "ERROR: Failed to download $1 from Zenodo"
     fi
 
-    # try again at downloading the file?
-    echo "Trying again to download the file"
-    sleep 1
-    wget --user-agent "'$ua'" -qO $tgt $url
-
-    # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
-        exit 1
-    elif [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1. File not found on disk."
+    doi=$(mirror_doi $1) || exit 1
+    echo "    dataverse/$doi > $tgt"
+    index="$DATAVERSE_URL/api/datasets/:persistentId/dirindex?persistentId=doi:$doi"
+    id=$(wget --user-agent "'$ua'" -qO- "$index" | sed -n "s|.*datafile/\([0-9]*\)\">${3//./\\.}</a>.*|\1|p")
+    if [ -z "$id" ] || ! fetch "$DATAVERSE_URL/api/access/datafile/$id" $tgt; then
+        echo "ERROR: Failed to download $3 from DataverseNL doi:$doi"
         exit 1
     fi
-
     return 0
 }
 
-# Wrapper around unzip command
+# Wrapper around unzip command, which first tests the archive
 function unzip_wrap {
     # $1 = zip file path
     # $2 = target folder to unzip into
 
-    # If the file to check for is in the zip, exclude it from unzip command
-    exclude_file="_readme.txt"
-    if unzip -l $1 | grep -q $exclude_file; then
-        exclude_flag="-x $exclude_file"
-    else
-        exclude_flag=""
+    if ! unzip -tq $1 > /dev/null; then
+        echo "ERROR: $1 is not a valid zip archive"
+        rm -f $1
+        return 1
     fi
 
-    unzip -oq $1 -d $2 ${exclude_flag}
+    # Exclude the readme and the DataverseNL manifest if the zip has them
+    exclude=""
+    for exclude_file in _readme.txt MANIFEST.TXT; do
+        if unzip -l $1 | grep -q " $exclude_file$"; then
+            exclude="$exclude $exclude_file"
+        fi
+    done
+
+    unzip -oq $1 -d $2 ${exclude:+-x $exclude}
     rm $1
 
     return 0
@@ -167,43 +215,24 @@ function zenodo_all {
     # $1 = Zenodo identifier for Record
     # $2 = target folder (on disk) to extract files into
 
-    # target file path
     tgt="$2/$1.zip"
-
-    # target url
-    url="https://zenodo.org/api/records/$1/files-archive"
-
-    # get data
-    echo "    zenodo/$1 > $tgt"
     mkdir -p $2
-    wget --user-agent "'$ua'" -qO $tgt $url
-
-    # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
-    elif [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1. File not found on disk."
-    else
-        unzip_wrap $tgt $2
-        return 0
+    if [ -z "$use_mirror" ]; then
+        echo "    zenodo/$1 > $tgt"
+        fetch "$ZENODO_URL/api/records/$1/files-archive" $tgt && unzip_wrap $tgt $2 && return 0
+        echo "Trying again to download the file"
+        sleep 1
+        fetch "$ZENODO_URL/api/records/$1/files-archive" $tgt && unzip_wrap $tgt $2 && return 0
+        echo "ERROR: Failed to download $1 from Zenodo"
     fi
 
-    # try again at downloading the file?
-    echo "Trying again to download the file"
-    sleep 1
-    wget --user-agent "'$ua'" -qO $tgt $url
-
-    # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
-        exit 1
-    elif [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1. File not found on disk."
+    doi=$(mirror_doi $1) || exit 1
+    echo "    dataverse/$doi > $tgt"
+    url="$DATAVERSE_URL/api/access/dataset/:persistentId/?persistentId=doi:$doi"
+    if ! (fetch "$url" $tgt && unzip_wrap $tgt $2); then
+        echo "ERROR: Failed to download $1 from DataverseNL doi:$doi"
         exit 1
     fi
-
-    unzip_wrap $tgt $2
-
     return 0
 }
 
@@ -214,7 +243,7 @@ function get_zip {
     # $3 = name of zip file in the Zenodo record
 
     zenodo $1 $2 $3
-    unzip_wrap "$2/$3" $2
+    unzip_wrap "$2/$3" $2 || exit 1
 }
 
 # Get a spectral file by name
