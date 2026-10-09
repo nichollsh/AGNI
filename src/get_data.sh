@@ -216,11 +216,7 @@ function unzip_wrap {
 # MD5 checksum of a file
 function md5_of {
     # $1 = file path
-    if [ -x "$(command -v md5sum)" ]; then
-        md5sum < "$1" | cut -d' ' -f1
-    else
-        md5 -q "$1"
-    fi
+    (md5sum || md5 -q) < "$1" 2> /dev/null | cut -d' ' -f1
 }
 
 # Get every file of a Zenodo record, checking each against its MD5 from the record API
@@ -228,23 +224,26 @@ function zenodo_files {
     # $1 = Zenodo identifier for Record
     # $2 = target folder (on disk)
 
+    local record entries count sum name
     record=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- "$ZENODO_URL/api/records/$1") || return 1
-    entries=$(echo "$record" | grep -o '"key": "[^"]*", "size": [0-9]*, "checksum": "md5:[0-9a-f]*"')
+    entries=$(echo "$record" | grep -o '"key": "[^"]*", "size": [0-9]*, "checksum": "md5:[0-9a-f]*"' | sed 's/^"key": "\(.*\)", "size": [0-9]*, "checksum": "md5:\(.*\)"$/\2 \1/')
     count=$(echo "$record" | grep -o "/api/records/$1/files/[^\"]*/content\"" | wc -l)
     if [ -z "$entries" ] || [ "$(echo "$entries" | wc -l)" -ne "$count" ]; then
         echo "ERROR: Failed to read the file list of Zenodo record $1"
         return 1
     fi
-    while read -r entry <&3; do
-        name=$(echo "$entry" | sed 's/^"key": "\([^"]*\)".*/\1/')
-        sum=$(echo "$entry" | sed 's/.*"md5:\([0-9a-f]*\)"$/\1/')
+    while read -r sum name <&3; do
         [ "$name" = "_readme.txt" ] && continue
-        fetch "$ZENODO_URL/records/$1/files/$name" "$2/$name" && [ "$(md5_of "$2/$name")" = "$sum" ] && continue
+        case $name in
+            .*|*[!A-Za-z0-9._+-]*) echo "ERROR: Zenodo record $1 lists a file name this script does not take: $name"; return 1 ;;
+        esac
+        # Download beside the target, so a failed download leaves a file already in place
+        fetch "$ZENODO_URL/records/$1/files/$name" "$2/$name.part" && [ "$(md5_of "$2/$name.part")" = "$sum" ] && mv "$2/$name.part" "$2/$name" && continue
         echo "Trying again to download $name"
         sleep 1
-        fetch "$ZENODO_URL/records/$1/files/$name" "$2/$name" && [ "$(md5_of "$2/$name")" = "$sum" ] && continue
+        fetch "$ZENODO_URL/records/$1/files/$name" "$2/$name.part" && [ "$(md5_of "$2/$name.part")" = "$sum" ] && mv "$2/$name.part" "$2/$name" && continue
         echo "ERROR: $name from Zenodo record $1 is missing or has the wrong checksum"
-        rm -f "$2/$name"
+        rm -f "$2/$name.part"
         return 1
     done 3<<< "$entries"
     return 0
