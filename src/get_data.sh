@@ -144,12 +144,11 @@ function mirror_doi {
 function fetch {
     # $1 = url
     # $2 = target file path
-    wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO "$2" "$1"
-    if [ $? -ne 0 ] || [[ ! -f "$2" ]]; then
+    if ! wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO "$2" "$1" || [ ! -f "$2" ]; then
         rm -f "$2"
         return 1
     fi
-    if head -c 512 "$2" | grep -qi "<html\|<!doctype html"; then
+    if head -c 512 "$2" | LC_ALL=C grep -qiE '^[[:space:]]*(<!doctype[[:space:]]+html|<html)'; then
         echo "ERROR: $1 returned an HTML page, not data"
         rm -f "$2"
         return 1
@@ -225,7 +224,7 @@ function zenodo_files {
     # $2 = target folder (on disk)
 
     local record entries count sum name try LC_ALL=C
-    record=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- "$ZENODO_URL/api/records/$1") || return 1
+    record=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- "$ZENODO_URL/api/records/$1" | tr '\n' ' ') || return 1
     entries=$(echo "$record" | grep -o '"key":[[:space:]]*"[^"]*",[[:space:]]*"size":[[:space:]]*[0-9]*,[[:space:]]*"checksum":[[:space:]]*"md5:[0-9a-f]\{32\}"' | sed 's/^"key":[[:space:]]*"\([^"]*\)".*"md5:\([0-9a-f]*\)"$/\2:\1/')
     count=$(echo "$record" | grep -o "/api/records/$1/files/[^\"]*/content\"" | wc -l)
     if [ -z "$entries" ] || [ "$(echo "$entries" | wc -l)" -ne "$count" ]; then
@@ -254,15 +253,23 @@ function mirror_complete {
     # $1 = DataverseNL DOI
     # $2 = zip file path
 
-    local listed missing
+    local listed content missing LC_ALL=C
     listed=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- "$DATAVERSE_URL/api/datasets/:persistentId/dirindex?persistentId=doi:$1" | grep -o 'datafile/[0-9]*">[^<]*</a>' | sed 's|.*">\(.*\)</a>|\1|')
-    missing=$(echo "$listed" | grep -vxF -f <(unzip -Z1 "$2" 2> /dev/null))
-    [ -z "$listed" ] && echo "ERROR: Failed to read the file list of DataverseNL doi:$1"
-    [ -n "$missing" ] && echo "ERROR: The DataverseNL archive of doi:$1 lacks:" $missing
-    if [ -z "$listed" ] || [ -n "$missing" ]; then
+    if ! content=$(unzip -Z1 "$2" 2> /dev/null); then
+        echo "ERROR: $2 is not a valid zip archive"
         rm -f "$2"
         return 1
     fi
+    missing=$(echo "$listed" | grep -vxF "$content" | tr '\n' ' ')
+    if [ -z "$listed" ]; then
+        echo "ERROR: Failed to read the file list of DataverseNL doi:$1"
+    elif [ -n "$missing" ]; then
+        echo "ERROR: The DataverseNL archive of doi:$1 lacks: $missing"
+    else
+        return 0
+    fi
+    rm -f "$2"
+    return 1
 }
 
 # Get every file of a Zenodo record, or the whole DataverseNL mirror as Zip and extract it
