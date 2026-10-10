@@ -169,11 +169,26 @@ function zenodo_all {
 
     # get list of files in the record
     url="https://zenodo.org/api/records/$1"
-    files=$(wget --user-agent "'$ua'" -qO- $url | grep -o "/$1/files/[^/\"]*/content")
+    files=$(wget --user-agent "'$ua'" -qO- $url)
+
+    # check if command failed, and try again?
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to list files in $1. Issue with wget command"
+        echo "Trying again to list the files"
+        sleep 1
+        files=$(wget --user-agent "'$ua'" -qO- $url)
+
+        # check if command failed
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to list files in $1. Issue with wget command"
+            exit 1
+        fi
+    fi
 
     # check that the record lists some files
+    files=$(echo "$files" | grep -o "/$1/files/[^/\"]*/content")
     if [[ -z "$files" ]]; then
-        echo "ERROR: Failed to list files in $1. Record not found, empty or unreachable."
+        echo "ERROR: Failed to list files in $1. No files found in Record."
         exit 1
     fi
 
