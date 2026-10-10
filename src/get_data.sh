@@ -162,47 +162,29 @@ function unzip_wrap {
     return 0
 }
 
-# Get whole Zenodo record as Zip, and extract the files
+# Get all files in a Zenodo record, except for the readme
 function zenodo_all {
     # $1 = Zenodo identifier for Record
-    # $2 = target folder (on disk) to extract files into
+    # $2 = target folder (on disk) to download files into
 
-    # target file path
-    tgt="$2/$1.zip"
+    # get list of files in the record
+    url="https://zenodo.org/api/records/$1"
+    files=$(wget --user-agent "'$ua'" -qO- $url | grep -o '/files/[^/"]*/content')
 
-    # target url
-    url="https://zenodo.org/api/records/$1/files-archive"
-
-    # get data
-    echo "    zenodo/$1 > $tgt"
-    mkdir -p $2
-    wget --user-agent "'$ua'" -qO $tgt $url
-
-    # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
-    elif [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1. File not found on disk."
-    else
-        unzip_wrap $tgt $2
-        return 0
-    fi
-
-    # try again at downloading the file?
-    echo "Trying again to download the file"
-    sleep 1
-    wget --user-agent "'$ua'" -qO $tgt $url
-
-    # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
-        exit 1
-    elif [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1. File not found on disk."
+    # check that the record lists some files
+    if [[ -z "$files" ]]; then
+        echo "ERROR: Failed to list files in $1. Record not found or empty."
         exit 1
     fi
 
-    unzip_wrap $tgt $2
+    # download each file in turn
+    for f in $files; do
+        f=${f#/files/}
+        f=${f%/content}
+        if [[ "$f" != "_readme.txt" ]]; then
+            zenodo $1 $2 $f
+        fi
+    done
 
     return 0
 }
