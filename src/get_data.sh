@@ -169,17 +169,17 @@ function zenodo_all {
 
     # get list of files in the record
     url="https://zenodo.org/api/records/$1"
-    files=$(wget --user-agent "'$ua'" -qO- $url | grep -o '/files/[^/"]*/content')
+    files=$(wget --user-agent "'$ua'" -qO- $url | grep -o "/$1/files/[^/\"]*/content")
 
     # check that the record lists some files
     if [[ -z "$files" ]]; then
-        echo "ERROR: Failed to list files in $1. Record not found or empty."
+        echo "ERROR: Failed to list files in $1. Record not found, empty or unreachable."
         exit 1
     fi
 
     # download each file in turn
     for f in $files; do
-        f=${f#/files/}
+        f=${f#/$1/files/}
         f=${f%/content}
         if [[ "$f" != "_readme.txt" ]]; then
             zenodo $1 $2 $f
