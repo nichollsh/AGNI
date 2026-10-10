@@ -212,6 +212,10 @@ module save
             var_znth =      defVar(ds, "zenith_angle"  ,Float64, (), attrib = OrderedDict("units" => "deg", "long_name" => "Zenith angle of direct stellar radiation"))
             var_sknd =      defVar(ds, "cond_skin_d"   ,Float64, (), attrib = OrderedDict("units" => "m", "long_name" => "Surface conductive skin boundary layer, thickness"))
             var_sknk =      defVar(ds, "cond_skin_k"   ,Float64, (), attrib = OrderedDict("units" => "W m-1 K-1", "long_name" => "Surface conductive skin boundary layer, thermal conductivity"))
+            var_exop =      defVar(ds, "exobase_p"     ,Float64, (), attrib = OrderedDict("units" => "Pa", "long_name" => "Exobase pressure, set to TOA when above the domain"))
+            var_exor =      defVar(ds, "exobase_r"     ,Float64, (), attrib = OrderedDict("units" => "m", "long_name" => "Exobase radius, set to TOA when above the domain"))
+            var_exot =      defVar(ds, "exobase_T"     ,Float64, (), attrib = OrderedDict("units" => "K", "long_name" => "Exobase temperature, set to TOA when above the domain"))
+            var_exod =      defVar(ds, "exobase_in_domain",Char, (), attrib = OrderedDict("units" => "1", "long_name" => "Whether the exobase lies within the modelled domain"))
             var_specfile =  defVar(ds, "specfile"      ,String,  (), attrib = OrderedDict("units" => "1", "long_name" => "Path to spectral file when read"))
             var_starfile =  defVar(ds, "starfile"      ,String,  (), attrib = OrderedDict("units" => "1", "long_name" => "Path to star file when read"))
             var_flux_sns =  defVar(ds, "fl_sens"       ,Float64, (), attrib = OrderedDict("units" => "W m-2", "long_name" => "Surface sensible heat flux [W m-2]"))
@@ -293,6 +297,11 @@ module save
 
             var_sknd[1] = atmos.skin_d
             var_sknk[1] = atmos.skin_k
+
+            var_exop[1] = atmos.exobase_p
+            var_exor[1] = atmos.exobase_r
+            var_exot[1] = atmos.exobase_tmp
+            var_exod[1] = atmos.exobase_in_domain ? 'y' : 'n'
 
             var_specfile[1] = atmos.spectral_file
             var_starfile[1] = atmos.star_file

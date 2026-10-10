@@ -1,54 +1,58 @@
 # AGNI configuration file
-title = "H2 + H2S test"
+title = "Grey gas with thermal conduction"
 
 [planet]
-    tmp_surf        = 1700.0
-    instellation    = 13680.0
+    tmp_surf        = 2000.0
+    instellation    = 1e6
     albedo_b        = 0.0
-    s0_fact         = 0.375
-    zenith_angle    = 48.19
-    surface_material= "res/surface_albedos/lunarmarebasalt.dat"
+    s0_fact         = 1.0
+    zenith_angle    = 0.0
+    surface_material= "greybody"
     albedo_s        = 0.0
-    radius          = 16628310.0
-    gravity         = 12.43
+    radius          = 8064561.9164
+    mass            = 9.79e24
     flux_int        = 0.0
     roughness       = 1.0e-2
     wind_speed      = 10.0
+    star_Teff       = 4000.0
 
 [files]
-    input_sf        = "res/spectral_files/Honeyside/256/Honeyside.sf"
-    input_star      = "res/stellar_spectra/sun.txt"
-    output_dir      = "nogit_h2s/h2o_30.0"
+    input_sf        = "greygas"
+    input_star      = "blackbody"
+    output_dir      = "out/"
 
 [composition]
-    p_surf          = 1e3
-    p_top           = 1e-5
-    vmr_dict        = { H2=0.7, H2O=0.3 }
+    p_surf          = 1e1
+    p_top           = 1e-15
+    vmr_dict        = { H2 = 1.0, H2O=1e-4}
     condensates     = []
+
 
 [execution]
     clean_output    = true
     verbosity       = 1
     max_steps       = 200
     max_runtime     = 400
-    num_levels      = 40
-    solution_type   = 3
+    num_levels      = 80
+    solution_type   = 1
     solver          = "newton"
     dx_max          = 400.0
-    initial_state   = ["loglin","500"]
+    initial_state   = ["loglin","2200"]
     linesearch      = 2
     easy_start      = false
     grey_start      = false
-    converge_atol   = 1e-1
-    converge_rtol   = 1.0e-3
+    converge_atol   = 1.0e-2
+    converge_rtol   = 1.0e-4
     perturb_all     = true
 
 [physics]
     chemistry       = false
     continua        = true
-    rayleigh        = true
+    rayleigh        = false
     cloud           = false
     overlap_method  = "ee"
+    grey_lw         = 1e-3
+    grey_sw         = 1e-2
     real_gas        = true
     thermo_funct    = true
     sensible_heat   = true
@@ -63,10 +67,10 @@ title = "H2 + H2S test"
     at_runtime      = true
     temperature     = true
     fluxes          = true
-    contribution    = true
-    emission        = true
-    albedo          = true
+    contribution    = false
+    emission        = false
+    albedo          = false
     mixing_ratios   = true
-    animate         = false
-    height          = false
+    animate         = true
+    height          = true
     cloud           = false

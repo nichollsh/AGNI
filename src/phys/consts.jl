@@ -10,7 +10,7 @@ module consts
     export UNSET_STR
 
     # Code versions
-    const AGNI_VERSION::String    = "1.13.0"  # current agni version
+    const AGNI_VERSION::String    = "1.13.1"  # current agni version
     export AGNI_VERSION
     const SOCVER_minimum::String  = "2603.9"    # minimum required socrates version
     export SOCVER_minimum
@@ -295,6 +295,52 @@ module consts
 
         # Imanaka et al. (2012) via Horst & Tolbert (2013)
         ("Tholin",              1350.0),  # 1.3-1.4 g/cm3
+    ])
+
+    # Lennard-Jones 12-6 parameters (σ [m], ε/k_B [K]) from the GRI-Mech 3.0 transport file
+    #    http://combustion.berkeley.edu/gri-mech/version30/files30/transport.dat ("est." = estimate there)
+    const _lookup_lj::Dict{String, Tuple{Float64,Float64}} = Dict([
+        # atoms and noble gases
+        ("H",       (2.050e-10, 145.000)),
+        ("O",       (2.750e-10,  80.000)),
+        ("C",       (3.298e-10,  71.400)),  # est.
+        ("N",       (3.298e-10,  71.400)),  # est.
+        ("He",      (2.576e-10,  10.200)),  # est.
+        ("Ar",      (3.330e-10, 136.500)),
+
+        # basic
+        ("H2",      (2.920e-10,  38.000)),
+        ("O2",      (3.458e-10, 107.400)),
+        ("N2",      (3.621e-10,  97.530)),
+        ("CO",      (3.650e-10,  98.100)),
+        ("CO2",     (3.763e-10, 244.000)),
+        ("H2O",     (2.605e-10, 572.400)),
+        ("CH4",     (3.746e-10, 141.400)),
+        ("NH3",     (2.920e-10, 481.000)),
+        ("OH",      (2.750e-10,  80.000)),
+        ("HO2",     (3.458e-10, 107.400)),  # est.
+        ("H2O2",    (3.458e-10, 107.400)),
+
+        # nitrogen
+        ("NO",      (3.621e-10,  97.530)),
+        ("NO2",     (3.500e-10, 200.000)),  # est.
+        ("N2O",     (3.828e-10, 232.400)),  # est.
+        ("N2H4",    (4.230e-10, 205.000)),
+        ("HCN",     (3.630e-10, 569.000)),
+        ("CN",      (3.856e-10,  75.000)),
+        ("C2N2",    (4.361e-10, 349.000)),
+
+        # carbon
+        ("C2",      (3.621e-10,  97.530)),
+        ("CH3",     (3.800e-10, 144.000)),
+        ("HCO",     (3.590e-10, 498.000)),
+        ("H2CO",    (3.590e-10, 498.000)),  # CH2O in the source
+        ("CH3CHO",  (3.970e-10, 436.000)),
+        ("C2H2",    (4.100e-10, 209.000)),
+        ("C2H3",    (4.100e-10, 209.000)),  # est.
+        ("C2H4",    (3.971e-10, 280.800)),
+        ("C2H6",    (4.302e-10, 252.300)),
+        ("C3H4",    (4.760e-10, 252.000)),
     ])
 
 end

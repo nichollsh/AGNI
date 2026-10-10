@@ -763,3 +763,126 @@ const lookup_rho = AGNI.consts._lookup_rho
     end
 
 end
+
+
+# Gas transport properties (src/phys/species.jl: omega22, get_Visc, get_Kc).
+# Invariants: dilute-gas viscosity and conductivity against NIST reference data;
+# the monatomic Chapman-Enskog identity k = (15/4)(R/M) η; the collision integral
+# decreasing with reduced temperature; the thermospheric temperature exponent of
+# atomic-H conductivity; constant-property and low-temperature guard behaviour.
+@testset "transport" begin
+
+    k_B   = AGNI.consts.k_B
+    R_gas = AGNI.consts.R_gas
+    tdir  = joinpath(RES_DIR, "thermodynamics/")
+
+    # The kinetic estimate that get_Kc replaced: hard sphere of 2 Å for every gas,
+    # Ω = 1, and c_p in place of c_v. Used only as a discrimination guard.
+    function _previous_kc(gas, t)
+        m = gas.mmw * 1e3 * AGNI.consts.proton_mass
+        return 25.0/(32.0*pi) * sqrt(pi * m * k_B * t) * species.get_Cp(gas, t) / (2e-10)^2
+    end
+
+    # NIST Chemistry WebBook fluid data at 0.01 bar (dilute limit), 300 K and 1000 K:
+    #    https://webbook.nist.gov/chemistry/fluid/
+    #    (viscosity [Pa s], thermal conductivity [W m-1 K-1])
+    nist = Dict(
+        "N2"  => ((17.877e-6, 0.025936), (41.540e-6, 0.065354)),
+        "O2"  => ((20.631e-6, 0.026441), (49.107e-6, 0.071532)),
+        "CO2" => ((14.994e-6, 0.016720), (41.176e-6, 0.070753)),
+        "H2"  => (( 8.9379e-6, 0.18656), (20.726e-6, 0.46032)),
+        "He"  => ((19.926e-6, 0.15590),  (46.159e-6, 0.36054)),
+        "Ar"  => ((22.724e-6, 0.017805), (55.682e-6, 0.043570)),
+    )
+
+    # Viscosity and conductivity of non-polar gases reproduce NIST data, and the
+    # previous estimate does not. Tolerances are the documented accuracy: the Eucken
+    # relation underestimates polyatomic conductivity by up to about 15 % at 1000 K.
+    @testset "dilute_gas_transport_matches_nist_reference_data" begin
+        for (g, ((eta300, k300), (eta1000, k1000))) in nist
+            gas = species.load_gas(tdir, g, true, false)
+            @test !gas.stub
+            @test isapprox(species.get_Visc(gas, 300.0),  eta300;  rtol=0.05)
+            @test isapprox(species.get_Visc(gas, 1000.0), eta1000; rtol=0.07)
+            @test isapprox(species.get_Kc(gas, 300.0),  k300;  rtol=0.07)
+            @test isapprox(species.get_Kc(gas, 1000.0), k1000; rtol=0.16)
+        end
+
+        # discrimination guard: the previous estimate is far outside the tolerance
+        for g in ("H2", "CO2")
+            gas = species.load_gas(tdir, g, true, false)
+            @test !isapprox(_previous_kc(gas, 1000.0), nist[g][2][2]; rtol=0.5)
+        end
+    end
+
+    # Polar H2O carries the documented overestimate (dipole ignored), bounded so that a
+    # regression toward the previous, larger error is caught.
+    @testset "water_vapour_conductivity_overestimate_is_bounded" begin
+        gas = species.load_gas(tdir, "H2O", true, false)
+        r300  = species.get_Kc(gas, 300.0)  / 0.018563
+        r1000 = species.get_Kc(gas, 1000.0) / 0.095805
+        @test 1.0 < r300  < 1.8
+        @test 1.0 < r1000 < 1.4
+        @test _previous_kc(gas, 1000.0) / 0.095805 > 1.4
+    end
+
+    # For monatomic gases the conductivity is (15/4)(R/M) times the viscosity, with no
+    # internal-mode term; the stub atom H must not inherit its diatomic default c_p.
+    @testset "monatomic_conductivity_follows_chapman_enskog_identity" begin
+        for g in ("He", "Ar", "H")
+            gas = species.load_gas(tdir, g, true, false)
+            for t in (50.0, 1000.0, 5000.0)   # spans T* below and well above 1
+                expect = 3.75 * R_gas / gas.mmw * species.get_Visc(gas, t)
+                @test isapprox(species.get_Kc(gas, t), expect; rtol=1e-12)
+            end
+        end
+        # discrimination guard: the general Eucken form with the stub c_p = (7/2) R/M
+        # would be 4.75/3.75 times larger
+        gas = species.load_gas(tdir, "H", true, false)
+        @test gas.stub
+        r_spec = R_gas / gas.mmw
+        eucken_stub = species.get_Visc(gas, 1000.0) * (species.get_Cp(gas, 1000.0) - r_spec + 2.25 * r_spec)
+        @test !isapprox(species.get_Kc(gas, 1000.0), eucken_stub; rtol=0.2)
+    end
+
+    # Atomic-H conductivity scales close to T^0.7 in thermospheric conditions
+    # (Watson et al. 1981, Icarus 48, 150, after Banks & Kockarts 1973).
+    @testset "atomic_hydrogen_conductivity_has_thermospheric_temperature_exponent" begin
+        gas = species.load_gas(tdir, "H", true, false)
+        s = log(species.get_Kc(gas, 2000.0) / species.get_Kc(gas, 500.0)) / log(4.0)
+        @test 0.6 < s < 0.8
+        # discrimination guard: the previous estimate scales as T^0.5 for a stub
+        s_prev = log(_previous_kc(gas, 2000.0) / _previous_kc(gas, 500.0)) / log(4.0)
+        @test !(0.6 < s_prev < 0.8)
+    end
+
+    # The Lennard-Jones collision integral falls monotonically with reduced
+    # temperature across the fitted range 0.3 to 100, and stays order unity.
+    @testset "collision_integral_decreases_with_reduced_temperature" begin
+        ts = exp10.(range(log10(0.3), log10(100.0), length=200))
+        om = species.omega22.(ts)
+        @test all(diff(om) .< 0.0)
+        @test all(0.5 .< om .< 3.0)
+        # hard-sphere-like limit near T* of a few, where Ω(2,2)* passes through unity
+        @test species.omega22(0.3) > 2.0 > 1.0 > species.omega22(100.0)
+    end
+
+    # Gases without Lennard-Jones data fall back to a 2 Å hard sphere; constant-property
+    # mode evaluates at 0 °C; temperatures at or below zero are floored, not NaN.
+    @testset "transport_guards_and_constant_property_mode" begin
+        gas_x = species.load_gas(tdir, "SO2", true, false)     # absent from the LJ table
+        @test isapprox(gas_x.particle_d, 2e-10; rtol=1e-12)
+        @test isnan(gas_x.lj_eps)
+        @test species.get_Visc(gas_x, 500.0) > species.get_Visc(gas_x, 300.0)
+
+        gas_c = species.load_gas(tdir, "N2", false, false)     # tmp_dep = false
+        @test isapprox(species.get_Kc(gas_c, 1000.0), species.get_Kc(gas_c, 300.0); rtol=1e-12)
+
+        gas_t = species.load_gas(tdir, "N2", true, false)
+        for t in (0.0, -10.0)
+            k = species.get_Kc(gas_t, t)
+            @test isfinite(k) && k > 0.0
+        end
+        @test species.get_Kc(gas_t, 0.0) < species.get_Kc(gas_t, 300.0)
+    end
+end

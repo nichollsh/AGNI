@@ -22,7 +22,7 @@ fi
 # User agent string to identify the script to Zenodo
 os=$(uname -s)
 arch=$(uname -m)
-ua="AGNI/1.0 ($os $arch)"
+ua="AGNI/1.13 ($os $arch)"
 
 # Check internet connectivity
 header=$(wget --user-agent "'$ua'" --spider -S "https://zenodo.org" 2>&1 | grep "HTTP")
@@ -114,12 +114,14 @@ function zenodo {
 
     # get data
     echo "    zenodo/$1 > $tgt"
+    rm -rf $tgt
     mkdir -p $2
     wget --user-agent "'$ua'" -qO $tgt $url
+    retcode=$?
 
     # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
+    if [ $retcode -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command (code=$retcode)"
     elif [[ ! -f "$tgt" ]]; then
         echo "ERROR: Failed to download $1. File not found on disk."
     else
@@ -130,10 +132,11 @@ function zenodo {
     echo "Trying again to download the file"
     sleep 1
     wget --user-agent "'$ua'" -qO $tgt $url
+    retcode=$?
 
     # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
+    if [ $retcode -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command (code=$retcode)"
         exit 1
     elif [[ ! -f "$tgt" ]]; then
         echo "ERROR: Failed to download $1. File not found on disk."
@@ -176,11 +179,14 @@ function zenodo_all {
     # get data
     echo "    zenodo/$1 > $tgt"
     mkdir -p $2
+    rm -f $tgt
     wget --user-agent "'$ua'" -qO $tgt $url
+    retcode=$?
 
     # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
+    # https://www.gnu.org/software/wget/manual/html_node/Exit-Status
+    if [ $retcode -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command (code=$retcode)"
     elif [[ ! -f "$tgt" ]]; then
         echo "ERROR: Failed to download $1. File not found on disk."
     else
@@ -192,10 +198,11 @@ function zenodo_all {
     echo "Trying again to download the file"
     sleep 1
     wget --user-agent "'$ua'" -qO $tgt $url
+    retcode=$?
 
     # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
+    if [ $retcode -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command (code=$retcode)"
         exit 1
     elif [[ ! -f "$tgt" ]]; then
         echo "ERROR: Failed to download $1. File not found on disk."
@@ -360,7 +367,7 @@ function handle_request {
 
         "thermodynamics")
             echo $help_thermo
-            get_zip 21390786 $thermo gases.zip
+            get_zip 15805459 $thermo gases.zip
             ;;
 
         "parfiles")

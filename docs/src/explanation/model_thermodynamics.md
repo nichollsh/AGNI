@@ -32,11 +32,34 @@ The mean molecular weight of the mixture is the mole-fraction-weighted average o
 
 The molar heat capacity at constant pressure $c_p$ determines how much energy is required to raise the temperature of the gas. Its value increases with temperature as rotational and vibrational degrees of freedom in polyatomic molecules become accessible[pierrehumbert_book_2010](@citep). AGNI therefore implements temperature-dependent $c_p(T)$ using tabulated experimental data from the JANAF thermochemical tables [JANAF](@citep), accessed by interpolation.
 
-The heat capacity and the molecular thermal conductivity $\kappa$ of the gas mixture is calculated as the mass-mixing-ratio-weighted linear combination of the per-species values:
+The heat capacity of the gas mixture is the mass-mixing-ratio-weighted sum of the per-species values:
 ```math
-c_{pm} = \sum_j q_j \, c_{p,j}(T), \qquad \kappa_\text{mix} = \sum_j q_j \, \kappa_j(T)
+c_{pm} = \sum_j q_j \, c_{p,j}(T)
 ```
-This is a simple ideal-mixing rule which neglects any non-additive effects on collisional transport properties that more detailed mixing rules (e.g. Wilke's method for viscosity).
+
+## Thermal conductivity
+
+Molecular thermal conduction follows Fourier's law. It is negligible in the lower atmosphere but becomes the main way to move heat where the gas is optically thin.
+
+The conductivity of the mixture is combined from mole fractions $x_j$ with the Wassiljewa rule and the Mason-Saxena coefficients [poling_properties_2001](@citep),
+```math
+\kappa_\text{mix} = \sum_i \frac{x_i \kappa_i}{\sum_j x_j \Phi_{ij}}, \qquad
+\Phi_{ij} = \frac{\left[1 + (\eta_i/\eta_j)^{1/2} (M_j/M_i)^{1/4}\right]^2}{\left[8 (1 + M_i/M_j)\right]^{1/2}} .
+```
+
+The conductivity of each gas uses the Eucken relation [poling_properties_2001](@citep),
+```math
+\kappa_j = \eta_j \left( c_{v,j} + \frac{9}{4} \frac{R}{M_j} \right),
+```
+with $c_{v,j} = c_{p,j} - R/M_j$ per unit mass. For monatomic gases this reduces to $\kappa_j = \tfrac{15}{4} (R/M_j) \, \eta_j$, which AGNI uses directly.
+
+The viscosity of each gas $j$ is taken from first-order Chapman-Enskog theory for the Lennard-Jones (12-6) potential,
+```math
+\eta_j = \frac{5}{16} \frac{\sqrt{\pi m_j k_B T}}{\pi \sigma_j^2 \, \Omega^{(2,2)*}(T/\varepsilon_j)},
+```
+where $m_j$ is the molecular mass, $\sigma_j$ the collision diameter, $\varepsilon_j$ the well depth (in K), and $\Omega^{(2,2)*}$ the reduced collision integral, evaluated with the empirical fit of [neufeld_collision_1972](@citet). The Lennard-Jones parameters are taken from the [GRI-Mech 3.0 transport file](http://combustion.berkeley.edu/gri-mech/version30/files30/transport.dat).
+
+Gases missing from GRI-Mech are treated as a hard sphere of diameter 2 Å with $\Omega^{(2,2)*} = 1$.  No laboratory reference exists for atomic hydrogen, so its conductivity scales close to $T^{0.7}$, the exponent commonly used for thermospheres [watson_dynamics_1981](@citep). Dipole moments are ignored, so polar gases are less accurately treated.
 
 ## Saturation pressure and condensation
 
