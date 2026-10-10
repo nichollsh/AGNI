@@ -56,8 +56,9 @@ Most of the Zenodo records used by `get_data.sh` are mirrored on
 [DataverseNL](https://dataverse.nl). When Zenodo cannot be reached, or a download from
 Zenodo fails, the script takes the same files from the mirror of that record. A record
 without a mirror fails with an error, so the `basic`, `thermodynamics` and `parfiles`
-targets still need Zenodo. Downloads that return an HTML page, and zip archives that fail
-`unzip -t`, are rejected rather than saved.
+targets still need Zenodo. Downloads that return an HTML page, zip archives that fail
+`unzip -t`, and mirror archives that lack a file of their dataset (DataverseNL leaves out
+files above its archive size limit) are rejected rather than saved.
 
 A target that takes a whole record from Zenodo checks each file against the MD5 checksum
 that the record lists. Each file is downloaded to `<name>.part` and moved into place after
