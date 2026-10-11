@@ -165,51 +165,48 @@ function unzip_wrap {
     return 0
 }
 
-# Get whole Zenodo record as Zip, and extract the files
+# Get all files in a Zenodo record, except for the readme
 function zenodo_all {
     # $1 = Zenodo identifier for Record
-    # $2 = target folder (on disk) to extract files into
+    # $2 = target folder (on disk) to download files into
 
-    # target file path
-    tgt="$2/$1.zip"
-
-    # target url
-    url="https://zenodo.org/api/records/$1/files-archive"
-
-    # get data
-    echo "    zenodo/$1 > $tgt"
-    mkdir -p $2
-    rm -f $tgt
-    wget --user-agent "'$ua'" -qO $tgt $url
+    # get list of files in the record
+    url="https://zenodo.org/api/records/$1"
+    files=$(wget --user-agent "'$ua'" -qO- $url)
     retcode=$?
 
-    # check if command failed or if file does not exist
-    # https://www.gnu.org/software/wget/manual/html_node/Exit-Status
+    # check if command failed, and try again?
     if [ $retcode -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command (code=$retcode)"
-    elif [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1. File not found on disk."
+        echo "ERROR: Failed to list files in $1. Issue with wget command (code=$retcode)"
+        echo "Trying again to list the files"
+        sleep 1
+        files=$(wget --user-agent "'$ua'" -qO- $url)
+        retcode=$?
+
+        # check if command failed
+        if [ $retcode -ne 0 ]; then
+            echo "ERROR: Failed to list files in $1. Issue with wget command (code=$retcode)"
+            exit 1
+        fi
+    fi
+
+    # check that the record lists some files
+    files=$(echo "$files" | grep -o "/$1/files/[^/\"]*/content")
+    if [[ -z "$files" ]]; then
+        echo "ERROR: Failed to list files in $1. No files found in Record."
+        exit 1
     else
-        unzip_wrap $tgt $2
-        return 0
+        echo "    downloading $(echo "$files" | wc -l) files"
     fi
 
-    # try again at downloading the file?
-    echo "Trying again to download the file"
-    sleep 1
-    wget --user-agent "'$ua'" -qO $tgt $url
-    retcode=$?
-
-    # check if command failed or if file does not exist
-    if [ $retcode -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command (code=$retcode)"
-        exit 1
-    elif [[ ! -f "$tgt" ]]; then
-        echo "ERROR: Failed to download $1. File not found on disk."
-        exit 1
-    fi
-
-    unzip_wrap $tgt $2
+    # download each file in turn
+    for f in $files; do
+        f=${f#/$1/files/}
+        f=${f%/content}
+        if [[ "$f" != "_readme.txt" ]]; then
+            zenodo $1 $2 $f
+        fi
+    done
 
     return 0
 }
