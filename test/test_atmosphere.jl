@@ -7,6 +7,9 @@
 #     path (Kirchhoff's law, albedo_s clamping) and the spectral-file path (r/e/w
 #     header conventions, interpolation onto the model's spectral bands, and the
 #     missing-file/bad-header/malformed-column error/gap paths).
+#   - atmosphere.calc_single_cpkc!() layer thermal conductivity: the Wassiljewa mixing
+#     rule on mole fractions (pure-gas limit, bounds between the mass- and mole-weighted
+#     sums, invariance to mixing-ratio normalisation, absent species ignored).
 
 using Test
 using AGNI
@@ -834,5 +837,67 @@ end
         @test !atmos.control.l_aerosol
         names = atmosphere.list_available_aerosols(atmos)
         @test names == String[]
+    end
+end
+
+
+# Layer conductivity of a gas mixture from the Wassiljewa / Mason-Saxena rule.
+@testset "layer_conductivity_mixing" begin
+
+    function _mixture_atmos(mf::Dict{String,Float64})
+        atmos = atmosphere.Atmos_t()
+        ok = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, "greygas",
+                                1000.0, 1.0, 0.0, _THETA, _TMP_SURF,
+                                _GRAVITY, _RADIUS, _NLEV, _P_SURF, _P_TOP,
+                                mf, ""; real_gas=false, thermo_functions=true,
+                                flag_rayleigh=false, benchmark_rt=true, flag_cloud=false)
+        ok || error("Failed to setup mixture atmosphere")
+        atmosphere.allocate!(atmos, ""; check_safe_gas=false) || error("Failed to allocate")
+        setpt.isothermal!(atmos, 500.0)
+        atmosphere.calc_layer_props!(atmos)
+        return atmos
+    end
+
+    # A light, conductive minor gas (10 % H2 by number in CO2) raises the mixture
+    # conductivity well above the mass-weighted sum, which nearly ignores it, and
+    # the Wassiljewa rule keeps it below the linear mole-weighted sum.
+    @testset "light_minor_gas_raises_mixture_conductivity_above_mass_weighting" begin
+        atmos = _mixture_atmos(Dict("CO2" => 0.9, "H2" => 0.1))
+        i  = 5
+        gC = atmos.gas_dat["CO2"];  gH = atmos.gas_dat["H2"]
+        kC = species.get_Kc(gC, atmos.tmp[i]);  kH = species.get_Kc(gH, atmos.tmp[i])
+        wH = 0.1 * gH.mmw / (0.1 * gH.mmw + 0.9 * gC.mmw)   # H2 mass fraction, about 0.005
+        k_mass = (1.0 - wH) * kC + wH * kH
+        k_mole = 0.9 * kC + 0.1 * kH
+        @test atmos.layer_kc[i] > 1.2 * k_mass
+        @test atmos.layer_kc[i] < k_mole
+        @test all(isfinite.(atmos.layer_kc)) && all(atmos.layer_kc .> 0.0)
+
+        # rescaling every mixing ratio leaves the conductivity unchanged
+        k_ref = atmos.layer_kc[i]
+        for g in atmos.gas_names
+            atmos.gas_vmr[g][i] *= 2.0
+        end
+        atmosphere.calc_single_cpkc!(atmos, i)
+        @test isapprox(atmos.layer_kc[i], k_ref; rtol=1e-12)
+    end
+
+    # A single gas reproduces its own conductivity (Φ_ii = 1), and a gas present in the
+    # list but at zero abundance contributes nothing (edge case of the rule).
+    @testset "pure_gas_limit_and_absent_species" begin
+        atmos = _mixture_atmos(Dict("N2" => 1.0))
+        k_n2 = species.get_Kc(atmos.gas_dat["N2"], atmos.tmp[3])
+        @test isapprox(atmos.layer_kc[3], k_n2; rtol=1e-12)
+
+        atmos = _mixture_atmos(Dict("N2" => 1.0, "H2" => 0.0))
+        @test isapprox(atmos.layer_kc[3], k_n2; rtol=1e-12)
+
+        # with every mixing ratio at zero the layer is non-conducting, not NaN
+        for g in atmos.gas_names
+            atmos.gas_vmr[g][3] = 0.0
+        end
+        atmosphere.calc_single_cpkc!(atmos, 3)
+        @test atmos.layer_kc[3] < 1e-300
+        @test !isnan(atmos.layer_kc[3])
     end
 end

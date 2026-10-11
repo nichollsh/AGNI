@@ -25,7 +25,7 @@ fi
 # User agent string to identify the script to Zenodo
 os=$(uname -s)
 arch=$(uname -m)
-ua="AGNI/1.0 ($os $arch)"
+ua="AGNI/1.13 ($os $arch)"
 
 ZENODO_URL=${ZENODO_URL:-https://zenodo.org}
 DATAVERSE_URL=${DATAVERSE_URL:-https://dataverse.nl}
@@ -213,22 +213,40 @@ function unzip_wrap {
     return 0
 }
 
-# Get whole Zenodo record as Zip, and extract the files
+# Get all files in a Zenodo record, except for the readme
 function zenodo_all {
     # $1 = Zenodo identifier for Record
-    # $2 = target folder (on disk) to extract files into
+    # $2 = target folder (on disk) to download files into
 
-    tgt="$2/$1.zip"
-    mkdir -p $2
     if [ -z "$use_mirror" ]; then
-        echo "    zenodo/$1 > $tgt"
-        fetch "$ZENODO_URL/api/records/$1/files-archive" $tgt && unzip_wrap $tgt $2 && return 0
-        echo "Trying again to download the file"
-        sleep 1
-        fetch "$ZENODO_URL/api/records/$1/files-archive" $tgt && unzip_wrap $tgt $2 && return 0
-        echo "WARNING: Failed to download $1 from Zenodo"
+        # get list of files in the record
+        url="$ZENODO_URL/api/records/$1"
+        files=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- $url)
+        if [ $? -ne 0 ]; then
+            echo "Trying again to list the files"
+            sleep 1
+            files=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- $url)
+        fi
+
+        # download each file in turn
+        files=$(echo "$files" | grep -o "/$1/files/[^/\"]*/content")
+        if [[ -n "$files" ]]; then
+            echo "    downloading $(echo "$files" | wc -l) files"
+            for f in $files; do
+                f=${f#/$1/files/}
+                f=${f%/content}
+                if [[ "$f" != "_readme.txt" ]]; then
+                    zenodo $1 $2 $f
+                fi
+            done
+            return 0
+        fi
+        echo "WARNING: Failed to list files in $1 on Zenodo"
     fi
 
+    # the mirror serves the whole dataset as one zip
+    tgt="$2/$1.zip"
+    mkdir -p $2
     doi=$(mirror_doi $1) || exit 1
     echo "    dataverse/$doi > $tgt"
     fetch "$DATAVERSE_URL/api/access/dataset/:persistentId/?persistentId=doi:$doi" $tgt && unzip_wrap $tgt $2 && return 0
@@ -392,7 +410,7 @@ function handle_request {
 
         "thermodynamics")
             echo $help_thermo
-            get_zip 21390786 $thermo gases.zip
+            get_zip 23278603 $thermo gases.zip
             ;;
 
         "parfiles")

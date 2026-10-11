@@ -391,9 +391,18 @@ module plotting
         i_unb = findlast(.!atmos.layer_isbound)
         if !isnothing(i_unb)
             hline!(plt, [atmos.pl[i_unb+1]*1e-5], lw=lw,
-                            lc=col_d, ls=:solid, label="Unbound")
+                            lc=col_unbound, ls=:solid, label="Unbound")
             vline!(plt, [atmos.rl[i_unb+1]*1e-3], lw=lw,
-                            lc=col_d, ls=:solid, label="")
+                            lc=col_unbound, ls=:solid, label="")
+        end
+
+        # mark where the exobase is estimated
+        if atmos.exobase_in_domain
+            i_exo = findlast(atmos.p .> atmos.exobase_p)
+            hline!(plt, [atmos.p[i_exo]*1e-5], lw=lw,
+                            lc=col_exobase, ls=:solid, label="Exobase")
+            vline!(plt, [atmos.r[i_exo]*1e-3], lw=lw,
+                            lc=col_exobase, ls=:solid, label="")
         end
 
         # Plot current surface pressure and original
