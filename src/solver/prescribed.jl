@@ -167,6 +167,7 @@ module solve_prescribed
         diagnostics.estimate_Ra!(atmos)
         diagnostics.estimate_timescale_conv!(atmos)
         diagnostics.estimate_timescale_rad!(atmos)
+        diagnostics.estimate_exobase!(atmos)
 
         # Flag as solved
         atmos.is_converged = succ

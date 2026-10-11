@@ -22,7 +22,7 @@ fi
 # User agent string to identify the script to Zenodo
 os=$(uname -s)
 arch=$(uname -m)
-ua="AGNI/1.0 ($os $arch)"
+ua="AGNI/1.13 ($os $arch)"
 
 # Check internet connectivity
 header=$(wget --user-agent "'$ua'" --spider -S "https://zenodo.org" 2>&1 | grep "HTTP")
@@ -114,12 +114,14 @@ function zenodo {
 
     # get data
     echo "    zenodo/$1 > $tgt"
+    rm -rf $tgt
     mkdir -p $2
     wget --user-agent "'$ua'" -qO $tgt $url
+    retcode=$?
 
     # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
+    if [ $retcode -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command (code=$retcode)"
     elif [[ ! -f "$tgt" ]]; then
         echo "ERROR: Failed to download $1. File not found on disk."
     else
@@ -130,10 +132,11 @@ function zenodo {
     echo "Trying again to download the file"
     sleep 1
     wget --user-agent "'$ua'" -qO $tgt $url
+    retcode=$?
 
     # check if command failed or if file does not exist
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to download $1. Issue with wget command"
+    if [ $retcode -ne 0 ]; then
+        echo "ERROR: Failed to download $1. Issue with wget command (code=$retcode)"
         exit 1
     elif [[ ! -f "$tgt" ]]; then
         echo "ERROR: Failed to download $1. File not found on disk."
@@ -170,17 +173,19 @@ function zenodo_all {
     # get list of files in the record
     url="https://zenodo.org/api/records/$1"
     files=$(wget --user-agent "'$ua'" -qO- $url)
+    retcode=$?
 
     # check if command failed, and try again?
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to list files in $1. Issue with wget command"
+    if [ $retcode -ne 0 ]; then
+        echo "ERROR: Failed to list files in $1. Issue with wget command (code=$retcode)"
         echo "Trying again to list the files"
         sleep 1
         files=$(wget --user-agent "'$ua'" -qO- $url)
+        retcode=$?
 
         # check if command failed
-        if [ $? -ne 0 ]; then
-            echo "ERROR: Failed to list files in $1. Issue with wget command"
+        if [ $retcode -ne 0 ]; then
+            echo "ERROR: Failed to list files in $1. Issue with wget command (code=$retcode)"
             exit 1
         fi
     fi
@@ -190,6 +195,8 @@ function zenodo_all {
     if [[ -z "$files" ]]; then
         echo "ERROR: Failed to list files in $1. No files found in Record."
         exit 1
+    else
+        echo "    downloading $(echo "$files" | wc -l) files"
     fi
 
     # download each file in turn
@@ -357,7 +364,7 @@ function handle_request {
 
         "thermodynamics")
             echo $help_thermo
-            get_zip 21390786 $thermo gases.zip
+            get_zip 23278603 $thermo gases.zip
             ;;
 
         "parfiles")

@@ -406,6 +406,12 @@ module atmosphere
         timescale_rad::Array{Float64,1}     # Radiative timescale [s]
         diagnostic_Ra::Array{Float64,1}     # Rayleigh number at each layer
 
+        # Exobase diagnostic (mean free path equals scale height)
+        exobase_p::Float64              # pressure [Pa], set to TOA when above domain
+        exobase_r::Float64              # radius [m], set to TOA when above domain
+        exobase_tmp::Float64            # temperature [K], set to TOA when above domain
+        exobase_in_domain::Bool         # whether the exobase lies within the modelled column
+
         # FastChem equilibrium chemistry
         flag_fastchem::Bool             # Fastchem enabled?
         fastchem_floor::Float64         # Minimum temperature allowed to be sent to FC
@@ -1110,6 +1116,10 @@ module atmosphere
         atmos.transspec_grav =  0.0
         atmos.transspec_r    =  0.0
         atmos.transspec_p    =  atmos.transspec_ref_p
+        atmos.exobase_p         = 0.0
+        atmos.exobase_r         = 0.0
+        atmos.exobase_tmp       = 0.0
+        atmos.exobase_in_domain = false
 
         # absorption contributors
         atmos.control.l_gas::Bool =         true
@@ -3031,23 +3041,70 @@ module atmosphere
     """
     **Calculate specific heat capacity and thermal conductivity of a single layer.**
 
-    Specific heat per unit mass: J K-1 kg-1.
-    Thermal conductivity: W m-1 K-1.
+    ## Specific heat per unit mass
 
-    Arguments:
-        - `atmos::Atmos_t`      the atmosphere struct instance to be used.
-        - `idx::Int64`          index of the layer
+    J K-1 kg-1, the mass-weighted sum over gases.
+
+    ## Thermal conductivity
+
+    W m-1 K-1, from the Wassiljewa mixing rule with the
+    Mason-Saxena (Wilke) coefficients on mole fractions,
+    `k = Σ_i x_i k_i / Σ_j x_j Φ_ij`,
+
+    where `Φ_ij = [1 + (η_i/η_j)^(1/2) (M_j/M_i)^(1/4)]² / sqrt(8 (1 + M_i/M_j))`.
+
+    - Poling, Prausnitz & O'Connell 2001, The Properties of Gases and Liquids
+    - https://idaes-pse.readthedocs.io/en/stable/explanations/components/property_package/general/transport_properties/thermal_conductivity_wms.html
+    - https://en.wikipedia.org/wiki/Viscosity_models_for_mixtures?useskin=vector#Classic_mixing_rules_for_gas
+
+    ## Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    - `idx::Int64`          index of the layer
     """
     function calc_single_cpkc!(atmos::atmosphere.Atmos_t, idx::Int64)
         # Reset
         mmr::Float64 = 0.0
         atmos.layer_cp[idx] = 0.0
         atmos.layer_kc[idx] = 0.0
-        # Loop over gases
+
+        # Heat capacity
         for gas in atmos.gas_names
             mmr = atmos.gas_vmr[gas][idx] * atmos.gas_dat[gas].mmw/atmos.layer_μ[idx]
             atmos.layer_cp[idx] += mmr * species.get_Cp(atmos.gas_dat[gas], atmos.tmp[idx])
-            atmos.layer_kc[idx] += mmr * species.get_Kc(atmos.gas_dat[gas], atmos.tmp[idx])
+        end
+
+        # Per-gas mole fraction, conductivity, viscosity, molar mass
+        ngas::Int = length(atmos.gas_names)
+        x  = zeros(Float64, ngas)
+        kc = zeros(Float64, ngas)
+        η  = zeros(Float64, ngas)
+        mw = zeros(Float64, ngas)
+        for (i, gas) in enumerate(atmos.gas_names)
+            x[i] = atmos.gas_vmr[gas][idx]
+            x[i] > 0.0 || continue # skip gases with zero mole fraction
+            kc[i] = species.get_Kc(atmos.gas_dat[gas], atmos.tmp[idx])
+            η[i]  = species.get_Visc(atmos.gas_dat[gas], atmos.tmp[idx])
+            mw[i] = atmos.gas_dat[gas].mmw
+        end
+
+        # Wassiljewa mixing rule
+        denom::Float64 = 0.0
+        for i in 1:ngas
+            x[i] > 0.0 || continue # skip gases with zero mole fraction
+            denom = 0.0
+            for j in 1:ngas
+                # skip vmr=0 gases
+                x[j] > 0.0 || continue
+
+                # Mason-Saxena (Wilke) coefficients
+                # n = viscosity
+                # mw = molar mass
+                denom += x[j] * (1.0 + sqrt(η[i]/η[j]) * (mw[j]/mw[i])^0.25)^2 /
+                                    sqrt(8.0 * (1.0 + mw[i]/mw[j]))
+            end
+
+            # add up species
+            atmos.layer_kc[idx] += x[i] * kc[i] / denom
         end
         return nothing
     end
@@ -3152,7 +3209,7 @@ module atmosphere
         # Set hill radius to infinity
         atmos.hill_radius = BIGFLOAT
 
-        # The column has been collapsed to near-zero thickness 
+        # The column has been collapsed to near-zero thickness
         atmos.hydrograv_constg = true
 
         # Set temperatures to be small, except the surface

@@ -18,6 +18,7 @@ module species
 
     # Import local modules
     using ..consts
+    import ..consts: _lookup_lj
     using ..formulae
     import ..blake: valid_file
     import ..style: pretty_colour, pretty_name
@@ -28,6 +29,9 @@ module species
     # Pressure limits for EOS evaluation (should be consistent with NetCDF data files)
     const EOS_LOGPMIN::Float64 = 0.0   # log10 Pa
     const EOS_LOGPMAX::Float64 = 11.0  # log10 Pa
+
+    # Fallback value for particle size [m]
+    const FALLBACK_SIZE::Float64 = 2e-10 # generic hard sphere of 2 Å
 
     # Enumerate potential equations of state
     @enum EOS EOS_IDEAL=1 EOS_VDW=2 EOS_AQUA=3 EOS_CMS19=4
@@ -87,9 +91,10 @@ module species
         cap_C::Array{Float64,1}     # Corresponding Cp values [J K-1 kg-1]
         cap_I::Extrapolation        # 1D linear interpolator-extrapolator
 
-        # Particle mass [kg] and diameter [m]
+        # Particle mass [kg], collision diameter [m], and Lennard-Jones well depth [K]
         particle_m::Float64
         particle_d::Float64
+        lj_eps::Float64             # ε/k_B; NaN when Lennard-Jones data are not available
 
         # Plotting colour (hex code) and label
         plot_color::String
@@ -160,11 +165,13 @@ module species
         gas.mmw = get_mmw(formula)
         gas.JANAF_name = "_unknown"
 
-        # Calculate particle mass [kg], taking mmw as atomic mass units
-        gas.particle_m = gas.mmw * 1e3 * proton_mass
-
-        # Set fixed particle diameter [m]
-        gas.particle_d = 2e-10
+        # Collision diameter [m] and well depth [K] from the Lennard-Jones table,
+        if haskey(_lookup_lj, formula)
+            gas.particle_d, gas.lj_eps = _lookup_lj[formula]
+        else
+            gas.particle_d = FALLBACK_SIZE
+            gas.lj_eps = NaN
+        end
 
         # heat capacity set to zero
         gas.cap_T = [0.0, BIGFLOAT]
@@ -368,6 +375,9 @@ module species
             gas.sat_I = extrapolate(interpolate((gas.sat_T,), gas.sat_P, Gridded(Linear())), Flat())
         end
 
+        # Particle mass [kg] from the final molar mass (N_A = R_gas / k_B)
+        gas.particle_m = gas.mmw * k_B / R_gas
+
         @debug("    using '$eos_name' equation of state")
         @debug("    done")
         return gas
@@ -544,20 +554,74 @@ module species
     export get_Cp
 
     """
-    **Get gas thermal conductivity at a given temperature.**
+    **Reduced collision integral Ω(2,2)* for the Lennard-Jones 12-6 potential.**
 
-    This assumes that the gas is within the ideal regime. An accurate accounting of
-    inter-particle effects is important here, and depends on the size of the particles,
-    their repulsion/attraction terms, and the number of atoms per molecule. This formulation
-    does a fairly good job while remaining simple, and gets the right order of magnitude
-    of kc for a range of gases.
+    Empirical fit of Neufeld, Janzen & Aziz (1972), J. Chem. Phys. 57, 1100, Table I,
+    without its small sinusoidal term. The fit was made over 0.3 ≤ T* ≤ 100.
 
-    Chapman-Enskog theory of transport properties of gases, can account for inter-particle
-    effects via the collision integral 'omega'. Here, we set `omega=1`.
+    Source: https://archive.org/download/wikipedia-scholarly-sources-corpus/10.1063%252F1.100061.zip/10.1063%252F1.1678363.pdf
 
-    - https://en.wikipedia.org/wiki/Thermal_conductivity_and_resistivity
-    - https://books.google.co.uk/books?id=Cbp5JP2OTrwC (page 164 ish)
-    - https://doi.org/10.1063/5.0244532
+    Arguments:
+    - `t_red::Float64`          reduced temperature T* = T / (ε/k_B)
+
+    Returns:
+    - `omega::Float64`          collision integral, dimensionless
+    """
+    function omega22(t_red::Float64)::Float64
+        return 1.16145 / t_red^0.14874 +
+               0.52487 * exp(-0.77320 * t_red) +
+               2.16178 * exp(-2.43787 * t_red)
+    end
+    export omega22
+
+    """
+    **Get dilute-gas dynamic viscosity at a given temperature.**
+
+    First-order Chapman-Enskog viscosity,
+    `η = (5/16) sqrt(π m k_B T) / (π σ² Ω(2,2)*(T*))`, with the Lennard-Jones
+    collision diameter σ and well depth ε of `_lookup_lj`.
+
+    Gases without LJ coeffs are treated as a hard sphere. Dipole moments are ignored.
+
+    - Chapman & Cowling (1970), The Mathematical Theory of Non-Uniform Gases
+    - https://doi.org/10.1063/1.1678363 (Neufeld et al. 1972)
+
+    Arguments:
+    - `gas::Gas_t`              the gas struct to be used
+    - `t::Float64`              temperature [K]
+
+    Returns:
+    - `eta::Float64`            dynamic viscosity [Pa s]
+    """
+    function get_Visc(gas::Gas_t, t::Float64)::Float64
+
+        # Constant value
+        if !gas.tmp_dep
+            t = zero_celcius
+        end
+
+        # Temperature floor, keeping the reduced temperature positive
+        t = max(t, 0.5)
+
+        # Collision integral
+        omega::Float64 = isnan(gas.lj_eps) ? 1.0 : omega22(t / gas.lj_eps)
+
+        return 5.0/16.0 * sqrt(pi * gas.particle_m * k_B * t) /
+                    (pi * gas.particle_d^2 * omega)
+    end
+    export get_Visc
+
+    """
+    **Get single gas thermal conductivity at a given temperature.**
+
+    Eucken relation `k = η (c_v + (9/4) R / M)` with `c_v = c_p - R/M` and M the molar mass.
+
+    Monatomic gases use Chapman-Enskog result `k = (15/4) (R/M) η`, which the Eucken
+    relation reduces to  when `c_v = (3/2) R/M`. Dipole effects are ignored
+
+    - Poling, Prausnitz, O'Connell (2001), The Properties of Gases and Liquids (5th ed.)
+    - Watson et al. 1981, Icarus 48, 150
+    - https://webbook.nist.gov/chemistry/fluid/
 
     Arguments:
     - `gas::Gas_t`              the gas struct to be used
@@ -573,21 +637,19 @@ module species
             t = zero_celcius
         end
 
-        # Temperature floor to avoid sqrt of negative number
-        t = max(t, 0.0)
+        # Specific gas constant [J K-1 kg-1]
+        r_spec::Float64 = R_gas / gas.mmw
 
-        # Inter-particle effects are important, and complicated...
-        #  An evaluation of collision integral 'omega' must be done numerically.
-        kc_omega::Float64 = 1.0
+        # Monatomic: translation only, independent of stub heat capacity
+        if sum(values(gas.atoms)) == 1
+            return get_Visc(gas, t) * 3.75 * r_spec
+        end
 
-        # Start with prefactor which accounts for inter-particle effects via omega
-        kc_gas::Float64 = 25.0 / (32.0 * pi * kc_omega)
+        # Heat capacity at constant volume, bounded below by translational DOF: 3/2=1.5
+        cv::Float64 = max(get_Cp(gas, t) - r_spec, 1.5 * r_spec)
 
-        # Add boltzmann terms
-        kc_gas *= sqrt(pi * gas.particle_m * k_B * t) * get_Cp(gas,t) / gas.particle_d^2
-
-        # Estimate for kc
-        return kc_gas
+        # Eucken relation (9/4 = 2.25)
+        return get_Visc(gas, t) * (cv + 2.25 * r_spec)
     end
     export get_Kc
 
