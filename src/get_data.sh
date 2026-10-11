@@ -221,12 +221,11 @@ function zenodo_all {
     if [ -z "$use_mirror" ]; then
         # get list of files in the record
         url="$ZENODO_URL/api/records/$1"
-        files=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- $url)
-        if [ $? -ne 0 ]; then
+        files=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- $url) || {
             echo "Trying again to list the files"
             sleep 1
-            files=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- $url)
-        fi
+            files=$(wget --user-agent "'$ua'" --timeout=60 --tries=3 -qO- $url) || files=""
+        }
 
         # download each file in turn
         files=$(echo "$files" | grep -o "/$1/files/[^/\"]*/content")
