@@ -133,6 +133,8 @@ function mirror_doi {
         23000222) echo 10.34894/PZFHP2 ;;
         15881238) echo 10.34894/QR4XR2 ;;
         15881496) echo 10.34894/FLOPVW ;;
+        23278603) echo 10.34894/X740H4 ;;
+        15806626) echo 10.34894/UZIMT2 ;;
         * )
             echo "ERROR: Failed to download $1 from Zenodo, and it has no mirror" >&2
             return 1
@@ -151,6 +153,9 @@ function wget_wrap {
             sleep 1
         fi
         if content=$(wget --user-agent "'$ua'" -T 60 -t 3 -qO "$2" "$1"); then
+            if [ $attempt -eq 2 ]; then
+                echo "Download succeeded on attempt 2" >&2
+            fi
             printf '%s' "$content"
             return 0
         fi
@@ -178,6 +183,7 @@ function zenodo {
     mkdir -p $2
 
     # get data from Zenodo, also after the switch to the mirror if the record has none
+    zenodo_failed=""
     if [ -z "$use_mirror" ] || ! mirror_doi $1 > /dev/null 2>&1; then
         echo "    zenodo/$1 > $tgt"
         if wget_wrap "$url" $tgt; then
@@ -185,6 +191,7 @@ function zenodo {
         fi
         # use the mirror for the rest of the run
         use_mirror=1
+        zenodo_failed=1
     fi
 
     # find the file in the mirror by its name, and get it
@@ -195,6 +202,9 @@ function zenodo {
     if [ -z "$id" ] || ! wget_wrap "$DATAVERSE_URL/api/access/datafile/$id" $tgt; then
         echo "ERROR: Failed to download $3 from DataverseNL (doi:$doi)"
         exit 1
+    fi
+    if [ -n "$zenodo_failed" ]; then
+        echo "Downloaded $3 from DataverseNL after the failure on Zenodo"
     fi
 
     return 0
@@ -227,12 +237,14 @@ function zenodo_all {
 
     # get list of files in the record
     files=""
+    zenodo_failed=""
     if [ -z "$use_mirror" ]; then
         files=$(wget_wrap "$ZENODO_URL/api/records/$1" -) || files=""
         files=$(echo "$files" | grep -o "/$1/files/[^/\"]*/content")
         if [[ -z "$files" ]]; then
             echo "WARNING: Failed to list files in $1 on Zenodo"
             use_mirror=1
+            zenodo_failed=1
         fi
     fi
 
@@ -246,6 +258,9 @@ function zenodo_all {
         if ! wget_wrap "$url" $tgt || ! unzip_wrap $tgt $2; then
             echo "ERROR: Failed to download $1 from DataverseNL (doi:$doi)"
             exit 1
+        fi
+        if [ -n "$zenodo_failed" ]; then
+            echo "Downloaded $1 from DataverseNL after the failure on Zenodo"
         fi
         return 0
     fi
