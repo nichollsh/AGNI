@@ -2,6 +2,8 @@
 # Download and unpack required and/or optional data
 # All files can be found at https://zenodo.org/communities/proteus_framework
 
+# A record with a mirror is taken from DataverseNL when Zenodo fails
+
 # Exit script if any of the commands fail
 # set -e
 
@@ -19,12 +21,12 @@ if ! [ -x "$(command -v unzip)" ]; then
   exit 1
 fi
 
-# User agent string to identify the script to Zenodo
+# User agent string to identify the script to Zenodo and DataverseNL
 os=$(uname -s)
 arch=$(uname -m)
 ua="AGNI/1.13 ($os $arch)"
 
-# Data servers; a record that Zenodo fails to provide is read from its DataverseNL mirror
+# Data servers, which the variables ZENODO_URL and DATAVERSE_URL can replace
 ZENODO_URL=${ZENODO_URL:-https://zenodo.org}
 DATAVERSE_URL=${DATAVERSE_URL:-https://dataverse.nl}
 
@@ -138,19 +140,24 @@ function mirror_doi {
     esac
 }
 
-# Wrapper around wget command, which tries twice and removes a failed download
-function fetch {
+# Wrapper around wget command, which tries twice and keeps nothing of a failed download
+function wget_wrap {
     # $1 = url
     # $2 = target file path, or - to print the content
 
     for attempt in 1 2; do
-        if wget --user-agent "'$ua'" -T 60 -t 3 -qO "$2" "$1"; then
+        if [ $attempt -eq 2 ]; then
+            sleep 1
+        fi
+        if content=$(wget --user-agent "'$ua'" -T 60 -t 1 -qO "$2" "$1"); then
+            printf '%s' "$content"
             return 0
         fi
         echo "WARNING: Failed to download $1 (attempt $attempt of 2)" >&2
-        sleep 1
     done
-    rm -f "$2"
+    if [ "$2" != "-" ]; then
+        rm -f "$2"
+    fi
     return 1
 }
 
@@ -169,20 +176,22 @@ function zenodo {
     rm -rf $tgt
     mkdir -p $2
 
-    # get data
-    if [ -z "$use_mirror" ]; then
+    # get data from Zenodo, also after the switch to the mirror if the record has none
+    if [ -z "$use_mirror" ] || ! mirror_doi $1 > /dev/null 2>&1; then
         echo "    zenodo/$1 > $tgt"
-        if fetch "$url" $tgt; then
+        if wget_wrap "$url" $tgt; then
             return 0
         fi
+        # use the mirror for the rest of the run
+        use_mirror=1
     fi
 
     # find the file in the mirror by its name, and get it
     doi=$(mirror_doi $1) || exit 1
     echo "    dataverse/$doi > $tgt"
     url="$DATAVERSE_URL/api/datasets/:persistentId/dirindex?persistentId=doi:$doi"
-    id=$(fetch "$url" - | sed -n "s|.*datafile/\([0-9]*\)\">${3//./\\.}</a>.*|\1|p")
-    if [ -z "$id" ] || ! fetch "$DATAVERSE_URL/api/access/datafile/$id" $tgt; then
+    id=$(wget_wrap "$url" - | sed -n "s|.*datafile/\([0-9]*\)\">${3//./\\.}</a>.*|\1|p")
+    if [ -z "$id" ] || ! wget_wrap "$DATAVERSE_URL/api/access/datafile/$id" $tgt; then
         echo "ERROR: Failed to download $3 from DataverseNL (doi:$doi)"
         exit 1
     fi
@@ -218,10 +227,11 @@ function zenodo_all {
     # get list of files in the record
     files=""
     if [ -z "$use_mirror" ]; then
-        files=$(fetch "$ZENODO_URL/api/records/$1" -) || files=""
+        files=$(wget_wrap "$ZENODO_URL/api/records/$1" -) || files=""
         files=$(echo "$files" | grep -o "/$1/files/[^/\"]*/content")
         if [[ -z "$files" ]]; then
             echo "WARNING: Failed to list files in $1 on Zenodo"
+            use_mirror=1
         fi
     fi
 
@@ -232,7 +242,7 @@ function zenodo_all {
         doi=$(mirror_doi $1) || exit 1
         echo "    dataverse/$doi > $tgt"
         url="$DATAVERSE_URL/api/access/dataset/:persistentId/?persistentId=doi:$doi"
-        if ! fetch "$url" $tgt || ! unzip_wrap $tgt $2; then
+        if ! wget_wrap "$url" $tgt || ! unzip_wrap $tgt $2; then
             echo "ERROR: Failed to download $1 from DataverseNL (doi:$doi)"
             exit 1
         fi
