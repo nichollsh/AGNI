@@ -105,7 +105,7 @@ Where [TARGET] can be any of the following:
         $help_thermo\
 "
 
-# Get the DOI of the DataverseNL mirror of a Zenodo record
+# Get the DOI of the DataverseNL mirror of a Zenodo record (add new mirrors here)
 function mirror_doi {
     # $1 = Zenodo identifier for Record
 
@@ -138,12 +138,20 @@ function mirror_doi {
     esac
 }
 
-# Wrapper around wget command
+# Wrapper around wget command, which tries twice and removes a failed download
 function fetch {
     # $1 = url
     # $2 = target file path, or - to print the content
 
-    wget --user-agent "'$ua'" -T 60 -t 3 -qO "$2" "$1"
+    for attempt in 1 2; do
+        if wget --user-agent "'$ua'" -T 60 -t 3 -qO "$2" "$1"; then
+            return 0
+        fi
+        echo "WARNING: Failed to download $1 (attempt $attempt of 2)" >&2
+        sleep 1
+    done
+    rm -f "$2"
+    return 1
 }
 
 # Generic single file from Zenodo record, or from its mirror if Zenodo fails
@@ -161,16 +169,12 @@ function zenodo {
     rm -rf $tgt
     mkdir -p $2
 
-    # get data, trying twice
+    # get data
     if [ -z "$use_mirror" ]; then
         echo "    zenodo/$1 > $tgt"
-        for attempt in 1 2; do
-            if fetch $url $tgt; then
-                return 0
-            fi
-            echo "WARNING: Failed to download $1 from Zenodo (attempt $attempt of 2)"
-            sleep 1
-        done
+        if fetch "$url" $tgt; then
+            return 0
+        fi
     fi
 
     # find the file in the mirror by its name, and get it
@@ -180,7 +184,6 @@ function zenodo {
     id=$(fetch "$url" - | sed -n "s|.*datafile/\([0-9]*\)\">${3//./\\.}</a>.*|\1|p")
     if [ -z "$id" ] || ! fetch "$DATAVERSE_URL/api/access/datafile/$id" $tgt; then
         echo "ERROR: Failed to download $3 from DataverseNL (doi:$doi)"
-        rm -f $tgt
         exit 1
     fi
 
@@ -215,18 +218,11 @@ function zenodo_all {
     # get list of files in the record
     files=""
     if [ -z "$use_mirror" ]; then
-        url="$ZENODO_URL/api/records/$1"
-        files=$(fetch $url -)
-        retcode=$?
-
-        # check if command failed, and try again?
-        if [ $retcode -ne 0 ]; then
-            echo "WARNING: Failed to list files in $1. Issue with wget (code=$retcode)"
-            echo "Trying again to list the files"
-            sleep 1
-            files=$(fetch $url -) || files=""
-        fi
+        files=$(fetch "$ZENODO_URL/api/records/$1" -) || files=""
         files=$(echo "$files" | grep -o "/$1/files/[^/\"]*/content")
+        if [[ -z "$files" ]]; then
+            echo "WARNING: Failed to list files in $1 on Zenodo"
+        fi
     fi
 
     # without a list of files, get the whole record as one zip from its mirror
@@ -238,7 +234,6 @@ function zenodo_all {
         url="$DATAVERSE_URL/api/access/dataset/:persistentId/?persistentId=doi:$doi"
         if ! fetch "$url" $tgt || ! unzip_wrap $tgt $2; then
             echo "ERROR: Failed to download $1 from DataverseNL (doi:$doi)"
-            rm -f $tgt
             exit 1
         fi
         return 0
