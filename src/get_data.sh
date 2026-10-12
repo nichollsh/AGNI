@@ -140,7 +140,8 @@ function mirror_doi {
     esac
 }
 
-# Wrapper around wget command, which tries twice and keeps nothing of a failed download
+# Wrapper around wget command, which makes two attempts, each with up to 3 wget tries,
+# and keeps nothing of a failed download
 function wget_wrap {
     # $1 = url
     # $2 = target file path, or - to print the content
@@ -149,7 +150,7 @@ function wget_wrap {
         if [ $attempt -eq 2 ]; then
             sleep 1
         fi
-        if content=$(wget --user-agent "'$ua'" -T 60 -t 1 -qO "$2" "$1"); then
+        if content=$(wget --user-agent "'$ua'" -T 60 -t 3 -qO "$2" "$1"); then
             printf '%s' "$content"
             return 0
         fi
