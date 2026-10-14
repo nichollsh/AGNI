@@ -18,12 +18,12 @@ module style
     const col_p::String = "#C8860F"; export col_p # phase change
     const col_d::String = "#8B008B"; export col_d # deepheating
 
-    const col_obs_phot::String = "#475CFF"; export col_obs_phot # photosphere
-    const col_unbound::String = "#37C930"; export col_unbound # unbound
-    const col_exobase::String = "#B1B32F"; export col_exobase # exobase
+    const col_obs_phot::String = "#4FA3D9"; export col_obs_phot # photosphere
+    const col_unbound::String = "#593E74"; export col_unbound # unbound
+    const col_exobase::String = "#E0A32E"; export col_exobase # exobase
 
     const col_black::String = "#10151B"; export col_black # generic black/text
-    const col_bg::String    = "#F2F5F7"; export col_bg    # plot background
+    const col_bg::String    = "#FFFFFF"; export col_bg    # plot background
 
     # Allowed plot file extensions
     const ALLOWED_EXTS::Set{String} = Set(["png", "pdf", "svg"])
