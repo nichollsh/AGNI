@@ -537,15 +537,30 @@ const lookup_rho = AGNI.consts._lookup_rho
 
     # -------------
     # Test _pretty_colour
-    # Known gases return their lookup colour; unknown gases return a valid hex string
+    # Known gases return their lookup colour; unknown gases mix their element colours
     # -------------
     @testset "pretty_colour" begin
         # known lookup entry
         @test style.pretty_colour("CO2") == lookup_colour["CO2"]
-        # unknown molecule: must return a 7-character hex code starting with '#'
-        col_sio = style.pretty_colour("SiO")
-        @test length(col_sio) == 7
-        @test col_sio[1] == '#'
+
+        # rock-vapour oxides have their own entries, so they are not mixed from Si + O
+        # (mixing gives "#b6ff7f" for SiO, a near-green shared with every other oxide)
+        @test style.pretty_colour("SiO") == lookup_colour["SiO"]
+        @test lookup_colour["SiO"] != "#b6ff7f"
+        @test style.pretty_colour("O2") != lookup_colour["O"]
+
+        # unknown molecule: AlO is not in the table, so mix Al (255,119,17) + O (0,204,0)
+        # = (255,323,17), scaled by max=323 -> (201,255,13); hand-computed, not from the code
+        col_alo = style.pretty_colour("AlO")
+        @test length(col_alo) == 7
+        @test col_alo[1] == '#'
+        @test col_alo == "#c9ff0d"
+        # discrimination: returning the first element's colour unmixed would differ
+        @test col_alo != lookup_colour["Al"]
+
+        # edge case: very bright mix (sum > 705) is darkened away from white
+        # K2 = 2*(187,187,238) = (374,374,476); m = 476*255/235 -> max channel 235 = "eb"
+        @test style.pretty_colour("K2") == "#b8b8eb"
     end
 
 
