@@ -133,7 +133,7 @@ function mirror_doi {
         23000222) echo 10.34894/PZFHP2 ;;
         15881238) echo 10.34894/QR4XR2 ;;
         15881496) echo 10.34894/FLOPVW ;;
-        23278603) echo 10.34894/X740H4 ;;
+        23419000) echo 10.34894/4LTQIC ;;
         15806626) echo 10.34894/UZIMT2 ;;
         * )
             echo "ERROR: Failed to download $1 from Zenodo, and it has no mirror" >&2
@@ -431,7 +431,7 @@ function handle_request {
 
         "thermodynamics")
             echo $help_thermo
-            get_zip 23278603 $thermo gases.zip
+            get_zip 23419000 $thermo gases.zip
             ;;
 
         "parfiles")

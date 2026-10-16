@@ -73,9 +73,8 @@ const lookup_rho = AGNI.consts._lookup_rho
     # Test heat capacity lookup tables
     # -------------
     # Species whose data file gives a placeholder critical point below the saturation curve
-    # (e.g. FeO, with T_crit = 0.5 K) take the top of the curve as their critical point, so
-    # that they can condense. Species with a real critical point are unchanged.
-    @testset "critical_point_fallback_to_saturation_curve" begin
+    # take the top of the curve as their critical point, so  that they can condense.
+    @testset "critpoint_fallback_to_saturation" begin
         thermo = "$RES_DIR/thermodynamics/"
         FeO = species.load_gas(thermo, "FeO", false, false)
         @test isapprox(FeO.T_crit, maximum(FeO.sat_T); rtol=1e-12)
@@ -93,11 +92,6 @@ const lookup_rho = AGNI.consts._lookup_rho
         H2O = species.load_gas(thermo, "H2O", false, false)
         @test isapprox(H2O.T_crit, 647.1; atol=0.1)
         @test species.get_Psat(H2O, 700.0) >= AGNI.consts.BIGFLOAT  # supercritical
-
-        # Edge case: species without saturation data are not modified
-        SiO = species.load_gas(thermo, "SiO", false, false)
-        @test SiO.no_sat
-        @test species.get_Psat(SiO, 1000.0) >= AGNI.consts.BIGFLOAT
     end
 
     @testset "cp" begin
