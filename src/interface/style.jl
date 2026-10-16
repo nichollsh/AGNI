@@ -158,6 +158,13 @@ module style
         ("S2" , "#FF8FA1" ),
         ("SO2", "#00008B" ),
 
+        ("O2"  , "#00a6a6"),
+        ("SiO" , "#7b3fbf"),
+        ("SiO2", "#4b0f6b"),
+        ("FeO" , "#e377c2"),
+        ("MgO" , "#f2d16b"),
+        ("TiO2", "#4d9de0"),
+
         # volatile elements
         ("H"  , "#0000aa"),
         ("D"  , "#0000ff"),

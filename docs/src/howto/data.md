@@ -49,3 +49,12 @@ callers. Blank variables are ignored, and relative paths are taken from the work
 directory. Each folder placed this way is reported once in the log when the atmosphere is
 set up. `get_data.sh` always writes to `res/`, and the file paths in `[files]` (such as
 `input_sf`) are used as written.
+
+## Mirror on DataverseNL
+
+The Zenodo records used by `get_data.sh` are mirrored on
+[DataverseNL](https://dataverse.nl). When Zenodo cannot be reached, or a download from
+Zenodo fails, the script takes the same files from the mirror of that record, and it
+reads the remaining records of that run from their mirrors too. A record without a mirror
+fails with an error. The environment variables `ZENODO_URL` and `DATAVERSE_URL` set the
+two servers.
