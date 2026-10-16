@@ -88,6 +88,7 @@ title = "Default"                       # Name for this configuration file
         flux_abs        = 10.0              # Set flux by [W m-2], used for power_mode="abs".
 
 [plots]
+    extension       = "pdf"                     # File extension for plots (png, pdf, svg, etc.)
     at_runtime      = true                      # Make some plots at runtime?
     temperature     = true                      # Plot temperature profile?
     fluxes          = true                      # Plot fluxes?
