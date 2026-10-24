@@ -680,7 +680,7 @@ module AGNI
 
         # Loop over requested solvers
         return_success::Bool = true
-        allowed_solvers::Array{String,1} = ["newton", "gauss", "levenberg", "jacobinewton"]
+        allowed_solvers::Array{String,1} = ["newton", "gauss", "levenberg"]
         sol = strip(lowercase(cfg["execution"]["solver"]))
         if isempty(sol)
             sol = "none"
@@ -744,6 +744,7 @@ module AGNI
                 :modplot        => Int64(modplot),
                 :save_frames    => Bool(plt_ani),
                 :perturb_all    => Bool(cfg["execution"]["perturb_all"]),
+                :broyden        => Bool(get(cfg["execution"], "broyden", false)),
             )
 
             if is_multicol

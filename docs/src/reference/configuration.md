@@ -123,7 +123,8 @@ Parameters that tell the model what to do.
 | `solution_type `  | Solution type (see [Configuring AGNI](@ref) and [Model description](@ref)). |
 | `solver        `  | Solver to use (see [Configuring AGNI](@ref)). |
 | `dx_max        `  | Maximum step size [kelvin] allowed to be taken by the solver during each step. |
-| `linesearch    `  | Linesearch method to be used (0: None, 1: Golden section, 2: Backtracking). |
+| `linesearch    `  | Linesearch method to be used (0: None, 1: Golden section, 2: Backtracking, 3: Non-monotone Armijo). |
+| `broyden       `  | Update the Jacobian with Broyden's method between finite-difference evaluations, to reduce the number of radiative transfer calculations (true/false, optional, default false). Intended for use with `linesearch = 3`. |
 | `easy_start    `  | Initially scale energy fluxes, to help with stability if the model is struggling. |
 | `grey_start    `  | Initially solve with double-grey RT scheme, to help with stability if the model is struggling. |
 | `perturb_all`     | Perturb all rows of Jacobian matrix at each solver iteration? True=stable, False=fast. |

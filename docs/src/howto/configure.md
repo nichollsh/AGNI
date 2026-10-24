@@ -50,6 +50,8 @@ The `execution.solver` string selects the numerical solver:
 * `"levenberg"` – Levenberg–Marquardt algorithm.
 * `"transparent"` – use when `composition.transparent=true`.
 
+The step taken by the non-linear solvers is controlled by `execution.linesearch`. The non-monotone Armijo linesearch (`linesearch = 3`) is recommended when steps are limited by `execution.dx_max`, since the backtracking linesearch (`linesearch = 2`) can stall in that case by repeatedly taking its smallest permitted step. Setting `execution.broyden = true` updates the Jacobian with Broyden's method between finite-difference evaluations. This substantially reduces the number of radiative transfer calculations when the solver converges, but it may need more steps, and it is intended for use with `linesearch = 3`. See [Iterative steps](@ref) for details.
+
 ## Setting the initial temperature profile
 
 `execution.initial_state` is an ordered list of descriptors applied in sequence to build

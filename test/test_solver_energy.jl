@@ -2,6 +2,7 @@ using Test
 using AGNI
 using Logging
 using LoggingExtras
+using LinearAlgebra
 
 const SE = AGNI.solver.solve_energy
 ROOT_DIR = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
@@ -254,14 +255,31 @@ end
         @test !converged_cv
         atmosphere.deallocate!(atmos_cv)
 
-        # method=2 (Gauss-Newton) and method=4 (Jacobi-preconditioned
-        # Newton): alternative solver methods, never selected by any other
-        # test's config
-        for method in (2, 4)
-            atmos_m = _cheap_atmos()
-            SE.solve_energy!(atmos_m; sol_type=1, method=method, max_steps=1,
-                                modplot=0, save_frames=false)
-            atmosphere.deallocate!(atmos_m)
+        # method=2 (Gauss-Newton): alternative solver method, never selected
+        # by any other test's config
+        atmos_m = _cheap_atmos()
+        SE.solve_energy!(atmos_m; sol_type=1, method=2, max_steps=1,
+                            modplot=0, save_frames=false)
+        @test atmos_m.is_solved
+        atmosphere.deallocate!(atmos_m)
+
+        # invalid options are configuration errors, rejected before solving:
+        #    method=4 (the former Jacobi-preconditioned Newton, which was a
+        #    duplicate of Gauss-Newton) no longer exists, the non-monotone
+        #    memory must be at least one, and the Broyden refresh interval
+        #    must be non-negative
+        for (kw, msg) in (((method=4,),           "Invalid solver method"),
+                          ((ls_memory=0,),        "Invalid linesearch memory"),
+                          ((broyden_refresh=-1,), "Invalid Broyden refresh"))
+            atmos_bad = _cheap_atmos()
+            logs, converged = Test.collect_test_logs() do
+                SE.solve_energy!(atmos_bad; sol_type=1, max_steps=2, modplot=0,
+                                    save_frames=false, kw...)
+            end
+            @test !converged
+            @test !atmos_bad.is_solved
+            @test any(occursin(msg, l.message) for l in logs if l.level == Logging.Warn)
+            atmosphere.deallocate!(atmos_bad)
         end
 
         # partial Jacobian update (perturb_all=false, step > 2): only reached
@@ -274,12 +292,17 @@ end
         @test atmos_pj.is_solved
         atmosphere.deallocate!(atmos_pj)
 
-        # method=3 (Levenberg-Marquardt): documents a pre-existing bug (an
-        # undefined `dtd` variable in this branch) rather than fixing it -
-        # pins the current (crashing) behaviour so a future change is deliberate
+        # method=3 (Levenberg-Marquardt): previously raised UndefVarError (an
+        # undefined `dtd` variable); a single step must now run and report that
+        # the iteration limit was reached
         atmos_lm = _cheap_atmos()
-        @test_throws UndefVarError SE.solve_energy!(atmos_lm; sol_type=1, method=3,
-                                                        max_steps=1, modplot=0, save_frames=false)
+        logs, converged = Test.collect_test_logs() do
+            SE.solve_energy!(atmos_lm; sol_type=1, method=3, max_steps=1, modplot=0,
+                                save_frames=false)
+        end
+        @test !converged
+        @test atmos_lm.is_solved
+        @test any(occursin("maximum iterations", l.message) for l in logs if l.level == Logging.Warn)
         atmosphere.deallocate!(atmos_lm)
     end
 
@@ -334,5 +357,148 @@ end
         @test any(occursin("maximum iterations", l.message) for l in logs if l.level == Logging.Warn)
         @test !any(occursin("not bound by gravity", l.message) for l in logs if l.level == Logging.Warn)
         atmosphere.deallocate!(atmos_both)
+    end
+
+    # Shared settings for the tests below: tolerances tight enough that each method
+    #    must make real progress from the fixture's isothermal initial state
+    solve_kw = (modplot=0, save_frames=false, conv_atol=1e-3, conv_rtol=1e-4, max_steps=100)
+    function _solve(; sol_type::Int64=1, kw...)
+        atmos = _cheap_atmos()
+        logs, ok = Test.collect_test_logs(; min_level=Logging.Info) do
+            SE.solve_energy!(atmos; sol_type=sol_type, solve_kw..., kw...)
+        end
+        tmp  = copy(atmos.tmp)
+        nrt  = atmos.num_rt_eval
+        atmosphere.deallocate!(atmos)
+        return ok, tmp, nrt, [string(l.message) for l in logs]
+    end
+
+    # The Levenberg-Marquardt step solves (b'b + λD) dx = -b'r. As λ → 0 it must equal
+    #    the Newton step, its D-scaled length must shrink monotonically as λ grows, and for
+    #    large λ it must turn towards the scaled gradient direction -D⁻¹b'r/λ.
+    @testset "levenberg_marquardt_step_interpolates_newton_and_gradient_directions" begin
+        J = [4.0 1.0 0.0; 1.0 3.0 1.0; 0.0 2.0 5.0]    # well-conditioned, non-symmetric
+        r = [1.0, -2.0, 0.5]
+        btb = J' * J
+        btr = J' * r
+        d   = diag(btb)
+        dx  = zeros(3)
+        fac = zeros(3, 3)
+
+        # λ = 0 reproduces the Newton step exactly (up to rounding)
+        SE._lm_step!(dx, btb, btr, 0.0, d, fac)
+        dx_newton = -(J \ r)
+        @test isapprox(dx, dx_newton; rtol=1e-10)
+
+        # D-scaled step length decreases monotonically with λ
+        lens = Float64[]
+        for λ in (1e-4, 1e-2, 1.0, 1e2, 1e4)
+            SE._lm_step!(dx, btb, btr, λ, d, fac)
+            push!(lens, sqrt(sum(d .* dx .^ 2)))
+        end
+        @test all(diff(lens) .< 0.0)
+
+        # large λ: step tends to the scaled gradient direction
+        λ = 1e8
+        SE._lm_step!(dx, btb, btr, λ, d, fac)
+        dx_grad = -btr ./ d ./ λ
+        @test isapprox(dx, dx_grad; rtol=1e-6)
+        # discrimination guard: the gradient and Newton directions differ markedly here
+        @test !isapprox(normalize(dx_grad), normalize(dx_newton); atol=0.1)
+
+        # error contract: an undamped singular system cannot be solved, while any positive
+        #    damping with a positive scaling makes it solvable
+        S = [1.0 2.0; 2.0 4.0]
+        @test_throws SingularException SE._lm_step!(zeros(2), S, [1.0, 1.0], 0.0, [1.0, 1.0], zeros(2, 2))
+        dx_s = zeros(2)
+        SE._lm_step!(dx_s, S, [1.0, 1.0], 1.0, [1.0, 4.0], zeros(2, 2))
+        @test all(isfinite, dx_s)
+    end
+
+    # Levenberg-Marquardt (method 3) must converge on the fixture, to the same profile as
+    #    Newton-Raphson in the deep levels, which are strongly coupled to the fixed surface.
+    #    (Levels near the top are optically thin, so weakly constrained by the residuals.)
+    @testset "levenberg_marquardt_converges_to_newton_solution" begin
+        ok_lm, tmp_lm, _, logs_lm = _solve(sol_type=1, method=3)
+        ok_nr, tmp_nr, _, _       = _solve(sol_type=1, method=1)
+        @test ok_lm && ok_nr
+        @test isapprox(tmp_lm[end-3:end], tmp_nr[end-3:end]; atol=0.5)
+        @test any(occursin("Lm", m) for m in logs_lm)   # LM steps were taken
+    end
+
+    # When steps are clipped by dx_max, the backtracking linesearch (ls_method=2) compares
+    #    trials with the cost of the full step, and so rejects steps which genuinely reduce
+    #    the cost. The non-monotone Armijo linesearch (ls_method=3) must accept them, and so
+    #    converge to the same solution with far fewer RT evaluations.
+    @testset "nonmonotone_armijo_accepts_clipped_steps_rejected_by_backtracking" begin
+        ok3, tmp3, nrt3, _ = _solve(sol_type=1, ls_method=3, dx_max=35.0)
+        ok2, tmp2, nrt2, _ = _solve(sol_type=1, ls_method=2, dx_max=35.0)
+        @test ok3 && ok2
+        @test nrt3 < 0.5 * nrt2       # measured ratio is about 0.3
+        @test isapprox(tmp3, tmp2; atol=0.1)
+
+        # free surface temperature (sol_type=3), and monotone Armijo (ls_memory=1) as an
+        #    edge case of the non-monotone condition
+        ok3s, tmp3s, _, _ = _solve(sol_type=3, ls_method=3)
+        ok1s, tmp1s, _, _ = _solve(sol_type=3, ls_method=3, ls_memory=1)
+        @test ok3s && ok1s
+        @test isapprox(tmp3s, tmp1s; atol=0.1)
+    end
+
+    # Broyden updates replace most finite-difference Jacobians, so the solver must converge
+    #    with fewer RT evaluations than when finite-differencing at every step. With
+    #    broyden_refresh=0 every step is finite-differenced, which must exactly reproduce
+    #    the solver without Broyden updates.
+    @testset "broyden_updates_reduce_rt_evaluations" begin
+        ok_f, tmp_f, nrt_f, logs_f = _solve(sol_type=3, ls_method=3, broyden=false)
+        ok_b, tmp_b, nrt_b, logs_b = _solve(sol_type=3, ls_method=3, broyden=true)
+        ok_0, tmp_0, nrt_0, logs_0 = _solve(sol_type=3, ls_method=3, broyden=true,
+                                            broyden_refresh=0)
+        @test ok_f && ok_b && ok_0
+        @test nrt_b < nrt_f
+        @test isapprox(tmp_b, tmp_f; atol=0.1)
+        @test any(occursin("Br", m) for m in logs_b)     # Broyden steps were taken
+        @test !any(occursin("Br", m) for m in logs_f)
+        @test !any(occursin("Br", m) for m in logs_0)
+        @test nrt_0 == nrt_f
+        @test isapprox(tmp_0, tmp_f; rtol=1e-12)
+    end
+
+    # Regression: with hundreds of levels, the running product of LU pivots underflows to
+    #    zero, so the former determinant-based test reported this well-conditioned Jacobian
+    #    as singular and the solver stopped at its first step. Singularity must instead be
+    #    judged from the factorisation itself.
+    @testset "singular_jacobian_check_is_not_fooled_by_determinant_underflow" begin
+        atmos = _cheap_atmos(nlev_centre=400)    # 400 levels triggers the underflow
+        x = _x_for(atmos, 1)
+        n = length(x)
+        J = zeros(Float64, n, n)
+        r = zeros(Float64, n)
+        SE._calc_jac_res!(atmos, x, J, r, true, 2, fill(true, n),
+                            1, true, false, true, true, true, true, true, true,
+                            1.0, 5.0, Ref(true), Ref(SE.CODE_99), 1e-4, 1e-5, false)
+
+        # discrimination guard: the determinant underflows, so the former test fails...
+        @test abs(det(J)) < floatmin() * 10.0
+        # ...although |det J| is mathematically far above that threshold...
+        @test logabsdet(J)[1] > log(floatmin() * 10.0) + 100.0
+        # ...and the matrix is far from singular to working precision
+        @test cond(J) < 1e10
+        @test !SE._is_singular(J)
+
+        # the solver must now proceed beyond the first step
+        logs, _ = Test.collect_test_logs() do
+            SE.solve_energy!(atmos; sol_type=1, max_steps=2, modplot=0, save_frames=false)
+        end
+        warns = [l.message for l in logs if l.level == Logging.Warn]
+        @test any(occursin("maximum iterations", m) for m in warns)
+        @test !any(occursin("singular jacobian", m) for m in warns)
+        atmosphere.deallocate!(atmos)
+
+        # error contract: exactly singular and non-finite matrices are still detected
+        @test SE._is_singular(zeros(Float64, 3, 3))
+        @test SE._is_singular([1.0 2.0; 2.0 4.0])
+        @test SE._is_singular([1.0 Inf; 0.0 1.0])
+        @test !SE._is_singular([2.0 1.0; 1.0 3.0])
     end
 end

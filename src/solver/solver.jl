@@ -22,6 +22,7 @@ module solver
     import ..multicol
 
     include("golden.jl"); using .golden
+    include("linesearch.jl"); using .linesearch
     include("energy.jl"); import .solve_energy: solve_energy!
     include("prescribed.jl"); import .solve_prescribed: solve_prescribed!
     include("transparent.jl"); import .solve_transparent: solve_transparent!
