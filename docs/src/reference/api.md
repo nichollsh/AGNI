@@ -25,9 +25,10 @@ Modules = [AGNI.chemistry]
 ```
 
 ## Numerical solvers
-Functions from `solver.jl`.
+Functions from `solver.jl`, including the energy-conserving solver `solve_energy!` (whose
+keyword arguments select the linesearch and Broyden updates) and the linesearch helpers.
 ```@autodocs
-Modules = [AGNI.solver]
+Modules = [AGNI.solver, AGNI.solver.solve_energy, AGNI.solver.linesearch]
 ```
 
 ## Multicolumn module
