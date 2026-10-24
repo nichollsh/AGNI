@@ -89,13 +89,13 @@ where $T_s$ is the surface temperature. Cell-edge temperatures in the bulk atmos
 
 The model converges when the cost function
 ```math
-\mathcal{C}(\bm{x}) = \left(\sum_l |r_l|^3\right)^{1/3}
+\mathcal{C}(\bm{x}) = \left(\sum_l |r_l|^p\right)^{1/p}
 ```
 satisfies
 ```math
 \mathcal{C}(\bm{x}) < \mathcal{C}_a + \mathcal{C}_r \cdot \underset{l}{\max}\ |F_l|
 ```
-which represents a state where fluxes are sufficiently conserved. The quantities $\mathcal{C}_a$ and $\mathcal{C}_r$ are the absolute and relative tolerances provided by the user (parameters `conv_atol` and `conv_rtol` in `solver.solve_energy!()`).
+which represents a state where fluxes are sufficiently conserved. The quantities $\mathcal{C}_a$ and $\mathcal{C}_r$ are the absolute and relative tolerances provided by the user (parameters `conv_atol` and `conv_rtol` in `solver.solve_energy!()`). The order of the norm is $p=4$ by default (parameter `cost_exponent`), which weights the cost towards the levels furthest from energy balance. The maximum flux $\max_l |F_l|$ is taken over the four lowest cell edges.
 
 ### Iterative steps
 The model solves for $\bm{x}$ iteratively starting from some initial guess. The flowchart below broadly outlines the solution process.
@@ -106,18 +106,28 @@ The Jacobian matrix $\bm{J}$ represents the directional gradient of the residual
 ```math
 J_{uv} = \frac{\partial r_u}{\partial x_v}
 ```
-AGNI estimates $\bm{J}$ using a finite-difference scheme, requiring $2(N+1)$ evaluations of $\bm{r}$. To reduce the total number of calculations, AGNI retains Jacobian columns between iterations when the local residuals are small - this assumes the second derivative of the residuals is small in converged regions.
+AGNI estimates $\bm{J}$ using a finite-difference scheme, requiring $2(N+1)$ evaluations of $\bm{r}$. Since each evaluation requires a full radiative transfer calculation, constructing the Jacobian dominates the cost of the solver. To reduce the total number of calculations, AGNI retains Jacobian columns between iterations when the local residuals are small - this assumes the second derivative of the residuals is small in converged regions.
+
+Alternatively, the Jacobian may be updated between iterations with Broyden's method [broyden_class_1965](@citep) (configuration option `execution.broyden`). After a step $\bm{s} = \bm{x}_{k+1} - \bm{x}_k$ changes the residuals by $\bm{y} = \bm{r}_{k+1} - \bm{r}_k$, the rank-one update
+```math
+\bm{J}_{k+1} = \bm{J}_k + \frac{(\bm{y} - \bm{J}_k \bm{s})\, \bm{s}^\mathsf{T}}{\bm{s}^\mathsf{T} \bm{s}}
+```
+is the smallest change to $\bm{J}_k$ which satisfies $\bm{J}_{k+1} \bm{s} = \bm{y}$. Because $\bm{y}$ is evaluated after the composition has been updated, this also captures the response of condensation and chemistry to the step. The Jacobian is recalculated with finite differences on the first step, after at most 10 consecutive Broyden updates (parameter `broyden_refresh`), when the convective flux scale factor is increased (`easy_start`), when the radiative transfer scheme changes (`grey_start`), and when the linesearch (below) fails. This reduces the number of radiative transfer calculations at the cost of taking more, less accurate, steps. Broyden updates are intended for use with the non-monotone Armijo linesearch, whose failures trigger these recalculations.
 
 With a Jacobian constructed, the Newton–Raphson update step is
 ```math
 \bm{d} = -\bm{J}^{-1} \bm{r}
 ```
-Gauss-Newton and Levenberg–Marquardt methods are also supported as alternatives.
+Gauss-Newton and Levenberg–Marquardt [marquardt_algorithm_1963](@citep) methods are also supported as alternatives. The Levenberg–Marquardt step solves $(\bm{J}^\mathsf{T}\bm{J} + \lambda \bm{D})\,\bm{d} = -\bm{J}^\mathsf{T}\bm{r}$, where $\bm{D}$ is the diagonal of $\bm{J}^\mathsf{T}\bm{J}$. The damping parameter $\lambda$ is increased until the step reduces $\lVert \bm{r} \rVert_2$, and then adapted according to how well the linear model predicted that reduction.
 
 Three stabilisation strategies are applied to $\bm{d}$:
 1. **Nudging**: when the model is stuck at a local minimum ($|\bm{d}|$ is on a plateau), $\bm{d}$ is scaled up.
-2. **Clipping**: when $|\bm{d}| > d_\text{max}$, the step is scaled back to $d_\text{max} \hat{\bm{d}}$ to prevent instabilities from the non-convex solution space.
-3. **Line search**: if the full step would increase the cost, $\bm{d}$ is scaled by a factor $\alpha$ found by golden-section or backtracking line search. This avoids oscillation around the solution.
+2. **Clipping**: when $|\bm{d}| > d_\text{max}$, the step is scaled back by a factor $s \le 1$ to $d_\text{max} \hat{\bm{d}}$ to prevent instabilities from the non-convex solution space.
+3. **Line search**: $\bm{d}$ is scaled by a factor $\alpha$, chosen to reduce the cost. AGNI provides golden-section and backtracking searches, which are applied when the full step would not reduce the cost by enough. It also provides a non-monotone Armijo search [grippo_nonmonotone_1986](@citep), which tries the full step first and then backtracks, accepting the first $\alpha$ which satisfies
+```math
+\mathcal{C}(\bm{x}_k + \alpha \bm{d}) \le \max_{0 \le j < M} \mathcal{C}(\bm{x}_{k-j}) - c_1\, \alpha\, s\, \mathcal{C}(\bm{x}_k)
+```
+with $c_1 = 10^{-4}$ and memory $M = 5$ (parameter `ls_memory`). Because the Newton step reduces the residuals linearly along $\bm{d}$, the final term is the decrease in cost predicted by the linear model. Comparing against the largest of the last $M$ costs, rather than the current cost, allows temporary increases in the cost, which may help the solver to move through regions where the cost changes abruptly. Unlike the backtracking search, this condition remains satisfiable when the step has been clipped, so it does not stall when $d_\text{max}$ limits the step size.
 
 ## Other features
 

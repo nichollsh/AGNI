@@ -18,6 +18,7 @@ module solve_energy
     import ..chemistry
     import ..ocean
     import ..golden: gs_search
+    import ..linesearch: armijo, nonmonotone_ref, broyden_update!
 
     # Status codes for solver
     @enum STATUSCODE begin
@@ -306,6 +307,56 @@ module solve_energy
     end # end _calc_jac_res!
 
     """
+    **Check whether a Jacobian matrix is singular.**
+
+    The matrix is singular if its LU factorisation (with partial pivoting) encounters an
+    exactly zero pivot, or if it contains non-finite elements. The determinant is not used
+    for this test, since the product of many pivots can underflow (or overflow) even when
+    the matrix is well-conditioned, as happens with hundreds of model levels.
+
+    Arguments:
+    - `a::Array{Float64,2}`     square matrix
+
+    Returns:
+    - `Bool`                    true if the matrix is singular
+    """
+    function _is_singular(a::Array{Float64,2})::Bool
+        if !all(isfinite, a)
+            return true
+        end
+        return !issuccess(lu(a; check=false))
+    end
+
+    """
+    **Solve for a Levenberg-Marquardt step.**
+
+    Solves `(bᵀb + λ D) dx = -bᵀr` for `dx`, where `D` is the diagonal matrix with entries
+    `d`. As λ tends to zero this is the Gauss-Newton step, and as λ increases the step
+    shrinks and turns towards the scaled steepest-descent direction `-D⁻¹ bᵀr / λ`.
+
+    Arguments:
+    - `dx::Array{Float64,1}`    step, overwritten with the solution
+    - `btb::Array{Float64,2}`   the matrix bᵀb
+    - `btr::Array{Float64,1}`   the vector bᵀr
+    - `lml::Float64`            damping parameter λ (non-negative)
+    - `d::Array{Float64,1}`     diagonal scaling (positive), normally the diagonal of bᵀb
+    - `fac::Array{Float64,2}`   scratch matrix, overwritten
+
+    Returns:
+    - `nothing`
+    """
+    function _lm_step!(dx::Array{Float64,1}, btb::Array{Float64,2}, btr::Array{Float64,1},
+                        lml::Float64, d::Array{Float64,1}, fac::Array{Float64,2})
+        copyto!(fac, btb)
+        for i in eachindex(d)
+            fac[i,i] += lml * d[i]
+        end
+        @. dx = -btr
+        ldiv!(lu!(fac), dx)
+        return nothing
+    end
+
+    """
     **Classify a solver STATUSCODE into a final log message and required actions.**
 
     Arguments:
@@ -372,7 +423,8 @@ module solve_energy
     - `method::Int64`                   numerical method (1: Newton-Raphson, 2: Gauss-Newton, 3: Levenberg-Marquardt)
     - `easy_start::Bool`                improve convergence reliability; introduce convection and latent heat gradually
     - `grey_start::Bool`                improve convergence reliability; obtain double-grey solution first
-    - `ls_method::Int64`                linesearch algorithm (0: None, 1: golden, 2: backtracking)
+    - `ls_method::Int64`                linesearch algorithm (0: None, 1: golden, 2: backtracking, 3: non-monotone Armijo)
+    - `broyden::Bool`                   update the Jacobian with Broyden's method, instead of finite-differencing it at every step?
     - `conv_type::Int64`                convergence type (1: cost function, 2: median residual, 3: mean residual)
     - `detect_plateau::Bool`            assist solver when it is stuck in a region of small dF/dT
     - `perturb_all::Bool`               always recalculate entire Jacobian matrix? Otherwise updates columns only as required
@@ -397,6 +449,8 @@ module solve_energy
     - `ls_max_steps::Int64`             linesearch: maximum steps undertaken by linesearch routine
     - `ls_min_scale::Float64`           linesearch: minimum step scale allowed by linesearch
     - `ls_max_scale::Float64`           linesearch: maximum step scale allowed by linesearch
+    - `ls_memory::Int64`                linesearch: number of previous costs used by the non-monotone Armijo condition (1 => monotone)
+    - `broyden_refresh::Int64`          broyden: maximum number of steps between finite-difference Jacobians
     - `easy_incr::Float64`              easystart: factor by which to increase easy_sf at each step
     - `easy_trig::Float64`              easystart: increase easy_sf when cost*easy_trig satisfies convergence
     - `easy_ini::Float64`               easystart: initial value for easy_sf
@@ -431,6 +485,8 @@ module solve_energy
                             ls_tau::Float64=0.5, ls_increase::Float64=0.7,
                             ls_max_steps::Int64=12,
                             ls_min_scale::Float64=1.0e-5, ls_max_scale::Float64=0.99,
+                            ls_memory::Int64=5,
+                            broyden::Bool=false, broyden_refresh::Int64=10,
                             easy_incr::Float64=2.0, easy_trig::Float64=0.1,
                             easy_ini::Float64=3e-4,
                             )::Bool
@@ -449,6 +505,22 @@ module solve_energy
         # Validate finite difference fdo option
         if !(fdo in [2,4])
             @warn "Invalid finite-difference order ($fdo). Must be 2 or 4."
+            return false
+        end
+
+        # Validate numerical method
+        if !(method in [1,2,3])
+            @warn "Invalid solver method ($method). Must be 1, 2, or 3."
+            return false
+        end
+
+        # Validate non-monotone linesearch memory and Broyden refresh interval
+        if ls_memory < 1
+            @warn "Invalid linesearch memory ($ls_memory). Must be at least 1."
+            return false
+        end
+        if broyden_refresh < 0
+            @warn "Invalid Broyden refresh interval ($broyden_refresh). Must be non-negative."
             return false
         end
 
@@ -501,8 +573,8 @@ module solve_energy
         #     jacobian matrix
         b::Array{Float64,2}      = zeros(Float64, (arr_len, arr_len))   # Approximate jacobian (i)
         b_fac::Array{Float64,2}  = zeros(Float64, (arr_len, arr_len))   # Scratch copy of b, factorised in-place (b itself must survive for plotting)
-        btb::Array{Float64,2}    = zeros(Float64, (arr_len, arr_len))   # Scratch for b'*b (methods 2-4)
-        btr::Array{Float64,1}    = zeros(Float64, arr_len)              # Scratch for b'*r_cur (methods 2-4), and solver RHS/solution
+        btb::Array{Float64,2}    = zeros(Float64, (arr_len, arr_len))   # Scratch for b'*b (methods 2-3)
+        btr::Array{Float64,1}    = zeros(Float64, arr_len)              # Scratch for b'*r_cur (methods 2-3), and solver RHS/solution
 
         #    solution vectors
         x_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Current best solution (i)
@@ -513,10 +585,16 @@ module solve_energy
         r_cur::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i)
         r_old::Array{Float64,1}  = zeros(Float64, arr_len)              # Residuals (i-1)
         r_tst::Array{Float64,1}  = zeros(Float64, arr_len)              # Test for rejection residuals
+        r_base::Array{Float64,1} = zeros(Float64, arr_len)              # Residuals at x_old, from the Jacobian stage
 
         #    other solver variables
         perturb::Array{Bool,1}   = falses(arr_len)      # Mask for levels which should be perturbed
-        lml::Float64             = 1.0                  # Levenberg-Marquardt lambda parameter
+        lml::Float64             = 1.0e-3               # Levenberg-Marquardt lambda parameter
+        s_clip::Float64          = 1.0                  # Scale factor applied to step by dx_max
+        c_hist::Array{Float64,1} = Float64[]            # Cost history, for non-monotone linesearch
+        force_full::Bool         = false                # Broyden: finite-difference the Jacobian at next step?
+        jac_age::Int64           = 0                    # Broyden: steps since last finite-difference Jacobian
+        rt_prev                  = atmos.rt_scheme      # Broyden: RT scheme used at previous step
         c_cur::Float64           = Inf                  # current cost (i)
         c_old::Float64           = Inf                  # old cost (i-1)
         conv_val::Float64        = Inf                  # quantity used to evaluate convergence
@@ -745,7 +823,19 @@ module solve_energy
 
             # Determine which parts of the Jacobian matrix need to be updated
             @debug "        jacobian"
-            if (step <= 2) || perturb_all || easy_step ||
+            if broyden
+                # Finite-difference the whole matrix only when required, otherwise keep
+                #    the matrix from the last step, which has a Broyden update applied
+                if (step == 1) || force_full || easy_step || (jac_age >= broyden_refresh) ||
+                        (atmos.rt_scheme != rt_prev)
+                    fill!(perturb, true)
+                    jac_age = 0
+                else
+                    fill!(perturb, false)
+                    jac_age += 1
+                end
+
+            elseif (step <= 2) || perturb_all || easy_step ||
                     (conv_val*perturb_trig < conv_atol + conv_rtol * c_max) ||
                     mod(step,perturb_mod)==0
                 # Update whole matrix when any of these are true:
@@ -781,7 +871,7 @@ module solve_energy
                     code[] = CODE_OBJ
                     break
                 end
-                stepflags *= "C$fdo-"
+                stepflags *= any(perturb) ? "C$fdo-" : "Br-"
             else
                 # otherwise, use forward difference
                 if !_calc_jac_res!(atmos, x_cur, b, r_cur, false, fdo, perturb,
@@ -792,13 +882,18 @@ module solve_energy
                     code[] = CODE_OBJ
                     break
                 end
-                stepflags *= "F$fdo-"
+                stepflags *= any(perturb) ? "F$fdo-" : "Br-"
             end
+
+            # Record residuals at x_old, for the linesearch and Broyden update
+            @. r_base = r_cur
+            rt_prev = atmos.rt_scheme
+            force_full = false
 
             # Check if jacobian is singular
             #    Diagonal elements are usually negative
             #    Off-diagonals are usually positive
-            if abs(det(b)) < floatmin()*10.0
+            if _is_singular(b)
                 code[] = CODE_SIN
                 step_ok[] = false
                 break
@@ -829,40 +924,48 @@ module solve_energy
 
             elseif method == 3
                 # Levenberg-Marquardt step
-                # This is essentially a Gauss-Newton step with a damping parameter (lambda)
-                # applied to the diagonal of the Jacobian.
+                # This is a Gauss-Newton step with a damping parameter (lambda) applied to
+                # the diagonal, scaled by D = diag(b'*b) so that the damping is invariant to
+                # the scaling of each temperature. The damping is increased until the step
+                # reduces the residuals, then adapted according to how well the linear
+                # model predicted that reduction (gain ratio).
                 # @debug "        LM step"
-                #    Calculate damping parameter ("delayed gratification")
-                if r_cur_2nm < r_old_2nm
-                    # got better
-                    lml /= 5.0
-                else
-                    # got worse
-                    lml *= 1.5
+                mul!(btb, b', b)                # calculate b'*b
+                mul!(btr, b', r_cur)            # calculate b'*r_cur
+                lm_d = max.(diag(btb), floatmin())
+                lm_r2 = sum(abs2, r_cur)
+                for _ in 1:ls_max_steps
+                    _lm_step!(x_dif, btb, btr, lml, lm_d, b_fac)
+                    x_dif *= min(1.0, dx_max / maximum(abs, x_dif))
+
+                    #    actual and predicted reductions in the squared residual norm
+                    @. x_cur = x_old + x_dif
+                    _fev!(atmos, x_cur, r_tst, sol_type, oceans, chem, rainout,
+                            latent, convect, sens_heat, conduct, deep, easy_sf,
+                            step_ok, code, compose=compose_ls)
+                    lm_pred = lm_r2 - sum(abs2, r_cur .+ b * x_dif)
+                    lm_rho  = (lm_r2 - sum(abs2, r_tst)) / lm_pred
+
+                    if isfinite(lm_rho) && (lm_rho > 1.0e-4) && (lm_pred > 0.0)
+                        # accept step, and adapt damping for the next one
+                        if lm_rho > 0.75
+                            lml = max(lml / 3.0, 1.0e-12)
+                        elseif lm_rho < 0.25
+                            lml = min(lml * 2.0, 1.0e12)
+                        end
+                        break
+                    end
+                    # reject step, and increase damping (bounded, so the system stays finite)
+                    lml = min(lml * 4.0, 1.0e12)
                 end
-
-                #    Update our estimate of the solution
-                # x_dif = -(b'*b + lml * dtd) \ (b' * r_cur)
-                mul!(btb, b', b)        # calculate b'*b
-                @. btb += lml * dtd     # add damping to diagonal of jacobian matrix
-                mul!(btr, b', r_cur)    # calculate b'*r_cur
-                ldiv!(lu!(btb), btr)    # LU factorise and solve in-place
-                @. x_dif = -btr         # store the solution
-                # stepflags *= "Lm-"
-
-            elseif method == 4
-                # Newton-Raphson with jacobi preconditioning
-                # x_dif = - (b' * b) \ (b' * r_cur)
-                mul!(btb, b', b)
-                mul!(btr, b', r_cur)
-                ldiv!(lu!(btb), btr)
-                @. x_dif = -btr
+                stepflags *= "Lm-"
 
             end
 
             # Max step size
             #    limited by user requirement, without changing direction of dx vector
-            x_dif *= min(1.0, dx_max / maximum(abs, x_dif))
+            s_clip = min(1.0, dx_max / maximum(abs, x_dif))
+            x_dif *= s_clip
 
             # Extrapolate step if on plateau.
             #    This acts to give the solver a 'nudge' in (hopefully) the right direction.
@@ -878,7 +981,8 @@ module solve_energy
             # This scales the update to the solution vector to ensure that the
             # cost function is optimally minimised. There are various methods for this.
             # https://people.maths.ox.ac.uk/hauser/hauser_lecture2.pdf
-            if linesearch && !plateau_apply
+            #    Levenberg-Marquardt (method 3) controls its own step length.
+            if linesearch && !plateau_apply && (method != 3) && (ls_method != 3)
                 @debug "        linesearch"
 
                 # Reset
@@ -950,6 +1054,45 @@ module solve_energy
                     x_dif *= ls_alpha
                 end
 
+            elseif linesearch && !plateau_apply && (method != 3)
+                # Non-monotone Armijo backtracking (ls_method == 3), starting from the full step.
+                #    A step is accepted if its cost is sufficiently below the largest of the
+                #    last `ls_memory` costs, which allows temporary increases in the cost.
+                @debug "        linesearch"
+
+                # Cost along the step direction
+                function _ls_merit(scale::Float64)::Float64
+                    @. x_cur = x_old + scale * x_dif
+                    if !_fev!(atmos, x_cur, r_tst, sol_type, oceans, chem, rainout,
+                                latent, convect, sens_heat, conduct, deep, easy_sf,
+                                step_ok, code, compose=compose_ls)
+                        return Inf
+                    end
+                    return _cost(r_tst)
+                end
+
+                # Cost at x_old, and its directional derivative along x_dif. For a Newton
+                #    step this is the negative of the cost, scaled by s_clip, for any p-norm.
+                ls_c0 = _cost(r_base)
+                push!(c_hist, ls_c0)
+                ls_alpha, ls_cost, _, ls_ok = armijo(_ls_merit, ls_c0, -s_clip * ls_c0;
+                                                φ_ref=nonmonotone_ref(c_hist, ls_memory),
+                                                α_min=ls_min_scale, max_iter=ls_max_steps)
+
+                # If no sufficient decrease was found, take the best step found (or a minimal
+                #    step), and finite-difference the Jacobian at the next step if using Broyden
+                if !ls_ok
+                    stepflags *= "Lf-"
+                    force_full = true
+                    if !(ls_alpha > 0.0)
+                        ls_alpha = ls_min_scale
+                    end
+                elseif ls_alpha < 1.0
+                    stepflags *= "Ls-"
+                end
+                @debug "            ls_alpha = $ls_alpha"
+                x_dif *= ls_alpha
+
             end # end linesearch
 
             # Enforce minimum step size (dx_min)
@@ -966,6 +1109,12 @@ module solve_energy
             _fev!(atmos, x_cur, r_cur, sol_type, oceans, chem, rainout,
                     latent, convect, sens_heat, conduct, deep, easy_sf,
                     step_ok, code, compose=true)
+
+            # Broyden update of the Jacobian, from the step just taken. The change in
+            #    residuals includes the response of the composition to the new temperatures.
+            if broyden
+                broyden_update!(b, x_cur .- x_old, r_cur .- r_base)
+            end
 
             # Recalculate layer properties
             if ! atmosphere.calc_layer_props!(atmos)
@@ -1035,6 +1184,7 @@ module solve_energy
                 @warn "Surface temperature collapsed! Resetting to initial guess..."
                 step_ok[] = false
                 @. x_cur = x_ini
+                force_full = force_full || broyden
             end
 
             # Converged?

@@ -26,6 +26,9 @@ These flags appear at each solver iteration:
 | `M` / `Mr`    | Convective fluxes are being modulated for stability. |
 | `C2` / `C4`   | Central finite-difference scheme used (at 2nd or 4th order). |
 | `F2` / `F4`   | Forward finite-difference scheme used (at 2nd or 4th order). |
+| `Br`          | Jacobian obtained from a Broyden update, without finite differences. |
+| `Lm`          | Levenberg–Marquardt step, with its own damping instead of a linesearch. |
 | `Ls`          | A linesearch method was applied to scale the update step. |
+| `Lf`          | The non-monotone Armijo linesearch found no sufficient decrease; the best (or a minimal) step was taken. |
 | `P`           | Step was forcibly extrapolated because the solver is not making progress. |
 | `U`           | The atmosphere has become gravitationally unbound. |

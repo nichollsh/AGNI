@@ -481,6 +481,48 @@ end
     @test any(occursin("globe.lons", m) for m in errs2)
 end
 
+# The optional `execution.broyden` key must reach the solver: when enabled, solver steps
+#    using a Broyden-updated Jacobian (flag `Br`) appear in the log; when absent, as in
+#    older configuration files, none appear. The removed `jacobinewton` solver (a duplicate
+#    of Gauss-Newton) must now be rejected as an invalid solver.
+@testset "agni_from_config_broyden_and_solver_names" begin
+    function _solver_cfg(; broyden=nothing)
+        cfg = _minimal_greygas_cfg()
+        # tight tolerances, so that the solver takes several steps after the first
+        merge!(cfg["execution"], Dict("max_steps" => 100, "max_runtime" => 300.0,
+                                      "dx_max" => 100.0, "linesearch" => 3,
+                                      "easy_start" => false, "perturb_all" => true,
+                                      "converge_atol" => 1e-3, "converge_rtol" => 1e-4))
+        cfg["plots"]["at_runtime"] = false
+        isnothing(broyden) || (cfg["execution"]["broyden"] = broyden)
+        return cfg
+    end
+    has_broyden_flag(msgs) = any(occursin(r"(\s|-)Br(-|\s|$)", m) for m in msgs)
+
+    # enabled: run succeeds, and Broyden steps were taken
+    logs_b, ok_b = Test.collect_test_logs(; min_level=Logging.Info) do
+        AGNI.run_from_config(_solver_cfg(broyden=true))
+    end
+    @test ok_b
+    @test has_broyden_flag([string(l.message) for l in logs_b])
+
+    # key absent (default): run succeeds, with no Broyden steps
+    logs_d, ok_d = Test.collect_test_logs(; min_level=Logging.Info) do
+        AGNI.run_from_config(_solver_cfg())
+    end
+    @test ok_d
+    @test !has_broyden_flag([string(l.message) for l in logs_d])
+
+    # the former "jacobinewton" solver is now an invalid choice
+    cfg_j = _solver_cfg()
+    cfg_j["execution"]["solver"] = "jacobinewton"
+    logs_j, ok_j = Test.collect_test_logs() do
+        AGNI.run_from_config(cfg_j)
+    end
+    @test ok_j == false
+    @test any(occursin("Invalid solver", l.message) for l in logs_j if l.level == Logging.Warn)
+end
+
 @testset "agni_main" begin
     # nonexistent config path raises before any file I/O
     @test_throws ErrorException AGNI.main(cfg_path="/nonexistent/path/to/config.toml")
