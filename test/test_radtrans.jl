@@ -51,7 +51,7 @@ end
                                 ("H2O" , 0.8),
                                 ("CO2" , 0.2),
                                 ])
-        spfile_name   = "$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
+        spfile_name   = "$RES_DIR/spectral_files/Proudspire/64/Proudspire.sf"
 
         # Setup atmosphere
         atmos = atmosphere.Atmos_t()
@@ -64,7 +64,7 @@ end
                                 mf_dict,"",
                                 flag_gcontinuum=false,
                                 flag_rayleigh=false,
-                                overlap_method="ro",
+                                overlap_method="rorr",
                                 real_gas=false
                         )
         atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
@@ -378,7 +378,7 @@ end
                                 ("H2O" , 0.6),
                                 ("CO2" , 0.4),
                                 ])
-        spfile_name   = "$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
+        spfile_name   = "$RES_DIR/spectral_files/Proudspire/64/Proudspire.sf"
 
         # Setup atmosphere
         atmos = atmosphere.Atmos_t()
@@ -391,7 +391,7 @@ end
                                 mf_dict, "",
                                 flag_gcontinuum=true,
                                 flag_rayleigh=true,
-                                overlap_method="ro",
+                                overlap_method="rorr",
                                 real_gas=false
                         )
         atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
@@ -407,8 +407,8 @@ end
         val_o = atmos.flux_u_sw[1]
         @test isapprox(val_e, val_o; rtol=rtol)
 
-        # check known value
-        val_e = 37.12571350789956
+        # check known value, for Proudspire/64 with resort-rebin overlap
+        val_e = 55.01006
         val_o = atmos.flux_u_sw[20]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -562,7 +562,7 @@ end
     #   - in the optically thin limit the flux perturbation is linear in MMR
     # -------------
     @testset "mie_aerosol_changes_fluxes_monotonically" begin
-        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        spfile = "$RES_DIR/spectral_files/Proudspire/32/Proudspire.sf"
         aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>0.0, "nk_file"=>"SiO2_amorph",
                                     "r_eff"=>1e-6, "sigma_g"=>1.65))
         atmos = atmosphere.Atmos_t()
@@ -622,7 +622,7 @@ end
     # validation would normally catch this, so the material is changed after setup!.
     # -------------
     @testset "mie_failure_returns_false_from_allocate" begin
-        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        spfile = "$RES_DIR/spectral_files/Proudspire/32/Proudspire.sf"
         aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>1e-6, "nk_file"=>"SiO2_amorph",
                                     "r_eff"=>1e-6, "sigma_g"=>1.65))
         atmos = atmosphere.Atmos_t()
@@ -650,7 +650,7 @@ end
     # -------------
     @testset "cloud_requires_droplet_block" begin
         tmpdir = mktempdir()
-        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        spfile = "$RES_DIR/spectral_files/Proudspire/32/Proudspire.sf"
 
         # copy of the spectral file with block 10 stripped
         stripped = joinpath(tmpdir, "noblock10.sf")

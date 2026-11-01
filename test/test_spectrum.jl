@@ -60,7 +60,7 @@ end
     # Test count_gases with a real spectral file
     @testset "count_gases_valid" begin
         # Use one of the test spectral files
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         @test isfile(spfile)
         num_gases = AGNI.spectrum.count_gases(spfile)
         @test num_gases > 0
@@ -329,7 +329,7 @@ Some more content
 
         # Setup paths
         tmpdir = mktempdir()
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
 
         # A real spectral file
         @test isfile(spfile)
@@ -416,16 +416,16 @@ Some more content
 
     # -------------
     # Band edges parsed from block 1 of a real spectral file are positive, contiguous, and
-    # increasing; the first band starts at 0.2857 μm in Dayspring/48.
+    # increasing; the first band starts at 0.2 μm in Proudspire/64.
     # -------------
     @testset "band_edges_parsed_from_block_1" begin
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         bands = AGNI.spectrum.read_band_edges(spfile)
-        @test size(bands) == (48, 2)
+        @test size(bands) == (64, 2)
         @test all(bands .> 0.0)
         @test all(bands[:,2] .> bands[:,1])
         @test all(isapprox.(bands[2:end,1], bands[1:end-1,2]; rtol=1e-8))
-        @test isapprox(bands[1,1], 2.857143673e-7; rtol=1e-8)
+        @test isapprox(bands[1,1], 2.000001000e-7; rtol=1e-8)
         # Error contract: missing file, and a file without block 1
         @test_throws ErrorException AGNI.spectrum.read_band_edges(tempname())
         write(temp_sf, "*BLOCK: TYPE =    0\n*END\n")
@@ -441,11 +441,11 @@ Some more content
     @testset "custom_aerosols_round_trip_through_socrates" begin
         SOC = AGNI.atmosphere.SOCRATES
         tmpdir = mktempdir()
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         work = joinpath(tmpdir, "work.sf")
         cp(spfile, work; force=true)
         cp(spfile*"_k", work*"_k"; force=true)
-        nb = 48
+        nb = 64
 
         # Values chosen to vary across bands, so that a band offset would be detected
         ka = [[10.0*b for b in 1:nb], fill(5.0, nb)]
@@ -497,7 +497,7 @@ Some more content
     @testset "custom_aerosols_follow_prep_spec_aerosols" begin
         SOC = AGNI.atmosphere.SOCRATES
         tmpdir = mktempdir()
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         star_file = joinpath(tmpdir, "star.dat")
         wl = collect(range(100.0, 1000.0, length=1000))
         @test AGNI.spectrum.write_to_socrates_format(wl, ones(1000) .* 1e10, star_file, 500)
@@ -506,7 +506,7 @@ Some more content
         outp = joinpath(tmpdir, "runtime.sf")
         @test AGNI.spectrum.insert_blocks(RAD_DIR, spfile, star_file, outp, false, true;
                                             aerosol_avg_files=avg)
-        nb = 48
+        nb = 64
         @test AGNI.spectrum.append_custom_aerosols!(outp, ["sio2"], [101],
                                                     [fill(2.0, nb)], [fill(3.0, nb)], [fill(0.1, nb)])
         lines = readlines(outp)
@@ -605,7 +605,7 @@ Some more content
     # -------------
     @testset "band_average_agrees_with_socrates_scatter_average" begin
         tmpdir = mktempdir()
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         monfile = joinpath(RES_DIR, "scattering", "soot.mon")
         wl, fl = AGNI.spectrum.load_from_file(joinpath(RES_DIR, "stellar_spectra", "sun.txt"))
         star_file = joinpath(tmpdir, "star.dat")
