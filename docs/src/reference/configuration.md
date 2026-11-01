@@ -46,7 +46,7 @@ Input/output files and other paths.
 
 | Parameter          | Description   |
 | -----------------: | :------------ |
-| `input_sf       `  | Path to the desired spectral file in `res/spectral_files/`. If "greygas", uses double-grey RT scheme. |
+| `input_sf       `  | Path to the desired spectral file in `res/spectral_files/`. If "greygas", uses double-grey RT scheme. See [Obtaining input data](@ref) for how to choose a spectral file. |
 | `input_star     `  | Path to stellar spectrum. If blank, spectrum assumed to be inside spectral file. If "blackbody" must provide `planet.star_Teff`. |
 | `output_dir     `  | Path to the output directory. |
 | `io_dir         `  | Path for fast I/O operations (optional, defaults to `output_dir`). |

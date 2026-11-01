@@ -344,6 +344,118 @@ function anyspec {
             rec="15696457"
             ;;
 
+        "Snowline32" )
+            rec="23806138"
+            ;;
+        "Snowline64" )
+            rec="23806186"
+            ;;
+        "Snowline128" )
+            rec="23806166"
+            ;;
+        "Snowline256" )
+            rec="23806212"
+            ;;
+        "Snowline2048" )
+            rec="23806236"
+            ;;
+
+        "Breezehome32" )
+            rec="23808218"
+            ;;
+        "Breezehome64" )
+            rec="23808200"
+            ;;
+        "Breezehome128" )
+            rec="23808184"
+            ;;
+        "Breezehome256" )
+            rec="23808153"
+            ;;
+        "Breezehome2048" )
+            rec="23808117"
+            ;;
+
+        "Volenfell32" )
+            rec="23808230"
+            ;;
+        "Volenfell64" )
+            rec="23808244"
+            ;;
+        "Volenfell128" )
+            rec="23808253"
+            ;;
+        "Volenfell256" )
+            rec="23808259"
+            ;;
+        "Volenfell2048" )
+            rec="23808275"
+            ;;
+
+        "Proudspire32" )
+            rec="23837929"
+            ;;
+        "Proudspire64" )
+            rec="23838157"
+            ;;
+        "Proudspire128" )
+            rec="23838187"
+            ;;
+        "Proudspire256" )
+            rec="23838213"
+            ;;
+        "Proudspire2048" )
+            rec="23838267"
+            ;;
+
+        "Skyborn32" )
+            rec="23838451"
+            ;;
+        "Skyborn64" )
+            rec="23838469"
+            ;;
+        "Skyborn128" )
+            rec="23838482"
+            ;;
+        "Skyborn256" )
+            rec="23838507"
+            ;;
+        "Skyborn2048" )
+            rec="23838562"
+            ;;
+
+        "Atmora32" )
+            rec="23837505"
+            ;;
+        "Atmora64" )
+            rec="23837520"
+            ;;
+        "Atmora128" )
+            rec="23837548"
+            ;;
+        "Atmora256" )
+            rec="23837583"
+            ;;
+        "Atmora2048" )
+            rec="23837640"
+            ;;
+
+        "Sovngarde32" )
+            rec="23838860"
+            ;;
+        "Sovngarde64" )
+            rec="23838886"
+            ;;
+        "Sovngarde128" )
+            rec="23838924"
+            ;;
+        "Sovngarde256" )
+            rec="23838984"
+            ;;
+        "Sovngarde2048" )
+            rec="23839054"
+            ;;
+
         "Oak318" )
             rec="15743843"
             ;;
