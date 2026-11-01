@@ -376,6 +376,22 @@ function anyspec {
             rec="23808117"
             ;;
 
+        "Cliffshade32" )
+            rec="23836927"
+            ;;
+        "Cliffshade64" )
+            rec="23836953"
+            ;;
+        "Cliffshade128" )
+            rec="23837412"
+            ;;
+        "Cliffshade256" )
+            rec="23837359"
+            ;;
+        "Cliffshade2048" )
+            rec="23836979"
+            ;;
+
         "Volenfell32" )
             rec="23808230"
             ;;
