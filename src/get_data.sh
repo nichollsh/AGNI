@@ -506,8 +506,8 @@ function handle_request {
             echo $help_basic
 
             anyspec Oak 318
-            anyspec Dayspring 48
-            anyspec Dayspring 16
+            anyspec Proudspire 64
+            anyspec Proudspire 32
 
             zenodo 17981836 $stellar sun.txt
 
@@ -520,15 +520,16 @@ function handle_request {
 
         "highres")
             echo $help_highres
-            anyspec Honeyside 4096
+            anyspec Sovngarde 2048
             ;;
 
         "steam")
             echo $help_steam
-            anyspec Frostflow 16
-            anyspec Frostflow 48
-            anyspec Frostflow 256
-            anyspec Frostflow 4096
+            anyspec Snowline 32
+            anyspec Snowline 64
+            anyspec Snowline 128
+            anyspec Snowline 256
+            anyspec Snowline 2048
             ;;
 
         "anyspec")

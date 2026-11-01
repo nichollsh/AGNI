@@ -20,7 +20,7 @@ title = "AGNI configuration file for test suite"
     star_Teff       = 5000.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"
+    input_sf        = "res/spectral_files/Proudspire/32/Proudspire.sf"
     input_star      = "blackbody"
     output_dir      = "out/"
     io_dir          = "out/io/"
@@ -59,7 +59,7 @@ title = "AGNI configuration file for test suite"
     thermo_funct    = true
     sensible_heat   = true
     conduction      = true
-    latent_heat     = true
+    latent_heat     = false
     convection      = true
     convection_crit = "l"
     rainout         = true

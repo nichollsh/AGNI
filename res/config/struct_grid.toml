@@ -17,9 +17,9 @@ title = "Base config for structure calcs"
     star_Teff       = 3150.0 #3415.0
 
 [files]
-    input_sf        = "res/spectral_files/Dayspring/48/Dayspring.sf"
+    input_sf        = "res/spectral_files/Proudspire/64/Proudspire.sf"
     #input_sf        = "greygas"
-    #input_sf        = "res/spectral_files/Dayspring/16/Dayspring.sf"
+    #input_sf        = "res/spectral_files/Proudspire/32/Proudspire.sf"
     input_star      = "blackbody"
     output_dir      = "nogit_scratch/out/"
 

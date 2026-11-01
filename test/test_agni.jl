@@ -5,7 +5,7 @@ using Logging
 const AGNI_CORE_ROOT = abspath(joinpath(dirname(abspath(@__FILE__)), "../"))
 const AGNI_CORE_TEST_CFG = joinpath(AGNI_CORE_ROOT, "test", "test.toml")
 const AGNI_CORE_OUT_DIR = joinpath(AGNI_CORE_ROOT, "out/")
-const AGNI_CORE_SF = joinpath(AGNI_CORE_ROOT, "res", "spectral_files", "Dayspring", "16", "Dayspring.sf")
+const AGNI_CORE_SF = joinpath(AGNI_CORE_ROOT, "res", "spectral_files", "Proudspire", "32", "Proudspire.sf")
 _base_cfg() = AGNI.open_config(AGNI_CORE_TEST_CFG)
 
 @testset "agni_core" begin
