@@ -18,7 +18,7 @@ TEST_DIR        = joinpath(ROOT_DIR,"test/")
     nlev            = 30
     theta           = 60.0
 
-    # Use cheap spectral file (Dayspring 48-band)
+    # Use the cheap grey-gas scheme, which needs no spectral file
     spfile_name = "greygas"
 
     # -------------
