@@ -167,6 +167,99 @@ module spectrum
     end
 
     """
+    **Get the names of all gases known to SOCRATES.**
+
+    Arguments:
+    - `SOCRATES`                    SOCRATES module
+    - `socrates_version::String`    Version of SOCRATES
+
+    Returns:
+    - `header_gas::Vector{String}`  Gas names, indexed by SOCRATES gas type
+    """
+    function socrates_gas_list(SOCRATES, socrates_version::String)::Vector{String}
+        if startswith(socrates_version, "24")
+            return String.(SOCRATES.input_head_pcf.header_gas)
+        else
+            return String.(SOCRATES.gas_list_pcf.header_gas)
+        end
+    end
+
+    """
+    **Get the names of the gases in a spectrum loaded into SOCRATES.**
+
+    Arguments:
+    - `spec`                        Spectrum loaded into SOCRATES (`StrSpecData`)
+    - `header_gas::Vector{String}`  Names of all gases known to SOCRATES, from `socrates_gas_list`
+
+    Returns:
+    - `names::Vector{String}`       Gas names, in the order of the spectral file
+    """
+    function spectrum_gas_names(spec, header_gas::Vector{String})::Vector{String}
+        return [header_gas[spec.Gas.type_absorb[i]] for i in 1:spec.Gas.n_absorb]
+    end
+
+    """
+    **Get the names of the gases that absorb in at least one band of a loaded spectrum.**
+
+    When SOCRATES loads only some gases of a spectral file, it removes the other gases from the
+    list of absorbers in each band, while keeping them in the list of gases.
+
+    Arguments:
+    - `spec`                        Spectrum loaded into SOCRATES (`StrSpecData`)
+    - `names::Vector{String}`       Gas names of the spectrum, from `spectrum_gas_names`
+
+    Returns:
+    - `absorbing::Vector{String}`   Names of the gases that absorb in at least one band
+    """
+    function absorbing_gas_names(spec, names::Vector{String})::Vector{String}
+        gas = spec.Gas
+        absorbing = Set{Int}()
+        for b in 1:spec.Basic.n_band, j in 1:gas.n_band_absorb[b]
+            push!(absorbing, gas.index_absorb[j, b])
+        end
+        return [names[i] for i in sort!(collect(absorbing))]
+    end
+
+    """
+    **Remove the generalised continua of other gases from a loaded spectrum.**
+
+    SOCRATES keeps all continua when it loads only some gases of a spectral file, so this
+    removes from each band the continua whose two gases are not both in `keep_gases`. A band
+    whose major absorber is a continuum that would be removed is left unchanged.
+
+    Arguments:
+    - `spec`                        Spectrum loaded into SOCRATES (`StrSpecData`)
+    - `names::Vector{String}`       Gas names of the spectrum, from `spectrum_gas_names`
+    - `keep_gases::Vector{String}`  Gases whose continua are kept
+
+    Returns:
+    - `n_removed::Int`              Number of continua removed, summed over bands
+    """
+    function remove_unused_continua!(spec, names::Vector{String},
+                                        keep_gases::Vector{String})::Int
+        cont = spec.ContGen
+        if cont.n_cont < 1
+            return 0
+        end
+        used(ic) = (names[cont.index_cont_gas_1[ic]] in keep_gases) &&
+                   (names[cont.index_cont_gas_2[ic]] in keep_gases)
+        n_removed::Int = 0
+        for b in 1:spec.Basic.n_band
+            n = cont.n_band_cont[b]
+            keep = [cont.index_cont[j, b] for j in 1:n if used(cont.index_cont[j, b])]
+            if (cont.l_cont_major[b] != 0) && (isempty(keep) || keep[1] != cont.index_cont[1, b])
+                continue
+            end
+            for (j, ic) in enumerate(keep)
+                cont.index_cont[j, b] = ic
+            end
+            cont.n_band_cont[b] = length(keep)
+            n_removed += n - length(keep)
+        end
+        return n_removed
+    end
+
+    """
     **Append aerosols with runtime-calculated optical properties to a spectral file.**
 
     Adds each aerosol to the list in block 0, and appends a block of type 11 (dry aerosol,

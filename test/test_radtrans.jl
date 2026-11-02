@@ -724,12 +724,12 @@ end
             B = _named_gases_atmos(vmr, false; overlap=overlap)
             @test A.load_all_opacities
             @test !B.load_all_opacities
-            @test length(atmosphere._loaded_gas_names(A)) == 14
-            @test sort(atmosphere._loaded_gas_names(B)) == named
+            @test length(spectrum.absorbing_gas_names(A.spectrum, A.gas_soc_names)) == 14
+            @test sort(spectrum.absorbing_gas_names(B.spectrum, B.gas_soc_names)) == named
 
             # every continuum kept in a band involves only named gases
             cont = B.spectrum.ContGen
-            gas_names = atmosphere._soc_gas_names(B)
+            gas_names = B.gas_soc_names
             kept = [(gas_names[cont.index_cont_gas_1[cont.index_cont[j, b]]],
                      gas_names[cont.index_cont_gas_2[cont.index_cont[j, b]]])
                     for b in 1:B.nbands for j in 1:cont.n_band_cont[b]]
@@ -773,7 +773,7 @@ end
                                tmp_surf=T, isothermal=true)
         B = _named_gases_atmos(Dict("He"=>1.0), false; cont=false, ray=false,
                                tmp_surf=T, isothermal=true)
-        @test isempty(atmosphere._loaded_gas_names(B))
+        @test isempty(spectrum.absorbing_gas_names(B.spectrum, B.gas_soc_names))
         @test sum(B.spectrum.Gas.n_band_absorb[b] for b in 1:B.nbands) == 0
         energy.radtrans!(A, true)
         energy.radtrans!(B, true)

@@ -1835,78 +1835,6 @@ module atmosphere
 
 
     """
-    **Names of the gases known to SOCRATES, indexed by gas type.**
-    """
-    function _soc_header_gas(atmos::atmosphere.Atmos_t)::Vector{String}
-        if startswith(atmos.SOCRATES_VERSION, "24")
-            return String.(SOCRATES.input_head_pcf.header_gas)
-        else
-            return String.(SOCRATES.gas_list_pcf.header_gas)
-        end
-    end
-
-
-    """
-    **Names of the gases in the spectrum loaded into SOCRATES, in the order of the spectral file.**
-    """
-    function _soc_gas_names(atmos::atmosphere.Atmos_t)::Vector{String}
-        header = _soc_header_gas(atmos)
-        return [header[atmos.spectrum.Gas.type_absorb[i]] for i in 1:atmos.spectrum.Gas.n_absorb]
-    end
-
-
-    """
-    **Names of the gases that absorb in at least one band of the loaded spectrum.**
-
-    When only the gases in the atmosphere are loaded, SOCRATES removes the other gases from
-    the list of absorbers in each band, while keeping them in the list of gases.
-    """
-    function _loaded_gas_names(atmos::atmosphere.Atmos_t)::Vector{String}
-        gas = atmos.spectrum.Gas
-        names = _soc_gas_names(atmos)
-        loaded = Set{Int}()
-        for b in 1:atmos.spectrum.Basic.n_band, j in 1:gas.n_band_absorb[b]
-            push!(loaded, gas.index_absorb[j, b])
-        end
-        return [names[i] for i in sort!(collect(loaded))]
-    end
-
-
-    """
-    **Remove the generalised continua of gases that are not in the atmosphere.**
-
-    SOCRATES keeps all continua when it removes gases from the loaded spectrum, so this removes
-    from each band the continua whose two gases are not both in the atmosphere. A band whose
-    major absorber is a continuum that would be removed is left unchanged.
-
-    Returns the number of continua removed, summed over bands.
-    """
-    function _remove_unused_continua!(atmos::atmosphere.Atmos_t)::Int
-        cont = atmos.spectrum.ContGen
-        if cont.n_cont < 1
-            return 0
-        end
-        names = _soc_gas_names(atmos)
-        used(ic) = (names[cont.index_cont_gas_1[ic]] in atmos.gas_names) &&
-                   (names[cont.index_cont_gas_2[ic]] in atmos.gas_names)
-        n_removed::Int = 0
-        for b in 1:atmos.spectrum.Basic.n_band
-            n = cont.n_band_cont[b]
-            keep = [cont.index_cont[j, b] for j in 1:n if used(cont.index_cont[j, b])]
-            if (cont.l_cont_major[b] != 0) && (isempty(keep) || keep[1] != cont.index_cont[1, b])
-                continue
-            end
-            for (j, ic) in enumerate(keep)
-                cont.index_cont[j, b] = ic
-            end
-            cont.n_band_cont[b] = length(keep)
-            n_removed += n - length(keep)
-        end
-        return n_removed
-    end
-
-
-    """
     **Allocate atmosphere arrays, prepare spectral files, and final steps.**
 
     Will not modify spectral file if `stellar_spectrum` is an empty string.
@@ -2100,11 +2028,11 @@ module atmosphere
 
             # Set spectrum in SOCRATES. Unless all gases are loaded, SOCRATES removes the
             #   gases that are not in the atmosphere from each band (compress_spectrum).
+            soc_gases = spectrum.socrates_gas_list(SOCRATES, atmos.SOCRATES_VERSION)
             gas_select = Dict{Symbol,Any}()
             if !atmos.load_all_opacities
                 soc_kwargs = Base.kwarg_decl(first(methods(SOCRATES.set_spectrum)))
-                soc_gases  = _soc_header_gas(atmos)
-                no_flag = [g for g in atmos.gas_names if (g in soc_gases) &&
+                no_flag =[g for g in atmos.gas_names if (g in soc_gases) &&
                                                 !(Symbol("l_"*lowercase(g)) in soc_kwargs)]
                 if isempty(no_flag)
                     for g in atmos.gas_names
@@ -2129,17 +2057,18 @@ module atmosphere
 
             if !atmos.load_all_opacities
                 # Every gas of the atmosphere that is in the spectral file must be kept
-                loaded = _loaded_gas_names(atmos)
-                in_file = _soc_gas_names(atmos)
+                in_file = spectrum.spectrum_gas_names(atmos.spectrum, soc_gases)
+                loaded  = spectrum.absorbing_gas_names(atmos.spectrum, in_file)
                 dropped = [g for g in atmos.gas_names if (g in in_file) && !(g in loaded)]
                 if !isempty(dropped)
                     @error "Gases $(join(dropped, ", ")) were not loaded from the spectral file"
-                    @error "    Set load_all_opacities to true to load all gases"
+                    @error "    Set `load_all_opacities=true` to load all gas opacities"
                     return false
                 end
-                n_cont = _remove_unused_continua!(atmos)
-                @info "Loaded $(length(loaded)) of $(atmos.spectrum.Gas.n_absorb) gases " *
-                        "from the spectral file, and removed $n_cont unused continua"
+                n_cont = spectrum.remove_unused_continua!(atmos.spectrum, in_file, atmos.gas_names)
+                @info "Loaded $(length(loaded))/$(atmos.spectrum.Gas.n_absorb) gas opacities"
+                @debug "    Removed $(atmos.spectrum.Gas.n_absorb - length(loaded)) unused gases"
+                @debug "    Removed $n_cont unused continua"
             end
 
             # Remove temporary star file if it exists
@@ -2376,12 +2305,12 @@ module atmosphere
 
             # Check supported gases
             atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases
-            atmos.gas_soc_names     = _soc_gas_names(atmos)                     # list of names
+            atmos.gas_soc_names     = spectrum.spectrum_gas_names(atmos.spectrum, soc_gases)
 
             # Warn user if all absorbers are condensable, which risks opacity going to zero
-            loaded = _loaded_gas_names(atmos)
+            loaded = spectrum.absorbing_gas_names(atmos.spectrum, atmos.gas_soc_names)
             if isempty(loaded)
-                @warn "No gas in the atmosphere absorbs in the spectral file"
+                @warn "No atmosphere gases contain opacity data in the spectral file"
             elseif issubset(loaded, atmos.condensates)
                 @warn "All absorbers are marked as condensable!"
                 @warn "    Opacity will be zero if they all rainout of the atmosphere."

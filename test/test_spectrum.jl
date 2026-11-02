@@ -434,6 +434,54 @@ Some more content
     end
 
     # -------------
+    # The gas names of a spectrum loaded into SOCRATES follow block 0 of the spectral file (H2O
+    # first and HCN last in Proudspire), and every gas absorbs in some band when all are loaded.
+    # Removing the continua of gases other than H2O and N2 leaves in each band only continua of
+    # these two gases, as many as were counted before the removal. Keeping every gas removes
+    # nothing (edge case), and keeping no gas of the file removes every continuum, since no band
+    # of Proudspire has a continuum as its major absorber.
+    # -------------
+    @testset "continua_of_other_gases_are_removed_from_each_band" begin
+        SOC = AGNI.atmosphere.SOCRATES
+        version = AGNI.spectrum.get_socrates_version(RAD_DIR)
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "32", "Proudspire.sf")
+        function load_all_gases()
+            sp = SOC.StrSpecData()
+            kw = Dict{Symbol,Any}(:spectrum=>sp, :spectral_file=>spfile)
+            kw[startswith(version, "24") ? :l_all_gasses : :l_all_gases] = true
+            SOC.set_spectrum(; kw...)
+            return sp
+        end
+
+        sp = load_all_gases()
+        names = AGNI.spectrum.spectrum_gas_names(sp, AGNI.spectrum.socrates_gas_list(SOC, version))
+        @test length(names) == 14
+        @test (names[1], names[end]) == ("H2O", "HCN")
+        @test AGNI.spectrum.absorbing_gas_names(sp, names) == names
+
+        keep = ["H2O", "N2"]
+        cont = sp.ContGen
+        nb = sp.Basic.n_band
+        pair(ic) = (names[cont.index_cont_gas_1[ic]], names[cont.index_cont_gas_2[ic]])
+        n_before = sum(cont.n_band_cont[b] for b in 1:nb)
+        n_expect = sum(count(j -> all(in(keep), pair(cont.index_cont[j, b])), 1:cont.n_band_cont[b])
+                       for b in 1:nb)
+        n_removed = AGNI.spectrum.remove_unused_continua!(sp, names, keep)
+        n_after = sum(cont.n_band_cont[b] for b in 1:nb)
+        @test n_after == n_expect
+        @test n_removed == n_before - n_after
+        @test all(all(in(keep), pair(cont.index_cont[j, b])) for b in 1:nb for j in 1:cont.n_band_cont[b])
+        # Discrimination guard: continua were removed, and some of H2O and N2 were kept
+        @test 0 < n_after < n_before
+
+        # Edge cases: keeping every gas removes nothing; keeping no gas of the file removes all
+        sp = load_all_gases()
+        @test AGNI.spectrum.remove_unused_continua!(sp, names, names) == 0
+        @test AGNI.spectrum.remove_unused_continua!(sp, names, ["He"]) == n_before
+        @test sum(sp.ContGen.n_band_cont[b] for b in 1:nb) == 0
+    end
+
+    # -------------
     # Runtime-calculated aerosols appended to a spectral file are read back by SOCRATES with
     # the written values, in the dry-aerosol parametrisation, alongside any aerosols already
     # present. Invalid properties are rejected without modifying the file.
