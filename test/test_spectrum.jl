@@ -60,7 +60,7 @@ end
     # Test count_gases with a real spectral file
     @testset "count_gases_valid" begin
         # Use one of the test spectral files
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         @test isfile(spfile)
         num_gases = AGNI.spectrum.count_gases(spfile)
         @test num_gases > 0
@@ -329,7 +329,7 @@ Some more content
 
         # Setup paths
         tmpdir = mktempdir()
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
 
         # A real spectral file
         @test isfile(spfile)
@@ -416,21 +416,69 @@ Some more content
 
     # -------------
     # Band edges parsed from block 1 of a real spectral file are positive, contiguous, and
-    # increasing; the first band starts at 0.2857 μm in Dayspring/48.
+    # increasing; the first band starts at 0.2 μm in Proudspire/64.
     # -------------
     @testset "band_edges_parsed_from_block_1" begin
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         bands = AGNI.spectrum.read_band_edges(spfile)
-        @test size(bands) == (48, 2)
+        @test size(bands) == (64, 2)
         @test all(bands .> 0.0)
         @test all(bands[:,2] .> bands[:,1])
         @test all(isapprox.(bands[2:end,1], bands[1:end-1,2]; rtol=1e-8))
-        @test isapprox(bands[1,1], 2.857143673e-7; rtol=1e-8)
+        @test isapprox(bands[1,1], 2.000001000e-7; rtol=1e-8)
         # Error contract: missing file, and a file without block 1
         @test_throws ErrorException AGNI.spectrum.read_band_edges(tempname())
         write(temp_sf, "*BLOCK: TYPE =    0\n*END\n")
         @test_throws ErrorException AGNI.spectrum.read_band_edges(temp_sf)
         rm(temp_sf, force=true)
+    end
+
+    # -------------
+    # The gas names of a spectrum loaded into SOCRATES follow block 0 of the spectral file (H2O
+    # first and HCN last in Proudspire), and every gas absorbs in some band when all are loaded.
+    # Removing the continua of gases other than H2O and N2 leaves in each band only continua of
+    # these two gases, as many as were counted before the removal. Keeping every gas removes
+    # nothing (edge case), and keeping no gas of the file removes every continuum, since no band
+    # of Proudspire has a continuum as its major absorber.
+    # -------------
+    @testset "continua_of_other_gases_are_removed_from_each_band" begin
+        SOC = AGNI.atmosphere.SOCRATES
+        version = AGNI.spectrum.get_socrates_version(RAD_DIR)
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "32", "Proudspire.sf")
+        function load_all_gases()
+            sp = SOC.StrSpecData()
+            kw = Dict{Symbol,Any}(:spectrum=>sp, :spectral_file=>spfile)
+            kw[startswith(version, "24") ? :l_all_gasses : :l_all_gases] = true
+            SOC.set_spectrum(; kw...)
+            return sp
+        end
+
+        sp = load_all_gases()
+        names = AGNI.spectrum.spectrum_gas_names(sp, AGNI.spectrum.socrates_gas_list(SOC, version))
+        @test length(names) == 14
+        @test (names[1], names[end]) == ("H2O", "HCN")
+        @test AGNI.spectrum.absorbing_gas_names(sp, names) == names
+
+        keep = ["H2O", "N2"]
+        cont = sp.ContGen
+        nb = sp.Basic.n_band
+        pair(ic) = (names[cont.index_cont_gas_1[ic]], names[cont.index_cont_gas_2[ic]])
+        n_before = sum(cont.n_band_cont[b] for b in 1:nb)
+        n_expect = sum(count(j -> all(in(keep), pair(cont.index_cont[j, b])), 1:cont.n_band_cont[b])
+                       for b in 1:nb)
+        n_removed = AGNI.spectrum.remove_unused_continua!(sp, names, keep)
+        n_after = sum(cont.n_band_cont[b] for b in 1:nb)
+        @test n_after == n_expect
+        @test n_removed == n_before - n_after
+        @test all(all(in(keep), pair(cont.index_cont[j, b])) for b in 1:nb for j in 1:cont.n_band_cont[b])
+        # Discrimination guard: continua were removed, and some of H2O and N2 were kept
+        @test 0 < n_after < n_before
+
+        # Edge cases: keeping every gas removes nothing; keeping no gas of the file removes all
+        sp = load_all_gases()
+        @test AGNI.spectrum.remove_unused_continua!(sp, names, names) == 0
+        @test AGNI.spectrum.remove_unused_continua!(sp, names, ["He"]) == n_before
+        @test sum(sp.ContGen.n_band_cont[b] for b in 1:nb) == 0
     end
 
     # -------------
@@ -441,11 +489,11 @@ Some more content
     @testset "custom_aerosols_round_trip_through_socrates" begin
         SOC = AGNI.atmosphere.SOCRATES
         tmpdir = mktempdir()
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         work = joinpath(tmpdir, "work.sf")
         cp(spfile, work; force=true)
         cp(spfile*"_k", work*"_k"; force=true)
-        nb = 48
+        nb = 64
 
         # Values chosen to vary across bands, so that a band offset would be detected
         ka = [[10.0*b for b in 1:nb], fill(5.0, nb)]
@@ -497,7 +545,7 @@ Some more content
     @testset "custom_aerosols_follow_prep_spec_aerosols" begin
         SOC = AGNI.atmosphere.SOCRATES
         tmpdir = mktempdir()
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         star_file = joinpath(tmpdir, "star.dat")
         wl = collect(range(100.0, 1000.0, length=1000))
         @test AGNI.spectrum.write_to_socrates_format(wl, ones(1000) .* 1e10, star_file, 500)
@@ -506,7 +554,7 @@ Some more content
         outp = joinpath(tmpdir, "runtime.sf")
         @test AGNI.spectrum.insert_blocks(RAD_DIR, spfile, star_file, outp, false, true;
                                             aerosol_avg_files=avg)
-        nb = 48
+        nb = 64
         @test AGNI.spectrum.append_custom_aerosols!(outp, ["sio2"], [101],
                                                     [fill(2.0, nb)], [fill(3.0, nb)], [fill(0.1, nb)])
         lines = readlines(outp)
@@ -605,7 +653,7 @@ Some more content
     # -------------
     @testset "band_average_agrees_with_socrates_scatter_average" begin
         tmpdir = mktempdir()
-        spfile = joinpath(RES_DIR, "spectral_files", "Dayspring", "48", "Dayspring.sf")
+        spfile = joinpath(RES_DIR, "spectral_files", "Proudspire", "64", "Proudspire.sf")
         monfile = joinpath(RES_DIR, "scattering", "soot.mon")
         wl, fl = AGNI.spectrum.load_from_file(joinpath(RES_DIR, "stellar_spectra", "sun.txt"))
         star_file = joinpath(tmpdir, "star.dat")

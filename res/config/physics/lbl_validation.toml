@@ -52,6 +52,7 @@ title = "Line-by-line validation tests"
     rayleigh        = false
     cloud           = false
     overlap_method  = "ro"
+    load_all_opacities = true
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = false

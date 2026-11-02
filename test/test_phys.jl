@@ -350,7 +350,7 @@ const lookup_rho = AGNI.consts._lookup_rho
                                 ("N2"  , 0.1),
                                 ("H2"  , 0.2)
                                 ])
-        spfile_name   ="$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
+        spfile_name   ="$RES_DIR/spectral_files/Proudspire/64/Proudspire.sf"
 
         # Setup atmosphere
         atmos = atmosphere.Atmos_t()

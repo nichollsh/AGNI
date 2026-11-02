@@ -52,6 +52,7 @@ title = "Pure-steam runaway OLR"
     rayleigh        = false
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     real_gas        = true
     thermo_funct    = true
     sensible_heat   = false

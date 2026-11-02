@@ -29,7 +29,7 @@ where $w_g$ are the $k$-term quadrature weights. SOCRATES implements the two-str
 
 ## Opacity sources
 
-The $k$-terms are pre-tabulated from gas line-absorption opacities sourced primarily from the [DACE](https://dace.unige.ch/opacityDatabase/) database [grimm_database_2021](@citep), which draws from the ExoMol and HITEMP molecular line databases [tennyson_exomol_2018, rothman_hitemp_2010](@citep). These are cross-sections integrated over the linelists with a line truncation width of 25 cm$^{-1}$.
+The $k$-terms are pre-tabulated from gas line-absorption opacities into 'spectral files'. In the Generation II spectral files, such as Frostflow, Dayspring and Honeyside, they are sourced primarily from the [DACE](https://dace.unige.ch/opacityDatabase/) database [grimm_database_2021](@citep), which draws from the ExoMol and HITEMP molecular line databases [tennyson_exomol_2018, rothman_hitemp_2010](@citep). These are cross-sections integrated over the linelists with a line truncation width of 25 cm$^{-1}$. The Generation III spectral files are mostly computed from ExoMol line lists. The [PROTEUS spectral files](https://proteus-framework.org/SOCRATES/Reference/proteus_spectral_file_reference.html) page of the SOCRATES documentation lists the gases, line lists, continua and references of every spectral file -- and explains how to choose between them.
 
 Water continuum absorption cross-sections are computed using the MTCKD model [mlawer_mtckd_2012, mlawer_mtckd_2023](@citep). Other continua, including CIA between H₂–H₂ and H₂–He, are taken from the HITRAN collision-induced absorption section [karman_hitran_2019](@citep). Rayleigh scattering, water clouds, and aerosols are also included; see [Aerosols and clouds](@ref).
 
@@ -37,7 +37,7 @@ The flowchart below outlines how these absorption data are converted into a spec
 
 ![](fig_spectral_flowchart.svg)
 
-You can find tools for fitting k-terms and processing line absorption data in the [SOCRATES repository](https://github.com/FormingWorlds/SOCRATES) on GitHub.
+You can find tools for fitting k-terms and processing line absorption data in the [SOCRATES repository](https://github.com/FormingWorlds/SOCRATES) on GitHub. The PROTEUS spectral files are made with the [`spectraltools`](https://github.com/FormingWorlds/SOCRATES/tree/main/spectraltools) scripts in the SOCRATES fork repository. [Building spectral files](https://proteus-framework.org/SOCRATES/Explanations/spectraltools_pipeline.html) in the SOCRATES documentation describes this process in detail.
 
 ## Stellar irradiation
 

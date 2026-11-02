@@ -58,6 +58,7 @@ title = "Deep heating demo"             # Name for this configuration file
     aerosol         = false                     # Include parametrised aerosols from SOCRATES spectral metadata?
     cloud           = false                     # Include water cloud radiative properties?
     overlap_method  = "ee"                      # Method for treating line overlap.
+    load_all_opacities = true                   # Load all gases in the spectral file (true), or only those in the atmosphere (false).
     grey_lw         = 1e-4                      # Grey longwave opacity, used when `input_sf="greygas"`
     grey_sw         = 1e-5                      # Grey shortwave opacity, used when `input_sf="greygas"`
     real_gas        = true                      # Use real gas equation of state where possible?

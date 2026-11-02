@@ -24,7 +24,7 @@ fi
 # User agent string to identify the script to Zenodo and DataverseNL
 os=$(uname -s)
 arch=$(uname -m)
-ua="AGNI/1.13 ($os $arch)"
+ua="AGNI/1.15 ($os $arch)"
 
 # Data servers, which the variables ZENODO_URL and DATAVERSE_URL can replace
 ZENODO_URL=${ZENODO_URL:-https://zenodo.org}
@@ -135,6 +135,46 @@ function mirror_doi {
         15881496) echo 10.34894/FLOPVW ;;
         23419000) echo 10.34894/4LTQIC ;;
         15806626) echo 10.34894/UZIMT2 ;;
+        23806138) echo 10.34894/WOAHQA ;;
+        23806186) echo 10.34894/IF2WVA ;;
+        23806166) echo 10.34894/5WDGHX ;;
+        23806212) echo 10.34894/UWN1FH ;;
+        23806236) echo 10.34894/BVDNWF ;;
+        23808218) echo 10.34894/8FMKZ1 ;;
+        23808200) echo 10.34894/2NXD03 ;;
+        23808184) echo 10.34894/JCQOM5 ;;
+        23808153) echo 10.34894/DU1IQ4 ;;
+        23808117) echo 10.34894/GFM4YD ;;
+        23836927) echo 10.34894/EUKJUR ;;
+        23836953) echo 10.34894/WAPYQF ;;
+        23837412) echo 10.34894/DHR6A2 ;;
+        23837359) echo 10.34894/KWUDYZ ;;
+        23836979) echo 10.34894/T5PEXJ ;;
+        23808230) echo 10.34894/NSMYFR ;;
+        23808244) echo 10.34894/ZWYLPQ ;;
+        23808253) echo 10.34894/BU0CM2 ;;
+        23808259) echo 10.34894/LYW4OT ;;
+        23808275) echo 10.34894/7IFTUX ;;
+        23837929) echo 10.34894/OKCDU3 ;;
+        23838157) echo 10.34894/T3X6DU ;;
+        23838187) echo 10.34894/L2ATPX ;;
+        23838213) echo 10.34894/VPJJNM ;;
+        23838267) echo 10.34894/WKT7MQ ;;
+        23838451) echo 10.34894/1SICM7 ;;
+        23838469) echo 10.34894/SNIUNW ;;
+        23838482) echo 10.34894/XG4C3N ;;
+        23838507) echo 10.34894/FQZ7VO ;;
+        23838562) echo 10.34894/G5LQIL ;;
+        23837505) echo 10.34894/MTXQMZ ;;
+        23837520) echo 10.34894/YSEQFR ;;
+        23837548) echo 10.34894/DAKNRA ;;
+        23837583) echo 10.34894/Z5PEOS ;;
+        23837640) echo 10.34894/S2OGCC ;;
+        23838860) echo 10.34894/H5E4KF ;;
+        23838886) echo 10.34894/XOXL3W ;;
+        23838924) echo 10.34894/TNFEMO ;;
+        23838984) echo 10.34894/U9MBAQ ;;
+        23839054) echo 10.34894/9PAPF8 ;;
         * )
             echo "ERROR: Failed to download $1 from Zenodo, and it has no mirror" >&2
             return 1
@@ -344,6 +384,134 @@ function anyspec {
             rec="15696457"
             ;;
 
+        "Snowline32" )
+            rec="23806138"
+            ;;
+        "Snowline64" )
+            rec="23806186"
+            ;;
+        "Snowline128" )
+            rec="23806166"
+            ;;
+        "Snowline256" )
+            rec="23806212"
+            ;;
+        "Snowline2048" )
+            rec="23806236"
+            ;;
+
+        "Breezehome32" )
+            rec="23808218"
+            ;;
+        "Breezehome64" )
+            rec="23808200"
+            ;;
+        "Breezehome128" )
+            rec="23808184"
+            ;;
+        "Breezehome256" )
+            rec="23808153"
+            ;;
+        "Breezehome2048" )
+            rec="23808117"
+            ;;
+
+        "Cliffshade32" )
+            rec="23836927"
+            ;;
+        "Cliffshade64" )
+            rec="23836953"
+            ;;
+        "Cliffshade128" )
+            rec="23837412"
+            ;;
+        "Cliffshade256" )
+            rec="23837359"
+            ;;
+        "Cliffshade2048" )
+            rec="23836979"
+            ;;
+
+        "Volenfell32" )
+            rec="23808230"
+            ;;
+        "Volenfell64" )
+            rec="23808244"
+            ;;
+        "Volenfell128" )
+            rec="23808253"
+            ;;
+        "Volenfell256" )
+            rec="23808259"
+            ;;
+        "Volenfell2048" )
+            rec="23808275"
+            ;;
+
+        "Proudspire32" )
+            rec="23837929"
+            ;;
+        "Proudspire64" )
+            rec="23838157"
+            ;;
+        "Proudspire128" )
+            rec="23838187"
+            ;;
+        "Proudspire256" )
+            rec="23838213"
+            ;;
+        "Proudspire2048" )
+            rec="23838267"
+            ;;
+
+        "Skyborn32" )
+            rec="23838451"
+            ;;
+        "Skyborn64" )
+            rec="23838469"
+            ;;
+        "Skyborn128" )
+            rec="23838482"
+            ;;
+        "Skyborn256" )
+            rec="23838507"
+            ;;
+        "Skyborn2048" )
+            rec="23838562"
+            ;;
+
+        "Atmora32" )
+            rec="23837505"
+            ;;
+        "Atmora64" )
+            rec="23837520"
+            ;;
+        "Atmora128" )
+            rec="23837548"
+            ;;
+        "Atmora256" )
+            rec="23837583"
+            ;;
+        "Atmora2048" )
+            rec="23837640"
+            ;;
+
+        "Sovngarde32" )
+            rec="23838860"
+            ;;
+        "Sovngarde64" )
+            rec="23838886"
+            ;;
+        "Sovngarde128" )
+            rec="23838924"
+            ;;
+        "Sovngarde256" )
+            rec="23838984"
+            ;;
+        "Sovngarde2048" )
+            rec="23839054"
+            ;;
+
         "Oak318" )
             rec="15743843"
             ;;
@@ -378,8 +546,8 @@ function handle_request {
             echo $help_basic
 
             anyspec Oak 318
-            anyspec Dayspring 48
-            anyspec Dayspring 16
+            anyspec Proudspire 64
+            anyspec Proudspire 32
 
             zenodo 17981836 $stellar sun.txt
 
@@ -392,15 +560,16 @@ function handle_request {
 
         "highres")
             echo $help_highres
-            anyspec Honeyside 4096
+            anyspec Sovngarde 2048
             ;;
 
         "steam")
             echo $help_steam
-            anyspec Frostflow 16
-            anyspec Frostflow 48
-            anyspec Frostflow 256
-            anyspec Frostflow 4096
+            anyspec Snowline 32
+            anyspec Snowline 64
+            anyspec Snowline 128
+            anyspec Snowline 256
+            anyspec Snowline 2048
             ;;
 
         "anyspec")

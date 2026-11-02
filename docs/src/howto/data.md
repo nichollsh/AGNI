@@ -10,18 +10,31 @@ root directory. To see how to use this script, run it without arguments:
 
 ## Spectral files
 
-Opacities are contained within "spectral files". Use the table within
-`res/spectral_files/reference.pdf` to decide which spectral files are best for you.
+Opacities are contained within "spectral files". Each spectral file is identified by a
+codename and a number of bands, and consists of two files: `<Codename>.sf` and its
+k-coefficient tables `<Codename>.sf_k`.
 
-For example, if you wanted to get the spectral file "Honeyside48" you would run:
+The spectral files available for AGNI are described in the
+[SOCRATES documentation](https://proteus-framework.org/SOCRATES/). Use it to decide which spectral file is best for you:
+
+- [PROTEUS spectral files](https://proteus-framework.org/SOCRATES/Reference/proteus_spectral_file_reference.html)
+  lists every codename with its gases, continua, band counts, data sources, references and  Zenodo records, and gives advice on
+  [choosing a spectral file](https://proteus-framework.org/SOCRATES/Reference/proteus_spectral_file_reference.html#choosing-a-spectral-file).
+- [Spectral files](https://proteus-framework.org/SOCRATES/Explanations/spectral_files.html) explains what each spectral file contains.
+- [Validation](https://proteus-framework.org/SOCRATES/Reference/spectral_file_validation.html) compares the Generation III spectral files with published runaway greenhouse calculations, and shows how their results change with the number of wavenumber bands.
+
+Download a spectral file by passing its codename and number of bands to the `get_data` script. For example, to get the spectral file "Honeyside48" you would run:
 ```bash
 ./src/get_data.sh anyspec Honeyside 48
 ```
+To get the Generation III water spectral file "Snowline" with 128 bands:
+```bash
+./src/get_data.sh anyspec Snowline 128
+```
+The files are placed in `res/spectral_files/<Codename>/<bands>/`. 
 
-Additional spectral files can also be downloaded directly from the
+Other spectral files can be downloaded directly from the
 [PROTEUS community on Zenodo](https://zenodo.org/communities/proteus_framework/records?q&f=subject%3Aspectral_files&l=list&p=1&s=10&sort=newest).
-
-A menu of the available spectral files is [available on the SOCRATES documentation website](https://proteus-framework.org/SOCRATES/Reference/proteus_spectral_file_reference.html).
 
 !!! tip "Get missing spectral files"
     See [Spectral file does not exist](@ref) in the troubleshooting guide if a spectral

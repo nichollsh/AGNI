@@ -51,6 +51,7 @@ title = "Grey gas"
     rayleigh        = false
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     grey_lw         = 1e-4
     grey_sw         = 1e-5
     real_gas        = true

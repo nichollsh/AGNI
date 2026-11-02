@@ -254,7 +254,7 @@ end
     # -----------------------------------------------------------------
     @testset "spectral_file_not_found" begin
         atmos = atmosphere.Atmos_t()
-        bogus_sf = joinpath(ROOT_DIR, "res", "spectral_files", "Dayspring", "16", "NoSuchFile.sf")
+        bogus_sf = joinpath(ROOT_DIR, "res", "spectral_files", "Proudspire", "32", "NoSuchFile.sf")
         @test !isfile(bogus_sf)
 
         ok = atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,

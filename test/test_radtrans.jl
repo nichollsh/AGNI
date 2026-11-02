@@ -51,7 +51,7 @@ end
                                 ("H2O" , 0.8),
                                 ("CO2" , 0.2),
                                 ])
-        spfile_name   = "$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
+        spfile_name   = "$RES_DIR/spectral_files/Proudspire/64/Proudspire.sf"
 
         # Setup atmosphere
         atmos = atmosphere.Atmos_t()
@@ -64,7 +64,7 @@ end
                                 mf_dict,"",
                                 flag_gcontinuum=false,
                                 flag_rayleigh=false,
-                                overlap_method="ro",
+                                overlap_method="rorr",
                                 real_gas=false
                         )
         atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
@@ -378,7 +378,7 @@ end
                                 ("H2O" , 0.6),
                                 ("CO2" , 0.4),
                                 ])
-        spfile_name   = "$RES_DIR/spectral_files/Dayspring/48/Dayspring.sf"
+        spfile_name   = "$RES_DIR/spectral_files/Proudspire/64/Proudspire.sf"
 
         # Setup atmosphere
         atmos = atmosphere.Atmos_t()
@@ -391,7 +391,7 @@ end
                                 mf_dict, "",
                                 flag_gcontinuum=true,
                                 flag_rayleigh=true,
-                                overlap_method="ro",
+                                overlap_method="rorr",
                                 real_gas=false
                         )
         atmosphere.allocate!(atmos,"$RES_DIR/stellar_spectra/sun.txt")
@@ -407,8 +407,8 @@ end
         val_o = atmos.flux_u_sw[1]
         @test isapprox(val_e, val_o; rtol=rtol)
 
-        # check known value
-        val_e = 37.12571350789956
+        # check known value, for Proudspire/64 with resort-rebin overlap
+        val_e = 55.01006
         val_o = atmos.flux_u_sw[20]
         test_check = isapprox(val_e, val_o; rtol=1e-3)
         if !test_check
@@ -562,7 +562,7 @@ end
     #   - in the optically thin limit the flux perturbation is linear in MMR
     # -------------
     @testset "mie_aerosol_changes_fluxes_monotonically" begin
-        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        spfile = "$RES_DIR/spectral_files/Proudspire/32/Proudspire.sf"
         aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>0.0, "nk_file"=>"SiO2_amorph",
                                     "r_eff"=>1e-6, "sigma_g"=>1.65))
         atmos = atmosphere.Atmos_t()
@@ -622,7 +622,7 @@ end
     # validation would normally catch this, so the material is changed after setup!.
     # -------------
     @testset "mie_failure_returns_false_from_allocate" begin
-        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        spfile = "$RES_DIR/spectral_files/Proudspire/32/Proudspire.sf"
         aer = Dict("sio2" => Dict("method"=>"mie", "mmr"=>1e-6, "nk_file"=>"SiO2_amorph",
                                     "r_eff"=>1e-6, "sigma_g"=>1.65))
         atmos = atmosphere.Atmos_t()
@@ -650,7 +650,7 @@ end
     # -------------
     @testset "cloud_requires_droplet_block" begin
         tmpdir = mktempdir()
-        spfile = "$RES_DIR/spectral_files/Dayspring/16/Dayspring.sf"
+        spfile = "$RES_DIR/spectral_files/Proudspire/32/Proudspire.sf"
 
         # copy of the spectral file with block 10 stripped
         stripped = joinpath(tmpdir, "noblock10.sf")
@@ -686,5 +686,121 @@ end
             expect && atmosphere.deallocate!(atmos)
         end
         rm(tmpdir; force=true, recursive=true)
+    end
+
+    # Set up an atmosphere on Proudspire/32, loading all gases of the spectral file or only
+    # those in vmr, and solve the radiative transfer on a log-linear T(p) profile
+    function _named_gases_atmos(vmr, load_all; overlap="ee", cont=true, ray=true,
+                                tmp_surf=1500.0, isothermal=false)
+        atmos = atmosphere.Atmos_t()
+        atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR,
+                          "$RES_DIR/spectral_files/Proudspire/32/Proudspire.sf",
+                          1800.0, 0.375, 0.0, 48.19, tmp_surf, 9.81, 6.37e6,
+                          30, 100.0, 1e-5, vmr, "";
+                          flag_gcontinuum=cont, flag_rayleigh=ray, overlap_method=overlap,
+                          real_gas=false, load_all_opacities=load_all) || error("setup failed")
+        with_logger(MinLevelLogger(current_logger(), Logging.Error+1)) do
+            atmosphere.allocate!(atmos, "$RES_DIR/stellar_spectra/sun.txt"; check_safe_gas=false)
+        end || error("allocate failed")
+        isothermal ? setpt.isothermal!(atmos, tmp_surf) : setpt.loglinear!(atmos, 300.0)
+        atmosphere.calc_layer_props!(atmos)
+        energy.radtrans!(atmos, true)
+        energy.radtrans!(atmos, false)
+        return atmos
+    end
+
+    # -------------
+    # Loading only the gases of an H2O/CO2/N2 atmosphere removes the 11 absent gases of
+    # Proudspire from each band, and the continua that involve them. The removed gases have
+    # zero abundance, and H2O (the first-listed absorber in every band of Proudspire) is still
+    # loaded, so the longwave and shortwave fluxes must equal those with all gases loaded, for
+    # both equivalent extinction and random overlap with resorting and rebinning.
+    # -------------
+    @testset "named_gases_reproduce_all_gas_fluxes" begin
+        vmr = Dict("H2O"=>0.1, "CO2"=>0.75, "N2"=>0.15)
+        named = ["CO2", "H2O", "N2"]
+        for (overlap, rt) in (("ee", 1e-8), ("rorr", 1e-6))
+            A = _named_gases_atmos(vmr, true; overlap=overlap)
+            B = _named_gases_atmos(vmr, false; overlap=overlap)
+            @test A.load_all_opacities
+            @test !B.load_all_opacities
+            @test length(spectrum.absorbing_gas_names(A.spectrum, A.gas_soc_names)) == 14
+            @test sort(spectrum.absorbing_gas_names(B.spectrum, B.gas_soc_names)) == named
+
+            # every continuum kept in a band involves only named gases
+            cont = B.spectrum.ContGen
+            gas_names = B.gas_soc_names
+            kept = [(gas_names[cont.index_cont_gas_1[cont.index_cont[j, b]]],
+                     gas_names[cont.index_cont_gas_2[cont.index_cont[j, b]]])
+                    for b in 1:B.nbands for j in 1:cont.n_band_cont[b]]
+            @test !isempty(kept)
+            @test all(g1 in named && g2 in named for (g1, g2) in kept)
+
+            # Discrimination guard: absorbers and continua were removed from the bands
+            nabs(x) = sum(x.spectrum.Gas.n_band_absorb[b] for b in 1:x.nbands)
+            ncont(x) = sum(x.spectrum.ContGen.n_band_cont[b] for b in 1:x.nbands)
+            @test nabs(B) < nabs(A) / 2
+            @test ncont(B) < ncont(A) / 2
+
+            # fluxes agree; recompute both bands in turn, since radtrans! overwrites them
+            for lw in (true, false)
+                energy.radtrans!(A, lw)
+                energy.radtrans!(B, lw)
+                FA = lw ? A.flux_u_lw : A.flux_u_sw
+                FB = lw ? B.flux_u_lw : B.flux_u_sw
+                @test all(isapprox.(FB, FA; rtol=rt, atol=1e-12))
+            end
+
+            # Discrimination guard: the atmosphere is optically thick in the longwave, so the
+            # agreement above is not that of two transparent columns
+            energy.radtrans!(A, true)
+            @test A.flux_u_lw[1] < 0.9 * consts.σSB * 1500.0^4
+            atmosphere.deallocate!(A)
+            atmosphere.deallocate!(B)
+        end
+    end
+
+    # -------------
+    # Edge case: an atmosphere of He alone, which Proudspire does not contain. With only the
+    # named gases, no absorber is loaded in any band; with all gases, every absorber has zero
+    # abundance. Without continua or Rayleigh scattering the column is transparent, so in both
+    # cases the OLR of an isothermal 1000 K atmosphere is that of a blackbody surface, σT⁴.
+    # The 1e-4 tolerance covers the band integration of the Planck function (1.7e-5 here).
+    # -------------
+    @testset "named_gases_absent_from_file_leave_a_transparent_column" begin
+        T = 1000.0
+        A = _named_gases_atmos(Dict("He"=>1.0), true; cont=false, ray=false,
+                               tmp_surf=T, isothermal=true)
+        B = _named_gases_atmos(Dict("He"=>1.0), false; cont=false, ray=false,
+                               tmp_surf=T, isothermal=true)
+        @test isempty(spectrum.absorbing_gas_names(B.spectrum, B.gas_soc_names))
+        @test sum(B.spectrum.Gas.n_band_absorb[b] for b in 1:B.nbands) == 0
+        energy.radtrans!(A, true)
+        energy.radtrans!(B, true)
+        @test isapprox(A.flux_u_lw[1], consts.σSB * T^4; rtol=1e-4)
+        @test isapprox(B.flux_u_lw[1], A.flux_u_lw[1]; rtol=1e-10)
+        # Discrimination guard: a 1 % error in temperature would change σT⁴ by 4 %
+        @test !isapprox(B.flux_u_lw[1], consts.σSB * (1.01*T)^4; rtol=1e-4)
+        atmosphere.deallocate!(A)
+        atmosphere.deallocate!(B)
+    end
+
+    # -------------
+    # Chemistry needs every gas: setup! loads all gases when use_all_vols or use_all_gases is
+    # set (as when FastChem is enabled), even if load_all_opacities is false. Without them, the
+    # requested selection is kept (positive control).
+    # -------------
+    @testset "chemistry_flags_force_loading_all_gases" begin
+        sf = "$RES_DIR/spectral_files/Proudspire/32/Proudspire.sf"
+        vmr = Dict("H2O"=>0.1, "CO2"=>0.9)
+        for (vols, gases, expect) in ((true, false, true), (false, true, true), (false, false, false))
+            atmos = atmosphere.Atmos_t()
+            @test atmosphere.setup!(atmos, ROOT_DIR, OUT_DIR, sf,
+                                    1000.0, 1.0, 0.0, 45.0, 300.0, gravity, radius,
+                                    20, 1.0, 1e-5, vmr, "";
+                                    load_all_opacities=false, use_all_vols=vols,
+                                    use_all_gases=gases, real_gas=false)
+            @test atmos.load_all_opacities == expect
+        end
     end
 end

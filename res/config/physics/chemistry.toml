@@ -15,7 +15,7 @@ title = "Chemistry by metallicity"
     wind_speed      = 2.0
 
 [files]
-    input_sf        = "res/spectral_files/Honeyside/48/Honeyside.sf"
+    input_sf        = "res/spectral_files/Proudspire/64/Proudspire.sf"
     input_star      = "res/stellar_spectra/hd97658.txt"
     output_dir      = "out/"
     io_dir          = "/tmp/agni/"
@@ -51,6 +51,7 @@ title = "Chemistry by metallicity"
     rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = false

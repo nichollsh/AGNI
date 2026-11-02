@@ -51,6 +51,7 @@ title = "Grey gas with thermal conduction"
     rayleigh        = false
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     grey_lw         = 1e-3
     grey_sw         = 1e-2
     real_gas        = true

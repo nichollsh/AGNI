@@ -46,7 +46,7 @@ Input/output files and other paths.
 
 | Parameter          | Description   |
 | -----------------: | :------------ |
-| `input_sf       `  | Path to the desired spectral file in `res/spectral_files/`. If "greygas", uses double-grey RT scheme. |
+| `input_sf       `  | Path to the desired spectral file in `res/spectral_files/`. If "greygas", uses double-grey RT scheme. See [Obtaining input data](@ref) for how to choose a spectral file. |
 | `input_star     `  | Path to stellar spectrum. If blank, spectrum assumed to be inside spectral file. If "blackbody" must provide `planet.star_Teff`. |
 | `output_dir     `  | Path to the output directory. |
 | `io_dir         `  | Path for fast I/O operations (optional, defaults to `output_dir`). |
@@ -143,6 +143,7 @@ Parameters that describe how the model should treat the physics.
 | `aerosol       `  | Include aerosols in radiative transfer (true/false). Aerosols are configured in `[composition.aerosols.<name>]`. |
 | `cloud         `  | Include water clouds in radiative transfer (true/false). Requires a spectral file containing droplet data. |
 | `overlap_method`  | Method for treating overlapping gas opacities within a given spectral band (see [Configuring AGNI](@ref)). |
+| `load_all_opacities` | Load all gases in the spectral file (true, the default), or only the gases in the atmosphere (false); see [Configuring AGNI](@ref). Always true when `chemistry` is enabled. |
 | `grey_lw`         | Grey opacity [m2/kg] of longwave (thermal) radiation. Used when `input_sf="greygas"`. |
 | `grey_sw`         | Grey opacity [m2/kg] of shortwave (stellar) radiation. Used when `input_sf="greygas"`. |
 | `real_gas      `  | Use real-gas equation(s) of state where possible (true/false). |
