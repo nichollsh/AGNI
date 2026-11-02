@@ -48,6 +48,7 @@ title = "Transparent atmosphere"
     cloud           = false
     aerosol         = false
     overlap_method  = "ee"
+    load_all_opacities = true
     real_gas        = false
     thermo_funct    = false
     sensible_heat   = false

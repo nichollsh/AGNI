@@ -50,6 +50,7 @@ title = "L 98-59 d"
     rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     real_gas        = true
     thermo_funct    = true
     sensible_heat   = true

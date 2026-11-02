@@ -53,6 +53,7 @@ module atmosphere
     const CFG_skin_k::Float64           = 2.0
     const CFG_benchmark_rt::Bool        = false
     const CFG_overlap_method::String    = "ee"
+    const CFG_load_all_opacities::Bool  = true
     const CFG_target_olr::Float64       = 250.0
     const CFG_flux_int::Float64         = 0.0
     const CFG_all_channels::Bool        = true
@@ -176,6 +177,7 @@ module atmosphere
         instellation::Float64           # Solar flux at top of atmopshere [W m-2]
         s0_fact::Float64                # Scale factor to instellation (see Cronin+14)
         overlap_method::String          # Absorber overlap method to be used
+        load_all_opacities::Bool        # Load all gases in the spectral file, or only those in the atmosphere
         κ_grey_lw::Float64              # LW opacity used for grey-gas scheme [m2 kg-1]
         κ_grey_sw::Float64              # SW opacity used for grey-gas scheme [m2 kg-1]
 
@@ -690,6 +692,7 @@ module atmosphere
     - `skin_d::Float64`                 skin thickness [m].
     - `skin_k::Float64`                 skin thermal conductivity [W m-1 K-1].
     - `overlap_method::String`          gaseous overlap scheme (ro: rand overlap, ee: equiv extinct, rorr: ro+resort+rebin).
+    - `load_all_opacities::Bool`        load all gases in the spectral file into SOCRATES, rather than only the gases in the atmosphere (always true with use_all_gases or use_all_vols).
     - `target_olr::Float64`             target OLR [W m-2] for sol_type==4.
     - `flux_int::Float64`               planet's internal flux for sol_type==3.
     - `all_channels::Bool`              use all channels available for RT?
@@ -769,6 +772,7 @@ module atmosphere
 
                     benchmark_rt::Bool =        CFG_benchmark_rt,
                     overlap_method::String =    CFG_overlap_method,
+                    load_all_opacities::Bool =  CFG_load_all_opacities,
                     target_olr::Float64 =       CFG_target_olr,
                     flux_int::Float64 =         CFG_flux_int,
                     all_channels::Bool  =       CFG_all_channels,
@@ -980,6 +984,9 @@ module atmosphere
 
         atmos.all_channels =    all_channels
         atmos.overlap_method =  overlap_method
+
+        # All gases are loaded when chemistry is used (use_all_gases or use_all_vols)
+        atmos.load_all_opacities = load_all_opacities || use_all_gases || use_all_vols
 
         atmos.demixing      = demixing
         atmos.real_gas      =   real_gas
@@ -2019,15 +2026,50 @@ module atmosphere
             # Read-in spectral file path to be used at runtime
             atmos.control.spectral_file = spectral_file_run
 
-            # Set spectrum in SOCRATES
-            set_spectrum_kwargs = Dict(:spectrum=>atmos.spectrum,
-                                        :spectral_file=>atmos.control.spectral_file)
+            # Set spectrum in SOCRATES. Unless all gases are loaded, SOCRATES removes the
+            #   gases that are not in the atmosphere from each band (compress_spectrum).
+            soc_gases = spectrum.socrates_gas_list(SOCRATES, atmos.SOCRATES_VERSION)
+            gas_select = Dict{Symbol,Any}()
+            if !atmos.load_all_opacities
+                soc_kwargs = Base.kwarg_decl(first(methods(SOCRATES.set_spectrum)))
+                no_flag =[g for g in atmos.gas_names if (g in soc_gases) &&
+                                                !(Symbol("l_"*lowercase(g)) in soc_kwargs)]
+                if isempty(no_flag)
+                    for g in atmos.gas_names
+                        if Symbol("l_"*lowercase(g)) in soc_kwargs
+                            gas_select[Symbol("l_"*lowercase(g))] = true
+                        end
+                    end
+                else
+                    @warn "SOCRATES cannot select $(join(no_flag, ", ")) when loading the " *
+                            "spectral file, so all gases will be loaded"
+                    atmos.load_all_opacities = true
+                end
+            end
+            set_spectrum_kwargs = Dict{Symbol,Any}(:spectrum=>atmos.spectrum,
+                                        :spectral_file=>atmos.control.spectral_file, gas_select...)
             if startswith(atmos.SOCRATES_VERSION, "24")
-                set_spectrum_kwargs[:l_all_gasses] = true
+                set_spectrum_kwargs[:l_all_gasses] = atmos.load_all_opacities
             else
-                set_spectrum_kwargs[:l_all_gases] = true
+                set_spectrum_kwargs[:l_all_gases] = atmos.load_all_opacities
             end
             SOCRATES.set_spectrum(; set_spectrum_kwargs...)
+
+            if !atmos.load_all_opacities
+                # Every gas of the atmosphere that is in the spectral file must be kept
+                in_file = spectrum.spectrum_gas_names(atmos.spectrum, soc_gases)
+                loaded  = spectrum.absorbing_gas_names(atmos.spectrum, in_file)
+                dropped = [g for g in atmos.gas_names if (g in in_file) && !(g in loaded)]
+                if !isempty(dropped)
+                    @error "Gases $(join(dropped, ", ")) were not loaded from the spectral file"
+                    @error "    Set `load_all_opacities=true` to load all gas opacities"
+                    return false
+                end
+                n_cont = spectrum.remove_unused_continua!(atmos.spectrum, in_file, atmos.gas_names)
+                @info "Loaded $(length(loaded))/$(atmos.spectrum.Gas.n_absorb) gas opacities"
+                @debug "    Removed $(atmos.spectrum.Gas.n_absorb - length(loaded)) unused gases"
+                @debug "    Removed $n_cont unused continua"
+            end
 
             # Remove temporary star file if it exists
             rm(socstar, force=true)
@@ -2263,17 +2305,13 @@ module atmosphere
 
             # Check supported gases
             atmos.gas_soc_num       = atmos.spectrum.Gas.n_absorb               # number of gases
-            atmos.gas_soc_names     = Array{String}(undef, atmos.gas_soc_num)   # list of names
-            for i_gas in 1:atmos.gas_soc_num   # for each supported gas
-                if startswith(atmos.SOCRATES_VERSION, "24")
-                    atmos.gas_soc_names[i_gas] = SOCRATES.input_head_pcf.header_gas[atmos.spectrum.Gas.type_absorb[i_gas]]
-                else
-                    atmos.gas_soc_names[i_gas] = SOCRATES.gas_list_pcf.header_gas[  atmos.spectrum.Gas.type_absorb[i_gas]]
-                end
-            end
+            atmos.gas_soc_names     = spectrum.spectrum_gas_names(atmos.spectrum, soc_gases)
 
             # Warn user if all absorbers are condensable, which risks opacity going to zero
-            if issubset(atmos.gas_soc_names, atmos.condensates)
+            loaded = spectrum.absorbing_gas_names(atmos.spectrum, atmos.gas_soc_names)
+            if isempty(loaded)
+                @warn "No atmosphere gases contain opacity data in the spectral file"
+            elseif issubset(loaded, atmos.condensates)
                 @warn "All absorbers are marked as condensable!"
                 @warn "    Opacity will be zero if they all rainout of the atmosphere."
             end

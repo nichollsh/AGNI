@@ -235,6 +235,11 @@ end
         cfg["plots"]["extension"] = "invalidext"
         @test AGNI.run_from_config(cfg) == false
 
+        # load_all_opacities must be a Bool
+        cfg = _base_cfg()
+        cfg["physics"]["load_all_opacities"] = "yes"
+        @test AGNI.run_from_config(cfg) == false
+
         # latent heat requires rainout
         cfg = _base_cfg()
         cfg["physics"]["latent_heat"] = true

@@ -53,6 +53,7 @@ title = "Ocean formation test"
     rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true

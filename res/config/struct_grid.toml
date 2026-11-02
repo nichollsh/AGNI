@@ -54,6 +54,7 @@ title = "Base config for structure calcs"
     rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     grey_lw         = 5e-3
     grey_sw         = 2e-4
     real_gas        = true
