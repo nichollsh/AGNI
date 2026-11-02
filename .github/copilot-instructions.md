@@ -57,6 +57,12 @@ julia agni.jl res/config/hotdry.toml  # use a specific config
 julia --project test/runtests.jl
 ```
 
+### Limit the memory used by tests
+On Linux, run the tests in a systemd scope with a memory cap, so that a run which uses too much memory is stopped on its own instead of exhausting the memory of the machine:
+```bash
+systemd-run --user --scope -q -p MemoryMax=10G -p MemorySwapMax=0 julia --project test/runtests.jl
+```
+
 ### Run fast tests only (skips integration tests, etc.)
 ```bash
 julia --project test/runtests.jl fast
