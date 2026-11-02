@@ -86,19 +86,13 @@ for a comparison.
 ## Gases loaded from the spectral file
 
 By default, AGNI loads every gas in the spectral file into SOCRATES, including gases that
-are not in the atmosphere. With `physics.load_all_opacities = false`, SOCRATES loads only the
-gases in the composition of the atmosphere, and AGNI removes the continua that involve other
-gases. Each band then includes fewer absorbers, which makes the radiative transfer faster
-when the spectral file contains many more gases than the atmosphere. For an atmosphere of
-H₂O, CO₂ and N₂ with Proudspire 32, each longwave calculation takes about a third less time
-with `"ee"`, and about half the time with `"rorr"`.
+are not in the atmosphere. With `physics.load_all_opacities = false`, SOCRATES loads only the gases in the composition of the atmosphere. Each band then includes fewer absorbers, which makes the RT faster. For an atmosphere of H₂O, CO₂ and N₂ with Proudspire 32, each longwave calculation takes about a third less time with `"ee"`, and about half the time with `"rorr"` (with this flag set to `physics.load_all_opacities=false`).
 
 The fluxes do not change when the first gas listed in each band of the spectral file is in
 the atmosphere, since the gases left out have zero abundance. SOCRATES treats the first gas
-listed in a band as its major absorber; when that gas is not in the atmosphere, loading only
-the named gases makes another gas the major absorber, which changes the fluxes.
+listed in a band as its major absorber.
 
-All gases are always loaded when `physics.chemistry` is enabled.
+All opacities and gases are always loaded when `physics.chemistry=true`.
 
 ## Transparent atmosphere
 
