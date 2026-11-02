@@ -24,7 +24,7 @@ fi
 # User agent string to identify the script to Zenodo and DataverseNL
 os=$(uname -s)
 arch=$(uname -m)
-ua="AGNI/1.13 ($os $arch)"
+ua="AGNI/1.15 ($os $arch)"
 
 # Data servers, which the variables ZENODO_URL and DATAVERSE_URL can replace
 ZENODO_URL=${ZENODO_URL:-https://zenodo.org}
