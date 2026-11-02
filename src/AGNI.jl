@@ -379,6 +379,17 @@ module AGNI
             use_all_vols = true
         end
 
+        #    gases loaded into SOCRATES from the spectral file
+        load_all_opacities = get(cfg["physics"], "load_all_opacities", atmosphere.CFG_load_all_opacities)
+        if !(load_all_opacities isa Bool)
+            @error "Config: physics.load_all_opacities must be true or false"
+            return false
+        end
+        if chem && !load_all_opacities
+            @warn "Config: chemistry is enabled, so all gases in the spectral file will be loaded"
+            load_all_opacities = true
+        end
+
         #    RFM radtrans
         rfm_parfile::String = consts.UNSET_STR
         rfm_wn_min::Float64 = atmosphere.CFG_rfm_wn_min
@@ -554,6 +565,7 @@ module AGNI
                                 aerosol_species   = aerosol_species,
                                 benchmark_rt      = get(cfg["execution"], "benchmark_rt", atmosphere.CFG_benchmark_rt),
                                 overlap_method    = cfg["physics"]["overlap_method"],
+                                load_all_opacities = load_all_opacities,
                                 real_gas          = real_gas,
                                 demixing          = demixing,
                                 thermo_functions  = cfg["physics"]["thermo_funct"],
