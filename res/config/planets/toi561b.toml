@@ -48,6 +48,7 @@ title = "TOI-561 b"
     rayleigh        = false
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = false

@@ -50,6 +50,7 @@ title = "Hot and dry"
     rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = false
     real_gas        = true
     thermo_funct    = true
     sensible_heat   = true

@@ -49,6 +49,7 @@ title = "K2-18 b, mixed"
     rayleigh        = true
     cloud           = false
     overlap_method  = "ee"
+    load_all_opacities = true
     real_gas        = false
     thermo_funct    = true
     sensible_heat   = true
