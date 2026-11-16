@@ -14,7 +14,7 @@ module species
     # Import packages
     using NCDatasets
     using LoggingExtras
-    import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation
+    import Interpolations: interpolate, Gridded, Linear, Flat, extrapolate, Extrapolation, deduplicate_knots!
 
     # Import local modules
     using ..consts
@@ -353,6 +353,8 @@ module species
                     end
 
                     # interpolate to 2D grid
+                    deduplicate_knots!(gas.eos_T)
+                    deduplicate_knots!(gas.eos_P)
                     gas.eos_I = extrapolate(interpolate(
                                                         (gas.eos_T,gas.eos_P), gas.eos_ρ,
                                                         Gridded(Linear())), # linear interp.
@@ -370,6 +372,9 @@ module species
             end
 
             # Setup 1D interpolators for Cp, Lv, and Psat
+            deduplicate_knots!(gas.cap_T)
+            deduplicate_knots!(gas.lat_T)
+            deduplicate_knots!(gas.sat_T)
             gas.cap_I = extrapolate(interpolate((gas.cap_T,), gas.cap_C, Gridded(Linear())), Flat())
             gas.lat_I = extrapolate(interpolate((gas.lat_T,), gas.lat_H, Gridded(Linear())), Flat())
             gas.sat_I = extrapolate(interpolate((gas.sat_T,), gas.sat_P, Gridded(Linear())), Flat())

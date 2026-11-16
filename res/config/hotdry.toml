@@ -22,7 +22,7 @@ title = "Hot and dry"
 
 [composition]
     p_surf          = 2700.0
-    p_top           = 1e-5
+    p_top           = 1e-8
     vmr_dict        = { H2O = 1.0}
     condensates     = []
 
@@ -36,7 +36,7 @@ title = "Hot and dry"
     solver          = "newton"
     dx_max          = 400.0
     initial_state   = ["iso","2300"]
-    linesearch      = 0
+    linesearch      = 3
     easy_start      = false
     grey_start      = false
     converge_atol   = 1.0e-1
@@ -57,7 +57,7 @@ title = "Hot and dry"
     conduction      = true
     latent_heat     = false
     convection      = true
-    convection_crit = "l"
+    convection_crit = "s"
     rainout         = false
     oceans          = false
     grey_lw         = 5e-3
