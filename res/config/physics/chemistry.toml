@@ -22,7 +22,7 @@ title = "Chemistry by metallicity"
 
 [composition]
     p_surf          = 5000.0
-    p_top           = 1e-5
+    p_top           = 1e-8
     metallicities   = {"C"=1.0, "S"=1.0, "O"=1.0, "N"=1.0}  # by mass fraction relative to H (solar is 0.01)
     condensates     = []
 
@@ -31,12 +31,12 @@ title = "Chemistry by metallicity"
     verbosity       = 1
     max_steps       = 20000
     max_runtime     = 400
-    num_levels      = 40
+    num_levels      = 48
     solution_type   = 3
     solver          = "newton"
     dx_max          = 100.0
     initial_state   = ["loglin", "800"]
-    linesearch      = 1
+    linesearch      = 3
     easy_start      = false
     grey_start      = false
     grey_lw         = 5e-2
@@ -58,7 +58,7 @@ title = "Chemistry by metallicity"
     conduction      = true
     latent_heat     = false
     convection      = true
-    convection_crit = "l"
+    convection_crit = "s"
     rainout         = false
     oceans          = false
 

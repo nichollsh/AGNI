@@ -27,7 +27,7 @@ title = "AGNI configuration file for test suite"
 
 [composition]
     p_surf          = 7000.0
-    p_top           = 1e-5
+    p_top           = 1e-8
     vmr_dict        = { H2O=0.1, CO2=0.75, N2=0.05}
     condensates     = ["H2O"]
 
@@ -36,12 +36,12 @@ title = "AGNI configuration file for test suite"
     verbosity       = 1
     max_steps       = 300
     max_runtime     = 400
-    num_levels      = 44
+    num_levels      = 48
     solution_type   = 3
     solver          = "newton"
     dx_max          = 150.0
     initial_state   = ["iso", "700"]
-    linesearch      = 1
+    linesearch      = 3
     easy_start      = true
     grey_start      = false
     converge_atol   = 1.0
@@ -75,8 +75,8 @@ title = "AGNI configuration file for test suite"
     contribution    = true
     optical_depth   = true
     emission        = true
-    albedo          = false
-    mixing_ratios   = false
+    albedo          = true
+    mixing_ratios   = true
     animate         = true
-    height          = false
-    cloud           = false
+    height          = true
+    cloud           = true
