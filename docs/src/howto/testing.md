@@ -33,8 +33,10 @@ julia --project test/runtests.jl fast
 From the AGNI root directory:
 
 ```bash
-julia --project --code-coverage test/runtests.jl
+julia --project --code-coverage=@$PWD/src test/runtests.jl
 ```
+
+The `@$PWD/src` argument limits coverage tracking to AGNI's own source files. Plain `--code-coverage` also instruments every dependency, which makes the tests many times slower. On one machine, for example, the `phys` tests took 16 minutes with plain `--code-coverage` and 49 seconds with the restricted form.
 
 #### Process Coverage Data
 From the AGNI root directory:
@@ -151,9 +153,9 @@ export RAD_DIR=/path/to/SOCRATES
 The test suite expects spectral files in `res/spectral_files/`. Ensure AGNI's resource directory is complete.
 
 ### Coverage is 0% or unexpectedly low
-- Make sure you ran tests with `--code-coverage` flag
+- Make sure you ran the tests with the `--code-coverage=@$PWD/src` flag
 - Run `runcoverage.jl` from the AGNI root directory (not `test/`)
-- Check that `.cov` files were generated in `src/` and `test/`
+- Check that `.cov` files were generated in `src/`
 
 ## Test Maintenance
 
