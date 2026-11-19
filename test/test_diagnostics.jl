@@ -77,7 +77,7 @@ end
     #   τ_cond ∝ Δz²; τ_cond/τ_rad = 4σT³Δz/k by hydrostatic balance; the zero-conductivity
     #   limit returns +Inf rather than NaN or a negative time.
     @testset "timescales" begin
-        σ_codata = 5.670374419e-8   # W m-2 K-4, written out so the pins do not reuse phys.σSB
+        σ_codata = 5.670374419e-8   # W m-2 K-4, written out rather than using phys.σSB
 
         # The tests above overwrite cp, k and density with arbitrary values, so restore
         #   physically consistent layer properties for the isothermal 400 K N2 column
@@ -172,7 +172,7 @@ end
 
         @testset "conductive_timescale_matches_diffusion" begin
             # Air near 1 bar and 300 K (k = 0.026 W/m/K, ρ = 1.16 kg/m3, cp = 1005 J/kg/K)
-            #   across a 100 m layer. Δz = 100 m is chosen so that Δz² and Δz differ by 100x.
+            #   across a 100 m layer. Δz = 100 m is chosen so Δz² and Δz differ by 100x.
             atmos.layer_kc[i_bot]    = 0.026
             atmos.layer_ρ[i_bot]     = 1.16
             atmos.layer_cp[i_bot]    = 1005.0

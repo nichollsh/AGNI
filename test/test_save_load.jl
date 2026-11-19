@@ -217,7 +217,7 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
             # Discrimination guard: ensure optical depth is not flat
             @test abs(optdepth[1, end] - optdepth[1, 1]) > 1.0
 
-            # Timescale diagnostics are written per layer, in seconds, from their own buffers
+            # Timescale diagnostics are written per layer, in seconds, from own buffers
             for (key, arr) in (("timescale_rad",  atmos.timescale_rad),
                                ("timescale_conv", atmos.timescale_conv),
                                ("timescale_cond", atmos.timescale_cond))
