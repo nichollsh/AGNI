@@ -1252,6 +1252,7 @@ module solve_energy
         diagnostics.estimate_Ra!(atmos)
         diagnostics.estimate_timescale_conv!(atmos)
         diagnostics.estimate_timescale_rad!(atmos)
+        diagnostics.estimate_timescale_cond!(atmos)
         diagnostics.estimate_exobase!(atmos)
 
         # calc radius of photosphere, and correspondingly the bulk density of the planet

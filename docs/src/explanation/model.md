@@ -140,6 +140,25 @@ For bare-rock planets, or to determine a planet's surface temperature in the abs
 ### Exobase diagnostic
 AGNI estimates where the exobase, the level at which the collisional mean free path equals the pressure scale height, might exist within the modelled atmosphere. It calculates this based on the $n$ is the number density, $\bar{m}$ the mean particle mass, and $\sigma = \sum_j x_j \pi \sigma_j^2$ the mole-fraction-weighted hard-sphere cross-section from the Lennard-Jones collision diameters. If none of the layers reach this criterion, the exobase variables are set equal to the TOA values.
 
+### Energy-transport timescales
+After `solve_energy!` or `solve_prescribed!` has finished, AGNI estimates three timescales in each layer. These indicate how quickly radiation, convection and conduction would each act to remove a temperature perturbation. They are order-of-magnitude diagnostics which are not used by the solver, so they should be interpreted with care. They are written to the output NetCDF file as `timescale_rad`, `timescale_conv` and `timescale_cond`, in seconds. The transparent-atmosphere solver does not calculate them, so they are left at zero in that case.
+
+The radiative timescale is that of a layer of pressure thickness $\Delta p$ which is slightly out of radiative equilibrium and radiates to space as a blackbody [showman_circulation_2010](@citep),
+```math
+\tau_\text{rad} = \frac{\Delta p}{g} \, \frac{c_p}{4 \sigma T^3} .
+```
+This neglects the optical depth of the layer and of the atmosphere above it. In deep, optically thick regions, where radiative transport is diffusive, a diffusion time may be more appropriate [showman_circulation_2010](@citep).
+
+The convective timescale is $\tau_\text{conv} = \lambda / w$, using the mixing length and convective velocity from [Atmospheric convection](@ref). It is zero in layers which are stable against convection (where $w = 0$), which should not be read as instantaneous transport.
+
+The conductive timescale is the time for heat to diffuse across a layer of geometric thickness $\Delta z$,
+```math
+\tau_\text{cond} = \frac{\Delta z^2}{\kappa} = \frac{\rho \, c_p \, \Delta z^2}{k} ,
+```
+where $\kappa = k / (\rho c_p)$ is the thermal diffusivity and $k$ is the thermal conductivity of the gas mixture described in [Thermodynamics and EOS](@ref). It is calculated whether or not conduction is enabled in the energy balance, and is infinite where $k = 0$. By hydrostatic balance, $\Delta p = \rho g \Delta z$, so the ratio of the two timescales within a layer is $\tau_\text{cond}/\tau_\text{rad} = 4 \sigma T^3 \Delta z / k$.
+
+Since $\tau_\text{rad} \propto \Delta p$ and $\tau_\text{cond} \propto \Delta z^2$, both depend on the vertical resolution of the model, while $\tau_\text{conv}$ does not. Comparisons between models with different numbers of levels should account for this.
+
 ## Julia and Fortran
 
 AGNI is primarily written in Julia [julialang](@citep), while SOCRATES is written in Fortran. Julia's precompilation allows the SOCRATES Fortran binaries to be packaged inside the precompiled Julia code, which significantly improves startup performance.

@@ -63,6 +63,9 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
         arr_o_flN::Array{Float64,1} = zero(arr_e)
         arr_o_flC::Array{Float64,1} = zero(arr_e)
         arr_o_Kzz::Array{Float64,1} = zero(arr_e)
+        arr_o_trad  = zeros(Float64, cfg["execution"]["num_levels"])
+        arr_o_tconv = zeros(Float64, cfg["execution"]["num_levels"])
+        arr_o_tcond = zeros(Float64, cfg["execution"]["num_levels"])
 
         atol = Float64(cfg["execution"]["converge_atol"])
         rtol = 1e-3
@@ -80,11 +83,26 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
             arr_o_flN[:] .= ds["fl_N"][:]
             arr_o_flC[:] .= ds["fl_cnvct"][:]
             arr_o_Kzz[:] .= ds["Kzz"][:]
+            arr_o_trad[:]  .= ds["timescale_rad"][:]
+            arr_o_tconv[:] .= ds["timescale_conv"][:]
+            arr_o_tcond[:] .= ds["timescale_cond"][:]
 
             # close netcdf
             close(ds)
         end
         @debug "ALL DEBUG RESTORED"
+
+        # Timescale diagnostics: solve_energy! must fill them before the NetCDF is written,
+        #   rather than leaving the zero-initialised arrays from allocate!
+        @test all(isfinite.(arr_o_trad)) && all(arr_o_trad .> 0.0)
+        @test all(isfinite.(arr_o_tcond)) && all(arr_o_tcond .> 0.0)
+
+        # Convective timescale is zero in stable layers and positive where MLT is active;
+        #   this run has a convective region (non-zero fl_cnvct below)
+        @test all(arr_o_tconv .>= 0.0) && any(arr_o_tconv .> 0.0)
+
+        # Radiation outpaces gas conduction across these km-scale layers
+        @test all(arr_o_tcond .> arr_o_trad)
 
         # pressure profile
         @debug ("Pressure...")

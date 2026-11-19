@@ -406,6 +406,7 @@ module atmosphere
         # Diagnostic profiles
         timescale_conv::Array{Float64,1}    # Convective timescale [s]
         timescale_rad::Array{Float64,1}     # Radiative timescale [s]
+        timescale_cond::Array{Float64,1}    # Conductive timescale [s]
         diagnostic_Ra::Array{Float64,1}     # Rayleigh number at each layer
 
         # Exobase diagnostic (mean free path equals scale height)
@@ -2716,6 +2717,7 @@ module atmosphere
         atmos.heating_rate =      zeros(Float64, atmos.nlev_c)
         atmos.timescale_conv =    zeros(Float64, atmos.nlev_c)
         atmos.timescale_rad =     zeros(Float64, atmos.nlev_c)
+        atmos.timescale_cond =    zeros(Float64, atmos.nlev_c)
         atmos.diagnostic_Ra =     zeros(Float64, atmos.nlev_c)
 
         # RFM values will be overwritten at runtime
