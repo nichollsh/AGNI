@@ -74,8 +74,9 @@ julia --project test/runtests.jl phys
 ```
 
 ### Generate coverage
+Restrict coverage tracking to `src/`; plain `--code-coverage` also instruments every dependency and makes the tests many times slower.
 ```bash
-julia --project --code-coverage test/runtests.jl
+julia --project --code-coverage=@$PWD/src test/runtests.jl
 julia --project test/runcoverage.jl
 ```
 
