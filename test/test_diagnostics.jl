@@ -71,6 +71,176 @@ end
         @test atmos.tim_rt_eval > 0.0
     end
 
+    # Energy-transport timescale diagnostics (diagnostics.estimate_timescale_rad!,
+    #   diagnostics.estimate_timescale_cond!). Invariants checked: the radiative estimate
+    #   reproduces Showman, Cho & Menou (2010) Eq. 19; τ_rad ∝ T⁻³ and grows with Δp;
+    #   τ_cond ∝ Δz²; τ_cond/τ_rad = 4σT³Δz/k by hydrostatic balance; the zero-conductivity
+    #   limit returns +Inf rather than NaN or a negative time.
+    @testset "timescales" begin
+        σ_codata = 5.670374419e-8   # W m-2 K-4, written out rather than using phys.σSB
+
+        # The tests above overwrite cp, k and density with arbitrary values, so restore
+        #   physically consistent layer properties for the isothermal 400 K N2 column
+        setpt.isothermal!(atmos, 400.0)
+        atmosphere.calc_layer_props!(atmos)
+        pl_saved  = copy(atmos.pl)
+        tmp_saved = copy(atmos.tmp)
+        i_bot     = atmos.nlev_c
+
+        @testset "conductive_to_radiative_ratio" begin
+            # With Δp = ρ g Δz the heat capacity cancels in the ratio, leaving
+            #   τ_cond/τ_rad = 4σT³Δz/k. This links the two diagnostics through the
+            #   hydrostatic integrator rather than re-deriving either formula. The ρ, Δz
+            #   and Δp/g from the integrator agree to better than 1e-3 in every layer
+            diagnostics.estimate_timescale_rad!(atmos)
+            diagnostics.estimate_timescale_cond!(atmos)
+            ratio    = atmos.timescale_cond ./ atmos.timescale_rad
+            expected = 4 .* σ_codata .* atmos.tmp.^3 .* atmos.layer_thick ./ atmos.layer_kc
+            @test all(isapprox.(ratio, expected; rtol=1e-3))
+
+            # Gas conduction is far slower than blackbody cooling in every layer, from the
+            #   thin surface-refined bottom layer to the km-thick upper layers
+            @test all(ratio .> 1e3)
+
+            # Discrimination guard: a conductive time linear in Δz would shift the ratio by
+            #   a factor Δz (16 m to 9 km on this grid), failing the pin in every layer
+            ratio_wrong = (atmos.layer_ρ .* atmos.layer_cp .* atmos.layer_thick ./
+                            atmos.layer_kc) ./ atmos.timescale_rad
+            @test !any(isapprox.(ratio_wrong, expected; rtol=1e-3))
+        end
+
+        @testset "radiative_timescale_scales_mass" begin
+            # In an isothermal column with constant cp, τ_rad ∝ Δp/g (the layer's mass per
+            #   unit area), so τ_rad g/Δp is uniform even though Δp spans 7 decades
+            diagnostics.estimate_timescale_rad!(atmos)
+            dp     = atmos.pl[2:end] .- atmos.pl[1:end-1]
+            scaled = atmos.timescale_rad .* atmos.g ./ dp
+            @test all(isapprox.(scaled, scaled[1]; rtol=1e-12))
+            @test maximum(dp) / minimum(dp) > 1e5
+            @test all(isfinite.(atmos.timescale_rad)) && all(atmos.timescale_rad .> 0.0)
+
+            # Edge case: the grid is refined towards the surface, so the bottom layer has
+            #   higher p but smaller Δp than the one above. τ_rad must follow Δp, not p.
+            @test atmos.p[end] > atmos.p[end-1]
+            @test dp[end] < dp[end-1]
+            @test atmos.timescale_rad[end] < atmos.timescale_rad[end-1]
+        end
+
+        @testset "radiative_timescale_scales_temperature" begin
+            # Doubling T at fixed cp, Δp and g must shorten τ_rad by exactly 2³ = 8.
+            #   Layer properties are not recomputed, so cp stays fixed.
+            diagnostics.estimate_timescale_rad!(atmos)
+            τ_ref = copy(atmos.timescale_rad)
+            atmos.tmp .*= 2.0
+            diagnostics.estimate_timescale_rad!(atmos)
+            ratio = τ_ref ./ atmos.timescale_rad
+            @test all(isapprox.(ratio, 8.0; rtol=1e-10))
+
+            # Discrimination guard: a σT⁴-based formula would give a ratio of 16
+            @test all(abs.(ratio .- 16.0) .> 1.0)
+            atmos.tmp .= tmp_saved
+        end
+
+        @testset "radiative_timescale_reproduces_terrestrial" begin
+            # Showman, Cho & Menou (2010) Eq. 19 and the text that follows it: a 0.2 bar
+            #   layer at 300 K on an Earth-like planet (cp = 1000 J/kg/K, g = 9.81 m/s2)
+            #   relaxes on a timescale comparable to an advection time of ~3 days.
+            #   The bottom layer is used because it can hold Δp = 2e4 Pa below 10 bar.
+            g_saved  = copy(atmos.g)
+            cp_saved = copy(atmos.layer_cp)
+            atmos.pl[i_bot]       = atmos.pl[i_bot+1] - 2.0e4
+            atmos.g[i_bot]        = 9.81
+            atmos.tmp[i_bot]      = 300.0
+            atmos.layer_cp[i_bot] = 1000.0
+            diagnostics.estimate_timescale_rad!(atmos)
+            τ_rad = atmos.timescale_rad[i_bot]
+
+            # Hand-calculated: 2e4/9.81 * 1000 / (4 σ 300³) = 3.3291e5 s = 3.85 days
+            @test isapprox(τ_rad, 3.329090e5; rtol=1e-5)
+            @test 1.0 * 86400.0 < τ_rad < 10.0 * 86400.0
+
+            # Discrimination guard: dropping the factor 4 gives 1.33e6 s, and using σT⁴ in
+            #   place of 4σT³ gives 4.4e3 s; both lie far outside the tolerance
+            @test !isapprox(τ_rad, 1.331636e6; rtol=0.1)
+            @test !isapprox(τ_rad, 4.438786e3; rtol=0.1)
+
+            atmos.g        .= g_saved
+            atmos.layer_cp .= cp_saved
+            atmos.pl       .= pl_saved
+            atmos.tmp      .= tmp_saved
+        end
+
+        @testset "conductive_timescale_matches_diffusion" begin
+            # Air near 1 bar and 300 K (k = 0.026 W/m/K, ρ = 1.16 kg/m3, cp = 1005 J/kg/K)
+            #   across a 100 m layer. Δz = 100 m is chosen so Δz² and Δz differ by 100x.
+            atmos.layer_kc[i_bot]    = 0.026
+            atmos.layer_ρ[i_bot]     = 1.16
+            atmos.layer_cp[i_bot]    = 1005.0
+            atmos.layer_thick[i_bot] = 100.0
+            diagnostics.estimate_timescale_cond!(atmos)
+            τ_cond = atmos.timescale_cond[i_bot]
+
+            # Hand-calculated: 1.16 * 1005 * 100² / 0.026 = 4.4838e8 s, about 14 years
+            @test isapprox(τ_cond, 4.483846e8; rtol=1e-5)
+
+            # Discrimination guard: a timescale linear in Δz would give 4.5e6 s
+            @test !isapprox(τ_cond, 4.483846e6; rtol=0.1)
+
+            # Doubling the thickness quadruples the diffusion time (linear would double it)
+            atmos.layer_thick[i_bot] = 200.0
+            diagnostics.estimate_timescale_cond!(atmos)
+            @test isapprox(atmos.timescale_cond[i_bot] / τ_cond, 4.0; rtol=1e-10)
+        end
+
+        @testset "conductive_timescale_is_infinite" begin
+            # Error contract: zero conductivity is the no-conduction limit and gives +Inf.
+            #   Negative or NaN conductivity is invalid input and gives NaN, the "not
+            #   computed" value, rather than a believable Inf or a negative time.
+            atmosphere.calc_layer_props!(atmos)
+            atmos.layer_kc[1] = 0.0
+            atmos.layer_kc[2] = -1.0
+            atmos.layer_kc[3] = NaN
+            diagnostics.estimate_timescale_cond!(atmos)
+            @test isinf(atmos.timescale_cond[1]) && atmos.timescale_cond[1] > 0.0
+            @test isnan(atmos.timescale_cond[2])
+            @test isnan(atmos.timescale_cond[3])
+
+            # Layers with physical conductivity are unaffected: finite and positive
+            @test all(isfinite.(atmos.timescale_cond[4:end]))
+            @test all(atmos.timescale_cond[4:end] .> 0.0)
+        end
+
+        @testset "convective_timescale_is_zero" begin
+            # Contract: τ_conv = λ/w is positive and finite at convective edges, and exactly
+            #   zero where MLT finds the profile stable (w = λ = 0). The profile is
+            #   superadiabatic (∇ = 0.4 > ∇_ad ≈ 0.29 for N2) below ~1.8 bar and isothermal
+            #   at 200 K above, so both regimes are present in one column.
+            prof(p) = max(400.0 * (p / atmos.pl[end])^0.4, 200.0)
+            atmos.tmp  .= prof.(atmos.p)
+            atmos.tmpl .= prof.(atmos.pl)
+            atmosphere.calc_layer_props!(atmos)
+            energy.convection!(atmos)
+            diagnostics.estimate_timescale_conv!(atmos)
+            conv = atmos.mask_c[1:atmos.nlev_c]
+            @test any(conv) && !all(conv)   # guard: both regimes are exercised
+            @test all(isfinite.(atmos.timescale_conv[conv]))
+            @test all(atmos.timescale_conv[conv] .> 0.0)
+            @test all(isapprox.(atmos.timescale_conv[.!conv], 0.0; atol=1e-300))
+
+            # Edge case: a vanishing velocity with a non-zero mixing length is floored at
+            #   eps(Float32), giving a large but finite time rather than Inf or NaN
+            atmos.λ_conv[1] = 100.0
+            atmos.w_conv[1] = 1e-12
+            diagnostics.estimate_timescale_conv!(atmos)
+            @test isapprox(atmos.timescale_conv[1], 100.0 / eps(Float32); rtol=1e-12)
+
+            setpt.isothermal!(atmos, 400.0)
+        end
+
+        # Leave the shared atmosphere in a consistent state for the tests below
+        atmosphere.calc_layer_props!(atmos)
+    end
+
     @testset "energy_utils_safe" begin
         # test handling NaN and Inf in energy fluxes
         arr = [1.0, Inf, NaN, -Inf]

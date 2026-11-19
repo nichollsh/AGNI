@@ -63,6 +63,9 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
         arr_o_flN::Array{Float64,1} = zero(arr_e)
         arr_o_flC::Array{Float64,1} = zero(arr_e)
         arr_o_Kzz::Array{Float64,1} = zero(arr_e)
+        arr_o_trad  = zeros(Float64, cfg["execution"]["num_levels"])
+        arr_o_tconv = zeros(Float64, cfg["execution"]["num_levels"])
+        arr_o_tcond = zeros(Float64, cfg["execution"]["num_levels"])
 
         atol = Float64(cfg["execution"]["converge_atol"])
         rtol = 1e-3
@@ -80,11 +83,26 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
             arr_o_flN[:] .= ds["fl_N"][:]
             arr_o_flC[:] .= ds["fl_cnvct"][:]
             arr_o_Kzz[:] .= ds["Kzz"][:]
+            arr_o_trad[:]  .= ds["timescale_rad"][:]
+            arr_o_tconv[:] .= ds["timescale_conv"][:]
+            arr_o_tcond[:] .= ds["timescale_cond"][:]
 
             # close netcdf
             close(ds)
         end
         @debug "ALL DEBUG RESTORED"
+
+        # Timescale diagnostics: solve_energy! must fill them before the NetCDF is written,
+        #   rather than leaving the zero-initialised arrays from allocate!
+        @test all(isfinite.(arr_o_trad)) && all(arr_o_trad .> 0.0)
+        @test all(isfinite.(arr_o_tcond)) && all(arr_o_tcond .> 0.0)
+
+        # Convective timescale is zero in stable layers and positive where MLT is active;
+        #   this run has a convective region (non-zero fl_cnvct below)
+        @test all(arr_o_tconv .>= 0.0) && any(arr_o_tconv .> 0.0)
+
+        # Radiation outpaces gas conduction across these km-scale layers
+        @test all(arr_o_tcond .> arr_o_trad)
 
         # pressure profile
         @debug ("Pressure...")
@@ -108,6 +126,11 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
         @test test_check
 
         # temperature profile
+        #   Only levels at p > 100 Pa are compared. Higher up, the solution with the cold
+        #   trap enabled is ill-conditioned: a 1e-12 relative change in instellation moves
+        #   T there by up to ~10 K, so results differ between platforms (Linux, macOS)
+        #   from round-off alone. At p > 100 Pa, platforms and perturbed runs agree to
+        #   better than 0.03 K, well within the tolerance.
         @debug ("Temperature...")
         arr_e[:] .= [155.25706240280056, 173.61267755731294, 181.36013894399753,
             169.87193667989538, 173.244579367712, 183.05430483539325, 180.67213846315002,
@@ -122,7 +145,10 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
             626.6160022732711, 644.5066550716222, 659.4307983760089, 671.3034729896871,
             681.788790444665, 691.3839768784753, 700.941560974456, 714.0905357688986,
             723.2971493397218, 723.4022847030413]
-        test_check = all(abs.(arr_e[:] .- arr_o_tmp[:]) .< abs.(arr_e[:].*rtol) .+ 0.5)
+        mask_T = arr_o_prs .> 100.0
+        @test count(mask_T) > 20   # guard: the deep atmosphere is still compared
+        test_check = all(abs.(arr_e[mask_T] .- arr_o_tmp[mask_T]) .<
+                            abs.(arr_e[mask_T].*rtol) .+ 0.5)
         if !test_check
             @error ("Fail 'tmp' \n Observed: $(arr_o_tmp) \n Expected: $(arr_e)")
         end
@@ -165,6 +191,10 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
         @test test_check
 
         # eddy diffusion coefficients
+        #   Only levels at p > 3000 Pa are compared. Above the main convective zone, Kzz is
+        #   extended upwards from the highest convective layer, which depends on whether a
+        #   thin convective layer forms in the ill-conditioned upper atmosphere (see the
+        #   temperature check above). This changes Kzz down to ~400 Pa between platforms.
         @debug ("Kzz...")
         arr_e[:] .= [26047.1151219131, 20589.3675244423, 16275.2018053592,
                     12864.9990579224, 10169.3486040735, 6581.61713940047, 6581.61713940047,
@@ -179,7 +209,10 @@ CONFIG_PATH     = joinpath(TEST_DIR,"test.toml")
                     14644.7517065071, 14644.7517065071, 14644.7517065071, 14644.7517065071,
                     14644.7517065071, 14644.7517065071, 14644.7517065071, 14644.7517065071,
                     14644.7517065071, 14644.7517065071 ]
-        test_check = all(abs.(arr_e[:] .- arr_o_Kzz[:]) .< abs.(arr_e[:].*rtol) .+ 1e4)
+        mask_K = arr_o_prs .> 3000.0
+        @test count(mask_K) > 15   # guard: the convective zone and below are still compared
+        test_check = all(abs.(arr_e[mask_K] .- arr_o_Kzz[mask_K]) .<
+                            abs.(arr_e[mask_K].*rtol) .+ 1e4)
         if !test_check
             @error ("Fail 'Kzz' \n Observed: $(arr_o_Kzz) \n Expected: $(arr_e)")
         end

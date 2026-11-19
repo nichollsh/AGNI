@@ -73,14 +73,25 @@ module diagnostics
     """
     **Estimate a diagnostic radiative timescale in each layer.**
 
-    This quantity must be taken lightly.
+    Time for a layer of pressure thickness `Δp`, slightly out of radiative equilibrium,
+    to relax by radiating to space as a blackbody:
+
+    `τ_rad = (Δp / g) c_p / (4 σ T³)`
+
+    This is an order-of-magnitude estimate, so it must be taken lightly. It neglects the
+    optical depth of the layer and of the overlying atmosphere. It scales with `Δp`, so
+    it depends on the vertical resolution of the model. Values are stored in
+    `atmos.timescale_rad` [s].
+
+    - Showman, Cho & Menou (2010), "Atmospheric Circulation of Exoplanets", in
+      Exoplanets (ed. S. Seager), University of Arizona Press, pp. 471-516; Eq. 19.
 
     Arguments:
     - `atmos::Atmos_t`      the atmosphere struct instance to be used.
     """
     function estimate_timescale_rad!(atmos::atmosphere.Atmos_t)
 
-        # Equation 10.1 from Seager textbook
+        # Showman, Cho & Menou (2010), Eq. 19
         @inbounds for i in 1:atmos.nlev_c
             atmos.timescale_rad[i] = atmos.layer_cp[i] * (atmos.pl[i+1] - atmos.pl[i]) /
                                      (atmos.g[i] * 4 * phys.σSB * atmos.tmp[i]^3)
@@ -101,6 +112,47 @@ module diagnostics
 
         @inbounds for i in 1:atmos.nlev_c
             atmos.timescale_conv[i] = atmos.λ_conv[i] / max(atmos.w_conv[i], eps(Float32))
+        end
+
+        return nothing
+    end
+
+    """
+    **Estimate a diagnostic conductive timescale in each layer.**
+
+    Time for thermal conduction to diffuse heat across a layer of geometric thickness
+    `Δz`, given by the diffusion time
+
+    `τ_cond = Δz² / κ = ρ c_p Δz² / k`
+
+    where `κ = k / (ρ c_p)` is the thermal diffusivity and `k` is the thermal
+    conductivity of the gas mixture. It is calculated regardless of whether conduction
+    is enabled in the energy balance. It scales with `Δz²`, so it depends on the vertical
+    resolution of the model. Values are stored in `atmos.timescale_cond` [s].
+
+    Where `k = 0` there is no conduction, so the timescale is `Inf`. Where `k` is
+    negative or NaN the timescale cannot be computed, so it is set to NaN, which is the
+    "not computed" value used for all of the timescale diagnostics.
+
+    This is an order-of-magnitude estimate, so it must be taken lightly.
+
+    Arguments:
+    - `atmos::Atmos_t`      the atmosphere struct instance to be used.
+    """
+    function estimate_timescale_cond!(atmos::atmosphere.Atmos_t)
+
+        # Diffusion time across the layer thickness. Zero conductivity is the
+        #   no-conduction limit (Inf); negative or NaN conductivity is invalid input,
+        #   which gives NaN ("not computed") rather than a believable value.
+        @inbounds for i in 1:atmos.nlev_c
+            if atmos.layer_kc[i] > 0.0
+                atmos.timescale_cond[i] = atmos.layer_ρ[i] * atmos.layer_cp[i] *
+                                            atmos.layer_thick[i]^2 / atmos.layer_kc[i]
+            elseif iszero(atmos.layer_kc[i])
+                atmos.timescale_cond[i] = Inf
+            else
+                atmos.timescale_cond[i] = NaN
+            end
         end
 
         return nothing

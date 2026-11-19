@@ -41,6 +41,20 @@ end
     @test all(atmos.tmp .≈ atmos.tmp_surf)
     @test all(atmos.tmpl .≈ atmos.tmp_surf)
 
+    # solve_prescribed! fills the timescale diagnostics, which are NaN until computed.
+    #   The isothermal column is stable everywhere, so τ_conv is exactly zero, while τ_rad
+    #   and τ_cond are finite and obey τ_cond/τ_rad = 4σT³Δz/k (hydrostatic balance).
+    @test all(isfinite.(atmos.timescale_rad)) && all(atmos.timescale_rad .> 0.0)
+    @test all(isfinite.(atmos.timescale_cond)) && all(atmos.timescale_cond .> 0.0)
+    @test all(isapprox.(atmos.timescale_conv, 0.0; atol=1e-300))
+
+    # The identity assumes constant g within a layer, so its error is bounded by the
+    #   relative change of g across each layer (~3e-3 in the thick top layer at 700 K)
+    dev  = (atmos.timescale_cond ./ atmos.timescale_rad) ./
+           (4 .* 5.670374419e-8 .* atmos.tmp.^3 .* atmos.layer_thick ./ atmos.layer_kc) .- 1
+    dg_g = (atmos.gl[2:end] .- atmos.gl[1:end-1]) ./ atmos.g
+    @test all(abs.(dev) .< dg_g)
+
     atmosphere.deallocate!(atmos)
 
     # sol_type=2: conductive skin-flux boundary condition. Solver should find a Tsurf

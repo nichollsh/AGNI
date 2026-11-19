@@ -130,7 +130,9 @@ jobs:
           export RAD_DIR="$HOME/work/AGNI/AGNI/SOCRATES"
           export FC_DIR="$HOME/work/AGNI/AGNI/fastchem"
           export LD_LIBRARY_PATH=""
-          julia --project --code-coverage test/runtests.jl
+          # Track coverage of AGNI's own source only. Plain --code-coverage instruments every
+          # dependency as well, which made the test suite many times slower.
+          julia --project --code-coverage=@$PWD/src test/runtests.jl
 
       # Get coverage when running on linux
       - name: Get coverage

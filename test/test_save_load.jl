@@ -143,6 +143,15 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
             atmos.tau_r[ba] = atmos.rl[2] * (1.0 + 0.01 * ba)
         end
 
+        # Seed the timescale diagnostics with non-overlapping ranges, so a swapped buffer
+        #   would fail the pins below; one Inf represents the zero-conductivity limit and
+        #   one NaN represents the "not computed" value
+        atmos.timescale_conv .= range(3.0e3, 5.0e3, length=atmos.nlev_c)
+        atmos.timescale_rad  .= range(1.0e5, 1.0e6, length=atmos.nlev_c)
+        atmos.timescale_cond .= range(1.0e9, 1.0e12, length=atmos.nlev_c)
+        atmos.timescale_cond[1] = Inf
+        atmos.timescale_rad[1]  = NaN
+
         # Write NetCDF
         result = AGNI.save.write_ncdf(atmos, nc_file)
 
@@ -207,6 +216,27 @@ nc_file = joinpath(OUT_DIR, "test_atmos.nc")
 
             # Discrimination guard: ensure optical depth is not flat
             @test abs(optdepth[1, end] - optdepth[1, 1]) > 1.0
+
+            # Timescale diagnostics are written per layer, in seconds, from own buffers
+            for (key, arr) in (("timescale_rad",  atmos.timescale_rad),
+                               ("timescale_conv", atmos.timescale_conv),
+                               ("timescale_cond", atmos.timescale_cond))
+                @test haskey(ds, key)
+                @test ds[key].attrib["units"] == "s"
+                vals = Float64.(ds[key][:])
+                @test length(vals) == atmos.nlev_c
+                @test all(isapprox.(vals[2:end], arr[2:end]; rtol=1e-12))
+            end
+
+            # Edge cases: the zero-conductivity Inf survives the round trip as +Inf, and the
+            #   "not computed" NaN survives as NaN rather than becoming a fill value
+            @test isinf(ds["timescale_cond"][1]) && ds["timescale_cond"][1] > 0.0
+            @test isnan(ds["timescale_rad"][1])
+
+            # Discrimination guard: the seeded ranges do not overlap, so the pins above
+            #   could not pass if two variables were written from the same buffer
+            @test minimum(ds["timescale_rad"][2:end]) > maximum(ds["timescale_conv"][:])
+            @test minimum(ds["timescale_cond"][2:end]) > maximum(ds["timescale_rad"][2:end])
         end
     end
 
