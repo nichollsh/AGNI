@@ -6,6 +6,13 @@ Functions from `atmosphere.jl`.
 Modules = [AGNI.atmosphere]
 ```
 
+## Diagnostics
+Functions from `diagnostics.jl`, which estimate the convective zone, Rayleigh number,
+energy-transport timescales and exobase level after a solve.
+```@autodocs
+Modules = [AGNI.diagnostics]
+```
+
 ## Energy flux calculations
 Functions from `energy.jl`.
 ```@autodocs
