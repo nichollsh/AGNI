@@ -87,16 +87,16 @@ end
         tmp_saved = copy(atmos.tmp)
         i_bot     = atmos.nlev_c
 
-        @testset "conductive_to_radiative_ratio_follows_from_hydrostatic_balance" begin
+        @testset "conductive_to_radiative_ratio" begin
             # With Δp = ρ g Δz the heat capacity cancels in the ratio, leaving
             #   τ_cond/τ_rad = 4σT³Δz/k. This links the two diagnostics through the
             #   hydrostatic integrator rather than re-deriving either formula. The ρ, Δz
-            #   and Δp/g from the integrator agree to ~1e-4 here; 2e-3 leaves margin.
+            #   and Δp/g from the integrator agree to better than 1e-3 in every layer
             diagnostics.estimate_timescale_rad!(atmos)
             diagnostics.estimate_timescale_cond!(atmos)
             ratio    = atmos.timescale_cond ./ atmos.timescale_rad
             expected = 4 .* σ_codata .* atmos.tmp.^3 .* atmos.layer_thick ./ atmos.layer_kc
-            @test all(isapprox.(ratio, expected; rtol=2e-3))
+            @test all(isapprox.(ratio, expected; rtol=1e-3))
 
             # Gas conduction is far slower than blackbody cooling in every layer, from the
             #   thin surface-refined bottom layer to the km-thick upper layers
@@ -106,10 +106,10 @@ end
             #   a factor Δz (16 m to 9 km on this grid), failing the pin in every layer
             ratio_wrong = (atmos.layer_ρ .* atmos.layer_cp .* atmos.layer_thick ./
                             atmos.layer_kc) ./ atmos.timescale_rad
-            @test !any(isapprox.(ratio_wrong, expected; rtol=2e-3))
+            @test !any(isapprox.(ratio_wrong, expected; rtol=1e-3))
         end
 
-        @testset "radiative_timescale_scales_with_layer_column_mass" begin
+        @testset "radiative_timescale_scales_mass" begin
             # In an isothermal column with constant cp, τ_rad ∝ Δp/g (the layer's mass per
             #   unit area), so τ_rad g/Δp is uniform even though Δp spans 7 decades
             diagnostics.estimate_timescale_rad!(atmos)
@@ -126,7 +126,7 @@ end
             @test atmos.timescale_rad[end] < atmos.timescale_rad[end-1]
         end
 
-        @testset "radiative_timescale_scales_as_inverse_cube_of_temperature" begin
+        @testset "radiative_timescale_scales_temperature" begin
             # Doubling T at fixed cp, Δp and g must shorten τ_rad by exactly 2³ = 8.
             #   Layer properties are not recomputed, so cp stays fixed.
             diagnostics.estimate_timescale_rad!(atmos)
@@ -141,7 +141,7 @@ end
             atmos.tmp .= tmp_saved
         end
 
-        @testset "radiative_timescale_reproduces_showman_terrestrial_estimate" begin
+        @testset "radiative_timescale_reproduces_terrestrial" begin
             # Showman, Cho & Menou (2010) Eq. 19 and the text that follows it: a 0.2 bar
             #   layer at 300 K on an Earth-like planet (cp = 1000 J/kg/K, g = 9.81 m/s2)
             #   relaxes on a timescale comparable to an advection time of ~3 days.
@@ -170,7 +170,7 @@ end
             atmos.tmp      .= tmp_saved
         end
 
-        @testset "conductive_timescale_matches_diffusion_time_and_scales_with_thickness_squared" begin
+        @testset "conductive_timescale_matches_diffusion" begin
             # Air near 1 bar and 300 K (k = 0.026 W/m/K, ρ = 1.16 kg/m3, cp = 1005 J/kg/K)
             #   across a 100 m layer. Δz = 100 m is chosen so that Δz² and Δz differ by 100x.
             atmos.layer_kc[i_bot]    = 0.026
@@ -192,20 +192,49 @@ end
             @test isapprox(atmos.timescale_cond[i_bot] / τ_cond, 4.0; rtol=1e-10)
         end
 
-        @testset "conductive_timescale_is_infinite_without_conductivity" begin
-            # Error contract: zero conductivity is the no-conduction limit and must give +Inf;
-            #   an unphysical negative conductivity must not produce a negative or NaN time.
+        @testset "conductive_timescale_is_infinite" begin
+            # Error contract: zero conductivity is the no-conduction limit and gives +Inf.
+            #   Negative or NaN conductivity is invalid input and gives NaN, the "not
+            #   computed" value, rather than a believable Inf or a negative time.
             atmosphere.calc_layer_props!(atmos)
             atmos.layer_kc[1] = 0.0
             atmos.layer_kc[2] = -1.0
+            atmos.layer_kc[3] = NaN
             diagnostics.estimate_timescale_cond!(atmos)
             @test isinf(atmos.timescale_cond[1]) && atmos.timescale_cond[1] > 0.0
-            @test isinf(atmos.timescale_cond[2]) && atmos.timescale_cond[2] > 0.0
-            @test !any(isnan.(atmos.timescale_cond))
+            @test isnan(atmos.timescale_cond[2])
+            @test isnan(atmos.timescale_cond[3])
 
             # Layers with physical conductivity are unaffected: finite and positive
-            @test all(isfinite.(atmos.timescale_cond[3:end]))
-            @test all(atmos.timescale_cond[3:end] .> 0.0)
+            @test all(isfinite.(atmos.timescale_cond[4:end]))
+            @test all(atmos.timescale_cond[4:end] .> 0.0)
+        end
+
+        @testset "convective_timescale_is_zero" begin
+            # Contract: τ_conv = λ/w is positive and finite at convective edges, and exactly
+            #   zero where MLT finds the profile stable (w = λ = 0). The profile is
+            #   superadiabatic (∇ = 0.4 > ∇_ad ≈ 0.29 for N2) below ~1.8 bar and isothermal
+            #   at 200 K above, so both regimes are present in one column.
+            prof(p) = max(400.0 * (p / atmos.pl[end])^0.4, 200.0)
+            atmos.tmp  .= prof.(atmos.p)
+            atmos.tmpl .= prof.(atmos.pl)
+            atmosphere.calc_layer_props!(atmos)
+            energy.convection!(atmos)
+            diagnostics.estimate_timescale_conv!(atmos)
+            conv = atmos.mask_c[1:atmos.nlev_c]
+            @test any(conv) && !all(conv)   # guard: both regimes are exercised
+            @test all(isfinite.(atmos.timescale_conv[conv]))
+            @test all(atmos.timescale_conv[conv] .> 0.0)
+            @test all(isapprox.(atmos.timescale_conv[.!conv], 0.0; atol=1e-300))
+
+            # Edge case: a vanishing velocity with a non-zero mixing length is floored at
+            #   eps(Float32), giving a large but finite time rather than Inf or NaN
+            atmos.λ_conv[1] = 100.0
+            atmos.w_conv[1] = 1e-12
+            diagnostics.estimate_timescale_conv!(atmos)
+            @test isapprox(atmos.timescale_conv[1], 100.0 / eps(Float32); rtol=1e-12)
+
+            setpt.isothermal!(atmos, 400.0)
         end
 
         # Leave the shared atmosphere in a consistent state for the tests below

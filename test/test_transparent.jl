@@ -50,6 +50,12 @@ end
     F_skin = energy.skin_flux(atmos)
     @test isapprox(atmos.flux_tot[1], F_skin; rtol=1e-2, atol=0.5)
 
+    # Not-computed convention: the transparent solver does not estimate the timescale
+    #   diagnostics, so they keep the NaN value set by allocate! rather than reading as 0
+    @test all(isnan.(atmos.timescale_rad))
+    @test all(isnan.(atmos.timescale_conv))
+    @test all(isnan.(atmos.timescale_cond))
+
     # try with type=3 and check converges
     atmosphere.make_transparent!(atmos)
     atmos.flux_int = 1200.0
